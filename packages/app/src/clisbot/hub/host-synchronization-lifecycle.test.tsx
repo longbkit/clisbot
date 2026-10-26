@@ -7,9 +7,11 @@ import { HubHostSynchronization } from "./host-synchronization";
 const adapters = vi.hoisted(() => ({
   slug: "sandbox",
   register: vi.fn(() => vi.fn()),
-  restart: vi.fn(async () => undefined),
+  adopt: vi.fn(async () => undefined),
   upsert: vi.fn(async () => ({ serverId: "server" })),
   remove: vi.fn(async () => true),
+  listError: null as { status: number } | null,
+  refetch: vi.fn(async (_options?: { cancelRefetch?: boolean }) => undefined),
   hosts: [
     {
       serverId: "server",
@@ -39,6 +41,8 @@ vi.mock("@/data/query", () => ({
         },
       ],
     },
+    error: adapters.listError,
+    refetch: adapters.refetch,
   }),
 }));
 vi.mock("./account-provider", () => {
@@ -60,7 +64,7 @@ vi.mock("@/runtime/host-runtime", () => ({
   getHostRuntimeStore: () => ({
     getHosts: () => adapters.hosts,
     upsertManagedConnectionFromOffer: adapters.upsert,
-    restartHostConnection: adapters.restart,
+    adoptHostConnection: adapters.adopt,
     removeManagedHost: adapters.remove,
   }),
   useHosts: () => adapters.hosts,
@@ -69,6 +73,9 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   adapters.slug = "sandbox";
+  adapters.listError = null;
+  adapters.refetch.mockReset();
+  adapters.refetch.mockImplementation(async () => undefined);
   adapters.hosts = [
     {
       serverId: "server",
@@ -83,8 +90,9 @@ afterEach(() => {
 });
 it("syncs a renamed daemon without replacing its ticket resolver or reconnecting", async () => {
   vi.stubGlobal("React", React);
+  adapters.adopt.mockClear();
   const view = render(<HubHostSynchronization />);
-  await waitFor(() => expect(adapters.restart).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(adapters.adopt).toHaveBeenCalledTimes(1));
   expect(adapters.register).toHaveBeenCalledTimes(1);
   adapters.slug = "build-studio";
   view.rerender(<HubHostSynchronization />);
@@ -96,7 +104,7 @@ it("syncs a renamed daemon without replacing its ticket resolver or reconnecting
       }),
     ),
   );
-  expect(adapters.restart).toHaveBeenCalledTimes(1);
+  expect(adapters.adopt).toHaveBeenCalledTimes(1);
   expect(adapters.register).toHaveBeenCalledTimes(1);
 });
 
@@ -136,13 +144,14 @@ it("evicts a Hub-managed Host whose daemon is no longer projected", async () => 
   );
 });
 
-it("reconnects a saved Host when Hub management is attached to it", async () => {
+it("adopts a saved Host when Hub management is attached to it", async () => {
   vi.stubGlobal("React", React);
-  adapters.restart.mockClear();
+  adapters.adopt.mockClear();
   adapters.hosts = [{ serverId: "server" }] as typeof adapters.hosts;
   render(<HubHostSynchronization />);
   await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
-  await waitFor(() => expect(adapters.restart).toHaveBeenCalledWith("server"));
+  await waitFor(() => expect(adapters.adopt).toHaveBeenCalledWith("server"));
+  expect(adapters.register).toHaveBeenCalled();
 });
 
 it("adds a Host back when it leaves the registry while the Hub still lists its daemon", async () => {
@@ -161,4 +170,66 @@ it("adds a Host back when it leaves the registry while the Hub still lists its d
   expect(adapters.upsert).toHaveBeenLastCalledWith(
     expect.objectContaining({ offer: expect.objectContaining({ serverId: "server" }) }),
   );
+});
+
+it("waits for the Hub to accept the account again before adding a refused Host back", async () => {
+  vi.stubGlobal("React", React);
+  const view = render(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
+  const upserts = adapters.upsert.mock.calls.length;
+
+  // The sign-in expired: the ticket was refused and the Host removed; the list read answers 401.
+  adapters.hosts = [];
+  view.rerender(<HubHostSynchronization />);
+  expect(adapters.refetch).toHaveBeenCalledTimes(1);
+  // Joins a read already in flight instead of cancelling it.
+  expect(adapters.refetch).toHaveBeenCalledWith({ cancelRefetch: false });
+  adapters.listError = { status: 401 };
+  view.rerender(<HubHostSynchronization />);
+  await new Promise((resolve) => setTimeout(resolve, 1_500));
+  expect(adapters.upsert.mock.calls.length).toBe(upserts);
+
+  // Signed in again: the list loads and the Host comes back.
+  adapters.listError = null;
+  view.rerender(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert.mock.calls.length).toBeGreaterThan(upserts), {
+    timeout: 3_000,
+  });
+});
+
+it("keeps adding a Host back while the Hub is only unreachable", async () => {
+  vi.stubGlobal("React", React);
+  const view = render(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
+  const upserts = adapters.upsert.mock.calls.length;
+  adapters.listError = { status: 503 };
+  adapters.hosts = [];
+  view.rerender(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert.mock.calls.length).toBeGreaterThan(upserts), {
+    timeout: 3_000,
+  });
+});
+
+it("waits for the list read a removal started before adding the Host back", async () => {
+  vi.stubGlobal("React", React);
+  let answerList: () => void = () => undefined;
+  adapters.refetch.mockImplementation(
+    () => new Promise<undefined>((resolve) => (answerList = () => resolve(undefined))),
+  );
+  const view = render(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
+  const upserts = adapters.upsert.mock.calls.length;
+
+  adapters.hosts = [];
+  view.rerender(<HubHostSynchronization />);
+  expect(adapters.refetch).toHaveBeenCalledTimes(1);
+  // Past the base wait, the read has not answered: the Host stays out.
+  await new Promise((resolve) => setTimeout(resolve, 1_500));
+  expect(adapters.upsert.mock.calls.length).toBe(upserts);
+
+  answerList();
+  await waitFor(() => expect(adapters.upsert.mock.calls.length).toBeGreaterThan(upserts), {
+    timeout: 3_000,
+  });
+  expect(adapters.refetch).toHaveBeenCalledTimes(1);
 });

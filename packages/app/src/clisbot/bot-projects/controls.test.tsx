@@ -4,6 +4,12 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { BotProjectsToggle } from "./controls";
 import { useBotProjectsPreference } from "./preferences";
+const flags = vi.hoisted(() => ({ navigationV2: false }));
+vi.mock("@/clisbot/navigation/feature", () => ({
+  get NAVIGATION_V2_ENABLED() {
+    return flags.navigationV2;
+  },
+}));
 vi.mock("react-native-unistyles", () => ({
   withUnistyles: (component: unknown) => component,
 }));
@@ -32,6 +38,7 @@ vi.mock("@/components/ui/menu", () => ({
 }));
 beforeEach(() => {
   vi.stubGlobal("React", React);
+  flags.navigationV2 = false;
   useBotProjectsPreference.setState({ showBotProjects: true });
 });
 afterEach(cleanup);

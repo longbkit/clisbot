@@ -8,7 +8,7 @@ import { SearchField } from "@/components/ui/search-field";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { settingsStyles } from "@/styles/settings";
-import { FilterChips } from "../hub/settings/filter-chips";
+import { FilterChips } from "@/components/ui/filter-chips";
 import { tableStyles } from "../hub/settings/table-styles";
 import { ConnectorLogo, serverLogoKey } from "./connector-logo";
 import { APP_STATE_LABELS, APP_STATE_VARIANTS, type ConnectorFilter } from "./model";

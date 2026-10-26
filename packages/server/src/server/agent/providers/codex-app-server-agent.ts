@@ -108,6 +108,7 @@ import {
   resolveBinaryVersion,
 } from "./diagnostic-utils.js";
 import { appendOrReplaceGrowingAssistantMessage, runProviderTurn } from "./provider-runner.js";
+import { createProviderTurnId } from "./provider-turn-id.js";
 import {
   MODE_APPLIES_NEXT_TURN_NOTICE,
   THINKING_APPLIES_NEXT_TURN_NOTICE,
@@ -5481,9 +5482,7 @@ export class CodexAppServerAgentSession implements AgentSession {
   }
 
   private createTurnId(): string {
-    // A resumed provider session shares the agent's durable delivery ledger.
-    // Process-local ordinals would reuse a turn already delivered before restart.
-    return `codex-turn-${randomUUID()}`;
+    return createProviderTurnId("codex");
   }
 
   private handleNotification(method: string, params: unknown): void {

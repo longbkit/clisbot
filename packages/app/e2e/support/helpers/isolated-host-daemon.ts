@@ -229,7 +229,8 @@ export async function startIsolatedHostDaemon(
       closed = true;
       await killProcessTree(child);
       if (!options.preserveHome) {
-        await rm(clisbotHome, { recursive: true, force: true });
+        // A killed daemon's last writes can still land while the tree is removed (ENOTEMPTY).
+        await rm(clisbotHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
       }
       if (publishedPackageRoot) {
         await rm(publishedPackageRoot, { recursive: true, force: true });

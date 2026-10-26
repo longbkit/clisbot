@@ -1,3 +1,4 @@
+import { i18n } from "@/i18n/i18next";
 import { useCallback, useLayoutEffect, useMemo } from "react";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -10,18 +11,24 @@ import { findHighlightRanges } from "@/components/ui/highlighted-text-segments";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { activityBucket, isUnreadReply } from "./activity";
 import { traceInstant } from "@/performance/native-trace";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import {
+  FLAT_ROW_FILL_INSET,
+  SIDEBAR_TWO_LINE_ROW_HEIGHT,
+  sidebarLeadingColumnWidth,
+} from "@/components/sidebar/row-geometry";
 
 /** Why a conversation sits in Needs you, in the words the row shows. */
 export function activityStatus(
   agent: AggregatedAgent,
 ): { label: string; variant: StatusBadgeVariant } | null {
-  if (agent.archivedAt) return { label: "Archived", variant: "muted" };
+  if (agent.archivedAt) return { label: i18n.t("home.activity.status.archived"), variant: "muted" };
   if (activityBucket(agent) !== "needs") return null;
   if ((agent.pendingPermissionCount ?? 0) > 0 || agent.attentionReason === "permission")
-    return { label: "Needs approval", variant: "warning" };
+    return { label: i18n.t("home.activity.status.needsApproval"), variant: "warning" };
   if (agent.status === "error" || agent.attentionReason === "error")
-    return { label: "Failed", variant: "error" };
-  return { label: "Needs you", variant: "warning" };
+    return { label: i18n.t("home.activity.status.failed"), variant: "error" };
+  return { label: i18n.t("home.activity.status.needsYou"), variant: "warning" };
 }
 
 /**
@@ -83,13 +90,13 @@ export function ActivityRow({
       accessibilityRole="button"
       testID={`agent-row-${agent.serverId}-${agent.id}`}
     >
-      <View style={styles.leading}>
+      <View style={[styles.leading, NAVIGATION_V2_ENABLED && styles.leadingV2]}>
         <ProviderGlyph provider={agent.provider} serverId={agent.serverId} />
       </View>
       <View style={styles.content}>
         <View style={styles.titleRow}>
           {isUnreadReply(agent) ? (
-            <View style={styles.unread} accessibilityLabel="Unread reply" />
+            <View style={styles.unread} accessibilityLabel={t("home.activity.unreadReply")} />
           ) : null}
           <HighlightedText
             text={title}
@@ -132,9 +139,9 @@ export function heldActivityStatus(
   if (!homeBucket) return null;
   const current = activityBucket(agent);
   if (current === "active" && homeBucket !== "active")
-    return { label: "Running", variant: "muted" };
+    return { label: i18n.t("home.activity.status.running"), variant: "muted" };
   if (current === "recent" && (homeBucket === "active" || homeBucket === "needs"))
-    return { label: "Finished", variant: "muted" };
+    return { label: i18n.t("home.activity.status.finished"), variant: "muted" };
   return null;
 }
 
@@ -159,6 +166,7 @@ const ProviderGlyph = withUnistyles(ProviderGlyphIcon, (theme) => ({
 
 const rowStyle = ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
   styles.row,
+  NAVIGATION_V2_ENABLED && styles.rowV2,
   hovered && styles.rowHovered,
   pressed && styles.rowPressed,
 ];
@@ -172,9 +180,18 @@ const styles = StyleSheet.create((t) => ({
     paddingHorizontal: t.spacing[3],
     borderRadius: t.borderRadius.lg,
   },
+  // Navigation V2: the Chats and Workspace rows' rails, so the title sits where theirs do.
+  // The feed's 12px padding is the controls' inset; the fill pulls out to `FLAT_ROW_FILL_INSET`.
+  rowV2: {
+    gap: t.spacing[2],
+    minHeight: SIDEBAR_TWO_LINE_ROW_HEIGHT,
+    marginHorizontal: FLAT_ROW_FILL_INSET - t.spacing[3],
+    paddingHorizontal: t.spacing[3] - FLAT_ROW_FILL_INSET,
+  },
   rowHovered: { backgroundColor: t.colors.surface1 },
   rowPressed: { backgroundColor: t.colors.surface2 },
   leading: { width: t.iconSize.sm, alignItems: "center" },
+  leadingV2: { width: sidebarLeadingColumnWidth(t) },
   content: { flex: 1, minWidth: 0 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: t.spacing[1.5] },
   title: { color: t.colors.foreground, fontSize: t.fontSize.base, flexShrink: 1 },

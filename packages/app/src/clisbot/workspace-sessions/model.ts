@@ -1,4 +1,6 @@
 import { useCallback, useMemo } from "react";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import type { WorkspaceSessionFilter } from "./session-filter";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useAppSettings, type AppSettings } from "@/hooks/use-settings";
@@ -48,7 +50,10 @@ interface WorkspaceRef {
 
 /** The one read of the preference; storage always fills it, so there is no fallback to apply. */
 export function useSidebarWorkspaceSessions(): SidebarWorkspaceSessions {
-  return useAppSettings().settings.sidebarWorkspaceSessions;
+  const stored = useAppSettings().settings.sidebarWorkspaceSessions;
+  // Navigation V2 orders by last update and has no Active filter; the stored choice belongs to
+  // the Home V2 sidebar until the flag goes (docs/features/navigation-v2/README.md#flag-removal).
+  return NAVIGATION_V2_ENABLED && stored.activeOnly ? { ...stored, activeOnly: false } : stored;
 }
 
 export interface WorkspaceSessionsPreferences extends SidebarWorkspaceSessions {
@@ -177,6 +182,7 @@ export function useWorkspaceSessions(input: {
   workspaceId: string;
   activeOnly: boolean;
   keepAgentIds: ReadonlySet<string>;
+  include?: (session: WorkspaceSessionItem) => boolean;
 }): WorkspaceSessionItem[] {
   const source = useSessionStore(
     useShallow((state) => {
@@ -193,8 +199,9 @@ export function useWorkspaceSessions(input: {
         workspaceId: input.workspaceId,
         activeOnly: input.activeOnly,
         keepAgentIds: input.keepAgentIds,
+        include: input.include,
       }),
-    [source, input.workspaceId, input.activeOnly, input.keepAgentIds],
+    [source, input.workspaceId, input.activeOnly, input.keepAgentIds, input.include],
   );
 }
 
@@ -285,6 +292,7 @@ export function useGroupedSidebarView(input: {
   groupMode: SidebarGroupMode;
   pinnedCollapsed: boolean;
   collapsedWorkspaceGroupKeys: ReadonlySet<string>;
+  sessionFilter?: WorkspaceSessionFilter | null;
 }): { workspaceGroups: StatusDisplayGroup[]; shortcutModel: SidebarShortcutModel } {
   const { visible, activeOnly } = useSidebarWorkspaceSessions();
   const sessionsShown = visible && listsSessions(input.groupMode);
@@ -294,6 +302,7 @@ export function useGroupedSidebarView(input: {
     sessionsShown,
     byStatus: input.groupMode === "status",
     activeOnly,
+    sessionFilter: input.sessionFilter ?? null,
   });
   const shortcutModel = useMemo(
     () =>
@@ -319,8 +328,9 @@ function useDisplayGroups(input: {
   sessionsShown: boolean;
   byStatus: boolean;
   activeOnly: boolean;
+  sessionFilter: WorkspaceSessionFilter | null;
 }): StatusDisplayGroup[] {
-  const { groups, sessionsShown, byStatus, activeOnly } = input;
+  const { groups, sessionsShown, byStatus, activeOnly, sessionFilter } = input;
   const { t } = useTranslation();
   const keepAgentIds = useOpenWorkspaceShownAgentIds(sessionsShown && activeOnly);
   const serverIds = useMemo(
@@ -341,8 +351,17 @@ function useDisplayGroups(input: {
       const messageSubmissions = submissionMaps[index];
       if (agents && messageSubmissions) sources.set(serverId, { agents, messageSubmissions });
     });
-    return sessionDisplayGroups({ groups, sources, activeOnly, keepAgentIds, byStatus, t });
+    return sessionDisplayGroups({
+      groups,
+      sources,
+      activeOnly,
+      keepAgentIds,
+      sessionFilter,
+      byStatus,
+      t,
+    });
   }, [
+    sessionFilter,
     sessionsShown,
     byStatus,
     activeOnly,

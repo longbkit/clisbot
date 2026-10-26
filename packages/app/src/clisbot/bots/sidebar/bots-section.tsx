@@ -146,7 +146,9 @@ export const BotRow = memo(function BotRow({
   selected,
   onPress,
   onOpenMenu,
+  pinned = false,
 }: {
+  pinned?: boolean;
   bot: BotsSidebarBot;
   selected: boolean;
   onPress: (bot: BotsSidebarBot) => void;
@@ -184,6 +186,7 @@ export const BotRow = memo(function BotRow({
       onPress={handlePress}
       onOpenMenu={onOpenMenu ? handleOpenMenu : undefined}
       menuLabel={t("bots.workspace.sidebar.botOptions")}
+      pinned={pinned}
     />
   );
 });

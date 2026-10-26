@@ -1,4 +1,5 @@
 import { useCallback, useMemo, type ComponentType, type ReactElement } from "react";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { withUnistyles } from "react-native-unistyles";
 import {
   ChevronsDownUp,
@@ -126,15 +127,18 @@ function WorkspaceSessionsPage(): ReactElement {
         />
       ))}
       <MenuSeparator />
-      <MenuItem
-        selected={preferences.activeOnly}
-        leading={activeOnlyLeading}
-        closeOnSelect={false}
-        onSelect={preferences.toggleActiveOnly}
-        testID="sidebar-workspace-sessions-active-only"
-      >
-        Active sessions only
-      </MenuItem>
+      {/* Navigation V2 orders by last update and has no Active filter. */}
+      {NAVIGATION_V2_ENABLED ? null : (
+        <MenuItem
+          selected={preferences.activeOnly}
+          leading={activeOnlyLeading}
+          closeOnSelect={false}
+          onSelect={preferences.toggleActiveOnly}
+          testID="sidebar-workspace-sessions-active-only"
+        >
+          Active sessions only
+        </MenuItem>
+      )}
       <MenuItem
         selected={preferences.fullTitles}
         leading={fullTitlesLeading}

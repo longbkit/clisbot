@@ -41,9 +41,9 @@ import {
   relayToolCall,
   toolActivityLine,
   type ToolActivity,
-  type ToolActivityTurn,
   type ToolLineWriter,
 } from "./tool-activity.js";
+import { dropClosedScopes, newTurnState, subagentTurnKey, type TurnState } from "./turn-state.js";
 
 export { appendThreadLink } from "./text.js";
 
@@ -120,36 +120,6 @@ export function replyLocationFor(context: StreamContext): {
   };
 }
 
-interface TurnState extends ToolActivityTurn {
-  /**
-   * The in-flight assistant message's text. A logical assistant message reaches
-   * the relay as several coalesced `assistant_message` items sharing one
-   * `messageId` (the daemon coalesces the stream on a 60ms window and flushes
-   * early on terminal tool calls); the items of one message are concatenated
-   * with `""` (never a newline) so the message is reassembled whole rather than
-   * split by blank lines mid-word.
-   */
-  pendingAssistantText: string;
-  /** The `messageId` of the in-flight assistant message (undefined = none open). */
-  pendingAssistantMessageId: string | undefined;
-  /** Message ids already closed and posted before a terminal tool event. */
-  postedAssistantMessageIds: Set<string>;
-  /** Exact assistant payloads already closed in this turn (guards id drift/replay). */
-  postedAssistantTexts: Set<string>;
-  /**
-   * Ledger sequence counter for this turn's ANSWER posts, in order. Status
-   * lines count in their own space (`nextToolSequence`) under their own ledger
-   * turn id: how many of them went out depends on the clock, and the answer's
-   * ledger key must not move with it — a shifted key is a second post of the
-   * same answer after a replay.
-   */
-  nextSequence: number;
-  /** Ledger sequence counter for this turn's tool lines. */
-  nextToolSequence: number;
-  /** True once the turn closed (no further relay posts for it). */
-  closed: boolean;
-}
-
 interface RelayContext {
   organizationId: string;
   logger: PlaneLogger;
@@ -203,8 +173,19 @@ export class RelayEngine {
     this.relay = relay;
   }
 
-  /** Register (or re-register after restart) an agent's stream context. */
+  /**
+   * Register an agent's stream context, or swap it in for an agent already
+   * attached. A re-attach (every follow-up, a steer into the running turn
+   * included) keeps the scopes still running: their sequence counters, the
+   * pending message and what they posted (`turn-state.ts`, #40).
+   */
   attach(context: StreamContext): RelayStream {
+    const attached = this.streams.get(context.agentId);
+    if (attached !== undefined) {
+      dropClosedScopes(attached.turns, attached.subagentLabels);
+      attached.context = context;
+      return attached;
+    }
     const stream: RelayStream = {
       context,
       subagentLabels: new Map(),
@@ -279,7 +260,7 @@ export class RelayEngine {
         if (event.label !== null) stream.subagentLabels.set(event.subagentId, event.label);
         return;
       case "timeline": {
-        const key = this.subagentTurnKey(event.subagentId);
+        const key = subagentTurnKey(event.subagentId);
         await this.onTimeline(
           stream,
           key,
@@ -294,7 +275,7 @@ export class RelayEngine {
         // message is posted, and nothing more posts for it. `finalAnswer`
         // stays false: the session-link final post is the root turn's, never
         // a subagent's.
-        const key = this.subagentTurnKey(event.subagentId);
+        const key = subagentTurnKey(event.subagentId);
         const turn = stream.turns.get(key);
         if (turn !== undefined) turn.closed = true;
         await this.postAssistantMessage(
@@ -310,16 +291,6 @@ export class RelayEngine {
   }
 
   // --- Event handlers ------------------------------------------------------
-
-  /**
-   * The subagent scope's turn key: `sub:<subagentId>`. The subagent id is a
-   * per-spawn UUID, stable across wire replays, so root and subagent ledger
-   * keys never collide and a replayed subagent scope dedupes against its own
-   * earlier posts.
-   */
-  private subagentTurnKey(subagentId: string): string {
-    return `sub:${subagentId}`;
-  }
 
   /** The subagent post prefix (`▶ {label} (subagent):`), from the upsert label. */
   private subagentPrefix(stream: RelayStream, subagentId: string): string {
@@ -459,7 +430,12 @@ export class RelayEngine {
     // Files leave through the `message` tool's media params (channel-reply.ts),
     // never through a text parse of the answer: local-file Markdown is only
     // rewritten to what the channel can show (`media/local-embeds.ts`).
-    await this.post(stream, key, turn, caption, finalAnswer, "assistant", transport);
+    await this.post(stream, key, turn, caption, {
+      finalAnswer,
+      outputKind: "assistant",
+      messageId,
+      transport,
+    });
   }
 
   /**
@@ -495,7 +471,8 @@ export class RelayEngine {
   private toolLineWriter(stream: RelayStream, key: string, turn: TurnState): ToolLineWriter {
     return {
       canEdit: this.relay.editPost !== undefined,
-      post: async (line) => await this.post(stream, key, turn, line, false, "tool"),
+      post: async (line) =>
+        await this.post(stream, key, turn, line, { finalAnswer: false, outputKind: "tool" }),
       edit: async (externalMessageId, line) =>
         await this.editPosted(stream, externalMessageId, line),
     };
@@ -580,7 +557,8 @@ export class RelayEngine {
     const fallback = toolTurnFallback(deliveries, finalText);
     if (fallback === undefined) return;
     const shown = rewriteLocalEmbeds(fallback, { delivered: new Set(deliveries.media) });
-    if (shown.trim() !== "") await this.post(stream, turnId, turn, shown, true, "assistant");
+    if (shown.trim() === "") return;
+    await this.post(stream, turnId, turn, shown, { finalAnswer: true, outputKind: "assistant" });
   }
 
   /**
@@ -613,7 +591,10 @@ export class RelayEngine {
     if (!failed || !owesFailureNotice(stream.context.route.defaults.outbound.path, deliveries)) {
       return;
     }
-    await this.post(stream, event.turnId, turn, failureNotice(event.error), true, "assistant");
+    await this.post(stream, event.turnId, turn, failureNotice(event.error), {
+      finalAnswer: true,
+      outputKind: "assistant",
+    });
   }
 
   /** On `hybrid`, text the tool already posted this turn is not relayed again. */
@@ -644,17 +625,10 @@ export class RelayEngine {
     turnId: string,
     turn: TurnState,
     text: string,
-    finalAnswer: boolean,
-    outputKind: OutputKind,
-    transport?: StreamingFinalizeTransport | undefined,
+    options: RelayPostOptions,
   ): Promise<RelayPostOutcome> {
     const context = stream.context;
-    // One post per recorded sequence, in order; the final answer is the turn's
-    // last ANSWER post. Status lines count in their own space, so the answer's
-    // key does not move with how many of them the clock let through.
-    const sequence = outputKind === "assistant" ? turn.nextSequence : turn.nextToolSequence;
-    if (outputKind === "assistant") turn.nextSequence += 1;
-    else turn.nextToolSequence += 1;
+    const { finalAnswer, outputKind, messageId } = options;
     return await deliverRelayPost(this.relay, {
       context,
       key: {
@@ -662,8 +636,13 @@ export class RelayEngine {
         accountId: context.accountId,
         externalConversationId: context.externalConversationId,
         externalThreadId: context.externalThreadId,
-        eventTurnId: ledgerTurnId(context.deliveryScopeId ?? context.agentId, turnId, outputKind),
-        sequence,
+        eventTurnId: ledgerTurnId(
+          context.deliveryScopeId ?? context.agentId,
+          turnId,
+          outputKind,
+          messageId,
+        ),
+        sequence: nextLedgerSequence(turn, outputKind, messageId),
       },
       location: replyLocationFor(context),
       text: appendThreadLink(
@@ -674,29 +653,45 @@ export class RelayEngine {
         context.agentId,
       ),
       outputKind,
-      transport,
+      transport: options.transport,
     });
   }
 
   private turn(stream: RelayStream, turnId: string): TurnState {
     let turn = stream.turns.get(turnId);
     if (turn === undefined) {
-      turn = {
-        pendingAssistantText: "",
-        pendingAssistantMessageId: undefined,
-        postedAssistantMessageIds: new Set(),
-        postedAssistantTexts: new Set(),
-        toolLines: new Map(),
-        liveToolCall: undefined,
-        lastToolPostAt: null,
-        nextSequence: 0,
-        nextToolSequence: 0,
-        closed: false,
-      };
+      turn = newTurnState();
       stream.turns.set(turnId, turn);
     }
     return turn;
   }
+}
+
+interface RelayPostOptions {
+  /** The scope's last answer post: the threadLink `final-only` target. */
+  finalAnswer: boolean;
+  outputKind: OutputKind;
+  /** The provider's id of the answer message, when it has one: the ledger key. */
+  messageId?: string | undefined;
+  transport?: StreamingFinalizeTransport | undefined;
+}
+
+/**
+ * The ledger sequence of one post. An answer message with an id is keyed by
+ * that id (`ledgerTurnId`) at sequence 0, so a replay finds its row and a later
+ * message never lands on it, whatever the relay remembers. The rest are
+ * numbered in order: answers without an id in one space, status lines in their
+ * own, so the answer's key does not move with how many of them the clock let
+ * through.
+ */
+function nextLedgerSequence(
+  turn: TurnState,
+  outputKind: OutputKind,
+  messageId: string | undefined,
+): number {
+  if (outputKind !== "assistant") return turn.nextToolSequence++;
+  if (messageId !== undefined) return 0;
+  return turn.nextSequence++;
 }
 
 // Media is sent only through the Hub's `message` MCP tool (`attachments`/`media`/`buffer`).

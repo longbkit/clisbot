@@ -126,6 +126,15 @@ import { createPerformanceTrace } from "@/performance/native-trace";
 import { revokePushNotifications } from "@/push-notifications";
 import { createAppWebSocketFactory } from "./websocket-factory";
 import { selectReceiveCodec } from "./encrypted-receive";
+import {
+  type BackoffPolicy,
+  ConnectLimiter,
+  DEFAULT_BACKOFF_POLICY,
+  MAX_CONCURRENT_HOST_CONNECTS,
+  RECONNECT_MAX_DELAY_MS,
+  ReconnectBackoff,
+} from "./connection-backoff";
+import { type NetworkReachability, subscribeNetworkReachability } from "./network-reachability";
 
 export type HostRuntimeConnectionStatus = "idle" | "connecting" | "online" | "offline" | "error";
 export type PairingNavigationTarget = "openProject" | "hostRoot" | "hostSettings";
@@ -316,6 +325,10 @@ export interface HostRuntimeControllerDeps {
     host: HostProfile;
     connection: HostConnection;
   }) => () => void;
+  /** Bounds connect attempts across Hosts; the store shares one, a lone controller owns one. */
+  connectLimiter?: ConnectLimiter;
+  /** Pacing of retries for a Host that is not online. */
+  backoffPolicy?: BackoffPolicy;
 }
 
 export interface HostRuntimeStorage extends ProviderCacheStorage {
@@ -711,6 +724,7 @@ function createDefaultDeps(
             }
           : {}),
         suppressSendErrors: true,
+        reconnect: { maxDelayMs: RECONNECT_MAX_DELAY_MS, jitter: "full" },
         clientId,
         clientType: "mobile",
         appVersion: resolveAppVersion() ?? undefined,
@@ -893,6 +907,8 @@ export class HostRuntimeController {
   private unsubscribeAdmission: (() => void) | null = null;
   private admissionAttemptFailed = false;
   private admissionRevoked = false;
+  private readonly reconnectBackoff: ReconnectBackoff;
+  private readonly connectLimiter: ConnectLimiter;
 
   constructor(input: {
     host: HostProfile;
@@ -904,6 +920,12 @@ export class HostRuntimeController {
     this.deps = input.deps ?? createDefaultDeps();
     this.onReconcileServerId = input.onReconcileServerId ?? null;
     this.onRelayProtectedSecurityNegotiated = input.onRelayProtectedSecurityNegotiated ?? null;
+    this.reconnectBackoff = new ReconnectBackoff(
+      this.deps.backoffPolicy ?? DEFAULT_BACKOFF_POLICY,
+      () => Date.now(),
+    );
+    this.connectLimiter =
+      this.deps.connectLimiter ?? new ConnectLimiter(MAX_CONCURRENT_HOST_CONNECTS);
     this.connectionMachineState = {
       tag: "booting",
     };
@@ -942,6 +964,7 @@ export class HostRuntimeController {
       return;
     }
     this.started = true;
+    this.reconnectBackoff.reset();
     const advertised = hostAdvertisedConnections(this.host.serverId);
     if (advertised !== undefined) this.advertisedConnections = advertised;
     this.admissionBindingRegistered = hostRequiresSessionAdmission(this.host.serverId);
@@ -963,7 +986,7 @@ export class HostRuntimeController {
     }
     if (options?.autoProbe !== false) {
       this.probeIntervalHandle = setInterval(() => {
-        void this.runProbeCycleNow();
+        void this.runScheduledProbeCycle();
       }, PROBE_TICK_MS);
     }
   }
@@ -1043,6 +1066,7 @@ export class HostRuntimeController {
       this.activeClient?.relaySecurityFloor !== "protected";
     const activeConnectionId = this.snapshot.activeConnectionId;
     const previousActiveConnection = findConnectionById(this.host, activeConnectionId);
+    this.resetBackoffForChangedRoutes(host);
     this.host = host;
     this.trackConnectionFirstSeen();
     const nextActiveConnection = findConnectionById(this.host, activeConnectionId);
@@ -1082,12 +1106,40 @@ export class HostRuntimeController {
     await this.runProbeCycleNow();
   }
 
+  /**
+   * The device's network came back: an online Host verifies its socket, any other Host drops
+   * its remaining backoff and tries now. Admission and probe connects still take a shared slot.
+   */
+  retryAfterNetworkChange(): void {
+    if (this.snapshot.connectionStatus === "online") {
+      this.activeClient?.verifyConnection();
+      return;
+    }
+    if (this.usesSessionAdmission() || !this.activeClient) {
+      void this.runProbeCycleNow();
+      return;
+    }
+    this.activeClient.ensureConnected();
+  }
+
+  /** The device lost its network: probe live sockets now so they report offline promptly. */
+  verifyIfOnline(): void {
+    if (this.snapshot.connectionStatus === "online") this.activeClient?.verifyConnection();
+  }
+
+  /** A changed route is new information, not another failure of the old one. */
+  private resetBackoffForChangedRoutes(next: HostProfile): void {
+    if (!equal(this.host.connections, next.connections)) this.reconnectBackoff.reset();
+  }
+
   ensureConnected(options?: { verify?: boolean }): void {
     if (this.host.management || hostRequiresSessionAdmission(this.host.serverId)) {
       if (this.snapshot.connectionStatus === "online") {
         if (options?.verify) this.activeClient?.verifyConnection();
       } else {
-        void this.runProbeCycleNow();
+        // Foreground/network nudges verify live sockets fast; an offline source keeps its
+        // backoff, or a hundred unreachable sandboxes would all reconnect at once.
+        void this.runScheduledProbeCycle();
       }
       return;
     }
@@ -1168,7 +1220,14 @@ export class HostRuntimeController {
     await this.switchToConnection(input);
   }
 
+  /** An explicit attempt (user Retry, new route or authority): skips the remaining backoff. */
   async runProbeCycleNow(): Promise<void> {
+    this.reconnectBackoff.reset();
+    return this.runScheduledProbeCycle();
+  }
+
+  /** The periodic tick; a Host that is not online is attempted only when its backoff is due. */
+  private async runScheduledProbeCycle(): Promise<void> {
     if (this.probeCycleInFlight) {
       return this.probeCycleInFlight;
     }
@@ -1403,10 +1462,9 @@ export class HostRuntimeController {
             if (activeClient) {
               connectedClient = activeClient;
             } else {
-              const { client, serverId } = await this.deps.connectToDaemon({
-                host: this.host,
-                connection,
-              });
+              const { client, serverId } = await this.connectLimiter.run(() =>
+                this.deps.connectToDaemon({ host: this.host, connection }),
+              );
               if (serverId !== this.host.serverId) {
                 if (isPlaceholderServerId(this.host.serverId) && this.onReconcileServerId) {
                   this.onReconcileServerId(this.host.serverId, serverId);
@@ -1510,6 +1568,27 @@ export class HostRuntimeController {
       }
       return;
     }
+    // Hub-managed Hosts own their retries here (their clients do not auto-reconnect), so an
+    // unreachable sandbox waits out a jittered backoff instead of minting a session every tick.
+    if (!this.reconnectBackoff.isDue()) return;
+    await this.tryAdmissionCandidates(requestVersion, localConnectionId);
+    if (!this.isCurrentProbeRequest(requestVersion)) return;
+    if (this.snapshot.connectionStatus === "online") {
+      this.reconnectBackoff.reset();
+      return;
+    }
+    const delayMs = this.reconnectBackoff.recordFailure();
+    recordHostDiagnostic("host-reconnect-backoff", {
+      serverId: this.host.serverId,
+      failures: this.reconnectBackoff.failureCount,
+      delayMs,
+    });
+  }
+
+  private async tryAdmissionCandidates(
+    requestVersion: number,
+    localConnectionId: string | null,
+  ): Promise<void> {
     for (const connection of this.sessionAdmissionCandidates(localConnectionId)) {
       if (!this.isCurrentProbeRequest(requestVersion)) return;
       await this.switchToConnection({
@@ -1813,7 +1892,7 @@ export class HostRuntimeController {
       }
     };
     try {
-      if (!existingClient) await client.connect();
+      if (!existingClient) await this.connectClient(client, requestVersion);
       if (!this.isCurrentSwitchRequest(requestVersion) || this.activeClient !== client) return;
       this.unsubscribeClientHandlers =
         this.deps.mountClientHandlers?.({ client, host: this.host, connection }) ?? null;
@@ -1823,7 +1902,10 @@ export class HostRuntimeController {
           void failConnection(new DaemonAuthenticationError(client.authFailureReason));
           return;
         }
-        if (state.status === "connected") this.learnRelaySecurity(client, connection.id);
+        if (state.status === "connected") {
+          this.reconnectBackoff.reset();
+          this.learnRelaySecurity(client, connection.id);
+        }
         this.applyConnectionEvent({ type: "client_state", state, lastError: client.lastError });
         this.updateSnapshot({
           ...toSnapshotConnectionPatch(this.connectionMachineState, this.connectionEpoch),
@@ -1835,6 +1917,30 @@ export class HostRuntimeController {
     } catch (error) {
       await failConnection(error);
     }
+  }
+
+  /**
+   * An admission client does not auto-retry, so its connect settles (or times out) and may hold
+   * one of the shared connect slots. A self-retrying client's connect can stay pending across
+   * retries, so it is never gated here.
+   */
+  private async connectClient(client: DaemonClient, requestVersion: number): Promise<void> {
+    if (!this.usesSessionAdmission()) {
+      await client.connect();
+      return;
+    }
+    const release = await this.connectLimiter.acquire();
+    try {
+      // Stopped or superseded while queued: the caller closes the client and returns.
+      if (!this.isCurrentSwitchRequest(requestVersion) || this.activeClient !== client) return;
+      await client.connect();
+    } finally {
+      release();
+    }
+  }
+
+  private usesSessionAdmission(): boolean {
+    return Boolean(this.host.management) || hostRequiresSessionAdmission(this.host.serverId);
   }
 
   // The active client is the one place every connection path meets: clients
@@ -1999,7 +2105,7 @@ export class HostRuntimeStore {
     replicaRowStore?: ReplicaRowStore;
     revokePushNotifications?: typeof revokePushNotifications;
   }) {
-    this.deps =
+    const deps =
       input?.deps ??
       createDefaultDeps(
         (management) => {
@@ -2007,6 +2113,11 @@ export class HostRuntimeStore {
         },
         (serverId) => this.getClient(serverId),
       );
+    // Every controller of this store shares one connect budget.
+    this.deps = {
+      ...deps,
+      connectLimiter: deps.connectLimiter ?? new ConnectLimiter(MAX_CONCURRENT_HOST_CONNECTS),
+    };
     this.storage = input?.storage ?? AsyncStorage;
     this.replicaCache = new ReplicaCache(input?.replicaRowStore ?? createReplicaRowStore());
     this.revokePushNotifications = input?.revokePushNotifications ?? revokePushNotifications;
@@ -3343,6 +3454,28 @@ export class HostRuntimeStore {
     await controller.start();
   }
 
+  /**
+   * Take over a Host for a newly mounted owner (a Hub binding) without tearing down what is
+   * already working. An online or connecting controller is kept: registering the binding has
+   * already re-run admission if it changed anything. Anything else gets one immediate attempt.
+   */
+  async adoptHostConnection(serverId: string): Promise<void> {
+    const controller = this.controllers.get(serverId);
+    if (controller === undefined) return;
+    const status = controller.getSnapshot().connectionStatus;
+    if (status === "online" || status === "connecting") return;
+    await controller.runProbeCycleNow();
+  }
+
+  /** OS network changes (web and Electron; native relies on foreground for now). */
+  handleNetworkChange(state: NetworkReachability): void {
+    recordHostDiagnostic("network-change", { state });
+    for (const controller of this.controllers.values()) {
+      if (state === "online") controller.retryAfterNetworkChange();
+      else controller.verifyIfOnline();
+    }
+  }
+
   setAppVisible(visible: boolean): void {
     // Keep normal reconnect backoff running while hidden, for as long as the OS
     // lets us execute. Foregrounding bypasses that backoff without closing healthy sockets.
@@ -3482,9 +3615,12 @@ export function getHostRuntimeStore(): HostRuntimeStore {
     return existing;
   }
 
-  singletonHostRuntimeStore = new HostRuntimeStore();
-  Reflect.set(globalThis, HOST_RUNTIME_STORE_GLOBAL_KEY, singletonHostRuntimeStore);
-  return singletonHostRuntimeStore;
+  const store = new HostRuntimeStore();
+  singletonHostRuntimeStore = store;
+  Reflect.set(globalThis, HOST_RUNTIME_STORE_GLOBAL_KEY, store);
+  // The app store lives for the process; it follows OS network changes where the platform has them.
+  subscribeNetworkReachability((state) => store.handleNetworkChange(state));
+  return store;
 }
 
 export function getHostRuntimeConnectionStatusSince(serverId: string): number | null {

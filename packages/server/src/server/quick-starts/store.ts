@@ -181,8 +181,15 @@ function isOnlyUnpublish(old: QuickStart | undefined, input: QuickStartInput) {
       target: input.target,
       startingPrompt: input.startingPrompt,
       agent: input.agent,
+      autoSend: input.autoSend ?? false,
     },
-    { name: old.name, target: old.target, startingPrompt: old.startingPrompt, agent: old.agent },
+    {
+      name: old.name,
+      target: old.target,
+      startingPrompt: old.startingPrompt,
+      agent: old.agent,
+      autoSend: old.autoSend ?? false,
+    },
   );
 }
 function pruneOtherPins(preferences: State["preferences"], item: QuickStart) {

@@ -6,7 +6,7 @@ import { SettingsSection } from "@/components/settings/headings/settings-section
 import { Alert } from "@/components/ui/alert";
 import { SearchField } from "@/components/ui/search-field";
 import { settingsStyles } from "@/styles/settings";
-import { FilterChips, type FilterChip } from "../filter-chips";
+import { FilterChips, type FilterChip } from "@/components/ui/filter-chips";
 import { EmptyRow } from "../resource-rows";
 import { InvitationRow } from "./invitation-row";
 import { filterInvitations, invitationState, type InvitationFilter } from "./invitation-status";

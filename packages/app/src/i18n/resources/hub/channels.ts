@@ -5972,7 +5972,7 @@ const vi: HubChannelsCopy = {
       characters: "ký tự",
       seconds: "giây",
     },
-    note: "Để trống thì dùng mặc định. Tin nhắn được xử lý là tin nhắn bắt đầu hoặc tiếp tục công việc. Khi vượt giới hạn, tin nhắn và lượt chạy sẽ chờ đến lượt; tin nhắn dài hơn sẽ bị từ chối, lượt chạy lâu hơn sẽ bị dừng.",
+    note: "Để trống thì dùng mặc định. Tin nhắn được xử lý là tin nhắn bắt đầu hoặc tiếp tục một phiên. Khi vượt giới hạn, tin nhắn và lượt chạy sẽ chờ đến lượt; tin nhắn dài hơn sẽ bị từ chối, lượt chạy lâu hơn sẽ bị dừng.",
     positiveWhole: "{{label}}: dùng số nguyên dương.",
     summaryOff: "{{label}}: tắt",
     summaryValue: "{{label}}: {{value}}",

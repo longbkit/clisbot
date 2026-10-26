@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import { i18n } from "@/i18n/i18next";
 import { identityCoversConnection } from "../../channel-identity-directory";
 import type { IdentityRealm } from "../channel-identity-link-realms";
-import type { FilterChip } from "../filter-chips";
+import type { FilterChip } from "@/components/ui/filter-chips";
 import { matchesSearch } from "../search-text";
 import { needsTeam } from "./team-membership";
 import type { HubIdentity, HubMember, HubTeam } from "./types";

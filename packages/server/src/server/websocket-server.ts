@@ -2488,6 +2488,7 @@ export class VoiceAssistantWebSocketServer {
       features: {
         localWeb: localWebAvailable(this.daemonRuntimeConfig, () => session.canStartLocalHub()),
         quickStarts: true,
+        quickStartAutoSend: true,
         quickChat: session.canUseQuickChat(),
         ...buildDeviceAccessServerFeatures({
           localHubStartStatus,

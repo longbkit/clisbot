@@ -99,6 +99,20 @@ describe("buildBotSearchContributions", () => {
     expect(input.openChat).toHaveBeenCalledWith("h1", "g1");
   });
 
+  it("tells Chats what is opening before it opens, so a hidden chat can be noticed", () => {
+    const order: string[] = [];
+    const input = source({
+      openBot: vi.fn(() => order.push("open-bot")),
+      openChat: vi.fn(() => order.push("open-chat")),
+      willOpenBot: vi.fn((opened) => order.push(`will-bot:${opened.id}`)),
+      willOpenChat: vi.fn((opened) => order.push(`will-chat:${opened.id}`)),
+    });
+    const [legal, , room] = buildBotSearchContributions(input);
+    void legal!.run();
+    void room!.run();
+    expect(order).toEqual(["will-bot:legal", "open-bot", "will-chat:g1", "open-chat"]);
+  });
+
   it("names the Host only with several, and offers each creation only when it can happen", () => {
     const rows = buildBotSearchContributions(source({ multipleHosts: true, canCreateBot: false }));
     expect(rows.map((row) => row.id)).not.toContain("new-bot");

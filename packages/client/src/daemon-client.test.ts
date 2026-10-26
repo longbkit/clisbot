@@ -1825,6 +1825,59 @@ test("does not reconnect after close when ensureConnected is called", async () =
   expect(client.getConnectionState().status).toBe("disposed");
 });
 
+test("full reconnect jitter publishes and waits the same drawn delay, doubling its ceiling", async () => {
+  useHeartbeatClock();
+  try {
+    const transports = [createMockTransport(), createMockTransport(), createMockTransport()];
+    let transportIndex = 0;
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId: "clsk_jittered_reconnect",
+      reconnect: {
+        enabled: true,
+        baseDelayMs: 1_000,
+        maxDelayMs: 60_000,
+        jitter: "full",
+        random: () => 0.5,
+      },
+      transportFactory: () => {
+        const transport = transports[transportIndex];
+        if (!transport) throw new Error("unexpected extra reconnect");
+        transportIndex += 1;
+        return transport.transport;
+      },
+    });
+    clients.push(client);
+    const initialConnect = client.connect();
+    transports[0].triggerOpen();
+    await initialConnect;
+
+    const lostAt = Date.now();
+    transports[0].triggerClose({ code: 1001, reason: "network changed" });
+    const firstRetry = client.getConnectionState();
+    expect(firstRetry.status === "disconnected" && firstRetry.nextRetryAt).toBe(
+      new Date(lostAt + 500).toISOString(),
+    );
+    await vi.advanceTimersByTimeAsync(499);
+    expect(transportIndex).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(transportIndex).toBe(2);
+
+    const failedAt = Date.now();
+    transports[1].triggerClose({ code: 1006, reason: "unreachable" });
+    const secondRetry = client.getConnectionState();
+    expect(secondRetry.status === "disconnected" && secondRetry.nextRetryAt).toBe(
+      new Date(failedAt + 1_000).toISOString(),
+    );
+    await vi.advanceTimersByTimeAsync(999);
+    expect(transportIndex).toBe(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(transportIndex).toBe(3);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 test("ensureConnected reconnects immediately without leaving the scheduled retry armed", async () => {
   useHeartbeatClock();
   try {

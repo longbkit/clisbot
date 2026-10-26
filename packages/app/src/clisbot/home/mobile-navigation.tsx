@@ -13,9 +13,17 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { usePathname, useRouter, type Href } from "expo-router";
 import { create } from "zustand";
+import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Home, MessageSquare, Inbox, CalendarClock } from "lucide-react-native";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import {
+  NAVIGATION_V2_TABS,
+  NavigationTabBadge,
+  lastListTabPath,
+  rememberListSection,
+} from "@/clisbot/navigation/mobile-tabs";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isWeb, isNative } from "@/constants/platform";
 import { usePanelStore } from "@/stores/panel-store";
@@ -34,14 +42,31 @@ export function rememberChatReturn(path: string) {
   useReturn.setState({ path });
 }
 export const HOME_TAB_PATH = "/open-project";
-const entries = [
+interface TabEntry {
+  path: string;
+  name: string;
+  /** Navigation V2 tabs are translated (Lịch, Thêm); the Home V2 tabs keep their English names. */
+  labelKey?: string;
+  Icon: typeof Home;
+}
+const HOME_V2_TABS: readonly TabEntry[] = [
   { path: HOME_TAB_PATH, name: "Home", Icon: Home },
   { path: "/chat", name: "Chat", Icon: MessageSquare },
   { path: "/sessions", name: "Inbox", Icon: Inbox },
   { path: "/schedules", name: "Automations", Icon: CalendarClock },
 ];
+const entries: readonly TabEntry[] = NAVIGATION_V2_ENABLED ? NAVIGATION_V2_TABS : HOME_V2_TABS;
 export function isHomeTabPath(path: string) {
   return entries.some((entry) => entry.path === path);
+}
+/** Tabs whose page is the retained conversation list panel: Chat, or Navigation V2's Chats and Work. */
+const LIST_TAB_PATHS: readonly string[] = NAVIGATION_V2_ENABLED ? ["/chat", "/work"] : ["/chat"];
+export function isListTabPath(path: string) {
+  return LIST_TAB_PATHS.includes(path);
+}
+/** The list tab a detail returns to, and the one the list panel shows. */
+export function currentListTabPath(): string {
+  return NAVIGATION_V2_ENABLED ? lastListTabPath() : "/chat";
 }
 /** All peer-tab entry points share the native stack policy; browser history stays ordinary. */
 export function useNavigateHomeTab() {
@@ -65,18 +90,12 @@ function isChatDetail(path: string) {
 function tabStyle({ pressed }: PressableStateCallbackType) {
   return [styles.tab, pressed && styles.tabPressed];
 }
-function Tab({
-  entry,
-  selected,
-  count,
-}: {
-  entry: (typeof entries)[number];
-  selected: boolean;
-  count?: number;
-}) {
+function Tab({ entry, selected, count }: { entry: TabEntry; selected: boolean; count?: number }) {
   const navigate = useNavigateHomeTab();
   const router = useRouter();
   const inboxLabel = useInboxActivityLabel();
+  const { t } = useTranslation();
+  const name = entry.labelKey ? t(entry.labelKey) : entry.name;
   const open = useCallback(
     (event: GestureResponderEvent) => {
       traceInstant("clisbot.tab.press", {
@@ -86,14 +105,21 @@ function Tab({
       const panels = usePanelStore.getState();
       const pending = !isWeb && nativePresentation.isPending(panels.mobilePanel);
       if (selected && !isWeb) {
-        if (entry.path === "/chat" && pending) {
+        if (isListTabPath(entry.path) && pending) {
           returnFromPendingChat(router, navigate);
         }
         return;
       }
-      if (entry.path === "/chat") {
-        rememberChatReturn("/chat");
+      if (isListTabPath(entry.path)) {
+        rememberChatReturn(entry.path);
+        rememberListSection(entry.path);
         usePanelStore.getState().showMobileAgentList();
+        // Web presents the panel a frame after the store changes; the route waits for it, so the
+        // outgoing page stays under the panel instead of a blank frame between them.
+        if (isWeb && NAVIGATION_V2_ENABLED && panels.mobilePanel.target !== "agent-list") {
+          requestAnimationFrame(() => navigate(entry.path as Href));
+          return;
+        }
       } else if (!isWeb && panels.mobilePanel.target === "agent-list") {
         nativePresentation.begin(panels.mobilePanel, entry.path, panels.showMobileAgent);
       } else panels.showMobileAgent();
@@ -105,7 +131,8 @@ function Tab({
     <Pressable
       accessibilityRole="tab"
       aria-selected={selected}
-      accessibilityLabel={entry.path === "/sessions" ? inboxLabel : entry.name}
+      accessibilityLabel={entry.path === "/sessions" ? inboxLabel : name}
+      testID={`home-tab-${entry.path.slice(1) || "home"}`}
       style={tabStyle}
       onPress={open}
     >
@@ -116,9 +143,12 @@ function Tab({
             <StatusBadge label={String(count)} variant="warning" size="xs" />
           </View>
         ) : null}
+        {NAVIGATION_V2_ENABLED ? <NavigationTabBadge path={entry.path} /> : null}
       </View>
       <View style={styles.label}>
-        <Text style={[styles.text, selected && styles.selected]}>{entry.name}</Text>
+        <Text style={[styles.text, selected && styles.selected]} numberOfLines={1}>
+          {name}
+        </Text>
         {entry.path === "/sessions" ? <InboxActivityIndicator /> : null}
       </View>
     </Pressable>
@@ -133,8 +163,9 @@ export function returnFromPendingChat(
   if (!nativePresentation.isPending(usePanelStore.getState().mobilePanel)) return false;
   const destination = nativePresentation.getPendingDestination();
   if (!nativePresentation.returnToList(expectedIntent)) return false;
-  if (destination && isHomeTabPath(destination)) navigate("/chat");
-  else router.navigate("/chat");
+  const list = currentListTabPath();
+  if (destination && isHomeTabPath(destination)) navigate(list as Href);
+  else router.navigate(list as Href);
   return true;
 }
 
@@ -180,7 +211,7 @@ export function MobileHomeTabs() {
   useMobileHardwareBack(path, compact, departing);
   // Chat's bar belongs to the actual list panel. Keeping it outside that panel leaves a
   // footer on the destination between its UI-thread close and the settled JS notification.
-  if (path === "/chat" || !isHomeTabPath(path)) return null;
+  if (isListTabPath(path) || !isHomeTabPath(path)) return null;
   return <MobileTabBar path={path} />;
 }
 
@@ -188,8 +219,8 @@ export function MobileHomeTabs() {
 export function MobileChatPanelTabs() {
   const path = usePathname();
   const departing = useIsChatListDeparting();
-  if (path !== "/chat" && !departing) return null;
-  return <MobileTabBar path="/chat" />;
+  if (!isListTabPath(path) && !departing) return null;
+  return <MobileTabBar path={isListTabPath(path) ? path : currentListTabPath()} />;
 }
 
 function MobileTabBar({ path }: { path: string }) {
@@ -206,7 +237,7 @@ function MobileTabBar({ path }: { path: string }) {
           key={entry.path}
           entry={entry}
           selected={path === entry.path}
-          count={entry.path === "/sessions" ? needsCount : undefined}
+          count={entry.path === "/sessions" && !NAVIGATION_V2_ENABLED ? needsCount : undefined}
         />
       ))}
     </View>

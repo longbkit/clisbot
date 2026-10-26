@@ -5,7 +5,8 @@ import { shallow } from "zustand/shallow";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useHosts } from "@/runtime/host-runtime";
-import { useSidebarModel } from "@/components/sidebar/sidebar-model";
+import { useOptionalSidebarModel } from "@/components/sidebar/sidebar-model";
+import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
 import { useBotCatalog } from "../data/runtime";
 import { useBotSidebarActions } from "./use-sidebar-actions";
 import { useResourcePins } from "./pins";
@@ -13,6 +14,7 @@ import { createPinnedRowsProjector } from "./pinned-row-model";
 import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 export type { PinRow } from "./pinned-row-model";
 const EMPTY_ROWS = [] as const;
+const NO_ENTRIES: ReadonlyMap<string, SidebarWorkspaceEntry> = new Map();
 type Session = ReturnType<typeof useSessionStore.getState>["sessions"][string];
 function usePinMetadata(hostIds: string[]) {
   // Existing accepted Host maps only. Pins neither acquire another directory demand nor repeat
@@ -53,7 +55,9 @@ function usePinMetadata(hostIds: string[]) {
 }
 
 export function usePinnedRows(onBeforeNavigate?: ChatListAdmission) {
-  const { allWorkspaceEntriesByKey } = useSidebarModel();
+  // Outside the list (Home's pin tags) pinned workspaces resolve from Host metadata instead.
+  const allWorkspaceEntriesByKey =
+    useOptionalSidebarModel()?.allWorkspaceEntriesByKey ?? NO_ENTRIES;
   const hosts = useHosts();
   const hostIds = useMemo(() => hosts.map((h) => h.serverId), [hosts]);
   const metadata = usePinMetadata(hostIds);

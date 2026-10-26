@@ -3,7 +3,10 @@
 import React, { useState } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { i18n } from "@/i18n/i18next";
 import { AutomationsLandingScreen } from "./screen";
+// The real catalog, so tab labels read as a reader sees them.
+void i18n;
 const state = vi.hoisted(() => ({ enabled: true, bots: false }));
 vi.mock("react-native", () => ({
   View: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
@@ -87,7 +90,7 @@ it("opens the existing creation path and retains its draft across tabs", () => {
   fireEvent.click(screen.getByText("New automation"));
   expect(screen.getByText("Create workflow")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Workflow draft"), { target: { value: "Daily brief" } });
-  fireEvent.click(screen.getByText("Schedules"));
+  fireEvent.click(screen.getByRole("button", { name: "Schedules" }));
   expect(screen.getByText("Embedded schedules")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Automations" }));
   expect((screen.getByLabelText("Workflow draft") as HTMLInputElement).value).toBe("Daily brief");

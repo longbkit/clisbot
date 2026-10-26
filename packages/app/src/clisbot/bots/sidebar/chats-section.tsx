@@ -177,7 +177,9 @@ export const ChatRow = memo(function ChatRow({
   selected,
   onPress,
   onOpenMenu,
+  pinned = false,
 }: {
+  pinned?: boolean;
   chat: ChatsSidebarChat;
   selected: boolean;
   onPress: (chat: ChatsSidebarChat) => void;
@@ -216,6 +218,7 @@ export const ChatRow = memo(function ChatRow({
       onPress={handlePress}
       onOpenMenu={onOpenMenu ? handleOpenMenu : undefined}
       menuLabel={t("bots.workspace.shared.chatOptions")}
+      pinned={pinned}
     />
   );
 });

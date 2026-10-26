@@ -11,6 +11,7 @@ import { useBotsQuery } from "../data/use-bots";
 import { useChatsQuery } from "../data/use-chats";
 import { useBotSidebarActions } from "../sidebar/use-sidebar-actions";
 import { useCreationRequest } from "../sidebar/creation-request";
+import { useRevealChatOpen } from "@/clisbot/navigation/chat-reveal";
 import { buildBotSearchContributions } from "./command-center-contributions";
 
 const muted = (theme: { colors: { foregroundMuted: string } }) => ({
@@ -55,6 +56,7 @@ export function BotsCommandCenterActions() {
     chats.loadState.status === "loaded",
   );
   const ask = useCreationRequest((state) => state.ask);
+  const { revealBot, revealGroup } = useRevealChatOpen(chatRows);
   const { t } = useTranslation();
   const toast = useToast();
   useEffect(() => {
@@ -72,10 +74,24 @@ export function BotsCommandCenterActions() {
         icons: ICONS,
         openBot: (serverId, botId) => void openBot(serverId, botId),
         openChat: navigate,
+        willOpenBot: revealBot,
+        willOpenChat: revealGroup,
         createBot: () => ask("bot"),
         createGroup: () => ask("group"),
       }),
-    [botRows, chatRows, hosts.length, canCreateBot, canCreateGroup, t, openBot, navigate, ask],
+    [
+      botRows,
+      chatRows,
+      hosts.length,
+      canCreateBot,
+      canCreateGroup,
+      t,
+      openBot,
+      navigate,
+      ask,
+      revealBot,
+      revealGroup,
+    ],
   );
   useCommandCenterActions({ sourceId: "clisbot-bots", enabled: hosts.length > 0, actions });
   return null;

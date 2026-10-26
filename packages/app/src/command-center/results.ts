@@ -1,4 +1,6 @@
+import type { ReactNode } from "react";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
+import type { SurfaceBackdrop } from "@/styles/surface-backdrop";
 import {
   compareMatchScores,
   type MatchScore,
@@ -61,6 +63,8 @@ export interface CommandCenterWorkspaceResult {
   /** PR/MR number backing this workspace, so a number query can match it exactly. */
   changeRequestNumber: number | null;
   activityAt: Date | null;
+  /** Muted status after the subtitle that the query never matches, e.g. "Outside filter". */
+  note?: string | null;
   run(): void;
 }
 
@@ -71,6 +75,8 @@ export interface CommandCenterAgentResult {
   title: string;
   subtitle: string;
   activityAt: Date | null;
+  /** Muted status after the subtitle that the query never matches, e.g. "Outside filter". */
+  note?: string | null;
   run(): void;
 }
 
@@ -92,11 +98,50 @@ export interface CommandCenterContributionResult {
   run(): void | Promise<void>;
 }
 
+export interface CommandCenterExtensionRenderInput {
+  query: string;
+  backdrop: SurfaceBackdrop;
+  /** Hovered, pressed or keyboard-active. */
+  highlighted: boolean;
+}
+
+export interface CommandCenterExtensionActionInput {
+  /** Hovered or keyboard-active: a pointer layout reveals the action only then. */
+  revealed: boolean;
+  runSecondary(): void;
+}
+
+/**
+ * A row drawn by an extension module rather than this file (Clisbot's search scope). The
+ * extension owns its content; the list owns height, selection and keyboard.
+ */
+export interface CommandCenterExtensionResult {
+  kind: "extension";
+  id: string;
+  lines: 1 | 2;
+  accessibilityLabel: string;
+  testID?: string;
+  /** Narrows or widens the search instead of leaving it: selecting keeps the panel open. */
+  keepOpen: boolean;
+  /** Tab accepts the row like Enter does. */
+  acceptsTab: boolean;
+  render(input: CommandCenterExtensionRenderInput): ReactNode;
+  /**
+   * The trailing button, drawn beside the row's pressable rather than inside it, so it is never a
+   * button nested in a button. Null when the row has no secondary action.
+   */
+  renderAction: ((input: CommandCenterExtensionActionInput) => ReactNode) | null;
+  run(): void;
+  /** ⌘/Ctrl+Enter, long-press or the row's button; it leaves the search. */
+  secondary: (() => void) | null;
+}
+
 export type CommandCenterResult =
   | CommandCenterWorkspaceResult
   | CommandCenterAgentResult
   | CommandCenterFileResult
-  | CommandCenterContributionResult;
+  | CommandCenterContributionResult
+  | CommandCenterExtensionResult;
 
 export interface CommandCenterResultSection {
   id: string;
@@ -184,6 +229,7 @@ function contributionSearchFields(
 /** Whether the row draws a second, subtitle line under its title. */
 function hasSubtitleLine(result: CommandCenterResult): boolean {
   if (result.kind === "workspace" || result.kind === "agent") return true;
+  if (result.kind === "extension") return result.lines === 2;
   if (result.kind === "file") return false;
   const presentation = result.contribution.presentation;
   return presentation.kind === "action" && Boolean(presentation.subtitle);

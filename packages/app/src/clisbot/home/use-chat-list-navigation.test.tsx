@@ -32,7 +32,12 @@ vi.mock("./feature", () => ({
   },
 }));
 const rememberChatReturn = vi.hoisted(() => vi.fn());
-vi.mock("./mobile-navigation", () => ({ rememberChatReturn }));
+const listTabs = vi.hoisted(() => ({ paths: ["/chat"] as string[] }));
+vi.mock("./mobile-navigation", () => ({
+  rememberChatReturn,
+  isListTabPath: (path: string) => listTabs.paths.includes(path),
+  currentListTabPath: () => listTabs.paths[0],
+}));
 import {
   createChatListPresentation,
   useChatListNavigation,
@@ -41,6 +46,7 @@ import {
 import { nativePresentation } from "./chat-list-presentation";
 
 beforeEach(() => {
+  listTabs.paths = ["/chat"];
   route.path = "/chat";
   route.homeV2 = true;
   route.native = false;
@@ -546,4 +552,18 @@ it("an earlier admission's own late commit does not cancel the newer queued row"
     nativePresentation.cancel();
     vi.useRealTimers();
   }
+});
+
+it("treats Navigation V2's Work as a list tab: Back returns there and leaving closes the list", () => {
+  listTabs.paths = ["/chat", "/work"];
+  route.path = "/work";
+  const closeList = vi.fn();
+  const view = renderHook(() => useChatListNavigation(closeList));
+  expect(view.result.current("/h/host-a/workspace/w")).toBe(false);
+  expect(rememberChatReturn).toHaveBeenCalledWith("/work");
+  // Web keeps the list until the destination commits, then closes it.
+  expect(closeList).not.toHaveBeenCalled();
+  route.path = "/h/host-a/workspace/w";
+  view.rerender();
+  expect(closeList).toHaveBeenCalledOnce();
 });

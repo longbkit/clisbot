@@ -90,6 +90,17 @@ function formatRelativeDuration(duration: RelativeDuration, t: TFunction): strin
   }
 }
 
+/** The time until a reset in its largest unit only ("2h", "3d", "30m"), or null once due. */
+export function formatResetDuration(
+  iso: string | null | undefined,
+  now = Date.now(),
+  t: TFunction = i18n.t,
+): string | null {
+  if (!iso) return null;
+  const rel = relativeDuration(iso, now);
+  return rel ? formatRelativeDuration(rel, t) : null;
+}
+
 export function formatResetLabel(
   iso: string | null | undefined,
   retained = false,

@@ -2,7 +2,7 @@
 // Drives the real ChannelStore (embedded PGlite) against an injected `post` to
 // prove the record-before-post ledger: a final answer posts once, progress is
 // throttled, `sync` knobs gate each event kind, and a replayed or restarted
-// stream never double-posts (the ledger dedupes by event/turn id + sequence).
+// stream never double-posts (the ledger dedupes by turn id + message id or sequence).
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -1115,6 +1115,87 @@ describe("ledger dedupe (restart / replay)", () => {
     second.attach(ctx);
     await second.onStream(AGENT_ID, { kind: "timeline", turnId: "turn-g", item });
     assert.equal(posts, 1, "the replayed tool line does not re-post");
+  });
+});
+
+// Every channel follow-up re-attaches the relay, a steer into the running turn
+// included, and a Hub restart re-attaches every bound Agent. Neither may move a
+// later answer onto a ledger key an earlier answer of the same turn holds: the
+// ledger would skip it as already delivered, with no `relay post started` (#40).
+describe("re-attach mid-turn (#40)", () => {
+  const recorder = (prefix: string) => {
+    const posted: string[] = [];
+    const post = async (params: OutboundPostParams): Promise<OutboundPostResult> => {
+      posted.push(params.text);
+      return { ok: true, externalMessageId: `${prefix}-${posted.length}` };
+    };
+    return { posted, post };
+  };
+  const say = (engine: RelayEngine, turnId: string, messageId: string, text: string) =>
+    engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId,
+      item: { type: "assistant_message", messageId, text },
+    });
+
+  it("keeps the running turn when a steer re-attaches: the pending and later answers post", async () => {
+    const { posted, post } = recorder("steer");
+    const ctx = context({ externalConversationId: "C0STEER", externalThreadId: "9.0" });
+    const engine = makeEngine(store, post);
+    engine.attach(ctx);
+    await engine.onStream(AGENT_ID, { kind: "turn_started", turnId: "turn-steer" });
+    await say(engine, "turn-steer", "m1", "Let me look");
+    await say(engine, "turn-steer", "m2", "Still looking"); // closes m1
+    // A follow-up steers the running turn: followUp → subscribe → attachStreamFor → attach.
+    engine.attach(context({ ...ctx, triggerMessageId: "9.5" }));
+    await say(engine, "turn-steer", "m3", "answer to the steer");
+    await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-steer" });
+    assert.deepEqual(posted, ["Let me look", "Still looking", "answer to the steer"]);
+  });
+
+  it("still skips a replayed message after a re-attach, in the same Hub or a fresh one", async () => {
+    const { posted, post } = recorder("replay");
+    const ctx = context({ externalConversationId: "C0REPLAY", externalThreadId: "9.1" });
+    const engine = makeEngine(store, post);
+    engine.attach(ctx);
+    await say(engine, "turn-replay", "m1", "first");
+    await say(engine, "turn-replay", "m2", "second");
+    engine.attach(ctx);
+    await say(engine, "turn-replay", "m1", "first");
+    await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-replay" });
+    assert.deepEqual(posted, ["first", "second"]);
+
+    // The whole turn again, through a fresh engine on the same ledger.
+    const replay = makeEngine(store, post);
+    replay.attach(ctx);
+    await say(replay, "turn-replay", "m1", "first");
+    await say(replay, "turn-replay", "m2", "second");
+    await replay.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-replay" });
+    assert.deepEqual(posted, ["first", "second"], "a replayed turn posts nothing again");
+  });
+
+  it("posts a turn's later messages after a Hub restart mid-turn", async () => {
+    const { posted, post } = recorder("restart");
+    const ctx = context({ externalConversationId: "C0RESTART", externalThreadId: "9.2" });
+    const before = makeEngine(store, post);
+    before.attach(ctx);
+    await say(before, "turn-restart", "m1", "Let me look");
+    await say(before, "turn-restart", "m2", "lost with the Hub"); // closes m1; m2 stays pending
+
+    // The restarted Hub re-attaches the binding with no memory of the turn, and the live
+    // stream carries only what the Agent says from now on.
+    const after = makeEngine(store, post);
+    after.attach(ctx);
+    await say(after, "turn-restart", "m3", "the answer");
+    await after.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-restart" });
+    assert.deepEqual(posted, ["Let me look", "the answer"]);
+
+    const replay = makeEngine(store, post);
+    replay.attach(ctx);
+    await say(replay, "turn-restart", "m1", "Let me look");
+    await say(replay, "turn-restart", "m3", "the answer");
+    await replay.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-restart" });
+    assert.deepEqual(posted, ["Let me look", "the answer"], "the delivered messages stay skipped");
   });
 });
 

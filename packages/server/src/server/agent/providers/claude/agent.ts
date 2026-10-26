@@ -68,6 +68,7 @@ import {
   formatProviderDiagnosticError,
 } from "../diagnostic-utils.js";
 import { appendOrReplaceGrowingAssistantMessage, runProviderTurn } from "../provider-runner.js";
+import { createProviderTurnId } from "../provider-turn-id.js";
 import {
   applyClaudeToolPolicy,
   ClaudeProviderOptionsSchema,
@@ -2349,7 +2350,6 @@ class ClaudeAgentSession implements AgentSession {
   >[] = [];
   private historyPending = false;
   private turnState: TurnState = "idle";
-  private nextTurnOrdinal = 1;
   private cancelCurrentTurn: (() => void) | null = null;
   private cachedRuntimeInfo: AgentRuntimeInfo | null = null;
   private lastOptionsModel: string | null = null;
@@ -3885,7 +3885,7 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private createTurnId(owner: "foreground" | "autonomous"): string {
-    return `${owner}-turn-${this.nextTurnOrdinal++}`;
+    return createProviderTurnId(owner);
   }
 
   private isTerminalTurnEvent(event: AgentStreamEvent): boolean {

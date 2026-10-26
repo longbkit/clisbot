@@ -6,7 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react-native";
+import { MoreHorizontal, SendHorizontal } from "lucide-react-native";
 import { withUnistyles } from "react-native-unistyles";
 import type { QuickStartView } from "@clisbot/protocol/quick-starts/types";
 import type { QuickStartDestination } from "./model";
@@ -54,6 +54,11 @@ export function QuickStartRow({
             {describeTarget(item, destination)}
           </Text>
         </View>
+        {sendsOnTap(item) ? (
+          <View testID="quick-start-sends-on-tap" accessibilityLabel="Sends on tap">
+            <SendIcon size={14} />
+          </View>
+        ) : null}
       </Pressable>
     );
   return (
@@ -88,6 +93,10 @@ export function QuickStartRow({
       </DropdownMenu>
     </View>
   );
+}
+/** Tapping sends at once: the reader's own quick start set to Send right away. */
+export function sendsOnTap(item: QuickStartView): boolean {
+  return item.autoSend === true && item.canEdit;
 }
 /** One line under a Quick start's name: where it opens, and a fresh worktree when it makes one. */
 export function describeTarget(item: QuickStartView, destination?: QuickStartDestination): string {
@@ -158,6 +167,9 @@ export function QuickStartMenu({
 }
 
 const MoreIcon = withUnistyles(MoreHorizontal, (theme) => ({
+  color: theme.colors.foregroundMuted,
+}));
+const SendIcon = withUnistyles(SendHorizontal, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
 

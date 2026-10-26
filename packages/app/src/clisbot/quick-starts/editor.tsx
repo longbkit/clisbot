@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { useHostFeature } from "@/runtime/host-features";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SelectField } from "@/components/ui/select-field";
 import { RadioList } from "@/clisbot/hub/settings/channel-route-audience-controls";
@@ -19,6 +20,19 @@ const VISIBILITY = [
     value: "host",
     label: "Share on this Host",
     description: "People with access to the destination can use it and pin it to their Home",
+  },
+] as const;
+const ON_TAP = [
+  {
+    value: "fill",
+    label: "Fill the composer",
+    description: "Review or change the prompt, then send",
+  },
+  {
+    value: "send",
+    label: "Send right away",
+    description:
+      "One tap starts the chat. It fills the composer instead when settings need a check or the composer has attachments",
   },
 ] as const;
 export function QuickStartEditor({
@@ -48,6 +62,11 @@ export function QuickStartEditor({
   );
   const share = useCallback(
     (visibility: "personal" | "host") => form.change({ ...input, visibility }),
+    [input, form],
+  );
+  const autoSendSupported = useHostFeature(serverId, "quickStartAutoSend");
+  const onTap = useCallback(
+    (value: "fill" | "send") => form.change({ ...input, autoSend: value === "send" }),
     [input, form],
   );
   return (
@@ -93,6 +112,15 @@ export function QuickStartEditor({
         size={size}
         disabled={busy}
       />
+      {autoSendSupported ? (
+        <RadioList
+          label="When you tap it"
+          options={ON_TAP}
+          selected={input.autoSend ? "send" : "fill"}
+          onChange={onTap}
+          disabled={busy}
+        />
+      ) : null}
       <RadioList
         label="Who can use this"
         options={VISIBILITY}

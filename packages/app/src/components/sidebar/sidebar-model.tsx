@@ -23,6 +23,11 @@ import {
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import type { SidebarShortcutModel } from "@/utils/sidebar-shortcuts";
 import { buildSidebarProjection } from "./sidebar-projection";
+import { useWorkListFilter, type WorkFilter } from "@/clisbot/navigation/work-filter";
+import {
+  WorkspaceSessionFilterProvider,
+  type WorkspaceSessionFilter,
+} from "@/clisbot/workspace-sessions/session-filter";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
 import { filterWorkspacesByLabels } from "./sidebar-labels";
 import {
@@ -57,6 +62,11 @@ interface SidebarModel extends SidebarWorkspacesListResult {
   collapsedProjectKeys: ReadonlySet<string>;
   toggleProjectCollapsed: (projectViewKey: string) => void;
   shortcutModel: SidebarShortcutModel;
+  /**
+   * Clisbot Navigation V2: the Workspace list's scope/chip/Bots rule and the root sessions it
+   * reads. Pinned rows, counts and session lines all ask it, so a pin never escapes the scope.
+   */
+  workList: ReturnType<typeof useWorkListFilter>;
 }
 
 const SidebarModelContext = createContext<SidebarModel | null>(null);
@@ -74,7 +84,10 @@ export function SidebarModelProvider({
   const groupMode = useSidebarGroupMode();
   const userFilters = useSidebarViewStore((state) => state.userFilters);
   const channelFilters = useSidebarViewStore((state) => state.channelFilters);
+  // Clisbot Navigation V2: Work's scope and quick-filter chips narrow workspaces like metadata does.
+  const workFilter = useWorkListFilter();
   const hasMetadataFilter = userFilters.length > 0 || channelFilters.length > 0;
+  const hasEntryFilter = hasMetadataFilter || workFilter !== null;
   const labelFilter = useSidebarViewStore((state) => state.labelFilter);
   const projectFilters = useSidebarViewStore((state) => state.projectFilters);
   const reconcileLabelFilter = useSidebarViewStore((state) => state.reconcileLabelFilter);
@@ -114,8 +127,7 @@ export function SidebarModelProvider({
   // anything; the label filter reads `labels`, which only exists on an entry. Hydration opens a
   // live session-store subscription over every workspace on every visible host, so widening this
   // for a filter that does not need it costs a retained-but-inactive sidebar real work.
-  const needsWorkspaceEntries =
-    groupMode !== "project" || hasActiveLabelFilter || hasMetadataFilter;
+  const needsWorkspaceEntries = groupMode !== "project" || hasActiveLabelFilter || hasEntryFilter;
   const entriesEnabled = active !== false || needsWorkspaceEntries;
   const workspaceEntriesByKey = useSidebarWorkspaceEntries(
     list.workspacePlacements,
@@ -129,9 +141,12 @@ export function SidebarModelProvider({
     const filtered = filterWorkspacesByLabels({
       workspaces: byProject.filter((workspace) => showBackground || !workspace.background),
       ...labelFilter,
-    }).filter((workspace) => matchesSessionMetadata(workspace, userFilters, channelFilters));
+    })
+      .filter((workspace) => matchesSessionMetadata(workspace, userFilters, channelFilters))
+      .filter((workspace) => workFilter?.filter.workspace(workspace) ?? true);
     return new Map(filtered.map((workspace) => [workspace.workspaceKey, workspace]));
   }, [
+    workFilter,
     showBackground,
     labelFilter,
     userFilters,
@@ -153,13 +168,13 @@ export function SidebarModelProvider({
       const included = new Set(resolvedProjectFilters);
       projects = projects.filter((project) => included.has(project.viewKey));
     }
-    if (hasActiveLabelFilter || hasMetadataFilter || !showBackground) {
+    if (hasActiveLabelFilter || hasEntryFilter || !showBackground) {
       projects = projects.flatMap((project) => {
         const workspaces = project.workspaces.filter((workspace) =>
           visibleWorkspaceKeys.has(workspace.workspaceKey),
         );
         return workspaces.length > 0 ||
-          (!hasActiveLabelFilter && !hasMetadataFilter && project.workspaces.length === 0)
+          (!hasActiveLabelFilter && !hasEntryFilter && project.workspaces.length === 0)
           ? [workspaces.length === project.workspaces.length ? project : { ...project, workspaces }]
           : [];
       });
@@ -168,7 +183,7 @@ export function SidebarModelProvider({
   }, [
     showBackground,
     hasActiveLabelFilter,
-    hasMetadataFilter,
+    hasEntryFilter,
     hasActiveProjectFilter,
     resolvedProjectFilters,
     list.projects,
@@ -213,11 +228,16 @@ export function SidebarModelProvider({
   );
   const projection = useMemo(() => buildSidebarProjection(projectionInput), [projectionInput]);
   // Clisbot: with Agent sessions on, the session modes list sessions and the shortcuts walk them.
+  const sessionFilter = useMemo(
+    () => (workFilter ? toSessionLineFilter(workFilter.filter, workFilter.pinnedSessions) : null),
+    [workFilter],
+  );
   const statusView = useGroupedSidebarView({
     projection,
     groupMode,
     pinnedCollapsed,
     collapsedWorkspaceGroupKeys,
+    sessionFilter,
   });
   const metadataRecoveryNotice = useMemo(
     () => sessionMetadataRecoveryNotice(workspaceEntriesByKey.values(), hasMetadataFilter),
@@ -242,8 +262,10 @@ export function SidebarModelProvider({
       collapsedProjectKeys,
       toggleProjectCollapsed,
       shortcutModel: statusView.shortcutModel,
+      workList: workFilter,
     }),
     [
+      workFilter,
       awaitingEntryProjection,
       metadataRecoveryNotice,
       resolvedProjectFilters,
@@ -260,11 +282,39 @@ export function SidebarModelProvider({
     ],
   );
 
-  return <SidebarModelContext.Provider value={value}>{children}</SidebarModelContext.Provider>;
+  return (
+    <SidebarModelContext.Provider value={value}>
+      <WorkspaceSessionFilterProvider value={sessionFilter}>
+        {children}
+      </WorkspaceSessionFilterProvider>
+    </SidebarModelContext.Provider>
+  );
+}
+
+/** For surfaces that may render outside the list (Home pin tags); null when no list is mounted. */
+export function useOptionalSidebarModel(): SidebarModel | null {
+  return useContext(SidebarModelContext);
 }
 
 export function useSidebarModel(): SidebarModel {
   const model = useContext(SidebarModelContext);
   if (!model) throw new Error("SidebarModelProvider is required");
   return model;
+}
+
+function toSessionLineFilter(
+  filter: WorkFilter,
+  pinned: ReadonlySet<string>,
+): WorkspaceSessionFilter {
+  return (session, workspace) =>
+    !pinned.has(`${session.agent.serverId}:${session.agent.id}`) &&
+    filter.session(
+      {
+        id: session.agent.id,
+        labels: session.agent.labels,
+        createdBy: session.agent.createdBy,
+        statusBucket: session.statusBucket,
+      },
+      workspace,
+    );
 }

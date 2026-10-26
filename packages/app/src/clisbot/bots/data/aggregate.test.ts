@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { fetchAggregated, toAggregateLoadState } from "./aggregate";
+import {
+  fetchAggregated,
+  holdAggregateRows,
+  toAggregateLoadState,
+  type FetchAggregatedState,
+  type HeldHostRows,
+} from "./aggregate";
 import type { BotsClient, BotsRuntime } from "./client";
 import type { BotPayload } from "./contracts";
 
@@ -102,4 +108,60 @@ it("distinguishes a successful empty Host from an online Host without an askable
     allHostsFailedMessage: "all failed",
   });
   expect(state).toEqual({ status: "loaded", data: [], hostErrors: [], acceptedServerIds: ["a"] });
+});
+
+describe("holdAggregateRows (Round 2 D6: a list with rows never blanks)", () => {
+  const row = (serverId: string, id: string) => ({ ...bot(id), serverId, serverName: serverId });
+  const loaded = (
+    data: ReturnType<typeof row>[],
+    acceptedServerIds: string[],
+  ): Extract<FetchAggregatedState<BotPayload>, { status: "loaded" }> => ({
+    status: "loaded",
+    data,
+    hostErrors: [],
+    acceptedServerIds,
+  });
+  const first = holdAggregateRows(
+    new Map(),
+    loaded([row("a", "a1"), row("a", "a2"), row("b", "b1")], ["a", "b"]),
+    ["a", "b"],
+  );
+
+  function ids(state: FetchAggregatedState<BotPayload> | undefined) {
+    return state?.status === "loaded" ? state.data.map((r) => r.id).sort() : state?.status;
+  }
+
+  it("keeps every row while a reconnect's new query has no answer yet", () => {
+    for (const pending of [undefined, { status: "connecting" } as const]) {
+      const next = holdAggregateRows(first.held, pending, ["a", "b"]);
+      expect(ids(next.state)).toEqual(["a1", "a2", "b1"]);
+      // Held rows prove nothing about the new admission.
+      expect(next.state?.status === "loaded" && next.state.acceptedServerIds).toEqual([]);
+    }
+  });
+
+  it("replaces a Host's rows when it answers and holds the Host that has not", () => {
+    const next = holdAggregateRows(first.held, loaded([row("a", "a3")], ["a"]), ["a", "b"]);
+    expect(ids(next.state)).toEqual(["a3", "b1"]);
+    expect(next.state?.status === "loaded" && next.state.acceptedServerIds).toEqual(["a"]);
+  });
+
+  it("holds a failing Host's rows beside its error", () => {
+    const failing: FetchAggregatedState<BotPayload> = {
+      ...loaded([row("a", "a1"), row("a", "a2")], ["a"]),
+      hostErrors: [{ serverId: "b", serverName: "b", message: "boom" }],
+    };
+    const next = holdAggregateRows(first.held, failing, ["a", "b"]);
+    expect(ids(next.state)).toEqual(["a1", "a2", "b1"]);
+    expect(next.state?.status === "loaded" && next.state.hostErrors).toHaveLength(1);
+  });
+
+  it("drops a Host's rows when it answers empty or leaves the list", () => {
+    expect(ids(holdAggregateRows(first.held, loaded([], ["a", "b"]), ["a", "b"]).state)).toEqual(
+      [],
+    );
+    expect(ids(holdAggregateRows(first.held, undefined, ["a"]).state)).toEqual(["a1", "a2"]);
+    const none: HeldHostRows<BotPayload> = new Map();
+    expect(holdAggregateRows(none, undefined, ["a"]).state).toBeUndefined();
+  });
 });

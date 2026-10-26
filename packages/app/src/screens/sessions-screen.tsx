@@ -223,11 +223,38 @@ function SessionsFilterRow({
   );
 }
 
+/** Inbox's own header; Home's embedded history sits under Home's. */
+function SessionsHeader({
+  embedded,
+  rightContent,
+}: {
+  embedded: boolean;
+  rightContent: ReactNode;
+}) {
+  const { t } = useTranslation();
+  if (embedded) return null;
+  return (
+    <MenuHeader
+      title={HOME_V2_ENABLED ? "Inbox" : t("sessions.title")}
+      rightContent={rightContent}
+    />
+  );
+}
+
 export function SessionsScreen() {
   return <SessionsScreenContent />;
 }
 
-function SessionsScreenContent() {
+/** Navigation V2 Home's search: Inbox's history, filters and Load more, under Home's header. */
+export function InboxHistory() {
+  return (
+    <View style={styles.fill} testID="home-history">
+      <SessionsScreenContent embedded />
+    </View>
+  );
+}
+
+function SessionsScreenContent({ embedded = false }: { embedded?: boolean }) {
   const focused = useIsFocused();
   const live = useAggregatedAgents({ demand: focused });
   const { theme } = useUnistyles();
@@ -371,10 +398,7 @@ function SessionsScreenContent() {
   );
   return (
     <View style={styles.container}>
-      <MenuHeader
-        title={HOME_V2_ENABLED ? "Inbox" : t("sessions.title")}
-        rightContent={importAction}
-      />
+      <SessionsHeader embedded={embedded} rightContent={importAction} />
       <View style={HOME_V2_ENABLED ? styles.body : styles.fill}>
         <SessionsFilterRow
           hosts={hosts}

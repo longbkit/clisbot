@@ -1,9 +1,15 @@
 import { useDirectoryHealth } from "./use-directory-health";
 import { useSidebarHostIds } from "./use-sidebar-host-ids";
 import { projectBotWorkspaces } from "@/clisbot/bot-projects/projection";
-import { useBotProjectsPreference } from "@/clisbot/bot-projects/preferences";
+import { useShowBotProjects } from "@/clisbot/bot-projects/preferences";
 import { useSidebarBotProjectKeys } from "@/clisbot/bots/sidebar/hide-bot-projects";
-import { quickChatProjectKeys, useQuickChatRoots } from "@/clisbot/quick-chats/quick-chat-projects";
+import {
+  mergeQuickChatProjects,
+  quickChatProjectKeys,
+  useQuickChatRoots,
+} from "@/clisbot/quick-chats/quick-chat-projects";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import { useTranslation } from "react-i18next";
 import { useHostFeatureMap } from "@/runtime/host-features";
 import { useCallback, useEffect, useMemo } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
@@ -12,7 +18,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceDirectoryServerIds } from "@/stores/session-store-hooks";
 import { workspaceEqualityFns } from "@/stores/session-store-hooks/selectors";
 import { useWorkspaceStructure } from "@/stores/session-store-hooks";
-import { getHostRuntimeStore, useHostRegistryLoaded, useHosts } from "@/runtime/host-runtime";
+import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import {
@@ -104,11 +110,7 @@ export function useSidebarWorkspacesList(options?: {
   enabled?: boolean;
 }): SidebarWorkspacesListResult {
   const runtime = getHostRuntimeStore();
-  const allHosts = useHosts();
-  const hostRegistryLoaded = useHostRegistryLoaded();
-  const allServerIds = useMemo(() => allHosts.map((h) => h.serverId), [allHosts]);
 
-  const reconcileHostFilters = useSidebarViewStore((state) => state.reconcileHostFilters);
   const isActive = options?.enabled !== false;
 
   const serverIds = useSidebarHostIds(options?.hostFilters);
@@ -119,12 +121,8 @@ export function useSidebarWorkspacesList(options?: {
     return () => releases.forEach((release) => release());
   }, [isActive, runtime, serverIds]);
 
-  useEffect(() => {
-    if (!hostRegistryLoaded) {
-      return;
-    }
-    reconcileHostFilters(allServerIds);
-  }, [allServerIds, hostRegistryLoaded, reconcileHostFilters]);
+  // Clisbot: the saved Host filter is reconciled once, app-wide, after the Host list has settled
+  // (`clisbot/hub/settled-host-ids.ts`), not here while the registry or a Hub list still loads.
 
   const persistedProjectOrder = useSidebarOrderStore((state) => state.projectOrder ?? EMPTY_ORDER);
 
@@ -144,19 +142,30 @@ export function useSidebarWorkspacesList(options?: {
 
   const selectPlacements = useMemo(createSidebarWorkspacePlacementSelector, []);
   const botProjectKeys = useSidebarBotProjectKeys();
-  const showBotProjects = useBotProjectsPreference((state) => state.showBotProjects);
+  const showBotProjects = useShowBotProjects().visible;
   const quickChatRoots = useQuickChatRoots(directoryServerIds);
-  const sidebarModel = useMemo(
-    () =>
-      selectPlacements(
-        projectBotWorkspaces(
-          projectBotWorkspaces(hostProjects, botProjectKeys, showBotProjects),
-          quickChatProjectKeys(hostProjects, quickChatRoots),
-          false,
-        ),
+  const quickChatName = useTranslation().t("home.start.quickChat");
+  const sidebarModel = useMemo(() => {
+    const quickKeys = quickChatProjectKeys(hostProjects, quickChatRoots);
+    // Clisbot Navigation V2: Bot and Quick chat sessions are Workspace sessions; the Bots chip
+    // hides Bot sessions by their label, and Quick chats fold into one project.
+    if (NAVIGATION_V2_ENABLED)
+      return selectPlacements(mergeQuickChatProjects(hostProjects, quickKeys, quickChatName));
+    return selectPlacements(
+      projectBotWorkspaces(
+        projectBotWorkspaces(hostProjects, botProjectKeys, showBotProjects),
+        quickKeys,
+        false,
       ),
-    [hostProjects, botProjectKeys, showBotProjects, quickChatRoots, selectPlacements],
-  );
+    );
+  }, [
+    hostProjects,
+    botProjectKeys,
+    showBotProjects,
+    quickChatRoots,
+    quickChatName,
+    selectPlacements,
+  ]);
 
   const projects = sidebarModel.projects.length > 0 ? sidebarModel.projects : EMPTY_PROJECTS;
   const workspacePlacements =

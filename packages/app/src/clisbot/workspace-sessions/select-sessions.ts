@@ -100,13 +100,17 @@ export function selectWorkspaceSessions(input: {
   activeOnly: boolean;
   /** Sessions a pane shows, kept by Active sessions only — see `passesActiveOnly`. */
   keepAgentIds?: ReadonlySet<string>;
+  /** The list owner's own rule (Navigation V2's Workspace scope); absent lists every line. */
+  include?: (session: WorkspaceSessionItem) => boolean;
 }): WorkspaceSessionItem[] {
   const sessions = listWorkspaceRootAgents(input.source.agents, input.workspaceId).map((agent) => ({
     agent,
     title: resolveWorkspaceAgentTabLabel(agent.title),
     statusBucket: deriveSessionStatusBucket(agent, input.source),
   }));
-  return sessions.filter((session) =>
-    passesActiveOnly(input, session.agent.id, session.statusBucket),
+  return sessions.filter(
+    (session) =>
+      passesActiveOnly(input, session.agent.id, session.statusBucket) &&
+      (input.include?.(session) ?? true),
   );
 }

@@ -3,6 +3,8 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
+import { home } from "./home";
+import { navigation } from "./navigation";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3120,4 +3122,6 @@ export const es: TranslationResources = {
   connectors: connectors.es,
   bots: bots.es,
   heartbeats: heartbeats.es,
+  navigation: navigation.es,
+  home: home.es,
 };

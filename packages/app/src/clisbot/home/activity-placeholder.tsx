@@ -1,29 +1,73 @@
 import { useMemo } from "react";
 import { View, useWindowDimensions } from "react-native";
+import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import {
+  FLAT_ROW_FILL_INSET,
+  SIDEBAR_TWO_LINE_ROW_HEIGHT,
+  sidebarLeadingColumnWidth,
+} from "@/components/sidebar/row-geometry";
 
 const rows = ["first", "second", "third"];
-/** Match the activity row height, including the system text scale, before the first snapshot. */
+/**
+ * Activity rows before the first snapshot, laid out as `ActivityRow` is (inset, leading column,
+ * gap, text column, time), so the loaded rows land where the placeholders were.
+ */
 export function ActivityPlaceholder() {
+  const { t } = useTranslation();
   const { fontScale } = useWindowDimensions();
-  const rowStyle = useMemo(() => ({ height: 56 * fontScale }), [fontScale]);
+  const rowStyle = useMemo(
+    () => ({ height: (NAVIGATION_V2_ENABLED ? SIDEBAR_TWO_LINE_ROW_HEIGHT : 56) * fontScale }),
+    [fontScale],
+  );
   return (
     <View
       testID="home-activity-placeholder"
-      accessibilityLabel="Loading activity"
+      accessibilityLabel={t("common.loading")}
       accessibilityRole="progressbar"
     >
       {rows.map((key) => (
-        <View key={key} style={[styles.row, rowStyle]}>
-          <View style={styles.title} />
-          <View style={styles.subtitle} />
+        <View
+          key={key}
+          style={[styles.row, NAVIGATION_V2_ENABLED && styles.rowV2, rowStyle]}
+          testID="home-activity-placeholder-row"
+        >
+          <View style={[styles.leading, NAVIGATION_V2_ENABLED && styles.leadingV2]}>
+            <View style={styles.mark} />
+          </View>
+          <View style={styles.content}>
+            <View style={styles.title} />
+            <View style={styles.subtitle} />
+          </View>
+          <View style={styles.time} />
         </View>
       ))}
     </View>
   );
 }
+// Insets, gap and the leading width are `ActivityRow`'s (`activity-row.tsx`).
 const styles = StyleSheet.create((theme) => ({
-  row: { justifyContent: "center", gap: theme.spacing[2] },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[3],
+    paddingHorizontal: theme.spacing[3],
+  },
+  rowV2: {
+    gap: theme.spacing[2],
+    marginHorizontal: FLAT_ROW_FILL_INSET - theme.spacing[3],
+    paddingHorizontal: theme.spacing[3] - FLAT_ROW_FILL_INSET,
+  },
+  leading: { width: theme.iconSize.sm, alignItems: "center" },
+  leadingV2: { width: sidebarLeadingColumnWidth(theme) },
+  mark: {
+    width: theme.iconSize.sm,
+    height: theme.iconSize.sm,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.surface3,
+  },
+  content: { flex: 1, minWidth: 0, gap: theme.spacing[2] },
   title: {
     width: "60%",
     height: theme.fontSize.sm,
@@ -32,6 +76,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   subtitle: {
     width: "80%",
+    height: theme.spacing[2],
+    backgroundColor: theme.colors.surface2,
+    borderRadius: theme.borderRadius.sm,
+  },
+  time: {
+    width: 20,
     height: theme.spacing[2],
     backgroundColor: theme.colors.surface2,
     borderRadius: theme.borderRadius.sm,

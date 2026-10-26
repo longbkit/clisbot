@@ -4050,6 +4050,9 @@ export const ServerInfoStatusPayloadSchema = z
         agentProfiles: z.boolean().optional(),
         // COMPAT(quickStarts): added in unreleased Fusion; review 2027-04-10.
         quickStarts: z.boolean().optional(),
+        // COMPAT(quickStartAutoSend): the daemon stores a quick start's `autoSend`. Added in
+        // unreleased Fusion; review 2027-04-26.
+        quickStartAutoSend: z.boolean().optional(),
         // COMPAT(quickChat): whether this session may start a Quick chat; absent on older Hosts,
         // which answer at prepare time instead. Added in unreleased Fusion; review 2027-04-10.
         quickChat: z.boolean().optional(),

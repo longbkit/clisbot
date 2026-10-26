@@ -452,7 +452,7 @@ interface StatusRowProjectPresentation {
   projectIconDataUri: string | null;
 }
 
-function buildStatusRowProjectPresentation({
+export function buildStatusRowProjectPresentation({
   workspace,
   projectIconByProjectViewKey,
   hostBadgeByServerId,
@@ -468,7 +468,7 @@ function buildStatusRowProjectPresentation({
   };
 }
 
-function StatusGroupHeader({
+export function StatusGroupHeader({
   group,
   collapsed,
   projectIconByProjectViewKey,
@@ -575,7 +575,7 @@ function StatusGroupIcon({ bucket }: { bucket: StatusBucket }) {
   }
 }
 
-const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
+export const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
   workspace,
   hostBadge,
   projectName,

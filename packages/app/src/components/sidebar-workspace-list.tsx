@@ -124,6 +124,9 @@ import {
 import { useLongPressDragInteraction } from "@/components/sidebar/use-long-press-drag-interaction";
 import { SidebarSectionHeader } from "@/components/sidebar/sidebar-section-header";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
+import { PinMark, usePinnedRow } from "@/components/ui/pin-mark";
+import { SidebarStatusFlatList } from "@/components/sidebar/sidebar-status-flat-list";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { createSidebarWorkspaceVisibilityPolicy } from "@/components/sidebar/sidebar-group-visibility";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
 import {
@@ -265,6 +268,11 @@ interface SidebarWorkspaceListProps {
   /** Gesture ref for coordinating with parent gestures (e.g., sidebar close) */
   parentGestureRef?: MutableRefObject<GestureType | undefined>;
   dragGestureHostActive?: boolean;
+  /**
+   * Clisbot Navigation V2's Work list: pinned rows float to the top with a pin mark instead of
+   * forming a Pinned section, and the old sidebar's collapsed Projects section never hides them.
+   */
+  pinPresentation?: "section" | "float";
 }
 
 interface ProjectHeaderRowProps {
@@ -741,9 +749,12 @@ function WorkspaceRowRightGroup({
     showShortcut,
   });
   const kebab = useOpenKebabMenuVisibility(showKebabInSlot);
+  // Clisbot: a floated pinned row marks itself at the end of its title line.
+  const pinnedRow = usePinnedRow();
 
   return (
     <>
+      {pinnedRow ? <PinMark /> : null}
       {isCreating ? (
         <Text style={styles.workspaceCreatingText}>{t("sidebar.workspace.status.creating")}</Text>
       ) : null}
@@ -2201,6 +2212,7 @@ export function SidebarWorkspaceList({
   listHeaderComponent,
   parentGestureRef,
   dragGestureHostActive,
+  pinPresentation = "section",
 }: SidebarWorkspaceListProps) {
   const pathname = usePathname();
   const hosts = useHosts();
@@ -2217,9 +2229,10 @@ export function SidebarWorkspaceList({
   const supportsMultiplicityByServerId = useHostFeatureMap(serverIds, "workspaceMultiplicity");
   const supportsPinningByServerId = useHostFeatureMap(serverIds, "workspacePinning");
   const fusion = useBotsFeatureHosts().length > 0;
+  const float = pinPresentation === "float";
   const effectivePinnedGroups = useMemo(
-    () => (fusion ? { ...pinnedGroups, pinnedChats: [] } : pinnedGroups),
-    [fusion, pinnedGroups],
+    () => (fusion || float ? { ...pinnedGroups, pinnedChats: [] } : pinnedGroups),
+    [fusion, float, pinnedGroups],
   );
   const onToggleWorkspacePin = useSidebarWorkspacePinController();
   const getPinnedWorkspaceOrder = useSidebarOrderStore((state) => state.getPinnedWorkspaceOrder);
@@ -2288,6 +2301,7 @@ export function SidebarWorkspaceList({
         <FusionPinnedSection
           onBeforeNavigate={onWorkspacePress}
           renderWorkspacePin={renderWorkspacePin}
+          float={float}
         />
       ) : null}
       {listLeadingComponent}
@@ -2337,6 +2351,7 @@ export function SidebarWorkspaceList({
         supportsPinningByServerId={supportsPinningByServerId}
         onToggleWorkspacePin={onToggleWorkspacePin}
         onPinnedWorkspaceReorder={handlePinnedWorkspaceReorder}
+        pinPresentation={pinPresentation}
       />
     );
 
@@ -2392,6 +2407,23 @@ function SidebarGroupedModeList({
     [pinnedGroups.pinnedChats, workspaceEntriesByKey],
   );
 
+  // Clisbot Navigation V2: one virtualized list, every row rendered, nothing behind Show more.
+  if (NAVIGATION_V2_ENABLED)
+    return (
+      <SidebarStatusFlatList
+        groups={workspaceGroups}
+        projectIconByProjectViewKey={projectIconByProjectViewKey}
+        shortcutIndexByWorkspaceKey={_projectShortcutIndex}
+        showShortcutBadges={showShortcutBadges}
+        onWorkspacePress={onWorkspacePress}
+        hostBadgeByServerId={hostBadgeByServerId}
+        supportsPinningByServerId={supportsPinningByServerId}
+        onToggleWorkspacePin={onToggleWorkspacePin}
+        listLeadingComponent={listLeadingComponent}
+        listHeaderComponent={listHeaderComponent}
+        sidebarFilterEmpty={sidebarFilterEmpty}
+      />
+    );
   return (
     <SidebarStatusWorkspaceList
       groups={workspaceGroups}
@@ -2437,6 +2469,7 @@ function ProjectModeList({
   supportsPinningByServerId,
   onToggleWorkspacePin,
   onPinnedWorkspaceReorder,
+  pinPresentation,
 }: Omit<
   SidebarWorkspaceListProps,
   | "workspaceGroups"
@@ -2482,7 +2515,8 @@ function ProjectModeList({
   const activeWorkspaceSelection = useSidebarWorkspaceSelection();
   const { pinnedChats, unpinnedProjects } = pinnedGroups;
   const hasBotsFeature = useBotsFeatureHosts().length > 0;
-  const [projectsCollapsed] = useSectionCollapsed("projects");
+  const [storedProjectsCollapsed] = useSectionCollapsed("projects");
+  const projectsCollapsed = pinPresentation !== "float" && storedProjectsCollapsed;
   const {
     visibleItems: visiblePinnedChats,
     expanded: pinnedChatsExpanded,

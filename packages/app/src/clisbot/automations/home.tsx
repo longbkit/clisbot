@@ -27,21 +27,16 @@ export function AutomationsHome({
   onSchedules: () => void;
   onAutomations: OpenAutomation;
 }) {
+  const { t } = useTranslation();
   return (
     <ScrollView>
-      <View style={styles.page}>
+      <View style={styles.page} testID="automations-home">
         <HomeSchedules onSeeAll={onSchedules} />
         <HomeAutomations onOpen={onAutomations} />
         <View style={styles.section}>
-          <Text style={styles.title}>Get started</Text>
-          <Text style={styles.text}>
-            Schedules run agents on a Host at a chosen time. Use them for recurring tasks and
-            reminders.
-          </Text>
-          <Text style={styles.text}>
-            Automations connect a Project to events, schedules or manual runs through your
-            organization.
-          </Text>
+          <Text style={styles.title}>{t("home.schedulesLanding.getStarted")}</Text>
+          <Text style={styles.text}>{t("home.schedulesLanding.schedulesHint")}</Text>
+          <Text style={styles.text}>{t("home.schedulesLanding.automationsHint")}</Text>
         </View>
       </View>
     </ScrollView>
@@ -50,15 +45,18 @@ export function AutomationsHome({
 
 function HomeSection({
   title,
+  createLabel,
   onCreate,
   onSeeAll,
   children,
 }: {
   title: string;
+  createLabel: string;
   onCreate?: () => void;
   onSeeAll: () => void;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
   const size = compact ? "md" : "sm";
   return (
@@ -67,11 +65,11 @@ function HomeSection({
       <View style={styles.actions}>
         {onCreate ? (
           <Button variant="outline" size={size} onPress={onCreate}>
-            New {title === "Schedules" ? "schedule" : "automation"}
+            {createLabel}
           </Button>
         ) : null}
         <Button variant="ghost" size={size} onPress={onSeeAll}>
-          See all
+          {t("home.schedulesLanding.seeAll")}
         </Button>
       </View>
       {children}
@@ -80,6 +78,7 @@ function HomeSection({
 }
 
 function HomeSchedules({ onSeeAll }: { onSeeAll: () => void }) {
+  const { t } = useTranslation();
   const { loadState, hostErrors, isError, refetch } = useSchedules();
   const canCreate = useCanCreateSchedules();
   const [form, setForm] = useState<"create" | AggregatedSchedule | null>(null);
@@ -96,7 +95,9 @@ function HomeSchedules({ onSeeAll }: { onSeeAll: () => void }) {
   if (!ready)
     content = (
       <Text style={styles.text}>
-        {isError ? "Could not load schedules." : "Connecting to Hosts…"}
+        {isError
+          ? t("home.schedulesLanding.schedulesFailed")
+          : t("home.schedulesLanding.connecting")}
       </Text>
     );
   else if (loadState.data.length)
@@ -109,13 +110,18 @@ function HomeSchedules({ onSeeAll }: { onSeeAll: () => void }) {
           onOpen={setDetail}
         />
       ));
-  else content = <Text style={styles.text}>No schedules yet.</Text>;
+  else content = <Text style={styles.text}>{t("home.schedulesLanding.noSchedules")}</Text>;
   return (
-    <HomeSection title="Schedules" onCreate={canCreate ? open : undefined} onSeeAll={onSeeAll}>
+    <HomeSection
+      title={t("home.schedulesLanding.schedules")}
+      createLabel={t("home.schedulesLanding.newSchedule")}
+      onCreate={canCreate ? open : undefined}
+      onSeeAll={onSeeAll}
+    >
       {content}
       {hostErrors.map((error) => (
         <Text key={error.serverId} style={styles.text}>
-          {error.serverName}: could not load schedules.
+          {t("home.schedulesLanding.hostSchedulesFailed", { host: error.serverName })}
         </Text>
       ))}
       {isError ? (
@@ -175,6 +181,7 @@ function previewRowStyle({ pressed, hovered }: PressableStateCallbackType & { ho
 }
 
 function HomeAutomations({ onOpen }: { onOpen: OpenAutomation }) {
+  const { t } = useTranslation();
   const hub = useHubAccount();
   const scope = {
     origin: hub.origin,
@@ -207,11 +214,11 @@ function HomeAutomations({ onOpen }: { onOpen: OpenAutomation }) {
     enabled &&
     canCreateAutomation(hub.signedIn?.capabilities.manageResources === true, access.data);
   let message: string | null = null;
-  if (!hub.enabled) message = "Connect a Hub to use Automations.";
-  else if (!hub.signedIn) message = "Sign in to view your organization’s Automations.";
-  else if (query.isError) message = "Could not load Automations.";
-  else if (!query.data) message = "Loading Automations…";
-  else if (!query.data.automations.length) message = "No Automations yet.";
+  if (!hub.enabled) message = t("home.schedulesLanding.connectHub");
+  else if (!hub.signedIn) message = t("home.schedulesLanding.signIn");
+  else if (query.isError) message = t("home.schedulesLanding.automationsFailed");
+  else if (!query.data) message = t("home.schedulesLanding.loadingAutomations");
+  else if (!query.data.automations.length) message = t("home.schedulesLanding.noAutomations");
   const content = message ? (
     <Text style={styles.text}>{message}</Text>
   ) : (
@@ -222,11 +229,16 @@ function HomeAutomations({ onOpen }: { onOpen: OpenAutomation }) {
     ))
   );
   return (
-    <HomeSection title="Automations" onCreate={canCreate ? create : undefined} onSeeAll={seeAll}>
+    <HomeSection
+      title={t("home.schedulesLanding.automations")}
+      createLabel={t("home.schedulesLanding.newAutomation")}
+      onCreate={canCreate ? create : undefined}
+      onSeeAll={seeAll}
+    >
       {content}
       {query.isError ? (
         <Button variant="ghost" onPress={retry}>
-          Retry
+          {t("home.schedulesLanding.retry")}
         </Button>
       ) : null}
     </HomeSection>

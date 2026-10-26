@@ -2,6 +2,8 @@ import { hostQueueVi as hostQueue } from "./host-queue";
 import type { TranslationResources } from "./en";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
+import { home } from "./home";
+import { navigation } from "./navigation";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 import { pluginSettings } from "./plugin-settings";
@@ -398,8 +400,8 @@ export const vi: TranslationResources = {
       responseFailed: "Không thể gửi câu trả lời. Hãy thử lại.",
     },
     todo: {
-      title: "Công việc",
-      empty: "Chưa có công việc nào.",
+      title: "Việc cần làm",
+      empty: "Chưa có việc nào.",
       tasksProgress: "{{completed}}/{{total}} việc",
       activity: {
         created: "Đã tạo {{count}} việc",
@@ -463,7 +465,7 @@ export const vi: TranslationResources = {
       trigger: "Tùy chọn hiển thị",
       heading: "Hiển thị",
       grouping: {
-        label: "Nhóm",
+        label: "Nhóm theo",
         project: "Dự án › Workspace",
         projectSession: "Dự án › Phiên",
         statusWorkspace: "Trạng thái › Workspace",
@@ -477,8 +479,8 @@ export const vi: TranslationResources = {
         workspace: "Workspace",
         session: "Phiên",
         status: "Trạng thái",
-        more: "Thêm",
-        moreHint: "Tất cả cách nhóm",
+        more: "Nhóm khác",
+        moreHint: "Các cách nhóm khác",
         groupBy: "Nhóm theo {{mode}}",
         active: "Đang hoạt động",
         activeOnlyHint: "Chỉ hiện các phiên đang chạy, đang chờ bạn, bị lỗi hoặc chưa đọc",
@@ -3088,6 +3090,8 @@ export const vi: TranslationResources = {
   connectors: connectors.vi,
   bots: bots.vi,
   heartbeats: heartbeats.vi,
+  navigation: navigation.vi,
+  home: home.vi,
 
   providerUsage: {
     options: "Cài đặt",

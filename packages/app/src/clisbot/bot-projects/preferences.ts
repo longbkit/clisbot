@@ -32,3 +32,13 @@ export const useBotProjectsPreference = create<{
     },
   ),
 );
+
+/**
+ * Whether the Home V2 sidebar's project list shows Bot home projects. Navigation V2 decides per
+ * session instead (the Workspace list's Bots chip), so this switch belongs to the old layout only.
+ */
+export function useShowBotProjects(): { visible: boolean; toggle: () => void } {
+  const visible = useBotProjectsPreference((state) => state.showBotProjects);
+  const toggle = useBotProjectsPreference((state) => state.toggleBotProjects);
+  return { visible, toggle };
+}

@@ -37,7 +37,7 @@ import { GrantAccessMenu } from "./access-grant-menu";
 import { AccessMemberTeams } from "./access-member-teams";
 import { BackLink } from "./back-link";
 import { DetailHeader } from "./detail-header";
-import { FilterChips } from "./filter-chips";
+import { FilterChips } from "@/components/ui/filter-chips";
 import { tableStyles } from "./table-styles";
 
 const MutedChevron = withUnistyles(ChevronRight, (theme) => ({

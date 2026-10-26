@@ -4,7 +4,7 @@ import { startArmedHermesSampling, traceInstant } from "@/performance/native-tra
 import { isNative } from "@/constants/platform";
 import { usePanelStore } from "@/stores/panel-store";
 import { HOME_V2_ENABLED } from "./feature";
-import { rememberChatReturn } from "./mobile-navigation";
+import { currentListTabPath, isListTabPath, rememberChatReturn } from "./mobile-navigation";
 
 import {
   nativePresentation,
@@ -12,6 +12,11 @@ import {
   type TransitionEvent,
 } from "./chat-list-presentation";
 export { createChatListPresentation } from "./chat-list-presentation";
+
+/** The list tabs' route names: Chat, and Navigation V2's Work. */
+function isListRouteName(name: string | undefined): boolean {
+  return name !== undefined && isListTabPath(`/${name}`);
+}
 
 /** Native-stack onAppear owns presentation; a parent navigator appearing cannot reveal a leaf. */
 export function useChatListScreenListeners() {
@@ -22,7 +27,7 @@ export function useChatListScreenListeners() {
         if (
           HOME_V2_ENABLED &&
           isNative &&
-          (navigation.getCurrentRoute() as PresentedRoute | undefined)?.name === "chat"
+          isListRouteName((navigation.getCurrentRoute() as PresentedRoute | undefined)?.name)
         )
           nativePresentation.didReturnToList();
       },
@@ -91,10 +96,10 @@ export function useChatListNavigation(
   // Destinations this owner already dispatched: Expo may commit one after a newer row was admitted.
   const dispatched = useRef(new Set<string>());
   useLayoutEffect(() => {
-    if (HOME_V2_ENABLED && !isNative && previousPath.current === "/chat" && path !== "/chat")
+    if (HOME_V2_ENABLED && !isNative && isListTabPath(previousPath.current) && !isListTabPath(path))
       closeList();
-    if (path === "/chat" && previousPath.current !== "/chat") cancelPending.current?.();
-    if (path === "/chat") dispatched.current.clear();
+    if (isListTabPath(path) && !isListTabPath(previousPath.current)) cancelPending.current?.();
+    if (isListTabPath(path)) dispatched.current.clear();
     previousPath.current = path;
   }, [closeList, path]);
   useLayoutEffect(() => () => cancelPending.current?.(), []);
@@ -102,14 +107,15 @@ export function useChatListNavigation(
     (destination?: string, go?: () => void) => {
       // Exact route must match the external one-shot arm; production/profile-off is a no-op.
       if (isNative && destination) startArmedHermesSampling(destination);
-      if (HOME_V2_ENABLED) rememberChatReturn("/chat");
       // Read the last committed path: Expo may still have a newer intent queued for dispatch.
       const committedPath = previousPath.current;
+      if (HOME_V2_ENABLED)
+        rememberChatReturn(isListTabPath(committedPath) ? committedPath : currentListTabPath());
       const panel = usePanelStore.getState().mobilePanel;
       const departing =
         HOME_V2_ENABLED &&
         isNative &&
-        (committedPath === "/chat" || nativePresentation.isPending(panel));
+        (isListTabPath(committedPath) || nativePresentation.isPending(panel));
       if (departing && destination) {
         cancelPending.current = nativePresentation.begin(panel, destination, closeList, {
           dispatched: !go,
@@ -135,7 +141,7 @@ export function useChatListNavigation(
       }
       cancelPending.current?.();
       // An overlay over an already presented workspace closes even for another tab in that workspace.
-      if (!HOME_V2_ENABLED || isNative || committedPath !== "/chat") closeList();
+      if (!HOME_V2_ENABLED || isNative || !isListTabPath(committedPath)) closeList();
       return false;
     },
     [closeList],

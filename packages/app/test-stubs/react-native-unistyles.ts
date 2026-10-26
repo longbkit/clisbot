@@ -42,6 +42,8 @@ const testTheme = {
     xs: 12,
     sm: 14,
     base: 16,
+    // Message text sits a step above the interface base, as in the real theme.
+    content: 17,
   },
   fontFamily: {
     ui: "sans-serif",

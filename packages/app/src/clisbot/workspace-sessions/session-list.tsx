@@ -1,4 +1,8 @@
-import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
+import { FLAT_ROW_FILL_INSET, sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import { PinnedRowProvider } from "@/components/ui/pin-mark";
+import { useSessionStore } from "@/stores/session-store";
+import { useWorkspaceSessionFilter } from "./session-filter";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import {
   lazy,
@@ -87,6 +91,18 @@ export const WorkspaceSessionList = memo(function WorkspaceSessionList(
   );
 });
 
+/** The list owner's session rule for this workspace, with the workspace's author as fallback. */
+function useSessionLineInclude(serverId: string, workspaceId: string) {
+  const filter = useWorkspaceSessionFilter();
+  const createdBy = useSessionStore((state) =>
+    filter ? state.sessions[serverId]?.workspaces?.get(workspaceId)?.createdBy : undefined,
+  );
+  return useMemo(
+    () => (filter ? (session: WorkspaceSessionItem) => filter(session, { createdBy }) : undefined),
+    [filter, createdBy],
+  );
+}
+
 function OpenWorkspaceSessionList({
   serverId,
   workspaceId,
@@ -104,31 +120,41 @@ function OpenWorkspaceSessionList({
 }): ReactElement | null {
   const shown = useWorkspaceShownAgents({ serverId, workspaceId, enabled: selected });
   const keepAgentIds = useMemo(() => shownAgentIds(shown), [shown]);
-  const sessions = useWorkspaceSessions({ serverId, workspaceId, activeOnly, keepAgentIds });
+  const include = useSessionLineInclude(serverId, workspaceId);
+  const sessions = useWorkspaceSessions({
+    serverId,
+    workspaceId,
+    activeOnly,
+    keepAgentIds,
+    include,
+  });
   if (sessions.length === 0) return null;
 
+  // The pin belongs to the workspace row above; its session lines carry no mark of their own.
   return (
-    <View testID={`sidebar-workspace-sessions-${workspaceKey}`}>
-      {sessions.map((session) => {
-        const agentId = session.agent.id;
-        let state: SessionLineState = "idle";
-        if (shown.selectedAgentId === agentId) state = "selected";
-        else if (shown.visibleAgentIds.has(agentId)) state = "visible";
-        return (
-          <WorkspaceSessionRow
-            key={agentId}
-            serverId={serverId}
-            workspaceId={workspaceId}
-            session={session}
-            state={state}
-            fullTitles={fullTitles}
-            details={details}
-            placement={indented ? "indented" : "flush"}
-            onPress={onSessionPress}
-          />
-        );
-      })}
-    </View>
+    <PinnedRowProvider value={false}>
+      <View testID={`sidebar-workspace-sessions-${workspaceKey}`}>
+        {sessions.map((session) => {
+          const agentId = session.agent.id;
+          let state: SessionLineState = "idle";
+          if (shown.selectedAgentId === agentId) state = "selected";
+          else if (shown.visibleAgentIds.has(agentId)) state = "visible";
+          return (
+            <WorkspaceSessionRow
+              key={agentId}
+              serverId={serverId}
+              workspaceId={workspaceId}
+              session={session}
+              state={state}
+              fullTitles={fullTitles}
+              details={details}
+              placement={indented ? "indented" : "flush"}
+              onPress={onSessionPress}
+            />
+          );
+        })}
+      </View>
+    </PinnedRowProvider>
   );
 }
 
@@ -261,6 +287,7 @@ function useSessionRowStyle({
       placement === "indented" && styles.rowIndented,
       placement === "statusGroup" && styles.rowInStatusGroup,
       placement === "topLevel" && styles.rowTopLevel,
+      placement === "topLevel" && NAVIGATION_V2_ENABLED && styles.rowTopLevelV2,
       (hovered || rowHovered) && styles.rowHovered,
       selected && styles.rowSelected,
       pressed && styles.rowPressed,
@@ -403,6 +430,12 @@ const styles = StyleSheet.create((theme) => ({
   // A workspace row's own left padding, for a line with no header above it: the Session
   // grouping, which lists straight under the Projects section.
   rowTopLevel: {
+    paddingLeft: theme.spacing[2],
+  },
+  // Navigation V2's flat list: the fill starts at `FLAT_ROW_FILL_INSET`, the mark at the
+  // controls' inset (`row-geometry.ts`).
+  rowTopLevelV2: {
+    marginLeft: FLAT_ROW_FILL_INSET - theme.spacing[2],
     paddingLeft: theme.spacing[2],
   },
   rowHovered: {

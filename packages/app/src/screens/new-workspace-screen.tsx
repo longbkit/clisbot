@@ -2,9 +2,16 @@ import { useIsFocused } from "expo-router/react-navigation";
 import { buildStartDestinations, StartDestinationOption } from "@/clisbot/home/start-destinations";
 import { orderStartOptions } from "@/clisbot/home/start-kinds";
 import { useStartTemplate, type PendingStartTemplate } from "@/clisbot/home/use-start-template";
+import { useQuickStartAutoSend } from "@/clisbot/home/use-quick-start-auto-send";
 import { snapshotStart, composerLaunch } from "@/clisbot/home/start-template";
 import { findDestination } from "@/clisbot/quick-starts/model";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import { NavigationHomeLayout } from "@/clisbot/navigation/home-layout";
+import {
+  useHomeModeStartTarget,
+  useHomeStartSwitcher,
+} from "@/clisbot/navigation/home-mode-target";
 import { HomeStartLayout, StartFeedback } from "@/clisbot/home/start-surface";
 import { StartSwitcher } from "@/clisbot/home/start-switcher";
 import { useQuickChatByDefault } from "@/clisbot/home/use-quick-chat-default";
@@ -1734,6 +1741,14 @@ export function NewWorkspaceScreen({
     effectiveIsolation,
     selectedItem,
   ]);
+  const requestAutoSend = useQuickStartAutoSend({
+    serverId: selectedServerId,
+    applying: pendingQuickStart !== null,
+    checks: [configurationProblem, templateBaseRequired, errorMessage, isPending],
+    attachments: chatDraft.attachments.length,
+    cwd: selectedSourceDirectory,
+    submit: handleSubmitNewWorkspace,
+  });
   const applyQuickStart = useCallback(
     (item: QuickStartInput) => {
       const destination = findDestination(destinations, item.target);
@@ -1745,8 +1760,11 @@ export function NewWorkspaceScreen({
       setPendingQuickStart({ serverId: selectedServerId, template: item });
       setTemplateApplied(true);
       setManualLaunchTarget({ kind: "chat" });
+      requestAutoSend(
+        item.autoSend ? { serverId: selectedServerId, text: item.startingPrompt } : null,
+      );
     },
-    [destinations, selectDestination, selectedServerId],
+    [destinations, selectDestination, selectedServerId, requestAutoSend],
   );
   // Reopening Home after a Bot chat restores that Bot with its own agent settings, through the
   // same selection a pick makes; inference alone would launch it with the composer's settings.
@@ -1802,6 +1820,15 @@ export function NewWorkspaceScreen({
       ) : undefined,
     [startKind, selectedProject, projectIconDataByProjectViewKey, projectTriggerLabel],
   );
+  useHomeModeStartTarget({
+    home,
+    focused,
+    serverId: selectedServerId,
+    startKind,
+    selectedBot,
+    setStartTarget,
+    prepareQuickChat,
+  });
   useQuickChatByDefault({
     focused,
     inferred: inferredStart,
@@ -1810,6 +1837,11 @@ export function NewWorkspaceScreen({
     kind: startKind,
     hasOrdinaryProject: destinations.some((entry) => entry.option.group === "Projects"),
     prepare: prepareQuickChat,
+  });
+  const startSwitcher = useHomeStartSwitcher({
+    home,
+    compact: isCompact,
+    quickChat: quickChatAllowed,
   });
   const quickChat = useCallback(() => chooseStart("quickChat"), [chooseStart]);
   const choices = useMemo(
@@ -1821,7 +1853,7 @@ export function NewWorkspaceScreen({
         label={projectTriggerLabel}
         mark={startKind === "project" ? projectMark : startMark}
         anchorRef={projectPickerAnchorRef}
-        quickChat={quickChatAllowed}
+        {...startSwitcher}
         onQuickChat={quickChat}
         onPick={chooseStart}
       />
@@ -1833,7 +1865,7 @@ export function NewWorkspaceScreen({
       projectTriggerLabel,
       projectMark,
       startMark,
-      quickChatAllowed,
+      startSwitcher,
       quickChat,
       chooseStart,
     ],
@@ -2107,7 +2139,8 @@ function NewWorkspacePresentation({
             {composer}
           </ComposerDock>
         ) : (
-          <HomeStartLayout
+          <StartLayout
+            navigationHome={NAVIGATION_V2_ENABLED && home}
             compact={compact}
             title={startTitle(home, t)}
             choices={choices}
@@ -2132,6 +2165,14 @@ function NewWorkspacePresentation({
       {composer}
     </NewWorkspaceLayout>
   );
+}
+
+/** Navigation V2's Home owns its own layout; New workspace and the Home V2 Home share this one. */
+function StartLayout({
+  navigationHome,
+  ...props
+}: Parameters<typeof HomeStartLayout>[0] & { navigationHome: boolean }) {
+  return navigationHome ? <NavigationHomeLayout {...props} /> : <HomeStartLayout {...props} />;
 }
 
 /** Home names itself in the header; New workspace keeps its title in the page. */

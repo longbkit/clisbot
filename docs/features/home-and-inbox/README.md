@@ -1,6 +1,10 @@
 # Home, Inbox and Quick starts
 
-CURRENT — implementation in `feat/multi-hub-hosts`, 2026-10-10.
+CURRENT — implementation in `feat/multi-hub-hosts`, 2026-10-10. With Navigation V2 on (the
+default since 2026-10-25) the sidebar, Inbox and the Home/Chat/Inbox/Automations tabs below give
+way to the rail, Chats, Work and a Home that absorbs Inbox; see
+[Navigation V2](../navigation-v2/README.md). This doc stays the reference for the Home V2 layout
+until the flag is removed.
 
 ## Navigation and scope
 
@@ -169,6 +173,9 @@ authoritative results replace that Host's rows, including an empty result. Remov
 excluded from projection. Recovery invalidates the existing history/archive query roots. Inbox
 reserves its status line, with the full per-Host errors and manual retry in Details, so errors do
 not push the reading viewport down. Retry attempts unavailable connections through the runtime.
+Each Host has 5 s to answer a history page; slower Hosts are listed as late and their rows merge
+into the shown page when they arrive, without moving rows already shown
+([connection resilience](../offline/connection-resilience.md#history-fan-out)).
 Home's deterministic activity identity ordering reuses a default `Intl.Collator`: locale/case/
 numeric semantics and accepted placement stay the same, without per-comparison ICU construction
 on Hermes. Mobile tabs acknowledge a held press with the shared interaction highlight; only the
@@ -208,8 +215,14 @@ project mapping, replication or execution on a different Host.
 
 ## Starting a session
 
-Applying a Quick start fills the composer; it never sends automatically. Users can review/change
-prompt, attachments and agent settings. Missing configured provider/model/effort/mode blocks sending
+Applying a Quick start fills the composer for review: users can change prompt, attachments and
+agent settings. A Quick start set to **Send right away** (`autoSend`, the editor's "When you tap it")
+sends instead, once its template has applied, through Home's own submit. It sends only the reader's
+own records (`canEdit`): a shared one's prompt is someone else's text, so it fills the composer. It
+also falls back to filling the composer whenever the reader would have to check something: settings
+to confirm, a worktree base asked at use time, an error, attachments already in the composer
+(`clisbot/home/use-quick-start-auto-send.ts`). This replaces the earlier rule that a Quick start
+never sends (Owner, 2026-10-26). Missing configured provider/model/effort/mode blocks sending
 until the user explicitly accepts current settings. Worktree templates retain only creation intent,
 never an existing worktree ID. Each completed use gets a fresh creation identity; retries keep the
 same identity. A missing ref or unsupported worktree is an explicit error, not a silent Local fallback.
@@ -248,7 +261,9 @@ Home shows pinned Quick starts as tiles (name, then destination) on a 3-column d
 phone grid, at most two rows; a short last row keeps column width. The section title opens the
 library, like the Inbox group titles; there is no separate View all button. With nothing pinned,
 the first slot is a tile of the same shape (New quick start, or Pin a quick start once some exist),
-so the empty grid still says what goes there. The library groups Pinned on Home (in Home order),
+so the empty grid still says what goes there. Saving a new Quick start also pins it to Home, first,
+so it shows without a separate Pin step; the pin is best effort and a conflict leaves it in the
+library. A tile that sends on tap carries a send mark. The library groups Pinned on Home (in Home order),
 Mine and Shared on this Host; New quick start is its primary action. Search fields and filter pills
 use the composer's surface (`surfaceComposer`), so anything you type into reads the same. New quick start opens even before the composer has
 a destination: it starts from the first one (Quick chat when available) and the form changes it.
@@ -267,6 +282,7 @@ The client extension is owned by `packages/app/src/clisbot/home/feature.ts`.
 `EXPO_PUBLIC_CLISBOT_HOME_V2` defaults on; `0` restores previous Home, startup/navigation and
 History grouping. The additive daemon catalog remains stored and can be used after re-enabling.
 `server_info.features.quickStarts` gates catalog/quick chat and bot launch overrides;
+`quickStartAutoSend` gates the Send right away choice (an older daemon strips `autoSend`);
 `inboxFilters` gates server type/date filtering. Older Hosts keep ordinary project creation,
 search and history pagination. Older Hubs need an update for managed Quick start ownership.
 All new shared wire fields are optional; no existing session/workspace/automation records are rekeyed.

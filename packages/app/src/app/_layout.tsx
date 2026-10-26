@@ -1,5 +1,9 @@
 import { ClientChatQueuePrincipalBinding } from "@/clisbot/bots/chat/client-queue/use-client-chat-queue";
 import { InboxActivityProvider } from "@/clisbot/home/inbox-activity";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import { NavigationActivityProvider } from "@/clisbot/navigation/activity";
+import { NavigationChrome } from "@/clisbot/navigation/list-panel";
+import { resolveNavigationChrome } from "@/clisbot/navigation/chrome-layout";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import { profileNativeRegion } from "@/utils/render-profiler";
 import { MobileHomeTabs } from "@/clisbot/home/mobile-navigation";
@@ -136,6 +140,7 @@ import { PluginCatalogSync } from "@/plugins";
 import { HubAccountProvider } from "@/clisbot/hub/account-provider";
 import { HubAccountEntryNavigation } from "@/clisbot/hub/account-entry-navigation";
 import { HubHostSynchronization } from "@/clisbot/hub/host-synchronization";
+import { HostFilterReconciler } from "@/clisbot/hub/settled-host-ids";
 import { BotsCommandCenterActions } from "@/clisbot/bots/search/command-center-registration";
 import { NotificationOpenRouter } from "@/notification-open/react";
 import { ensureOsNotificationPermission } from "@/utils/os-notifications";
@@ -431,10 +436,17 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
     }),
   });
   const hasTopLeftWindowControls = useHasWindowChromeObstruction("top-left");
+  const { railVisible, leftChromeRendered, sidebarControlsEnabled } = resolveNavigationChrome({
+    compact: isCompactLayout,
+    chromeEnabled,
+    sidebarMounted: desktopSidebarMounted,
+    sidebarVisible: desktopSidebarVisible,
+    focusMode: isWorkspaceFocusModeEnabled,
+  });
   const appChromeLayout = resolveDesktopAppChromeLayout({
-    desktopSidebarRendered: desktopSidebarVisible,
+    desktopSidebarRendered: leftChromeRendered,
     hasTopLeftWindowControls,
-    sidebarControlsEnabled: chromeEnabled && !isWorkspaceFocusModeEnabled,
+    sidebarControlsEnabled,
   });
   const compactSidebarMounted = isNative ? hasMountedSidebar : chromeEnabled;
   const sidebarChrome = profileNativeRegion(
@@ -442,6 +454,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
     <SidebarChrome
       mounted={isCompactLayout ? compactSidebarMounted : desktopSidebarMounted}
       visible={isCompactLayout ? chromeEnabled : desktopSidebarVisible}
+      railVisible={railVisible}
       keyboardShortcutsEnabled={keyboardShortcutsEnabled}
     />,
   );
@@ -577,19 +590,28 @@ function RoutedAppContent({ children, compact }: { children: ReactNode; compact:
 function SidebarChrome({
   mounted,
   visible,
+  railVisible,
   keyboardShortcutsEnabled,
 }: {
   mounted: boolean;
   visible: boolean;
+  railVisible: boolean;
   keyboardShortcutsEnabled: boolean;
 }) {
   const isCompactLayout = useIsCompactFormFactor();
   const isMobileActive = useIsMobilePanelActive("agent-list");
   const isDesktopOpen = usePanelStore((state) => state.desktop.agentListOpen);
   const active = visible && (isCompactLayout ? isMobileActive : isDesktopOpen);
+  let chrome: ReactNode = null;
+  if (mounted)
+    chrome = NAVIGATION_V2_ENABLED ? (
+      <NavigationChrome active={active} presented={visible} railVisible={railVisible} />
+    ) : (
+      <LeftSidebar active={active} presented={visible} />
+    );
   return (
     <SidebarModelProvider active={active}>
-      {mounted ? <LeftSidebar active={active} presented={visible} /> : null}
+      {chrome}
       <WorkspaceShortcutTargetsSubscriber enabled={keyboardShortcutsEnabled} />
     </SidebarModelProvider>
   );
@@ -787,6 +809,11 @@ function AppWithSidebar({ children }: { children: ReactNode }) {
     (pathname === "/open-project" ||
       pathname === "/new" ||
       (HOME_V2_ENABLED && pathname === "/chat") ||
+      (NAVIGATION_V2_ENABLED &&
+        (pathname === "/work" ||
+          pathname === "/more" ||
+          pathname === "/tasks" ||
+          pathname === "/design")) ||
       pathname === "/sessions" ||
       pathname === "/schedules" ||
       pathname === "/automations" ||
@@ -826,6 +853,9 @@ function RootStack() {
         <Stack.Screen name="new" />
         <Stack.Screen name="open-project" />
         <Stack.Screen name="chat" />
+        <Stack.Screen name="work" />
+        <Stack.Screen name="more" />
+        <Stack.Screen name="tasks" />
         <Stack.Screen name="sessions" />
         <Stack.Screen name="schedules" />
         <Stack.Screen name="automations" />
@@ -884,7 +914,9 @@ function RuntimeProviders({ children }: { children: ReactNode }) {
       <NotificationOpenBridge />
       <SidebarCalloutProvider>
         <ProvidersWrapper>
-          <InboxActivityProvider>{children}</InboxActivityProvider>
+          <InboxActivityProvider>
+            <NavigationActivityProvider>{children}</NavigationActivityProvider>
+          </InboxActivityProvider>
         </ProvidersWrapper>
       </SidebarCalloutProvider>
     </HostRuntimeBootstrapProvider>
@@ -932,6 +964,7 @@ function ClisbotHubScope({ children }: { children: ReactNode }) {
       <OfferLinkListener />
       <HubAccountProvider>
         <HubHostSynchronization />
+        <HostFilterReconciler />
         <ClientChatQueuePrincipalBinding />
         {children}
       </HubAccountProvider>

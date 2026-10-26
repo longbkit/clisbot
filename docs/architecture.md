@@ -161,7 +161,9 @@ so a loading burst does not construct one for every comparison.
 
 `DirectorySync` publishes agent and workspace/project request readiness independently into the
 Host controller snapshot. `useDirectoryHealth` selects the relevant lifecycle: Home reads agents;
-Chat's list, status and empty card share `useSidebarHostIds` and workspace readiness. Agent success
+Chat's list, status and empty card share `useSidebarHostIds` and workspace readiness. It reads
+debounced per-source health, so one unreachable Host never makes the aggregate loading or
+unavailable while another can serve; see [connection resilience](features/offline/connection-resilience.md#source-health). Agent success
 cannot complete a pending or failed workspace request. A successful empty result remains accepted
 through revalidation/error, so status changes do not unmount empty copy or focused creation actions.
 A first failed request instead exposes recovery without claiming the catalog is empty. Superseded

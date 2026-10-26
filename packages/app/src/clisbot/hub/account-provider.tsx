@@ -28,6 +28,8 @@ import {
 import { createHubTransport } from "./transport/create";
 import type { HubTransport } from "./transport/contract";
 import { updateHubProfile } from "@/device-access/hub-profiles";
+import { getHubDaemonListCache } from "./hub-daemon-list-cache";
+import { hubResourceQueryKey } from "./query-keys";
 import { HubAccountRequestError, needsOwnerSetupRecovery } from "@/device-access/hub-account-error";
 import { PairedHubTransport } from "@/device-access/hub-transport";
 import {
@@ -242,8 +244,12 @@ function EnabledHubAccountController({
     return consumedInvitation?.url === currentUrl && consumedInvitation.id === id ? null : id;
   }, [consumedInvitation, currentUrl]);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const accountQueryKey = useMemo(
+    () => ["clisbot", "hub", configuration.origin, "account", invitationId] as const,
+    [configuration.origin, invitationId],
+  );
   const account = useFetchQuery({
-    queryKey: ["clisbot", "hub", configuration.origin, "account", invitationId],
+    queryKey: accountQueryKey,
     queryFn: () => readAccountState(transport, invitationId),
     dataShape: "value",
     retry: false,
@@ -263,12 +269,30 @@ function EnabledHubAccountController({
       ...(configuration.deviceProfile ? [connection.refetch()] : []),
     ]);
   }, [account, configuration.deviceProfile, connection]);
+  // Signing in again as the same account keeps the daemon-list query key, so a list the Hub
+  // refused (401) would stay refused until its backed-off poll. Read it again at once; a read
+  // still in flight carries the old credential and is replaced.
+  const readDaemonListAgain = useCallback(() => {
+    const state = queryClient.getQueryData<HubAccountState>(accountQueryKey);
+    if (state?.status !== "active" && state?.status !== "appSetupRequired") return;
+    void queryClient.invalidateQueries({
+      queryKey: hubResourceQueryKey(
+        {
+          origin: configuration.origin,
+          organizationId: state.organization.id,
+          accountId: state.account.id,
+        },
+        "daemons",
+      ),
+      exact: true,
+    });
+  }, [accountQueryKey, configuration.origin, queryClient]);
   useEffect(
     () =>
       transport.subscribeSessionChange?.(() => {
-        void refresh();
+        void refresh().then(readDaemonListAgain);
       }),
-    [transport, refresh],
+    [transport, refresh, readDaemonListAgain],
   );
   const run = useCallback(
     async (operation: () => Promise<void>) => {
@@ -287,8 +311,10 @@ function EnabledHubAccountController({
   );
   const signIn = useCallback(
     (input?: { email: string; password: string }) =>
-      run(() => transport.signIn(input, invitationId === null ? undefined : { invitationId })),
-    [invitationId, run, transport],
+      run(() => transport.signIn(input, invitationId === null ? undefined : { invitationId })).then(
+        readDaemonListAgain,
+      ),
+    [invitationId, readDaemonListAgain, run, transport],
   );
   const signUp = useCallback(
     (input: { name: string; email: string; password: string; invitationId?: string }) =>
@@ -354,8 +380,8 @@ function EnabledHubAccountController({
           if (options?.claimInstance) await recoverOwnerSetup(error);
           throw error;
         }
-      });
-  }, [invitationId, run, transport, recoverOwnerSetup]);
+      }).then(readDaemonListAgain);
+  }, [invitationId, readDaemonListAgain, run, transport, recoverOwnerSetup]);
   const claimInstance = useCallback(
     (input: { email: string; password: string }) =>
       run(async () => {
@@ -411,8 +437,10 @@ function EnabledHubAccountController({
           await refresh();
           throw error;
         }
+        // Signing out hides this Hub's Hosts even while the Hub cannot confirm it.
+        getHubDaemonListCache().forget(configuration.origin);
       }),
-    [run, transport, refresh],
+    [run, transport, refresh, configuration.origin],
   );
   const updateProfile = useCallback(
     (input: { name?: string; image?: string | null }) =>

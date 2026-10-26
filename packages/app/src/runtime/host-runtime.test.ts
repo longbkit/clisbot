@@ -2227,6 +2227,60 @@ describe("HostRuntimeStore", () => {
     store.syncHosts([]);
   });
 
+  it("adopts an online Hub Host without reconnecting and retries one that gave up", async () => {
+    const connection = makeHost().connections[0]!;
+    let reachable = true;
+    const created: FakeDaemonClient[] = [];
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage(),
+      replicaRowStore: createMemoryReplicaRowStore(),
+      deps: {
+        createClient: () => {
+          const client = new FakeDaemonClient();
+          if (!reachable)
+            client.connect = async () => {
+              throw new Error("Transport closed before hello");
+            };
+          created.push(client);
+          return client as unknown as DaemonClient;
+        },
+        connectToDaemon: async () => {
+          throw new Error("Managed admission must not open a temporary probe");
+        },
+        getClientId: async () => "cid_adopt",
+      },
+    });
+    const online = makeHost({
+      serverId: "srv_adopt_online",
+      management,
+      connections: [connection],
+      preferredConnectionId: connection.id,
+    });
+    store.syncHosts([online]);
+    await waitForHostOnline(store, online.serverId);
+    const client = store.getClient(online.serverId);
+    const restart = vi.spyOn(store, "restartHostConnection");
+
+    await store.adoptHostConnection(online.serverId);
+    expect(store.getClient(online.serverId)).toBe(client);
+    expect(created).toHaveLength(1);
+    expect(restart).not.toHaveBeenCalled();
+
+    reachable = false;
+    const failing = makeHost({ ...online, serverId: "srv_adopt_failed" });
+    store.syncHosts([online, failing]);
+    await vi.waitFor(() =>
+      expect(store.getSnapshot(failing.serverId)?.connectionStatus).toBe("error"),
+    );
+    expect(created).toHaveLength(2);
+    reachable = true;
+    await store.adoptHostConnection(failing.serverId);
+    expect(created).toHaveLength(3);
+    expect(store.getSnapshot(failing.serverId)?.connectionStatus).toBe("online");
+    expect(store.getClient(online.serverId)).toBe(client);
+    store.syncHosts([]);
+  });
+
   it("does not retry a password-rejected managed connection until its password changes", async () => {
     const connection = makeHost().connections[0]!;
     const host = makeHost({

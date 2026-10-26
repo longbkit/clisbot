@@ -24,6 +24,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { startStatusLabel } from "./start-status";
 import { ADDABLE_PROVIDER_COUNT } from "./host-readiness";
+
 /**
  * One trigger for the Host's readiness: the ready agents' icons and a short label, opening
  * Status & Setup. The name lives in the tooltip and accessibility label, not on screen.

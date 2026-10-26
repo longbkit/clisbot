@@ -99,6 +99,8 @@ export interface SidebarWorkspaceMenuProps {
   onTogglePin?: () => void;
   /** Clisbot: a session line's menu also renames that session. */
   onRenameSession?: () => void;
+  /** Clisbot Navigation V2: a session line's menu pins or unpins that session. */
+  sessionPin?: { pinned: boolean; toggle: () => void };
   openInFileManagerPath?: string | null;
   /**
    * Lifted so the row that reveals the kebab can keep it mounted while its menu is up. See
@@ -148,6 +150,7 @@ function SidebarWorkspaceMenuItems({
   isPinned,
   onTogglePin,
   onRenameSession,
+  sessionPin,
   openInFileManagerPath,
 }: SidebarWorkspaceMenuItemsProps & { surface: MenuSurface }): ReactNode {
   const { t } = useTranslation();
@@ -222,6 +225,18 @@ function SidebarWorkspaceMenuItems({
           Mark as unread
         </WorkspaceMenuItem>
       ) : null}
+      {sessionPin ? (
+        <WorkspaceMenuItem
+          surface={surface}
+          testID={`sidebar-session-menu-pin-${workspaceKey}`}
+          leading={sessionPin.pinned ? unpinLeadingIcon : pinLeadingIcon}
+          onSelect={sessionPin.toggle}
+        >
+          {sessionPin.pinned
+            ? t("bots.workspace.sidebar.unpinSession")
+            : t("bots.workspace.sidebar.pinSession")}
+        </WorkspaceMenuItem>
+      ) : null}
       {onTogglePin ? (
         <WorkspaceMenuItem
           surface={surface}
@@ -288,6 +303,7 @@ export function SidebarWorkspaceMenu({
   isPinned,
   onTogglePin,
   onRenameSession,
+  sessionPin,
   openInFileManagerPath,
   open,
   onOpenChange,
@@ -335,6 +351,7 @@ export function SidebarWorkspaceMenu({
           isPinned={isPinned}
           onTogglePin={onTogglePin}
           onRenameSession={onRenameSession}
+          sessionPin={sessionPin}
           openInFileManagerPath={openInFileManagerPath}
         />
       </DropdownMenuContent>
@@ -369,6 +386,7 @@ export function SidebarWorkspaceContextMenu({
   isPinned,
   onTogglePin,
   onRenameSession,
+  sessionPin,
   openInFileManagerPath,
   accessibilityLabel,
   highlightStyle,
@@ -451,6 +469,7 @@ export function SidebarWorkspaceContextMenu({
           isPinned={isPinned}
           onTogglePin={onTogglePin}
           onRenameSession={onRenameSession}
+          sessionPin={sessionPin}
           openInFileManagerPath={openInFileManagerPath}
         />
       </ContextMenuContent>

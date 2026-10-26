@@ -1183,7 +1183,6 @@ test("reuses one autonomous run for unbound stream_event bursts with no foregrou
   const session = await createSession();
   const internal: {
     turnState: "idle" | "foreground" | "autonomous";
-    nextTurnOrdinal: number;
     routeSdkMessageFromPump: (
       message: Record<string, unknown>,
       activeQuery: QueryMock,
@@ -1206,8 +1205,7 @@ test("reuses one autonomous run for unbound stream_event bursts with no foregrou
   );
 
   const firstRunId = internal.autonomousTurn?.id ?? null;
-  expect(firstRunId).toBe("autonomous-turn-1");
-  expect(internal.nextTurnOrdinal).toBe(2);
+  expect(firstRunId).toMatch(/^autonomous-turn-/);
 
   await internal.routeSdkMessageFromPump(
     {
@@ -1220,7 +1218,6 @@ test("reuses one autonomous run for unbound stream_event bursts with no foregrou
     queryMock,
   );
   expect(internal.autonomousTurn?.id).toBe(firstRunId);
-  expect(internal.nextTurnOrdinal).toBe(2);
 
   await internal.routeSdkMessageFromPump(
     {
@@ -1360,12 +1357,35 @@ test("a main-session frame opens no turn until Claude starts one", async () => {
   // session start a turn of its own, with no prompt from the user.
   await internal.routeSdkMessageFromPump(claudeTurnInit(), queryMock);
   await internal.routeSdkMessageFromPump(unboundTextDelta("picking this up"), queryMock);
-  expect(internal.autonomousTurn?.id).toBe("autonomous-turn-1");
+  expect(internal.autonomousTurn?.id).toMatch(/^autonomous-turn-/);
 
   await internal.routeSdkMessageFromPump(successResult(), queryMock);
   expect(internal.autonomousTurn).toBeNull();
 
   await session.close();
+});
+
+// The channel delivery ledger keys replies by agent and turn id, and outlives the runtime (#40).
+test("an autonomous turn after resume does not reuse an earlier runtime's turn id", async () => {
+  const first = await createSession();
+  const firstInternal: SessionStateInternals = asInternals(first);
+  const queryMock = createPendingQueryMock();
+  await firstInternal.routeSdkMessageFromPump(claudeTurnInit(), queryMock);
+  const before = firstInternal.autonomousTurn?.id;
+  expect(before).toMatch(/^autonomous-turn-/);
+  await first.close();
+
+  const resumed = await new ClaudeAgentClient({
+    logger: createTestLogger(),
+    queryFactory: sdkQueryFactory,
+    resolveBinary: async () => "/test/claude/bin",
+  }).resumeSession({ provider: "claude", sessionId: "sess-1" }, { cwd: process.cwd() });
+  const resumedInternal: SessionStateInternals = asInternals(resumed);
+  await resumedInternal.routeSdkMessageFromPump(claudeTurnInit(), queryMock);
+  expect(resumedInternal.autonomousTurn?.id).toMatch(/^autonomous-turn-/);
+  expect(resumedInternal.autonomousTurn?.id).not.toBe(before);
+
+  await resumed.close();
 });
 
 test("a background subagent's frames never open a turn while the main session is idle", async () => {
@@ -1410,7 +1430,7 @@ test("Claude waking up after a helper finishes gets an autonomous turn that its 
   expect(internal.autonomousTurn).toBeNull();
 
   await internal.routeSdkMessageFromPump(claudeTurnInit(), queryMock);
-  expect(internal.autonomousTurn?.id).toBe("autonomous-turn-1");
+  expect(internal.autonomousTurn?.id).toMatch(/^autonomous-turn-/);
   expect(internal.turnState).toBe("autonomous");
 
   await internal.routeSdkMessageFromPump(unboundTextDelta("the helper is done"), queryMock);
@@ -1446,7 +1466,8 @@ test("a steer folded into a turn keeps one turn, and a turn Claude starts after 
 
   // A message that arrived while Claude wrote its final answer runs as a turn of its own.
   await internal.routeSdkMessageFromPump(claudeTurnInit(), queryMock);
-  expect(internal.autonomousTurn?.id).toBe("autonomous-turn-2");
+  expect(internal.autonomousTurn?.id).toMatch(/^autonomous-turn-/);
+  expect(internal.autonomousTurn?.id).not.toBe(turnId);
   await internal.routeSdkMessageFromPump(successResult(), queryMock);
   expect(internal.autonomousTurn).toBeNull();
   expect(internal.turnState).toBe("idle");
@@ -1483,7 +1504,7 @@ test("an idle session state closes an autonomous turn that no result closed", as
   session.subscribe((event) => events.push(event));
 
   await internal.routeSdkMessageFromPump(claudeTurnInit(), queryMock);
-  expect(internal.autonomousTurn?.id).toBe("autonomous-turn-1");
+  expect(internal.autonomousTurn?.id).toMatch(/^autonomous-turn-/);
 
   // Safety net: Claude says nothing at all is running any more.
   await internal.routeSdkMessageFromPump(sessionState("idle"), queryMock);
@@ -1685,7 +1706,7 @@ test("a new turn clears an interrupt flag no result will consume", async () => {
 
   await internal.routeSdkMessageFromPump(claudeTurnInit(), queryMock);
   expect(internal.pendingInterruptAbort).toBe(false);
-  expect(internal.autonomousTurn?.id).toBe("autonomous-turn-1");
+  expect(internal.autonomousTurn?.id).toMatch(/^autonomous-turn-/);
 
   // This turn's own failure is reported, not swallowed as the interrupted turn's leftover.
   await internal.routeSdkMessageFromPump(
