@@ -32,6 +32,48 @@ async function firstVisibleAnchor(rows: Map<string, View>, surviving: Set<string
     );
 }
 
+interface HeldAnchor {
+  rows: Map<string, View>;
+  scrollView: ScrollView;
+  offset: { current: number };
+  frame: { current: number };
+  isCurrent(): boolean;
+}
+
+/**
+ * Scrolls so the anchor row is back at `target.y`, then checks again on the next frames. The
+ * change can land over several frames (rows mount, then sections measure), so one correction two
+ * frames after the change is not enough on a slow device. A correction that does not move the row
+ * means the offset is clamped, and holding stops there.
+ */
+async function holdAnchor(
+  held: HeldAnchor,
+  target: { key: string; y: number },
+  framesLeft: number,
+  scrolledDrift: number | null,
+): Promise<void> {
+  const view = held.rows.get(target.key);
+  const position = view ? await measure(view) : null;
+  if (!held.isCurrent()) return;
+  const drift = position ? position.y - target.y : 0;
+  if (scrolledDrift !== null && Math.abs(drift - scrolledDrift) < 0.5) return;
+  let scrolled: number | null = null;
+  if (Math.abs(drift) >= 0.5) {
+    const y = Math.max(0, held.offset.current + drift);
+    held.scrollView.scrollTo({ y, animated: false });
+    // onScroll reports this offset later; the next frame must not count the same drift twice.
+    held.offset.current = y;
+    scrolled = drift;
+  }
+  if (framesLeft <= 0) return;
+  held.frame.current = requestAnimationFrame(() => {
+    void holdAnchor(held, target, framesLeft - 1, scrolled);
+  });
+}
+
+/** Frames the anchor stays held after an apply: about half a second at 60 fps, longer on a slow device. */
+const HOLD_FRAMES = 30;
+
 /** Keep the first surviving visible row at its pixel offset when the user applies updates. */
 export function useActivityAnchor(offset: { current: number }) {
   const scroll = useRef<ScrollView>(null);
@@ -68,18 +110,12 @@ export function useActivityAnchor(offset: { current: number }) {
       if (!mounted.current || version !== revision.current) return;
       change();
       if (!anchor) return;
-      const restore = async () => {
-        const view = rows.current.get(anchor.key);
-        const position = view ? await measure(view) : null;
-        if (!position || !mounted.current || version !== revision.current) return;
-        scrollView.scrollTo({
-          y: Math.max(0, offset.current + position.y - anchor.position!.y),
-          animated: false,
-        });
-      };
+      const isCurrent = () => mounted.current && version === revision.current;
+      const target = { key: anchor.key, y: anchor.position!.y };
+      const held = { rows: rows.current, scrollView, offset, frame, isCurrent };
       frame.current = requestAnimationFrame(() => {
         frame.current = requestAnimationFrame(() => {
-          void restore();
+          void holdAnchor(held, target, HOLD_FRAMES, null);
         });
       });
     },

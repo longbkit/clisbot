@@ -31,7 +31,14 @@ function setup() {
         await Promise.resolve();
       }
     });
-  return { ...hook, offset, row, scrollTo, paint };
+  const paintFrames = (count: number) =>
+    act(async () => {
+      for (let i = 0; i < count && frames.length; i++) {
+        for (const frame of frames.splice(0)) frame(0);
+        await Promise.resolve();
+      }
+    });
+  return { ...hook, offset, row, scrollTo, paint, paintFrames };
 }
 
 test.each([false, true])(
@@ -99,4 +106,15 @@ test("unmount cancels a queued restoration", async () => {
   view.unmount();
   await view.paint();
   expect(view.scrollTo).not.toHaveBeenCalled();
+});
+
+test("rows that land after the first correction are still compensated", async () => {
+  const view = setup();
+  await act(async () => view.result.current.apply(() => undefined, new Set(["survivor"])));
+  await view.paintFrames(4);
+  expect(view.scrollTo).not.toHaveBeenCalled();
+  // A section mounts a few frames late and pushes the reader's row 224px down.
+  view.row.y = 324;
+  await view.paint();
+  expect(view.scrollTo).toHaveBeenCalledExactlyOnceWith({ y: 1224, animated: false });
 });
