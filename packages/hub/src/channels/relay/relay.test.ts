@@ -1010,6 +1010,38 @@ describe("ledger dedupe (restart / replay)", () => {
     assert.equal(posts, 1, "the replayed final answer does not re-post");
   });
 
+  // A direct binding has no delivery scope: the key is Agent id + turn id + sequence, and
+  // re-attaching restarts the sequence. A resumed provider runtime must therefore mint a turn id
+  // the Agent never used; the ledger alone cannot tell a resumed turn from a replay (#40).
+  it("posts a resumed Agent's new turn once and still skips the replayed old turn", async () => {
+    const posted: string[] = [];
+    const post = async (params: OutboundPostParams): Promise<OutboundPostResult> => {
+      posted.push(params.text);
+      return { ok: true, externalMessageId: `resume-${posted.length}` };
+    };
+    const ctx = context({ externalConversationId: "C0RESUME", externalThreadId: "7.0" });
+    const answer = async (engine: RelayEngine, turnId: string, text: string) => {
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId,
+        item: { type: "assistant_message", text },
+      });
+      await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId });
+    };
+
+    const beforeClose = makeEngine(store, post);
+    beforeClose.attach(ctx);
+    await answer(beforeClose, "foreground-turn-before-close", "before close");
+
+    // Idle close + resume (or a Hub restart) re-attaches the same Agent and binding.
+    const afterResume = makeEngine(store, post);
+    afterResume.attach(ctx);
+    await answer(afterResume, "foreground-turn-after-resume", "after resume");
+    await answer(afterResume, "foreground-turn-before-close", "before close");
+
+    assert.deepEqual(posted, ["before close", "after resume"]);
+  });
+
   it("does not collide when a reused Agent restarts its provider-local turn id", async () => {
     let posts = 0;
     const post = async (): Promise<OutboundPostResult> => {

@@ -865,6 +865,34 @@ describe("ClaudeAgentSession features", () => {
     await session.close();
   });
 
+  // A resumed session writes into the same agent's channel delivery ledger, keyed by turn id.
+  // A reused id would make the Hub treat the resumed answer as a replay and skip it (#40).
+  test("does not reuse a foreground turn id when the same Claude session is resumed", async () => {
+    const { queryFactory } = createQueryMock();
+    const client = new ClaudeAgentClient({
+      logger,
+      queryFactory,
+      resolveBinary: async () => "/test/claude/bin",
+    });
+    const first = await client.createSession({ provider: "claude", cwd: process.cwd() });
+    const before = await first.startTurn("before idle close");
+    await first.close();
+
+    const { queryFactory: resumedQueryFactory } = createQueryMock();
+    const resumed = await new ClaudeAgentClient({
+      logger,
+      queryFactory: resumedQueryFactory,
+      resolveBinary: async () => "/test/claude/bin",
+    }).resumeSession({ provider: "claude", sessionId: "claude-session-1" }, { cwd: process.cwd() });
+    try {
+      const after = await resumed.startTurn("after resume");
+      expect(after.turnId).toMatch(/^foreground-turn-/);
+      expect(after.turnId).not.toBe(before.turnId);
+    } finally {
+      await resumed.close();
+    }
+  });
+
   test("passes extra Claude Code CLI arguments to the SDK", async () => {
     const { queryFactory, launches } = createQueryMock();
     const client = new ClaudeAgentClient({
