@@ -10,6 +10,8 @@ const adapters = vi.hoisted(() => ({
   adopt: vi.fn(async () => undefined),
   upsert: vi.fn(async () => ({ serverId: "server" })),
   remove: vi.fn(async () => true),
+  listError: null as { status: number } | null,
+  refetch: vi.fn(async () => undefined),
   hosts: [
     {
       serverId: "server",
@@ -39,6 +41,8 @@ vi.mock("@/data/query", () => ({
         },
       ],
     },
+    error: adapters.listError,
+    refetch: adapters.refetch,
   }),
 }));
 vi.mock("./account-provider", () => {
@@ -69,6 +73,8 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   adapters.slug = "sandbox";
+  adapters.listError = null;
+  adapters.refetch.mockClear();
   adapters.hosts = [
     {
       serverId: "server",
@@ -163,4 +169,40 @@ it("adds a Host back when it leaves the registry while the Hub still lists its d
   expect(adapters.upsert).toHaveBeenLastCalledWith(
     expect.objectContaining({ offer: expect.objectContaining({ serverId: "server" }) }),
   );
+});
+
+it("waits for the Hub to accept the account again before adding a refused Host back", async () => {
+  vi.stubGlobal("React", React);
+  const view = render(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
+  const upserts = adapters.upsert.mock.calls.length;
+
+  // The sign-in expired: the ticket was refused and the Host removed; the list read answers 401.
+  adapters.hosts = [];
+  view.rerender(<HubHostSynchronization />);
+  expect(adapters.refetch).toHaveBeenCalledTimes(1);
+  adapters.listError = { status: 401 };
+  view.rerender(<HubHostSynchronization />);
+  await new Promise((resolve) => setTimeout(resolve, 1_500));
+  expect(adapters.upsert.mock.calls.length).toBe(upserts);
+
+  // Signed in again: the list loads and the Host comes back.
+  adapters.listError = null;
+  view.rerender(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert.mock.calls.length).toBeGreaterThan(upserts), {
+    timeout: 3_000,
+  });
+});
+
+it("keeps adding a Host back while the Hub is only unreachable", async () => {
+  vi.stubGlobal("React", React);
+  const view = render(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
+  const upserts = adapters.upsert.mock.calls.length;
+  adapters.listError = { status: 503 };
+  adapters.hosts = [];
+  view.rerender(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert.mock.calls.length).toBeGreaterThan(upserts), {
+    timeout: 3_000,
+  });
 });

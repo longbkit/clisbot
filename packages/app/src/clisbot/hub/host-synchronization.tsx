@@ -8,6 +8,7 @@ import type { HubHostManagement } from "@/types/host-connection";
 import { i18n } from "@/i18n/i18next";
 import { HubAccountScope, useHubAccount, useHubAccounts } from "./account-provider";
 import { HubAccessTicketSchema } from "./contracts";
+import { classifyHubFailure } from "./hub-failure";
 import { hubManagedHostRequiresAccessTicket } from "./managed-host-admission";
 import { orphanedManagedHosts } from "./managed-host-reconciliation";
 import { useHubDaemonsQuery } from "./host-inventory";
@@ -125,6 +126,12 @@ function AccountHostSynchronization() {
   ) {
     return null;
   }
+  // The list kept from before a 401 or 403 still mounts the bindings, but the Hub refuses this
+  // account a ticket too: re-adding a Host it removed would be refused again.
+  const hubRefusesAccount =
+    daemons.error !== null &&
+    daemons.error !== undefined &&
+    classifyHubFailure(daemons.error) !== "unreachable";
   return daemons.data.daemons.flatMap((daemon) =>
     daemon.connectionOffer === null
       ? []
@@ -137,6 +144,8 @@ function AccountHostSynchronization() {
             managedAccessMode={daemon.managedAccessMode}
             hubOrigin={hubOrigin}
             organizationId={signedIn.organization.id}
+            readdPaused={hubRefusesAccount}
+            refreshList={daemons.refetch}
           />,
         ],
   );
@@ -176,6 +185,8 @@ function HubHostBinding({
   managedAccessMode,
   hubOrigin,
   organizationId,
+  readdPaused,
+  refreshList,
 }: {
   daemonId: string;
   label: string;
@@ -183,6 +194,9 @@ function HubHostBinding({
   managedAccessMode: "off" | "external";
   hubOrigin: string;
   organizationId: string;
+  /** The Hub answered that this account must sign in again or lost access. */
+  readdPaused: boolean;
+  refreshList: () => unknown;
 }) {
   const hub = useHubAccount();
   const [attempt, setAttempt] = useState(0);
@@ -345,34 +359,54 @@ function HubHostBinding({
 
   // The Hub still lists this daemon, so a Host that left the registry while this binding is
   // mounted (a revocation during a Hub blip) is added back rather than left "Registering" until a
-  // reload. Repeated removals back off, so a real denial does not turn into a tight loop.
+  // reload. Repeated removals back off, so a real denial does not turn into a tight loop. A
+  // removal also reads the list again: while the Hub answers 401 or 403 nothing is added back,
+  // and the first list it serves again (after signing in) adds the Host back at once.
   const hosts = useHosts();
   const registered = hosts.some((host) => host.serverId === synchronizedOffer.serverId);
   const wasRegisteredRef = useRef(false);
   const readdCountRef = useRef(0);
   const registeredSinceRef = useRef<number | null>(null);
+  const readdDelayRef = useRef<number | null>(null);
+  const refreshListRef = useRef(refreshList);
+  refreshListRef.current = refreshList;
   useEffect(() => {
     if (registered) {
       wasRegisteredRef.current = true;
       registeredSinceRef.current = Date.now();
+      readdDelayRef.current = null;
       return;
     }
     if (!wasRegisteredRef.current) return;
-    wasRegisteredRef.current = false;
-    const stableFor = Date.now() - (registeredSinceRef.current ?? 0);
-    if (stableFor >= HOST_READD_STABLE_MS) readdCountRef.current = 0;
-    const delay = Math.min(
-      HOST_READD_MAX_DELAY_MS,
-      HOST_READD_BASE_DELAY_MS * 2 ** readdCountRef.current,
-    );
-    readdCountRef.current += 1;
+    if (readdDelayRef.current === null) {
+      readdDelayRef.current = nextReaddDelay(readdCountRef, registeredSinceRef.current);
+      void refreshListRef.current();
+    }
+    if (readdPaused) {
+      readdCountRef.current = 0;
+      readdDelayRef.current = HOST_READD_BASE_DELAY_MS;
+      return;
+    }
+    const delay = readdDelayRef.current;
     recordHostDiagnostic("managed-host-readd-scheduled", {
       serverId: synchronizedOffer.serverId,
       daemonId,
       delayMs: delay,
     });
-    const timer = setTimeout(retry, delay);
+    const timer = setTimeout(() => {
+      wasRegisteredRef.current = false;
+      readdDelayRef.current = null;
+      retry();
+    }, delay);
     return () => clearTimeout(timer);
-  }, [daemonId, registered, retry, synchronizedOffer.serverId]);
+  }, [daemonId, readdPaused, registered, retry, synchronizedOffer.serverId]);
   return null;
+}
+
+/** The wait before re-adding a removed Host: doubling per removal, reset after a stable spell. */
+function nextReaddDelay(count: { current: number }, registeredSince: number | null): number {
+  if (Date.now() - (registeredSince ?? 0) >= HOST_READD_STABLE_MS) count.current = 0;
+  const delay = Math.min(HOST_READD_MAX_DELAY_MS, HOST_READD_BASE_DELAY_MS * 2 ** count.current);
+  count.current += 1;
+  return delay;
 }

@@ -76,6 +76,12 @@ Unreachable never hides or wipes data.
 The daemon list polls every 60 s while the Hub answers, then backs off (jittered, doubling) to
 at most 5 min after consecutive failures.
 
+A Hub Host removed while the Hub still lists its daemon (a refused ticket) is added back with a
+doubling wait, and the removal reads the list again. While that read answers 401 or 403, nothing
+is added back: the Hub would refuse the ticket again, and with an expired sign-in every Host of
+that Hub looped through remove and re-add. The first list the Hub serves again, after signing in,
+adds the Host back at once (`clisbot/hub/host-synchronization.tsx`).
+
 ## Remembered Hub daemon list
 
 `hub-daemon-list-cache.ts` stores, per Hub origin, the last list the signed-in account read:
