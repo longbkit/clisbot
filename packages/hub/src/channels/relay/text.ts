@@ -48,12 +48,21 @@ export function appendThreadLink(
 }
 
 /**
- * The ledger event-turn id: the agent + stream turn id (stable across replay),
- * and a suffix for everything that is not the answer. Status lines get their
- * own id so their sequence counter cannot shift the answer's key — how many
- * of them went out depends on the clock, and a shifted key is a second post
- * of the same answer after a replay.
+ * The ledger event-turn id: the agent (or delivery scope) + stream turn id,
+ * both stable across replay. An answer message the provider gave an id is
+ * keyed by that id too, so its key is the same on every replay and no other
+ * message of the turn can take it — not after a re-attach, not after a Hub
+ * restart forgot the turn (#40). Everything that is not the answer gets a
+ * suffix: status lines count their own sequence, which depends on the clock,
+ * and a shifted answer key is a second post of the same answer after a replay.
  */
-export function ledgerTurnId(scopeId: string, turnId: string, outputKind: string): string {
-  return outputKind === "assistant" ? `${scopeId}:${turnId}` : `${scopeId}:${turnId}:${outputKind}`;
+export function ledgerTurnId(
+  scopeId: string,
+  turnId: string,
+  outputKind: string,
+  messageId?: string | undefined,
+): string {
+  if (outputKind !== "assistant") return `${scopeId}:${turnId}:${outputKind}`;
+  if (messageId === undefined) return `${scopeId}:${turnId}`;
+  return `${scopeId}:${turnId}:message:${messageId}`;
 }

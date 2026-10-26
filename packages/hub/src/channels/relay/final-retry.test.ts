@@ -17,6 +17,7 @@ import { ManualClock } from "../plane/clock.js";
 import { outboundFailure, type OutboundFailureKind } from "../plane/outbound-failure.js";
 import type { OutboundPostResult, PlaneLogger, PostFn, StreamContext } from "../plane/types.js";
 import { RelayEngine } from "./index.js";
+import { ledgerTurnId } from "./text.js";
 import {
   FinalAnswerRetrier,
   MAX_FINAL_ANSWER_ATTEMPTS,
@@ -161,9 +162,14 @@ async function ledgerRow(accountId: string, turnId: string, outputKind = "assist
     "out",
     "C1",
     "1.0",
-    // Status lines carry their own event-turn id, so their sequence counter
-    // can never shift the answer's ledger key (`relay/text.ts`).
-    outputKind === "assistant" ? `${AGENT_ID}:${turnId}` : `${AGENT_ID}:${turnId}:${outputKind}`,
+    // `answer` gives its message an id, which keys the answer; status lines
+    // carry their own event-turn id (`relay/text.ts`).
+    ledgerTurnId(
+      AGENT_ID,
+      turnId,
+      outputKind,
+      outputKind === "assistant" ? `${turnId}-m` : undefined,
+    ),
     0,
   );
   assert.ok(record, "the ledger row exists");
