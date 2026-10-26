@@ -142,3 +142,19 @@ test("a reverted pending batch cancels its timer; the next batch gets its own de
   act(() => vi.advanceTimersByTime(1));
   expect(keys(result.current.accepted)).toEqual(["host:next", "host:existing"]);
 });
+
+test("a held layout whose rows all left takes the rows that arrived at once, even under hover", () => {
+  vi.useFakeTimers();
+  const { result, rerender } = renderHook(
+    ({ agents }) => {
+      const interaction = useHomeInteraction();
+      return { interaction, ...useActivityLayout(agents, day, interaction.automatic) };
+    },
+    { initialProps: { agents: [agent("gone", 1)] } },
+  );
+  act(() => result.current.interaction.handlers.onPointerEnter(mouse));
+  rerender({ agents: [agent("fresh", 2), agent("other", 3)] });
+  act(() => vi.advanceTimersByTime(0));
+  expect(keys(result.current.accepted).sort()).toEqual(["host:fresh", "host:other"]);
+  expect(result.current.pending).toBe(0);
+});
