@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/shallow";
 import type { WorkspaceStructureProject } from "@/projects/workspace-structure";
 import { useSessionStore } from "@/stores/session-store";
+import { QUICK_CHAT_PROJECT_VIEW_KEY } from "./quick-chat-project-key";
 
 /**
  * A Host names its Quick chats folder in `server_info.quickChatRoot`; every project and chat
@@ -61,8 +62,7 @@ export function quickChatProjectKeys(
   return keys;
 }
 
-/** The one project every Quick chat folds into in Navigation V2's Workspace list. */
-export const QUICK_CHAT_PROJECT_VIEW_KEY = "clisbot:quick-chat";
+export { QUICK_CHAT_PROJECT_VIEW_KEY };
 
 /**
  * Navigation V2: Quick chats are ordinary Workspace sessions, so they are not set apart — every

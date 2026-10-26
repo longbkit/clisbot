@@ -18,6 +18,7 @@ import {
   type SidebarProjectEntry,
   type SidebarWorkspacePlacement,
 } from "./sidebar-workspaces-view-model";
+import { QUICK_CHAT_PROJECT_VIEW_KEY } from "@/clisbot/quick-chats/quick-chat-project-key";
 
 function workspaceWithForge(forge: string | undefined, prUrl: string): WorkspaceDescriptor {
   return {
@@ -536,6 +537,61 @@ describe("shared sidebar workspace model", () => {
     });
 
     expect(entries.get("srv:clone-a")?.projectViewKey).toBe(projectKey);
+  });
+
+  it("names a Quick chat row after the one Quick chat project, not its Host folder", () => {
+    const placement: SidebarWorkspacePlacement = {
+      workspaceKey: "srv:chat-1",
+      serverId: "srv",
+      workspaceId: "chat-1",
+      projectViewKey: QUICK_CHAT_PROJECT_VIEW_KEY,
+      projectName: "Chat nhanh",
+      projectKind: "directory",
+      workspaceKind: "checkout",
+      name: "chat-1",
+    };
+    const entries = buildSidebarWorkspaceEntries({
+      placements: [
+        placement,
+        {
+          ...placement,
+          workspaceKey: "srv:repo",
+          workspaceId: "repo",
+          projectViewKey: "srv:repo",
+          projectName: "Ignored",
+        },
+      ],
+      sessions: [
+        {
+          serverId: "srv",
+          workspaceAgentActivity: new Map(),
+          workspaces: new Map([
+            [
+              "chat-1",
+              workspace({
+                id: "chat-1",
+                name: "chat-1",
+                projectId: "quick",
+                projectDisplayName: "Quick chats",
+              }),
+            ],
+            [
+              "repo",
+              workspace({
+                id: "repo",
+                name: "main",
+                projectId: "repo",
+                projectDisplayName: "acme/app",
+              }),
+            ],
+          ]),
+        },
+      ],
+    });
+
+    expect(entries.get("srv:chat-1")?.projectName).toBe("Chat nhanh");
+    // Every other placement keeps the workspace's own project name.
+    expect(entries.get("srv:repo")?.projectName).toBe("acme/app");
   });
 });
 

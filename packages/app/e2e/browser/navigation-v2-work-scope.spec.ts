@@ -38,6 +38,7 @@ interface Fleet {
   port: number;
   teammateWorkspaceId: string;
   sandboxWorkspaceId: string;
+  releaseWorkspaceId: string;
 }
 
 function agentRecord(input: {
@@ -192,7 +193,12 @@ const test = base.extend<{ fleet: Fleet }>({
       await createQuickChat(client, TITLES.quickB);
       // Pinned on the Host by the teammate: the pin travels with the workspace to every reader.
       await client.setWorkspacePinned(seeded.teammateWorkspaceId, true);
-      await provide({ serverId: daemon.serverId, port: daemon.port, ...seeded });
+      await provide({
+        serverId: daemon.serverId,
+        port: daemon.port,
+        releaseWorkspaceId: release.workspace.id,
+        ...seeded,
+      });
     } finally {
       await client.close().catch(() => undefined);
       await repo.cleanup().catch(() => undefined);
@@ -237,9 +243,10 @@ async function scope(page: Page, value: "mine" | "others" | "all") {
 
 async function shot(page: Page, name: string) {
   if (!SHOTS) return;
-  await mkdir(SHOTS, { recursive: true });
+  const file = path.join(SHOTS, `${name}.png`);
+  await mkdir(path.dirname(file), { recursive: true });
   await page.waitForTimeout(600);
-  await page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
+  await page.screenshot({ path: file });
 }
 
 /** The seeded titles in the order the list shows them. */
@@ -340,3 +347,42 @@ for (const viewport of [
     await shot(page, `${viewport.name}-project-all`);
   });
 }
+
+const VIEWPORTS = [
+  { name: "desktop", width: 1440, height: 900 },
+  { name: "phone", width: 390, height: 844 },
+];
+const shotsDescribe = SHOTS ? test.describe : test.describe.skip;
+
+/** The review set: both groupings with a pinned row in each scope, per theme and language. */
+shotsDescribe("Workspace screenshots", () => {
+  for (const theme of ["light", "dark"])
+    for (const language of ["vi", "en"])
+      test(`Project and Session grouping with pins (${theme} · ${language})`, async ({
+        page,
+        fleet,
+      }) => {
+        test.setTimeout(300_000);
+        // A pin of the reader's own beside the teammate's, so For me shows a pinned row too.
+        const client = await connectSeedClient({ port: fleet.port });
+        await client.setWorkspacePinned(fleet.releaseWorkspaceId, true);
+        await client.close();
+        await page.addInitScript(
+          (settings) => localStorage.setItem("@clisbot:app-settings", JSON.stringify(settings)),
+          { theme, language },
+        );
+        for (const viewport of VIEWPORTS) {
+          await openWork(page, fleet, viewport);
+          for (const mode of ["project", "session"] as const) {
+            await group(page, mode);
+            for (const value of ["mine", "all"] as const) {
+              await scope(page, value);
+              await expect(work(page).getByTestId("pinned-float").first()).toBeVisible({
+                timeout: 30_000,
+              });
+              await shot(page, `matrix/${theme}-${language}/${viewport.name}-${mode}-${value}`);
+            }
+          }
+        }
+      });
+});

@@ -15,6 +15,7 @@ import { aggregateSidebarStateBuckets } from "@/utils/sidebar-agent-state";
 import { shortenPath } from "@/utils/shorten-path";
 import type { WorkspaceAgentActivity } from "@/utils/workspace-agent-activity";
 import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
+import { QUICK_CHAT_PROJECT_VIEW_KEY } from "@/clisbot/quick-chats/quick-chat-project-key";
 
 const EMPTY_PROJECTS: SidebarProjectEntry[] = [];
 
@@ -147,6 +148,8 @@ export function createSidebarWorkspaceEntry(input: {
   serverId: string;
   workspace: WorkspaceDescriptor;
   projectViewKey?: string;
+  /** The placement's project name when it differs from the workspace's own (merged projects). */
+  projectName?: string;
   pendingCreateAttempts?: Record<string, PendingCreateAttempt>;
   workspaceAgentActivity?: ReadonlyMap<string, WorkspaceAgentActivity>;
 }): SidebarWorkspaceEntry {
@@ -164,7 +167,7 @@ export function createSidebarWorkspaceEntry(input: {
     serverId: input.serverId,
     workspaceId: input.workspace.id,
     projectViewKey,
-    projectName: projectNameForWorkspace(input.workspace),
+    projectName: input.projectName ?? projectNameForWorkspace(input.workspace),
     projectRootPath: input.workspace.projectRootPath,
     workspaceDirectory: input.workspace.workspaceDirectory,
     workspaceDirectoryLabel:
@@ -382,6 +385,11 @@ export function buildSidebarWorkspaceEntries(input: {
       serverId: placement.serverId,
       workspace,
       projectViewKey: placement.projectViewKey,
+      // Navigation V2 folds every Quick chat into one project; its rows carry that name.
+      projectName:
+        placement.projectViewKey === QUICK_CHAT_PROJECT_VIEW_KEY
+          ? placement.projectName
+          : undefined,
       pendingCreateAttempts: input.pendingCreateAttempts,
       workspaceAgentActivity: session.workspaceAgentActivity,
     });
