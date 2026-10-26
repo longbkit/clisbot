@@ -7,6 +7,7 @@ import { expect, test, disabledQueueProviders } from "../support/helpers/queue-f
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
 import { getServerId } from "../support/helpers/server-id";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
+import { pressQueueRowAction } from "../support/helpers/queue-row";
 
 test.use({
   hasTouch: true,
@@ -127,7 +128,7 @@ for (const surface of ["agent", "direct", "group"] as const) {
       await expect(composer).toHaveValue("");
       const original = (await queue({ action: "fetch" })).queue!;
       const id = original.items[0].id;
-      await row.getByRole("button", { name: "Edit", exact: true }).click();
+      await pressQueueRowAction(page, row, "Edit");
       await expect(composer).toHaveValue(surface === "direct" ? "" : "Queued draft A");
       await expect(page.getByTestId("composer-file-attachment-pill")).toBeVisible();
       await expect(page.getByTestId("composer-image-attachment-pill")).toBeVisible();
@@ -135,7 +136,7 @@ for (const surface of ["agent", "direct", "group"] as const) {
       expect(opened.revision).toBe(original.revision); // No Host edit state or lock.
       await scope.getByRole("button", { name: "Cancel edit", exact: true }).click();
       expect((await queue({ action: "fetch" })).queue!.revision).toBe(original.revision);
-      await row.getByRole("button", { name: "Edit", exact: true }).click();
+      await pressQueueRowAction(page, row, "Edit");
       await expect(page.getByTestId("composer-send-once-queue")).toHaveCount(0);
       await composer.fill("Edited draft in original position");
       await scope.getByRole("button", { name: "Save changes", exact: true }).first().click();
@@ -171,10 +172,7 @@ for (const surface of ["agent", "direct", "group"] as const) {
           .filter({ hasText: "Steer through the shared saved setting" }),
       ).toBeVisible();
       expect((await queue({ action: "fetch" })).queue!.items.map((item) => item.id)).toEqual([id]);
-      await scope
-        .locator(`[data-testid="host-queue-${id}"]`)
-        .getByRole("button", { name: "Edit", exact: true })
-        .click();
+      await pressQueueRowAction(page, scope.locator(`[data-testid="host-queue-${id}"]`), "Edit");
       await composer.fill("Local draft survives the original handoff");
       const latest = (await queue({ action: "fetch" })).queue!;
       const sent = await queue({
@@ -215,10 +213,11 @@ for (const surface of ["agent", "direct", "group"] as const) {
       expect(newQueue.items).toHaveLength(1);
       expect(newQueue.items[0].id).not.toBe(id);
       expect(newQueue.items[0].text).toBe("Local draft survives the original handoff");
-      await scope
-        .locator(`[data-testid="host-queue-${newQueue.items[0].id}"]`)
-        .getByRole("button", { name: "Delete", exact: true })
-        .click();
+      await pressQueueRowAction(
+        page,
+        scope.locator(`[data-testid="host-queue-${newQueue.items[0].id}"]`),
+        "Delete",
+      );
       await expect(scope.locator('[data-testid^="host-queue-"]')).toHaveCount(0);
       await writeFile(
         info.outputPath(`${surface}-provenance.json`),

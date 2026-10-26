@@ -4,6 +4,7 @@ import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { test, expect, disabledQueueProviders } from "../support/helpers/queue-fixture";
 import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
+import { pressQueueRowAction } from "../support/helpers/queue-row";
 
 test.use({
   hasTouch: true,
@@ -79,10 +80,7 @@ test("stale editor admits once while acknowledgement is held and retries the sam
     expect(seeded.error).toBeNull();
     await openAgentRoute(page, { workspaceId: workspace.workspaceId, agentId: workspace.agentId });
     const input = page.getByRole("textbox").last();
-    await page
-      .getByTestId("host-queue-original")
-      .getByRole("button", { name: "Edit", exact: true })
-      .click();
+    await pressQueueRowAction(page, page.getByTestId("host-queue-original"), "Edit");
     await input.fill("Deliberate new queued draft");
     const before = (await queue({ action: "fetch" })).queue!;
     await queue({ action: "delete", id: "original", revision: before.revision });

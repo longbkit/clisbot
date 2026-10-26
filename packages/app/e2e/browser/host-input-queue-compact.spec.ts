@@ -86,7 +86,13 @@ for (const manual of [false, true]) {
           await expect(scope.getByText("Client queue (this app)", { exact: true })).toHaveCount(0);
           const box = (await first.boundingBox())!;
           expect(box.height).toBeLessThanOrEqual(56);
-          for (const label of ["Edit", "Delete", manual ? "Send message" : "Steer this send"]) {
+          // A phone row shows Send and ⋯; a desktop row shows Send, and View, Edit and Delete
+          // over its first line while hovered (packages/app/src/composer/queue-row.tsx).
+          const send = manual ? "Send message" : "Steer this send";
+          const labels =
+            name === "phone" ? ["More actions", send] : ["View", "Edit", "Delete", send];
+          if (name === "desktop") await first.hover();
+          for (const label of labels) {
             const button = first.getByRole("button", { name: label, exact: true });
             const target = (await button.boundingBox())!;
             expect(target.height).toBeGreaterThanOrEqual(44);

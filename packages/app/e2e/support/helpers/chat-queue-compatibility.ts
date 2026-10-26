@@ -5,6 +5,7 @@ import { daemonWsRoutePattern } from "./daemon-port";
 import { connectDaemonClient } from "./daemon-client-loader";
 import { longPressSend } from "./queue-send-gesture";
 import { attachFileFromMenu, attachComposerTestImage } from "./composer";
+import { pressQueueRowAction } from "./queue-row";
 
 export function registerChatQueueCompatibility() {
   test.use({
@@ -134,7 +135,7 @@ export function registerChatQueueCompatibility() {
             .locator('[data-testid^="host-queue-"]')
             .filter({ hasText: "Delete this local item" });
           await expect(disposable).toBeVisible();
-          await disposable.getByRole("button", { name: "Delete", exact: true }).tap();
+          await pressQueueRowAction(page, disposable, "Delete", "tap");
           await expect(disposable).toHaveCount(0);
           await expect(page.getByTestId(`host-queue-${itemId}`)).toBeVisible();
         }
@@ -149,7 +150,7 @@ export function registerChatQueueCompatibility() {
           await expect(
             row.getByRole("button", { name: "Steer this send", exact: true }),
           ).toHaveCount(0);
-          await row.getByRole("button", { name: "Edit", exact: true }).tap();
+          await pressQueueRowAction(page, row, "Edit", "tap");
           await expect(input).toHaveValue("2+2");
           await expect(page.getByTestId("composer-file-attachment-pill")).toBeVisible();
           await expect(page.getByTestId("composer-image-attachment-pill")).toBeVisible();

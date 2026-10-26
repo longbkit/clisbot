@@ -4,6 +4,7 @@ import { longPressSend } from "../support/helpers/queue-send-gesture";
 import { attachFileFromMenu } from "../support/helpers/composer";
 import { expect, test, disabledQueueProviders } from "../support/helpers/queue-fixture";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
+import { pressQueueRowAction } from "../support/helpers/queue-row";
 test.use({
   hasTouch: true,
   e2eDaemonConfig: {
@@ -65,7 +66,7 @@ test("disabled Host queue retains dismissed drafts and admits attachments throug
     await expect(row.getByLabel("Attachments (1)", { exact: true })).toBeVisible();
     await expect(page.getByRole("alert").filter({ hasText: "Update this Host" })).toHaveCount(0);
     expect(client.getLastServerInfoMessage()?.features?.hostInputQueue).not.toBe(true);
-    await row.getByRole("button", { name: "Edit", exact: true }).tap();
+    await pressQueueRowAction(page, row, "Edit", "tap");
     await expect(composer).toHaveValue("Keep this client queue draft");
     await expect(page.getByTestId("composer-file-attachment-pill")).toBeVisible();
     await page.getByTestId("composer-send-button").tap();

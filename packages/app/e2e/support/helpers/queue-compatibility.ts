@@ -6,6 +6,7 @@ import { openAgentRoute, seedMockAgentWorkspace } from "./mock-agent";
 import { longPressSend } from "./queue-send-gesture";
 import { attachFileFromMenu } from "./composer";
 import { connectDaemonClient } from "./daemon-client-loader";
+import { pressQueueRowAction } from "./queue-row";
 
 export function registerSessionQueueCompatibility(mode: "legacy" | "upgrade") {
   test.use({
@@ -129,7 +130,7 @@ export function registerSessionQueueCompatibility(mode: "legacy" | "upgrade") {
             .filter({ hasText: "Explicit local queue" });
           await expect(row).toBeVisible();
           const rowId = await row.getAttribute("data-testid");
-          await row.getByRole("button", { name: "Edit", exact: true }).tap();
+          await pressQueueRowAction(page, row, "Edit", "tap");
           await expect(page.getByTestId("composer-file-attachment-pill")).toBeVisible();
           await input.fill("Edited local queue");
           await page.getByTestId("composer-send-button").tap();
@@ -140,10 +141,7 @@ export function registerSessionQueueCompatibility(mode: "legacy" | "upgrade") {
           expect(violations).toEqual([]);
           await page.screenshot({ path: info.outputPath("legacy-client-queue.png") });
           if (mode === "legacy") {
-            await page
-              .getByTestId(rowId!)
-              .getByRole("button", { name: "Delete", exact: true })
-              .tap();
+            await pressQueueRowAction(page, page.getByTestId(rowId!), "Delete", "tap");
             await expect(page.getByTestId(rowId!)).toHaveCount(0);
             if (preference === "queue") {
               await client.cancelAgent(workspace.agentId);
@@ -180,7 +178,7 @@ export function registerSessionQueueCompatibility(mode: "legacy" | "upgrade") {
             )
             .toBe(1);
           await expect(page.getByTestId(rowId!)).toContainText("Edited local queue");
-          await page.getByTestId(rowId!).getByRole("button", { name: "Delete", exact: true }).tap();
+          await pressQueueRowAction(page, page.getByTestId(rowId!), "Delete", "tap");
           await expect(page.getByTestId(rowId!)).toHaveCount(0);
           expect(
             (
