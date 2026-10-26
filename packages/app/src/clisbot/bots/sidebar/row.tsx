@@ -1,4 +1,4 @@
-import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
+import { FLAT_ROW_FILL_INSET, sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import { SidebarStatusDot } from "@/components/agent-status-dot";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { getStatusBucketLabel } from "@/hooks/sidebar-status-view-model";
@@ -81,7 +81,7 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
   );
   return (
     <View
-      style={styles.container}
+      style={[styles.container, NAVIGATION_V2_ENABLED && styles.containerV2]}
       testID={testID}
       onPointerEnter={handleHoverIn}
       onPointerLeave={handleHoverOut}
@@ -228,7 +228,11 @@ export function BotsSidebarRowSkeleton() {
       accessibilityRole="progressbar"
     >
       {SKELETON_ROWS.map((key) => (
-        <View key={key} style={styles.container} testID="chats-list-placeholder-row">
+        <View
+          key={key}
+          style={[styles.container, NAVIGATION_V2_ENABLED && styles.containerV2]}
+          testID="chats-list-placeholder-row"
+        >
           <View
             style={[styles.row, compact && styles.rowTouch, NAVIGATION_V2_ENABLED && styles.rowV2]}
           >
@@ -270,6 +274,9 @@ const styles = StyleSheet.create((theme) => ({
     marginBottom: theme.spacing[0.5],
     paddingLeft: sectionRowIndent(theme),
   },
+  // Navigation V2's flat lists: no section indent; the fill starts at `FLAT_ROW_FILL_INSET`
+  // inside the list's 8px padding.
+  containerV2: { paddingLeft: 0, marginLeft: FLAT_ROW_FILL_INSET - theme.spacing[2] },
   row: {
     flex: 1,
     minWidth: 0,

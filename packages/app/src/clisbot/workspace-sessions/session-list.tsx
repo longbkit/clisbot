@@ -1,4 +1,4 @@
-import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
+import { FLAT_ROW_FILL_INSET, sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { PinnedRowProvider } from "@/components/ui/pin-mark";
 import { useSessionStore } from "@/stores/session-store";
@@ -432,10 +432,11 @@ const styles = StyleSheet.create((theme) => ({
   rowTopLevel: {
     paddingLeft: theme.spacing[2],
   },
-  // Navigation V2 lists workspace rows (pinned, Workspace grouping) beside these lines; the
-  // status-group indent puts both titles on one rail.
+  // Navigation V2's flat list: the fill starts at `FLAT_ROW_FILL_INSET`, the mark at the
+  // controls' inset (`row-geometry.ts`).
   rowTopLevelV2: {
-    paddingLeft: theme.spacing[2] + theme.spacing[2],
+    marginLeft: FLAT_ROW_FILL_INSET - theme.spacing[2],
+    paddingLeft: theme.spacing[2],
   },
   rowHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,

@@ -13,6 +13,7 @@ import { activityBucket, isUnreadReply } from "./activity";
 import { traceInstant } from "@/performance/native-trace";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import {
+  FLAT_ROW_FILL_INSET,
   SIDEBAR_TWO_LINE_ROW_HEIGHT,
   sidebarLeadingColumnWidth,
 } from "@/components/sidebar/row-geometry";
@@ -180,7 +181,13 @@ const styles = StyleSheet.create((t) => ({
     borderRadius: t.borderRadius.lg,
   },
   // Navigation V2: the Chats and Workspace rows' rails, so the title sits where theirs do.
-  rowV2: { gap: t.spacing[2], minHeight: SIDEBAR_TWO_LINE_ROW_HEIGHT },
+  // The feed's 12px padding is the controls' inset; the fill pulls out to `FLAT_ROW_FILL_INSET`.
+  rowV2: {
+    gap: t.spacing[2],
+    minHeight: SIDEBAR_TWO_LINE_ROW_HEIGHT,
+    marginHorizontal: FLAT_ROW_FILL_INSET - t.spacing[3],
+    paddingHorizontal: t.spacing[3] - FLAT_ROW_FILL_INSET,
+  },
   rowHovered: { backgroundColor: t.colors.surface1 },
   rowPressed: { backgroundColor: t.colors.surface2 },
   leading: { width: t.iconSize.sm, alignItems: "center" },

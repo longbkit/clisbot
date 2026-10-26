@@ -296,6 +296,23 @@ async function rowHeights(page: Page, list: ListName): Promise<number[]> {
     );
 }
 
+const SESSION_ROWS = '[data-testid^="sidebar-workspace-session-"]';
+
+async function groupWork(page: Page, mode: "session" | "workspace") {
+  const work = page.getByTestId("work-pane").filter({ visible: true });
+  const tab = work.getByTestId(`sidebar-view-${mode}`);
+  if (await tab.count()) await tab.click();
+  else {
+    await work.getByTestId("sidebar-view-more").click();
+    await page.getByTestId(`sidebar-view-more-${mode}`).click();
+  }
+  await expect(
+    work.locator(mode === "session" ? SESSION_ROWS : LISTS.work.rows).first(),
+  ).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
 /** The section each list sits in; rails are measured from its edge. */
 const FRAMES: Record<ListName, string> = {
   chats: '[data-testid="chats-pane"]',
@@ -484,24 +501,24 @@ test.describe("Navigation V2 Chats error and row rails (D2: V5, V3)", () => {
           body: JSON.stringify(heights),
           contentType: "application/json",
         });
-        // Workspace's Session grouping is the virtualized flat list; it keeps the same rail.
-        await openList(page, "work", compact);
-        await page
-          .getByTestId("work-pane")
-          .filter({ visible: true })
-          .getByTestId("sidebar-view-session")
-          .click();
-        const sessionRail = (
-          await rowGeometry(page, "work", '[data-testid^="sidebar-workspace-session-"]')
-        ).titleLeft;
-        console.log(`[session rail ${width}] ${sessionRail}`);
-        expect(sessionRail).toBe(geometry.work!.titleLeft);
-
-        // V3: one row height and one title rail across Chats, Workspace and the Home feed.
+        // V3: one row height across Chats, Workspace and the Home feed.
         const all = Object.values(heights).flat();
         expect(new Set(all).size, JSON.stringify(heights)).toBe(1);
-        const rails = Object.values(geometry).map((entry) => entry.titleLeft);
-        expect(new Set(rails).size, JSON.stringify(geometry)).toBe(1);
+
+        // The flat lists share one title rail, with the mark column at the controls' inset:
+        // Chats, Home, and Workspace's Session and Workspace grouping. Project grouping keeps one
+        // step in under each project header.
+        const rails: Record<string, number | null> = {
+          chats: geometry.chats!.titleLeft,
+          home: geometry.home!.titleLeft,
+        };
+        await openList(page, "work", compact);
+        await groupWork(page, "session");
+        rails.session = (await rowGeometry(page, "work", SESSION_ROWS)).titleLeft;
+        await groupWork(page, "workspace");
+        rails.workspace = (await rowGeometry(page, "work")).titleLeft;
+        console.log(`[flat rails ${width}] ${JSON.stringify(rails)}`);
+        expect(new Set(Object.values(rails)), JSON.stringify(rails)).toEqual(new Set([52]));
       } finally {
         listings.release();
         await seeded.client.close().catch(() => undefined);

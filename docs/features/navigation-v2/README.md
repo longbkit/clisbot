@@ -58,8 +58,11 @@ The primary navigation says where you are; each section owns its header, filters
   `ActivityPlaceholder`), so loaded rows land where the placeholders were. Menus open at
   `DISPLAY_MENU_WIDTH`.
 - **One row geometry.** Chats rows, Workspace rows and session lines, and Home feed rows share the
-  Workspace row's two-line height (`SIDEBAR_TWO_LINE_ROW_HEIGHT`, 52px) and title rail (64px from
-  the pane: inset, the 32px mark column `sidebarLeadingColumnWidth`, gap). The three row components
+  Workspace row's two-line height (`SIDEBAR_TWO_LINE_ROW_HEIGHT`, 52px). In the flat lists
+  (Chats, Home, Workspace's Session and Workspace grouping) the mark column starts at the
+  controls' 12px inset and the title at 52px; rows pull their fill out to `FLAT_ROW_FILL_INSET`
+  rather than the lists changing a padding their headers share. Project grouping keeps one step in
+  under each project header (title at 64px), which is the hierarchy. The three row components
   stay separate: the Workspace rows are upstream's, so they share geometry tokens instead of one
   component. A `FlatList`'s `contentContainerStyle` gets no Unistyles class on web
   ([unistyles](../../unistyles.md#main-gotcha-contentcontainerstyle)), so Chats and the flat

@@ -6,6 +6,7 @@ import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { PinnedRowProvider } from "@/components/ui/pin-mark";
+import { FLAT_ROW_FILL_INSET } from "@/components/sidebar/row-geometry";
 
 import { usePathname, useRouter } from "expo-router";
 import { StyleSheet } from "react-native-unistyles";
@@ -91,15 +92,7 @@ export function FusionPinnedSection({
       ) : null}
       {!collapsed
         ? visibleItems.map((row) => (
-            <View
-              key={row.key}
-              testID={`sidebar-pin-${row.key}`}
-              style={
-                row.kind === "bot" || row.kind === "chat" || row.kind === "unavailable"
-                  ? undefined
-                  : styles.workspacePin
-              }
-            >
+            <View key={row.key} testID={`sidebar-pin-${row.key}`} style={pinStyle(row, float)}>
               {float ? (
                 <FloatedPin>
                   {renderPin(row, pathname, openBot, openChat, menu, renderWorkspacePin, toggle)}
@@ -196,7 +189,15 @@ function renderPin(
   return renderWorkspacePin(row);
 }
 
+/** A workspace pin's wrapper: a section's indent, or none where it floats over a flat list. */
+function pinStyle(row: PinRow, float: boolean) {
+  if (row.kind === "bot" || row.kind === "chat" || row.kind === "unavailable") return undefined;
+  return float ? styles.workspacePinFloat : styles.workspacePin;
+}
+
 const styles = StyleSheet.create((theme) => ({
   workspacePin: { paddingLeft: sectionRowIndent(theme) },
+  // Floated above Navigation V2's flat list: no section indent, the fill at `FLAT_ROW_FILL_INSET`.
+  workspacePinFloat: { marginLeft: FLAT_ROW_FILL_INSET - theme.spacing[2] },
   error: { color: theme.colors.foregroundMuted, padding: 8, fontSize: theme.fontSize.sm },
 }));

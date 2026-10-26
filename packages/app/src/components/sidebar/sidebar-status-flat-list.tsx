@@ -2,6 +2,8 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { StyleSheet } from "react-native-unistyles";
 import { FlatList } from "@/components/ui/scroll-view";
 import { SPACING } from "@/styles/theme";
+import { View } from "react-native";
+import { FLAT_ROW_FILL_INSET } from "@/components/sidebar/row-geometry";
 import { SidebarFilterEmptyState } from "@/components/sidebar/empty-states";
 import {
   buildStatusRowProjectPresentation,
@@ -117,20 +119,22 @@ export function SidebarStatusFlatList({
               onWorkspacePress={onWorkspacePress}
             />
           ) : (
-            <StatusWorkspaceRow
-              workspace={row.workspace}
-              {...buildStatusRowProjectPresentation({
-                workspace: row.workspace,
-                projectIconByProjectViewKey,
-                hostBadgeByServerId,
-              })}
-              inStatusGroup={item.headed}
-              shortcutNumber={shortcutNumber}
-              showShortcutBadge={showShortcutBadges}
-              canPin={canPin}
-              onToggleWorkspacePin={onToggleWorkspacePin}
-              onWorkspacePress={onWorkspacePress}
-            />
+            <View style={item.headed ? undefined : styles.flatWorkspaceRow}>
+              <StatusWorkspaceRow
+                workspace={row.workspace}
+                {...buildStatusRowProjectPresentation({
+                  workspace: row.workspace,
+                  projectIconByProjectViewKey,
+                  hostBadgeByServerId,
+                })}
+                inStatusGroup={item.headed}
+                shortcutNumber={shortcutNumber}
+                showShortcutBadge={showShortcutBadges}
+                canPin={canPin}
+                onToggleWorkspacePin={onToggleWorkspacePin}
+                onWorkspacePress={onWorkspacePress}
+              />
+            </View>
           )}
         </ProjectAboveProvider>
       );
@@ -168,4 +172,6 @@ const LIST_CONTENT = { paddingHorizontal: SPACING[2], paddingTop: 2, paddingBott
 
 const styles = StyleSheet.create({
   list: { flex: 1 },
+  // A workspace row with no group header above it: its fill at `FLAT_ROW_FILL_INSET`.
+  flatWorkspaceRow: { marginLeft: FLAT_ROW_FILL_INSET - SPACING[2] },
 });

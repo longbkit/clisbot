@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import {
+  FLAT_ROW_FILL_INSET,
   SIDEBAR_TWO_LINE_ROW_HEIGHT,
   sidebarLeadingColumnWidth,
 } from "@/components/sidebar/row-geometry";
@@ -53,7 +54,11 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[3],
     paddingHorizontal: theme.spacing[3],
   },
-  rowV2: { gap: theme.spacing[2] },
+  rowV2: {
+    gap: theme.spacing[2],
+    marginHorizontal: FLAT_ROW_FILL_INSET - theme.spacing[3],
+    paddingHorizontal: theme.spacing[3] - FLAT_ROW_FILL_INSET,
+  },
   leading: { width: theme.iconSize.sm, alignItems: "center" },
   leadingV2: { width: sidebarLeadingColumnWidth(theme) },
   mark: {
