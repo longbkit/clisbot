@@ -24,6 +24,7 @@ describe("resolveNavigationSections", () => {
       "home",
       "chats",
       "work",
+      "design",
       "schedules",
       "tasks",
       "connectors",
@@ -32,6 +33,7 @@ describe("resolveNavigationSections", () => {
     expect(keys(resolved.railBottom)).toEqual(["plugin:c:1", "hosts", "help", "settings"]);
     expect(keys(resolved.phoneTabs)).toEqual(["home", "chats", "work", "schedules"]);
     expect(keys(resolved.more)).toEqual([
+      "design",
       "tasks",
       "connectors",
       "plugin:a:1",
@@ -53,7 +55,7 @@ describe("resolveNavigationSections", () => {
     expect(keys(resolved.railPrimary)).not.toContain("connectors");
   });
 
-  it("marks Tasks as a preview section", () => {
+  it("marks Tasks and Design as preview sections", () => {
     const { railPrimary } = resolveNavigationSections({
       headerItems: [],
       footerItems: [],
@@ -63,6 +65,10 @@ describe("resolveNavigationSections", () => {
     expect(railPrimary.find((section) => section.key === "tasks")).toMatchObject({
       status: "preview",
       href: "/tasks",
+    });
+    expect(railPrimary.find((section) => section.key === "design")).toMatchObject({
+      status: "preview",
+      href: "/design",
     });
   });
 });

@@ -4,17 +4,20 @@ import { StyleSheet } from "react-native-unistyles";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { MenuHeader } from "@/components/headers/menu-header";
 
-/** Tasks is visible but in development (brief C14): no data, no actions. */
-export function TasksScreen() {
+/**
+ * A section that is visible but in development (brief C14: Tasks; Design, Owner 2026-10-26): its
+ * place in the navigation and a placeholder page, no data, no actions.
+ */
+export function PreviewSectionScreen({ section }: { section: "tasks" | "design" }) {
   const { t } = useTranslation();
   return (
-    <View style={styles.page} testID="tasks-screen">
+    <View style={styles.page} testID={`${section}-screen`}>
       {/* MenuHeader gives a phone its Back to More; the rail is the desktop's way out. */}
-      <MenuHeader title={t("navigation.sections.tasks")} />
+      <MenuHeader title={t(`navigation.sections.${section}`)} />
       <View style={styles.body}>
         <StatusBadge label={t("navigation.preview")} variant="warning" />
-        <Text style={styles.title}>{t("navigation.tasksPlaceholder.title")}</Text>
-        <Text style={styles.text}>{t("navigation.tasksPlaceholder.body")}</Text>
+        <Text style={styles.title}>{t(`navigation.${section}Placeholder.title`)}</Text>
+        <Text style={styles.text}>{t(`navigation.${section}Placeholder.body`)}</Text>
       </View>
     </View>
   );

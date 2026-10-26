@@ -13,12 +13,13 @@ import {
   Home,
   ListTodo,
   MessageSquare,
+  PenTool,
   Puzzle,
   Server,
   Settings,
+  X,
   type LucideIcon,
 } from "lucide-react-native";
-import { ConnectionStatusDot } from "@/components/host-status-dot";
 import {
   SidebarHostPicker,
   type SidebarHostPickerTrigger,
@@ -44,6 +45,10 @@ import { CONTROL_HEIGHTS, MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-
 import { useNavigationActivity } from "./activity";
 import { SECTION_MENU_WIDTH } from "./section-header";
 import { useHostsStatus } from "./hosts-status";
+import { useHostFilter } from "./host-filter";
+import { useCurrentSession } from "./opened-session";
+import { SessionQuota } from "./session-quota";
+import { hostFilterLabel } from "./host-filter-chip";
 import type {
   BuiltinSection,
   BuiltinSectionId,
@@ -59,6 +64,7 @@ export const SECTION_ICONS: Record<BuiltinSectionId, LucideIcon> = {
   home: Home,
   chats: MessageSquare,
   work: FolderKanban,
+  design: PenTool,
   schedules: CalendarClock,
   tasks: ListTodo,
   connectors: Blocks,
@@ -133,13 +139,27 @@ function RailRoute({ section }: { section: BuiltinSection }) {
   );
 }
 
+/** Usage; while a session is on screen, that session's quota under the label. */
 function RailUsage({ section }: { section: BuiltinSection }) {
   const label = useSectionLabel(section);
   const openUsage = useOpenSidebarUsage();
+  const session = useCurrentSession();
+  const caption = useMemo(
+    () =>
+      session ? (
+        <SessionQuota
+          key={`${session.serverId}:${session.agentId}`}
+          session={session}
+          layout="rail"
+        />
+      ) : undefined,
+    [session],
+  );
   return (
     <RailButton
       Icon={CircleGauge}
       label={label}
+      caption={caption}
       onPress={openUsage}
       testID="navigation-rail-usage"
     />
@@ -150,30 +170,80 @@ function RailHosts({ section }: { section: BuiltinSection }) {
   const label = useSectionLabel(section);
   const router = useRouter();
   const status = useHostsStatus();
+  const filter = useHostFilter();
+  const { t } = useTranslation();
+  const counts = `${filter.online}/${filter.total}`;
+  const countsLabel = t("navigation.hostFilter.online", {
+    online: filter.online,
+    total: filter.total,
+  });
   const addHost = useCallback(() => router.push(buildSettingsAddHostRoute(Date.now())), [router]);
-  const dot = useMemo(() => <ConnectionStatusDot status={status} small />, [status]);
+  // Online / total in the status dot's corner, coloured as the dot was: one item's height.
+  const badge = useMemo(
+    () => (
+      <Text style={[styles.hostCount, HOST_COUNT_TONE[status]]} testID="rail-host-count">
+        {counts}
+      </Text>
+    ),
+    [counts, status],
+  );
   const renderTrigger = useCallback(
     (trigger: SidebarHostPickerTrigger) => (
       <View ref={trigger.ref} collapsable={false}>
         <RailButton
           Icon={Server}
           label={label}
-          tooltip={trigger.label}
+          tooltip={`${trigger.label} · ${countsLabel}`}
           onPress={trigger.onPress}
-          dot={dot}
+          badge={badge}
           testID="sidebar-hosts-trigger"
         />
       </View>
     ),
-    [dot, label],
+    [badge, countsLabel, label],
   );
   return (
-    <SidebarHostPicker
-      label={label}
-      onAddHost={addHost}
-      onOpenHostSettings={openHostOverview}
-      renderTrigger={renderTrigger}
-    />
+    <>
+      <SidebarHostPicker
+        label={label}
+        onAddHost={addHost}
+        onOpenHostSettings={openHostOverview}
+        renderTrigger={renderTrigger}
+      />
+      {filter.active ? <RailHostFilterTag /> : null}
+    </>
+  );
+}
+
+/**
+ * The Host filter in force, on the rail where it is set (Owner, 2026-10-26): it filters every
+ * list, so it stays in sight; pressing it clears the filter.
+ */
+function RailHostFilterTag() {
+  const { t } = useTranslation();
+  const filter = useHostFilter();
+  const name = hostFilterLabel(filter, t);
+  const clearLabel = `${t("navigation.hostFilter.clear")}: ${name}`;
+  return (
+    <Tooltip delayDuration={300}>
+      <TooltipTrigger asChild>
+        <PressHighlight
+          accessibilityRole="button"
+          accessibilityLabel={clearLabel}
+          onPress={filter.clear}
+          style={styles.hostTag}
+          testID="rail-host-filter-tag"
+        >
+          <Text style={styles.hostTagLabel} numberOfLines={1}>
+            {name}
+          </Text>
+          <ThemedIcon Icon={X} uniProps={mutedColor} size={ICON_SIZE.xs} />
+        </PressHighlight>
+      </TooltipTrigger>
+      <TooltipContent side="right" align="center" offset={6}>
+        <Text style={styles.tooltip}>{clearLabel}</Text>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -243,10 +313,13 @@ function RailButton({
   onPress,
   badge,
   dot,
+  caption,
   testID,
 }: {
   Icon: LucideIcon;
   label: string;
+  /** Quieter lines under the label: Hosts' online / total, a session's quota. */
+  caption?: ReactNode;
   tooltip?: string;
   active?: boolean;
   onPress: () => void;
@@ -275,6 +348,7 @@ function RailButton({
               hovered={Boolean(hovered) || pressed}
               badge={badge}
               dot={dot}
+              caption={caption}
             />
           )}
         </PressHighlight>
@@ -293,6 +367,7 @@ function RailContent({
   hovered,
   badge,
   dot,
+  caption,
 }: {
   Icon: LucideIcon;
   label: string;
@@ -300,6 +375,7 @@ function RailContent({
   hovered: boolean;
   badge?: ReactNode;
   dot?: ReactNode;
+  caption?: ReactNode;
 }) {
   return (
     <>
@@ -311,6 +387,13 @@ function RailContent({
       <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>
         {label}
       </Text>
+      {typeof caption === "string" ? (
+        <Text style={styles.caption} numberOfLines={1}>
+          {caption}
+        </Text>
+      ) : (
+        caption
+      )}
     </>
   );
 }
@@ -318,11 +401,13 @@ function RailContent({
 function Glyph({
   Icon,
   color,
+  size = ICON_SIZE.lg,
 }: {
   Icon: ComponentType<{ size: number; color?: string; strokeWidth?: number }>;
   color?: string;
+  size?: number;
 }) {
-  return <Icon size={ICON_SIZE.lg} color={color} strokeWidth={ICON_STROKE_WIDTH} />;
+  return <Icon size={size} color={color} strokeWidth={ICON_STROKE_WIDTH} />;
 }
 const ThemedIcon = withUnistyles(Glyph);
 const mutedColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
@@ -364,8 +449,49 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
   },
   labelActive: { color: theme.colors.foreground, fontWeight: theme.fontWeight.medium },
+  caption: {
+    maxWidth: RAIL_WIDTH - theme.spacing[2],
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    lineHeight: 14,
+    fontVariant: ["tabular-nums"],
+    textAlign: "center",
+  },
+  // A plain text tag under Hosts: no pill, small, so it costs one short line of the rail.
+  hostTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "center",
+    gap: 2,
+    maxWidth: RAIL_WIDTH - theme.spacing[2],
+    paddingHorizontal: theme.spacing[1],
+    marginTop: -theme.spacing[1],
+    borderRadius: theme.borderRadius.sm,
+  },
+  hostTagLabel: {
+    flexShrink: 1,
+    minWidth: 0,
+    color: theme.colors.foreground,
+    fontSize: 11,
+    lineHeight: 13,
+  },
+  hostCount: {
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: theme.fontWeight.medium,
+    fontVariant: ["tabular-nums"],
+  },
+  hostCountOnline: { color: theme.colors.statusSuccess },
+  hostCountConnecting: { color: theme.colors.statusWarning },
+  hostCountError: { color: theme.colors.statusDanger },
   badge: { position: "absolute", top: -theme.spacing[1.5], right: -theme.spacing[2] },
   dot: { position: "absolute", top: theme.spacing[1], right: theme.spacing[1.5] },
   tooltip: { color: theme.colors.popoverForeground, fontSize: theme.fontSize.sm },
   pluginMenu: { padding: theme.spacing[1] },
 }));
+
+const HOST_COUNT_TONE = {
+  online: styles.hostCountOnline,
+  connecting: styles.hostCountConnecting,
+  error: styles.hostCountError,
+} as const;

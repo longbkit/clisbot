@@ -810,7 +810,10 @@ function AppWithSidebar({ children }: { children: ReactNode }) {
       pathname === "/new" ||
       (HOME_V2_ENABLED && pathname === "/chat") ||
       (NAVIGATION_V2_ENABLED &&
-        (pathname === "/work" || pathname === "/more" || pathname === "/tasks")) ||
+        (pathname === "/work" ||
+          pathname === "/more" ||
+          pathname === "/tasks" ||
+          pathname === "/design")) ||
       pathname === "/sessions" ||
       pathname === "/schedules" ||
       pathname === "/automations" ||

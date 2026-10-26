@@ -9,6 +9,7 @@ export type BuiltinSectionId =
   | "home"
   | "chats"
   | "work"
+  | "design"
   | "schedules"
   | "tasks"
   | "connectors"
@@ -66,11 +67,13 @@ export const WORK_PATH = "/work";
 export const SCHEDULES_PATH = "/schedules";
 export const MORE_PATH = "/more";
 export const TASKS_PATH = "/tasks";
+export const DESIGN_PATH = "/design";
 
 export const BUILTIN_SECTIONS: readonly BuiltinSection[] = [
   builtin("home", "primary", "tab", HOME_PATH),
   builtin("chats", "primary", "tab", CHATS_PATH),
   builtin("work", "primary", "tab", WORK_PATH),
+  builtin("design", "primary", "more", DESIGN_PATH, "preview"),
   builtin("schedules", "primary", "tab", SCHEDULES_PATH),
   builtin("tasks", "primary", "more", TASKS_PATH, "preview"),
   builtin("connectors", "primary", "more", "/connectors"),
@@ -132,6 +135,7 @@ export function sectionForPath(
   if (pathname === WORK_PATH || pathname === "/new") return "work";
   if (pathname === SCHEDULES_PATH || pathname === "/automations") return "schedules";
   if (pathname === TASKS_PATH) return "tasks";
+  if (pathname === DESIGN_PATH) return "design";
   if (pathname === "/connectors") return "connectors";
   if (pathname === MORE_PATH) return "more";
   if (pathname.startsWith("/settings")) return "settings";

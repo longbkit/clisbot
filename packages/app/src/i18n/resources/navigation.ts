@@ -4,6 +4,7 @@ const en = {
     home: "Home",
     chats: "Chats",
     work: "Workspace",
+    design: "Design",
     schedules: "Schedules",
     tasks: "Tasks",
     connectors: "Connectors",
@@ -17,6 +18,10 @@ const en = {
   tasksPlaceholder: {
     title: "Tasks is in development",
     body: "Task boards and integrations will live here. Nothing is stored yet.",
+  },
+  designPlaceholder: {
+    title: "Design is in development",
+    body: "Designs and prototypes made with your agents will live here. Nothing is stored yet.",
   },
   scope: {
     mine: "For me",
@@ -91,6 +96,19 @@ const en = {
     hosts: "Hosts",
     allHosts: "All Hosts",
   },
+  quota: {
+    hour: "Session {{percent}} {{state}}, resets in {{reset}}",
+    week: "Weekly {{percent}} {{state}}, resets in {{reset}}",
+    used: "used",
+    left: "left",
+  },
+  hostFilter: {
+    all: "All Hosts",
+    several: "{{count}} Hosts",
+    online: "{{online}}/{{total}} online",
+    clear: "Clear Host filter",
+    choose: "Choose Hosts",
+  },
   lists: {
     emptyChats: "No chats yet.",
     emptyFeed: "Nothing here yet.",
@@ -110,6 +128,7 @@ const vi: typeof en = {
     home: "Trang chủ",
     chats: "Trò chuyện",
     work: "Workspace",
+    design: "Thiết kế",
     schedules: "Lịch",
     tasks: "Công việc",
     connectors: "Kết nối",
@@ -123,6 +142,10 @@ const vi: typeof en = {
   tasksPlaceholder: {
     title: "Công việc đang được phát triển",
     body: "Bảng công việc và các tích hợp sẽ nằm ở đây. Hiện chưa lưu dữ liệu nào.",
+  },
+  designPlaceholder: {
+    title: "Thiết kế đang được phát triển",
+    body: "Bản thiết kế và prototype làm cùng agent sẽ nằm ở đây. Hiện chưa lưu dữ liệu nào.",
   },
   scope: { mine: "Của tôi", others: "Người khác", all: "Tất cả", label: "Hiển thị" },
   mode: { chat: "Chat", work: "Workspace", hybrid: "Tất cả", label: "Trang chủ hiển thị" },
@@ -183,6 +206,19 @@ const vi: typeof en = {
     hosts: "Máy chủ",
     allHosts: "Tất cả máy chủ",
   },
+  quota: {
+    hour: "Phiên {{percent}} {{state}}, đặt lại sau {{reset}}",
+    week: "Tuần {{percent}} {{state}}, đặt lại sau {{reset}}",
+    used: "đã dùng",
+    left: "còn lại",
+  },
+  hostFilter: {
+    all: "Tất cả máy chủ",
+    several: "{{count}} máy chủ",
+    online: "{{online}}/{{total}} trực tuyến",
+    clear: "Bỏ lọc máy chủ",
+    choose: "Chọn máy chủ",
+  },
   lists: {
     emptyChats: "Chưa có cuộc trò chuyện.",
     emptyFeed: "Chưa có gì ở đây.",
@@ -224,6 +260,7 @@ const zhCN = localized({
     home: "首页",
     chats: "聊天",
     work: "工作区",
+    design: "设计",
     schedules: "日程",
     tasks: "任务",
     connectors: "连接器",
@@ -243,6 +280,7 @@ const ja = localized({
     home: "ホーム",
     chats: "チャット",
     work: "ワークスペース",
+    design: "デザイン",
     schedules: "スケジュール",
     tasks: "タスク",
     connectors: "コネクタ",
@@ -262,6 +300,7 @@ const ko = localized({
     home: "홈",
     chats: "채팅",
     work: "워크스페이스",
+    design: "디자인",
     schedules: "일정",
     tasks: "작업",
     connectors: "커넥터",
@@ -280,6 +319,7 @@ const es = localized({
   sections: {
     home: "Inicio",
     work: "Workspace",
+    design: "Diseño",
     schedules: "Programaciones",
     tasks: "Tareas",
     connectors: "Conectores",
@@ -297,6 +337,7 @@ const ptBR = localized({
   sections: {
     home: "Início",
     work: "Workspace",
+    design: "Design",
     schedules: "Agendamentos",
     tasks: "Tarefas",
     connectors: "Conectores",
@@ -314,6 +355,7 @@ const fr = localized({
   sections: {
     home: "Accueil",
     work: "Workspace",
+    design: "Design",
     schedules: "Planifications",
     tasks: "Tâches",
     connectors: "Connecteurs",
@@ -333,6 +375,7 @@ const ru = localized({
     home: "Главная",
     chats: "Чаты",
     work: "Пространство",
+    design: "Дизайн",
     schedules: "Расписания",
     tasks: "Задачи",
     connectors: "Коннекторы",
@@ -352,6 +395,7 @@ const ar = localized({
     home: "الرئيسية",
     chats: "المحادثات",
     work: "مساحة العمل",
+    design: "التصميم",
     schedules: "الجداول",
     tasks: "المهام",
     connectors: "الموصلات",
