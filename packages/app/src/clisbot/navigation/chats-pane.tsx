@@ -334,7 +334,7 @@ function NewChatMenu() {
           onSelect={newBot}
           testID="chats-new-bot"
         >
-          {t("navigation.actions.newBotChat")}
+          {t("navigation.actions.newBot")}
         </DropdownMenuItem>
         <DropdownMenuItem
           leading={groupIcon}
