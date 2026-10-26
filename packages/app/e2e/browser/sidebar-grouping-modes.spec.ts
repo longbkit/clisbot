@@ -113,14 +113,14 @@ test("the view bar under Projects switches grouping and filters to active sessio
     await expect(page.getByText("Show only sessions that are running")).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath("view-bar-tooltip.png") });
 
-    // Session and Project have one pick each now, so a single pick from More does not beat them.
+    // Session and Project have one pick each now, so a single pick from Other does not beat them.
     await page.getByTestId("sidebar-view-project").click();
     await page.getByTestId("sidebar-view-more").click();
     await expect(page.getByTestId("sidebar-view-more-menu")).toBeVisible();
-    await expect(page.getByTestId("sidebar-view-more-heading")).toHaveText("Grouping");
+    await expect(page.getByTestId("sidebar-view-more-heading")).toHaveText("Group by");
     await page.screenshot({ path: testInfo.outputPath("view-bar-more.png") });
     await page.getByTestId("sidebar-view-more-status").click();
-    // Picked from More, it names itself there, selected, until it earns a tab.
+    // Picked from Other, it names itself there, selected, until it earns a tab.
     await expect(page.getByTestId("sidebar-view-more")).toContainText("Status");
     await expect(page.getByTestId("sidebar-status-group-done")).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath("view-bar-overflow.png") });
@@ -137,7 +137,7 @@ test("the view bar under Projects switches grouping and filters to active sessio
     await page.getByTestId("sidebar-view-more-status").click();
     await expect(page.getByTestId("sidebar-view-status")).toBeVisible();
     await expect(page.getByTestId("sidebar-view-session")).toHaveCount(0);
-    await expect(page.getByTestId("sidebar-view-more")).toContainText("More");
+    await expect(page.getByTestId("sidebar-view-more")).toContainText("Other");
 
     await page.getByTestId("sidebar-view-project").click();
     await expect(row).toBeVisible();
