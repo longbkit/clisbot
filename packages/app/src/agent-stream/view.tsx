@@ -1648,6 +1648,39 @@ function PermissionActionButton({
   );
 }
 
+function PermissionRequestContext({
+  metadata,
+}: {
+  metadata: PendingPermission["request"]["metadata"];
+}) {
+  const { t } = useTranslation();
+  const decisionReason =
+    typeof metadata?.decisionReason === "string" ? metadata.decisionReason.trim() : "";
+  const blockedPath = typeof metadata?.blockedPath === "string" ? metadata.blockedPath : "";
+  return (
+    <>
+      {decisionReason ? (
+        <View style={permissionStyles.context}>
+          <Text style={permissionStyles.contextLabel}>{t("agentStream.permission.reason")}</Text>
+          <Text selectable testID="permission-request-reason" style={permissionStyles.title}>
+            {decisionReason}
+          </Text>
+        </View>
+      ) : null}
+      {blockedPath.trim() ? (
+        <View style={permissionStyles.context}>
+          <Text style={permissionStyles.contextLabel}>
+            {t("agentStream.permission.blockedPath")}
+          </Text>
+          <Text selectable testID="permission-request-blocked-path" style={permissionStyles.title}>
+            {blockedPath}
+          </Text>
+        </View>
+      ) : null}
+    </>
+  );
+}
+
 export function PermissionRequestCard({
   permission,
   client,
@@ -1842,6 +1875,7 @@ export function PermissionRequestCard({
 
   const footer = (
     <>
+      <PermissionRequestContext metadata={request.metadata} />
       {responseError}
       <Text testID="permission-request-question" style={permissionStyles.question}>
         {t("agentStream.permission.question")}
@@ -2003,6 +2037,14 @@ const stylesheet = StyleSheet.create((theme) => ({
 }));
 
 const permissionStyles = StyleSheet.create((theme) => ({
+  context: {
+    gap: theme.spacing[1],
+    minWidth: 0,
+  },
+  contextLabel: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.foregroundMuted,
+  },
   container: {
     marginVertical: theme.spacing[3],
     padding: theme.spacing[3],

@@ -253,6 +253,8 @@ export const vi: TranslationResources = {
     historyLoadFailed: "Không thể tải lịch sử agent",
     messageCapped: "Tin nhắn này đã bị cắt bớt ({{bytes}} byte).",
     permission: {
+      reason: "Lý do cần phê duyệt",
+      blockedPath: "Đường dẫn bị chặn",
       rejectedPlan: "Đã từ chối kế hoạch",
       approvedPlan: "Đã phê duyệt kế hoạch",
       canceledPlan: "Đã hủy kế hoạch",
