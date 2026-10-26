@@ -52,8 +52,9 @@ export interface WorkItem {
 }
 
 /**
- * A workspace's root sessions: `null` while its Host has not delivered its sessions yet, so a
- * workspace that turns out to be all Chat is never shown first and hidden after.
+ * A workspace's root sessions: `null` while its Host has not delivered its sessions yet (or never
+ * will, offline), so with Bots hidden a workspace that turns out to be all Bot sessions is never
+ * shown first and hidden after.
  */
 export type WorkSessionsOf = (workspace: WorkWorkspace) => readonly WorkSession[] | null;
 
@@ -62,8 +63,10 @@ export function workItemsOf(
   sessions: readonly WorkSession[] | null,
   showBots: boolean,
 ): WorkItem[] {
-  if (sessions === null) return [];
-  if (!sessions.length)
+  // Unknown sessions only matter while Bots are hidden: a workspace that may turn out to be all
+  // Bot sessions waits instead of showing and then vanishing. With Bots shown it is listed.
+  if (sessions === null && !showBots) return [];
+  if (!sessions?.length)
     return [
       {
         key: workspace.workspaceKey,

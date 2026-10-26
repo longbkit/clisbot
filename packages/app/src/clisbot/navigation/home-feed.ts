@@ -1,4 +1,4 @@
-import { getBotIdFromLabels } from "@clisbot/protocol/bots/labels";
+import { isChatSession } from "./work-items";
 import { activityBucket, isUnreadReply } from "@/clisbot/home/activity";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import {
@@ -24,8 +24,9 @@ export interface HomeRow {
 }
 
 /** Chat = sessions of a Bot (DMs and groups); Work = projects and Quick chats (brief C13). */
+/** Home's Chat mode reads the one Chat-vs-Workspace rule (`isChatSession`). */
 export function isChatAgent(agent: Pick<AggregatedAgent, "labels">): boolean {
-  return getBotIdFromLabels(agent.labels) !== null;
+  return isChatSession(agent);
 }
 
 export function matchesMode(agent: Pick<AggregatedAgent, "labels">, mode: HomeMode): boolean {

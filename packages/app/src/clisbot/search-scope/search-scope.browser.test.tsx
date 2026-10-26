@@ -17,7 +17,11 @@ const stable = vi.hoisted(() => ({
     {
       origin: "hub://company",
       enabled: true,
-      signedIn: { organization: { name: "Company" } },
+      signedIn: {
+        organization: { name: "Company" },
+        account: { id: "account-me" },
+        membership: { id: "member-me" },
+      },
       connection: null,
     },
   ],

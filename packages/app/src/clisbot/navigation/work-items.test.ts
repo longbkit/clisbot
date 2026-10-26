@@ -92,9 +92,11 @@ describe("Workspace items", () => {
     expect(hidden.workspace(sandbox)).toBe(true);
   });
 
-  it("holds a workspace back until its Host's sessions have arrived, so nothing flashes", () => {
-    expect(workItemsOf(sandbox, null, true)).toEqual([]);
-    expect(workItemsOf(sandbox, [], true)).toHaveLength(1);
+  it("with Bots hidden, holds a workspace back until its sessions arrive, so nothing flashes", () => {
+    expect(workItemsOf(sandbox, null, false)).toEqual([]);
+    // With Bots shown (the default) and offline Hosts, the cached workspace stays listed.
+    expect(workItemsOf(sandbox, null, true)).toHaveLength(1);
+    expect(workItemsOf(sandbox, [], false)).toHaveLength(1);
   });
 
   it("counts items, so counts follow the scope and the Bots chip", () => {
