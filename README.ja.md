@@ -59,7 +59,7 @@
 
 ## スポンサー
 
-Clisbot のスポンサー向け情報は準備中です。準備ができ次第、ここに掲載します。
+Clisbot のスポンサー制度は準備中です。準備が整い次第、確認済みの支援先リンクとスポンサー条件を公開します。
 
 <!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
 
@@ -178,10 +178,6 @@ npm run build:server
 # リポジトリ全体のチェック
 npm run typecheck
 ```
-
-## Clisbot を支援する
-
-Clisbot は一人で開発しており、使ってくれる人たちの支援で成り立っています。[GitHub Sponsors](https://github.com/sponsors/boudra) で支援できます。企業として毎月[スポンサー](https://clisbot.com/sponsor#spot)になっていただくと、ロゴをこの README の冒頭と、clisbot.com のトップページおよびドキュメントに掲載します。
 
 ## 出典と謝辞
 

@@ -58,7 +58,7 @@
 
 ## Sponsors
 
-Sponsorship options for Clisbot are being set up. Check back here when they are ready.
+Sponsorship options for Clisbot are being set up. We will publish verified contribution links and sponsorship terms when they are ready.
 
 <!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
 
@@ -234,10 +234,6 @@ npm run build:server
 # repo-wide checks
 npm run typecheck
 ```
-
-## Support Clisbot
-
-Clisbot is an independent project used by tens of thousands of developers daily, built by one person and funded by the people who use it. Support the work on [GitHub Sponsors](https://github.com/sponsors/boudra). Companies can [sponsor Clisbot](https://clisbot.com/sponsor#spot) monthly and have their logo shown at the top of this README and on the clisbot.com homepage and docs.
 
 ## Attribution
 
