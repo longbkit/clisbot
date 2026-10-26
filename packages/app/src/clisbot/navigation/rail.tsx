@@ -1,4 +1,11 @@
-import { useCallback, useMemo, useRef, type ComponentType, type ReactNode } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  type ComponentType,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Text, View, type PressableStateCallbackType } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "expo-router";
@@ -29,6 +36,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  useDropdownMenuClose,
 } from "@/components/ui/dropdown-menu";
 import type { MenuTriggerState } from "@/components/ui/menu/menu-root";
 import { ConnectionStatusDot } from "@/components/host-status-dot";
@@ -288,11 +296,7 @@ function RailPluginItem({ section }: { section: PluginSection }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent side="right" align="start" width={SECTION_MENU_WIDTH}>
         <View ref={anchor} collapsable={false} style={styles.pluginMenu}>
-          <PluginSidebarItem
-            group={section.group}
-            section={section.rail === "primary" ? "header" : "footer"}
-            fallbackAnchorRef={anchor}
-          />
+          <RailPluginMenuItem section={section} anchor={anchor} />
         </View>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -406,6 +410,25 @@ function Glyph({
 const ThemedIcon = withUnistyles(Glyph);
 const mutedColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const strongColor = (theme: Theme) => ({ color: theme.colors.foreground });
+
+/** The plugin's item inside its rail menu; the menu closes when the item opens a screen. */
+function RailPluginMenuItem({
+  section,
+  anchor,
+}: {
+  section: PluginSection;
+  anchor: RefObject<View | null>;
+}) {
+  const close = useDropdownMenuClose();
+  return (
+    <PluginSidebarItem
+      group={section.group}
+      section={section.rail === "primary" ? "header" : "footer"}
+      fallbackAnchorRef={anchor}
+      onBeforeNavigate={close}
+    />
+  );
+}
 
 const styles = StyleSheet.create((theme) => ({
   rail: {
