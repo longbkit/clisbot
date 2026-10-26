@@ -1,4 +1,5 @@
 import { createWriteStream } from "node:fs";
+import { openSettings } from "./support/navigation.mjs";
 
 const GC_ATTEMPTS = 6;
 const SETTINGS_PANE_TEST_ID = "settings-detail-pane";
@@ -55,7 +56,7 @@ async function openSettingsDestination(page, title) {
 }
 
 async function rotateSettings(page) {
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await openSettings(page);
   await page.locator('[data-testid="settings-sidebar"]:visible').waitFor({ state: "visible" });
 
   for (const title of SETTINGS_DESTINATIONS) {

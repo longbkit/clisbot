@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect } from "@playwright/test";
+import { openPluginSidebarItem } from "./support/navigation.mjs";
 
 export function seedPluginLinks(clisbotHome, workspaceId, url, remoteWorkspaceId) {
   const directory = path.join(clisbotHome, "link-plugin");
@@ -66,7 +67,7 @@ export async function runPluginLinksRegression({
     localStorage.setItem(key, JSON.stringify(registry));
   }, remotePort);
   await page.reload();
-  await pluginEntry.click();
+  await openPluginSidebarItem(page, "Plugin links QA");
   await expect(
     page.getByRole("button", { name: "Old documentation workaround", exact: true }),
   ).toBeVisible({ timeout: 60_000 });
@@ -93,7 +94,7 @@ export async function runPluginLinksRegression({
   await expectPresentedBrowser(page, url);
   expect(popups).toHaveLength(0);
   await page.screenshot({ path: path.join(artifactDir, "plugin-workspace-browser.png") });
-  await pluginEntry.click();
+  await openPluginSidebarItem(page, "Plugin links QA");
   await page.getByRole("button", { name: "Open remote workspace browser", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/h/plugin-links-remote/workspace/${remoteWorkspaceId}`));
   await expectPresentedBrowser(page, url);

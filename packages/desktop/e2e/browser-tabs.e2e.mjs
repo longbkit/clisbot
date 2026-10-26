@@ -15,6 +15,7 @@ import { chromium } from "playwright";
 import { hideDeveloperToasts } from "../../app/e2e/support/developer-ui.mjs";
 import { runAppearanceFontSizeRegression } from "./appearance-font-size.electron.mjs";
 import { runSettingsMemoryRegression } from "./settings-memory.electron.mjs";
+import { openCommandCenter, openWorkspaceFromList } from "./support/navigation.mjs";
 
 import { seedPluginLinks, runPluginLinksRegression } from "./plugin-links.electron.mjs";
 
@@ -640,11 +641,7 @@ async function runRegression({
 }) {
   const failures = [];
   const originalWorkspaceId = workspaceIds[0];
-  const originalWorkspaceRow = page.getByTestId(
-    `sidebar-workspace-row-${serverId}:${originalWorkspaceId}`,
-  );
-  await originalWorkspaceRow.waitFor({ state: "visible", timeout: timeoutMs });
-  await originalWorkspaceRow.click();
+  await openWorkspaceFromList(page, serverId, originalWorkspaceId);
 
   await page.evaluate(() => {
     if (document.getElementById("overlay-root")) return;
@@ -880,7 +877,7 @@ async function runRegression({
   }
 
   for (const workspaceId of workspaceIds.slice(1)) {
-    await page.getByTestId(`sidebar-workspace-row-${serverId}:${workspaceId}`).click();
+    await openWorkspaceFromList(page, serverId, workspaceId);
     await page
       .getByTestId(`workspace-deck-entry-${serverId}:${workspaceId}`)
       .waitFor({ state: "visible" });
@@ -938,7 +935,7 @@ async function runRegression({
     agent: typingAgent,
   });
 
-  await originalWorkspaceRow.click();
+  await openWorkspaceFromList(page, serverId, originalWorkspaceId);
   await originalDeck.getByTestId(`workspace-tab-browser_${browserId}`).click();
   await page.waitForFunction(
     ({ id, webContentsId }) => {
@@ -1044,7 +1041,7 @@ async function runRegression({
   await originalDeck.getByRole("button", { name: "Cancel element selector" }).click();
 
   await originalDeck.getByTestId(`workspace-tab-agent_${callerAgentId}`).click();
-  await page.getByTestId("sidebar-footer-search").click();
+  await openCommandCenter(page);
   await page.getByTestId("command-center-input").fill("Split pane right");
   await page.getByText("Split pane right", { exact: true }).click();
   assert(

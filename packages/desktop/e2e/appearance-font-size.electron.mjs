@@ -1,3 +1,5 @@
+import { openSettings } from "./support/navigation.mjs";
+
 const SETTINGS_TIMEOUT_MS = 5_000;
 
 function assert(condition, message) {
@@ -9,7 +11,7 @@ async function readFontSize(locator) {
 }
 
 export async function runAppearanceFontSizeRegression(page) {
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await openSettings(page);
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
 
   await page.getByLabel("Theme: System", { exact: true }).click();
