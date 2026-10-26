@@ -100,6 +100,7 @@ import {
   toDiagnosticErrorMessage,
 } from "./diagnostic-utils.js";
 import { runProviderTurn } from "./provider-runner.js";
+import { createProviderTurnId } from "./provider-turn-id.js";
 import { PromptNotDeliveredError } from "../prompt-not-delivered-error.js";
 import { renderPromptAttachmentAsText } from "../prompt-attachments.js";
 import { composeSystemPromptParts } from "../system-prompt.js";
@@ -3417,7 +3418,6 @@ class OpenCodeAgentSession implements AgentSession {
   private partTypes = new Map<string, string>();
   private availableModesCache: AgentMode[] | null = null;
   private readonly subscribers = new Set<(event: AgentStreamEvent) => void>();
-  private nextTurnOrdinal = 0;
   private turnState: OpenCodeTurnState = { status: "idle" };
   /**
    * Settlement of every session-scoped abort issued so far. It outlives the stop
@@ -4903,7 +4903,7 @@ class OpenCodeAgentSession implements AgentSession {
 
   private createTurnId(): string {
     this.gapRepairRevision += 1;
-    return `opencode-turn-${this.nextTurnOrdinal++}`;
+    return createProviderTurnId("opencode");
   }
 
   private traceOpenCode(msg: OpenCodeTraceMessage, data: OpenCodeTraceData = {}): void {

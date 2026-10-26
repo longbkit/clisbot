@@ -19,12 +19,13 @@ import {
   TestOpenCodeClient,
   TestOpenCodeHarness,
 } from "./opencode/test-utils/test-opencode-harness.js";
-import type {
-  AgentSessionConfig,
-  AgentStreamEvent,
-  ToolCallTimelineItem,
-  AssistantMessageTimelineItem,
-  AgentTimelineItem,
+import {
+  getAgentStreamEventTurnId,
+  type AgentSessionConfig,
+  type AgentStreamEvent,
+  type ToolCallTimelineItem,
+  type AssistantMessageTimelineItem,
+  type AgentTimelineItem,
 } from "../agent-sdk-types.js";
 
 // Deliberately an independent literal rather than the production constant these tests
@@ -32,6 +33,27 @@ import type {
 // readiness tests green if that constant were shortened below the required budget.
 const EXPECTED_STARTUP_BUDGET_MS = 30_000;
 const EXPECTED_EVENT_READINESS_BUDGET_MS = 45_000;
+
+// Turn ids are UUID-based so a resumed session never repeats one (#40). Tests capture the
+// id a turn was given and compare against it instead of hard-coding a value.
+const OPENCODE_TURN_ID = /^opencode-turn-[0-9a-f-]{36}$/;
+
+function openCodeTurnIdOf(event: AgentStreamEvent | undefined): string {
+  const turnId = event ? getAgentStreamEventTurnId(event) : undefined;
+  expect(turnId).toMatch(OPENCODE_TURN_ID);
+  return turnId!;
+}
+
+function startedTurnIds(events: AgentStreamEvent[]): string[] {
+  return events.flatMap((event) => (event.type === "turn_started" ? [event.turnId] : []));
+}
+
+/** A new turn id is OpenCode-minted and differs from every id handed out before it. */
+function expectNewTurnId(turnId: string | undefined, earlier: readonly string[]): string {
+  expect(turnId).toMatch(OPENCODE_TURN_ID);
+  expect(earlier).not.toContain(turnId);
+  return turnId!;
+}
 
 function tmpCwd(): string {
   const dir = mkdtempSync(path.join(os.tmpdir(), "opencode-agent-test-"));
@@ -1638,11 +1660,12 @@ describe("OpenCode adapter startTurn error handling", () => {
       type: "timeline",
       item: { type: "user_message", clientMessageId: "client-message-1" },
     });
+    const turnId = openCodeTurnIdOf(turn.events[0]);
     expect(turn.events.map((event) => ("turnId" in event ? event.turnId : undefined))).toEqual([
-      "opencode-turn-0",
-      "opencode-turn-0",
-      "opencode-turn-0",
-      "opencode-turn-0",
+      turnId,
+      turnId,
+      turnId,
+      turnId,
     ]);
   });
 
@@ -1824,7 +1847,8 @@ describe("OpenCode adapter startTurn error handling", () => {
     session.subscribe((event) => events.push(event));
 
     try {
-      await session.startTurn("hello");
+      const { turnId } = await session.startTurn("hello");
+      expect(turnId).toMatch(OPENCODE_TURN_ID);
       await vi.advanceTimersByTimeAsync(10_000);
 
       expect(events).toContainEqual({
@@ -1834,7 +1858,7 @@ describe("OpenCode adapter startTurn error handling", () => {
           type: "error",
           message: "Provider retry (attempt 1): model does not exist",
         },
-        turnId: "opencode-turn-0",
+        turnId,
       });
       expect(events.some((event) => event.type === "turn_failed")).toBe(false);
       await session.close();
@@ -2599,7 +2623,7 @@ describe("OpenCode adapter startTurn error handling", () => {
       }
     });
     try {
-      await session.startTurn("first");
+      const { turnId: firstTurnId } = await session.startTurn("first");
       const interrupt = session.interrupt();
       await retryStarted.promise;
       expect(openCode.calls.sessionPromptAsync).toHaveLength(1);
@@ -2628,7 +2652,10 @@ describe("OpenCode adapter startTurn error handling", () => {
 
       settleRetry.resolve();
       await interrupt;
-      await replacement;
+      const { turnId: replacementTurnId } = await replacement;
+      expect(firstTurnId).toMatch(OPENCODE_TURN_ID);
+      expect(replacementTurnId).toMatch(OPENCODE_TURN_ID);
+      expect(replacementTurnId).not.toBe(firstTurnId);
       expect(openCode.calls.sessionPromptAsync).toHaveLength(2);
 
       for (const event of assistantTurnEvents({
@@ -2642,11 +2669,11 @@ describe("OpenCode adapter startTurn error handling", () => {
       expect(
         turnEventSignatures(events.filter((event) => event.type !== "provider_subagent")),
       ).toEqual([
-        ["turn_started", "opencode-turn-0"],
-        ["turn_canceled", "opencode-turn-0"],
-        ["turn_started", "opencode-turn-1"],
-        ["timeline", "opencode-turn-1"],
-        ["turn_completed", "opencode-turn-1"],
+        ["turn_started", firstTurnId],
+        ["turn_canceled", firstTurnId],
+        ["turn_started", replacementTurnId],
+        ["timeline", replacementTurnId],
+        ["turn_completed", replacementTurnId],
       ]);
     } finally {
       settleRetry.resolve();
@@ -2666,7 +2693,7 @@ describe("OpenCode adapter startTurn error handling", () => {
     session.subscribe((event) => events.push(event));
 
     try {
-      await session.startTurn("first");
+      const { turnId: firstTurnId } = await session.startTurn("first");
       const interrupt = session.interrupt();
       await vi.waitFor(() => expect(openCode.calls.sessionAbort).toHaveLength(1));
 
@@ -2707,10 +2734,19 @@ describe("OpenCode adapter startTurn error handling", () => {
         expect(events).toContainEqual(
           expect.objectContaining({
             type: "timeline",
-            turnId: "opencode-turn-1",
             item: expect.objectContaining({ text: "Wake output streams live." }),
           }),
         ),
+      );
+      const [canceledTurnId, wakeTurnId] = startedTurnIds(events);
+      expect(canceledTurnId).toBe(firstTurnId);
+      expectNewTurnId(wakeTurnId, [firstTurnId]);
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          type: "timeline",
+          turnId: wakeTurnId,
+          item: expect.objectContaining({ text: "Wake output streams live." }),
+        }),
       );
       expect(events).not.toContainEqual(
         expect.objectContaining({
@@ -2727,12 +2763,12 @@ describe("OpenCode adapter startTurn error handling", () => {
       });
       await vi.waitFor(() =>
         expect(events).toContainEqual(
-          expect.objectContaining({ type: "turn_completed", turnId: "opencode-turn-1" }),
+          expect.objectContaining({ type: "turn_completed", turnId: wakeTurnId }),
         ),
       );
-      await expect(session.startTurn("after the wake")).resolves.toEqual({
-        turnId: "opencode-turn-2",
-      });
+      const afterWake = await session.startTurn("after the wake");
+      expect(afterWake).toEqual({ turnId: expect.stringMatching(OPENCODE_TURN_ID) });
+      expectNewTurnId(afterWake.turnId, [firstTurnId, wakeTurnId]);
     } finally {
       settleAbort.resolve();
       await session.close();
@@ -2761,7 +2797,7 @@ describe("OpenCode adapter startTurn error handling", () => {
     });
 
     try {
-      await session.startTurn("first");
+      const { turnId: firstTurnId } = await session.startTurn("first");
       openCode.emitEvent({
         type: "message.part.updated",
         properties: {
@@ -2841,16 +2877,19 @@ describe("OpenCode adapter startTurn error handling", () => {
       await interrupt;
       await new Promise<void>((resolve) => setImmediate(resolve));
 
+      const [canceledTurnId, autonomousTurnId] = startedTurnIds(events);
+      expect(canceledTurnId).toBe(firstTurnId);
+      expectNewTurnId(autonomousTurnId, [firstTurnId]);
       expect(events).toContainEqual({
         type: "turn_started",
         provider: "opencode",
-        turnId: "opencode-turn-1",
+        turnId: autonomousTurnId,
       });
       await vi.waitFor(() =>
         expect(events).toContainEqual({
           type: "turn_completed",
           provider: "opencode",
-          turnId: "opencode-turn-1",
+          turnId: autonomousTurnId,
           usage: expect.objectContaining({
             inputTokens: 7,
             outputTokens: 3,
@@ -2859,7 +2898,7 @@ describe("OpenCode adapter startTurn error handling", () => {
         }),
       );
       const autonomousCompletion = events.find(
-        (event) => event.type === "turn_completed" && event.turnId === "opencode-turn-1",
+        (event) => event.type === "turn_completed" && event.turnId === autonomousTurnId,
       );
       expect(autonomousCompletion?.type).toBe("turn_completed");
       if (autonomousCompletion?.type === "turn_completed") {
@@ -2868,16 +2907,16 @@ describe("OpenCode adapter startTurn error handling", () => {
       expect(events).toContainEqual(
         expect.objectContaining({
           type: "timeline",
-          turnId: "opencode-turn-1",
+          turnId: autonomousTurnId,
           item: expect.objectContaining({
             type: "assistant_message",
             text: "Autonomous wake completed.",
           }),
         }),
       );
-      await expect(session.startTurn("after autonomous wake")).resolves.toEqual({
-        turnId: "opencode-turn-2",
-      });
+      const afterWake = await session.startTurn("after autonomous wake");
+      expect(afterWake).toEqual({ turnId: expect.stringMatching(OPENCODE_TURN_ID) });
+      expectNewTurnId(afterWake.turnId, [firstTurnId, autonomousTurnId]);
     } finally {
       settleAbort.resolve();
       await session.close();
@@ -2944,7 +2983,8 @@ describe("OpenCode adapter startTurn error handling", () => {
     session.subscribe((event) => events.push(event));
 
     try {
-      await session.startTurn("still running upstream");
+      const { turnId: canceledTurnId } = await session.startTurn("still running upstream");
+      expect(canceledTurnId).toMatch(OPENCODE_TURN_ID);
       await expect(session.interrupt()).rejects.toThrow("abort failed");
       expect(events.map((event) => event.type)).toEqual(["turn_started"]);
 
@@ -2955,16 +2995,16 @@ describe("OpenCode adapter startTurn error handling", () => {
         type: "turn_canceled",
         provider: "opencode",
         reason: "interrupted",
-        turnId: "opencode-turn-0",
+        turnId: canceledTurnId,
       });
 
       openCode.emitEvent({
         type: "session.idle",
         properties: { sessionID: "ses_retried_stop" },
       });
-      await expect(session.startTurn("replacement")).resolves.toEqual({
-        turnId: "opencode-turn-1",
-      });
+      const replacement = await session.startTurn("replacement");
+      expect(replacement).toEqual({ turnId: expect.stringMatching(OPENCODE_TURN_ID) });
+      expectNewTurnId(replacement.turnId, [canceledTurnId]);
       expect(openCode.calls.sessionPromptAsync).toHaveLength(2);
     } finally {
       await session.close();
@@ -3032,7 +3072,7 @@ describe("OpenCode adapter startTurn error handling", () => {
 
     let replacement: Promise<{ turnId: string }> | undefined;
     try {
-      await session.startTurn("first");
+      const { turnId: firstTurnId } = await session.startTurn("first");
       const firstStop = session.interrupt();
       void firstStop.catch(() => undefined);
       await vi.waitFor(() => expect(openCode.calls.sessionAbort).toHaveLength(1));
@@ -3055,13 +3095,15 @@ describe("OpenCode adapter startTurn error handling", () => {
       })) {
         openCode.emitEvent(event);
       }
-      await vi.waitFor(() =>
-        expect(events).toContainEqual({
-          type: "turn_started",
-          provider: "opencode",
-          turnId: "opencode-turn-1",
-        }),
-      );
+      await vi.waitFor(() => expect(startedTurnIds(events)).toHaveLength(2));
+      const [startedFirstTurnId, autonomousTurnId] = startedTurnIds(events);
+      expect(startedFirstTurnId).toBe(firstTurnId);
+      expectNewTurnId(autonomousTurnId, [firstTurnId]);
+      expect(events).toContainEqual({
+        type: "turn_started",
+        provider: "opencode",
+        turnId: autonomousTurnId,
+      });
 
       await session.interrupt();
       expect(openCode.calls.sessionAbort).toHaveLength(2);
@@ -3755,7 +3797,7 @@ describe("OpenCode adapter startTurn error handling", () => {
     openCode.sessionPromptAsyncEvents = [];
 
     try {
-      await session.startTurn("first");
+      const { turnId: firstTurnId } = await session.startTurn("first");
       await session.interrupt();
       const descriptor = session.usageSession?.();
       openCode.emitEvent({ type: "server-exited", error: new Error("OpenCode exited") });
@@ -3768,7 +3810,10 @@ describe("OpenCode adapter startTurn error handling", () => {
       ];
       const replacement = session.startTurn("second");
       await vi.advanceTimersByTimeAsync(10_000);
-      await expect(replacement).resolves.toEqual({ turnId: "opencode-turn-1" });
+      await expect(replacement).resolves.toEqual({
+        turnId: expect.stringMatching(OPENCODE_TURN_ID),
+      });
+      expectNewTurnId((await replacement).turnId, [firstTurnId]);
       expect(countEvents(events, "turn_canceled")).toBe(1);
     } finally {
       vi.useRealTimers();
@@ -3825,6 +3870,37 @@ describe("OpenCode adapter startTurn error handling", () => {
     expect(resumed.id).toBe("ses_idle_resume");
     expect(runtime.acquisitions.at(-1)).toEqual({ kind: "current", releaseCount: 0 });
     await resumed.close();
+  });
+
+  // A resumed session writes into the same agent's channel delivery ledger, keyed by turn id.
+  // A reused id would make the Hub treat the resumed answer as a replay and skip it (#40).
+  test("does not reuse a turn id when the same OpenCode session is resumed", async () => {
+    const runtime = new TestOpenCodeHarness();
+    const sessionId = "ses_turn_id_resume";
+    for (let index = 0; index < 2; index += 1) {
+      const openCode = new TestOpenCodeClient();
+      openCode.sessionCreateResponse = { data: { id: sessionId } };
+      openCode.sessionPromptAsyncEvents = [
+        { type: "session.idle", properties: { sessionID: sessionId } },
+      ];
+      runtime.enqueueClient(openCode);
+    }
+    const client = new OpenCodeAgentClient(createTestLogger(), undefined, {
+      serverManager: runtime,
+      createClient: runtime.createClient,
+    });
+    const session = await client.createSession({ provider: "opencode", cwd: "/workspace/repo" });
+    const before = await session.startTurn("before idle close");
+    await session.close();
+
+    const resumed = await client.resumeSession(session.describePersistence()!);
+    try {
+      const after = await resumed.startTurn("after resume");
+      expect(after.turnId).not.toBe(before.turnId);
+      expect(after.turnId).toMatch(/^opencode-turn-[0-9a-f-]{36}$/);
+    } finally {
+      await resumed.close();
+    }
   });
 
   test("continues ordered ingress after one event callback rejects", async () => {
@@ -4088,7 +4164,7 @@ describe("OpenCode adapter startTurn error handling", () => {
     };
 
     try {
-      await session.startTurn("first");
+      const { turnId: firstTurnId } = await session.startTurn("first");
       const interrupt = session.interrupt();
       const replacement = session.startTurn("second");
       await vi.waitFor(() => expect(openCode.calls.sessionStatus).toHaveLength(1));
@@ -4100,7 +4176,10 @@ describe("OpenCode adapter startTurn error handling", () => {
       expect(openCode.calls.sessionStatus).toHaveLength(1);
 
       releaseIdle.resolve();
-      await expect(replacement).resolves.toEqual({ turnId: "opencode-turn-1" });
+      await expect(replacement).resolves.toEqual({
+        turnId: expect.stringMatching(OPENCODE_TURN_ID),
+      });
+      expectNewTurnId((await replacement).turnId, [firstTurnId]);
       expect(openCode.calls.sessionPromptAsync).toHaveLength(2);
       expect(openCode.calls.sessionStatus.length).toBeGreaterThanOrEqual(2);
     } finally {
@@ -4799,10 +4878,11 @@ describe("OpenCode provider subagent contract", () => {
       "timeline",
       "turn_completed",
     ]);
+    const autonomousTurnId = openCodeTurnIdOf(events[0]);
     expect(events.map((event) => ("turnId" in event ? event.turnId : undefined))).toEqual([
-      "opencode-turn-0",
-      "opencode-turn-0",
-      "opencode-turn-0",
+      autonomousTurnId,
+      autonomousTurnId,
+      autonomousTurnId,
     ]);
     expect(events).toContainEqual(
       expect.objectContaining({
@@ -4838,9 +4918,12 @@ describe("OpenCode provider subagent contract", () => {
           expect(events).toContainEqual({
             type: "turn_started",
             provider: "opencode",
-            turnId: "opencode-turn-0",
+            turnId: expect.stringMatching(OPENCODE_TURN_ID),
           });
         });
+        const autonomousTurnId = openCodeTurnIdOf(
+          events.find((event) => event.type === "turn_started"),
+        );
         for (const event of assistantTurnEvents({
           sessionId: "ses_child_external",
           text: "already-running child says hi",
@@ -4852,9 +4935,9 @@ describe("OpenCode provider subagent contract", () => {
 
         expect(childClient.calls.sessionStatus).toEqual([{ directory: "/workspace/repo" }]);
         expect(turnEventSignatures(events)).toEqual([
-          ["turn_started", "opencode-turn-0"],
-          ["timeline", "opencode-turn-0"],
-          ["turn_completed", "opencode-turn-0"],
+          ["turn_started", autonomousTurnId],
+          ["timeline", autonomousTurnId],
+          ["turn_completed", autonomousTurnId],
         ]);
         expect(events).toContainEqual(
           expect.objectContaining({
@@ -4958,10 +5041,12 @@ describe("OpenCode provider subagent contract", () => {
       }
 
       await vi.waitFor(() => {
+        const [autonomousTurnId] = startedTurnIds(events);
+        expect(autonomousTurnId).toMatch(OPENCODE_TURN_ID);
         expect(turnEventSignatures(events)).toEqual([
-          ["turn_started", "opencode-turn-0"],
-          ["timeline", "opencode-turn-0"],
-          ["turn_completed", "opencode-turn-0"],
+          ["turn_started", autonomousTurnId],
+          ["timeline", autonomousTurnId],
+          ["turn_completed", autonomousTurnId],
         ]);
       });
       expect(events).toContainEqual(
@@ -5004,10 +5089,12 @@ describe("OpenCode provider subagent contract", () => {
       }
 
       await vi.waitFor(() => {
+        const [autonomousTurnId] = startedTurnIds(events);
+        expect(autonomousTurnId).toMatch(OPENCODE_TURN_ID);
         expect(turnEventSignatures(events)).toEqual([
-          ["turn_started", "opencode-turn-0"],
-          ["timeline", "opencode-turn-0"],
-          ["turn_completed", "opencode-turn-0"],
+          ["turn_started", autonomousTurnId],
+          ["timeline", autonomousTurnId],
+          ["turn_completed", autonomousTurnId],
         ]);
       });
     } finally {
@@ -5081,7 +5168,11 @@ describe("OpenCode provider subagent contract", () => {
       });
       await vi.waitFor(() => {
         expect(events).toEqual([
-          { type: "turn_started", provider: "opencode", turnId: "opencode-turn-0" },
+          {
+            type: "turn_started",
+            provider: "opencode",
+            turnId: expect.stringMatching(OPENCODE_TURN_ID),
+          },
         ]);
       });
 
@@ -5166,7 +5257,8 @@ describe("OpenCode provider subagent contract", () => {
     });
 
     try {
-      await parent.startTurn("Start from Clisbot");
+      const { turnId: interruptedTurnId } = await parent.startTurn("Start from Clisbot");
+      expect(interruptedTurnId).toMatch(OPENCODE_TURN_ID);
       await parent.interrupt();
 
       for (const event of userMessageEvents({
@@ -5196,12 +5288,12 @@ describe("OpenCode provider subagent contract", () => {
 
       await streamDrained.promise;
       expect(events.filter((event) => event.type !== "provider_subagent")).toEqual([
-        { type: "turn_started", provider: "opencode", turnId: "opencode-turn-0" },
+        { type: "turn_started", provider: "opencode", turnId: interruptedTurnId },
         {
           type: "turn_canceled",
           provider: "opencode",
           reason: "interrupted",
-          turnId: "opencode-turn-0",
+          turnId: interruptedTurnId,
         },
       ]);
     } finally {
@@ -5248,11 +5340,12 @@ describe("OpenCode provider subagent contract", () => {
       "permission_requested",
       "turn_completed",
     ]);
+    const autonomousTurnId = openCodeTurnIdOf(events[0]);
     expect(events).toContainEqual(
       expect.objectContaining({
         type: "permission_requested",
         request: expect.objectContaining({ id: "perm_child_external" }),
-        turnId: "opencode-turn-0",
+        turnId: autonomousTurnId,
       }),
     );
   });
