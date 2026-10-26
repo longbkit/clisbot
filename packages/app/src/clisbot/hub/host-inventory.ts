@@ -38,8 +38,15 @@ export function hubListPollIntervalMs(failures: number, random: () => number = M
   return Math.round(ceiling * (0.5 + random() / 2));
 }
 
-/** Reads the list and keeps the remembered copy in step: replaced on success, dropped on 403. */
-export async function readHubDaemons(hub: HubAccountContextValue): Promise<HubDaemons> {
+/**
+ * Reads the list and keeps the remembered copy in step: replaced on success, dropped on 403. A
+ * read the query cancelled (`signal` aborted) still runs to its end but is not counted as a
+ * failure: one refused list must not count once per caller that replaced it.
+ */
+export async function readHubDaemons(
+  hub: HubAccountContextValue,
+  signal?: AbortSignal,
+): Promise<HubDaemons> {
   const failureKey = JSON.stringify(hubDaemonsQueryKey(hub));
   const cache = getHubDaemonListCache();
   try {
@@ -55,7 +62,8 @@ export async function readHubDaemons(hub: HubAccountContextValue): Promise<HubDa
       });
     return list;
   } catch (error) {
-    listFailures.set(failureKey, (listFailures.get(failureKey) ?? 0) + 1);
+    if (signal?.aborted !== true)
+      listFailures.set(failureKey, (listFailures.get(failureKey) ?? 0) + 1);
     if (hub.origin !== null && classifyHubFailure(error) === "revoked") cache.forget(hub.origin);
     throw error;
   }
@@ -65,7 +73,7 @@ function hubDaemonsQueryInput(hub: HubAccountContextValue) {
   const failureKey = JSON.stringify(hubDaemonsQueryKey(hub));
   return {
     queryKey: hubDaemonsQueryKey(hub),
-    queryFn: () => readHubDaemons(hub),
+    queryFn: ({ signal }: { signal: AbortSignal }) => readHubDaemons(hub, signal),
     dataShape: "value" as const,
     enabled: hub.enabled && hub.signedIn !== null,
     retry: false,

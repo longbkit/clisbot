@@ -11,7 +11,7 @@ const adapters = vi.hoisted(() => ({
   upsert: vi.fn(async () => ({ serverId: "server" })),
   remove: vi.fn(async () => true),
   listError: null as { status: number } | null,
-  refetch: vi.fn(async () => undefined),
+  refetch: vi.fn(async (_options?: { cancelRefetch?: boolean }) => undefined),
   hosts: [
     {
       serverId: "server",
@@ -74,7 +74,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   adapters.slug = "sandbox";
   adapters.listError = null;
-  adapters.refetch.mockClear();
+  adapters.refetch.mockReset();
+  adapters.refetch.mockImplementation(async () => undefined);
   adapters.hosts = [
     {
       serverId: "server",
@@ -181,6 +182,8 @@ it("waits for the Hub to accept the account again before adding a refused Host b
   adapters.hosts = [];
   view.rerender(<HubHostSynchronization />);
   expect(adapters.refetch).toHaveBeenCalledTimes(1);
+  // Joins a read already in flight instead of cancelling it.
+  expect(adapters.refetch).toHaveBeenCalledWith({ cancelRefetch: false });
   adapters.listError = { status: 401 };
   view.rerender(<HubHostSynchronization />);
   await new Promise((resolve) => setTimeout(resolve, 1_500));
@@ -205,4 +208,28 @@ it("keeps adding a Host back while the Hub is only unreachable", async () => {
   await waitFor(() => expect(adapters.upsert.mock.calls.length).toBeGreaterThan(upserts), {
     timeout: 3_000,
   });
+});
+
+it("waits for the list read a removal started before adding the Host back", async () => {
+  vi.stubGlobal("React", React);
+  let answerList: () => void = () => undefined;
+  adapters.refetch.mockImplementation(
+    () => new Promise<undefined>((resolve) => (answerList = () => resolve(undefined))),
+  );
+  const view = render(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
+  const upserts = adapters.upsert.mock.calls.length;
+
+  adapters.hosts = [];
+  view.rerender(<HubHostSynchronization />);
+  expect(adapters.refetch).toHaveBeenCalledTimes(1);
+  // Past the base wait, the read has not answered: the Host stays out.
+  await new Promise((resolve) => setTimeout(resolve, 1_500));
+  expect(adapters.upsert.mock.calls.length).toBe(upserts);
+
+  answerList();
+  await waitFor(() => expect(adapters.upsert.mock.calls.length).toBeGreaterThan(upserts), {
+    timeout: 3_000,
+  });
+  expect(adapters.refetch).toHaveBeenCalledTimes(1);
 });

@@ -17,6 +17,7 @@ import { useHostInventory } from "@/clisbot/hub/host-inventory";
 
 import { resolveStartupRoute } from "@/navigation/host-runtime-bootstrap";
 import { useMessageSender } from "@/clisbot/session-storage/message-sender";
+import { getHostRuntimeStore } from "@/runtime/host-runtime";
 
 interface FakeHost {
   serverId: string;
@@ -33,6 +34,10 @@ const state = vi.hoisted(() => ({
   },
   pendingHub: null as string | null,
   accountSignedIn: true,
+  /** The OAuth company Hub's daemon list: what it serves, whether it answers 401, reads so far. */
+  companyDaemonIds: ["company-daemon"],
+  companyListRefused: false,
+  companyListReads: 0,
   accountListeners: new Set<() => void>(),
   hosts: [] as FakeHost[],
   localServerIds: [] as string[],
@@ -43,7 +48,11 @@ const state = vi.hoisted(() => ({
 }));
 
 /** Each Hub signs in its own account and lists one Host. */
-const hubHosts: Record<string, string> = { personal: "laptop", company: "build-03" };
+const hubHosts: Record<string, string> = {
+  personal: "laptop",
+  company: "build-03",
+  "company-daemon-2": "build-04",
+};
 
 vi.mock("expo-linking", () => ({ useURL: () => null }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ setParams: vi.fn() }) }));
@@ -64,7 +73,14 @@ vi.mock("@/clisbot/hub/transport/create", () => ({
             ? active("company")
             : { status: "signedOut", registration: "invite_only" },
         );
-      if (path.endsWith("/daemons")) return Response.json({ daemons: [daemon("company")] });
+      if (path.endsWith("/daemons")) {
+        state.companyListReads += 1;
+        if (state.companyListRefused)
+          return Response.json({ error: "unauthorized" }, { status: 401 });
+        return Response.json({
+          daemons: state.companyDaemonIds.map((id) => daemon("company", id)),
+        });
+      }
       return new Response(null, { status: 404 });
     },
   }),
@@ -172,10 +188,11 @@ function active(hubId: string) {
   };
 }
 
-function daemon(hubId: string) {
+function daemon(hubId: string, id = `${hubId}-daemon`) {
+  const serverId = hubHosts[id] ?? hubHosts[hubId];
   return {
-    id: `${hubId}-daemon`,
-    slug: hubHosts[hubId],
+    id,
+    slug: serverId,
     status: "active",
     presence: "online",
     connectedAt: null,
@@ -184,7 +201,7 @@ function daemon(hubId: string) {
     managedAccessMode: "external",
     connectionOffer: {
       v: 2,
-      serverId: hubHosts[hubId],
+      serverId,
       daemonPublicKeyB64: `${hubId}-key`,
       relay: { endpoint: "relay.example.test", useTls: true },
     },
@@ -230,6 +247,9 @@ beforeEach(async () => {
   vi.stubGlobal("React", React);
   state.pendingHub = null;
   state.accountSignedIn = true;
+  state.companyDaemonIds = ["company-daemon"];
+  state.companyListRefused = false;
+  state.companyListReads = 0;
   await loadHubProfiles();
   await removeHubProfile("https://company.test");
   for (const profile of state.registry.profiles) {
@@ -291,6 +311,62 @@ test("a company OAuth Hub and a paired personal Hub keep their Hosts through sel
   await waitFor(() => expect(probe().hosts).toEqual(["build-03", "laptop"]));
   await act(() => removeHubProfile("https://company.test"));
   await waitFor(() => expect(probe().hosts).toEqual(["laptop"]));
+});
+
+test("Hosts a refused ticket removed read the list once and come back as soon as the account signs in again", async () => {
+  await removeHubProfile("company");
+  await saveDiscoveredHub({
+    authentication: "oauth",
+    hubId: "https://company.test",
+    origin: "https://company.test",
+    label: "Company",
+    entry: "account",
+  });
+  state.companyDaemonIds = ["company-daemon", "company-daemon-2"];
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={client}>
+      <HubAccountProvider>
+        <HubHostSynchronization />
+      </HubAccountProvider>
+    </QueryClientProvider>,
+  );
+  const companyHosts = () =>
+    state.hosts
+      .filter((host) => host.management?.hubOrigin === "https://company.test")
+      .map((host) => host.serverId)
+      .sort();
+  await waitFor(() => expect(companyHosts()).toEqual(["build-03", "build-04"]));
+
+  // The Hub sign-in expired: both tickets are refused, both Hosts are removed together.
+  state.companyListRefused = true;
+  const readsBefore = state.companyListReads;
+  await act(async () => {
+    const store = getHostRuntimeStore();
+    for (const daemonId of state.companyDaemonIds)
+      await store.removeManagedHost({
+        kind: "hub",
+        hubOrigin: "https://company.test",
+        organizationId: "company-org",
+        daemonId,
+      });
+  });
+  await waitFor(() => expect(state.companyListReads).toBe(readsBefore + 1));
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+  });
+  expect(state.companyListReads).toBe(readsBefore + 1);
+  expect(companyHosts()).toEqual([]);
+
+  // Signing in again as the same account reads the list at once, without waiting for the poll.
+  state.companyListRefused = false;
+  act(() => {
+    for (const listener of state.accountListeners) listener();
+  });
+  await waitFor(() => expect(companyHosts()).toEqual(["build-03", "build-04"]), {
+    timeout: 3_000,
+  });
+  expect(state.companyListReads).toBe(readsBefore + 2);
 });
 
 afterEach(async () => {
