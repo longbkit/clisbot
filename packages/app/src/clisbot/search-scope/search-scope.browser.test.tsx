@@ -271,7 +271,9 @@ describe("global search over 100 Hosts and 2,000 sessions", () => {
     // kept in docs/features/global-search/verification.md, not a CI gate. Scope has added at most
     // 1.33x upstream p95 in recorded runs.
     expect(results.on.p95).toBeLessThan(results.off.p95 * SCOPED_P95_MAX_RATIO);
-  });
+    // Four passes of 56 keystrokes, each waiting two frames, plus two mounts: about 10 s on a dev
+    // machine and past the 15 s default on a CI runner (15.6 s in run 40356750337).
+  }, 60_000);
 });
 
 function summarize(samples: number[]) {
