@@ -1,17 +1,18 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Image, ScrollView, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   ChevronUp,
-  MoreHorizontal,
+  MoreVertical,
   PencilLine,
   Send,
   Trash2,
   type LucideIcon,
 } from "lucide-react-native";
-import type { AttachmentMetadata } from "@/attachments/types";
+import type { InputQueueView } from "@clisbot/protocol/input-queue";
+import type { ComposerAttachment } from "@/attachments/types";
 import { useAttachmentPreviewUrl } from "@/attachments/use-attachment-preview-url";
 import { AttachmentLightbox, type ImageLightboxSource } from "@/components/attachment-lightbox";
 import { Button } from "@/components/ui/button";
@@ -21,18 +22,24 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  type DropdownMenuTriggerProps,
 } from "@/components/ui/dropdown-menu";
 import { mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
+import { ICON_SIZE } from "@/styles/theme";
+
+type HostQueueItem = InputQueueView["items"][number];
 
 export interface QueueRowItem {
   id: string;
   text: string;
   state: "queued" | "sending" | "needs_review";
-  attachments?: readonly unknown[];
-  images?: readonly unknown[];
+  /** A Host item's agent attachments, or a client item's composer attachments. */
+  attachments?: readonly (NonNullable<HostQueueItem["attachments"]>[number] | ComposerAttachment)[];
+  /** A Host item's inline images. */
+  images?: HostQueueItem["images"];
 }
 
 export interface QueueRowActions {
@@ -43,137 +50,199 @@ export interface QueueRowActions {
   pending: boolean;
 }
 
+interface QueueImage {
+  key: string;
+  source: ImageLightboxSource;
+}
+
+/** How many images and attachments a queued message carries. */
+export function queueAttachmentCount(item: QueueRowItem): number {
+  return (item.images?.length ?? 0) + (item.attachments?.length ?? 0);
+}
+
 /**
  * The images a queued message carries: a Host item's inline images (base64), a client item's
  * composer image attachments. Other attachments are counted, not shown.
  */
-export function queueImageSources(item: QueueRowItem): ImageLightboxSource[] {
+export function queueImages(item: QueueRowItem): QueueImage[] {
   const sources: ImageLightboxSource[] = [];
-  for (const image of item.images ?? []) {
-    const value = image as { data?: unknown; mimeType?: unknown };
-    if (typeof value.data === "string" && typeof value.mimeType === "string")
-      sources.push({ type: "uri", uri: `data:${value.mimeType};base64,${value.data}` });
-  }
+  for (const image of item.images ?? [])
+    sources.push({ type: "uri", uri: `data:${image.mimeType};base64,${image.data}` });
   for (const attachment of item.attachments ?? []) {
-    const value = attachment as { kind?: unknown; metadata?: unknown };
-    if (value.kind === "image" && value.metadata)
-      sources.push({ type: "attachment", metadata: value.metadata as AttachmentMetadata });
+    if ("kind" in attachment && attachment.kind === "image")
+      sources.push({ type: "attachment", metadata: attachment.metadata });
   }
-  return sources;
+  // The same image may be attached twice, so its position is part of its key.
+  return sources.map((source, index) => ({
+    key: `${index}:${source.type === "attachment" ? source.metadata.id : source.uri.slice(-32)}`,
+    source,
+  }));
 }
 
+/** One action slot; the hover actions are three of them. */
+const ACTION = 44;
+
 /**
- * One queued message. Send is the one action always in sight; on desktop, hovering the row
- * lays View, Edit and Delete over the end of the text (the text never moves), and a cut-off text
- * shows in full as a tooltip. A phone shows Send and ⋯ (View, Edit, Delete). View expands the row
- * to the full message and its images; an image opens large.
+ * One queued message. Send is the one action always in sight; on desktop, hovering the row or
+ * moving keyboard focus into it shows View, Edit and Delete over the end of the first line (the
+ * text never moves), and a cut-off text shows in full as a tooltip. A phone shows Send and ⋯
+ * (View, Edit, Delete). View expands the row to the full message and its images; an image opens
+ * large.
  */
 export function QueueRow({
   item,
   actions,
+  attachmentCount,
   badges,
   sendingLabel,
 }: {
   item: QueueRowItem;
   actions: QueueRowActions;
+  attachmentCount: number;
   /** Manual / Outcome unknown badges and the attachment count, before the actions. */
   badges: ReactNode;
   sendingLabel: string;
 }) {
   const compact = useIsCompactFormFactor() || isNative;
-  const [hovered, setHovered] = useState(false);
+  const { revealed, handlers } = useRevealOnHoverOrFocus(compact);
   const [expanded, setExpanded] = useState(false);
-  const [truncated, setTruncated] = useState(false);
-  const textRef = useRef<Text>(null);
   const toggle = useCallback(() => setExpanded((open) => !open), []);
-  const enter = useCallback(() => {
-    setHovered(true);
-    // Web only: a one-line text is cut off when it is wider than its box.
-    const element = textRef.current as unknown as HTMLElement | null;
-    if (isWeb && element) setTruncated(element.scrollWidth > element.clientWidth + 1);
-  }, []);
-  const leave = useCallback(() => setHovered(false), []);
-  const images = useMemo(() => queueImageSources(item), [item]);
+  const images = useMemo(() => queueImages(item), [item]);
   const sending = item.state === "sending";
+  const hoverActions = !sending && !compact;
   return (
-    <View
-      style={styles.frame}
-      onPointerEnter={compact ? undefined : enter}
-      onPointerLeave={compact ? undefined : leave}
-      testID={`host-queue-${item.id}`}
-    >
-      <View style={[styles.row, hovered && !compact && styles.rowHovered]}>
+    <View style={styles.frame} {...handlers} testID={`host-queue-${item.id}`}>
+      <View style={[styles.row, revealed && styles.rowRevealed]}>
         <View style={styles.textColumn}>
           <QueueText
             item={item}
-            textRef={textRef}
+            attachmentCount={attachmentCount}
             expanded={expanded}
-            truncated={truncated && !expanded}
-            onPress={toggle}
+            reserveActions={hoverActions}
+            onExpand={toggle}
           />
-          {!sending && !compact && hovered ? (
-            <QueueHoverActions expanded={expanded} onToggle={toggle} actions={actions} />
+          {hoverActions ? (
+            <QueueHoverActions
+              visible={revealed}
+              expanded={expanded}
+              onToggle={toggle}
+              actions={actions}
+            />
           ) : null}
         </View>
-        {badges}
-        {sending ? <Text style={styles.hint}>{sendingLabel}</Text> : null}
-        {!sending && item.state === "queued" ? (
-          <QueueIconAction
-            label={actions.sendLabel}
-            Icon={Send}
-            disabled={actions.pending}
-            onPress={actions.send}
-          />
-        ) : null}
-        {!sending && compact ? (
-          <QueueMoreMenu expanded={expanded} onToggle={toggle} actions={actions} />
-        ) : null}
+        <View style={styles.trailing}>
+          {badges}
+          {sending ? <Text style={styles.hint}>{sendingLabel}</Text> : null}
+          {!sending && item.state === "queued" ? (
+            <QueueIconAction
+              label={actions.sendLabel}
+              Icon={Send}
+              disabled={actions.pending}
+              onPress={actions.send}
+            />
+          ) : null}
+          {!sending && compact ? (
+            <QueueMoreMenu expanded={expanded} onToggle={toggle} actions={actions} />
+          ) : null}
+        </View>
       </View>
       {expanded && images.length ? <QueueImages images={images} /> : null}
     </View>
   );
 }
 
+/**
+ * Desktop only: the row's actions show while the pointer is on it (docs/hover.md) or keyboard
+ * focus is inside it. A mouse click focuses the button it lands on too; only a keyboard focus
+ * counts, or the actions would stay up after the pointer leaves.
+ */
+function useRevealOnHoverOrFocus(compact: boolean) {
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const handlers = useMemo(
+    () =>
+      compact
+        ? {}
+        : {
+            onPointerEnter: () => setHovered(true),
+            onPointerLeave: () => setHovered(false),
+            onFocus: (event: { target: unknown }) => setFocused(isKeyboardFocus(event.target)),
+            onBlur: () => setFocused(false),
+          },
+    [compact],
+  );
+  return { revealed: !compact && (hovered || focused), handlers };
+}
+
+function isKeyboardFocus(target: unknown): boolean {
+  if (!isWeb || !(target instanceof HTMLElement)) return false;
+  return target.matches(":focus-visible");
+}
+
+/** Web only: whether a one-line text is cut off, measured on layout so the first hover knows. */
+function useTruncated(label: string) {
+  const ref = useRef<Text>(null);
+  const [truncated, setTruncated] = useState(false);
+  const measure = useCallback(() => {
+    if (!isWeb) return;
+    const element: unknown = ref.current;
+    if (element instanceof HTMLElement) setTruncated(element.scrollWidth > element.clientWidth + 1);
+  }, []);
+  useLayoutEffect(measure, [measure, label]);
+  return { ref, truncated, measure };
+}
+
+/**
+ * The message. Collapsed, a tap expands it; expanded, it is selectable text and collapses only
+ * through View/Collapse, so selecting text never collapses the row. The tap target is a pointer
+ * shortcut: assistive tech reads the message as text and reaches View through the actions.
+ */
 function QueueText({
   item,
-  textRef,
+  attachmentCount,
   expanded,
-  truncated,
-  onPress,
+  reserveActions,
+  onExpand,
 }: {
   item: QueueRowItem;
-  textRef: React.RefObject<Text | null>;
+  attachmentCount: number;
   expanded: boolean;
-  truncated: boolean;
-  onPress(): void;
+  /** Keeps the expanded text clear of the hover actions over its first line. */
+  reserveActions: boolean;
+  onExpand(): void;
 }) {
   const { t } = useTranslation();
-  const count = (item.images?.length ?? 0) + (item.attachments?.length ?? 0);
-  const label = item.text || t("composer.hostQueue.attachments", { count });
-  const state = useMemo(() => ({ expanded }), [expanded]);
-  const text = (
-    <PressHighlight
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={state}
-      accessibilityLabel={label}
-      style={styles.textPress}
-      testID="host-queue-text"
-    >
-      <Text
-        ref={textRef}
-        style={styles.text}
-        testID="host-queue-text-label"
-        numberOfLines={expanded ? undefined : 1}
-        selectable={expanded}
-      >
-        {label}
-      </Text>
-    </PressHighlight>
-  );
+  const label = item.text || t("composer.hostQueue.attachments", { count: attachmentCount });
+  const { ref, truncated, measure } = useTruncated(label);
+  if (expanded)
+    return (
+      <View style={[styles.textBox, reserveActions && styles.textClearOfActions]}>
+        <Text style={styles.text} testID="host-queue-text-label" selectable>
+          {label}
+        </Text>
+      </View>
+    );
   return (
     <Tooltip delayDuration={400} enabledOnDesktop={truncated}>
-      <TooltipTrigger asChild>{text}</TooltipTrigger>
+      <TooltipTrigger asChild>
+        <PressHighlight
+          onPress={onExpand}
+          tabIndex={-1}
+          accessibilityHint={t("composer.hostQueue.view")}
+          style={styles.textBox}
+          testID="host-queue-text"
+        >
+          <Text
+            ref={ref}
+            onLayout={measure}
+            style={styles.text}
+            testID="host-queue-text-label"
+            numberOfLines={1}
+          >
+            {label}
+          </Text>
+        </PressHighlight>
+      </TooltipTrigger>
       <TooltipContent>
         <Text style={styles.tooltip}>{label}</Text>
       </TooltipContent>
@@ -181,19 +250,28 @@ function QueueText({
   );
 }
 
-/** View, Edit and Delete laid over the end of the text, on the row's own surface. */
+/**
+ * View, Edit and Delete over the end of the first line, on the row's own surface. Always
+ * mounted so keyboard and screen-reader users reach them; invisible and pointer-transparent
+ * until the row is hovered or focused.
+ */
 function QueueHoverActions({
+  visible,
   expanded,
   onToggle,
   actions,
 }: {
+  visible: boolean;
   expanded: boolean;
   onToggle(): void;
   actions: QueueRowActions;
 }) {
   const { t } = useTranslation();
   return (
-    <View style={styles.overlay} testID="host-queue-hover-actions">
+    <View
+      style={[styles.overlay, !visible && styles.overlayHidden]}
+      testID="host-queue-hover-actions"
+    >
       <QueueIconAction
         label={t(expanded ? "composer.hostQueue.collapse" : "composer.hostQueue.view")}
         Icon={expanded ? ChevronUp : ChevronDown}
@@ -216,6 +294,13 @@ function QueueHoverActions({
   );
 }
 
+const moreTriggerStyle: DropdownMenuTriggerProps["style"] = ({ hovered, pressed, open }) => [
+  styles.iconTarget,
+  styles.more,
+  (hovered || pressed || open) && styles.moreActive,
+];
+
+/** The phone's row kebab (docs/design.md: rows): View, Edit and Delete. */
 function QueueMoreMenu({
   expanded,
   onToggle,
@@ -231,18 +316,23 @@ function QueueMoreMenu({
       <DropdownMenuTrigger
         accessibilityRole="button"
         accessibilityLabel={t("composer.hostQueue.more")}
-        style={styles.iconTarget}
+        style={moreTriggerStyle}
         testID="host-queue-more"
       >
-        <ThemedMore size={18} uniProps={mutedIconColorMapping} />
+        <ThemedMoreVertical size={ICON_SIZE.sm} uniProps={mutedIconColorMapping} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={onToggle} testID="host-queue-view">
+        <DropdownMenuItem
+          onSelect={onToggle}
+          leading={expanded ? collapseIcon : viewIcon}
+          testID="host-queue-view"
+        >
           {t(expanded ? "composer.hostQueue.collapse" : "composer.hostQueue.view")}
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={actions.edit}
           disabled={actions.pending}
+          leading={editIcon}
           testID="host-queue-edit"
         >
           {t("composer.hostQueue.edit")}
@@ -251,6 +341,7 @@ function QueueMoreMenu({
           onSelect={actions.remove}
           disabled={actions.pending}
           destructive
+          leading={deleteIcon}
           testID="host-queue-delete"
         >
           {t("composer.hostQueue.delete")}
@@ -262,18 +353,14 @@ function QueueMoreMenu({
 
 const THUMB = 64;
 
-function imageKey(source: ImageLightboxSource): string {
-  return source.type === "attachment" ? source.metadata.id : source.uri.slice(-64);
-}
-
-function QueueImages({ images }: { images: readonly ImageLightboxSource[] }) {
+function QueueImages({ images }: { images: readonly QueueImage[] }) {
   const [open, setOpen] = useState<ImageLightboxSource | null>(null);
   const close = useCallback(() => setOpen(null), []);
   return (
     <>
       <ScrollView horizontal contentContainerStyle={styles.images} testID="host-queue-images">
-        {images.map((source) => (
-          <QueueImageThumb key={imageKey(source)} source={source} onOpen={setOpen} />
+        {images.map((image) => (
+          <QueueImageThumb key={image.key} source={image.source} onOpen={setOpen} />
         ))}
       </ScrollView>
       <AttachmentLightbox source={open} onClose={close} />
@@ -337,57 +424,91 @@ function QueueIconAction({
   );
 }
 
-const ThemedMore = withUnistyles(MoreHorizontal);
+const ThemedMoreVertical = withUnistyles(MoreVertical);
+const ThemedChevronDown = withUnistyles(ChevronDown);
+const ThemedChevronUp = withUnistyles(ChevronUp);
+const ThemedPencilLine = withUnistyles(PencilLine);
+const ThemedTrash2 = withUnistyles(Trash2);
+// Menu items lead with a small muted icon (docs/design.md: kebab menus).
+const viewIcon = <ThemedChevronDown size={ICON_SIZE.sm} uniProps={mutedIconColorMapping} />;
+const collapseIcon = <ThemedChevronUp size={ICON_SIZE.sm} uniProps={mutedIconColorMapping} />;
+const editIcon = <ThemedPencilLine size={ICON_SIZE.sm} uniProps={mutedIconColorMapping} />;
+const deleteIcon = <ThemedTrash2 size={ICON_SIZE.sm} uniProps={mutedIconColorMapping} />;
 
-const styles = StyleSheet.create((theme) => ({
-  // The hover target only (docs/hover.md); layout lives on the row inside it.
-  frame: {
-    position: "relative",
-    borderBottomWidth: theme.borderWidth[1],
-    borderColor: theme.colors.border,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    minHeight: 48,
-    gap: theme.spacing[1],
-    paddingLeft: theme.spacing[2],
-  },
-  rowHovered: { backgroundColor: theme.colors.surface1, borderRadius: theme.borderRadius.md },
-  // The text and, while hovered, the actions laid over its end: badges and Send stay clickable.
-  textColumn: { flex: 1, minWidth: 0, position: "relative", justifyContent: "center" },
-  textPress: { paddingVertical: theme.spacing[2] },
-  text: { color: theme.colors.foreground, fontSize: theme.fontSize.base },
-  hint: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
-  tooltip: { color: theme.colors.popoverForeground, fontSize: theme.fontSize.sm, maxWidth: 480 },
-  // Over the end of the text, on the hovered row's fill: the text never reflows.
-  overlay: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    right: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingLeft: theme.spacing[2],
-    backgroundColor: theme.colors.surface1,
-    borderRadius: theme.borderRadius.md,
-  },
-  iconTarget: {
-    width: 44,
-    height: 44,
-    minWidth: 44,
-    minHeight: 44,
-    padding: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  images: { gap: theme.spacing[2], paddingLeft: theme.spacing[2], paddingBottom: theme.spacing[2] },
-  thumb: {
-    width: THUMB,
-    height: THUMB,
-    borderRadius: theme.borderRadius.md,
-    overflow: "hidden",
-    backgroundColor: theme.colors.surface2,
-  },
-  thumbImage: { width: THUMB, height: THUMB },
-}));
+const styles = StyleSheet.create((theme) => {
+  // Message text, as in a sent message (components/message.tsx); one line fills one action slot.
+  const lineHeight = Math.round(theme.fontSize.content * 1.4);
+  const overlayWidth = ACTION * 3 + theme.spacing[2];
+  return {
+    // The hover and focus target only (docs/hover.md); layout lives on the row inside it.
+    frame: {
+      position: "relative",
+      borderBottomWidth: theme.borderWidth[1],
+      borderColor: theme.colors.border,
+    },
+    // Top-aligned: an expanded message grows down, its actions stay beside the first line.
+    row: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      paddingVertical: theme.spacing[0.5],
+      gap: theme.spacing[1],
+      paddingLeft: theme.spacing[2],
+    },
+    rowRevealed: { backgroundColor: theme.colors.surface1, borderRadius: theme.borderRadius.md },
+    // The text and the actions over its first line: badges and Send stay clickable.
+    textColumn: { flex: 1, minWidth: 0, position: "relative" },
+    textBox: {
+      minHeight: ACTION,
+      justifyContent: "center",
+      paddingVertical: Math.max(0, (ACTION - lineHeight) / 2),
+    },
+    textClearOfActions: { paddingRight: overlayWidth },
+    text: { color: theme.colors.foreground, fontSize: theme.fontSize.content, lineHeight },
+    trailing: {
+      flexDirection: "row",
+      alignItems: "center",
+      minHeight: ACTION,
+      gap: theme.spacing[1],
+    },
+    hint: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
+    tooltip: { color: theme.colors.popoverForeground, fontSize: theme.fontSize.sm, maxWidth: 480 },
+    // Over the end of the first line, on the revealed row's fill: the text never reflows.
+    overlay: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      width: overlayWidth,
+      height: ACTION,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      backgroundColor: theme.colors.surface1,
+      borderRadius: theme.borderRadius.md,
+    },
+    overlayHidden: { opacity: 0, pointerEvents: "none" },
+    iconTarget: {
+      width: ACTION,
+      height: ACTION,
+      minWidth: ACTION,
+      minHeight: ACTION,
+      padding: 0,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    more: { borderRadius: theme.borderRadius.base },
+    moreActive: { backgroundColor: theme.colors.surface2 },
+    images: {
+      gap: theme.spacing[2],
+      paddingLeft: theme.spacing[2],
+      paddingBottom: theme.spacing[2],
+    },
+    thumb: {
+      width: THUMB,
+      height: THUMB,
+      borderRadius: theme.borderRadius.md,
+      overflow: "hidden",
+      backgroundColor: theme.colors.surface2,
+    },
+    thumbImage: { width: THUMB, height: THUMB },
+  };
+});

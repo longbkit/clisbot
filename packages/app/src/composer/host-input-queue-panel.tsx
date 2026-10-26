@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { QueueRow } from "./queue-row";
+import { QueueRow, queueAttachmentCount, type QueueRowItem } from "./queue-row";
 import { View, Text, ScrollView } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
@@ -13,13 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
 const ThemedPaperclip = withUnistyles(Paperclip);
-interface QueuePanelItem {
-  id: string;
-  text: string;
-  state: "queued" | "sending" | "needs_review";
+interface QueuePanelItem extends QueueRowItem {
   reason?: string;
-  attachments?: readonly unknown[];
-  images?: readonly unknown[];
 }
 
 interface QueuePanelActions {
@@ -86,7 +81,7 @@ function QueueRowEntry({
     () => ({ edit: editItem, send: sendItem, remove: removeItem, sendLabel, pending }),
     [editItem, pending, removeItem, sendItem, sendLabel],
   );
-  const count = (item.images?.length ?? 0) + (item.attachments?.length ?? 0);
+  const count = queueAttachmentCount(item);
   const badges = (
     <>
       {count > 0 ? (
@@ -110,6 +105,7 @@ function QueueRowEntry({
     <QueueRow
       item={item}
       actions={actions}
+      attachmentCount={count}
       badges={badges}
       sendingLabel={t("composer.hostQueue.sending")}
     />

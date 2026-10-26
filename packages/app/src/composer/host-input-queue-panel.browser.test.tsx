@@ -1,63 +1,51 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { HostInputQueuePanel } from "./host-input-queue-panel";
 import { i18n } from "@/i18n/i18next";
 
-// The phone's ⋯ menu opens a bottom sheet, which needs the app's sheet providers; the stub keeps
-// the row's own part under test: which items ⋯ offers and what each one calls.
-vi.mock("@/components/ui/dropdown-menu", async (importOriginal) => {
-  const { createContext, useContext, useMemo, useReducer } = await import("react");
-  interface Props {
-    children?: React.ReactNode;
-    testID?: string;
-    accessibilityLabel?: string;
-    onSelect?: () => void;
-  }
-  const Open = createContext({ open: false, toggle: () => {} });
-  function DropdownMenu({ children }: Props) {
-    const [open, toggle] = useReducer((was: boolean) => !was, false);
-    const value = useMemo(() => ({ open, toggle }), [open]);
-    return <Open.Provider value={value}>{children}</Open.Provider>;
-  }
-  function DropdownMenuTrigger({ children, testID, accessibilityLabel }: Props) {
-    const { toggle } = useContext(Open);
-    return (
-      <button type="button" aria-label={accessibilityLabel} data-testid={testID} onClick={toggle}>
-        {children}
-      </button>
-    );
-  }
-  function DropdownMenuContent({ children }: Props) {
-    return useContext(Open).open ? <div>{children}</div> : null;
-  }
-  function DropdownMenuItem({ children, testID, onSelect }: Props) {
-    return (
-      <button type="button" data-testid={testID} onClick={onSelect}>
-        {children}
-      </button>
-    );
-  }
-  return {
-    ...(await importOriginal<typeof import("@/components/ui/dropdown-menu")>()),
-    DropdownMenu,
-    DropdownMenuTrigger,
-    DropdownMenuContent,
-    DropdownMenuItem,
-  };
-});
 const layout = vi.hoisted(() => ({ compact: false }));
 vi.mock("@/constants/layout", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/constants/layout")>()),
   useIsCompactFormFactor: () => layout.compact,
 }));
+// A compact menu opens as a bottom sheet, which needs the app's sheet providers. Only that
+// presentation is swapped: every menu here opens as the real popover, with its real items.
+vi.mock("@/components/ui/menu/menu-context", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/components/ui/menu/menu-context")>();
+  return {
+    ...original,
+    useMenuState: (...args: Parameters<typeof original.useMenuState>) => ({
+      ...original.useMenuState(...args),
+      presentation: "popover" as const,
+    }),
+  };
+});
+
+// A keyboard focus opens each action's tooltip, and the tooltip's web fade cannot run in this
+// harness (reanimated throws on it); tooltips appear and close without it.
+vi.mock("react-native-reanimated", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-native-reanimated")>()),
+  FadeIn: { duration: () => undefined },
+  FadeOut: { duration: () => undefined },
+}));
 
 // A 1×1 PNG: an image a queued message carries.
 const PIXEL =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+const FILE = {
+  type: "uploaded_file",
+  id: "file",
+  fileName: "notes.txt",
+  mimeType: "text/plain",
+  size: 1,
+  path: "/notes.txt",
+} as const;
 const DEFAULT_VIEW: React.ComponentProps<typeof HostInputQueuePanel>["view"] = {
-  items: [{ id: "one", text: "Preview", attachments: [{}], state: "queued" }],
+  items: [{ id: "one", text: "Preview", attachments: [FILE], state: "queued" }],
 };
+const LONG = "A long queued message ".repeat(12).trim();
 let root: Root;
 let container: HTMLDivElement;
 beforeAll(async () => {
@@ -98,35 +86,50 @@ function mount(overrides: Partial<React.ComponentProps<typeof HostInputQueuePane
   );
   return actions;
 }
+function one(text: string, extra: Partial<{ images: { data: string; mimeType: string }[] }> = {}) {
+  return { items: [{ id: "one", text, state: "queued" as const, ...extra }] };
+}
 function button(label: string) {
-  return document.querySelector(`[aria-label="${label}"]`) as HTMLButtonElement;
+  return document.querySelector(`[aria-label="${label}"]`) as HTMLElement;
 }
 const click = (element: Element) => act(() => (element as HTMLElement).click());
 function row(id = "one") {
   return container.querySelector(`[data-testid="host-queue-${id}"]`) as HTMLElement;
+}
+function find(id: string, scope: ParentNode = row()) {
+  return scope.querySelector(`[data-testid="${id}"]`) as HTMLElement;
 }
 function hover(element: Element) {
   act(() => {
     element.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
   });
 }
+function shown(element: Element) {
+  const style = getComputedStyle(element);
+  return style.opacity !== "0" && style.pointerEvents !== "none";
+}
+function expectTarget(element: Element) {
+  const rect = element.getBoundingClientRect();
+  expect(rect.width).toBeGreaterThanOrEqual(44);
+  expect(rect.height).toBeGreaterThanOrEqual(44);
+}
 
 test.each([undefined, "Send message"])(
   "desktop shows only Send; hovering lays View, Edit and Delete over the text; client label=%s",
   (sendNowLabel) => {
     const actions = mount({ sendNowLabel });
+    expect(container.textContent).not.toContain("Client queue");
     expect(container.querySelector('[aria-label="Attachments (1)"]')).not.toBeNull();
     // Without manual delivery the queue steers; the label names it either way.
     const send = "Steer this send";
-    expect(button(send)).not.toBeNull();
-    for (const label of ["Edit", "Delete", "View"]) expect(button(label)).toBeNull();
-    const text = row().querySelector('[data-testid="host-queue-text"]')!;
+    expectTarget(button(send));
+    expect(shown(find("host-queue-hover-actions"))).toBe(false);
+    const text = find("host-queue-text");
+    expect(text.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
     const before = text.getBoundingClientRect();
     hover(row());
-    for (const label of ["Edit", "Delete", "View"]) {
-      const rect = button(label).getBoundingClientRect();
-      expect(rect.width).toBeGreaterThanOrEqual(44);
-    }
+    expect(shown(find("host-queue-hover-actions"))).toBe(true);
+    for (const label of ["Edit", "Delete", "View", send]) expectTarget(button(label));
     // An overlay: the text keeps its box, nothing reflows.
     const after = text.getBoundingClientRect();
     expect(after.width).toBe(before.width);
@@ -138,34 +141,48 @@ test.each([undefined, "Send message"])(
     click(button(send));
     expect(actions.steer).toHaveBeenCalledExactlyOnceWith("one");
     expect(actions.sendNow).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="menuitem"]')).toBeNull();
+    expect(document.body.textContent).not.toContain("Interrupt and send");
   },
 );
+
+test("the keyboard reaches View, Edit and Delete, and focus shows them", async () => {
+  mount({ view: one("Preview") });
+  const overlay = find("host-queue-hover-actions");
+  expect(shown(overlay)).toBe(false);
+  const reached: (string | null)[] = [];
+  for (let step = 0; step < 4; step += 1) {
+    await userEvent.tab();
+    reached.push(document.activeElement?.getAttribute("aria-label") ?? null);
+    if (document.activeElement?.getAttribute("aria-label") === "Edit")
+      expect(shown(overlay)).toBe(true);
+  }
+  // The text is read as text, not a second View control.
+  expect(reached).toEqual(["View", "Edit", "Delete", "Steer this send"]);
+});
 
 test("reads at the normal text size, larger than the row's small hints", () => {
   mount();
   const size = (element: Element) => parseFloat(getComputedStyle(element).fontSize);
-  const text = row().querySelector('[data-testid="host-queue-text-label"]')!;
+  const text = find("host-queue-text-label");
   const hint = row().querySelector('[aria-label="Attachments (1)"] div')!;
   expect(size(text)).toBeGreaterThan(size(hint));
 });
 
-test("View expands the full message and its images; an image opens large", async () => {
-  mount({
-    view: {
-      items: [
-        {
-          id: "one",
-          text: "A long queued message ".repeat(12),
-          images: [{ data: PIXEL, mimeType: "image/png" }],
-          state: "queued",
-        },
-      ],
-    },
-  });
-  expect(row().querySelector('[data-testid="host-queue-images"]')).toBeNull();
+test("View expands the full message and its images, clear of the actions; an image opens large", async () => {
+  mount({ view: one(LONG, { images: [{ data: PIXEL, mimeType: "image/png" }] }) });
+  expect(find("host-queue-images")).toBeNull();
   hover(row());
   click(button("View"));
-  const image = row().querySelector('[data-testid="host-queue-image"]')!;
+  // Hovered and expanded: the actions sit beside the first line, never over the text.
+  const overlay = find("host-queue-hover-actions").getBoundingClientRect();
+  const label = find("host-queue-text-label").getBoundingClientRect();
+  expect(overlay.height).toBe(44);
+  expect(label.height).toBeGreaterThan(overlay.height);
+  expect(label.right).toBeLessThanOrEqual(overlay.left);
+  // Expanded text can be selected; a press on it does not collapse the row.
+  click(find("host-queue-text-label"));
+  const image = find("host-queue-image");
   expect(image).not.toBeNull();
   expect(row().querySelector("img")?.getAttribute("src")).toContain("data:image/png;base64");
   click(image);
@@ -174,21 +191,54 @@ test("View expands the full message and its images; an image opens large", async
       1,
     ),
   );
+  click(button("Collapse"));
+  expect(find("host-queue-images")).toBeNull();
+});
+
+test("a cut-off message shows in full on the first hover", async () => {
+  mount({ view: one(LONG) });
+  await userEvent.hover(find("host-queue-text-label"));
+  await vi.waitFor(() =>
+    expect(
+      [...document.querySelectorAll("div")].filter((e) => e.textContent === LONG).length,
+    ).toBeGreaterThan(2),
+  );
 });
 
 test("a phone shows Send and ⋯; ⋯ offers View, Edit and Delete", async () => {
   layout.compact = true;
   const actions = mount();
-  expect(button("Steer this send")).not.toBeNull();
-  const more = row().querySelector('[data-testid="host-queue-more"]')!;
-  expect(more).not.toBeNull();
+  expectTarget(button("Steer this send"));
+  const more = find("host-queue-more");
+  expectTarget(more);
+  expect(find("host-queue-hover-actions")).toBeNull();
   expect(button("Edit")).toBeNull();
   click(more);
-  expect(document.querySelector('[data-testid="host-queue-edit"]')).not.toBeNull();
-  for (const id of ["host-queue-view", "host-queue-delete"])
-    expect(document.querySelector(`[data-testid="${id}"]`)).not.toBeNull();
-  click(document.querySelector('[data-testid="host-queue-edit"]')!);
+  await vi.waitFor(() =>
+    expect(document.querySelector('[data-testid="host-queue-edit"]')).not.toBeNull(),
+  );
+  for (const id of ["host-queue-view", "host-queue-edit", "host-queue-delete"]) {
+    const item = find(id, document);
+    expect(item.getAttribute("role")).toBe("menuitem");
+  }
+  click(find("host-queue-edit", document));
   expect(actions.edit).toHaveBeenCalledExactlyOnceWith("one");
+});
+
+test("a phone's ⋯ keeps Edit and Delete disabled while a change is pending", async () => {
+  layout.compact = true;
+  const actions = mount({ pending: true });
+  click(find("host-queue-more"));
+  await vi.waitFor(() =>
+    expect(document.querySelector('[data-testid="host-queue-edit"]')).not.toBeNull(),
+  );
+  for (const id of ["host-queue-edit", "host-queue-delete"])
+    expect(find(id, document).getAttribute("aria-disabled")).toBe("true");
+  expect(find("host-queue-view", document).getAttribute("aria-disabled")).not.toBe("true");
+  click(find("host-queue-edit", document));
+  click(find("host-queue-delete", document));
+  expect(actions.edit).not.toHaveBeenCalled();
+  expect(actions.remove).not.toHaveBeenCalled();
 });
 
 test("manual badge explains on demand, direct Send remains named", async () => {
@@ -224,6 +274,7 @@ test("pending and nonqueued rows cannot send; stale Save/Move remain disabled", 
   expect(row("two").querySelector('[aria-label="Steer this send"]')).toBeNull();
   hover(row("two"));
   expect(row("two").querySelector('[aria-label="Edit"]')).toBeNull();
+  expect(row("two").querySelector('[role="button"]')).toBeNull();
   expect(row("three").querySelector('[aria-label="Steer this send"]')).toBeNull();
   const save = [...container.querySelectorAll('button,[role="button"]')].find(
     (e) => e.textContent === "Save changes",
@@ -242,8 +293,12 @@ test("localized manual badge keeps all icon targets inside a compact row", async
     mount({ notice: "Giải thích khi chạm", hideSteer: true, sendNowLabel: "Gửi tin nhắn" });
     const box = row().getBoundingClientRect();
     expect(box.height).toBeLessThanOrEqual(56);
-    for (const target of container.querySelectorAll('[role="button"]')) {
+    expect(find("host-queue-text").getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+    const targets = container.querySelectorAll('[role="button"]');
+    expect(targets.length).toBeGreaterThan(0);
+    for (const target of targets) {
       const rect = target.getBoundingClientRect();
+      expect(rect.height).toBeGreaterThanOrEqual(44);
       expect(rect.right).toBeLessThanOrEqual(box.right + 1);
     }
     expect(button("Gửi thủ công")).not.toBeNull();
