@@ -12,6 +12,7 @@ import { openProjectDirectoryWithHosts } from "../support/helpers/project-groupi
 import { connectSeedClient, type SeedDaemonClient } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
 import { createTempGitRepo } from "../support/helpers/workspace";
+import { seedSidebarHostFilters } from "../support/helpers/sidebar";
 
 /**
  * Global search Host / Project scope (docs/features/global-search/README.md) in the real app:
@@ -204,16 +205,14 @@ test.describe("Global search Host and Project scope", () => {
     fleet,
   }) => {
     await openFleet(page, fleet);
-    await page.evaluate((serverId) => {
-      const raw = JSON.parse(localStorage.getItem("sidebar-view") ?? "{}");
-      raw.state = { ...raw.state, hostFilters: [serverId] };
-      localStorage.setItem("sidebar-view", JSON.stringify(raw));
+    await page.evaluate(() => {
       // Keep the Hosts this test added: skip the fixture's registry reset on this reload.
       localStorage.setItem(
         "@clisbot:e2e-disable-default-seed-once",
         localStorage.getItem("@clisbot:e2e-seed-nonce") ?? "",
       );
-    }, getServerId());
+    });
+    await seedSidebarHostFilters(page, [getServerId()]);
     await page.reload();
     const panel = await openSearch(page);
     await type(panel, "release");

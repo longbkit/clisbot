@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, type Locator, type Page } from "@playwright/test";
 import { getServerId } from "./server-id";
 import { projectEquivalenceViewKey } from "./project-view-key";
@@ -421,4 +422,22 @@ export async function revealSidebarProjectWorkspaces(
   await page
     .getByTestId(`sidebar-project-show-more-${projectEquivalenceViewKey(projectKey)}`)
     .click();
+}
+
+/**
+ * Saves the sidebar's Host filter as a reader would have left it, for the next load only and
+ * before the app boots. A running app persists its own copy of `sidebar-view`, which can land on
+ * top of a write made behind its back (a slow runner reloads before the write survives).
+ */
+export async function seedSidebarHostFilters(page: Page, hostFilters: string[]): Promise<void> {
+  await page.addInitScript(
+    ({ ids, once }) => {
+      if (sessionStorage.getItem(once)) return;
+      sessionStorage.setItem(once, "1");
+      const raw = JSON.parse(localStorage.getItem("sidebar-view") ?? "{}");
+      raw.state = { ...raw.state, hostFilters: ids, projectFilters: [] };
+      localStorage.setItem("sidebar-view", JSON.stringify(raw));
+    },
+    { ids: hostFilters, once: `@clisbot:e2e-host-filter-${randomUUID()}` },
+  );
 }

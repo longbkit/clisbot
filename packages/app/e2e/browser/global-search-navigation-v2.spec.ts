@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Locator, Page } from "@playwright/test";
@@ -13,6 +12,7 @@ import { HUB_TEAMMATE, signInToE2EHub } from "../support/helpers/hub-reader";
 import { connectSeedClient, type SeedDaemonClient } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
 import { createTempDirectory, createTempGitRepo } from "../support/helpers/workspace";
+import { seedSidebarHostFilters } from "../support/helpers/sidebar";
 
 /**
  * Global search wired into Navigation V2 (docs/features/global-search/README.md): Work publishes
@@ -145,22 +145,8 @@ async function gotoWork(page: Page) {
   });
 }
 
-/**
- * Saves Workspace's Host filter as a reader would have left it, on the next load and before the
- * app boots: a running app persists its own copy of this key, which can land on top of a write
- * made behind its back.
- */
 async function setWorkFilter(page: Page, hostFilters: string[]) {
-  await page.addInitScript(
-    ({ ids, once }) => {
-      if (sessionStorage.getItem(once)) return;
-      sessionStorage.setItem(once, "1");
-      const raw = JSON.parse(localStorage.getItem("sidebar-view") ?? "{}");
-      raw.state = { ...raw.state, hostFilters: ids, projectFilters: [] };
-      localStorage.setItem("sidebar-view", JSON.stringify(raw));
-    },
-    { ids: hostFilters, once: `@clisbot:e2e-work-filter-${randomUUID()}` },
-  );
+  await seedSidebarHostFilters(page, hostFilters);
   await gotoWork(page);
 }
 
@@ -276,6 +262,9 @@ test.describe("Global search in Navigation V2", () => {
     await openFleet(page, fleet);
     await setWorkFilter(page, [getServerId()]);
     await page.goto("/open-project");
+    // The shortcut is a window listener the shell installs once it mounts; a key pressed while the
+    // page is still booting goes nowhere (seen on a slow runner).
+    await expect(page.getByTestId("navigation-rail-home")).toBeVisible({ timeout: 30_000 });
     await page.keyboard.press("ControlOrMeta+K");
     const panel = page.getByTestId("command-center-panel");
     await expect(panel).toBeVisible({ timeout: 30_000 });
