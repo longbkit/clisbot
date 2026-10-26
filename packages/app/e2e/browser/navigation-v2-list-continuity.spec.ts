@@ -5,7 +5,7 @@ import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { expect, test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
-import { wsRoutePatternForPort } from "../support/helpers/daemon-port";
+import { daemonWsRoutePattern, wsRoutePatternForPort } from "../support/helpers/daemon-port";
 import { addConnectedHostAndReload } from "../support/helpers/hosts";
 import {
   startIsolatedHostDaemon,
@@ -228,27 +228,117 @@ test.describe("Navigation V2 lists keep their rows (D6)", () => {
   });
 });
 
-/** Holds this Host's chat and Bot list requests on the socket until `release`. */
-async function holdListings(page: Page, port: number) {
-  let holding = true;
+type ListingMode = "hold" | "fail" | "pass";
+
+function rpcError(raw: string): string | null {
+  const envelope = JSON.parse(raw) as { message?: { type?: string; requestId?: string } };
+  const request = envelope.message;
+  if (!request?.type || !request.requestId) return null;
+  return JSON.stringify({
+    type: "session",
+    message: {
+      type: "rpc_error",
+      payload: {
+        requestId: request.requestId,
+        requestType: request.type,
+        error: "Injected list failure.",
+        code: "handler_error",
+      },
+    },
+  });
+}
+
+/**
+ * Chat and Bot list requests on the given Hosts' sockets: held until `release`, answered with an
+ * error, or passed through. Everything else passes.
+ */
+async function controlListings(page: Page, patterns: RegExp[], initial: ListingMode) {
+  let mode = initial;
   const held: (() => void)[] = [];
   const isListing = (raw: string) =>
     raw.includes('"chat.list.request"') || raw.includes('"bot.list.request"');
-  await page.routeWebSocket(wsRoutePatternForPort(String(port)), (browser) => {
-    const server = browser.connectToServer();
-    browser.onMessage((message) => {
-      const raw = typeof message === "string" ? message : message.toString("utf8");
-      if (holding && isListing(raw)) held.push(() => server.send(message));
-      else server.send(message);
+  for (const pattern of patterns)
+    await page.routeWebSocket(pattern, (browser) => {
+      const server = browser.connectToServer();
+      browser.onMessage((message) => {
+        const raw = typeof message === "string" ? message : message.toString("utf8");
+        const failure = mode === "fail" && isListing(raw) ? rpcError(raw) : null;
+        if (failure) browser.send(failure);
+        else if (mode === "hold" && isListing(raw)) held.push(() => server.send(message));
+        else server.send(message);
+      });
+      server.onMessage((message) => browser.send(message));
     });
-    server.onMessage((message) => browser.send(message));
-  });
   return {
+    set(next: ListingMode) {
+      mode = next;
+    },
     release() {
-      holding = false;
+      mode = "pass";
       for (const send of held.splice(0)) send();
     },
   };
+}
+
+/** The drawn height of each row in the visible list; a Home row is the title's whole row. */
+async function rowHeights(page: Page, list: ListName): Promise<number[]> {
+  const rowOf =
+    list === "home" ? '[data-testid^="agent-row-"]:not([data-testid^="agent-row-title-"])' : "*";
+  return page
+    .locator(`${LISTS[list].pane} >> visible=true`)
+    .locator(LISTS[list].rows)
+    .evaluateAll(
+      (elements, closest) =>
+        elements.map((element) =>
+          Math.round((element.closest(closest) ?? element).getBoundingClientRect().height),
+        ),
+      rowOf,
+    );
+}
+
+/** The section each list sits in; rails are measured from its edge. */
+const FRAMES: Record<ListName, string> = {
+  chats: '[data-testid="chats-pane"]',
+  work: '[data-testid="work-pane"]',
+  home: '[data-testid="home-activity"]',
+};
+
+/** The first row's geometry relative to its pane: row inset, height, mark and title rails. */
+async function rowGeometry(page: Page, list: ListName, rows = LISTS[list].rows) {
+  const rowOf =
+    list === "home" ? '[data-testid^="agent-row-"]:not([data-testid^="agent-row-title-"])' : "*";
+  return page
+    .locator(`${LISTS[list].pane} >> visible=true`)
+    .locator(rows)
+    .first()
+    .evaluate(
+      (element, input) => {
+        const row = element.closest(input.rowOf) ?? element;
+        const pane = row.closest(input.frame)!.getBoundingClientRect();
+        const box = row.getBoundingClientRect();
+        const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+        let text: Text | null = null;
+        while (walker.nextNode()) {
+          const node = walker.currentNode as Text;
+          // Avatar initials are tiny text; the title is the first line at reading size.
+          const size = parseFloat(getComputedStyle(node.parentElement!).fontSize);
+          if (node.textContent?.trim() && size >= 12) {
+            text = node;
+            break;
+          }
+        }
+        const range = document.createRange();
+        if (text) range.selectNodeContents(text);
+        const title = text ? range.getBoundingClientRect() : null;
+        return {
+          rowLeft: Math.round(box.left - pane.left),
+          height: Math.round(box.height),
+          titleLeft: title ? Math.round(title.left - pane.left) : null,
+          titleSize: text ? getComputedStyle(text.parentElement!).fontSize : null,
+        };
+      },
+      { rowOf, frame: FRAMES[list] },
+    );
 }
 
 const SHOTS = process.env.NAV_V2_LIST_SHOTS;
@@ -266,7 +356,11 @@ test.describe("Navigation V2 Chats skeleton (D7)", () => {
       const folder = SHOTS ?? info.outputPath("shots");
       mkdirSync(folder, { recursive: true });
       // Chat and Bot lists from this Host wait until the test lets them through.
-      const hold = await holdListings(page, daemon.port);
+      const hold = await controlListings(
+        page,
+        [wsRoutePatternForPort(String(daemon.port))],
+        "hold",
+      );
       try {
         await page.setViewportSize({ width, height: compact ? 844 : 900 });
         await gotoAppShell(page);
@@ -326,6 +420,90 @@ test.describe("Navigation V2 Chats skeleton (D7)", () => {
         if (chipRow.overflows) expect(chipRow.fades).toBeGreaterThan(0);
       } finally {
         hold.release();
+        await seeded.client.close().catch(() => undefined);
+        await seeded.workspace.cleanup().catch(() => undefined);
+        await daemon.close().catch(() => undefined);
+      }
+    });
+  }
+});
+
+test.describe("Navigation V2 Chats error and row rails (D2: V5, V3)", () => {
+  test.use({ navigationV2: true });
+
+  for (const width of [1440, 390]) {
+    test(`Chats says it failed and Retry recovers; rows keep one height at ${width}px`, async ({
+      page,
+    }, info) => {
+      test.setTimeout(240_000);
+      const compact = width < 500;
+      const size = compact ? "phone" : "desktop";
+      const serverId = `srv_nav_error_${randomUUID().slice(0, 8)}`;
+      const daemon = await startIsolatedHostDaemon(serverId);
+      const seeded = await seedHost(daemon);
+      const folder = SHOTS ?? info.outputPath("shots");
+      mkdirSync(folder, { recursive: true });
+      // Every Host's chat and Bot lists fail, so Chats has nothing to show but the error.
+      const listings = await controlListings(
+        page,
+        [wsRoutePatternForPort(String(daemon.port)), daemonWsRoutePattern()],
+        "fail",
+      );
+      try {
+        await page.setViewportSize({ width, height: compact ? 844 : 900 });
+        await gotoAppShell(page);
+        await addConnectedHostAndReload(page, { serverId, label: "List Host", port: daemon.port });
+        await openList(page, "chats", compact);
+        const error = page.getByTestId("chats-list-error").filter({ visible: true });
+        await expect(error).toBeVisible({ timeout: 60_000 });
+        await page.waitForTimeout(300);
+        await page.screenshot({ path: `${folder}/chats-error-${size}.png` });
+
+        listings.set("pass");
+        await error.getByTestId("chats-list-error-action").click();
+        await expect(
+          page.getByTestId(`sidebar-chat-${seeded.chatIds[0]!}`).filter({ visible: true }),
+        ).toBeVisible({ timeout: 60_000 });
+        await page.screenshot({ path: `${folder}/chats-retried-${size}.png` });
+
+        // V3: within a list, every row of a kind is one height.
+        const heights: Record<string, number[]> = {};
+        const geometry: Record<string, Awaited<ReturnType<typeof rowGeometry>>> = {};
+        for (const list of ["chats", "work", "home"] as const) {
+          if (list !== "chats") await openList(page, list, compact);
+          const rows = page
+            .locator(`${LISTS[list].pane} >> visible=true`)
+            .locator(LISTS[list].rows);
+          await expect(rows.first()).toBeVisible({ timeout: 60_000 });
+          heights[list] = await rowHeights(page, list);
+          geometry[list] = await rowGeometry(page, list);
+        }
+        console.log(`[row heights ${width}] ${JSON.stringify(heights)}`);
+        console.log(`[row geometry ${width}] ${JSON.stringify(geometry)}`);
+        await info.attach(`row-heights-${size}.json`, {
+          body: JSON.stringify(heights),
+          contentType: "application/json",
+        });
+        // Workspace's Session grouping is the virtualized flat list; it keeps the same rail.
+        await openList(page, "work", compact);
+        await page
+          .getByTestId("work-pane")
+          .filter({ visible: true })
+          .getByTestId("sidebar-view-session")
+          .click();
+        const sessionRail = (
+          await rowGeometry(page, "work", '[data-testid^="sidebar-workspace-session-"]')
+        ).titleLeft;
+        console.log(`[session rail ${width}] ${sessionRail}`);
+        expect(sessionRail).toBe(geometry.work!.titleLeft);
+
+        // V3: one row height and one title rail across Chats, Workspace and the Home feed.
+        const all = Object.values(heights).flat();
+        expect(new Set(all).size, JSON.stringify(heights)).toBe(1);
+        const rails = Object.values(geometry).map((entry) => entry.titleLeft);
+        expect(new Set(rails).size, JSON.stringify(geometry)).toBe(1);
+      } finally {
+        listings.release();
         await seeded.client.close().catch(() => undefined);
         await seeded.workspace.cleanup().catch(() => undefined);
         await daemon.close().catch(() => undefined);
