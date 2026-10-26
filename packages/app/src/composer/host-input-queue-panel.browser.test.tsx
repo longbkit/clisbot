@@ -123,12 +123,12 @@ test.each([undefined, "Send message"])(
     // Without manual delivery the queue steers; the label names it either way.
     const send = "Steer this send";
     expectTarget(button(send));
-    expect(shown(find("host-queue-hover-actions"))).toBe(false);
-    const text = find("host-queue-text");
+    expect(shown(find("queue-row-hover-actions"))).toBe(false);
+    const text = find("queue-row-text");
     expect(text.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
     const before = text.getBoundingClientRect();
     hover(row());
-    expect(shown(find("host-queue-hover-actions"))).toBe(true);
+    expect(shown(find("queue-row-hover-actions"))).toBe(true);
     for (const label of ["Edit", "Delete", "View", send]) expectTarget(button(label));
     // An overlay: the text keeps its box, nothing reflows.
     const after = text.getBoundingClientRect();
@@ -148,7 +148,7 @@ test.each([undefined, "Send message"])(
 
 test("the keyboard reaches View, Edit and Delete, and focus shows them", async () => {
   mount({ view: one("Preview") });
-  const overlay = find("host-queue-hover-actions");
+  const overlay = find("queue-row-hover-actions");
   expect(shown(overlay)).toBe(false);
   const reached: (string | null)[] = [];
   for (let step = 0; step < 4; step += 1) {
@@ -164,25 +164,25 @@ test("the keyboard reaches View, Edit and Delete, and focus shows them", async (
 test("reads at the normal text size, larger than the row's small hints", () => {
   mount();
   const size = (element: Element) => parseFloat(getComputedStyle(element).fontSize);
-  const text = find("host-queue-text-label");
+  const text = find("queue-row-text-label");
   const hint = row().querySelector('[aria-label="Attachments (1)"] div')!;
   expect(size(text)).toBeGreaterThan(size(hint));
 });
 
 test("View expands the full message and its images, clear of the actions; an image opens large", async () => {
   mount({ view: one(LONG, { images: [{ data: PIXEL, mimeType: "image/png" }] }) });
-  expect(find("host-queue-images")).toBeNull();
+  expect(find("queue-row-images")).toBeNull();
   hover(row());
   click(button("View"));
   // Hovered and expanded: the actions sit beside the first line, never over the text.
-  const overlay = find("host-queue-hover-actions").getBoundingClientRect();
-  const label = find("host-queue-text-label").getBoundingClientRect();
+  const overlay = find("queue-row-hover-actions").getBoundingClientRect();
+  const label = find("queue-row-text-label").getBoundingClientRect();
   expect(overlay.height).toBe(44);
   expect(label.height).toBeGreaterThan(overlay.height);
   expect(label.right).toBeLessThanOrEqual(overlay.left);
   // Expanded text can be selected; a press on it does not collapse the row.
-  click(find("host-queue-text-label"));
-  const image = find("host-queue-image");
+  click(find("queue-row-text-label"));
+  const image = find("queue-row-image");
   expect(image).not.toBeNull();
   expect(row().querySelector("img")?.getAttribute("src")).toContain("data:image/png;base64");
   click(image);
@@ -192,12 +192,12 @@ test("View expands the full message and its images, clear of the actions; an ima
     ),
   );
   click(button("Collapse"));
-  expect(find("host-queue-images")).toBeNull();
+  expect(find("queue-row-images")).toBeNull();
 });
 
 test("a cut-off message shows in full on the first hover", async () => {
   mount({ view: one(LONG) });
-  await userEvent.hover(find("host-queue-text-label"));
+  await userEvent.hover(find("queue-row-text-label"));
   await vi.waitFor(() =>
     expect(
       [...document.querySelectorAll("div")].filter((e) => e.textContent === LONG).length,
@@ -209,34 +209,34 @@ test("a phone shows Send and ⋯; ⋯ offers View, Edit and Delete", async () =>
   layout.compact = true;
   const actions = mount();
   expectTarget(button("Steer this send"));
-  const more = find("host-queue-more");
+  const more = find("queue-row-more");
   expectTarget(more);
-  expect(find("host-queue-hover-actions")).toBeNull();
+  expect(find("queue-row-hover-actions")).toBeNull();
   expect(button("Edit")).toBeNull();
   click(more);
   await vi.waitFor(() =>
-    expect(document.querySelector('[data-testid="host-queue-edit"]')).not.toBeNull(),
+    expect(document.querySelector('[data-testid="queue-row-edit"]')).not.toBeNull(),
   );
-  for (const id of ["host-queue-view", "host-queue-edit", "host-queue-delete"]) {
+  for (const id of ["queue-row-view", "queue-row-edit", "queue-row-delete"]) {
     const item = find(id, document);
     expect(item.getAttribute("role")).toBe("menuitem");
   }
-  click(find("host-queue-edit", document));
+  click(find("queue-row-edit", document));
   expect(actions.edit).toHaveBeenCalledExactlyOnceWith("one");
 });
 
 test("a phone's ⋯ keeps Edit and Delete disabled while a change is pending", async () => {
   layout.compact = true;
   const actions = mount({ pending: true });
-  click(find("host-queue-more"));
+  click(find("queue-row-more"));
   await vi.waitFor(() =>
-    expect(document.querySelector('[data-testid="host-queue-edit"]')).not.toBeNull(),
+    expect(document.querySelector('[data-testid="queue-row-edit"]')).not.toBeNull(),
   );
-  for (const id of ["host-queue-edit", "host-queue-delete"])
+  for (const id of ["queue-row-edit", "queue-row-delete"])
     expect(find(id, document).getAttribute("aria-disabled")).toBe("true");
-  expect(find("host-queue-view", document).getAttribute("aria-disabled")).not.toBe("true");
-  click(find("host-queue-edit", document));
-  click(find("host-queue-delete", document));
+  expect(find("queue-row-view", document).getAttribute("aria-disabled")).not.toBe("true");
+  click(find("queue-row-edit", document));
+  click(find("queue-row-delete", document));
   expect(actions.edit).not.toHaveBeenCalled();
   expect(actions.remove).not.toHaveBeenCalled();
 });
@@ -293,7 +293,7 @@ test("localized manual badge keeps all icon targets inside a compact row", async
     mount({ notice: "Giải thích khi chạm", hideSteer: true, sendNowLabel: "Gửi tin nhắn" });
     const box = row().getBoundingClientRect();
     expect(box.height).toBeLessThanOrEqual(56);
-    expect(find("host-queue-text").getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+    expect(find("queue-row-text").getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
     const targets = container.querySelectorAll('[role="button"]');
     expect(targets.length).toBeGreaterThan(0);
     for (const target of targets) {

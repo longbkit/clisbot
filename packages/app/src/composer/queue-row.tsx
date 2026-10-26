@@ -212,7 +212,7 @@ function QueueText({
   if (expanded)
     return (
       <View style={[styles.textBox, reserveActions && styles.textClearOfActions]}>
-        <Text style={styles.text} testID="host-queue-text-label" selectable>
+        <Text style={styles.text} testID="queue-row-text-label" selectable>
           {label}
         </Text>
       </View>
@@ -225,13 +225,13 @@ function QueueText({
           tabIndex={-1}
           accessibilityHint={t("composer.hostQueue.view")}
           style={styles.textBox}
-          testID="host-queue-text"
+          testID="queue-row-text"
         >
           <Text
             ref={ref}
             onLayout={measure}
             style={styles.text}
-            testID="host-queue-text-label"
+            testID="queue-row-text-label"
             numberOfLines={1}
           >
             {label}
@@ -265,7 +265,7 @@ function QueueHoverActions({
   return (
     <View
       style={[styles.overlay, !visible && styles.overlayHidden]}
-      testID="host-queue-hover-actions"
+      testID="queue-row-hover-actions"
     >
       <QueueIconAction
         label={t(expanded ? "composer.hostQueue.collapse" : "composer.hostQueue.view")}
@@ -312,7 +312,7 @@ function QueueMoreMenu({
         accessibilityRole="button"
         accessibilityLabel={t("composer.hostQueue.more")}
         style={moreTriggerStyle}
-        testID="host-queue-more"
+        testID="queue-row-more"
       >
         <ThemedMoreVertical size={ICON_SIZE.sm} uniProps={mutedIconColorMapping} />
       </DropdownMenuTrigger>
@@ -320,7 +320,7 @@ function QueueMoreMenu({
         <DropdownMenuItem
           onSelect={onToggle}
           leading={expanded ? collapseIcon : viewIcon}
-          testID="host-queue-view"
+          testID="queue-row-view"
         >
           {t(expanded ? "composer.hostQueue.collapse" : "composer.hostQueue.view")}
         </DropdownMenuItem>
@@ -328,7 +328,7 @@ function QueueMoreMenu({
           onSelect={actions.edit}
           disabled={actions.pending}
           leading={editIcon}
-          testID="host-queue-edit"
+          testID="queue-row-edit"
         >
           {t("composer.hostQueue.edit")}
         </DropdownMenuItem>
@@ -337,7 +337,7 @@ function QueueMoreMenu({
           disabled={actions.pending}
           destructive
           leading={deleteIcon}
-          testID="host-queue-delete"
+          testID="queue-row-delete"
         >
           {t("composer.hostQueue.delete")}
         </DropdownMenuItem>

@@ -19,7 +19,7 @@ export function QueueImages({ images }: { images: readonly QueueImage[] }) {
   const close = useCallback(() => setOpen(null), []);
   return (
     <>
-      <ScrollView horizontal contentContainerStyle={styles.images} testID="host-queue-images">
+      <ScrollView horizontal contentContainerStyle={styles.images} testID="queue-row-images">
         {images.map((image) => (
           <QueueImageThumb key={image.key} source={image.source} onOpen={setOpen} />
         ))}
@@ -47,7 +47,7 @@ function QueueImageThumb({
       accessibilityRole="imagebutton"
       accessibilityLabel={t("composer.hostQueue.openImage")}
       style={styles.thumb}
-      testID="host-queue-image"
+      testID="queue-row-image"
     >
       {image ? <Image source={image} style={styles.thumbImage} resizeMode="cover" /> : null}
     </PressHighlight>
