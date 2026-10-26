@@ -47,6 +47,11 @@ describe("daemon quick starts", () => {
     });
     expect((await restarted.list(user("b"))).items).toEqual([]);
   });
+  it("keeps a quick start's auto-send choice across restart", async () => {
+    await store.save(user("a"), id, 0, { ...input, autoSend: true });
+    const restarted = new QuickStartStore(join(dir, "catalog.json"));
+    expect((await restarted.list(user("a"))).items[0]).toMatchObject({ autoSend: true });
+  });
   it("lets creators publish while recipients pin independently and cannot edit", async () => {
     await store.save(user("a"), id, 0, { ...input, visibility: "host" });
     expect((await store.list(user("b"))).items[0]).toMatchObject({

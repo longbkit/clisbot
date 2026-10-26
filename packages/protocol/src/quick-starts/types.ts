@@ -38,6 +38,10 @@ export const QuickStartInputSchema = z.object({
     z.object({ kind: z.literal("default") }),
     z.object({ kind: z.literal("configured"), config: BotLaunchDefaultsSchema }),
   ]),
+  // COMPAT(quickStartAutoSend): added in unreleased Fusion; review 2027-04-26. Tapping the quick
+  // start sends its prompt instead of filling the composer. An older daemon strips the field, so
+  // clients offer it only under `server_info.features.quickStartAutoSend`.
+  autoSend: z.boolean().optional(),
 });
 export const QuickStartSchema = QuickStartInputSchema.extend({
   id: z.string().regex(/^qs_[a-f0-9]{16}$/),

@@ -6,6 +6,8 @@ import type { QuickStartDestination } from "./model";
 import { useQuickStartWebNavigation } from "./use-web-navigation";
 import { useQuickStartEditor, newQuickStartId } from "./use-editor";
 import { useQuickStartMutation, useQuickStartAction } from "./use-mutations";
+import { sendsOnTap } from "./row";
+import type { QuickStartEdit } from "./model";
 export function useQuickStartLibrary(
   source: ReturnType<typeof useQuickStarts>,
   snapshot: () => QuickStartInput | null,
@@ -101,7 +103,8 @@ function useQuickStartSubmission({
         );
         return;
       }
-      onApply(item);
+      // Only the reader's own quick start sends on tap; a shared one's prompt is someone else's text.
+      onApply({ ...item, autoSend: sendsOnTap(item) });
       setOpen(false);
     },
     [onApply, source.online, setError, setOpen],
@@ -109,18 +112,13 @@ function useQuickStartSubmission({
   const save = useCallback(() => {
     if (edit?.canSave && source.client)
       void run(
-        () =>
-          source.client!.saveQuickStart({
-            id: edit.id,
-            expectedRevision: edit.revision,
-            input: edit.input,
-          }),
+        () => saveAndPinNew(source, edit),
         editor.finish,
         (code) => {
           if (code === "conflict") editor.form?.setConflict();
         },
       );
-  }, [edit, source.client, run, editor]);
+  }, [edit, source, run, editor]);
   return { apply, save };
 }
 
@@ -197,4 +195,28 @@ function useConflictRecovery(
     setError(null);
   }, [editor, setError]);
   return { reload, saveCopy };
+}
+
+/**
+ * Saves the edit; a new quick start is also pinned to Home, first, so it shows without another
+ * step. The pin is best effort: a pin conflict leaves the saved quick start in the library.
+ */
+async function saveAndPinNew(source: ReturnType<typeof useQuickStarts>, edit: QuickStartEdit) {
+  const client = source.client!;
+  const saved = await client.saveQuickStart({
+    id: edit.id,
+    expectedRevision: edit.revision,
+    input: edit.input,
+  });
+  if (saved.error || edit.revision !== 0) return saved;
+  const preferences = source.data?.preferences;
+  const pinned = preferences?.pinnedIds ?? [];
+  if (!pinned.includes(edit.id))
+    await client
+      .setQuickStartPins({
+        pinnedIds: [edit.id, ...pinned],
+        expectedRevision: preferences?.revision ?? 0,
+      })
+      .catch(() => undefined);
+  return saved;
 }

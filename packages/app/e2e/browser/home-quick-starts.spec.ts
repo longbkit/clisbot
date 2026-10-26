@@ -10,6 +10,11 @@ import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon
 import { getServerId } from "../support/helpers/server-id";
 import { ALL_HOSTS_OPTION_ID } from "@/components/hosts/host-picker-constants";
 
+async function findQuickStart(client: DaemonClient, name: string) {
+  const catalog = await client.listQuickStarts();
+  return catalog.items?.find((item) => item.name === name);
+}
+
 function scrollTop(element: HTMLElement | SVGElement) {
   return element.scrollTop;
 }
@@ -148,7 +153,13 @@ test.describe("Home and daemon quick starts", () => {
       await page.getByTestId("quick-start-name").fill("Fix a bug safely");
       await page.getByRole("button", { name: "New worktree", exact: true }).click();
       await page.getByRole("button", { name: "Save", exact: true }).click();
-      await expect(page.getByText("Fix a bug safely", { exact: true })).toBeVisible();
+      // The library lists it, and Home already shows it pinned.
+      await expect(
+        page.locator("#overlay-root").getByText("Fix a bug safely", { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByTestId("home-scroll").getByText("Fix a bug safely", { exact: true }),
+      ).toBeVisible();
       const catalog = await client.listQuickStarts();
       expect(catalog.error).toBeNull();
       const saved = catalog.items!.find((item) => item.name === "Fix a bug safely")!;
@@ -158,8 +169,7 @@ test.describe("Home and daemon quick starts", () => {
         workspace: { kind: "worktree" },
       });
       expect(saved.startingPrompt).toBe("Investigate and fix this bug:");
-      await page.getByRole("button", { name: "Actions for Fix a bug safely" }).click();
-      await page.getByRole("menuitem", { name: "Pin to Home", exact: true }).click();
+      // A new quick start is pinned to Home as it is saved, with no separate Pin step.
       await expect
         .poll(async () => (await client.listQuickStarts()).preferences?.pinnedIds)
         .toEqual([savedId]);
@@ -265,6 +275,64 @@ test.describe("Home and daemon quick starts", () => {
       await page.goBack();
       await expect(tabs).toBeVisible();
     } finally {
+      await workspace.cleanup();
+    }
+  });
+});
+
+test.describe("Quick starts in Navigation V2", () => {
+  test.describe.configure({ timeout: 180000 });
+  test.use({ navigationV2: true });
+
+  test("a new quick start is on Home at once, and Send right away starts the chat in one tap", async ({
+    page,
+  }, info) => {
+    const workspace = await seedWorkspace({ repoPrefix: "home-quick-start-send-" });
+    const client = await connectDaemonClient<DaemonClient>({
+      clientIdPrefix: "quick-start-send-observer",
+    });
+    let savedId: string | undefined;
+    const prompt = `Summarize today's changes ${Date.now()}`;
+    try {
+      await gotoAppShell(page);
+      await expect(page).toHaveURL(/\/open-project$/);
+      await fillNewWorkspaceDraft(page, prompt);
+      await page.getByRole("link", { name: "View all quick starts" }).click();
+      await page.getByRole("button", { name: "New quick start", exact: true }).click();
+      await page.getByTestId("quick-start-name").fill("Daily summary");
+      await page.getByText("Send right away", { exact: true }).click();
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      await expect
+        .poll(() => findQuickStart(client, "Daily summary"))
+        .toMatchObject({ autoSend: true, startingPrompt: prompt });
+      const saved = (await findQuickStart(client, "Daily summary"))!;
+      savedId = saved.id;
+      expect((await client.listQuickStarts()).preferences?.pinnedIds?.[0]).toBe(savedId);
+
+      const library = page.locator("#overlay-root").getByRole("button", { name: "Daily summary" });
+      await expect(async () => {
+        await page.keyboard.press("Escape");
+        await expect(library).toHaveCount(0, { timeout: 1_000 });
+      }).toPass({ timeout: 15_000 });
+      // Start from an empty composer, so the sent text is the quick start's alone.
+      await fillNewWorkspaceDraft(page, "");
+      const tile = page.getByTestId("home-scroll").getByRole("button", {
+        name: "Daily summary",
+        exact: true,
+      });
+      await expect(tile.getByTestId("quick-start-sends-on-tap")).toBeVisible({ timeout: 30_000 });
+      await page.screenshot({ path: info.outputPath("quick-start-send-tile.png") });
+      await tile.click();
+      await expect(page).toHaveURL(/\/workspace\//, { timeout: 45_000 });
+      await expect(page.getByText(prompt, { exact: true }).first()).toBeVisible({
+        timeout: 30_000,
+      });
+    } finally {
+      if (savedId) {
+        const item = (await client.listQuickStarts()).items?.find((entry) => entry.id === savedId);
+        if (item) await client.deleteQuickStart({ id: savedId, expectedRevision: item.revision });
+      }
+      await client.close();
       await workspace.cleanup();
     }
   });

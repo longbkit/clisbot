@@ -2,6 +2,7 @@ import { useIsFocused } from "expo-router/react-navigation";
 import { buildStartDestinations, StartDestinationOption } from "@/clisbot/home/start-destinations";
 import { orderStartOptions } from "@/clisbot/home/start-kinds";
 import { useStartTemplate, type PendingStartTemplate } from "@/clisbot/home/use-start-template";
+import { useQuickStartAutoSend } from "@/clisbot/home/use-quick-start-auto-send";
 import { snapshotStart, composerLaunch } from "@/clisbot/home/start-template";
 import { findDestination } from "@/clisbot/quick-starts/model";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
@@ -1740,6 +1741,14 @@ export function NewWorkspaceScreen({
     effectiveIsolation,
     selectedItem,
   ]);
+  const requestAutoSend = useQuickStartAutoSend({
+    serverId: selectedServerId,
+    applying: pendingQuickStart !== null,
+    checks: [configurationProblem, templateBaseRequired, errorMessage, isPending],
+    attachments: chatDraft.attachments.length,
+    cwd: selectedSourceDirectory,
+    submit: handleSubmitNewWorkspace,
+  });
   const applyQuickStart = useCallback(
     (item: QuickStartInput) => {
       const destination = findDestination(destinations, item.target);
@@ -1751,8 +1760,11 @@ export function NewWorkspaceScreen({
       setPendingQuickStart({ serverId: selectedServerId, template: item });
       setTemplateApplied(true);
       setManualLaunchTarget({ kind: "chat" });
+      requestAutoSend(
+        item.autoSend ? { serverId: selectedServerId, text: item.startingPrompt } : null,
+      );
     },
-    [destinations, selectDestination, selectedServerId],
+    [destinations, selectDestination, selectedServerId, requestAutoSend],
   );
   // Reopening Home after a Bot chat restores that Bot with its own agent settings, through the
   // same selection a pick makes; inference alone would launch it with the composer's settings.
