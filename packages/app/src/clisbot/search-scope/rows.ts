@@ -88,6 +88,20 @@ function missingProjectLabel(host: ScopeHost, context: RowContext): string {
 
 function hubRow(hub: ScopeHub, context: RowContext): ScopeRowModel {
   const { t } = context;
+  // Signed in, but no Host is shared with the reader yet: findable, and the note says why there
+  // is nothing under it — there is no Workspace list to show it in.
+  if (hub.serverIds.length === 0)
+    return {
+      id: `scope:hub:${hub.origin}`,
+      icon: "hub",
+      title: hub.name,
+      subtitle: "Hub",
+      note: t("hubRow.noHosts"),
+      status: "offline",
+      chips: [{ kind: "hub", origin: hub.origin, label: hub.name }],
+      workTarget: null,
+      testID: `command-center-scope-hub-${hub.origin}`,
+    };
   return {
     id: `scope:hub:${hub.origin}`,
     icon: "hub",

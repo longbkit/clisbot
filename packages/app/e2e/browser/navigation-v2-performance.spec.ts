@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
+import { BOT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import type { Page } from "@playwright/test";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { expect, metroTest as test } from "../support/fixtures";
@@ -13,6 +16,9 @@ import { seedWorkspace } from "../support/helpers/seed-client";
 // Opt in with CLISBOT_NAV_V2_PERF_E2E=1; numbers land in the console and the test attachments.
 const RUN = process.env.CLISBOT_NAV_V2_PERF_E2E === "1";
 const SESSIONS = Number(process.env.CLISBOT_NAV_V2_PERF_SESSIONS ?? 500);
+// Real scale (Owner's Hub, ~4,900 sessions) spreads sessions over workspaces; every tenth is a
+// Bot session, so the Workspace list's Bots chip has something to hide.
+const WORKSPACES = Number(process.env.CLISBOT_NAV_V2_PERF_WORKSPACES ?? 1);
 const CHATS = Number(process.env.CLISBOT_NAV_V2_PERF_CHATS ?? 500);
 const HOME_ITEMS = 200;
 const SWITCHES = 20;
@@ -44,16 +50,28 @@ async function seedSyntheticHost(): Promise<Seeded> {
     clientIdPrefix: "nav-v2-perf",
     port: daemon.port,
   });
-  const agents = await inBatches(SESSIONS, (i) =>
-    client.createAgent({
+  const places = [{ cwd: workspace.repoPath, workspaceId: workspace.workspaceId }];
+  for (let w = 1; w < WORKSPACES; w += 1) {
+    const cwd = path.join(workspace.repoPath, `ws-${w}`);
+    await mkdir(cwd, { recursive: true });
+    const created = await client.createWorkspace({
+      source: { kind: "directory", path: cwd },
+      title: `Synthetic workspace ${w}`,
+    });
+    if (created.workspace) places.push({ cwd, workspaceId: created.workspace.id });
+  }
+  const agents = await inBatches(SESSIONS, (i) => {
+    const place = places[i % places.length]!;
+    return client.createAgent({
       provider: "mock",
-      cwd: workspace.repoPath,
-      workspaceId: workspace.workspaceId,
-      title: `Synthetic session ${String(i).padStart(3, "0")}`,
+      cwd: place.cwd,
+      workspaceId: place.workspaceId,
+      title: `Synthetic session ${String(i).padStart(4, "0")}`,
       modeId: "load-test",
       model: "e2e-fast-stream",
-    }),
-  );
+      ...(WORKSPACES > 1 && i % 10 === 0 ? { labels: { [BOT_ID_LABEL]: "bot_synthetic" } } : {}),
+    });
+  });
   // A chat with one Bot is that Bot's direct chat; a group needs two.
   const botIds = await Promise.all(
     ["Synthetic bot A", "Synthetic bot B"].map(async (name) => {
@@ -165,6 +183,46 @@ async function measureSwitch(page: Page, press: string, target: string, panes: s
     };
     if (state.blank) console.log(`[perf] blank frames: ${state.frames.join(" ")}`);
     return { ms: state.t1 - state.t0, blank: state.blank, frames: state.frames };
+  });
+}
+
+/**
+ * Input to the next painted frame: the click's task (React's synchronous render of a discrete
+ * event included), then the first animation frame after it — and the longest task meanwhile.
+ */
+async function measureInteraction(page: Page, act: () => Promise<void>) {
+  await page.evaluate(() => {
+    const state = { t0: 0, t1: 0, longest: 0 };
+    Reflect.set(window, "__navInteraction", state);
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries())
+        state.longest = Math.max(state.longest, entry.duration);
+    });
+    observer.observe({ type: "longtask", buffered: false });
+    Reflect.set(window, "__navInteractionObserver", observer);
+    window.addEventListener("pointerdown", () => (state.t0 = performance.now()), {
+      capture: true,
+      once: true,
+    });
+    const nextFrame = () => requestAnimationFrame(() => (state.t1 = performance.now()));
+    window.addEventListener("click", () => setTimeout(nextFrame, 0), {
+      capture: true,
+      once: true,
+    });
+  });
+  await act();
+  await page.waitForFunction(
+    () => (Reflect.get(window, "__navInteraction") as { t1: number }).t1 > 0,
+  );
+  await page.waitForTimeout(300);
+  return page.evaluate(() => {
+    const state = Reflect.get(window, "__navInteraction") as {
+      t0: number;
+      t1: number;
+      longest: number;
+    };
+    (Reflect.get(window, "__navInteractionObserver") as PerformanceObserver).disconnect();
+    return { ms: Math.round(state.t1 - state.t0), longestTaskMs: Math.round(state.longest) };
   });
 }
 
@@ -417,6 +475,51 @@ perfDescribe("Navigation V2 performance (synthetic 500 sessions / 500 chats)", (
     console.log(`[perf] cpu ${target}:\n${top.join("\n")}`);
     await testInfo.attach("cpu-profile", {
       body: JSON.stringify(profile),
+      contentType: "application/json",
+    });
+  });
+
+  // D1: the Workspace list at the Owner's scale (set CLISBOT_NAV_V2_PERF_SESSIONS=5000 and
+  // CLISBOT_NAV_V2_PERF_WORKSPACES=50): Session grouping, scope and Bots chip, scroll.
+  test("workspace list at scale", async ({ page }, testInfo) => {
+    test.setTimeout(600_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openApp(page, seeded);
+    await page.getByTestId("navigation-rail-work").click();
+    const work = page.getByTestId("work-pane").filter({ visible: true });
+    await expect(work.getByTestId(/^sidebar-workspace-row-/).first()).toBeVisible({
+      timeout: 120_000,
+    });
+    const scale: Record<string, unknown> = {};
+    scale.groupSession = await measureInteraction(page, () =>
+      work.getByTestId("sidebar-view-session").click(),
+    );
+    await expect(page.getByTestId("sidebar-status-list-scroll")).toBeVisible();
+    scale.rowsMounted = await page
+      .getByTestId("sidebar-status-list-scroll")
+      .locator(
+        '[data-testid^="sidebar-workspace-session-"], [data-testid^="sidebar-workspace-row-"]',
+      )
+      .count();
+    const scopes: Record<string, unknown>[] = [];
+    for (const value of ["all", "others", "mine", "all", "mine"] as const)
+      scopes.push({
+        to: value,
+        ...(await measureInteraction(page, () => work.getByTestId(`work-scope-${value}`).click())),
+      });
+    scale.scopeSwitches = scopes;
+    scale.botsOff = await measureInteraction(page, () =>
+      work.getByTestId("work-bots-chip").click(),
+    );
+    scale.botsOn = await measureInteraction(page, () => work.getByTestId("work-bots-chip").click());
+    scale.counts = await work.getByTestId("work-scope").innerText();
+    scale.scroll = await measureScroll(page, "sidebar-status-list-scroll");
+    scale.groupProject = await measureInteraction(page, () =>
+      work.getByTestId("sidebar-view-project").click(),
+    );
+    report.workspaceAtScale = scale;
+    await testInfo.attach("navigation-v2-workspace-scale", {
+      body: JSON.stringify(scale, null, 2),
       contentType: "application/json",
     });
   });

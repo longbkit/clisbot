@@ -141,12 +141,28 @@ export function useSearchScopeCatalog(input: {
   agents: readonly AggregatedAgent[];
 }): SearchScopeCatalog | null {
   const hosts = useScopeHosts(input.enabled);
+  const signedInHubs = useSignedInHubs();
   return useMemo(() => {
     if (!input.enabled) return null;
     return buildSearchScopeCatalog({
       hosts,
       projects: toProjectInputs(input.projects),
       agents: toAgentInputs(input.agents),
+      signedInHubs,
     });
-  }, [hosts, input.agents, input.enabled, input.projects]);
+  }, [hosts, input.agents, input.enabled, input.projects, signedInHubs]);
+}
+
+/** Hubs signed in on this device, named as the Hub settings name them. */
+function useSignedInHubs(): readonly { origin: string; name: string }[] {
+  const accounts = useHubAccounts();
+  return useMemo(
+    () =>
+      accounts.flatMap((account) =>
+        account.signedIn && account.origin
+          ? [{ origin: account.origin, name: account.signedIn.organization.name }]
+          : [],
+      ),
+    [accounts],
+  );
 }

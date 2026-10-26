@@ -166,6 +166,8 @@ export function buildSearchScopeCatalog(input: {
   hosts: readonly ScopeHostInput[];
   projects: readonly ScopeProjectInput[];
   agents: readonly ScopeAgentInput[];
+  /** Hubs the reader is signed in to; one with no visible Host still gets a row that says so. */
+  signedInHubs?: readonly { origin: string; name: string }[];
 }): SearchScopeCatalog {
   const visible = new Set(input.hosts.map((host) => host.serverId));
   // A project on a Host the user cannot see must not leak through search.
@@ -232,6 +234,10 @@ export function buildSearchScopeCatalog(input: {
       host.serverId,
     ]);
     if (host.hubName) hubNames.set(host.hubOrigin, host.hubName);
+  }
+  for (const hub of input.signedInHubs ?? []) {
+    if (!serverIdsByHub.has(hub.origin)) serverIdsByHub.set(hub.origin, []);
+    if (!hubNames.has(hub.origin)) hubNames.set(hub.origin, hub.name);
   }
   const hubs: ScopeHub[] = [...serverIdsByHub].map(([origin, serverIds]) => {
     const name = hubNames.get(origin) ?? origin;
