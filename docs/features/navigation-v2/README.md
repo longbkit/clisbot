@@ -203,7 +203,11 @@ the mode switch and search (the tab bar already says Home).
   nothing for a refresh, a Bot change or a Host reconnecting. Bot and chat queries key on each
   Host's admission, so a managed Host's reconnect starts a new query; `useAggregatedQuery` holds each
   Host's last rows for display until that Host answers again (`holdAggregateRows`), while
-  `acceptedServerIds` still proves only the current admission. Home treats a held layout whose rows
+  `acceptedServerIds` still proves only the current admission. Each Host's Bot/chat event feed restarts only on
+  that Host's own reconnect (`useHostCatalogFeeds` in `clisbot/bots/data/runtime.ts`): a feed
+  restart refetches the Host's open transcripts, and when one Host is revoked and re-added in a
+  loop (an expired Hub sign-in) it used to restart every Host's feed, refetching every open chat
+  and flashing "Updating messages". Home treats a held layout whose rows
   have all left as empty, so it never keeps arrivals behind Show updates over nothing.
 - **Reading position**. Content above the feed that changes height by itself — the connection
   notice, the Show updates / Mark all as seen line — sits in `HoldReadingPosition`: while the reader
