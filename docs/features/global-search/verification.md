@@ -63,6 +63,10 @@ p50 sits near the two-frame wait the method includes (~26–34 ms). Scope adds 0
 over upstream in the same run and stays under the 100 ms target in every run; run 4 is after the
 final fixes. Not measured: native release builds (iOS / Android) and a production web bundle.
 
+The browser test gates scoped p95 at under 1.5× the same run's upstream p95, not at 100 ms: on
+shared CI runners upstream search alone measures about 100 ms at p95, so an absolute budget fails
+on runner speed rather than on a regression.
+
 What keeps it flat: the catalog (Hosts, Hubs, projects, workspace → project index) is rebuilt
 only when the directory or a Host's status changes; per keystroke the work is scoring ~130 Host,
 Hub and project candidates plus two `Set` lookups per item row; annotated item rows keep their
