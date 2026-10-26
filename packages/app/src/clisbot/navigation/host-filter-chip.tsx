@@ -45,7 +45,7 @@ export function HostFilterChip() {
           accessibilityRole="button"
           accessibilityLabel={`${t("navigation.hostFilter.choose")}: ${label}`}
           onPress={trigger.onPress}
-          style={filter.active ? chipActiveStyle : chipStyle}
+          style={filter.active ? [styles.chip, styles.chipActive] : styles.chip}
           testID="home-host-filter"
         >
           <ServerIcon size={14} />
@@ -112,6 +112,3 @@ const styles = StyleSheet.create((theme) => ({
   },
   count: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
 }));
-
-const chipStyle = styles.chip;
-const chipActiveStyle = [styles.chip, styles.chipActive];
