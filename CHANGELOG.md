@@ -1,5 +1,104 @@
 # Changelog
 
+## 2.2.0 - 2026-10-27
+
+### Added
+
+- Added a new app layout with a desktop rail and phone tabs for Home, Chats, Workspace, Schedules and More
+- Added Chats, one list of Bot conversations and group chats with pinned chats on top
+- Added For me, Others and All tabs to Home, Chats and Workspace to separate your sessions from teammates'
+- Added a Chat · Workspace · All switch to Home that filters the feed and sets what the composer starts
+- Added Needs me, Running, Updated and Failed filters to Home's feed
+- Added Mark as seen, Mark unread, Dismiss and Reload for failures and pending requests on Home
+- Added pinned items to Home as tags
+- Added one Host filter shared by Home, Chats and Workspace
+- Added Host, Hub and Project results to ⌘K search that narrow the results as removable chips
+- Added Show in Workspace to Host and Project search results, with Undo
+- Added a Send right away option that starts a chat from a quick start in one tap
+- Added the open session's 5-hour and weekly quota under Usage in the rail, or in More on phones
+- Added a Bots chip to Workspace that hides Bot sessions
+- Added a Home connection notice that names the Hub or Host that cannot be reached
+- Added `CLISBOT_PROVIDER_UNAVAILABLE_RETRY=1` to let the daemon recheck a provider cached as unavailable after 60 seconds ([#38](https://github.com/longbkit/clisbot/pull/38))
+- Added connected hosts, so agents can create, prompt and monitor agents on other machines and see them in the Subagents track ([#7370](https://github.com/getpaseo/paseo/pull/7370), [#7593](https://github.com/getpaseo/paseo/pull/7593))
+- Added All changes to the Changes pane as the default, showing committed and uncommitted work since the branch base in one diff ([#7576](https://github.com/getpaseo/paseo/pull/7576))
+- Added pasting images and dropping files into terminals, so agent TUIs such as Claude Code and Codex can read them, including on remote Hosts ([#3795](https://github.com/getpaseo/paseo/pull/3795) by [@gerardbalaoro](https://github.com/gerardbalaoro))
+- Added the wide layout on foldable phones when they are unfolded ([#7424](https://github.com/getpaseo/paseo/pull/7424), [#7705](https://github.com/getpaseo/paseo/pull/7705))
+- Added Implement with Auto mode to Claude plan approvals when Auto was on before Plan ([#7453](https://github.com/getpaseo/paseo/pull/7453))
+- Added option previews to Claude question cards ([#6171](https://github.com/getpaseo/paseo/pull/6171) by [@gabrielgiordan](https://github.com/gabrielgiordan))
+- Added Hoplite as an opt-in provider in a searchable Add provider catalog ([#6953](https://github.com/getpaseo/paseo/pull/6953), [#7030](https://github.com/getpaseo/paseo/pull/7030) by [@odinglyn0](https://github.com/odinglyn0))
+- Added plugin file panels, so a plugin can open matching files in the file tab, such as a PDF viewer ([#7411](https://github.com/getpaseo/paseo/pull/7411), [#7366](https://github.com/getpaseo/paseo/pull/7366), [#7614](https://github.com/getpaseo/paseo/pull/7614))
+- Added plugin translations, so plugin content and labels follow the app's language ([#7478](https://github.com/getpaseo/paseo/pull/7478))
+- Added `useTabState` and `addAgentPanel` to the plugin SDK, with per-tab panel state that survives reloads ([#7685](https://github.com/getpaseo/paseo/pull/7685))
+- Added `Markdown` to `@clisbot/plugin/client/ui` to render Markdown with the app's renderer ([#7579](https://github.com/getpaseo/paseo/pull/7579))
+- Added inline SVG and component icons to every plugin `icon` ([#7368](https://github.com/getpaseo/paseo/pull/7368))
+
+### Changed
+
+- Changed Home to include the Inbox, with Home's search opening the full activity history
+- Changed Workspace to one list ordered by last update, replacing the Active sessions only filter
+- Changed Quick chats to appear as ordinary Workspace sessions instead of a separate section
+- Changed new quick starts to be pinned to Home when saved
+- Changed queued messages to show at normal text size, with View for the full message and its images
+- Changed Host reconnects to back off by up to 60 seconds, with at most four connections at a time
+- Changed offline Hosts to reconnect at once when the browser or desktop app reports the network is back
+- Changed text selection in replies on iOS and Android to cross paragraphs, headings and lists ([#6973](https://github.com/getpaseo/paseo/pull/6973))
+- Changed messages that one agent sends another through the CLI or MCP to steer its running turn instead of interrupting it ([#5164](https://github.com/getpaseo/paseo/pull/5164) by [@derwells](https://github.com/derwells))
+- Changed an agent's report and its finish notification to reach the parent agent as one message ([#7561](https://github.com/getpaseo/paseo/pull/7561))
+- Changed Manual metadata generation to use only the models you chose, without falling back to the defaults ([#7611](https://github.com/getpaseo/paseo/pull/7611))
+- Changed sidebar workspaces to sort by Created, with Last prompt and Manual under Display → Sort ([#7635](https://github.com/getpaseo/paseo/pull/7635), [#7771](https://github.com/getpaseo/paseo/pull/7771))
+- Changed Command Center to rank workspaces and agents by match then recency, with timestamps, project icons and status ([#7277](https://github.com/getpaseo/paseo/pull/7277), [#7690](https://github.com/getpaseo/paseo/pull/7690))
+- Changed phones to open files and subagents in stacked, closable sheets instead of new tabs ([#6827](https://github.com/getpaseo/paseo/pull/6827), [#6885](https://github.com/getpaseo/paseo/pull/6885), [#6958](https://github.com/getpaseo/paseo/pull/6958))
+- Changed Explorer to use the same tabs and launcher on phones, tablets and desktop, with full tab labels that scroll on phones ([#7589](https://github.com/getpaseo/paseo/pull/7589))
+- Moved workspace scripts on phones into ⋯ → Scripts, which shows what is running ([#7122](https://github.com/getpaseo/paseo/pull/7122))
+- Removed the legacy WebView terminal renderer; iOS and Android always use the native terminal renderer ([#7639](https://github.com/getpaseo/paseo/pull/7639))
+- Changed plugin turn-ended hooks to send an empty `timeline`; fetch recent history with `timeline.refetch` instead ([#7477](https://github.com/getpaseo/paseo/pull/7477))
+- Changed every plugin UI import to `@clisbot/plugin/client/ui`; the previous entry point, including `useRevealedText`, still works and is deprecated ([#7474](https://github.com/getpaseo/paseo/pull/7474), [#7780](https://github.com/getpaseo/paseo/pull/7780) by [@RRD-dev](https://github.com/RRD-dev), [@luoph](https://github.com/luoph))
+
+### Fixed
+
+- Fixed Claude and OpenCode 1 channel replies being dropped after a session resumed from idle close or a daemon restart ([#40](https://github.com/longbkit/clisbot/issues/40))
+- Fixed channel replies being skipped after a follow-up message steered into a running turn ([#40](https://github.com/longbkit/clisbot/issues/40))
+- Fixed Hub Hosts and their cached sessions disappearing when the app starts while the Hub is unreachable
+- Fixed Hub requests waiting indefinitely when the Hub does not respond
+- Fixed one unreachable Host keeping Home and the sidebar in a loading or error state
+- Fixed activity history waiting for the slowest Host before showing any results
+- Fixed Hub Hosts being removed and re-added in a loop after the Hub sign-in expired
+- Fixed signing in to a Hub again not reloading its Host list until the next poll
+- Fixed open Bot chats repeatedly showing Updating messages while another Host reconnects
+- Fixed a saved Host filter for a Hub Host being cleared on every app start
+- Fixed Projects with Clisbot tools set to On not receiving them when the Host's Inject Clisbot tools is off
+- Fixed the Hub reusing a database connection after a transaction could not begin or roll back ([#37](https://github.com/longbkit/clisbot/pull/37))
+- Fixed plugin hosts, the CLI and the desktop app growing to about 1 GB of memory after 30 to 75 minutes ([#6847](https://github.com/getpaseo/paseo/pull/6847) by [@babo-jeonguk](https://github.com/babo-jeonguk))
+- Fixed agents showing as running after a daemon restart ([#7573](https://github.com/getpaseo/paseo/pull/7573))
+- Fixed parent agents never hearing from `notifyOnFinish` children after a daemon restart ([#7683](https://github.com/getpaseo/paseo/pull/7683))
+- Fixed the daemon reporting the Hub as connected after a silent network failure instead of reconnecting ([#7315](https://github.com/getpaseo/paseo/pull/7315))
+- Fixed opening a large Claude session showing an empty chat or crashing the daemon ([#7431](https://github.com/getpaseo/paseo/pull/7431) by [@ZouYusheng](https://github.com/ZouYusheng))
+- Fixed Import session crashing the daemon with large Claude histories ([#7626](https://github.com/getpaseo/paseo/pull/7626) by [@lanej](https://github.com/lanej))
+- Fixed the daemon running out of memory during long OpenCode v2 reply or reasoning streams ([#6262](https://github.com/getpaseo/paseo/pull/6262))
+- Fixed oversized attachments disconnecting the Host in a loop instead of failing with a size error ([#6285](https://github.com/getpaseo/paseo/pull/6285))
+- Fixed Download in Files failing on Hosts connected over relay, SSH or a socket ([#6595](https://github.com/getpaseo/paseo/pull/6595) by [@JrDw0](https://github.com/JrDw0), [@YASICJUNWOO](https://github.com/YASICJUNWOO), [@odoo-mvds](https://github.com/odoo-mvds))
+- Fixed relay connections failing on slow networks when another resolved address is unreachable ([#7336](https://github.com/getpaseo/paseo/pull/7336))
+- Fixed opening another agent or workspace stalling while a different agent on the same Host is streaming ([#7074](https://github.com/getpaseo/paseo/pull/7074) by [@colonelpanic8](https://github.com/colonelpanic8))
+- Fixed reloading a chat during a streaming reply showing a frozen copy above the live one and dropping the ending ([#7256](https://github.com/getpaseo/paseo/pull/7256))
+- Fixed changing a running Claude agent's thinking level and then its mode killing its running command ([#7179](https://github.com/getpaseo/paseo/pull/7179))
+- Fixed Claude models that need a recent Claude Code being hidden when the provider command is a wrapper script ([#7209](https://github.com/getpaseo/paseo/pull/7209) by [@SulthanZahran1](https://github.com/SulthanZahran1))
+- Fixed Changes, Discard and commit diffs for workspaces opened at a repository subdirectory ([#6777](https://github.com/getpaseo/paseo/pull/6777), [#6801](https://github.com/getpaseo/paseo/pull/6801), [#6882](https://github.com/getpaseo/paseo/pull/6882) by [@Mar-garet](https://github.com/Mar-garet))
+- Fixed tapping a notification opening a stale workspace on iOS, and Android reopening the notification's agent on every app reopen ([#7612](https://github.com/getpaseo/paseo/pull/7612) by [@kassamkhoja](https://github.com/kassamkhoja))
+- Fixed sidebar PR status and checks disappearing after the app reconnects ([#7638](https://github.com/getpaseo/paseo/pull/7638))
+- Fixed new worktrees not opening the terminals configured in `clisbot.json` after setup ([#6999](https://github.com/getpaseo/paseo/pull/6999) by [@davidyang](https://github.com/davidyang))
+- Fixed Add image failing with "Failed to select image" on Android after changing the font size ([#7546](https://github.com/getpaseo/paseo/pull/7546) by [@RRD-dev](https://github.com/RRD-dev), [@idoyana](https://github.com/idoyana), [@luoph](https://github.com/luoph))
+
+### Security
+
+- Changed relay connections to require the daemon password when the daemon has one; re-add relay Hosts saved without it ([#7668](https://github.com/getpaseo/paseo/pull/7668) by [@nickmaglowsch](https://github.com/nickmaglowsch))
+- Added replay protection to encrypted relay sessions between updated apps and daemons, with `daemon.relay.requireProtectedSecurity` to refuse older clients ([#7610](https://github.com/getpaseo/paseo/pull/7610))
+
+The channel reply fixes take effect when both the Host and its Hub are upgraded. Send right away and the Project tools fix require an upgraded Host; the Hub database fix takes effect when the Hub is upgraded. Hosts that do not report who started a session list all of their sessions under For me.
+
+Relay Hosts saved without a password need re-adding once the target daemon has one. Plugin turn-ended hooks now receive an empty `timeline`. This release moves the app to Expo 57 and React Native 0.86. Going back to an earlier app version after this one removes saved Hosts.
+
+Paseo baseline: `v0.13.0` at `d34d17a9072149320ace35ec2a2e5c7dcd992cb3`.
+
 ## 2.1.8 - 2026-10-22
 
 ### Fixed

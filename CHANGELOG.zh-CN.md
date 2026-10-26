@@ -1,5 +1,104 @@
 # 更新日志
 
+## 2.2.0 - 2026-10-27
+
+### 新增
+
+- 新增全新的应用布局：桌面端侧栏，手机端底部标签页，包含 Home、Chats、Workspace、Schedules 和 More
+- 新增 Chats，在一个列表中显示 Bot 对话和群聊，置顶的聊天排在最前
+- Home、Chats 和 Workspace 新增 For me、Others 和 All 标签页，将你的会话与队友的会话分开
+- Home 新增 Chat · Workspace · All 切换，可筛选信息流并决定输入框的起始模式
+- Home 的信息流新增 Needs me、Running、Updated 和 Failed 筛选
+- Home 上的失败和待处理请求新增 Mark as seen、Mark unread、Dismiss 和 Reload
+- Home 新增以标签形式显示的置顶项
+- Home、Chats 和 Workspace 新增共用的主机筛选
+- ⌘K 搜索新增主机、Hub 和项目结果，并以可移除的标签收窄结果
+- 主机和项目搜索结果新增 Show in Workspace，并支持 Undo
+- 新增 Send right away 选项，从快速开始一键发起聊天
+- 在侧栏的 Usage 下（手机上在 More 中）新增当前会话的 5 小时和每周配额
+- Workspace 新增 Bots 标签，可隐藏 Bot 会话
+- Home 新增连接提示，指出无法连接的 Hub 或主机
+- 新增 `CLISBOT_PROVIDER_UNAVAILABLE_RETRY=1`，让 daemon 在 60 秒后重新检查被缓存为不可用的 Provider ([#38](https://github.com/longbkit/clisbot/pull/38))
+- 新增已连接主机，Agent 可以在其他机器上创建、提示和监控 Agent，并在 Subagents 中查看它们 ([#7370](https://github.com/getpaseo/paseo/pull/7370), [#7593](https://github.com/getpaseo/paseo/pull/7593))
+- Changes 窗格新增 All changes 并设为默认，在一个 diff 中显示自分支基点以来已提交和未提交的工作 ([#7576](https://github.com/getpaseo/paseo/pull/7576))
+- 新增在终端中粘贴图片和拖放文件，Claude Code、Codex 等 Agent TUI 可以读取它们，远程主机同样适用 ([#3795](https://github.com/getpaseo/paseo/pull/3795) by [@gerardbalaoro](https://github.com/gerardbalaoro))
+- 新增折叠屏手机展开时的宽屏布局 ([#7424](https://github.com/getpaseo/paseo/pull/7424), [#7705](https://github.com/getpaseo/paseo/pull/7705))
+- 如果进入 Plan 前开启了 Auto，Claude 计划审批新增 Implement with Auto mode ([#7453](https://github.com/getpaseo/paseo/pull/7453))
+- Claude 问题卡片新增选项预览 ([#6171](https://github.com/getpaseo/paseo/pull/6171) by [@gabrielgiordan](https://github.com/gabrielgiordan))
+- 新增 Hoplite 作为可选 Provider，位于可搜索的 Add provider 目录中 ([#6953](https://github.com/getpaseo/paseo/pull/6953), [#7030](https://github.com/getpaseo/paseo/pull/7030) by [@odinglyn0](https://github.com/odinglyn0))
+- 新增插件文件面板，插件可以在文件标签页中打开匹配的文件，例如 PDF 查看器 ([#7411](https://github.com/getpaseo/paseo/pull/7411), [#7366](https://github.com/getpaseo/paseo/pull/7366), [#7614](https://github.com/getpaseo/paseo/pull/7614))
+- 新增插件翻译，插件内容和标签会跟随应用的语言 ([#7478](https://github.com/getpaseo/paseo/pull/7478))
+- 插件 SDK 新增 `useTabState` 和 `addAgentPanel`，每个标签页的面板状态在重新加载后仍会保留 ([#7685](https://github.com/getpaseo/paseo/pull/7685))
+- `@clisbot/plugin/client/ui` 新增 `Markdown`，可使用应用的渲染器渲染 Markdown ([#7579](https://github.com/getpaseo/paseo/pull/7579))
+- 所有插件 `icon` 新增对内联 SVG 和组件图标的支持 ([#7368](https://github.com/getpaseo/paseo/pull/7368))
+
+### 变更
+
+- Home 改为包含 Inbox，Home 的搜索会打开完整的活动历史
+- Workspace 改为按最近更新排序的单一列表，取代 Active sessions only 筛选
+- Quick chats 现在显示为普通的 Workspace 会话，不再单独成区
+- 新保存的快速开始现在会自动置顶到 Home
+- 排队的消息现在以正常字号显示，可通过 View 查看完整消息及其图片
+- 主机重连的退避时间最长为 60 秒，同时最多建立四个连接
+- 浏览器或桌面应用报告网络恢复后，离线主机会立即重连
+- iOS 和 Android 上回复中的文本选择现在可以跨段落、标题和列表 ([#6973](https://github.com/getpaseo/paseo/pull/6973))
+- 一个 Agent 通过 CLI 或 MCP 发给另一个 Agent 的消息，现在会引导其正在运行的轮次，而不是打断它 ([#5164](https://github.com/getpaseo/paseo/pull/5164) by [@derwells](https://github.com/derwells))
+- Agent 的报告和完成通知现在合并为一条消息发送给父 Agent ([#7561](https://github.com/getpaseo/paseo/pull/7561))
+- 手动元数据生成现在只使用你选择的模型，不再回退到默认模型 ([#7611](https://github.com/getpaseo/paseo/pull/7611))
+- 侧边栏工作区改为按“创建时间”排序，可在“显示”→“排序”中选择“最近提示词”或“手动” ([#7635](https://github.com/getpaseo/paseo/pull/7635), [#7771](https://github.com/getpaseo/paseo/pull/7771))
+- Command Center 现在先按匹配度、再按最近使用对工作区和 Agent 排序，并显示时间戳、项目图标和状态 ([#7277](https://github.com/getpaseo/paseo/pull/7277), [#7690](https://github.com/getpaseo/paseo/pull/7690))
+- 手机上的文件和子 Agent 现在在可堆叠、可关闭的面板中打开，不再打开新标签页 ([#6827](https://github.com/getpaseo/paseo/pull/6827), [#6885](https://github.com/getpaseo/paseo/pull/6885), [#6958](https://github.com/getpaseo/paseo/pull/6958))
+- Explorer 在手机、平板和桌面上使用相同的标签页和启动器，手机上的完整标签可滚动 ([#7589](https://github.com/getpaseo/paseo/pull/7589))
+- 手机上的工作区脚本移到 ⋯ → Scripts，并显示正在运行的内容 ([#7122](https://github.com/getpaseo/paseo/pull/7122))
+- 移除了旧版 WebView 终端渲染器；iOS 和 Android 始终使用原生终端渲染器 ([#7639](https://github.com/getpaseo/paseo/pull/7639))
+- 插件 turn-ended hook 现在发送空的 `timeline`；请改用 `timeline.refetch` 获取最近的历史记录 ([#7477](https://github.com/getpaseo/paseo/pull/7477))
+- 所有插件 UI 导入改为 `@clisbot/plugin/client/ui`；原入口（包括 `useRevealedText`）仍可使用，但已弃用 ([#7474](https://github.com/getpaseo/paseo/pull/7474), [#7780](https://github.com/getpaseo/paseo/pull/7780) by [@RRD-dev](https://github.com/RRD-dev), [@luoph](https://github.com/luoph))
+
+### 修复
+
+- 修复了会话从空闲关闭或 daemon 重启后恢复时，Claude 和 OpenCode 1 的频道回复被丢弃的问题 ([#40](https://github.com/longbkit/clisbot/issues/40))
+- 修复了后续消息引导进正在运行的轮次后，频道回复被跳过的问题 ([#40](https://github.com/longbkit/clisbot/issues/40))
+- 修复了应用启动时 Hub 无法连接，导致 Hub 主机及其缓存会话消失的问题
+- 修复了 Hub 无响应时 Hub 请求无限等待的问题
+- 修复了一台无法连接的主机让 Home 和侧边栏一直处于加载或错误状态的问题
+- 修复了活动历史要等最慢的主机才显示任何结果的问题
+- 修复了 Hub 登录过期后 Hub 主机被反复移除又重新添加的问题
+- 修复了重新登录 Hub 后，主机列表要等到下一次轮询才重新加载的问题
+- 修复了另一台主机重连时，已打开的 Bot 聊天反复显示 Updating messages 的问题
+- 修复了为 Hub 主机保存的主机筛选在每次启动应用时被清除的问题
+- 修复了主机的 Inject Clisbot tools 关闭时，Clisbot tools 设为 On 的项目收不到这些工具的问题
+- 修复了 Hub 在事务无法开始或回滚后仍复用数据库连接的问题 ([#37](https://github.com/longbkit/clisbot/pull/37))
+- 修复了插件宿主、CLI 和桌面应用在 30 到 75 分钟后内存增长到约 1 GB 的问题 ([#6847](https://github.com/getpaseo/paseo/pull/6847) by [@babo-jeonguk](https://github.com/babo-jeonguk))
+- 修复了 daemon 重启后 Agent 仍显示为运行中的问题 ([#7573](https://github.com/getpaseo/paseo/pull/7573))
+- 修复了 daemon 重启后父 Agent 收不到 `notifyOnFinish` 子 Agent 通知的问题 ([#7683](https://github.com/getpaseo/paseo/pull/7683))
+- 修复了网络静默故障后 daemon 仍报告 Hub 已连接、而不重新连接的问题 ([#7315](https://github.com/getpaseo/paseo/pull/7315))
+- 修复了打开大型 Claude 会话时聊天为空或 daemon 崩溃的问题 ([#7431](https://github.com/getpaseo/paseo/pull/7431) by [@ZouYusheng](https://github.com/ZouYusheng))
+- 修复了 Claude 历史记录较大时导入会话导致 daemon 崩溃的问题 ([#7626](https://github.com/getpaseo/paseo/pull/7626) by [@lanej](https://github.com/lanej))
+- 修复了 OpenCode v2 长时间回复或推理流式输出期间 daemon 内存耗尽的问题 ([#6262](https://github.com/getpaseo/paseo/pull/6262))
+- 修复了过大的附件导致主机反复断开、而不是提示大小错误的问题 ([#6285](https://github.com/getpaseo/paseo/pull/6285))
+- 修复了通过 relay、SSH 或 socket 连接的主机上 Files 中 Download 失败的问题 ([#6595](https://github.com/getpaseo/paseo/pull/6595) by [@JrDw0](https://github.com/JrDw0), [@YASICJUNWOO](https://github.com/YASICJUNWOO), [@odoo-mvds](https://github.com/odoo-mvds))
+- 修复了在网络较慢且另一个解析出的地址不可达时 relay 连接失败的问题 ([#7336](https://github.com/getpaseo/paseo/pull/7336))
+- 修复了同一主机上另一个 Agent 正在流式输出时，打开其他 Agent 或工作区卡住的问题 ([#7074](https://github.com/getpaseo/paseo/pull/7074) by [@colonelpanic8](https://github.com/colonelpanic8))
+- 修复了在流式回复期间重新加载聊天时，实时内容上方出现冻结副本并丢失结尾的问题 ([#7256](https://github.com/getpaseo/paseo/pull/7256))
+- 修复了先修改运行中 Claude Agent 的思考级别、再修改其模式会终止其正在运行的命令的问题 ([#7179](https://github.com/getpaseo/paseo/pull/7179))
+- 修复了 Provider 命令是包装脚本时，需要较新 Claude Code 的 Claude 模型被隐藏的问题 ([#7209](https://github.com/getpaseo/paseo/pull/7209) by [@SulthanZahran1](https://github.com/SulthanZahran1))
+- 修复了在仓库子目录中打开的工作区里 Changes、Discard 和提交 diff 的问题 ([#6777](https://github.com/getpaseo/paseo/pull/6777), [#6801](https://github.com/getpaseo/paseo/pull/6801), [#6882](https://github.com/getpaseo/paseo/pull/6882) by [@Mar-garet](https://github.com/Mar-garet))
+- 修复了 iOS 上点击通知打开过期工作区，以及 Android 每次重新打开应用都会再次打开通知对应 Agent 的问题 ([#7612](https://github.com/getpaseo/paseo/pull/7612) by [@kassamkhoja](https://github.com/kassamkhoja))
+- 修复了应用重新连接后侧边栏中的 PR 状态和检查消失的问题 ([#7638](https://github.com/getpaseo/paseo/pull/7638))
+- 修复了新 worktree 在设置完成后不打开 `clisbot.json` 中配置的终端的问题 ([#6999](https://github.com/getpaseo/paseo/pull/6999) by [@davidyang](https://github.com/davidyang))
+- 修复了 Android 上更改字体大小后添加图片失败并提示“选择图片失败”的问题 ([#7546](https://github.com/getpaseo/paseo/pull/7546) by [@RRD-dev](https://github.com/RRD-dev), [@idoyana](https://github.com/idoyana), [@luoph](https://github.com/luoph))
+
+### 安全
+
+- relay 连接现在在 daemon 设置了密码时需要该密码；请重新添加保存时未带密码的 relay 主机 ([#7668](https://github.com/getpaseo/paseo/pull/7668) by [@nickmaglowsch](https://github.com/nickmaglowsch))
+- 已更新的应用与 daemon 之间的加密 relay 会话新增重放保护，可通过 `daemon.relay.requireProtectedSecurity` 拒绝较旧的客户端 ([#7610](https://github.com/getpaseo/paseo/pull/7610))
+
+频道回复修复需要主机及其 Hub 都升级后才会生效。Send right away 和项目工具修复需要升级主机；Hub 数据库修复在 Hub 升级后生效。不报告会话发起者的主机，其所有会话都会列在 For me 下。
+
+保存时未带密码的 relay 主机，需要在目标 daemon 设置密码后重新添加。插件 turn-ended hook 现在会收到空的 `timeline`。此版本将应用升级到 Expo 57 和 React Native 0.86。回退到此版本之前的应用版本会移除已保存的主机。
+
+Paseo 基线：`v0.13.0`，对应 `d34d17a9072149320ace35ec2a2e5c7dcd992cb3`。
+
 ## 0.13.0 - 2026-10-24
 
 折叠屏手机布局、可将工作委派给其他机器的 Agent、插件文件面板，以及插件翻译。
