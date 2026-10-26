@@ -62,6 +62,7 @@ export function NavigationHomeHeader() {
       title={compact ? null : t("navigation.sections.home")}
       center={center}
       centerInline
+      centerMiddle
       actions={actions}
     />
   );

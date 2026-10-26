@@ -19,6 +19,7 @@ export function SectionHeader({
   title,
   center,
   centerInline = false,
+  centerMiddle = false,
   actions,
   testID,
 }: {
@@ -27,23 +28,36 @@ export function SectionHeader({
   center?: ReactNode;
   /** Keep `center` in the title row on a phone too, instead of a row of its own. */
   centerInline?: boolean;
+  /**
+   * On desktop, put `center` in the middle of the header rather than after the title. The header
+   * spans the same pane as the page under it, so this is the centre line of a centred column.
+   */
+  centerMiddle?: boolean;
   actions?: ReactNode;
   testID?: string;
 }) {
   const compact = useIsCompactFormFactor();
+  const middle = !!center && centerMiddle && !compact;
   const left = useMemo(
     () => (
       <View style={styles.left}>
         {typeof title === "string" ? <ScreenTitle>{title}</ScreenTitle> : title}
-        {center && (!compact || centerInline) ? <View style={styles.center}>{center}</View> : null}
+        {center && !middle && (!compact || centerInline) ? (
+          <View style={styles.center}>{center}</View>
+        ) : null}
       </View>
     ),
-    [center, centerInline, compact, title],
+    [center, centerInline, compact, middle, title],
   );
   const right = useMemo(() => <View style={styles.actions}>{actions}</View>, [actions]);
   return (
-    <View testID={testID}>
+    <View testID={testID} style={styles.frame}>
       <ScreenHeader borderless left={left} right={right} />
+      {middle ? (
+        <View style={styles.middle} pointerEvents="box-none">
+          {center}
+        </View>
+      ) : null}
       {center && compact && !centerInline ? (
         <View style={styles.centerCompact}>{center}</View>
       ) : null}
@@ -103,6 +117,17 @@ export function HeaderMenuIcon({ Icon }: { Icon: LucideIcon }) {
 const styles = StyleSheet.create((theme) => ({
   left: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: theme.spacing[3] },
   center: { flexShrink: 1, minWidth: 0 },
+  frame: { position: "relative" },
+  // Over the header row, in its middle; taps outside the control reach the row (and its drag area).
+  middle: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   centerCompact: { paddingHorizontal: theme.spacing[3], paddingBottom: theme.spacing[2] },
   actions: { flexDirection: "row", alignItems: "center", gap: theme.spacing[1] },
 }));
