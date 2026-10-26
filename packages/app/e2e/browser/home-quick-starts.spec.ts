@@ -309,11 +309,12 @@ test.describe("Quick starts in Navigation V2", () => {
       savedId = saved.id;
       expect((await client.listQuickStarts()).preferences?.pinnedIds?.[0]).toBe(savedId);
 
-      const library = page.locator("#overlay-root").getByRole("button", { name: "Daily summary" });
-      await expect(async () => {
-        await page.keyboard.press("Escape");
-        await expect(library).toHaveCount(0, { timeout: 1_000 });
-      }).toPass({ timeout: 15_000 });
+      // Close the window once with its Close button. The window keeps its place in browser
+      // history, and after a loop of Escapes a slow runner had it back over Home, covering the
+      // tile until the test timed out.
+      const library = page.getByRole("dialog");
+      await library.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(library).toHaveCount(0);
       // Start from an empty composer, so the sent text is the quick start's alone.
       await fillNewWorkspaceDraft(page, "");
       const tile = page.getByTestId("home-scroll").getByRole("button", {
