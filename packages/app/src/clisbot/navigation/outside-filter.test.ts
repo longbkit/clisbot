@@ -24,7 +24,6 @@ beforeEach(() => {
   useSidebarViewStore.setState({ hostFilters: ["a"], projectFilters: ["view:other"] });
   useNavigationStore.setState({
     scopes: { home: "mine", chats: "mine", work: "mine" },
-    chatsHosts: ["a"],
   });
 });
 
@@ -69,13 +68,14 @@ describe("the outside-filter notice (R3)", () => {
     expect(useNavigationStore.getState().scopes.chats).toBe("mine");
   });
 
-  it("Chats: its own Host filter and scope", () => {
+  it("Chats: the app-wide Host filter, and its own scope", () => {
     const chat = { ...hostReveal, itemKind: "chat" as const };
     switchTo(chat, "chats");
-    expect(useNavigationStore.getState().chatsHosts).toEqual(["b"]);
+    expect(useSidebarViewStore.getState().hostFilters).toEqual(["b"]);
     showAllFor(chat, "chats");
-    expect(useNavigationStore.getState().chatsHosts).toEqual([]);
-    expect(useSidebarViewStore.getState().hostFilters).toEqual(["a"]);
+    expect(useSidebarViewStore.getState().hostFilters).toEqual([]);
+    // Workspace's Project filter is not a Chats dimension.
+    expect(useSidebarViewStore.getState().projectFilters).toEqual(["view:other"]);
   });
 });
 

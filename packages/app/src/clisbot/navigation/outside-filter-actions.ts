@@ -6,18 +6,21 @@ import { useNavigationStore, type ListSection } from "./store";
 
 const NO_KEYS: readonly string[] = [];
 
-/** The filter a list hides by: Work reads the sidebar's Host and Project filters, Chats its own. */
+/**
+ * The filter a list hides by: the app-wide Host filter (the sidebar's saved one), Workspace's
+ * Project filter, and the list's scope.
+ */
 export function useListFilter(list: ListSection): ListFilter {
-  const sidebarHosts = useSidebarViewStore((state) => state.hostFilters);
+  const hosts = useSidebarViewStore((state) => state.hostFilters);
   const sidebarProjects = useSidebarViewStore((state) => state.projectFilters);
-  const chatsHosts = useNavigationStore((state) => state.chatsHosts);
   const scope = useNavigationStore((state) => state.scopes[list]);
   return useMemo(
-    () =>
-      list === "work"
-        ? { serverIds: sidebarHosts, projectViewKeys: sidebarProjects, scope }
-        : { serverIds: chatsHosts, projectViewKeys: NO_KEYS, scope },
-    [chatsHosts, list, scope, sidebarHosts, sidebarProjects],
+    () => ({
+      serverIds: hosts,
+      projectViewKeys: list === "work" ? sidebarProjects : NO_KEYS,
+      scope,
+    }),
+    [hosts, list, scope, sidebarProjects],
   );
 }
 
@@ -27,24 +30,16 @@ export function showAllFor(reveal: OutsideFilterReveal, list: ListSection): void
     useNavigationStore.getState().setScope(list, "all");
     return;
   }
-  if (list === "chats") {
-    useNavigationStore.getState().clearChatsHosts();
-    return;
-  }
   useSidebarViewStore.setState(
-    reveal.reason === "host" ? { hostFilters: [] } : { projectFilters: [] },
+    reveal.reason === "host" || list === "chats" ? { hostFilters: [] } : { projectFilters: [] },
   );
 }
 
 /** "Switch to {Host}" / "Switch to {project}": replace the hiding dimension with the item's. */
 export function switchTo(reveal: OutsideFilterReveal, list: ListSection): void {
   if (reveal.reason === "others") return;
-  if (list === "chats") {
-    useNavigationStore.setState({ chatsHosts: [reveal.serverId] });
-    return;
-  }
   useSidebarViewStore.setState(
-    reveal.reason === "host"
+    reveal.reason === "host" || list === "chats"
       ? { hostFilters: [reveal.serverId] }
       : { projectFilters: [...reveal.projectViewKeys] },
   );

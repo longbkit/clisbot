@@ -38,6 +38,16 @@ describe("Navigation V2 preferences", () => {
     });
   });
 
+  it("drops Chats' own Host filter for the app-wide one, and keeps a v2 Home scope (v2 → v3)", () => {
+    const migrate = useNavigationStore.persist.getOptions().migrate!;
+    const migrated = migrate(
+      { scopes: { home: "mine", chats: "mine", work: "mine" }, chatsHosts: ["a"] },
+      2,
+    ) as Record<string, unknown>;
+    expect(migrated).not.toHaveProperty("chatsHosts");
+    expect(migrated.scopes).toMatchObject({ home: "mine" });
+  });
+
   it("persists the Bots chip", () => {
     const partialize = useNavigationStore.persist.getOptions().partialize!;
     expect(partialize(useNavigationStore.getState())).toHaveProperty("workShowBots", true);

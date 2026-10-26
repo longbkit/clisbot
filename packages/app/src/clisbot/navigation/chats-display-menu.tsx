@@ -12,10 +12,11 @@ import {
 import { DISPLAY_MENU_WIDTH } from "@/components/sidebar/display-preferences/menu";
 import { HostsDisplayItems } from "./hosts-display-items";
 import { useNavigationStore } from "./store";
+import { useHostFilter } from "./host-filter";
 
 /**
  * Chats' one Display menu for the mixed list (brief C7a): order, the opt-in Bot chats / groups
- * split (off by default, brief C3), and which Hosts it lists when there are several.
+ * split (off by default, brief C3), and the app-wide Host filter when there are several Hosts.
  */
 export function ChatsDisplayMenu() {
   const { t } = useTranslation();
@@ -23,11 +24,15 @@ export function ChatsDisplayMenu() {
   const setSort = useNavigationStore((state) => state.setChatsSort);
   const split = useNavigationStore((state) => state.chatsSplit);
   const toggleSplit = useNavigationStore((state) => state.toggleChatsSplit);
-  const selectedHosts = useNavigationStore((state) => state.chatsHosts);
-  const clearHosts = useNavigationStore((state) => state.clearChatsHosts);
-  const toggleHost = useNavigationStore((state) => state.toggleChatsHost);
+  // The app-wide Host filter: choosing Hosts here filters Home and Workspace too.
+  const {
+    serverIds: selectedHosts,
+    clear: clearHosts,
+    toggle: toggleHost,
+    active,
+  } = useHostFilter();
   const hosts = useBotsFeatureHosts();
-  const filtered = selectedHosts.length > 0;
+  const filtered = active;
   return (
     <DropdownMenu>
       <DisplayMenuTrigger

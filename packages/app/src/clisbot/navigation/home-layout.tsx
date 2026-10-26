@@ -17,6 +17,7 @@ import { HomeFeedControls } from "./home-controls";
 import { buildHomeFeed, type HomeRow } from "./home-feed";
 import { NavigationHomeFeed } from "./home-feed-view";
 import { useNavigationStore } from "./store";
+import { useHostFilter } from "./host-filter";
 
 interface HomeLayoutProps {
   compact: boolean;
@@ -39,7 +40,7 @@ export function NavigationHomeLayout(props: HomeLayoutProps) {
   const scope = useNavigationStore((state) => state.scopes.home);
   const mode = useNavigationStore((state) => state.homeMode);
   const chip = useNavigationStore((state) => state.homeChip);
-  const serverIds = useNavigationStore((state) => state.homeHosts);
+  const { serverIds } = useHostFilter();
   const searchOpen = useNavigationStore((state) => state.homeSearchOpen);
   const feed = useMemo(
     () => buildHomeFeed(rows, { scope, mode, chip, serverIds }),

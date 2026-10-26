@@ -50,6 +50,7 @@ import {
 } from "./section-header";
 import { useNavigationStore } from "./store";
 import { useChatEntries, type ChatsEntry } from "./use-chat-entries";
+import { useHostFilter } from "./host-filter";
 
 const CHIP_LABELS: Record<ChatsChip, string> = {
   all: "navigation.chips.all",
@@ -75,7 +76,7 @@ export function ChatsPane({ onBeforeNavigate }: { onBeforeNavigate?: ChatListAdm
   }, []);
   const sort = useNavigationStore((state) => state.chatsSort);
   const split = useNavigationStore((state) => state.chatsSplit);
-  const serverIds = useNavigationStore((state) => state.chatsHosts);
+  const { serverIds } = useHostFilter();
   const query = useMemo(
     () => ({ entries, scope, chip, search, sort, serverIds }),
     [entries, scope, chip, search, sort, serverIds],

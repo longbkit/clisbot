@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { Page } from "@playwright/test";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { UsageReportEntry } from "@clisbot/protocol/messages";
 import { expect, test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import { createMockIdleAgent } from "../support/helpers/archive-tab";
@@ -12,6 +13,8 @@ import { addConnectedHostAndReload } from "../support/helpers/hosts";
 import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon";
 import { createTempDirectory } from "../support/helpers/workspace";
 import { getServerId } from "../support/helpers/server-id";
+import { buildAgentRoute } from "../support/helpers/mock-agent";
+import { installUsageReportsFixture } from "../support/helpers/usage-reports";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 
 // Navigation V2 (docs/features/navigation-v2/README.md): rail, Chats/Work, Home feed and More.
@@ -382,4 +385,110 @@ test.describe("Navigation V2 Home pin tags", () => {
       }
     });
   }
+});
+
+/** One account report for every agent: a 5-hour window resetting in 70 min, a weekly in 26 h. */
+function sessionQuotaReports(): UsageReportEntry[] {
+  const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+  return [
+    {
+      id: "codex:me",
+      account: { label: "me@example.com" },
+      fetchedAt: new Date().toISOString(),
+      sourceId: "codex",
+      sourceLabel: "Codex",
+      report: {
+        status: "available",
+        windows: [
+          { id: "five_hour", label: "Session", usedPct: 31, resetsAt: inMinutes(70) },
+          { id: "weekly", label: "Weekly", usedPct: 54, resetsAt: inMinutes(26 * 60) },
+        ],
+      },
+    },
+  ];
+}
+
+test.describe("Navigation V2 session quota", () => {
+  test.use({ navigationV2: true });
+
+  test("the rail shows the open session's quota; a phone's More shows the last one opened", async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    await installUsageReportsFixture(page, { lists: [() => sessionQuotaReports()] });
+    const workspace = await seedWorkspace({ repoPrefix: "nav-v2-quota-" });
+    try {
+      const agent = await createMockIdleAgent(workspace.client, {
+        cwd: workspace.workspaceDirectory,
+        workspaceId: workspace.workspaceId,
+        title: "Quota session",
+      });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await gotoAppShell(page);
+      const rail = page.getByTestId("navigation-rail-usage");
+      // Home has no session open: the rail shows Usage alone.
+      await expect(rail).toBeVisible({ timeout: 60_000 });
+      await expect(rail.getByTestId("session-quota")).toHaveCount(0);
+      await page.goto(buildAgentRoute(workspace.workspaceId, agent.id));
+      await expect(rail.getByTestId("session-quota-hour")).toHaveText("31% 1h", {
+        timeout: 60_000,
+      });
+      await expect(rail.getByTestId("session-quota-week")).toHaveText("54% 1d");
+      await shot(page, "session-quota-rail");
+
+      // A phone reaches More from its tabs, or after the app restarts: the last session stays.
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/more");
+      const usage = page.getByTestId("more-usage").filter({ visible: true });
+      await expect(usage.getByTestId("session-quota-hour")).toHaveText("31% 1h", {
+        timeout: 30_000,
+      });
+      await expect(usage.getByTestId("session-quota-week")).toHaveText("54% 1d");
+      await shot(page, "session-quota-more");
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+});
+
+test.describe("Navigation V2 app-wide Host filter", () => {
+  test.use({ navigationV2: true });
+
+  test("one Host filter for Home, Chats and Workspace, shown and cleared on the rail", async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    const serverId = `srv_nav_hosts_${randomUUID().slice(0, 8)}`;
+    const daemon = await startIsolatedHostDaemon(serverId);
+    try {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await gotoAppShell(page);
+      await addConnectedHostAndReload(page, { serverId, label: "Second Host", port: daemon.port });
+      const chip = page.getByTestId("home-host-filter").filter({ visible: true });
+      await expect(chip).toContainText("All Hosts", { timeout: 60_000 });
+      await expect(page.getByTestId("rail-host-count")).toHaveText("2/2", {
+        timeout: 60_000,
+      });
+      // Choosing a Host on Home filters every list and puts its tag on the rail.
+      await chip.click();
+      await page.getByText("Second Host", { exact: true }).last().click();
+      await page.keyboard.press("Escape");
+      await expect(chip).toContainText("Second Host");
+      const tag = page.getByTestId("rail-host-filter-tag");
+      await expect(tag).toContainText("Second Host");
+      await shot(page, "host-filter-home");
+      await page.getByTestId("navigation-rail-chats").click();
+      await expect(page.getByTestId("chats-display").filter({ visible: true })).toBeVisible();
+      expect(
+        await page.evaluate(() => JSON.parse(localStorage.getItem("sidebar-view") ?? "{}").state),
+      ).toMatchObject({ hostFilters: [serverId] });
+      // ✕ on the rail clears it everywhere.
+      await tag.click();
+      await expect(tag).toHaveCount(0);
+      await page.getByTestId("navigation-rail-home").click();
+      await expect(chip).toContainText("All Hosts");
+    } finally {
+      await daemon.close().catch(() => undefined);
+    }
+  });
 });

@@ -19,6 +19,7 @@ export function SectionControls<T extends string>({
   onChip,
   backdrop,
   display,
+  leading,
   children,
 }: {
   section: ScopedSection;
@@ -30,11 +31,14 @@ export function SectionControls<T extends string>({
   backdrop: "surface0" | "surfaceSidebar";
   /** The Display menu, alone on its row. */
   display?: ReactNode;
+  /** A row above the scope tabs for a wider choice (Home's Host filter); it brings its inset. */
+  leading?: ReactNode;
   /** Rows that belong to this section only (Work's grouping tabs); each brings its inset. */
   children?: ReactNode;
 }) {
   return (
     <View style={styles.controls} testID={`${section}-controls`}>
+      {leading}
       <ScopeTabs section={section} counts={scopeCounts} />
       <FilterChips
         chips={chips}

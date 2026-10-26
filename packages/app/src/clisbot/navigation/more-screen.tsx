@@ -29,6 +29,10 @@ import { SectionHeader } from "./section-header";
 import { MORE_PATH } from "./sections";
 import { rememberChatReturn } from "@/clisbot/home/mobile-navigation";
 import { useNavigationSections } from "./use-navigation-sections";
+import { useLastOpenedSession } from "./opened-session";
+import { useHostFilter } from "./host-filter";
+import { hostFilterLabel } from "./host-filter-chip";
+import { SessionQuota } from "./session-quota";
 
 /** The phone's More (brief C10): every section that is not a tab, Settings last. */
 export function MoreScreen() {
@@ -92,14 +96,28 @@ function MoreRoute({ section, last }: { section: BuiltinSection; last: boolean }
   );
 }
 
+/** Usage, with the quota of the session opened last (a phone has left it to reach More). */
 function MoreUsage({ section, last }: { section: BuiltinSection; last: boolean }) {
   const { t } = useTranslation();
   const openUsage = useOpenSidebarUsage();
+  const session = useLastOpenedSession();
+  const trailing = useMemo(
+    () =>
+      session ? (
+        <SessionQuota
+          key={`${session.serverId}:${session.agentId}`}
+          session={session}
+          layout="row"
+        />
+      ) : undefined,
+    [session],
+  );
   return (
     <MoreRow
       Icon={SECTION_ICONS.usage}
       label={t(section.labelKey)}
       onPress={openUsage}
+      trailing={trailing}
       last={last}
       testID="more-usage"
     />
@@ -112,7 +130,23 @@ function MoreHosts({ section, last }: { section: BuiltinSection; last: boolean }
   const status = useHostsStatus();
   const addHost = useCallback(() => router.push(buildSettingsAddHostRoute(Date.now())), [router]);
   const label = t(section.labelKey);
-  const dot = useMemo(() => <ConnectionStatusDot status={status} />, [status]);
+  const filter = useHostFilter();
+  const filterLabel = filter.active ? hostFilterLabel(filter, t) : null;
+  // The app-wide Host filter and the online / total count, as the rail shows them.
+  const dot = useMemo(
+    () => (
+      <View style={styles.hostsTrailing}>
+        {filterLabel ? (
+          <Text style={styles.hostsFilter} numberOfLines={1} testID="more-hosts-filter">
+            {filterLabel}
+          </Text>
+        ) : null}
+        <Text style={styles.hostsCount}>{`${filter.online}/${filter.total}`}</Text>
+        <ConnectionStatusDot status={status} />
+      </View>
+    ),
+    [filter.online, filter.total, filterLabel, status],
+  );
   const renderTrigger = useCallback(
     (trigger: SidebarHostPickerTrigger) => (
       <View ref={trigger.ref} collapsable={false}>
@@ -248,4 +282,16 @@ const styles = StyleSheet.create((theme) => ({
   },
   label: { flex: 1, minWidth: 0, color: theme.colors.foreground, fontSize: theme.fontSize.base },
   plugin: { paddingHorizontal: theme.spacing[2], paddingVertical: theme.spacing[1] },
+  hostsTrailing: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    maxWidth: "55%",
+  },
+  hostsFilter: { flexShrink: 1, color: theme.colors.foreground, fontSize: theme.fontSize.sm },
+  hostsCount: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    fontVariant: ["tabular-nums"],
+  },
 }));

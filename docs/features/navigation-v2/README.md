@@ -73,48 +73,69 @@ The primary navigation says where you are; each section owns its header, filters
 
 ## Change map
 
-| #   | Status | Where                                                                                                                                             |
-| --- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1  | done   | `rail.tsx` from the registry; bottom Usage (when on), Hosts with its dot, Help, Settings                                                          |
-| C2  | done   | `list-panel.tsx` replaces `LeftSidebar`; no Pinned, Bots, Group chats, Projects sections or footer in V2                                          |
-| C3  | done   | `chats-pane.tsx`, `chat-list.ts`, `use-chat-entries.ts`, `held-order.ts`                                                                          |
-| C4  | done   | `work-pane.tsx` wraps `SidebarWorkspaceList` with `pinPresentation="float"`; see [Workspace list](#workspace-list)                                |
-| C5  | done   | `section-header.tsx`; Home 🔍, Chats 🔍 ✎, Workspace 🔍 +; ⌘K unchanged                                                                           |
-| C6  | done   | `home-layout.tsx`; `/sessions` redirects to Home; Home 🔍 shows Inbox's history in place (`InboxHistory`)                                         |
-| C7  | done   | `home-controls.tsx` chips over Home's existing activity buckets                                                                                   |
-| C7a | done   | one Display ▾ per list: Chats (order, split, Hosts), Workspace (the sidebar display menu; grouping tabs and the Bots chip under it), Home (Hosts) |
-| C8  | done   | `pin-tags.tsx`, `pin-tags-model.ts`                                                                                                               |
-| C9  | done   | phone tabs from the registry; Home carries the unseen-issue badge                                                                                 |
-| C10 | done   | `more-screen.tsx`                                                                                                                                 |
-| C11 | done   | rail, tabs and the `/schedules` landing title read Schedules / Lịch; routes unchanged                                                             |
-| C12 | done   | `ownership.ts`, `scope-tabs.tsx` on Home, Chats and Workspace; `work-items.ts` for the Workspace list                                             |
-| C13 | done   | `home-header.tsx` switch; `home-mode-target.ts` moves the composer target                                                                         |
-| C14 | done   | Tasks entry with `status: "preview"`, `tasks-screen.tsx`                                                                                          |
-| C15 | done   | the scope applies before chips, pin tags, counts and badges (`home-feed.ts`, `homeBadgeCount`)                                                    |
-| C16 | done   | `issues.ts`, `issue-store.ts`, `activity.tsx`, `issue-actions.tsx`, `home-feed-view.tsx`                                                          |
+| #   | Status | Where                                                                                                                                                                                                     |
+| --- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | done   | `rail.tsx` from the registry; bottom Usage (when on), Hosts with its dot, Help, Settings                                                                                                                  |
+| C2  | done   | `list-panel.tsx` replaces `LeftSidebar`; no Pinned, Bots, Group chats, Projects sections or footer in V2                                                                                                  |
+| C3  | done   | `chats-pane.tsx`, `chat-list.ts`, `use-chat-entries.ts`, `held-order.ts`                                                                                                                                  |
+| C4  | done   | `work-pane.tsx` wraps `SidebarWorkspaceList` with `pinPresentation="float"`; see [Workspace list](#workspace-list)                                                                                        |
+| C5  | done   | `section-header.tsx`; Home 🔍, Chats 🔍 ✎, Workspace 🔍 +; ⌘K unchanged                                                                                                                                   |
+| C6  | done   | `home-layout.tsx`; `/sessions` redirects to Home; Home 🔍 shows Inbox's history in place (`InboxHistory`)                                                                                                 |
+| C7  | done   | `home-controls.tsx` chips over Home's existing activity buckets                                                                                                                                           |
+| C7a | done   | one Display ▾ per list: Chats (order, split, Hosts), Workspace (the sidebar display menu; grouping tabs and the Bots chip under it); Home's Host chip leads its controls; see [Host filter](#host-filter) |
+| C8  | done   | `pin-tags.tsx`, `pin-tags-model.ts`                                                                                                                                                                       |
+| C9  | done   | phone tabs from the registry; Home carries the unseen-issue badge                                                                                                                                         |
+| C10 | done   | `more-screen.tsx`                                                                                                                                                                                         |
+| C11 | done   | rail, tabs and the `/schedules` landing title read Schedules / Lịch; routes unchanged                                                                                                                     |
+| C12 | done   | `ownership.ts`, `scope-tabs.tsx` on Home, Chats and Workspace; `work-items.ts` for the Workspace list                                                                                                     |
+| C13 | done   | `home-header.tsx` switch; `home-mode-target.ts` moves the composer target                                                                                                                                 |
+| C14 | done   | Tasks and Design entries with `status: "preview"`, `preview-screen.tsx` (Design below Workspace, Owner 2026-10-26)                                                                                        |
+| C15 | done   | the scope applies before chips, pin tags, counts and badges (`home-feed.ts`, `homeBadgeCount`)                                                                                                            |
+| C16 | done   | `issues.ts`, `issue-store.ts`, `activity.tsx`, `issue-actions.tsx`, `home-feed-view.tsx`                                                                                                                  |
 
 ## Old controls → new home (3.1a)
 
-| Before                                   | Desktop                                              | Phone                         |
-| ---------------------------------------- | ---------------------------------------------------- | ----------------------------- |
-| Sidebar Home row                         | Rail Home                                            | Home tab                      |
-| New workspace row, footer `+` New        | Workspace header `+` (the `/new` shortcut stays)     | Workspace header `+`          |
-| Add project row / footer icon            | Workspace `+` → Add project (shortcut stays)         | same                          |
-| Import session (footer, Inbox header)    | Workspace `+` → Import session; Home status line     | same                          |
-| New bot, New group                       | Chats header ✎                                       | Chats header ✎                |
-| Inbox row and tab                        | Home (feed, 🔍 opens the full history)               | Home tab                      |
-| Search row / footer search, ⌘K           | 🔍 in each section header; ⌘K                        | 🔍 in each tab header         |
-| Automations row and tab                  | Rail Schedules / Lịch                                | Lịch tab                      |
-| Connectors row                           | Rail Connectors                                      | More → Connectors             |
-| Plugin header/footer rows                | Rail entries; a plugin's own row opens from it       | More rows                     |
-| Pinned section                           | Pinned rows on top of Chats/Workspace; Home pin tags | same                          |
-| Bots, Group chats sections               | Chats list                                           | Chats tab                     |
-| Projects section, display menu, view bar | Workspace list and its filter rows                   | Workspace tab                 |
-| Usage (opt-in)                           | Rail bottom while the Usage icon is on               | More → Usage                  |
-| Hosts + dot (Host picker)                | Rail bottom Hosts, same picker, status dot           | More → Hosts; dot on More tab |
-| Help menu                                | Rail bottom Help                                     | More → Help                   |
-| Settings                                 | Rail bottom, last                                    | More → Settings / Cài đặt     |
-| Account / Hub top row                    | Settings → Hub                                       | Settings                      |
+| Before                                   | Desktop                                                                                      | Phone                                              |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Sidebar Home row                         | Rail Home                                                                                    | Home tab                                           |
+| New workspace row, footer `+` New        | Workspace header `+` (the `/new` shortcut stays)                                             | Workspace header `+`                               |
+| Add project row / footer icon            | Workspace `+` → Add project (shortcut stays)                                                 | same                                               |
+| Import session (footer, Inbox header)    | Workspace `+` → Import session; Home status line                                             | same                                               |
+| New bot, New group                       | Chats header ✎                                                                               | Chats header ✎                                     |
+| Inbox row and tab                        | Home (feed, 🔍 opens the full history)                                                       | Home tab                                           |
+| Search row / footer search, ⌘K           | 🔍 in each section header; ⌘K                                                                | 🔍 in each tab header                              |
+| Automations row and tab                  | Rail Schedules / Lịch                                                                        | Lịch tab                                           |
+| Connectors row                           | Rail Connectors                                                                              | More → Connectors                                  |
+| Plugin header/footer rows                | Rail entries; a plugin's own row opens from it                                               | More rows                                          |
+| Pinned section                           | Pinned rows on top of Chats/Workspace; Home pin tags                                         | same                                               |
+| Bots, Group chats sections               | Chats list                                                                                   | Chats tab                                          |
+| Projects section, display menu, view bar | Workspace list and its filter rows                                                           | Workspace tab                                      |
+| Usage (opt-in)                           | Rail bottom while the Usage icon is on; the open session's quota under it                    | More → Usage, with the last opened session's quota |
+| Hosts + dot (Host picker)                | Rail bottom Hosts, same picker, status dot, online / total; the filtered Host's tag above it | More → Hosts with the same; dot on More tab        |
+| Help menu                                | Rail bottom Help                                                                             | More → Help                                        |
+| Settings                                 | Rail bottom, last                                                                            | More → Settings / Cài đặt                          |
+| Account / Hub top row                    | Settings → Hub                                                                               | Settings                                           |
+
+## Host filter
+
+One Host filter for every list (Owner, 2026-10-26): it is the sidebar's saved `hostFilters`
+(`host-filter.ts`), so Home, Chats and Workspace show the same Hosts and a choice made anywhere
+applies everywhere. It is set from the rail's Hosts picker, from Home's Host chip (first in Home's
+controls: a Host is the widest thing a reader chooses), and from Chats' and Workspace's Display
+menus. While it filters, its tag sits on the rail above Hosts (✕ clears it) and Home's chip shows
+it with ✕; Hosts on the rail and in More show online / total. It survives restarts and drops a
+Host only once the Host list has settled ([sidebar agent sessions](../sidebar-agent-sessions/README.md)).
+Store version 3 drops Chats' former Host filter (`chatsHosts`); Home's was never stored.
+
+## Session quota
+
+While a session is on screen (a workspace's focused session, or a Bot chat's session),
+the rail's Usage item shows that session's account quota in two lines: the 5-hour window and the
+weekly one, each as a percent (used or remaining, as the Usage preference says) and the time to
+its reset in its largest unit (`1d`, `1h`, `30m`: the Usage view's own rule). Scoped limits (one
+model's weekly) are left out; a session whose Host cannot report usage shows Usage alone. A phone
+shows the most recently opened session's quota in More's Usage row; that session's ids are stored
+so it survives a restart (`opened-session.ts`, `session-quota.tsx`).
 
 ## For me / Others / All
 
@@ -148,8 +169,9 @@ item a list hides leaves the list's filter alone and shows a notice above it
 Home opens on the All scope (Owner, 2026-10-26); Chats and Workspace open on For me.
 
 Order: header (mode switch, 🔍) → a connection notice only when something is wrong → composer and
-its context row → Status & Setup and Import session → quick starts → scope tabs → chips → Display
-(Hosts, when there are several) → pin tags → feed. Hosts live on the rail and in More; Home has no Hosts block and no
+its context row → Status & Setup and Import session → quick starts → the Host chip → scope tabs →
+chips → pin tags → feed. On desktop the mode switch sits in the middle of the header, on the centre
+line of Home's column. Home has no Hosts block and no
 floating updates bar (held updates show as an inline "Show N updates" above the feed). The
 composer is at the top on phones too, with its pickers opening downward; a phone's header row is
 the mode switch and search (the tab bar already says Home).
@@ -392,4 +414,4 @@ Round 1.
 ## Not in Round 1
 
 Watch/Unwatch and Following; cross-device sync of seen/dismissed; offline outbox, tiered cache and
-Storage; real Tasks; Notes, Design, Files; calendar inside Lịch; split DM/Group lists in Chats.
+Storage; real Tasks and Design; Notes, Files; calendar inside Lịch; split DM/Group lists in Chats.

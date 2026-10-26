@@ -32,6 +32,7 @@ import { useNavigationStore, type ListSection } from "./store";
 import { useNavigationSearchIntegration } from "./search-integration";
 import { useActiveSection } from "./use-open-section";
 import { WorkPane } from "./work-pane";
+import { useTrackOpenedSession } from "./opened-session";
 
 /**
  * Navigation V2's chrome in place of the sidebar (docs/features/navigation-v2/README.md): the
@@ -49,6 +50,7 @@ export const NavigationChrome = memo(function NavigationChrome({
 }) {
   const compact = useIsCompactFormFactor();
   useNavigationSearchIntegration();
+  useTrackOpenedSession();
   return (
     <>
       {compact ? (

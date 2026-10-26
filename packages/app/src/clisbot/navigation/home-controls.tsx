@@ -1,14 +1,10 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
-import { DisplayMenuTrigger } from "@/components/ui/display-menu-trigger";
-import { DropdownMenu, DropdownMenuContent } from "@/components/ui/dropdown-menu";
 import type { FilterChip } from "@/components/ui/filter-chips";
-import { DISPLAY_MENU_WIDTH } from "@/components/sidebar/display-preferences/menu";
 import { HOME_CHIPS, type HomeChip } from "./home-feed";
-import { HostsDisplayItems } from "./hosts-display-items";
 import type { ScopeCounts } from "./ownership";
 import { HomePinTags } from "./pin-tags";
+import { HostFilterChip } from "./host-filter-chip";
 import { SectionControls } from "./section-controls";
 import { useNavigationStore } from "./store";
 
@@ -21,8 +17,8 @@ const CHIP_LABELS: Record<HomeChip, string> = {
 };
 
 /**
- * Home's filters in the brief's order (C7, C7a, C8, C12): scope, quick-filter chips over the
- * existing activity buckets, the Display menu with the Host filter, then the reader's pins.
+ * Home's filters, widest first: the app-wide Host filter, scope, quick-filter chips over the
+ * existing activity buckets, then the reader's pins (C7, C8, C12; Owner, 2026-10-26).
  */
 export function HomeFeedControls({
   scopeCounts,
@@ -34,7 +30,6 @@ export function HomeFeedControls({
   const { t } = useTranslation();
   const chip = useNavigationStore((state) => state.homeChip);
   const setChip = useNavigationStore((state) => state.setHomeChip);
-  const multipleHosts = useAvailableHosts().length > 1;
   const chips = useMemo<FilterChip<HomeChip>[]>(
     () =>
       HOME_CHIPS.map((value) => ({
@@ -52,42 +47,11 @@ export function HomeFeedControls({
       chip={chip}
       onChip={setChip}
       backdrop="surface0"
-      display={multipleHosts ? homeDisplayMenu : undefined}
+      leading={hostFilterChip}
     >
       <HomePinTags />
     </SectionControls>
   );
 }
 
-/** Home's Display menu: which Hosts the feed covers. */
-function HomeDisplayMenu() {
-  const { t } = useTranslation();
-  const hosts = useAvailableHosts();
-  const selected = useNavigationStore((state) => state.homeHosts);
-  const toggle = useNavigationStore((state) => state.toggleHomeHost);
-  const clear = useNavigationStore((state) => state.clearHomeHosts);
-  return (
-    <DropdownMenu>
-      <DisplayMenuTrigger
-        label={t("navigation.display")}
-        active={selected.length > 0}
-        testID="home-display"
-      />
-      <DropdownMenuContent
-        align="start"
-        width={DISPLAY_MENU_WIDTH}
-        sheetTitle={t("navigation.display")}
-      >
-        <HostsDisplayItems
-          hosts={hosts}
-          selected={selected}
-          onToggle={toggle}
-          onClear={clear}
-          testID="home-display"
-        />
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-const homeDisplayMenu = <HomeDisplayMenu />;
+const hostFilterChip = <HostFilterChip />;

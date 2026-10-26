@@ -129,7 +129,7 @@ test.describe("Navigation V2 continuity", () => {
     await expect(work.getByTestId("work-bots-chip")).toHaveAccessibleName("Hide Bot sessions");
     await expect
       .poll(async () => (await storedJson(page, "clisbot-navigation-preferences"))?.version)
-      .toBe(2);
+      .toBe(3);
     const stored = await storedJson(page, "clisbot-navigation-preferences");
     // Home opens on All (v2); the Workspace scope the reader chose stays.
     expect(stored.state.scopes).toMatchObject({ home: "all", work: "others" });
@@ -140,6 +140,8 @@ test.describe("Navigation V2 continuity", () => {
       workShowBots: true,
     });
     expect(stored.state).not.toHaveProperty("showBotProjectsInWork");
+    // Chats' own Host filter gave way to the app-wide one (v3).
+    expect(stored.state).not.toHaveProperty("chatsHosts");
     // The old layout's own switch is untouched, ready for the flag to go off.
     expect((await storedJson(page, "sidebar-bot-projects")).state.showBotProjects).toBe(false);
   });

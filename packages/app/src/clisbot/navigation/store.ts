@@ -19,7 +19,6 @@ const PersistedSchema = z.object({
   workShowBots: z.boolean().optional(),
   chatsSort: z.enum(["recent", "name"]).optional(),
   chatsSplit: z.boolean().optional(),
-  chatsHosts: z.array(z.string()).optional(),
 });
 
 interface NavigationState {
@@ -30,14 +29,14 @@ interface NavigationState {
   homeChip: HomeChip;
   chatsChip: ChatsChip;
   workChip: WorkChip;
-  /** Chats' Display menu: order, the opt-in DM/group split, and the Hosts it lists. */
+  /**
+   * Chats' Display menu: order and the opt-in DM/group split. Which Hosts every list shows is the
+   * one app-wide Host filter (`useSidebarViewStore.hostFilters`, `host-filter.ts`).
+   */
   chatsSort: "recent" | "name";
   chatsSplit: boolean;
-  chatsHosts: string[];
   setChatsSort: (sort: "recent" | "name") => void;
   toggleChatsSplit: () => void;
-  toggleChatsHost: (serverId: string) => void;
-  clearChatsHosts: () => void;
   /**
    * The Workspace list's Bots chip: Bot-labelled sessions (and so Bot home projects) are listed by
    * default; off hides them from the list, its counts and its scope tabs in one tap.
@@ -46,8 +45,6 @@ interface NavigationState {
   toggleWorkShowBots: () => void;
   /** Home's 🔍 swaps the feed for Inbox's full history and search. */
   homeSearchOpen: boolean;
-  /** Home's Host filter; empty means every Host. */
-  homeHosts: string[];
   /** Whether Home's collapsed Seen issues group is open. */
   seenIssuesOpen: boolean;
   setHomeMode: (mode: HomeMode) => void;
@@ -57,13 +54,7 @@ interface NavigationState {
   setChatsChip: (chip: ChatsChip) => void;
   setWorkChip: (chip: WorkChip) => void;
   setHomeSearchOpen: (open: boolean) => void;
-  toggleHomeHost: (serverId: string) => void;
-  clearHomeHosts: () => void;
   setSeenIssuesOpen: (open: boolean) => void;
-}
-
-function toggled(ids: readonly string[], id: string): string[] {
-  return ids.includes(id) ? ids.filter((entry) => entry !== id) : [...ids, id];
 }
 
 export const useNavigationStore = create<NavigationState>()(
@@ -78,15 +69,10 @@ export const useNavigationStore = create<NavigationState>()(
       workShowBots: true,
       chatsSort: "recent",
       chatsSplit: false,
-      chatsHosts: [],
       setChatsSort: (chatsSort) => set({ chatsSort }),
       toggleChatsSplit: () => set((state) => ({ chatsSplit: !state.chatsSplit })),
-      toggleChatsHost: (serverId) =>
-        set((state) => ({ chatsHosts: toggled(state.chatsHosts, serverId) })),
-      clearChatsHosts: () => set({ chatsHosts: [] }),
       toggleWorkShowBots: () => set((state) => ({ workShowBots: !state.workShowBots })),
       homeSearchOpen: false,
-      homeHosts: [],
       seenIssuesOpen: false,
       setHomeMode: (homeMode) => set({ homeMode }),
       setScope: (section, scope) =>
@@ -96,9 +82,6 @@ export const useNavigationStore = create<NavigationState>()(
       setChatsChip: (chatsChip) => set({ chatsChip }),
       setWorkChip: (workChip) => set({ workChip }),
       setHomeSearchOpen: (homeSearchOpen) => set({ homeSearchOpen }),
-      toggleHomeHost: (serverId) =>
-        set((state) => ({ homeHosts: toggled(state.homeHosts, serverId) })),
-      clearHomeHosts: () => set({ homeHosts: [] }),
       setSeenIssuesOpen: (seenIssuesOpen) => set({ seenIssuesOpen }),
     }),
     {
@@ -106,7 +89,8 @@ export const useNavigationStore = create<NavigationState>()(
       // v1: the Display menu's "Bot projects" switch (off by default) became the Bots chip (on by
       // default) — Bot sessions now show in the list, so the old choice is not carried over.
       // v2: Home opens on All (Owner, 2026-10-26); a stored Home scope moves to All once.
-      version: 2,
+      // v3: Chats' own Host filter gave way to the app-wide one (Owner, 2026-10-26).
+      version: 3,
       migrate: (persisted, version) => {
         const state = { ...((persisted ?? {}) as Record<string, unknown>) };
         if (version < 1) {
@@ -114,7 +98,8 @@ export const useNavigationStore = create<NavigationState>()(
           state.workShowBots = true;
         }
         const scopes = state.scopes as Record<string, unknown> | undefined;
-        if (scopes) state.scopes = { ...scopes, home: "all" };
+        if (version < 2 && scopes) state.scopes = { ...scopes, home: "all" };
+        delete state.chatsHosts;
         return state as unknown as NavigationState;
       },
       storage: createValidatedPersistStorage(AsyncStorage, PersistedSchema),
@@ -125,7 +110,6 @@ export const useNavigationStore = create<NavigationState>()(
         workShowBots: state.workShowBots,
         chatsSort: state.chatsSort,
         chatsSplit: state.chatsSplit,
-        chatsHosts: state.chatsHosts,
       }),
     },
   ),

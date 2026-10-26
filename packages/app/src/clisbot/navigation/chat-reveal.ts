@@ -7,10 +7,13 @@ import { chatReveal } from "./outside-filter";
 import { resolveDirectChatOwnership, resolveOwnership } from "./ownership";
 import { useReaderAccounts } from "./reader";
 import { useNavigationStore } from "./store";
+import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 
 function chatsFilter() {
-  const state = useNavigationStore.getState();
-  return { serverIds: state.chatsHosts, scope: state.scopes.chats };
+  return {
+    serverIds: useSidebarViewStore.getState().hostFilters,
+    scope: useNavigationStore.getState().scopes.chats,
+  };
 }
 
 /**
