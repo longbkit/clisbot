@@ -1,0 +1,5 @@
+The channel reply fixes take effect when both the Host and its Hub are upgraded. Send right away and the Project tools fix require an upgraded Host; the Hub database fix takes effect when the Hub is upgraded. Hosts that do not report who started a session list all of their sessions under For me.
+
+Relay Hosts saved without a password need re-adding once the target daemon has one. Plugin turn-ended hooks now receive an empty timeline. This release mov...
+
+Full notes: https://clisbot.com/changelog
