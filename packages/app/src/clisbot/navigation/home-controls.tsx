@@ -9,7 +9,7 @@ import { HOME_CHIPS, type HomeChip } from "./home-feed";
 import { HostsDisplayItems } from "./hosts-display-items";
 import type { ScopeCounts } from "./ownership";
 import { HomePinTags } from "./pin-tags";
-import { SectionControls, SectionInset } from "./section-controls";
+import { SectionControls } from "./section-controls";
 import { useNavigationStore } from "./store";
 
 const CHIP_LABELS: Record<HomeChip, string> = {
@@ -54,9 +54,7 @@ export function HomeFeedControls({
       backdrop="surface0"
       display={multipleHosts ? homeDisplayMenu : undefined}
     >
-      <SectionInset>
-        <HomePinTags />
-      </SectionInset>
+      <HomePinTags />
     </SectionControls>
   );
 }

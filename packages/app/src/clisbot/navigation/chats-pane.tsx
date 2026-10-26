@@ -7,13 +7,13 @@ import { StyleSheet } from "react-native-unistyles";
 import { Bot, Hash, SquarePen } from "lucide-react-native";
 import { usePathname } from "expo-router";
 import { BotRow, type BotsSidebarBot } from "@/clisbot/bots/sidebar/bots-section";
+import { BotsSidebarRowSkeleton } from "@/clisbot/bots/sidebar/row";
 import { ChatRow, type ChatsSidebarChat } from "@/clisbot/bots/sidebar/chats-section";
 import { PinOptionsMenu } from "@/clisbot/bots/sidebar/pin-options";
 import { useSidebarPinMenu } from "@/clisbot/bots/sidebar/use-section-actions";
 import { useBotSidebarActions } from "@/clisbot/bots/sidebar/use-sidebar-actions";
 import { useCreationRequest } from "@/clisbot/bots/sidebar/creation-request";
 import { refreshBotsAndChats } from "@/clisbot/bots/data/runtime";
-import { ActivityPlaceholder } from "@/clisbot/home/activity-placeholder";
 import { useBotCreationHosts } from "@/clisbot/bots/feature";
 import { parseChatRouteFromPathname } from "@/clisbot/bots/routes";
 import { selectedDirectBotKey } from "@/clisbot/bots/sidebar/sidebar-model";
@@ -173,7 +173,7 @@ function ChatsListState({
   const reach = useHostsReachability();
   const loaded = bots.loadState.status === "loaded" || chats.loadState.status === "loaded";
   if (!loaded && reach === "unreachable") return <HostsUnreachableState testID="chats-offline" />;
-  if (!loaded && !bots.error && !chats.error) return <ActivityPlaceholder />;
+  if (!loaded && !bots.error && !chats.error) return <BotsSidebarRowSkeleton />;
   if (!loaded)
     return (
       <ListState

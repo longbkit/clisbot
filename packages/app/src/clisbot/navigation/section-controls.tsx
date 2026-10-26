@@ -36,25 +36,19 @@ export function SectionControls<T extends string>({
   return (
     <View style={styles.controls} testID={`${section}-controls`}>
       <ScopeTabs section={section} counts={scopeCounts} />
-      <View style={styles.inset}>
-        <FilterChips
-          chips={chips}
-          value={chip}
-          onChange={onChip}
-          scroll
-          backdrop={backdrop}
-          testID={`${section}-chip`}
-        />
-      </View>
+      <FilterChips
+        chips={chips}
+        value={chip}
+        onChange={onChip}
+        scroll
+        backdrop={backdrop}
+        contentStyle={styles.inset}
+        testID={`${section}-chip`}
+      />
       {display ? <View style={[styles.inset, styles.display]}>{display}</View> : null}
       {children}
     </View>
   );
-}
-
-/** A row on the controls' inset, for a section-only row such as Home's pins. */
-export function SectionInset({ children }: { children: ReactNode }) {
-  return <View style={styles.inset}>{children}</View>;
 }
 
 const styles = StyleSheet.create((theme) => ({

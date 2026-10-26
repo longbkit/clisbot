@@ -127,5 +127,6 @@ function Tag({ tag, onPress }: { tag: RowTag; onPress: (tag: RowTag) => void }) 
 const pinMark = <PinMark />;
 
 const styles = StyleSheet.create((theme) => ({
-  row: { flexDirection: "row", gap: theme.spacing[2] },
+  // The row scrolls edge to edge; the inset is the controls' (`section-controls.tsx`).
+  row: { flexDirection: "row", gap: theme.spacing[2], paddingHorizontal: theme.spacing[3] },
 }));

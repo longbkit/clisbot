@@ -35,6 +35,7 @@ export function FilterChips<T extends string>({
   onChange,
   scroll = false,
   backdrop = "surface0",
+  contentStyle,
   testID,
 }: {
   chips: readonly FilterChip<T>[];
@@ -43,6 +44,8 @@ export function FilterChips<T extends string>({
   scroll?: boolean;
   /** The surface behind a scrolling row; its trailing edge fades into it. */
   backdrop?: ChipBackdrop;
+  /** A scrolling row's inset, as padding, so the chips scroll off the pane's own edge. */
+  contentStyle?: ScrollView["props"]["contentContainerStyle"];
   testID?: string;
 }) {
   const row = (
@@ -59,10 +62,18 @@ export function FilterChips<T extends string>({
     </View>
   );
   if (!scroll) return row;
-  return <ChipRow backdrop={backdrop}>{row}</ChipRow>;
+  return (
+    <ChipRow backdrop={backdrop} contentStyle={contentStyle}>
+      {row}
+    </ChipRow>
+  );
 }
 
-/** One line of chips that scrolls sideways; a fade on the trailing edge says there is more. */
+/**
+ * One line of chips that scrolls sideways; a fade on either edge says there is more that way.
+ * Give it the full pane width and its inset as `contentStyle` padding, so a chip that does not
+ * fit runs under the fade at the pane's edge instead of stopping at an inner line.
+ */
 export function ChipRow({
   backdrop = "surface0",
   contentStyle,
@@ -85,6 +96,7 @@ export function ChipRow({
     setOffset(event.nativeEvent.contentOffset.x);
   }, []);
   const more = content - width - offset > 1;
+  const before = offset > 1;
   return (
     <View style={styles.scrollFrame} onLayout={measure} testID={testID}>
       <ScrollView
@@ -98,8 +110,11 @@ export function ChipRow({
       >
         {children}
       </ScrollView>
+      {before ? (
+        <EdgeFade edge="left" solidFraction={0.2} backdrop={backdrop} style={styles.fadeLeft} />
+      ) : null}
       {more ? (
-        <EdgeFade edge="right" solidFraction={0} backdrop={backdrop} style={styles.fade} />
+        <EdgeFade edge="right" solidFraction={0.2} backdrop={backdrop} style={styles.fade} />
       ) : null}
     </View>
   );
@@ -214,6 +229,13 @@ const styles = StyleSheet.create((theme) => ({
     top: theme.spacing[0],
     bottom: theme.spacing[0],
     right: theme.spacing[0],
+    width: theme.spacing[8],
+  },
+  fadeLeft: {
+    position: "absolute",
+    top: theme.spacing[0],
+    bottom: theme.spacing[0],
+    left: theme.spacing[0],
     width: theme.spacing[8],
   },
   chip: {

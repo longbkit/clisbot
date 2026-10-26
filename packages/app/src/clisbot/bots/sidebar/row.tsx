@@ -210,6 +210,45 @@ function RowKebab({
   );
 }
 
+const SKELETON_ROWS = ["first", "second", "third", "fourth"];
+
+/**
+ * Chats while its first answer is on the way: placeholder rows drawn with the row's own container,
+ * insets, mark column and title rail, so the loaded rows land where the placeholders were.
+ */
+export function BotsSidebarRowSkeleton() {
+  const { t } = useTranslation();
+  const compact = useIsCompactFormFactor() || isNative;
+  return (
+    <View
+      testID="chats-list-placeholder"
+      accessibilityLabel={t("common.loading")}
+      accessibilityRole="progressbar"
+    >
+      {SKELETON_ROWS.map((key) => (
+        <View key={key} style={styles.container} testID="chats-list-placeholder-row">
+          <View style={[styles.row, compact && styles.rowTouch]}>
+            <View style={styles.leadingSlot}>
+              <View style={styles.skeletonMark} testID="chats-list-placeholder-mark" />
+            </View>
+            <View style={styles.titleColumn}>
+              <View style={styles.skeletonTitleLine}>
+                <View style={styles.skeletonTitle} testID="chats-list-placeholder-title" />
+              </View>
+              <View style={styles.skeletonSubtitleLine}>
+                <View style={styles.skeletonSubtitle} />
+              </View>
+            </View>
+            <View style={[styles.trailingSlot, compact && styles.trailingSlotTouch]}>
+              <View style={styles.skeletonTrailing} />
+            </View>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const TITLE_LINE_HEIGHT = 20;
 
 /**
@@ -310,5 +349,31 @@ const styles = StyleSheet.create((theme) => ({
   },
   kebabTouch: { width: 44, height: 44 },
   kebabVisible: { opacity: 1 },
+  skeletonMark: {
+    width: sidebarMarkSize(true),
+    height: sidebarMarkSize(true),
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.surface3,
+  },
+  skeletonTitleLine: { height: TITLE_LINE_HEIGHT, justifyContent: "center" },
+  skeletonTitle: {
+    width: "60%",
+    height: theme.fontSize.sm,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.surface3,
+  },
+  skeletonSubtitleLine: { height: 16, justifyContent: "center" },
+  skeletonSubtitle: {
+    width: "40%",
+    height: theme.spacing[2],
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.surface2,
+  },
+  skeletonTrailing: {
+    width: 20,
+    height: theme.spacing[2],
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.surface2,
+  },
   kebabHovered: { backgroundColor: theme.colors.surface2 },
 }));
