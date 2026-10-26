@@ -22,6 +22,10 @@ export const hostQueue = {
   move: "Move to end",
   cancel: "Cancel edit",
   enqueueNew: "Add as new item",
+  view: "View",
+  collapse: "Collapse",
+  more: "More actions",
+  openImage: "Open image",
 };
 
 export const hostQueueVi: Record<keyof typeof hostQueue, string> = {
@@ -47,6 +51,10 @@ export const hostQueueVi: Record<keyof typeof hostQueue, string> = {
   move: "Thêm cuối hàng",
   cancel: "Hủy sửa",
   enqueueNew: "Thêm thành mục mới",
+  view: "Xem",
+  collapse: "Thu gọn",
+  more: "Thao tác khác",
+  openImage: "Mở ảnh",
 };
 
 export const hostQueueEs: Record<keyof typeof hostQueue, string> = {
@@ -73,6 +81,10 @@ export const hostQueueEs: Record<keyof typeof hostQueue, string> = {
   move: "Mover al final",
   cancel: "Cancelar edición",
   enqueueNew: "Añadir como nuevo",
+  view: "Ver",
+  collapse: "Contraer",
+  more: "Más acciones",
+  openImage: "Abrir imagen",
 };
 
 export const hostQueueFr: Record<keyof typeof hostQueue, string> = {
@@ -99,6 +111,10 @@ export const hostQueueFr: Record<keyof typeof hostQueue, string> = {
   move: "Déplacer à la fin",
   cancel: "Annuler la modification",
   enqueueNew: "Ajouter comme nouveau",
+  view: "Voir",
+  collapse: "Réduire",
+  more: "Plus d’actions",
+  openImage: "Ouvrir l’image",
 };
 
 export const hostQueueJa: Record<keyof typeof hostQueue, string> = {
@@ -125,6 +141,10 @@ export const hostQueueJa: Record<keyof typeof hostQueue, string> = {
   move: "末尾に移動",
   cancel: "編集をキャンセル",
   enqueueNew: "新しい項目として追加",
+  view: "表示",
+  collapse: "折りたたむ",
+  more: "その他の操作",
+  openImage: "画像を開く",
 };
 
 export const hostQueueKo: Record<keyof typeof hostQueue, string> = {
@@ -149,6 +169,10 @@ export const hostQueueKo: Record<keyof typeof hostQueue, string> = {
   move: "맨 뒤로 이동",
   cancel: "편집 취소",
   enqueueNew: "새 항목으로 추가",
+  view: "보기",
+  collapse: "접기",
+  more: "추가 작업",
+  openImage: "이미지 열기",
 };
 
 export const hostQueuePtBR: Record<keyof typeof hostQueue, string> = {
@@ -175,6 +199,10 @@ export const hostQueuePtBR: Record<keyof typeof hostQueue, string> = {
   move: "Mover para o fim",
   cancel: "Cancelar edição",
   enqueueNew: "Adicionar como novo",
+  view: "Ver",
+  collapse: "Recolher",
+  more: "Mais ações",
+  openImage: "Abrir imagem",
 };
 
 export const hostQueueRu: Record<keyof typeof hostQueue, string> = {
@@ -201,6 +229,10 @@ export const hostQueueRu: Record<keyof typeof hostQueue, string> = {
   move: "В конец очереди",
   cancel: "Отменить правку",
   enqueueNew: "Добавить как новое",
+  view: "Показать",
+  collapse: "Свернуть",
+  more: "Другие действия",
+  openImage: "Открыть изображение",
 };
 
 export const hostQueueZhCN: Record<keyof typeof hostQueue, string> = {
@@ -225,6 +257,10 @@ export const hostQueueZhCN: Record<keyof typeof hostQueue, string> = {
   move: "移到队尾",
   cancel: "取消编辑",
   enqueueNew: "添加为新项目",
+  view: "查看",
+  collapse: "收起",
+  more: "更多操作",
+  openImage: "打开图片",
 };
 
 export const hostQueueAr: Record<keyof typeof hostQueue, string> = {
@@ -250,4 +286,8 @@ export const hostQueueAr: Record<keyof typeof hostQueue, string> = {
   move: "نقل إلى النهاية",
   cancel: "إلغاء التعديل",
   enqueueNew: "إضافة كعنصر جديد",
+  view: "عرض",
+  collapse: "طي",
+  more: "إجراءات أخرى",
+  openImage: "فتح الصورة",
 };

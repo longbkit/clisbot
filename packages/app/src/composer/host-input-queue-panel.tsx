@@ -1,10 +1,10 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
+import { QueueRow } from "./queue-row";
 import { View, Text, ScrollView } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { PencilLine, Send, Trash2, Paperclip, type LucideIcon } from "lucide-react-native";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Paperclip } from "lucide-react-native";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -44,37 +44,6 @@ interface HostInputQueuePanelProps extends QueuePanelActions, QueueEditorActions
   error: string | null;
 }
 
-function QueueIconAction({
-  label,
-  Icon,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  Icon: LucideIcon;
-  disabled: boolean;
-  onPress(): void;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          size="md"
-          variant="ghost"
-          accessibilityLabel={label}
-          disabled={disabled}
-          onPress={onPress}
-          style={styles.iconTarget}
-          leftIcon={Icon}
-        />
-      </TooltipTrigger>
-      <TooltipContent>
-        <Text style={styles.hint}>{label}</Text>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
 function QueueInfoBadge({ label, explanation }: { label: string; explanation: string }) {
   return (
     <DropdownMenu>
@@ -92,35 +61,7 @@ function QueueInfoBadge({ label, explanation }: { label: string; explanation: st
   );
 }
 
-function QueueSendActions({
-  disabled,
-  hideSteer,
-  sendNowLabel,
-  sendNow,
-  steer,
-}: {
-  disabled: boolean;
-  hideSteer?: boolean;
-  sendNowLabel?: string;
-  sendNow(): void;
-  steer(): void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <QueueIconAction
-      label={
-        hideSteer
-          ? (sendNowLabel ?? t("composer.input.sendMessage"))
-          : t("composer.hostQueue.steerOnce")
-      }
-      Icon={Send}
-      disabled={disabled}
-      onPress={hideSteer ? sendNow : steer}
-    />
-  );
-}
-
-function QueueRow({
+function QueueRowEntry({
   item,
   edit,
   sendNow,
@@ -133,15 +74,21 @@ function QueueRow({
 }: QueuePanelActions & { pending: boolean; item: QueuePanelItem; notice?: string }) {
   const { t } = useTranslation();
   const editItem = useCallback(() => edit(item.id), [edit, item.id]);
-  const steerItem = useCallback(() => steer(item.id), [steer, item.id]);
-  const sendItem = useCallback(() => sendNow(item.id), [sendNow, item.id]);
+  const sendItem = useCallback(
+    () => (hideSteer ? sendNow(item.id) : steer(item.id)),
+    [hideSteer, item.id, sendNow, steer],
+  );
   const removeItem = useCallback(() => remove(item.id), [remove, item.id]);
+  const sendLabel = hideSteer
+    ? (sendNowLabel ?? t("composer.input.sendMessage"))
+    : t("composer.hostQueue.steerOnce");
+  const actions = useMemo(
+    () => ({ edit: editItem, send: sendItem, remove: removeItem, sendLabel, pending }),
+    [editItem, pending, removeItem, sendItem, sendLabel],
+  );
   const count = (item.images?.length ?? 0) + (item.attachments?.length ?? 0);
-  return (
-    <View style={styles.item} testID={`host-queue-${item.id}`}>
-      <Text style={styles.text} numberOfLines={1}>
-        {item.text || t("composer.hostQueue.attachments", { count })}
-      </Text>
+  const badges = (
+    <>
       {count > 0 ? (
         <View
           style={styles.fileCount}
@@ -157,34 +104,15 @@ function QueueRow({
       {item.reason ? (
         <QueueInfoBadge label={t("composer.hostQueue.unknown")} explanation={item.reason} />
       ) : null}
-      {item.state === "sending" ? (
-        <Text style={styles.hint}>{t("composer.hostQueue.sending")}</Text>
-      ) : (
-        <View style={styles.rowActions}>
-          <QueueIconAction
-            label={t("composer.hostQueue.edit")}
-            Icon={PencilLine}
-            disabled={pending}
-            onPress={editItem}
-          />
-          {item.state === "queued" ? (
-            <QueueSendActions
-              disabled={pending}
-              hideSteer={hideSteer}
-              sendNowLabel={sendNowLabel}
-              sendNow={sendItem}
-              steer={steerItem}
-            />
-          ) : null}
-          <QueueIconAction
-            label={t("composer.hostQueue.delete")}
-            Icon={Trash2}
-            disabled={pending}
-            onPress={removeItem}
-          />
-        </View>
-      )}
-    </View>
+    </>
+  );
+  return (
+    <QueueRow
+      item={item}
+      actions={actions}
+      badges={badges}
+      sendingLabel={t("composer.hostQueue.sending")}
+    />
   );
 }
 
@@ -258,7 +186,7 @@ export function HostInputQueuePanel(props: HostInputQueuePanelProps) {
       {props.view.items.length ? (
         <ScrollView style={styles.viewport} nestedScrollEnabled keyboardShouldPersistTaps="handled">
           {props.view.items.map((item, index) => (
-            <QueueRow
+            <QueueRowEntry
               key={item.id}
               item={item}
               pending={props.pending}
@@ -291,33 +219,13 @@ const styles = StyleSheet.create((theme) => ({
   touchAction: { minHeight: 44 },
   track: { gap: theme.spacing[2] },
   viewport: { maxHeight: 144 },
-  item: {
-    flexDirection: "row",
-    alignItems: "center",
-    minHeight: 48,
-    gap: theme.spacing[1],
-    paddingLeft: theme.spacing[2],
-    borderBottomWidth: theme.borderWidth[1],
-    borderColor: theme.colors.border,
-  },
-  text: { flex: 1, minWidth: 0, color: theme.colors.foreground, fontSize: theme.fontSize.sm },
   fileCount: { flexDirection: "row", gap: 2, alignItems: "center" },
-  iconTarget: {
-    width: 44,
-    height: 44,
-    minWidth: 44,
-    minHeight: 44,
-    padding: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   badge: {
     minHeight: 44,
     paddingHorizontal: theme.spacing[1],
     alignItems: "center",
     justifyContent: "center",
   },
-  rowActions: { flexDirection: "row", alignItems: "center" },
   hint: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
   actions: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: theme.spacing[2] },
   editor: { gap: theme.spacing[2] },
