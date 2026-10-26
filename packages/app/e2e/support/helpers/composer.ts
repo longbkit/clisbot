@@ -63,7 +63,13 @@ export async function blurComposerInput(page: Page): Promise<void> {
 }
 
 export async function submitMessage(page: Page, text: string): Promise<void> {
-  const input = composerInput(page);
+  // A workspace keeps the panels of tabs it has shown, each with its own composer. After a reload
+  // the previously focused agent tab can mount before the opened one takes focus, leaving a hidden
+  // composer first in the DOM; type into the one the reader sees.
+  const input = page
+    .getByRole("textbox", { name: "Message agent..." })
+    .filter({ visible: true })
+    .first();
   await expect(input).toBeEditable({ timeout: 30_000 });
   await input.fill(text);
   await input.press("Enter");
