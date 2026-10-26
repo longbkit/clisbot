@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Locator, Page } from "@playwright/test";
@@ -144,12 +145,22 @@ async function gotoWork(page: Page) {
   });
 }
 
+/**
+ * Saves Workspace's Host filter as a reader would have left it, on the next load and before the
+ * app boots: a running app persists its own copy of this key, which can land on top of a write
+ * made behind its back.
+ */
 async function setWorkFilter(page: Page, hostFilters: string[]) {
-  await page.evaluate((ids) => {
-    const raw = JSON.parse(localStorage.getItem("sidebar-view") ?? "{}");
-    raw.state = { ...raw.state, hostFilters: ids, projectFilters: [] };
-    localStorage.setItem("sidebar-view", JSON.stringify(raw));
-  }, hostFilters);
+  await page.addInitScript(
+    ({ ids, once }) => {
+      if (sessionStorage.getItem(once)) return;
+      sessionStorage.setItem(once, "1");
+      const raw = JSON.parse(localStorage.getItem("sidebar-view") ?? "{}");
+      raw.state = { ...raw.state, hostFilters: ids, projectFilters: [] };
+      localStorage.setItem("sidebar-view", JSON.stringify(raw));
+    },
+    { ids: hostFilters, once: `@clisbot:e2e-work-filter-${randomUUID()}` },
+  );
   await gotoWork(page);
 }
 

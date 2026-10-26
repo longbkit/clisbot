@@ -18,7 +18,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceDirectoryServerIds } from "@/stores/session-store-hooks";
 import { workspaceEqualityFns } from "@/stores/session-store-hooks/selectors";
 import { useWorkspaceStructure } from "@/stores/session-store-hooks";
-import { getHostRuntimeStore, useHostRegistryLoaded, useHosts } from "@/runtime/host-runtime";
+import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import {
@@ -110,11 +110,7 @@ export function useSidebarWorkspacesList(options?: {
   enabled?: boolean;
 }): SidebarWorkspacesListResult {
   const runtime = getHostRuntimeStore();
-  const allHosts = useHosts();
-  const hostRegistryLoaded = useHostRegistryLoaded();
-  const allServerIds = useMemo(() => allHosts.map((h) => h.serverId), [allHosts]);
 
-  const reconcileHostFilters = useSidebarViewStore((state) => state.reconcileHostFilters);
   const isActive = options?.enabled !== false;
 
   const serverIds = useSidebarHostIds(options?.hostFilters);
@@ -125,12 +121,8 @@ export function useSidebarWorkspacesList(options?: {
     return () => releases.forEach((release) => release());
   }, [isActive, runtime, serverIds]);
 
-  useEffect(() => {
-    if (!hostRegistryLoaded) {
-      return;
-    }
-    reconcileHostFilters(allServerIds);
-  }, [allServerIds, hostRegistryLoaded, reconcileHostFilters]);
+  // Clisbot: the saved Host filter is reconciled once, app-wide, after the Host list has settled
+  // (`clisbot/hub/settled-host-ids.ts`), not here while the registry or a Hub list still loads.
 
   const persistedProjectOrder = useSidebarOrderStore((state) => state.projectOrder ?? EMPTY_ORDER);
 

@@ -25,6 +25,8 @@ The terms are in the [glossary](../../glossary.md) under **Agent sessions**.
 
 An active Host filter keeps the Projects header, display menu and filter chips mounted while its directory is loading. Selecting an offline Host must leave a way to clear the filter; the initial-load skeleton must not replace those controls.
 
+A saved Host filter survives startup. It drops a Host only once the Host list has settled: the registry has loaded and every signed-in Hub has answered or failed. Until then an unknown Host is pending, and a Host a Hub lists that the registry has not added yet still counts, because Hub Hosts join the registry after the Hub's list arrives. `HostFilterReconciler` (`clisbot/hub/settled-host-ids.ts`, mounted once in the Hub scope) does this for the whole app; the sidebar list hook no longer reconciles on its own, which dropped a Hub Host's filter on every start.
+
 The display menu’s **User** and **Channel** filters have a search field and a bounded, scrollable list. Search matches names and identity details, ignoring case and Vietnamese accents. You can select several matches across searches; **Clear filter** clears the selection even when the current search has no results. Closing the menu resets the search, while the selected filters survive reload.
 
 Everything lives on one page, **Show → Agent sessions** — the first row of the Show page, in a group of its own — in the sidebar's display preferences, in four groups split by separators: the switch, expansion, Active sessions only with Full titles, and the details a line shows. There is no deeper submenu.

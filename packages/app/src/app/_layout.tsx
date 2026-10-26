@@ -140,6 +140,7 @@ import { PluginCatalogSync } from "@/plugins";
 import { HubAccountProvider } from "@/clisbot/hub/account-provider";
 import { HubAccountEntryNavigation } from "@/clisbot/hub/account-entry-navigation";
 import { HubHostSynchronization } from "@/clisbot/hub/host-synchronization";
+import { HostFilterReconciler } from "@/clisbot/hub/settled-host-ids";
 import { BotsCommandCenterActions } from "@/clisbot/bots/search/command-center-registration";
 import { NotificationOpenRouter } from "@/notification-open/react";
 import { ensureOsNotificationPermission } from "@/utils/os-notifications";
@@ -960,6 +961,7 @@ function ClisbotHubScope({ children }: { children: ReactNode }) {
       <OfferLinkListener />
       <HubAccountProvider>
         <HubHostSynchronization />
+        <HostFilterReconciler />
         <ClientChatQueuePrincipalBinding />
         {children}
       </HubAccountProvider>

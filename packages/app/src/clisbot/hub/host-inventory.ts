@@ -189,17 +189,16 @@ export function useHostInventory() {
     accountError ??
     (hub.enabled && hub.signedIn !== null ? errors[activeIndex]?.message : null) ??
     null;
+  // Every Hub account has answered, or failed: its Host list will not grow on its own.
+  const settled = !accounts.some(
+    (account, index) =>
+      account.loading ||
+      (account.signedIn !== null && lists[index] === undefined && errors[index] === null),
+  );
   let status: "error" | "loading" | "ready" = "ready";
   if (hosts.length > 0) status = "ready";
   else if (error) status = "error";
-  else if (
-    accounts.some(
-      (account, index) =>
-        account.loading ||
-        (account.signedIn !== null && lists[index] === undefined && errors[index] === null),
-    )
-  )
-    status = "loading";
+  else if (!settled) status = "loading";
   const retry = useCallback(() => {
     for (const [index, account] of accounts.entries()) {
       if (account.signedIn === null) void account.refresh();
@@ -212,7 +211,7 @@ export function useHostInventory() {
       }
     }
   }, [accounts, queryClient, refetches]);
-  return { hosts, daemons, status, error, retry, lastSyncedAtByOrigin };
+  return { hosts, daemons, status, settled, error, retry, lastSyncedAtByOrigin };
 }
 
 export function useAvailableHosts() {
