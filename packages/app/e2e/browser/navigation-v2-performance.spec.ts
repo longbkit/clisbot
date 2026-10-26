@@ -530,20 +530,27 @@ perfDescribe("Navigation V2 performance (synthetic 500 sessions / 500 chats)", (
     await openApp(page, seeded);
     await expect(page.getByTestId("home-mobile-tabs")).toBeVisible({ timeout: 60_000 });
     const panes = ["chats-pane", "work-pane", "home-controls", "more-screen"];
+    // Chats is reached from Home and from Workspace, so a slow arrival can be told apart from a
+    // slow departure (leaving Home's page).
     const order = [
       ["home-tab-chat", "chats-pane"],
       ["home-tab-work", "work-pane"],
+      ["home-tab-chat", "chats-pane"],
       ["home-tab-more", "more-screen"],
       ["home-tab-open-project", "home-controls"],
     ] as const;
     const switches: number[] = [];
     const byTarget: Record<string, number[]> = {};
+    const byTransition: Record<string, number[]> = {};
+    let from = "home-controls";
     let blank = 0;
     for (let i = 0; i < SWITCHES; i += 1) {
       const [press, target] = order[i % order.length]!;
       const result = await measureSwitch(page, press, target, panes);
       switches.push(result.ms);
       (byTarget[target] ??= []).push(Math.round(result.ms));
+      (byTransition[`${from}→${target}`] ??= []).push(Math.round(result.ms));
+      from = target;
       if (result.blank) console.log(`[perf] blank ${press}→${target}: ${result.frames.join(" ")}`);
       if (result.blank) blank += 1;
       await page.waitForTimeout(150);
@@ -555,6 +562,7 @@ perfDescribe("Navigation V2 performance (synthetic 500 sessions / 500 chats)", (
       maxMs: Math.round(Math.max(...switches)),
       blankFrames: blank,
       byTarget,
+      byTransition,
     };
     await testInfo.attach("navigation-v2-performance-phone", {
       body: JSON.stringify(report.phoneSwitch, null, 2),
