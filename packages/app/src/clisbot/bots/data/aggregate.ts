@@ -96,3 +96,43 @@ export function toAggregateLoadState<T>(
   if (state?.status === "loaded") return { status: "loaded", data: state.data };
   return { status: "loading" };
 }
+
+/** Each Host's rows from its last answer, kept while that Host reconnects or fails. */
+export type HeldHostRows<T> = ReadonlyMap<string, HostTagged<T>[]>;
+
+/**
+ * A list that has rows never drops back to loading for a background refresh, a reconnect or one
+ * Host failing: a Host that answered replaces its rows, every other Host still listed keeps the
+ * rows of its last answer. A Host that leaves the list takes its rows with it.
+ */
+export function holdAggregateRows<T>(
+  held: HeldHostRows<T>,
+  state: FetchAggregatedState<T> | undefined,
+  serverIds: readonly string[],
+): { held: HeldHostRows<T>; state: FetchAggregatedState<T> | undefined } {
+  const answered = new Set(state?.status === "loaded" ? state.acceptedServerIds : []);
+  const fresh = state?.status === "loaded" ? state.data : [];
+  const next = new Map<string, HostTagged<T>[]>();
+  const kept: HostTagged<T>[] = [];
+  for (const serverId of serverIds) {
+    if (answered.has(serverId)) {
+      next.set(
+        serverId,
+        fresh.filter((row) => row.serverId === serverId),
+      );
+      continue;
+    }
+    const rows = held.get(serverId);
+    if (!rows) continue;
+    next.set(serverId, rows);
+    kept.push(...rows);
+  }
+  if (state?.status === "loaded") {
+    return { held: next, state: kept.length ? { ...state, data: [...fresh, ...kept] } : state };
+  }
+  if (next.size === 0) return { held: next, state };
+  return {
+    held: next,
+    state: { status: "loaded", data: kept, hostErrors: [], acceptedServerIds: [] },
+  };
+}
