@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Image, ScrollView, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import {
@@ -13,8 +13,7 @@ import {
 } from "lucide-react-native";
 import type { InputQueueView } from "@clisbot/protocol/input-queue";
 import type { ComposerAttachment } from "@/attachments/types";
-import { useAttachmentPreviewUrl } from "@/attachments/use-attachment-preview-url";
-import { AttachmentLightbox, type ImageLightboxSource } from "@/components/attachment-lightbox";
+import type { ImageLightboxSource } from "@/components/attachment-lightbox";
 import { Button } from "@/components/ui/button";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import {
@@ -29,6 +28,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import { ICON_SIZE } from "@/styles/theme";
+import { QueueImages, type QueueImage } from "./queue-row-images";
 
 type HostQueueItem = InputQueueView["items"][number];
 
@@ -48,11 +48,6 @@ export interface QueueRowActions {
   remove(): void;
   sendLabel: string;
   pending: boolean;
-}
-
-interface QueueImage {
-  key: string;
-  source: ImageLightboxSource;
 }
 
 /** How many images and attachments a queued message carries. */
@@ -351,48 +346,6 @@ function QueueMoreMenu({
   );
 }
 
-const THUMB = 64;
-
-function QueueImages({ images }: { images: readonly QueueImage[] }) {
-  const [open, setOpen] = useState<ImageLightboxSource | null>(null);
-  const close = useCallback(() => setOpen(null), []);
-  return (
-    <>
-      <ScrollView horizontal contentContainerStyle={styles.images} testID="host-queue-images">
-        {images.map((image) => (
-          <QueueImageThumb key={image.key} source={image.source} onOpen={setOpen} />
-        ))}
-      </ScrollView>
-      <AttachmentLightbox source={open} onClose={close} />
-    </>
-  );
-}
-
-function QueueImageThumb({
-  source,
-  onOpen,
-}: {
-  source: ImageLightboxSource;
-  onOpen(source: ImageLightboxSource): void;
-}) {
-  const { t } = useTranslation();
-  const preview = useAttachmentPreviewUrl(source.type === "attachment" ? source.metadata : null);
-  const uri = source.type === "uri" ? source.uri : preview;
-  const open = useCallback(() => onOpen(source), [onOpen, source]);
-  const image = useMemo(() => (uri ? { uri } : null), [uri]);
-  return (
-    <PressHighlight
-      onPress={open}
-      accessibilityRole="imagebutton"
-      accessibilityLabel={t("composer.hostQueue.openImage")}
-      style={styles.thumb}
-      testID="host-queue-image"
-    >
-      {image ? <Image source={image} style={styles.thumbImage} resizeMode="cover" /> : null}
-    </PressHighlight>
-  );
-}
-
 function QueueIconAction({
   label,
   Icon,
@@ -497,18 +450,5 @@ const styles = StyleSheet.create((theme) => {
     },
     more: { borderRadius: theme.borderRadius.base },
     moreActive: { backgroundColor: theme.colors.surface2 },
-    images: {
-      gap: theme.spacing[2],
-      paddingLeft: theme.spacing[2],
-      paddingBottom: theme.spacing[2],
-    },
-    thumb: {
-      width: THUMB,
-      height: THUMB,
-      borderRadius: theme.borderRadius.md,
-      overflow: "hidden",
-      backgroundColor: theme.colors.surface2,
-    },
-    thumbImage: { width: THUMB, height: THUMB },
   };
 });
