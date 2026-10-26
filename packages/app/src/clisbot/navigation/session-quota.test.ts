@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { i18n } from "@/i18n/i18next";
 import type { UsageReportEntry } from "@/usage/types";
 import { chatSessionAgent } from "./opened-session";
-import { sessionQuotaLines } from "./session-quota";
+import { quotaSource, sessionQuotaLines } from "./session-quota";
 
 const now = Date.parse("2026-10-26T10:00:00Z");
 const at = (minutes: number) => new Date(now + minutes * 60_000).toISOString();
@@ -59,6 +59,39 @@ describe("sessionQuotaLines", () => {
     expect(
       sessionQuotaLines([unavailable, report([{ id: "monthly", label: "M" }])], "used", now, t),
     ).toEqual([]);
+  });
+});
+
+describe("quotaSource", () => {
+  const hour = { id: "five_hour", label: "Session", usedPct: 37, resetsAt: at(70) };
+
+  it("reads an available report as current, from when it was read", () => {
+    const source = quotaSource([
+      { ...report([hour, { id: "opus:weekly", label: "Opus", usedPct: 9 }]), successfulAt: at(-2) },
+    ]);
+    expect(source).toMatchObject({ current: true, goodAt: now - 2 * 60_000 });
+    // Scoped limits are not part of the quota.
+    expect(source?.windows.map((window) => window.id)).toEqual(["five_hour"]);
+  });
+
+  it("keeps a failed report's numbers through the daemon's last good read, not current", () => {
+    const failed = {
+      ...report([]),
+      report: { status: "error", error: "429" },
+      lastSuccessful: {
+        fetchedAt: at(-8),
+        report: { status: "available", windows: [hour] },
+      },
+    } as UsageReportEntry;
+    expect(quotaSource([failed])).toMatchObject({ current: false, goodAt: now - 8 * 60_000 });
+    expect(sessionQuotaLines([failed], "used", now, i18n.getFixedT("en"))).toMatchObject([
+      { kind: "hour", percent: "37%" },
+    ]);
+  });
+
+  it("has nothing when a failed report never had good numbers", () => {
+    const failed = { ...report([]), report: { status: "error", error: "429" } } as UsageReportEntry;
+    expect(quotaSource([failed])).toBeNull();
   });
 });
 

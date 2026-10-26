@@ -388,7 +388,7 @@ test.describe("Navigation V2 Home pin tags", () => {
 });
 
 /** One account report for every agent: a 5-hour window resetting in 70 min, a weekly in 26 h. */
-function sessionQuotaReports(): UsageReportEntry[] {
+function sessionQuotaReports(hourUsedPct = 31): UsageReportEntry[] {
   const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
   return [
     {
@@ -400,7 +400,7 @@ function sessionQuotaReports(): UsageReportEntry[] {
       report: {
         status: "available",
         windows: [
-          { id: "five_hour", label: "Session", usedPct: 31, resetsAt: inMinutes(70) },
+          { id: "five_hour", label: "Session", usedPct: hourUsedPct, resetsAt: inMinutes(70) },
           { id: "weekly", label: "Weekly", usedPct: 54, resetsAt: inMinutes(26 * 60) },
         ],
       },
@@ -445,6 +445,56 @@ test.describe("Navigation V2 session quota", () => {
       });
       await expect(usage.getByTestId("session-quota-week")).toHaveText("54% 1d");
       await shot(page, "session-quota-more");
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+});
+
+test.describe("Navigation V2 session quota refresh", () => {
+  test.use({ navigationV2: true });
+
+  test("the rail's quota follows the daemon on its own, and says when it could not refresh", async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    let hourUsedPct = 31;
+    let failing = false;
+    const usage = await installUsageReportsFixture(page, {
+      lists: [() => (failing ? { error: "usage unavailable" } : sessionQuotaReports(hourUsedPct))],
+    });
+    await page.clock.install({ time: Date.now() });
+    const workspace = await seedWorkspace({ repoPrefix: "nav-v2-quota-refresh-" });
+    try {
+      const agent = await createMockIdleAgent(workspace.client, {
+        cwd: workspace.workspaceDirectory,
+        workspaceId: workspace.workspaceId,
+        title: "Quota refresh session",
+      });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(buildAgentRoute(workspace.workspaceId, agent.id));
+      const hour = page.getByTestId("navigation-rail-usage").getByTestId("session-quota-hour");
+      await expect(hour).toHaveText("31% 1h", { timeout: 60_000 });
+
+      // No session switch: the next poll brings the new number.
+      hourUsedPct = 36;
+      await page.clock.fastForward("02:05");
+      await expect(hour).toHaveText("36% 1h");
+      expect(usage.listRequests().some((request) => request.forceRefresh)).toBe(false);
+
+      // Reads fail: the number stays, and is marked once it is older than a cache lifetime.
+      failing = true;
+      await page.clock.fastForward("02:05");
+      await expect(hour).toHaveText("36% 1h");
+      await page.clock.fastForward("06:00");
+      // The reset keeps counting down on the faked clock; only the percent is under test.
+      await expect(hour).toHaveText(/^~36% /);
+      await shot(page, "session-quota-rail-stale");
+
+      failing = false;
+      hourUsedPct = 40;
+      await page.clock.fastForward("11:00");
+      await expect(hour).toHaveText(/^40% /);
     } finally {
       await workspace.cleanup();
     }

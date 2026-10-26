@@ -101,6 +101,7 @@ const en = {
     week: "Weekly {{percent}} {{state}}, resets in {{reset}}",
     used: "used",
     left: "left",
+    stale: "could not be refreshed, may be out of date",
   },
   hostFilter: {
     all: "All Hosts",
@@ -211,6 +212,7 @@ const vi: typeof en = {
     week: "Tuần {{percent}} {{state}}, đặt lại sau {{reset}}",
     used: "đã dùng",
     left: "còn lại",
+    stale: "chưa làm mới được, có thể đã cũ",
   },
   hostFilter: {
     all: "Tất cả máy chủ",

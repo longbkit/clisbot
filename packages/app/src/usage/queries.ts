@@ -176,11 +176,24 @@ export function useUsageHostReports(serverId: string | null): UsageReportEntry[]
   return query.data ?? NO_REPORTS;
 }
 
+/** How often an agent's usage is read again; a function decides from what the query holds. */
+export type AgentUsagePoll =
+  | number
+  | false
+  | ((query: {
+      state: { data: UsageReportEntry[] | undefined; error: Error | null };
+    }) => number | false);
+
 /**
- * The reports of the account an agent runs under, as its meter's tooltip or sheet shows them.
- * Fetched while either is mounted, so only while it is open.
+ * The query behind an agent's usage. Every consumer of one agent shares its key, so the rail, a
+ * details sheet and a popover share one request. `refetchInterval` is the one option a consumer
+ * may add: the rail polls, the sheets read once per open.
  */
-export function useAgentUsage(serverId: string, agentId: string): AgentUsageView {
+export function useAgentUsageQuery(
+  serverId: string,
+  agentId: string,
+  options: { refetchInterval?: AgentUsagePoll } = {},
+) {
   const queryClient = useQueryClient();
   const canReport = useHostReportsUsage(serverId);
   const queryKey = agentUsageQueryKey(serverId, agentId);
@@ -200,7 +213,17 @@ export function useAgentUsage(serverId: string, agentId: string): AgentUsageView
     // fetches again; retrying would hold the loading sentence for seconds instead.
     retry: false,
     staleTimeMs: REPORTS_STALE_TIME_MS,
+    refetchInterval: options.refetchInterval,
   });
+  return { canReport, query };
+}
+
+/**
+ * The reports of the account an agent runs under, as its meter's tooltip or sheet shows them.
+ * Fetched while either is mounted, so only while it is open.
+ */
+export function useAgentUsage(serverId: string, agentId: string): AgentUsageView {
+  const { canReport, query } = useAgentUsageQuery(serverId, agentId);
   const { t } = useTranslation();
   return resolveAgentUsageView({ canReport, query: toQueryState(query) }, t);
 }

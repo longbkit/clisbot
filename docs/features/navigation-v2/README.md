@@ -137,6 +137,15 @@ model's weekly) are left out; a session whose Host cannot report usage shows Usa
 shows the most recently opened session's quota in More's Usage row; that session's ids are stored
 so it survives a restart (`opened-session.ts`, `session-quota.tsx`).
 
+The quota stays current without hammering the providers (`usage/refresh-policy.ts`,
+`usage/live-agent-usage.ts`): it polls every 2 minutes while the app is visible, rereads when the
+window comes back and when the session's turn ends, and never forces a provider call (the
+daemon's five-minute cache answers; [why][quota-cadence]). When reads fail it keeps the last
+numbers and backs off; once they are older than five minutes with the latest read failed, the
+lines are dimmed and the percent gets a `~` prefix.
+
+[quota-cadence]: ../../audits/2026-10-27-session-quota-refresh-cadence.md
+
 ## For me / Others / All
 
 `resolveOwnership({ createdBy, accounts, watched })` returns `mine` or `others`:
