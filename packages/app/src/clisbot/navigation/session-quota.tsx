@@ -12,6 +12,7 @@ import { UsageMeter } from "@/usage/meter";
 import { windowTone } from "@/usage/tone";
 import { useRelativeTimeTick } from "@/usage/use-relative-time-tick";
 import type { OpenedSession } from "./opened-session";
+import { RAIL_MICRO_TEXT } from "./rail-text";
 
 export interface QuotaLine {
   kind: "hour" | "week";
@@ -101,12 +102,20 @@ export function SessionQuota({
       testID="session-quota"
     >
       {lines.map((entry) => (
-        <View key={entry.kind} style={styles.entry}>
-          <Text style={styles.line} numberOfLines={1} testID={`session-quota-${entry.kind}`}>
+        <View key={entry.kind} style={layout === "rail" ? styles.entryRail : styles.entry}>
+          <Text
+            style={layout === "rail" ? styles.lineRail : styles.line}
+            numberOfLines={1}
+            testID={`session-quota-${entry.kind}`}
+          >
             <Text style={styles.percent}>{entry.percent}</Text>
             {entry.reset ? <Text style={styles.reset}>{` ${entry.reset}`}</Text> : null}
           </Text>
-          <UsageMeter percent={entry.value} tone={entry.tone} style={styles.meter} />
+          <UsageMeter
+            percent={entry.value}
+            tone={entry.tone}
+            style={layout === "rail" ? styles.meterRail : styles.meter}
+          />
         </View>
       ))}
     </View>
@@ -115,15 +124,20 @@ export function SessionQuota({
 
 const NO_REPORTS: readonly UsageReportEntry[] = [];
 
-// Two dense lines: the percent carries the weight, the reset recedes, and a 2px meter in the
-// window's tone says how full it is at a glance.
+// Two dense lines: the percent carries the weight, the reset recedes, and a thin meter in the
+// window's tone says how full it is at a glance. On the rail they use its micro text
+// (`RAIL_MICRO_TEXT`), smaller than the item label above them.
 const QUOTA_LINE_HEIGHT = 14;
 const METER_WIDTH = 40;
+const RAIL_METER_WIDTH = 30;
 
 const styles = StyleSheet.create((theme) => ({
-  rail: { alignItems: "center", gap: theme.spacing[1], marginTop: theme.spacing[0.5] },
+  rail: { alignItems: "center", gap: 3, marginTop: 2 },
   row: { alignItems: "flex-end", gap: theme.spacing[1] },
   entry: { alignItems: "stretch", gap: 2, width: METER_WIDTH + theme.spacing[2] },
+  entryRail: { alignItems: "center", gap: 1 },
+  lineRail: { textAlign: "center", ...RAIL_MICRO_TEXT, fontVariant: ["tabular-nums"] },
+  meterRail: { height: 2, borderRadius: 1, width: RAIL_METER_WIDTH },
   line: {
     textAlign: "center",
     fontSize: theme.fontSize.sm,

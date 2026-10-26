@@ -48,6 +48,7 @@ import { useHostsStatus } from "./hosts-status";
 import { useHostFilter } from "./host-filter";
 import { useCurrentSession } from "./opened-session";
 import { SessionQuota } from "./session-quota";
+import { RAIL_MICRO_TEXT } from "./rail-text";
 import { hostFilterLabel } from "./host-filter-chip";
 import type {
   BuiltinSection,
@@ -237,7 +238,7 @@ function RailHostFilterTag() {
           <Text style={styles.hostTagLabel} numberOfLines={1}>
             {name}
           </Text>
-          <ThemedIcon Icon={X} uniProps={mutedColor} size={ICON_SIZE.xs} />
+          <ThemedIcon Icon={X} uniProps={mutedColor} size={10} />
         </PressHighlight>
       </TooltipTrigger>
       <TooltipContent side="right" align="center" offset={6}>
@@ -462,22 +463,20 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "center",
-    gap: 2,
+    gap: 1,
     maxWidth: RAIL_WIDTH - theme.spacing[2],
-    paddingHorizontal: theme.spacing[1],
-    marginTop: -theme.spacing[1],
+    paddingHorizontal: theme.spacing[0.5],
+    marginTop: -theme.spacing[1.5],
     borderRadius: theme.borderRadius.sm,
   },
   hostTagLabel: {
     flexShrink: 1,
     minWidth: 0,
-    color: theme.colors.foreground,
-    fontSize: 11,
-    lineHeight: 13,
+    color: theme.colors.foregroundMuted,
+    ...RAIL_MICRO_TEXT,
   },
   hostCount: {
-    fontSize: 10,
-    lineHeight: 12,
+    ...RAIL_MICRO_TEXT,
     fontWeight: theme.fontWeight.medium,
     fontVariant: ["tabular-nums"],
   },
