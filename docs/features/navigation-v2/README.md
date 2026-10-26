@@ -95,26 +95,26 @@ The primary navigation says where you are; each section owns its header, filters
 
 ## Old controls → new home (3.1a)
 
-| Before                                   | Desktop                                                                                      | Phone                                              |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Sidebar Home row                         | Rail Home                                                                                    | Home tab                                           |
-| New workspace row, footer `+` New        | Workspace header `+` (the `/new` shortcut stays)                                             | Workspace header `+`                               |
-| Add project row / footer icon            | Workspace `+` → Add project (shortcut stays)                                                 | same                                               |
-| Import session (footer, Inbox header)    | Workspace `+` → Import session; Home status line                                             | same                                               |
-| New bot, New group                       | Chats header ✎                                                                               | Chats header ✎                                     |
-| Inbox row and tab                        | Home (feed, 🔍 opens the full history)                                                       | Home tab                                           |
-| Search row / footer search, ⌘K           | 🔍 in each section header; ⌘K                                                                | 🔍 in each tab header                              |
-| Automations row and tab                  | Rail Schedules / Lịch                                                                        | Lịch tab                                           |
-| Connectors row                           | Rail Connectors                                                                              | More → Connectors                                  |
-| Plugin header/footer rows                | Rail entries; a plugin's own row opens from it                                               | More rows                                          |
-| Pinned section                           | Pinned rows on top of Chats/Workspace; Home pin tags                                         | same                                               |
-| Bots, Group chats sections               | Chats list                                                                                   | Chats tab                                          |
-| Projects section, display menu, view bar | Workspace list and its filter rows                                                           | Workspace tab                                      |
-| Usage (opt-in)                           | Rail bottom while the Usage icon is on; the open session's quota under it                    | More → Usage, with the last opened session's quota |
-| Hosts + dot (Host picker)                | Rail bottom Hosts, same picker, status dot, online / total; the filtered Host's tag above it | More → Hosts with the same; dot on More tab        |
-| Help menu                                | Rail bottom Help                                                                             | More → Help                                        |
-| Settings                                 | Rail bottom, last                                                                            | More → Settings / Cài đặt                          |
-| Account / Hub top row                    | Settings → Hub                                                                               | Settings                                           |
+| Before                                   | Desktop                                                                        | Phone                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------- |
+| Sidebar Home row                         | Rail Home                                                                      | Home tab                                           |
+| New workspace row, footer `+` New        | Workspace header `+` (the `/new` shortcut stays)                               | Workspace header `+`                               |
+| Add project row / footer icon            | Workspace `+` → Add project (shortcut stays)                                   | same                                               |
+| Import session (footer, Inbox header)    | Workspace `+` → Import session; Home status line                               | same                                               |
+| New bot, New group                       | Chats header ✎                                                                 | Chats header ✎                                     |
+| Inbox row and tab                        | Home (feed, 🔍 opens the full history)                                         | Home tab                                           |
+| Search row / footer search, ⌘K           | 🔍 in each section header; ⌘K                                                  | 🔍 in each tab header                              |
+| Automations row and tab                  | Rail Schedules / Lịch                                                          | Lịch tab                                           |
+| Connectors row                           | Rail Connectors                                                                | More → Connectors                                  |
+| Plugin header/footer rows                | Rail entries; a plugin's own row opens from it                                 | More rows                                          |
+| Pinned section                           | Pinned rows on top of Chats/Workspace; Home pin tags                           | same                                               |
+| Bots, Group chats sections               | Chats list                                                                     | Chats tab                                          |
+| Projects section, display menu, view bar | Workspace list and its filter rows                                             | Workspace tab                                      |
+| Usage (opt-in)                           | Rail bottom while the Usage icon is on; the open session's quota under it      | More → Usage, with the last opened session's quota |
+| Hosts + dot (Host picker)                | Rail bottom Hosts, same picker, online count; the filtered Host's tag under it | More → Hosts with online / total; dot on More tab  |
+| Help menu                                | Rail bottom Help                                                               | More → Help                                        |
+| Settings                                 | Rail bottom, last                                                              | More → Settings / Cài đặt                          |
+| Account / Hub top row                    | Settings → Hub                                                                 | Settings                                           |
 
 ## Host filter
 
@@ -123,7 +123,7 @@ One Host filter for every list (Owner, 2026-10-26): it is the sidebar's saved `h
 applies everywhere. It is set from the rail's Hosts picker, from Home's Host chip (first in Home's
 controls: a Host is the widest thing a reader chooses), and from Chats' and Workspace's Display
 menus. While it filters, its tag sits on the rail above Hosts (✕ clears it) and Home's chip shows
-it with ✕; Hosts on the rail and in More show online / total. It survives restarts and drops a
+it with ✕. The rail's Hosts shows how many are online (its tooltip and More give online / total). It survives restarts and drops a
 Host only once the Host list has settled ([sidebar agent sessions](../sidebar-agent-sessions/README.md)).
 Store version 3 drops Chats' former Host filter (`chatsHosts`); Home's was never stored.
 

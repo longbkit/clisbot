@@ -173,7 +173,8 @@ function RailHosts({ section }: { section: BuiltinSection }) {
   const status = useHostsStatus();
   const filter = useHostFilter();
   const { t } = useTranslation();
-  const counts = `${filter.online}/${filter.total}`;
+  // Only how many are online; the tooltip and the Hosts picker give the total.
+  const counts = String(filter.online);
   const countsLabel = t("navigation.hostFilter.online", {
     online: filter.online,
     total: filter.total,
