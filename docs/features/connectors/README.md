@@ -222,7 +222,8 @@ The **Tools** tab also chooses what a Project's sessions get of the daemon's own
 agents, permissions, workspaces, terminals, schedules, providers) with a switch and a list of every
 tool, named by what it does. Host follows the Host's **Inject Clisbot tools**
 (`daemon.mcp.injectIntoAgents`); On and Off win over the Host, so one Project can have them while
-the Host's default is off. The Browser group also has the Host's **Browser tools** default
+the Host's default is off. Disabling the MCP endpoint itself (`daemon.mcp.enabled`) still withholds
+the server from every session, including Projects set to On. The Browser group also has the Host's **Browser tools** default
 (`daemon.browserTools.enabled`): its switch stores `browserTools` only while it differs from the
 Host, and switching it back to the Host's value follows the Host again.
 

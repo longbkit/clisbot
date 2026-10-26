@@ -21,7 +21,8 @@ import {
   parseListenString,
   type ClisbotDaemonConfig,
 } from "./bootstrap.js";
-import type { ProviderSnapshotEntry } from "./agent/agent-sdk-types.js";
+import type { AgentSessionConfig, ProviderSnapshotEntry } from "./agent/agent-sdk-types.js";
+import { ConnectorStore } from "./connectors/connector-store.js";
 import { loadConfig } from "./config.js";
 import {
   FileBackedProjectRegistry,
@@ -92,6 +93,139 @@ async function callAgentMcpAuthorityTool(
     await client.close();
   }
 }
+
+async function seedMcpInjectionProjects(home: string): Promise<void> {
+  const logger = pino({ level: "silent" });
+  const projects = new FileBackedProjectRegistry(path.join(home, "projects/projects.json"), logger);
+  const workspaces = new FileBackedWorkspaceRegistry(
+    path.join(home, "projects/workspaces.json"),
+    logger,
+  );
+  const grants = new ConnectorStore(path.join(home, "connectors"));
+  const timestamp = "2026-10-26T00:00:00.000Z";
+  for (const [name, enabled] of [
+    ["on", true],
+    ["off", false],
+    ["inherit", undefined],
+  ] as const) {
+    const cwd = path.join(home, `mcp-${name}`);
+    await mkdir(cwd, { recursive: true });
+    await projects.upsert(
+      createPersistedProjectRecord({
+        projectId: `prj_mcp_${name}`,
+        rootPath: cwd,
+        kind: "non_git",
+        displayName: name,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
+    await workspaces.upsert(
+      createPersistedWorkspaceRecord({
+        workspaceId: `wks_mcp_${name}`,
+        projectId: `prj_mcp_${name}`,
+        cwd,
+        kind: "directory",
+        displayName: name,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
+    if (enabled !== undefined)
+      await grants.setProjectGrant(`prj_mcp_${name}`, { agentTools: { enabled } });
+  }
+}
+
+async function startMcpInjectionDaemon(mcpEnabled: boolean) {
+  const launched: AgentSessionConfig[] = [];
+  const handle = await createTestClisbotDaemon({
+    agentClients: createTestAgentClients({
+      supportsMcpServers: true,
+      beforeCreateSession: async (config) => {
+        launched.push(config);
+      },
+    }),
+    createDaemon: async (config, logger, deps) => {
+      await seedMcpInjectionProjects(config.clisbotHome);
+      return createClisbotDaemon(
+        {
+          ...config,
+          mcpEnabled,
+          mcpInjectIntoAgents: false,
+          browserToolsEnabled: true,
+          connectors: { enabled: true, composioApiUrl: "http://127.0.0.1:9" },
+        },
+        logger,
+        deps,
+      );
+    },
+  });
+  return { ...handle, launched };
+}
+
+test("Project MCP injection survives a disabled Host default and live policy changes", async () => {
+  const handle = await startMcpInjectionDaemon(true);
+  const client = new DaemonClient({ url: `ws://127.0.0.1:${handle.port}/ws`, appVersion: "2.1.8" });
+  const create = async (name: "on" | "off" | "inherit") => {
+    await handle.daemon.agentManager.createAgent(
+      { provider: "codex", cwd: path.join(handle.clisbotHome, `mcp-${name}`) },
+      undefined,
+      { workspaceId: `wks_mcp_${name}` },
+    );
+    return handle.launched.at(-1)?.mcpServers ?? {};
+  };
+  try {
+    await client.connect();
+    expect(await create("on")).toHaveProperty("clisbot");
+    expect(await create("inherit")).not.toHaveProperty("clisbot");
+    await client.patchDaemonConfig({ mcp: { injectIntoAgents: true } });
+    expect(await create("inherit")).toHaveProperty("clisbot");
+    expect(await create("off")).not.toHaveProperty("clisbot");
+    await client.patchDaemonConfig({ mcp: { injectIntoAgents: false } });
+    expect(await create("on")).toHaveProperty("clisbot");
+    expect(await create("inherit")).not.toHaveProperty("clisbot");
+    expect(await create("off")).not.toHaveProperty("clisbot");
+    const servers = await create("on");
+    expect(servers).toHaveProperty("clisbot");
+    const mcp = new AgentMcpTestClient({ name: "project-browser-injection", version: "1" });
+    try {
+      const server = servers.clisbot;
+      if (server.type !== "http") throw new Error("Expected injected HTTP MCP server");
+      await mcp.connect(
+        new StreamableHTTPClientTransport(new URL(server.url), {
+          requestInit: { headers: server.headers },
+        }),
+      );
+      expect((await mcp.listTools()).tools.map((tool) => tool.name)).toContain("browser_new_tab");
+    } finally {
+      await mcp.close();
+    }
+  } finally {
+    await client.close();
+    await handle.close();
+  }
+});
+
+test("a disabled MCP endpoint withholds injection even when a Project opts in", async () => {
+  const handle = await startMcpInjectionDaemon(false);
+  const client = new DaemonClient({ url: `ws://127.0.0.1:${handle.port}/ws`, appVersion: "2.1.8" });
+  try {
+    await client.connect();
+    await client.patchDaemonConfig({ mcp: { injectIntoAgents: true } });
+    await handle.daemon.agentManager.createAgent(
+      { provider: "codex", cwd: path.join(handle.clisbotHome, "mcp-on") },
+      undefined,
+      { workspaceId: "wks_mcp_on" },
+    );
+    expect(handle.launched.at(-1)?.mcpServers ?? {}).not.toHaveProperty("clisbot");
+    expect(
+      (await fetch(`http://127.0.0.1:${handle.port}/mcp/agents`, { method: "POST" })).status,
+    ).toBe(404);
+  } finally {
+    await client.close();
+    await handle.close();
+  }
+});
 
 describe("clisbot daemon bootstrap", () => {
   afterEach(() => {

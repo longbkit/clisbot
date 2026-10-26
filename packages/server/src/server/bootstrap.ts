@@ -2066,20 +2066,20 @@ export async function createClisbotDaemon(
           const logAndResolve = async () => {
             boundListenTarget = resolveBoundListenTarget(listenTarget, httpServer);
             const mcpBaseUrl = createAgentMcpBaseUrl(boundListenTarget);
-            agentMcpBaseUrl =
-              !mcpEnabled || config.mcpInjectIntoAgents === false ? null : mcpBaseUrl;
+            // Keep the endpoint available for Projects that opt in over the Host default.
+            // AgentManager's launch policy decides which sessions receive it.
+            agentMcpBaseUrl = mcpEnabled ? mcpBaseUrl : null;
             agentManager.setMcpBaseUrl(agentMcpBaseUrl);
             connectors.setListenUrl(mcpBaseUrl);
             agentManager.setClisbotToolsEnabled(mcpEnabled && config.mcpInjectIntoAgents !== false);
             daemonConfigStore.onFieldChange("mcp.enabled", (value) => {
               mcpEnabled = value !== false;
               const inject = daemonConfigStore.get().mcp.injectIntoAgents !== false;
-              agentManager.setMcpBaseUrl(mcpEnabled && inject ? mcpBaseUrl : null);
+              agentManager.setMcpBaseUrl(mcpEnabled ? mcpBaseUrl : null);
               agentManager.setClisbotToolsEnabled(mcpEnabled && inject);
               setAgentProviderToolsEnabled(mcpEnabled && inject);
             });
             daemonConfigStore.onFieldChange("mcp.injectIntoAgents", (value) => {
-              agentManager.setMcpBaseUrl(mcpEnabled && value ? mcpBaseUrl : null);
               agentManager.setClisbotToolsEnabled(mcpEnabled && value !== false);
               setAgentProviderToolsEnabled(mcpEnabled && value !== false);
             });
