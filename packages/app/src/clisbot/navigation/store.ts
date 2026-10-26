@@ -16,7 +16,7 @@ const PersistedSchema = z.object({
   homeMode: z.enum(["chat", "work", "hybrid"]),
   scopes: z.object({ home: ScopeSchema, chats: ScopeSchema, work: ScopeSchema }),
   lastList: z.enum(["chats", "work"]),
-  showBotProjectsInWork: z.boolean().optional(),
+  workShowBots: z.boolean().optional(),
   chatsSort: z.enum(["recent", "name"]).optional(),
   chatsSplit: z.boolean().optional(),
   chatsHosts: z.array(z.string()).optional(),
@@ -38,9 +38,12 @@ interface NavigationState {
   toggleChatsSplit: () => void;
   toggleChatsHost: (serverId: string) => void;
   clearChatsHosts: () => void;
-  /** Bot home projects are Chats; Work lists them only when the reader opts in (brief C4). */
-  showBotProjectsInWork: boolean;
-  toggleBotProjectsInWork: () => void;
+  /**
+   * The Workspace list's Bots chip: Bot-labelled sessions (and so Bot home projects) are listed by
+   * default; off hides them from the list, its counts and its scope tabs in one tap.
+   */
+  workShowBots: boolean;
+  toggleWorkShowBots: () => void;
   /** Home shows other members' pins only after the reader asks (brief C8). */
   showOthersPins: boolean;
   /** Home's 🔍 swaps the feed for Inbox's full history and search. */
@@ -76,7 +79,7 @@ export const useNavigationStore = create<NavigationState>()(
       chatsChip: "all",
       workChip: "all",
       showOthersPins: false,
-      showBotProjectsInWork: false,
+      workShowBots: true,
       chatsSort: "recent",
       chatsSplit: false,
       chatsHosts: [],
@@ -85,8 +88,7 @@ export const useNavigationStore = create<NavigationState>()(
       toggleChatsHost: (serverId) =>
         set((state) => ({ chatsHosts: toggled(state.chatsHosts, serverId) })),
       clearChatsHosts: () => set({ chatsHosts: [] }),
-      toggleBotProjectsInWork: () =>
-        set((state) => ({ showBotProjectsInWork: !state.showBotProjectsInWork })),
+      toggleWorkShowBots: () => set((state) => ({ workShowBots: !state.workShowBots })),
       homeSearchOpen: false,
       homeHosts: [],
       seenIssuesOpen: false,
@@ -106,12 +108,22 @@ export const useNavigationStore = create<NavigationState>()(
     }),
     {
       name: "clisbot-navigation-preferences",
+      // v1: the Display menu's "Bot projects" switch (off by default) became the Bots chip (on by
+      // default) — Bot sessions now show in the list, so the old choice is not carried over.
+      version: 1,
+      migrate: (persisted) => {
+        const { showBotProjectsInWork: _dropped, ...rest } = (persisted ?? {}) as Record<
+          string,
+          unknown
+        >;
+        return { ...rest, workShowBots: true } as unknown as NavigationState;
+      },
       storage: createValidatedPersistStorage(AsyncStorage, PersistedSchema),
       partialize: (state) => ({
         homeMode: state.homeMode,
         scopes: state.scopes,
         lastList: state.lastList,
-        showBotProjectsInWork: state.showBotProjectsInWork,
+        workShowBots: state.workShowBots,
         chatsSort: state.chatsSort,
         chatsSplit: state.chatsSplit,
         chatsHosts: state.chatsHosts,

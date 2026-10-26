@@ -13,6 +13,7 @@ import {
   STATUS_BUCKET_ORDER,
   type StatusBucket,
 } from "@/hooks/sidebar-status-view-model";
+import type { WorkspaceSessionFilter } from "./session-filter";
 import {
   listWorkspaceRootAgents,
   selectWorkspaceSessions,
@@ -66,6 +67,8 @@ export function sessionDisplayGroups(input: {
   activeOnly: boolean;
   /** Sessions a pane shows, kept by Active sessions only. */
   keepAgentIds?: ReadonlySet<string>;
+  /** The list owner's session rule (Navigation V2's Workspace scope); absent lists all. */
+  sessionFilter?: WorkspaceSessionFilter | null;
   byStatus: boolean;
   t: TFunction;
 }): StatusDisplayGroup[] {
@@ -101,6 +104,7 @@ function rankWorkspace(input: {
   sources: ReadonlyMap<string, WorkspaceSessionSource>;
   activeOnly: boolean;
   keepAgentIds?: ReadonlySet<string>;
+  sessionFilter?: WorkspaceSessionFilter | null;
   order: () => number;
 }): RankedItem[] {
   const { workspace } = input;
@@ -115,6 +119,9 @@ function rankWorkspace(input: {
     workspaceId: workspace.workspaceId,
     activeOnly: input.activeOnly,
     keepAgentIds: input.keepAgentIds,
+    include: input.sessionFilter
+      ? (session) => input.sessionFilter!(session, workspace)
+      : undefined,
   });
   return sessions.map((session) => ({
     item: {

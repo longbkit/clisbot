@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Locator, Page } from "@playwright/test";
-import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { expect, test as base } from "../support/fixtures";
 import { buildSeededHost } from "../support/helpers/daemon-registry";
 import {
@@ -9,6 +8,7 @@ import {
   type IsolatedHostDaemon,
 } from "../support/helpers/isolated-host-daemon";
 import { gotoAppShell } from "../support/helpers/app";
+import { HUB_TEAMMATE, signInToE2EHub } from "../support/helpers/hub-reader";
 import { connectSeedClient, type SeedDaemonClient } from "../support/helpers/seed-client";
 import { getServerId } from "../support/helpers/server-id";
 import { createTempDirectory, createTempGitRepo } from "../support/helpers/workspace";
@@ -21,20 +21,11 @@ import { createTempDirectory, createTempGitRepo } from "../support/helpers/works
 base.use({ navigationV2: true });
 
 const SANDBOX = "sandbox-12";
-const HUB = "https://hub.e2e.test";
-const ME = { accountId: "account-me", memberId: "member-me" };
 const SCREENSHOTS = process.env.GS_SCREENSHOTS === "1";
 const ARTIFACTS = path.resolve(__dirname, "../../../../artifacts/global-search");
 
 /** A teammate on the same Hub: their workspace is "Others" for the reader. */
-const TEAMMATE: SessionActor = {
-  kind: "user",
-  id: "account-teammate",
-  displayName: "Teammate",
-  hubOrigin: HUB,
-  organizationId: "org-e2e",
-  memberId: "member-teammate",
-};
+const TEAMMATE = HUB_TEAMMATE;
 
 interface Fleet {
   sandbox: { serverId: string; label: string; port: number };
@@ -128,71 +119,11 @@ const test = base.extend<{ fleet: Fleet }>({
 });
 
 /**
- * A signed-in Hub account, at the network boundary: the reader is `ME`, so the teammate's
- * workspace resolves to Others by the production ownership rule.
- */
-async function signInToHub(page: Page): Promise<void> {
-  await page.addInitScript((origin) => {
-    localStorage.setItem(
-      "clisbot:device-hub-profiles:v1",
-      JSON.stringify({
-        profiles: [
-          {
-            authentication: "oauth",
-            hubId: origin,
-            origin,
-            label: "E2E Hub",
-            entry: "account",
-            setupStatus: "ready",
-          },
-        ],
-        activeId: origin,
-      }),
-    );
-  }, HUB);
-  const state = {
-    status: "active",
-    account: { id: ME.accountId, name: "Long", email: "long@e2e.test", image: null },
-    memberships: [
-      {
-        id: "org-e2e",
-        name: "E2E Org",
-        slug: "e2e",
-        membershipId: ME.memberId,
-        role: "member",
-      },
-    ],
-    organization: { id: "org-e2e", name: "E2E Org", slug: "e2e" },
-    membership: { id: ME.memberId, role: "member" },
-    capabilities: { view: true, manageMembers: false, manageOwners: false, manageResources: false },
-    isInstanceOperator: false,
-    team: { members: [] },
-    canCreateOrganization: false,
-  };
-  await page.route(`${HUB}/**`, async (route) => {
-    const headers = {
-      "access-control-allow-origin": "*",
-      "access-control-allow-headers": "*",
-      "content-type": "application/json",
-    };
-    if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers });
-    const { pathname } = new URL(route.request().url());
-    if (pathname === "/api/auth/clisbot/state") {
-      return route.fulfill({ status: 200, headers, body: JSON.stringify(state) });
-    }
-    if (pathname.endsWith("/daemons")) {
-      return route.fulfill({ status: 200, headers, body: JSON.stringify({ daemons: [] }) });
-    }
-    return route.fulfill({ status: 404, headers, body: JSON.stringify({ error: "not_found" }) });
-  });
-}
-
-/**
  * The sandbox goes in the harness's extra-Hosts list, which the seed merges on every navigation,
  * so it survives the reloads a language switch needs.
  */
 async function openFleet(page: Page, fleet: Fleet, options: { hub?: boolean } = {}) {
-  if (options.hub) await signInToHub(page);
+  if (options.hub) await signInToE2EHub(page);
   await gotoAppShell(page);
   const sandbox = buildSeededHost({
     serverId: fleet.sandbox.serverId,

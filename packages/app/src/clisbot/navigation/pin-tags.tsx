@@ -44,7 +44,9 @@ function useRowOwnership() {
       }
       if (row.kind === "workspace" || row.kind === "session")
         return resolveOwnership({
-          createdBy: workspaceAuthor(row.workspace.serverId, row.workspace.workspaceId),
+          createdBy:
+            (row.kind === "session" ? row.session.agent.createdBy : undefined) ??
+            workspaceAuthor(row.workspace.serverId, row.workspace.workspaceId),
           accounts,
         });
       return "mine";

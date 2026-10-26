@@ -5,7 +5,7 @@ import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useCallback, useMemo, type ReactNode } from "react";
-import { PinMark } from "@/components/ui/pin-mark";
+import { PinnedRowProvider } from "@/components/ui/pin-mark";
 
 import { usePathname, useRouter } from "expo-router";
 import { StyleSheet } from "react-native-unistyles";
@@ -15,6 +15,8 @@ import { BotRow } from "./bots-section";
 import { ChatRow } from "./chats-section";
 import { useSidebarPinMenu } from "./use-section-actions";
 import { usePinnedRows, type PinRow } from "./use-pinned-rows";
+import { useOptionalSidebarModel } from "@/components/sidebar/sidebar-model";
+import type { WorkFilter } from "@/clisbot/navigation/work-items";
 import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 
 export function FusionPinnedSection({
@@ -29,15 +31,26 @@ export function FusionPinnedSection({
 }) {
   const pinned = usePinnedRows(onBeforeNavigate);
   const { error, chats, openBot: openPinnedBot, toggle } = pinned;
-  const rows = useMemo(
-    () => (float ? pinned.rows.filter(isWorkPin) : pinned.rows),
-    [float, pinned.rows],
-  );
+  const model = useOptionalSidebarModel();
+  const workList = model?.workList ?? null;
+  const visibleProjects = model?.projects;
+  const rows = useMemo(() => {
+    if (!float) return pinned.rows;
+    // The scope comes first: a pin floats a row the Workspace list already admits, never another
+    // member's row into For me.
+    const admitted = (row: PinRow) =>
+      !workList || admitsPin(row, workList.filter, visibleProjects ?? []);
+    return pinned.rows.filter((row) => isWorkPin(row) && admitted(row));
+  }, [float, pinned.rows, workList, visibleProjects]);
   const menu = useSidebarPinMenu(onBeforeNavigate, chats);
   const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
-  const { visibleItems, expanded, canToggle, toggleExpanded } = useLimitedSidebarGroup(rows);
+  const limited = useLimitedSidebarGroup(rows);
+  // Floated pins are part of one list; they are never folded behind Show more.
+  const visibleItems = float ? rows : limited.visibleItems;
+  const canToggle = !float && limited.canToggle;
+  const { expanded, toggleExpanded } = limited;
   const [storedCollapsed, toggleCollapsed] = useSectionCollapsed("pinned");
   const collapsed = !float && storedCollapsed;
   const openChat = useCallback(
@@ -115,19 +128,39 @@ export function FusionPinnedSection({
     </>
   );
 }
+function admitsPin(
+  row: PinRow,
+  filter: WorkFilter,
+  projects: readonly { viewKey: string }[],
+): boolean {
+  if (row.kind === "workspace") return filter.workspace(row.workspace);
+  if (row.kind === "session")
+    return filter.session(
+      {
+        id: row.session.agent.id,
+        labels: row.session.agent.labels,
+        createdBy: row.session.agent.createdBy,
+        statusBucket: row.session.statusBucket,
+      },
+      row.workspace,
+    );
+  if (row.kind === "project") return projects.some((p) => p.viewKey === row.project.viewKey);
+  return true;
+}
+
 function isWorkPin(row: PinRow): boolean {
   if (row.kind === "bot" || row.kind === "chat") return false;
   return row.kind !== "unavailable" || (row.pin.kind !== "bot" && row.pin.kind !== "chat");
 }
 
-/** A pinned row in a list without a Pinned section: the row, with a pin mark at its start. */
+/**
+ * A pinned row in a list without a Pinned section. The row itself draws the pin mark at the end
+ * of its title line (`usePinnedRow`), so every list puts it in the same place.
+ */
 function FloatedPin({ children }: { children: ReactNode }) {
   return (
-    <View style={styles.floated} testID="pinned-float">
-      <View style={styles.floatedMark}>
-        <PinMark />
-      </View>
-      <View style={styles.floatedRow}>{children}</View>
+    <View testID="pinned-float">
+      <PinnedRowProvider value>{children}</PinnedRowProvider>
     </View>
   );
 }
@@ -165,15 +198,5 @@ function renderPin(
 
 const styles = StyleSheet.create((theme) => ({
   workspacePin: { paddingLeft: sectionRowIndent(theme) },
-  floated: { flexDirection: "row", alignItems: "center" },
-  floatedMark: {
-    position: "absolute",
-    left: theme.spacing[0],
-    top: theme.spacing[0],
-    bottom: theme.spacing[0],
-    justifyContent: "center",
-    zIndex: 1,
-  },
-  floatedRow: { flex: 1, minWidth: 0 },
   error: { color: theme.colors.foregroundMuted, padding: 8, fontSize: theme.fontSize.sm },
 }));

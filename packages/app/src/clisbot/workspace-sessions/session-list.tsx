@@ -1,4 +1,7 @@
 import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
+import { PinnedRowProvider } from "@/components/ui/pin-mark";
+import { useSessionStore } from "@/stores/session-store";
+import { useWorkspaceSessionFilter } from "./session-filter";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import {
   lazy,
@@ -87,6 +90,18 @@ export const WorkspaceSessionList = memo(function WorkspaceSessionList(
   );
 });
 
+/** The list owner's session rule for this workspace, with the workspace's author as fallback. */
+function useSessionLineInclude(serverId: string, workspaceId: string) {
+  const filter = useWorkspaceSessionFilter();
+  const createdBy = useSessionStore((state) =>
+    filter ? state.sessions[serverId]?.workspaces?.get(workspaceId)?.createdBy : undefined,
+  );
+  return useMemo(
+    () => (filter ? (session: WorkspaceSessionItem) => filter(session, { createdBy }) : undefined),
+    [filter, createdBy],
+  );
+}
+
 function OpenWorkspaceSessionList({
   serverId,
   workspaceId,
@@ -104,31 +119,41 @@ function OpenWorkspaceSessionList({
 }): ReactElement | null {
   const shown = useWorkspaceShownAgents({ serverId, workspaceId, enabled: selected });
   const keepAgentIds = useMemo(() => shownAgentIds(shown), [shown]);
-  const sessions = useWorkspaceSessions({ serverId, workspaceId, activeOnly, keepAgentIds });
+  const include = useSessionLineInclude(serverId, workspaceId);
+  const sessions = useWorkspaceSessions({
+    serverId,
+    workspaceId,
+    activeOnly,
+    keepAgentIds,
+    include,
+  });
   if (sessions.length === 0) return null;
 
+  // The pin belongs to the workspace row above; its session lines carry no mark of their own.
   return (
-    <View testID={`sidebar-workspace-sessions-${workspaceKey}`}>
-      {sessions.map((session) => {
-        const agentId = session.agent.id;
-        let state: SessionLineState = "idle";
-        if (shown.selectedAgentId === agentId) state = "selected";
-        else if (shown.visibleAgentIds.has(agentId)) state = "visible";
-        return (
-          <WorkspaceSessionRow
-            key={agentId}
-            serverId={serverId}
-            workspaceId={workspaceId}
-            session={session}
-            state={state}
-            fullTitles={fullTitles}
-            details={details}
-            placement={indented ? "indented" : "flush"}
-            onPress={onSessionPress}
-          />
-        );
-      })}
-    </View>
+    <PinnedRowProvider value={false}>
+      <View testID={`sidebar-workspace-sessions-${workspaceKey}`}>
+        {sessions.map((session) => {
+          const agentId = session.agent.id;
+          let state: SessionLineState = "idle";
+          if (shown.selectedAgentId === agentId) state = "selected";
+          else if (shown.visibleAgentIds.has(agentId)) state = "visible";
+          return (
+            <WorkspaceSessionRow
+              key={agentId}
+              serverId={serverId}
+              workspaceId={workspaceId}
+              session={session}
+              state={state}
+              fullTitles={fullTitles}
+              details={details}
+              placement={indented ? "indented" : "flush"}
+              onPress={onSessionPress}
+            />
+          );
+        })}
+      </View>
+    </PinnedRowProvider>
   );
 }
 

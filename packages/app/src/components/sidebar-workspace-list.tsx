@@ -124,6 +124,9 @@ import {
 import { useLongPressDragInteraction } from "@/components/sidebar/use-long-press-drag-interaction";
 import { SidebarSectionHeader } from "@/components/sidebar/sidebar-section-header";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
+import { PinMark, usePinnedRow } from "@/components/ui/pin-mark";
+import { SidebarStatusFlatList } from "@/components/sidebar/sidebar-status-flat-list";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { createSidebarWorkspaceVisibilityPolicy } from "@/components/sidebar/sidebar-group-visibility";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
 import {
@@ -746,9 +749,12 @@ function WorkspaceRowRightGroup({
     showShortcut,
   });
   const kebab = useOpenKebabMenuVisibility(showKebabInSlot);
+  // Clisbot: a floated pinned row marks itself at the end of its title line.
+  const pinnedRow = usePinnedRow();
 
   return (
     <>
+      {pinnedRow ? <PinMark /> : null}
       {isCreating ? (
         <Text style={styles.workspaceCreatingText}>{t("sidebar.workspace.status.creating")}</Text>
       ) : null}
@@ -2401,6 +2407,23 @@ function SidebarGroupedModeList({
     [pinnedGroups.pinnedChats, workspaceEntriesByKey],
   );
 
+  // Clisbot Navigation V2: one virtualized list, every row rendered, nothing behind Show more.
+  if (NAVIGATION_V2_ENABLED)
+    return (
+      <SidebarStatusFlatList
+        groups={workspaceGroups}
+        projectIconByProjectViewKey={projectIconByProjectViewKey}
+        shortcutIndexByWorkspaceKey={_projectShortcutIndex}
+        showShortcutBadges={showShortcutBadges}
+        onWorkspacePress={onWorkspacePress}
+        hostBadgeByServerId={hostBadgeByServerId}
+        supportsPinningByServerId={supportsPinningByServerId}
+        onToggleWorkspacePin={onToggleWorkspacePin}
+        listLeadingComponent={listLeadingComponent}
+        listHeaderComponent={listHeaderComponent}
+        sidebarFilterEmpty={sidebarFilterEmpty}
+      />
+    );
   return (
     <SidebarStatusWorkspaceList
       groups={workspaceGroups}

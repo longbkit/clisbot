@@ -3,7 +3,7 @@ const en = {
   sections: {
     home: "Home",
     chats: "Chats",
-    work: "Work",
+    work: "Workspace",
     schedules: "Schedules",
     tasks: "Tasks",
     connectors: "Connectors",
@@ -26,8 +26,8 @@ const en = {
   },
   mode: {
     chat: "Chat",
-    work: "Work",
-    hybrid: "Hybrid",
+    work: "Workspace",
+    hybrid: "All",
     label: "Home shows",
   },
   chips: {
@@ -78,6 +78,11 @@ const en = {
   updates_one: "Show {{count}} update",
   updates_other: "Show {{count}} updates",
   display: "Display",
+  work: {
+    bots: "Bots",
+    showBots: "Show Bot sessions",
+    hideBots: "Hide Bot sessions",
+  },
   chatsDisplay: {
     sort: "Sort by",
     recent: "Recent activity",
@@ -104,9 +109,9 @@ const vi: typeof en = {
   sections: {
     home: "Trang chủ",
     chats: "Trò chuyện",
-    work: "Công việc",
+    work: "Workspace",
     schedules: "Lịch",
-    tasks: "Tác vụ",
+    tasks: "Công việc",
     connectors: "Kết nối",
     usage: "Mức dùng",
     hosts: "Máy chủ",
@@ -116,11 +121,11 @@ const vi: typeof en = {
   },
   preview: "Đang phát triển",
   tasksPlaceholder: {
-    title: "Tác vụ đang được phát triển",
-    body: "Bảng tác vụ và các tích hợp sẽ nằm ở đây. Hiện chưa lưu dữ liệu nào.",
+    title: "Công việc đang được phát triển",
+    body: "Bảng công việc và các tích hợp sẽ nằm ở đây. Hiện chưa lưu dữ liệu nào.",
   },
   scope: { mine: "Của tôi", others: "Người khác", all: "Tất cả", label: "Hiển thị" },
-  mode: { chat: "Chat", work: "Công việc", hybrid: "Kết hợp", label: "Trang chủ hiển thị" },
+  mode: { chat: "Chat", work: "Workspace", hybrid: "Tất cả", label: "Trang chủ hiển thị" },
   chips: {
     all: "Tất cả",
     needs: "Cần tôi",
@@ -169,6 +174,7 @@ const vi: typeof en = {
   updates_one: "Hiện {{count}} cập nhật",
   updates_other: "Hiện {{count}} cập nhật",
   display: "Hiển thị",
+  work: { bots: "Bot", showBots: "Hiện phiên của Bot", hideBots: "Ẩn phiên của Bot" },
   chatsDisplay: {
     sort: "Sắp xếp theo",
     recent: "Hoạt động gần đây",
@@ -191,15 +197,184 @@ const vi: typeof en = {
   },
 };
 
+interface Overrides {
+  sections: Partial<(typeof en)["sections"]>;
+  mode: Partial<(typeof en)["mode"]>;
+  scope: Partial<(typeof en)["scope"]>;
+  work: Partial<(typeof en)["work"]>;
+}
+
+/**
+ * The words a reader meets first — sections, the Home mode switch, the scope tabs — in each
+ * locale; the rest falls back to English. Workspace and Tasks never share a word, and in no
+ * locale is "Công việc"-style ambiguity possible (Owner naming decision, 2026-10-26).
+ */
+function localized(overrides: Overrides): typeof en {
+  return {
+    ...en,
+    sections: { ...en.sections, ...overrides.sections },
+    mode: { ...en.mode, ...overrides.mode },
+    scope: { ...en.scope, ...overrides.scope },
+    work: { ...en.work, ...overrides.work },
+  };
+}
+
+const zhCN = localized({
+  sections: {
+    home: "首页",
+    chats: "聊天",
+    work: "工作区",
+    schedules: "日程",
+    tasks: "任务",
+    connectors: "连接器",
+    usage: "用量",
+    hosts: "主机",
+    help: "帮助",
+    settings: "设置",
+    more: "更多",
+  },
+  mode: { chat: "聊天", work: "工作区", hybrid: "全部" },
+  scope: { mine: "我的", others: "他人", all: "全部" },
+  work: { bots: "机器人" },
+});
+
+const ja = localized({
+  sections: {
+    home: "ホーム",
+    chats: "チャット",
+    work: "ワークスペース",
+    schedules: "スケジュール",
+    tasks: "タスク",
+    connectors: "コネクタ",
+    usage: "使用量",
+    hosts: "ホスト",
+    help: "ヘルプ",
+    settings: "設定",
+    more: "その他",
+  },
+  mode: { chat: "チャット", work: "ワークスペース", hybrid: "すべて" },
+  scope: { mine: "自分", others: "他の人", all: "すべて" },
+  work: { bots: "ボット" },
+});
+
+const ko = localized({
+  sections: {
+    home: "홈",
+    chats: "채팅",
+    work: "워크스페이스",
+    schedules: "일정",
+    tasks: "작업",
+    connectors: "커넥터",
+    usage: "사용량",
+    hosts: "호스트",
+    help: "도움말",
+    settings: "설정",
+    more: "더 보기",
+  },
+  mode: { chat: "채팅", work: "워크스페이스", hybrid: "전체" },
+  scope: { mine: "내 항목", others: "다른 사람", all: "전체" },
+  work: { bots: "봇" },
+});
+
+const es = localized({
+  sections: {
+    home: "Inicio",
+    work: "Workspace",
+    schedules: "Programaciones",
+    tasks: "Tareas",
+    connectors: "Conectores",
+    usage: "Uso",
+    help: "Ayuda",
+    settings: "Ajustes",
+    more: "Más",
+  },
+  mode: { work: "Workspace", hybrid: "Todo" },
+  scope: { mine: "Míos", others: "Otros", all: "Todo" },
+  work: {},
+});
+
+const ptBR = localized({
+  sections: {
+    home: "Início",
+    work: "Workspace",
+    schedules: "Agendamentos",
+    tasks: "Tarefas",
+    connectors: "Conectores",
+    usage: "Uso",
+    help: "Ajuda",
+    settings: "Configurações",
+    more: "Mais",
+  },
+  mode: { work: "Workspace", hybrid: "Tudo" },
+  scope: { mine: "Meus", others: "Outros", all: "Tudo" },
+  work: {},
+});
+
+const fr = localized({
+  sections: {
+    home: "Accueil",
+    work: "Workspace",
+    schedules: "Planifications",
+    tasks: "Tâches",
+    connectors: "Connecteurs",
+    usage: "Utilisation",
+    hosts: "Hôtes",
+    help: "Aide",
+    settings: "Réglages",
+    more: "Plus",
+  },
+  mode: { work: "Workspace", hybrid: "Tout" },
+  scope: { mine: "Moi", others: "Autres", all: "Tout" },
+  work: {},
+});
+
+const ru = localized({
+  sections: {
+    home: "Главная",
+    chats: "Чаты",
+    work: "Пространство",
+    schedules: "Расписания",
+    tasks: "Задачи",
+    connectors: "Коннекторы",
+    usage: "Использование",
+    hosts: "Хосты",
+    help: "Справка",
+    settings: "Настройки",
+    more: "Ещё",
+  },
+  mode: { chat: "Чат", work: "Пространство", hybrid: "Все" },
+  scope: { mine: "Мои", others: "Чужие", all: "Все" },
+  work: { bots: "Боты" },
+});
+
+const ar = localized({
+  sections: {
+    home: "الرئيسية",
+    chats: "المحادثات",
+    work: "مساحة العمل",
+    schedules: "الجداول",
+    tasks: "المهام",
+    connectors: "الموصلات",
+    usage: "الاستخدام",
+    hosts: "المضيفون",
+    help: "المساعدة",
+    settings: "الإعدادات",
+    more: "المزيد",
+  },
+  mode: { chat: "محادثة", work: "مساحة العمل", hybrid: "الكل" },
+  scope: { mine: "لي", others: "للآخرين", all: "الكل" },
+  work: { bots: "البوتات" },
+});
+
 export const navigation = {
   en,
-  ar: en,
-  es: en,
-  fr: en,
-  ja: en,
-  ko: en,
-  "pt-BR": en,
-  ru: en,
+  ar,
+  es,
+  fr,
+  ja,
+  ko,
+  "pt-BR": ptBR,
+  ru,
   vi,
-  "zh-CN": en,
+  "zh-CN": zhCN,
 };

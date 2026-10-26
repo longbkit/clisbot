@@ -204,11 +204,16 @@ function useOwnership() {
     [serverIds, workspaceMaps],
   );
   const ownershipOf = useCallback(
-    (agent: Pick<AggregatedAgent, "serverId" | "workspaceId" | "labels">): Ownership => {
+    (
+      agent: Pick<AggregatedAgent, "serverId" | "workspaceId" | "labels" | "createdBy">,
+    ): Ownership => {
+      // A session's own author decides; its chat's or workspace's author only stands in for a
+      // session that records none (the same rule the Workspace list scopes by).
       const chatId = getChatIdFromLabels(agent.labels);
-      let createdBy: SessionActor | undefined;
-      if (chatId) createdBy = chatAuthors.get(`${agent.serverId}:${chatId}`);
-      else if (agent.workspaceId) createdBy = workspaceAuthor(agent.serverId, agent.workspaceId);
+      let createdBy: SessionActor | undefined = agent.createdBy;
+      if (!createdBy && chatId) createdBy = chatAuthors.get(`${agent.serverId}:${chatId}`);
+      else if (!createdBy && agent.workspaceId)
+        createdBy = workspaceAuthor(agent.serverId, agent.workspaceId);
       return resolveOwnership({ createdBy, accounts });
     },
     [accounts, chatAuthors, workspaceAuthor],

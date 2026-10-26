@@ -2,6 +2,7 @@ import { MetadataFilterPage } from "./metadata-filter-page";
 import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
 import { GROUP_MODE_MENU_ORDER } from "@/clisbot/workspace-sessions/grouping";
 import { BotProjectsToggle } from "@/clisbot/bot-projects/controls";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import {
   workspaceSessionsMenuPage,
   WorkspaceSessionsSubTrigger,
@@ -787,8 +788,13 @@ function ShowPage({ preferences }: { preferences: Preferences }): ReactElement {
     <>
       <WorkspaceSessionsSubTrigger />
       <MenuSeparator />
-      <BotProjectsToggle />
-      <MenuSeparator />
+      {/* Navigation V2 has the Bots chip beside the grouping tabs instead. */}
+      {NAVIGATION_V2_ENABLED ? null : (
+        <>
+          <BotProjectsToggle />
+          <MenuSeparator />
+        </>
+      )}
       {SIDEBAR_ROW_ITEMS.map((item) => (
         <OptionItem
           key={item}

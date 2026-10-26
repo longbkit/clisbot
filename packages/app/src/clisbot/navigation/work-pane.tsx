@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { FolderPlus, Import, Plus } from "lucide-react-native";
 import type { GestureType } from "react-native-gesture-handler";
-import { QuickChatsSection } from "@/clisbot/quick-chats/quick-chats-section";
 import { SidebarViewBar } from "@/clisbot/workspace-sessions/view-bar";
 import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 import { SidebarAgentListSkeleton } from "@/components/sidebar-agent-list-skeleton";
@@ -32,7 +31,6 @@ import { RenderProfile } from "@/utils/render-profiler";
 import { useHostsReachability } from "./hosts-status";
 import { HostsUnreachableState } from "./hosts-unreachable-state";
 import { OutsideFilterNotice } from "./outside-filter-notice";
-import { useReaderAccounts } from "./reader";
 import { SectionControls } from "./section-controls";
 import {
   HeaderMenuIcon,
@@ -41,7 +39,7 @@ import {
   SectionHeader,
 } from "./section-header";
 import { useNavigationStore, type WorkChip } from "./store";
-import { countWork, WORK_CHIPS } from "./work-filter";
+import { countWork, useWorkQuery, WORK_CHIPS } from "./work-filter";
 
 const CHIP_LABELS: Record<WorkChip, string> = {
   all: "navigation.chips.all",
@@ -78,10 +76,6 @@ export function WorkPane({
   }, [model]);
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
   const workState = useWorkListState(model, hasActiveHostFilter);
-  const leading = useMemo(
-    () => <QuickChatsSection onBeforeNavigate={onBeforeNavigate} />,
-    [onBeforeNavigate],
-  );
   const headerActions = useMemo(
     () => (
       <>
@@ -125,7 +119,6 @@ export function WorkPane({
             onImportSession={importSession.open}
             parentGestureRef={parentGestureRef}
             dragGestureHostActive={active}
-            listLeadingComponent={leading}
           />
         ) : null}
         {importSession.sheet}
@@ -156,16 +149,23 @@ function useOpenSearch() {
   return useCallback(() => setOpen(true), [setOpen]);
 }
 
+const EMPTY_COUNTS = {
+  chips: { all: 0, needs: 0, running: 0, done: 0, failed: 0 },
+  scopes: { mine: 0, others: 0, all: 0 },
+};
+
 function WorkControls() {
   const { t } = useTranslation();
-  const { allWorkspaceEntriesByKey } = useSidebarModel();
-  const scope = useNavigationStore((state) => state.scopes.work);
-  const chip = useNavigationStore((state) => state.workChip);
+  const { allWorkspaceEntriesByKey, workList } = useSidebarModel();
+  const query = useWorkQuery();
   const setChip = useNavigationStore((state) => state.setWorkChip);
-  const accounts = useReaderAccounts();
+  // Once per change of the entries, the sessions or the query; the same items the list shows.
   const counts = useMemo(
-    () => countWork(allWorkspaceEntriesByKey.values(), scope, accounts),
-    [allWorkspaceEntriesByKey, scope, accounts],
+    () =>
+      workList
+        ? countWork(allWorkspaceEntriesByKey.values(), workList.sessionsOf, query)
+        : EMPTY_COUNTS,
+    [allWorkspaceEntriesByKey, workList, query],
   );
   const chips = useMemo<FilterChip<WorkChip>[]>(
     () =>
@@ -181,7 +181,7 @@ function WorkControls() {
       section="work"
       scopeCounts={counts.scopes}
       chips={chips}
-      chip={chip}
+      chip={query.chip}
       onChip={setChip}
       backdrop="surfaceSidebar"
       display={displayMenu}

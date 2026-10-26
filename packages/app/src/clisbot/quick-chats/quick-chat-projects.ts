@@ -60,3 +60,36 @@ export function quickChatProjectKeys(
         keys.add(`${host.serverId}:${host.projectId}`);
   return keys;
 }
+
+/** The one project every Quick chat folds into in Navigation V2's Workspace list. */
+export const QUICK_CHAT_PROJECT_VIEW_KEY = "clisbot:quick-chat";
+
+/**
+ * Navigation V2: Quick chats are ordinary Workspace sessions, so they are not set apart — every
+ * Quick chat placement folds into one "Quick chat" project that sorts, scopes, pins and filters
+ * like any other. It takes the first Quick chat's place in the list.
+ */
+export function mergeQuickChatProjects<T extends WorkspaceStructureProject>(
+  projects: T[],
+  keys: ReadonlySet<string>,
+  name: string,
+): T[] {
+  if (!keys.size) return projects;
+  const isQuick = (project: T) =>
+    project.hosts.some((host) => keys.has(`${host.serverId}:${host.projectId}`));
+  const quick = projects.filter(isQuick);
+  if (!quick.length) return projects;
+  const first = quick[0]!;
+  const merged: T = {
+    ...first,
+    viewKey: QUICK_CHAT_PROJECT_VIEW_KEY,
+    projectKey: null,
+    projectName: name,
+    hosts: quick.flatMap((project) => project.hosts),
+    workspaceKeys: quick.flatMap((project) => project.workspaceKeys),
+  };
+  return projects.flatMap((project) => {
+    if (project === first) return [merged];
+    return isQuick(project) ? [] : [project];
+  });
+}

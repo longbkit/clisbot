@@ -40,6 +40,8 @@ interface SegmentedControlProps<T extends string> {
   /** Rendered inside the control after the segments — a menu trigger drawn as a segment. */
   trailing?: ReactNode;
   style?: StyleProp<ViewStyle>;
+  /** Names the control as a whole, so its segments and trailing menu read as one control. */
+  accessibilityLabel?: string;
   testID?: string;
 }
 
@@ -106,6 +108,7 @@ export function SegmentedControl<T extends string>({
   hideLabels = false,
   trailing,
   style,
+  accessibilityLabel,
   testID,
 }: SegmentedControlProps<T>) {
   const containerSizeStyle = {
@@ -122,7 +125,12 @@ export function SegmentedControl<T extends string>({
   );
 
   return (
-    <View style={containerStyle} testID={testID}>
+    <View
+      style={containerStyle}
+      testID={testID}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityLabel ? "tablist" : undefined}
+    >
       {options.map((option) => {
         const isSelected = option.value === value;
 

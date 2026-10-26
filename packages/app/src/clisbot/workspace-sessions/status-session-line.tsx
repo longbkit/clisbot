@@ -1,4 +1,7 @@
-import { memo, useCallback, useState, type ReactElement } from "react";
+import { memo, useCallback, useMemo, useState, type ReactElement } from "react";
+import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
+import { pinKey, useResourcePins } from "@/clisbot/bots/sidebar/pins";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import {
   SidebarWorkspaceContextMenu,
   SidebarWorkspaceMenu,
@@ -75,6 +78,7 @@ export const StatusSessionLine = memo(function StatusSessionLine({
   const renameSession = useCallback(() => setRenaming(true), []);
   const closeRename = useCallback(() => setRenaming(false), []);
   const badgeNumber = showShortcutBadge ? shortcutNumber : null;
+  const sessionPin = useSessionPinAction(serverId, agentId);
   const renderActions = useCallback(
     ({ menuOpen, onMenuOpenChange }: SessionLineActionsInput) => (
       <SidebarWorkspaceMenu
@@ -82,13 +86,14 @@ export const StatusSessionLine = memo(function StatusSessionLine({
         onOpenChange={onMenuOpenChange}
         {...menuActions}
         onRenameSession={renameSession}
+        sessionPin={sessionPin}
         workspaceKey={workspace.workspaceKey}
         serverId={workspace.serverId}
         workspaceId={workspace.workspaceId}
         workspaceLabels={workspace.labels}
       />
     ),
-    [workspace, menuActions, renameSession],
+    [workspace, menuActions, renameSession, sessionPin],
   );
 
   const line = (
@@ -101,6 +106,7 @@ export const StatusSessionLine = memo(function StatusSessionLine({
       workspaceKey={workspace.workspaceKey}
       {...menuActions}
       onRenameSession={renameSession}
+      sessionPin={sessionPin}
       openInFileManagerPath={workspace.workspaceDirectory}
       disabled={menuDisabled}
       highlightStyle={undefined}
@@ -129,3 +135,22 @@ export const StatusSessionLine = memo(function StatusSessionLine({
     </>
   );
 });
+
+/**
+ * Navigation V2: Pin and Unpin session sit in the line's menu, so a touch list needs no pin button
+ * on every line. Undefined where session pins do not exist (no Bots feature) or outside V2.
+ */
+function useSessionPinAction(serverId: string, agentId: string) {
+  const enabled = useBotsFeatureHosts().length > 0 && NAVIGATION_V2_ENABLED;
+  const { pins, toggle } = useResourcePins();
+  const pinned = pins.some(
+    (pin) => pinKey(pin) === pinKey({ kind: "session", serverId, id: agentId }),
+  );
+  return useMemo(
+    () =>
+      enabled
+        ? { pinned, toggle: () => toggle({ kind: "session", serverId, id: agentId }) }
+        : undefined,
+    [enabled, pinned, toggle, serverId, agentId],
+  );
+}

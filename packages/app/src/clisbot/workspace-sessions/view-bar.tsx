@@ -1,4 +1,6 @@
 import { useCallback, useMemo, type ReactElement } from "react";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import { WorkBotsChip } from "@/clisbot/navigation/bots-chip";
 import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -58,7 +60,8 @@ export function SidebarViewBar(): ReactElement | null {
   return (
     <View style={styles.bar} testID="sidebar-view-bar">
       <GroupingTabs />
-      <ActiveOnlyTag />
+      {/* Navigation V2 orders by last update, so its quick control is the Bots chip instead. */}
+      {NAVIGATION_V2_ENABLED ? <WorkBotsChip /> : <ActiveOnlyTag />}
     </View>
   );
 }
@@ -99,6 +102,7 @@ function GroupingTabs(): ReactElement {
         onValueChange={setGroupMode}
         trailing={more}
         style={styles.track}
+        accessibilityLabel={t("sidebar.display.grouping.label")}
         testID="sidebar-view-grouping"
       />
     </View>

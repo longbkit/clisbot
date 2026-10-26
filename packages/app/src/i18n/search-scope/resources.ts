@@ -57,9 +57,9 @@ const en = {
     switchTo: "Switch to {{name}}",
     dismiss: "Dismiss",
   },
-  showInWork: "Show in Work",
-  showInWorkLabel: "Show {{label}} in Work",
-  workFilterChanged: "Work now shows {{label}}",
+  showInWork: "Show in Workspace",
+  showInWorkLabel: "Show {{label}} in Workspace",
+  workFilterChanged: "Workspace now shows {{label}}",
   undo: "Undo",
 };
 
@@ -118,9 +118,9 @@ const vi: SearchScopeResources = {
     switchTo: "Chuyển sang {{name}}",
     dismiss: "Ẩn",
   },
-  showInWork: "Xem trong Work",
-  showInWorkLabel: "Xem {{label}} trong Work",
-  workFilterChanged: "Work đang hiện {{label}}",
+  showInWork: "Xem trong Workspace",
+  showInWorkLabel: "Xem {{label}} trong Workspace",
+  workFilterChanged: "Workspace đang hiện {{label}}",
   undo: "Hoàn tác",
 };
 

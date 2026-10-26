@@ -1,4 +1,6 @@
 import { useState, type ReactElement, type ReactNode } from "react";
+import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import { PinMark, usePinnedRow } from "@/components/ui/pin-mark";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SessionPinButton } from "@/clisbot/bots/sidebar/session-pin";
@@ -46,6 +48,7 @@ export function SessionLineTrailing({
   renderActions?: (input: SessionLineActionsInput) => ReactNode;
 }): ReactElement {
   const touch = useIsCompactFormFactor() || isNative;
+  const pinnedRow = usePinnedRow();
   const [menuOpen, setMenuOpen] = useState(false);
   const agentId = agent.id;
   if (badgeNumber !== null) {
@@ -55,17 +58,33 @@ export function SessionLineTrailing({
       </View>
     );
   }
+  // Navigation V2: pin and unpin live in the line's menu (and on hover on desktop); a touch list
+  // never shows a pin button on every line. A pinned line shows the one pin mark instead.
+  const pinButton =
+    NAVIGATION_V2_ENABLED && touch ? null : (
+      <SessionPinButton serverId={serverId} agentId={agentId} />
+    );
   const actions = (
     <>
-      <SessionPinButton serverId={serverId} agentId={agentId} />
+      {pinButton}
       {renderActions?.({ menuOpen, onMenuOpenChange: setMenuOpen })}
     </>
   );
-  if (touch) return <View style={styles.inline}>{actions}</View>;
+  const mark = pinnedRow ? <PinMark /> : null;
+  if (touch)
+    return (
+      <View style={styles.inline}>
+        {mark}
+        {actions}
+      </View>
+    );
   const backdrop = resolveActionsBackdrop({ selected, rowHovered });
   return (
     <View style={styles.slot}>
-      {showActivity ? <LastActivity agent={agent} /> : null}
+      <View style={styles.marks}>
+        {mark}
+        {showActivity ? <LastActivity agent={agent} /> : null}
+      </View>
       {rowHovered || menuOpen ? (
         <View style={styles.overlay} testID={`sidebar-session-actions-${agentId}`}>
           <View style={styles.fade} pointerEvents="none">
@@ -110,6 +129,7 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 0,
     alignItems: "flex-end",
   },
+  marks: { flexDirection: "row", alignItems: "center" },
   activity: {
     color: theme.colors.foregroundExtraMuted,
     fontSize: theme.fontSize.sm,

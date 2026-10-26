@@ -42,6 +42,7 @@ function projectAgent({
     createdAt: source.createdAt,
     labels: source.labels,
     projectPlacement: source.projectPlacement,
+    createdBy: source.createdBy,
   };
 }
 

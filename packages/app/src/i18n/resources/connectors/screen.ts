@@ -2292,8 +2292,8 @@ const vi: Copy<typeof en> = {
     title: "Kết nối thêm một tài khoản {{app}}",
     continue: "Tiếp tục trong trình duyệt",
     nameLabel: "Tên tài khoản",
-    nameHint: "Hiển thị cho bạn và trong cài đặt của mỗi Bot, ví dụ công việc hoặc cá nhân.",
-    namePlaceholder: "công việc",
+    nameHint: "Hiển thị cho bạn và trong cài đặt của mỗi Bot, ví dụ cơ quan hoặc cá nhân.",
+    namePlaceholder: "cơ quan",
   },
   sending: {
     title: "Gửi",
