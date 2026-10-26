@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitPinTags, type PinTag } from "./pin-tags-model";
+import { splitPinTags, type PinTag, fitPinTags } from "./pin-tags-model";
 
 const tags: PinTag[] = [
   { key: "bot:nia", title: "Nia", area: "chat", ownership: "mine" },
@@ -20,5 +20,28 @@ describe("splitPinTags", () => {
   it("follows Home's mode", () => {
     expect(keys(splitPinTags(tags, "chat").mine)).toEqual(["bot:nia"]);
     expect(keys(splitPinTags(tags, "work").others)).toEqual(["ws:theirs"]);
+  });
+});
+
+const layout = { width: 300, gap: 8, moreWidth: 60 };
+
+describe("fitPinTags", () => {
+  it("shows every tag when they fit on two lines", () => {
+    expect(fitPinTags([100, 100, 100, 100], layout)).toBe(4);
+  });
+
+  it("stops at two lines and keeps room for the +N tag on the second", () => {
+    // Line 1: 100 + 100; line 2: 100 + 100 + the +N tag (60) = 276 of 300; the fifth would wrap.
+    expect(fitPinTags([100, 100, 100, 100, 100], layout)).toBe(4);
+    // Line 2: 100 + 130 leaves no room for +N, so the 130 gives way.
+    expect(fitPinTags([100, 100, 100, 130, 100], layout)).toBe(3);
+  });
+
+  it("gives a tag wider than the line a line of its own", () => {
+    expect(fitPinTags([400, 400, 400], layout)).toBe(1);
+  });
+
+  it("shows nothing but +N when not even one tag fits beside it", () => {
+    expect(fitPinTags([400, 400, 400], { ...layout, lines: 1 })).toBe(0);
   });
 });

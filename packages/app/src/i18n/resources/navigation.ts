@@ -65,9 +65,9 @@ const en = {
   },
   pins: {
     label: "Pinned",
-    showOthers_one: "+{{count}} · Show",
-    showOthers_other: "+{{count}} · Show",
-    hideOthers: "Hide others",
+    more_one: "+{{count}} · Show more",
+    more_other: "+{{count}} · Show more",
+    less: "Show less",
   },
   issues: {
     seenIssues: "Seen issues ({{count}})",
@@ -161,9 +161,9 @@ const vi: typeof en = {
   },
   pins: {
     label: "Đã ghim",
-    showOthers_one: "+{{count}} · Xem",
-    showOthers_other: "+{{count}} · Xem",
-    hideOthers: "Ẩn của người khác",
+    more_one: "+{{count}} · Xem thêm",
+    more_other: "+{{count}} · Xem thêm",
+    less: "Thu gọn",
   },
   issues: {
     seenIssues: "Sự cố đã xem ({{count}})",

@@ -1,10 +1,16 @@
+import { mkdir } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import path from "node:path";
 import type { Page } from "@playwright/test";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { expect, test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import { createMockIdleAgent } from "../support/helpers/archive-tab";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
-import { seedWorkspace } from "../support/helpers/seed-client";
+import { connectSeedClient, seedWorkspace } from "../support/helpers/seed-client";
+import { addConnectedHostAndReload } from "../support/helpers/hosts";
+import { startIsolatedHostDaemon } from "../support/helpers/isolated-host-daemon";
+import { createTempDirectory } from "../support/helpers/workspace";
 import { getServerId } from "../support/helpers/server-id";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 
@@ -317,6 +323,62 @@ test.describe("Navigation V2", () => {
         }
       } finally {
         await seeded.cleanup();
+      }
+    });
+  }
+});
+
+/** How many lines the pin tags take, and how many tags (the fold tag included) they show. */
+function tagLines(tags: import("@playwright/test").Locator) {
+  return tags.evaluate((root) => {
+    const tops = [...root.children].map((child) => Math.round(child.getBoundingClientRect().top));
+    return { lines: new Set(tops).size, count: root.children.length };
+  });
+}
+
+test.describe("Navigation V2 Home pin tags", () => {
+  test.use({ navigationV2: true });
+
+  for (const width of [1440, 390]) {
+    test(`pins wrap onto two lines and open the rest downward at ${width}px`, async ({ page }) => {
+      test.setTimeout(240_000);
+      const serverId = `srv_nav_pins_${randomUUID().slice(0, 8)}`;
+      const daemon = await startIsolatedHostDaemon(serverId);
+      const client = await connectSeedClient({ port: daemon.port });
+      const folders = await createTempDirectory("nav-v2-pins-");
+      try {
+        for (let i = 1; i <= 12; i += 1) {
+          const dir = path.join(folders.path, `pinned-${i}`);
+          await mkdir(dir, { recursive: true });
+          const created = await client.createWorkspace({
+            source: { kind: "directory", path: dir },
+            title: `Pinned workspace ${String(i).padStart(2, "0")}`,
+          });
+          if (!created.workspace) throw new Error(created.error ?? "workspace");
+          await client.setWorkspacePinned(created.workspace.id, true);
+        }
+        await page.setViewportSize({ width, height: 900 });
+        await gotoAppShell(page);
+        await addConnectedHostAndReload(page, { serverId, label: "Pins Host", port: daemon.port });
+        const tags = page.getByTestId("home-pin-tags").filter({ visible: true });
+        const more = tags.getByTestId("home-pin-tags-more");
+        await expect(more).toBeVisible({ timeout: 60_000 });
+        const lines = () => tagLines(tags);
+        const collapsed = await lines();
+        expect(collapsed.lines).toBe(2);
+        await expect(more).toContainText(`+${12 - (collapsed.count - 1)}`);
+        await more.click();
+        const expanded = await lines();
+        expect(expanded.lines).toBeGreaterThan(2);
+        // Every pin plus the fold tag; nothing scrolls sideways.
+        expect(expanded.count).toBeGreaterThanOrEqual(13);
+        expect(await tags.evaluate((root) => root.scrollWidth <= root.clientWidth + 1)).toBe(true);
+        await tags.getByTestId("home-pin-tags-less").click();
+        expect((await lines()).lines).toBe(2);
+      } finally {
+        await client.close().catch(() => undefined);
+        await daemon.close().catch(() => undefined);
+        await folders.cleanup().catch(() => undefined);
       }
     });
   }

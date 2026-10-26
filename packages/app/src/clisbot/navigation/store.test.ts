@@ -24,6 +24,20 @@ describe("Navigation V2 preferences", () => {
     expect(migrated).toMatchObject({ homeMode: "work", chatsSplit: true, workShowBots: true });
   });
 
+  it("opens Home on All, and moves a stored Home scope to All once (v1 → v2)", () => {
+    expect(useNavigationStore.getState().scopes.home).toBe("all");
+    const migrate = useNavigationStore.persist.getOptions().migrate!;
+    const migrated = migrate(
+      { scopes: { home: "mine", chats: "others", work: "mine" }, workShowBots: false },
+      1,
+    ) as Record<string, unknown>;
+    // The reader's other choices stay, the Bots chip included.
+    expect(migrated).toMatchObject({
+      scopes: { home: "all", chats: "others", work: "mine" },
+      workShowBots: false,
+    });
+  });
+
   it("persists the Bots chip", () => {
     const partialize = useNavigationStore.persist.getOptions().partialize!;
     expect(partialize(useNavigationStore.getState())).toHaveProperty("workShowBots", true);

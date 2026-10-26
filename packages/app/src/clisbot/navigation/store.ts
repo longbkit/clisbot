@@ -44,8 +44,6 @@ interface NavigationState {
    */
   workShowBots: boolean;
   toggleWorkShowBots: () => void;
-  /** Home shows other members' pins only after the reader asks (brief C8). */
-  showOthersPins: boolean;
   /** Home's 🔍 swaps the feed for Inbox's full history and search. */
   homeSearchOpen: boolean;
   /** Home's Host filter; empty means every Host. */
@@ -58,7 +56,6 @@ interface NavigationState {
   setHomeChip: (chip: HomeChip) => void;
   setChatsChip: (chip: ChatsChip) => void;
   setWorkChip: (chip: WorkChip) => void;
-  setShowOthersPins: (show: boolean) => void;
   setHomeSearchOpen: (open: boolean) => void;
   toggleHomeHost: (serverId: string) => void;
   clearHomeHosts: () => void;
@@ -73,12 +70,11 @@ export const useNavigationStore = create<NavigationState>()(
   persist(
     (set) => ({
       homeMode: "hybrid",
-      scopes: { home: "mine", chats: "mine", work: "mine" },
+      scopes: { home: "all", chats: "mine", work: "mine" },
       lastList: "work",
       homeChip: "all",
       chatsChip: "all",
       workChip: "all",
-      showOthersPins: false,
       workShowBots: true,
       chatsSort: "recent",
       chatsSplit: false,
@@ -99,7 +95,6 @@ export const useNavigationStore = create<NavigationState>()(
       setHomeChip: (homeChip) => set({ homeChip }),
       setChatsChip: (chatsChip) => set({ chatsChip }),
       setWorkChip: (workChip) => set({ workChip }),
-      setShowOthersPins: (showOthersPins) => set({ showOthersPins }),
       setHomeSearchOpen: (homeSearchOpen) => set({ homeSearchOpen }),
       toggleHomeHost: (serverId) =>
         set((state) => ({ homeHosts: toggled(state.homeHosts, serverId) })),
@@ -110,13 +105,17 @@ export const useNavigationStore = create<NavigationState>()(
       name: "clisbot-navigation-preferences",
       // v1: the Display menu's "Bot projects" switch (off by default) became the Bots chip (on by
       // default) — Bot sessions now show in the list, so the old choice is not carried over.
-      version: 1,
-      migrate: (persisted) => {
-        const { showBotProjectsInWork: _dropped, ...rest } = (persisted ?? {}) as Record<
-          string,
-          unknown
-        >;
-        return { ...rest, workShowBots: true } as unknown as NavigationState;
+      // v2: Home opens on All (Owner, 2026-10-26); a stored Home scope moves to All once.
+      version: 2,
+      migrate: (persisted, version) => {
+        const state = { ...((persisted ?? {}) as Record<string, unknown>) };
+        if (version < 1) {
+          delete state.showBotProjectsInWork;
+          state.workShowBots = true;
+        }
+        const scopes = state.scopes as Record<string, unknown> | undefined;
+        if (scopes) state.scopes = { ...scopes, home: "all" };
+        return state as unknown as NavigationState;
       },
       storage: createValidatedPersistStorage(AsyncStorage, PersistedSchema),
       partialize: (state) => ({

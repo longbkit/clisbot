@@ -145,6 +145,8 @@ item a list hides leaves the list's filter alone and shows a notice above it
 
 ## Home
 
+Home opens on the All scope (Owner, 2026-10-26); Chats and Workspace open on For me.
+
 Order: header (mode switch, 🔍) → a connection notice only when something is wrong → composer and
 its context row → Status & Setup and Import session → quick starts → scope tabs → chips → Display
 (Hosts, when there are several) → pin tags → feed. Hosts live on the rail and in More; Home has no Hosts block and no
@@ -185,8 +187,10 @@ the mode switch and search (the tab bar already says Home).
   notice, the Show updates / Mark all as seen line — sits in `HoldReadingPosition`: while the reader
   is scrolled, the scroll moves by the same amount, so no row moves under them. At the top the
   change is simply shown.
-- **Pins** (C8). Every resource pin as a tag, the reader's own first; other members' pins fold into
-  `+N · Show`. Ownership follows the rules above.
+- **Pins** (C8). Every pin as a tag, the reader's own first (ownership follows the rules above).
+  Tags wrap onto at most two lines; the last place on the second line is `+N · Show more`, which
+  opens the rest below, and Show less folds them back. How many fit comes from the measured tag
+  widths (`fitPinTags`); the two-line height is fixed, so nothing jumps while they are measured.
 
 ## Workspace list
 
@@ -209,7 +213,7 @@ The list's unit is the root session (`work-items.ts`); a workspace with no sessi
   switch.
 - **No Active filter.** Ordering by last update covers it; V2 ignores the stored `activeOnly`.
 - The navigation store's persist version 1 drops `showBotProjectsInWork` and sets `workShowBots`;
-  the scope, mode and Chats choices carry over.
+  the scope, mode and Chats choices carry over. Version 2 moves a stored Home scope to All once.
 
 ## Failure and needs-action lifecycle (3.1c)
 

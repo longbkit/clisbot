@@ -22,3 +22,33 @@ export function splitPinTags<T extends PinTag>(tags: readonly T[], mode: HomeMod
     others: visible.filter((tag) => tag.ownership === "others"),
   };
 }
+
+/**
+ * How many tags fit on `lines` wrapped lines of `width`, leaving room on the last line for the
+ * "+N" tag when some do not fit. Tags keep their order; a tag wider than a line takes a line.
+ */
+export function fitPinTags(
+  widths: readonly number[],
+  layout: { width: number; gap: number; moreWidth: number; lines?: number },
+): number {
+  const lines = layout.lines ?? 2;
+  const fits = (count: number, reserve: number) => {
+    let line = 1;
+    let used = 0;
+    for (let i = 0; i < count + (reserve ? 1 : 0); i += 1) {
+      const next = i < count ? widths[i]! : reserve;
+      const needed = used === 0 ? next : used + layout.gap + next;
+      if (needed <= layout.width || used === 0) used = needed;
+      else {
+        line += 1;
+        used = next;
+      }
+      if (line > lines) return false;
+    }
+    return true;
+  };
+  if (fits(widths.length, 0)) return widths.length;
+  let count = widths.length - 1;
+  while (count > 0 && !fits(count, layout.moreWidth)) count -= 1;
+  return count;
+}
