@@ -17,19 +17,19 @@ Clisbot scope layer lives in `packages/app/src/clisbot/search-scope/` and is swi
   in Navigation V2: the Work/Chats filter row). Search never changes it silently and it never hides
   search results (R1). It only ranks: rows inside it come first, the rest carry "Outside filter".
 - **Container** (Host, Hub, Project) — Enter, Tab or tap adds a chip and clears the typed text.
-  "Show in Work" (the row's arrow button, ⌘/Ctrl+Enter, or long-press) sets the view filter to
+  "Show in Workspace" (the row's arrow button, ⌘/Ctrl+Enter, or long-press) sets the view filter to
   that scope and offers Undo (R2, R4).
 - **Item** (workspace, session, file, command) — Enter or tap opens it. Opening an item outside the
   view filter publishes a reveal signal; the list shows the notice, the filter stays (R3).
 
 ## Matching
 
-| Result            | Matched on                                                       | Notes                                                                                                                    |
-| ----------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Host              | label, Hub name, connection hostname / SSH host, Hub daemon slug | Case- and diacritics-insensitive (`đ`→`d`). Duplicate labels show the Hub (or "Direct"), then a short id if still equal. |
-| Hub               | organization name / profile label                                | Only Hubs with at least one Host you can see. Chip shows the Host count: "Company (92)".                                 |
-| Project (merged)  | project name, custom name, repo folder name                      | One row per name across Hosts: "on 4 Hosts · 12 sessions".                                                               |
-| Project on a Host | project name **and** Host label                                  | Shown under the merged row when a query word matched a Host label, or when the project is on 2–3 Hosts. Adds two chips.  |
+| Result            | Matched on                                                       | Notes                                                                                                                                                                                |
+| ----------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Host              | label, Hub name, connection hostname / SSH host, Hub daemon slug | Case- and diacritics-insensitive (`đ`→`d`). Duplicate labels show the Hub (or "Direct"), then a short id if still equal.                                                             |
+| Hub               | organization name / profile label                                | Every Hub you are signed in to. Chip shows the Host count: "Company (92)". A Hub with no Host you can see is listed with "Signed in · no Host shared with you yet" and adds no chip. |
+| Project (merged)  | project name, custom name, repo folder name                      | One row per name across Hosts: "on 4 Hosts · 12 sessions".                                                                                                                           |
+| Project on a Host | project name **and** Host label                                  | Shown under the merged row when a query word matched a Host label, or when the project is on 2–3 Hosts. Adds two chips.                                                              |
 
 Projects show before Hosts, both above Workspaces and Sessions, at most 6 rows each. Matching is
 the shared `scoreTextFields` ranker on folded text, so token order does not matter.
@@ -42,26 +42,26 @@ search with it.
 
 Each row is a test in `packages/app/src/clisbot/search-scope/cases.test.ts`.
 
-| #   | State before                          | Input / action                          | Results                                                                                                                                         | Selection → resulting scope                                                     |
-| --- | ------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| 1   | No chips                              | type `sandbox-12`                       | Hosts: sandbox-12 (status, Hub, sessions)                                                                                                       | Enter → chip [sandbox-12]; query clears; items narrow to that Host              |
-| 2   | No chips                              | type `clisbot` (on local + 3 sandboxes) | Projects: "clisbot · on 4 Hosts"                                                                                                                | Enter → chip [clisbot]; sessions of clisbot on all 4 Hosts                      |
-| 3   | No chips                              | type `clisbot sandbox-12`               | "clisbot · on 4 Hosts", then "clisbot on sandbox-12"                                                                                            | Enter on the second → chips [sandbox-12] [clisbot]                              |
-| 4   | Two Hosts both labelled `build`       | type `build`                            | Two rows, subtitles "Company · …" and "Direct · …" (short id if the Hub also matches)                                                           | Each adds its own serverId                                                      |
-| 5   | Chip [Host B]                         | type `anyapp` (only on Host A)          | Suggestions first, then "No 'anyapp' in Host B" · Remove Host filter (+ Remove Project filter · Search everywhere when both dimensions are set) | Remove → chip dropped, query kept; Search everywhere → all chips dropped        |
-| 6   | Chip [clisbot]                        | type `release`                          | Sessions/workspaces named release inside clisbot on every Host                                                                                  | —                                                                               |
-| 7   | Chip [Company] (Hub)                  | empty input                             | Recent / active / needs-action items on the Hub's Hosts, plus up to 5 project suggestions                                                       | —                                                                               |
-| 8   | Chip [sandbox-12]                     | empty input                             | Projects on sandbox-12 as suggestions, recent items on it                                                                                       | Enter on a project → adds chip                                                  |
-| 9   | Chip [clisbot]                        | type `sand`                             | Hosts; those without clisbot are labelled "No clisbot"                                                                                          | Enter → adds Host chip (AND)                                                    |
-| 10  | Chip [Host A]                         | Enter on Host B                         | Both chips (OR within the Host set)                                                                                                             | —                                                                               |
-| 11  | Host offline                          | type its project                        | Rows from cache labelled "Offline · cached 10:42"; online rows unaffected                                                                       | Host chip on an offline Host shows the same label in its subtitle               |
-| 12  | View filter Host A, no chips          | type `clisbot`                          | Items on A first; others labelled "Outside filter"; suggestion chip "Only current filter (Host A)"                                              | Tap suggestion → chips [Host A]                                                 |
-| 13  | View filter Host A                    | Enter on a session on Host B            | Opens it; filter kept; reveal signal `{ serverId: B, reason: "host" }`                                                                          | List pane shows "Outside your filter · Show all · Switch to Host B"             |
-| 14  | Any                                   | "Show in Work" on "clisbot on Host B"   | —                                                                                                                                               | View filter = Host B + Project clisbot; Undo toast restores the previous filter |
-| 15  | Chips                                 | Backspace on empty input                | —                                                                                                                                               | Last chip removed                                                               |
-| 16  | Chips                                 | Clear (×)                               | —                                                                                                                                               | All chips removed                                                               |
-| 17  | Chips                                 | Esc / close, reopen after 3 s           | Chips restored                                                                                                                                  | Reopen after 10 s: no chips                                                     |
-| 18  | `files` scope (workspace file search) | type                                    | Scope rows hidden; file search unchanged                                                                                                        | —                                                                               |
+| #   | State before                          | Input / action                             | Results                                                                                                                                         | Selection → resulting scope                                                     |
+| --- | ------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 1   | No chips                              | type `sandbox-12`                          | Hosts: sandbox-12 (status, Hub, sessions)                                                                                                       | Enter → chip [sandbox-12]; query clears; items narrow to that Host              |
+| 2   | No chips                              | type `clisbot` (on local + 3 sandboxes)    | Projects: "clisbot · on 4 Hosts"                                                                                                                | Enter → chip [clisbot]; sessions of clisbot on all 4 Hosts                      |
+| 3   | No chips                              | type `clisbot sandbox-12`                  | "clisbot · on 4 Hosts", then "clisbot on sandbox-12"                                                                                            | Enter on the second → chips [sandbox-12] [clisbot]                              |
+| 4   | Two Hosts both labelled `build`       | type `build`                               | Two rows, subtitles "Company · …" and "Direct · …" (short id if the Hub also matches)                                                           | Each adds its own serverId                                                      |
+| 5   | Chip [Host B]                         | type `anyapp` (only on Host A)             | Suggestions first, then "No 'anyapp' in Host B" · Remove Host filter (+ Remove Project filter · Search everywhere when both dimensions are set) | Remove → chip dropped, query kept; Search everywhere → all chips dropped        |
+| 6   | Chip [clisbot]                        | type `release`                             | Sessions/workspaces named release inside clisbot on every Host                                                                                  | —                                                                               |
+| 7   | Chip [Company] (Hub)                  | empty input                                | Recent / active / needs-action items on the Hub's Hosts, plus up to 5 project suggestions                                                       | —                                                                               |
+| 8   | Chip [sandbox-12]                     | empty input                                | Projects on sandbox-12 as suggestions, recent items on it                                                                                       | Enter on a project → adds chip                                                  |
+| 9   | Chip [clisbot]                        | type `sand`                                | Hosts; those without clisbot are labelled "No clisbot"                                                                                          | Enter → adds Host chip (AND)                                                    |
+| 10  | Chip [Host A]                         | Enter on Host B                            | Both chips (OR within the Host set)                                                                                                             | —                                                                               |
+| 11  | Host offline                          | type its project                           | Rows from cache labelled "Offline · cached 10:42"; online rows unaffected                                                                       | Host chip on an offline Host shows the same label in its subtitle               |
+| 12  | View filter Host A, no chips          | type `clisbot`                             | Items on A first; others labelled "Outside filter"; suggestion chip "Only current filter (Host A)"                                              | Tap suggestion → chips [Host A]                                                 |
+| 13  | View filter Host A                    | Enter on a session on Host B               | Opens it; filter kept; reveal signal `{ serverId: B, reason: "host" }`                                                                          | List pane shows "Outside your filter · Show all · Switch to Host B"             |
+| 14  | Any                                   | "Show in Workspace" on "clisbot on Host B" | —                                                                                                                                               | View filter = Host B + Project clisbot; Undo toast restores the previous filter |
+| 15  | Chips                                 | Backspace on empty input                   | —                                                                                                                                               | Last chip removed                                                               |
+| 16  | Chips                                 | Clear (×)                                  | —                                                                                                                                               | All chips removed                                                               |
+| 17  | Chips                                 | Esc / close, reopen after 3 s              | Chips restored                                                                                                                                  | Reopen after 10 s: no chips                                                     |
+| 18  | `files` scope (workspace file search) | type                                       | Scope rows hidden; file search unchanged                                                                                                        | —                                                                               |
 
 ## Contract case table → tests
 
@@ -72,8 +72,8 @@ Navigation V2. Real app: `global-search-scope.spec.ts` (sidebar layout) and
 | Rules row (rules.md)                    | Unit                           | Real app                                                      |
 | --------------------------------------- | ------------------------------ | ------------------------------------------------------------- |
 | View filter Host A, type "clisbot"      | cases 2, 12; V2 For me ranking | "a view filter ranks and labels…"                             |
-| Enter on a session from Host B          | case 13; outside-filter        | V2 "opening a session outside Work's Host filter…"            |
-| "Show in Work" on clisbot @ B           | case 14                        | sidebar and V2 "Show in Work … Undo"                          |
+| Enter on a session from Host B          | case 13; outside-filter        | V2 "opening a session outside Workspace's Host filter…"       |
+| "Show in Workspace" on clisbot @ B      | case 14                        | sidebar and V2 "Show in Workspace … Undo"                     |
 | No filters, "sandbox-12", Enter on Host | case 1                         | "a Host chip with a project it lacks…"                        |
 | Chip [Host B], "anyapp"                 | case 5                         | "a Host chip with a project it lacks…"                        |
 | Chip [Project clisbot], "release"       | case 6                         | "a project on two Hosts is one row…"                          |
@@ -94,9 +94,12 @@ Navigation V2. Real app: `global-search-scope.spec.ts` (sidebar layout) and
 - **Commands and files while chips are active.** Hidden. They do not live on a Host or Project,
   so showing them inside a scope would contradict the chip.
 - **For me / Others.** Results rank in four bands: in the view and For me, in the view and Others,
-  then the same two outside it. Others rows say "Others". A workspace's ownership is Work's rule
-  (`resolveOwnership` on its author); a session is its workspace's. Chats use Chats' rule, so a
-  Bot's direct chat is its author's, else the Bot owner's.
+  then the same two outside it. Others rows say "Others". A session's ownership is its own author
+  (`createdBy`, else its workspace's), as in the Workspace list; a workspace's is its author's.
+  Chats use Chats' rule, so a Bot's direct chat is its author's, else the Bot owner's.
+- **A Hub with no visible Host.** Signed in, but none of its Hosts is listed for you (none yet, or
+  none shared). Searching its name still finds it, with "Signed in · no Host shared with you yet" instead of a Host count,
+  so the reader learns why its work is missing; it has nothing to scope, so it adds no chip.
 - **Secondary action key.** ⌘/Ctrl+Enter, matching "open in background" conventions; → stays
   caret movement. Phones use the row's arrow button (always visible on touch) or long-press.
 - **When a Host counts as offline.** As the Home strip judges it: online, or connecting until the
@@ -110,13 +113,13 @@ Navigation V2. Real app: `global-search-scope.spec.ts` (sidebar layout) and
 The seam is `packages/app/src/clisbot/search-scope/work-navigation.ts`; Navigation V2 plugs into
 it from `clisbot/navigation/search-integration.ts`, mounted with the V2 chrome.
 
-- **Work's filter** is published with `setSearchViewContext({ serverIds, projectViewKeys,
-ownership, suggest })`: Work's Host and Project filters (the sidebar's, which Work reads) and
+- **Workspace's filter** is published with `setSearchViewContext({ serverIds, projectViewKeys,
+ownership, suggest })`: Workspace's Host and Project filters (the sidebar's, which Workspace reads) and
   its For me / Others / All scope. "Only current filter" is offered only when search was opened
-  from Work. Without Navigation V2 nothing is published and search reads the sidebar filters.
-- **Show in Work** (`setOpenInWorkHandler`) replaces only the dimensions the target names, opens
-  the V2 Work section and returns the Undo that restores both filters (R4).
-- **The notice** (`navigation/outside-filter-notice.tsx`) sits above Work's and Chats' lists while
+  from Workspace. Without Navigation V2 nothing is published and search reads the sidebar filters.
+- **Show in Workspace** (`setOpenInWorkHandler`) replaces only the dimensions the target names, opens
+  the V2 Workspace section and returns the Undo that restores both filters (R4).
+- **The notice** (`navigation/outside-filter-notice.tsx`) sits above Workspace's and Chats' lists while
   `useOutsideFilterReveal()` names an item that list's filter still hides: "This workspace /
   session / chat is outside your filter" with **Show all** (clear only the hiding dimension) and
   **Switch to {Host or project}** (replace it), or "Shown from Others" with **Show all** (scope →
