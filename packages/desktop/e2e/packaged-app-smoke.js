@@ -806,7 +806,21 @@ async function openSmokeWorkspace({ appPath, env, page, daemonHome }) {
     ],
     label: "Create packaged smoke workspace",
   });
-  await page.getByRole("button", { name: "Sandbox smoke workspace", exact: true }).click();
+  // Navigation V2 (the default layout) lists workspaces under the rail's Workspace section; the
+  // earlier layout lists them in the sidebar by title.
+  const workSection = page.getByTestId("navigation-rail-work");
+  const navigationV2 = await workSection.waitFor({ timeout: 15_000 }).then(
+    () => true,
+    () => false,
+  );
+  if (navigationV2) {
+    await workSection.click();
+    await page
+      .locator(`[data-testid^="sidebar-workspace-row-"][data-testid$=":${workspace.workspaceId}"]`)
+      .click();
+  } else {
+    await page.getByRole("button", { name: "Sandbox smoke workspace", exact: true }).click();
+  }
   await page.waitForURL((url) => url.pathname.endsWith(`/workspace/${workspace.workspaceId}`));
   await page.getByRole("button", { name: "Agent", exact: true }).click();
   await page.getByRole("textbox", { name: "Message agent..." }).click();
