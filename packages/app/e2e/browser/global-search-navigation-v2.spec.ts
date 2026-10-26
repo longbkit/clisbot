@@ -176,6 +176,30 @@ async function openFromSearch(page: Page, query: string, rowTestId: string) {
   await expect(page.getByTestId("command-center-panel")).toHaveCount(0);
 }
 
+/**
+ * Rows whose note is cut off. The note may share a line with a long Host or project name; the name
+ * gives way, not the note.
+ */
+function clippedNotes(notes: Locator, note: string) {
+  return notes.evaluateAll((elements, wanted) => {
+    const clipped: string[] = [];
+    for (const element of elements) {
+      const text = element.textContent ?? "";
+      const node = element.firstChild;
+      const start = text.indexOf(wanted);
+      if (start < 0 || !node?.textContent) continue;
+      const range = document.createRange();
+      range.setStart(node, Math.min(start, node.textContent.length));
+      range.setEnd(node, node.textContent.length);
+      const shown = element.getBoundingClientRect();
+      const needed = range.getBoundingClientRect();
+      if (needed.right > shown.right + 1 || element.scrollWidth > element.clientWidth + 1)
+        clipped.push(text);
+    }
+    return clipped;
+  }, note);
+}
+
 const workNotice = (page: Page) =>
   page.getByTestId("work-outside-filter-notice").filter({ visible: true });
 
@@ -204,6 +228,34 @@ test.describe("Global search in Navigation V2", () => {
       .poll(async () => (await storedFilters(page)).hosts)
       .toEqual([fleet.sandbox.serverId]);
     await expect(workNotice(page)).toHaveCount(0);
+  });
+
+  test("on a 390pt phone the Outside filter note stays readable on every out-of-filter row", async ({
+    page,
+    fleet,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openFleet(page, fleet);
+    await setWorkFilter(page, [getServerId()]);
+    for (const [language, note] of [
+      ["en", "Outside filter"],
+      ["vi", "Ngoài bộ lọc"],
+    ] as const) {
+      await setLanguage(page, language);
+      await gotoWork(page);
+      const panel = await openSearch(page);
+      await panel.getByTestId("command-center-input").fill("release");
+      const notes = panel.getByText(note, { exact: false });
+      await expect(notes.first()).toBeVisible({ timeout: 30_000 });
+      const clipped = await clippedNotes(notes, note);
+      if (SCREENSHOTS)
+        await page.screenshot({
+          path: path.join(ARTIFACTS, `08-outside-filter-row-phone-390-light-${language}.png`),
+        });
+      expect(clipped).toEqual([]);
+      await page.keyboard.press("Escape");
+    }
+    await setLanguage(page, "en");
   });
 
   test("Show in Work opens the V2 Work section with that scope, and Undo restores", async ({
