@@ -57,7 +57,11 @@ test("DM: capture in-flight interleaving and settled positions on pinned accepte
   const client = await connectDaemonClient<DaemonClient>({ clientIdPrefix: "f03-running" });
   const result = await client.createBot({
     name: "F03 isolated DM",
-    launch: { provider: "mock", model: "ten-second-stream", modeId: "load-test" },
+    // The turn must still be running when the interleaved input lands and the running state is
+    // read. A ten second stream could end first on a slow runner (the input then took seq 33
+    // behind the turn's reply, or the order read was already the settled one); this stream runs
+    // for a minute and is ended below once the running state is captured.
+    launch: { provider: "mock", model: "e2e-held-stream", modeId: "load-test" },
   });
   expect(result.error).toBeNull();
   const bot = result.bot!;
@@ -103,6 +107,7 @@ test("DM: capture in-flight interleaving and settled positions on pinned accepte
       body: await page.screenshot(),
       contentType: "image/png",
     });
+    await client.cancelAgent(agentId);
     await expect(page.getByTestId("turn-working-indicator")).toHaveCount(0, { timeout: 25_000 });
     const settled = {
       positions: await positions(page),

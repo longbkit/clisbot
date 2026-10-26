@@ -166,6 +166,18 @@ const MODELS: AgentModelDefinition[] = [
   },
   {
     provider: MOCK_LOAD_TEST_PROVIDER_ID,
+    id: "e2e-held-stream",
+    label: "E2E held stream",
+    description:
+      "Emits as fast as the ten second stream but runs for a minute, so a browser test acts while the turn is still running on a slow runner, then ends it.",
+    isSelectable: false,
+    metadata: {
+      durationMs: 60_000,
+      intervalMs: 5,
+    },
+  },
+  {
+    provider: MOCK_LOAD_TEST_PROVIDER_ID,
     id: "e2e-fast-stream",
     label: "E2E fast stream",
     description: "Short deterministic stream for browser tests.",
