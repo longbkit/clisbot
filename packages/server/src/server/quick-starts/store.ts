@@ -125,6 +125,9 @@ export class QuickStartStore {
       const now = new Date().toISOString();
       const item = QuickStartSchema.parse({
         ...input,
+        // COMPAT(quickStartAutoSend): an app older than the auto-send choice saves without it;
+        // keep the stored choice instead of turning it off. Review 2027-04-26.
+        autoSend: input.autoSend ?? old?.autoSend,
         name,
         id,
         owner: old?.owner ?? authority.owner,
@@ -181,7 +184,7 @@ function isOnlyUnpublish(old: QuickStart | undefined, input: QuickStartInput) {
       target: input.target,
       startingPrompt: input.startingPrompt,
       agent: input.agent,
-      autoSend: input.autoSend ?? false,
+      autoSend: input.autoSend ?? old.autoSend ?? false,
     },
     {
       name: old.name,

@@ -52,6 +52,17 @@ describe("daemon quick starts", () => {
     const restarted = new QuickStartStore(join(dir, "catalog.json"));
     expect((await restarted.list(user("a"))).items[0]).toMatchObject({ autoSend: true });
   });
+  it("keeps auto-send when an older app saves without the choice", async () => {
+    await store.save(user("a"), id, 0, { ...input, autoSend: true });
+    const { autoSend: _omitted, ...olderAppInput } = { ...input, autoSend: undefined };
+    await store.save(user("a"), id, 1, { ...olderAppInput, name: "Renamed" });
+    expect((await store.list(user("a"))).items[0]).toMatchObject({
+      name: "Renamed",
+      autoSend: true,
+    });
+    await store.save(user("a"), id, 2, { ...input, autoSend: false });
+    expect((await store.list(user("a"))).items[0]).toMatchObject({ autoSend: false });
+  });
   it("lets creators publish while recipients pin independently and cannot edit", async () => {
     await store.save(user("a"), id, 0, { ...input, visibility: "host" });
     expect((await store.list(user("b"))).items[0]).toMatchObject({
