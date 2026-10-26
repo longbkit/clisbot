@@ -15,6 +15,8 @@ test("quick start configuration, conflict recovery and confirmed delete", async 
   try {
     await gotoAppShell(page);
     await page.getByRole("link", { name: "View all quick starts" }).click();
+    // A saved quick start is pinned to Home as well, behind this window; read the window's list.
+    const library = page.getByRole("dialog");
     await page.getByRole("button", { name: "New quick start", exact: true }).click();
     await page.getByTestId("quick-start-name").fill("Configured triage");
     await page.getByTestId("quick-start-prompt").fill("Find and fix the regression");
@@ -31,7 +33,7 @@ test("quick start configuration, conflict recovery and confirmed delete", async 
     });
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "Configured triage", exact: true }),
+      library.getByRole("button", { name: "Configured triage", exact: true }),
     ).toBeVisible();
     const saved = (await client.listQuickStarts()).items!.find(
       (item) => item.name === "Configured triage",
@@ -46,7 +48,7 @@ test("quick start configuration, conflict recovery and confirmed delete", async 
         modeId: "load-test",
       },
     });
-    await page.getByRole("button", { name: "Actions for Configured triage" }).click();
+    await library.getByRole("button", { name: "Actions for Configured triage" }).click();
     await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
     await page.getByTestId("quick-start-prompt").fill("My local investigation");
     await client.saveQuickStart({
@@ -60,7 +62,7 @@ test("quick start configuration, conflict recovery and confirmed delete", async 
     await page.getByRole("button", { name: "Save as copy", exact: true }).click();
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "Configured triage copy", exact: true }),
+      library.getByRole("button", { name: "Configured triage copy", exact: true }),
     ).toBeVisible();
     const copy = (await client.listQuickStarts()).items!.find(
       (item) => item.name === "Configured triage copy",
@@ -68,16 +70,17 @@ test("quick start configuration, conflict recovery and confirmed delete", async 
     ids.push(copy.id);
     expect(copy.startingPrompt).toBe("My local investigation");
     expect(copy.visibility).toBe("personal");
-    await page.getByRole("button", { name: "Actions for Configured triage copy" }).click();
+    await library.getByRole("button", { name: "Actions for Configured triage copy" }).click();
     await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     expect((await client.listQuickStarts()).items!.some((item) => item.id === copy.id)).toBe(true);
-    await page.getByRole("button", { name: "Actions for Configured triage copy" }).click();
+    await library.getByRole("button", { name: "Actions for Configured triage copy" }).click();
     await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
+    // Gone from the window and from Home.
     await expect(
       page.getByRole("button", { name: "Configured triage copy", exact: true }),
-    ).not.toBeVisible();
+    ).toHaveCount(0);
   } finally {
     for (const id of ids) {
       const current = (await client.listQuickStarts()).items?.find((item) => item.id === id);
