@@ -5,7 +5,7 @@ import { useSessionStore } from "@/stores/session-store";
 import type { AgentDirectoryEntry } from "@/types/agent-directory";
 import type { Agent } from "@/stores/session-store";
 import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
-import { createAggregatedAgentProjector } from "./aggregated-agent-projector";
+import { sharedAggregatedAgentProjector } from "./aggregated-agent-projector";
 import { nativePerformanceTrace } from "@/performance/native-trace";
 
 export interface AggregatedAgent extends AgentDirectoryEntry {
@@ -54,7 +54,7 @@ export function useAggregatedAgents(options?: {
     for (const serverId of serverIds) void runtime.refreshDirectories(serverId);
   }, [demand, runtime, serverIds]);
 
-  const projectAgents = useMemo(createAggregatedAgentProjector, []);
+  const projectAgents = sharedAggregatedAgentProjector(includeArchived);
   const result = useMemo(() => {
     const tracing = nativePerformanceTrace.isEnabled();
     if (tracing) nativePerformanceTrace.beginSection("clisbot.agents.derive");

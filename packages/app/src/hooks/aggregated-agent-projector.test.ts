@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { Agent } from "@/stores/session-store";
 import {
   createAggregatedAgentProjector,
+  createMemoizedAggregatedAgentProjector,
+  sharedAggregatedAgentProjector,
   type AggregatedAgentSources,
 } from "./aggregated-agent-projector";
 
@@ -103,5 +105,24 @@ describe("aggregated agent projection", () => {
     const first = project(input(a));
     expect(project(input())).toEqual([]);
     expect(project(input(a))[0]).not.toBe(first[0]);
+  });
+});
+
+describe("shared aggregated agent projection", () => {
+  it("answers an equal input with the same array and recomputes when a source changes", () => {
+    const project = createMemoizedAggregatedAgentProjector();
+    const sources = input(agent({ id: "a" }), agent({ id: "b" }));
+    const first = project(sources);
+    const again = project({ ...sources, hosts: [{ serverId: "host-a", label: "Host A" }] });
+    expect(again).toBe(first);
+    const renamedHost = project({ ...sources, hosts: [{ serverId: "host-a", label: "Renamed" }] });
+    expect(renamedHost[0]?.serverLabel).toBe("Renamed");
+    const archived = project({ ...sources, includeArchived: true });
+    expect(archived).not.toBe(renamedHost);
+  });
+
+  it("hands every consumer of a view the same projector", () => {
+    expect(sharedAggregatedAgentProjector(false)).toBe(sharedAggregatedAgentProjector(false));
+    expect(sharedAggregatedAgentProjector(true)).not.toBe(sharedAggregatedAgentProjector(false));
   });
 });
