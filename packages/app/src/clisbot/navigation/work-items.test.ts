@@ -102,13 +102,30 @@ describe("Workspace items", () => {
   it("counts items, so counts follow the scope and the Bots chip", () => {
     const all = [sandbox, teammateWorkspace, workspace("bots-only", me)];
     const shown = countWork(all, sessionsOf, { scope: "mine", accounts: [reader], showBots: true });
-    expect(shown.scopes).toEqual({ mine: 4, others: 2, all: 6 });
+    expect(shown.scopes).toEqual({ mine: 4, others: 2, unknown: 0, all: 6 });
     const hidden = countWork(all, sessionsOf, {
       scope: "mine",
       accounts: [reader],
       showBots: false,
     });
-    expect(hidden.scopes).toEqual({ mine: 1, others: 2, all: 3 });
+    expect(hidden.scopes).toEqual({ mine: 1, others: 2, unknown: 0, all: 3 });
     expect(hidden.chips.done).toBe(1);
+  });
+
+  it("lists an item whose Hub has no known reader only under All", () => {
+    const stranger: SessionActor = { kind: "user", id: "u-9", hubOrigin: "https://other.example" };
+    const unplaced = workspace("unplaced", stranger);
+    const rows = [sandbox, unplaced];
+    const none = (ws: WorkWorkspace) =>
+      ws === unplaced ? [session("u", { createdBy: stranger })] : [];
+    const counts = countWork(rows, none, { scope: "mine", accounts: [reader], showBots: true });
+    expect(counts.scopes).toEqual({ mine: 1, others: 0, unknown: 1, all: 2 });
+    for (const [scope, listed] of [
+      ["mine", false],
+      ["others", false],
+      ["all", true],
+    ] as const) {
+      expect(createWorkFilter(query({ scope }), none).workspace(unplaced)).toBe(listed);
+    }
   });
 });

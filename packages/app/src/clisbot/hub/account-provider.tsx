@@ -29,6 +29,7 @@ import { createHubTransport } from "./transport/create";
 import type { HubTransport } from "./transport/contract";
 import { updateHubProfile } from "@/device-access/hub-profiles";
 import { getHubDaemonListCache } from "./hub-daemon-list-cache";
+import { useReaderMemory } from "./reader-memory";
 import { hubResourceQueryKey } from "./query-keys";
 import { HubAccountRequestError, needsOwnerSetupRecovery } from "@/device-access/hub-account-error";
 import { PairedHubTransport } from "@/device-access/hub-transport";
@@ -439,6 +440,8 @@ function EnabledHubAccountController({
         }
         // Signing out hides this Hub's Hosts even while the Hub cannot confirm it.
         getHubDaemonListCache().forget(configuration.origin);
+        // Only an explicit sign-out forgets who the reader was on this Hub.
+        useReaderMemory.getState().forget(configuration.origin);
       }),
     [run, transport, refresh, configuration.origin],
   );

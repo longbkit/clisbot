@@ -14,12 +14,15 @@ export function pinTagMatchesMode(tag: Pick<PinTag, "area">, mode: HomeMode): bo
   return mode === "hybrid" || tag.area === mode;
 }
 
-/** The reader's own pins by default; other members' pins fold into one `+N · Show` tag. */
+/**
+ * The reader's own pins by default; every other pin, including one nobody can place yet, folds
+ * into one `+N · Show` tag.
+ */
 export function splitPinTags<T extends PinTag>(tags: readonly T[], mode: HomeMode) {
   const visible = tags.filter((tag) => pinTagMatchesMode(tag, mode) && tag.title);
   return {
     mine: visible.filter((tag) => tag.ownership === "mine"),
-    others: visible.filter((tag) => tag.ownership === "others"),
+    others: visible.filter((tag) => tag.ownership !== "mine"),
   };
 }
 

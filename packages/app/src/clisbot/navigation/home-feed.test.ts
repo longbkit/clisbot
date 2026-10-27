@@ -72,7 +72,7 @@ describe("Home feed", () => {
     const others = buildHomeFeed(rows, filters({ scope: "others" }));
     expect(ids(others)).toEqual(["their-fail"]);
     const all = buildHomeFeed(rows, filters({ scope: "all" }));
-    expect(all.scopeCounts).toEqual({ mine: 5, others: 1, all: 6 });
+    expect(all.scopeCounts).toEqual({ mine: 5, others: 1, unknown: 0, all: 6 });
   });
 
   it("collapses seen failures into the Seen group and stops counting them", () => {
@@ -99,6 +99,22 @@ describe("Home feed", () => {
     expect(ids(buildHomeFeed(rows, filters({ chip: "needs" })))).toEqual(["my-fail", "approval"]);
     const counts = buildHomeFeed(rows, filters()).chipCounts;
     expect(counts).toMatchObject({ needs: 2, failed: 1, running: 1, updated: 1, all: 5 });
+  });
+
+  it("lists a session nobody can place only under All, and counts it there", () => {
+    const owners: Record<string, "others" | "unknown"> = {
+      "their-fail": "others",
+      "my-fail": "unknown",
+    };
+    const placed = (row: AggregatedAgent) => owners[row.id] ?? "mine";
+    const unplaced = homeRows({ agents, ownershipOf: placed, records, now: NOW });
+    expect(ids(buildHomeFeed(unplaced, filters()))).not.toContain("my-fail");
+    expect(ids(buildHomeFeed(unplaced, filters({ scope: "others" })))).toEqual(["their-fail"]);
+    const all = buildHomeFeed(unplaced, filters({ scope: "all" }));
+    expect(ids(all)).toContain("my-fail");
+    expect(all.scopeCounts).toEqual({ mine: 4, others: 1, unknown: 1, all: 6 });
+    // Its unseen failure is no one's badge until it can be placed.
+    expect(homeBadgeCount(unplaced)).toBe(1);
   });
 
   it("filters by Host", () => {

@@ -46,9 +46,9 @@ export function isInView(view: SearchViewContext | null, placement: ItemPlacemen
 }
 
 /**
- * Keep every match (R1) in four bands: in view and For me, in view and Others, then the same two
- * outside the view. Stable, so the matcher's order holds within each band and the highlighted row
- * does not jump while results stream in.
+ * Keep every match (R1) in four bands: in view and For me, in view and not mine (Others, or
+ * nobody can tell), then the same two outside the view. Stable, so the matcher's order holds
+ * within each band and the highlighted row does not jump while results stream in.
  */
 export function rankItemsByView<Row>(
   rows: readonly Row[],
@@ -58,7 +58,7 @@ export function rankItemsByView<Row>(
   const bands: Row[][] = [[], [], [], []];
   for (const row of rows) {
     const placement = placementOf(row);
-    const band = (isInView(view, placement) ? 0 : 2) + (placement.ownership === "others" ? 1 : 0);
+    const band = (isInView(view, placement) ? 0 : 2) + (placement.ownership === "mine" ? 0 : 1);
     bands[band]!.push(row);
   }
   return bands.flat();

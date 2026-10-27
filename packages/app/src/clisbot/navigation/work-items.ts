@@ -1,6 +1,12 @@
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { getBotIdFromLabels } from "@clisbot/protocol/bots/labels";
-import { inScope, resolveOwnership, type OwnershipScope, type ReaderAccount } from "./ownership";
+import {
+  EMPTY_SCOPE_COUNTS,
+  inScope,
+  resolveOwnership,
+  type OwnershipScope,
+  type ReaderAccount,
+} from "./ownership";
 import type { WorkChip } from "./store";
 
 /**
@@ -137,7 +143,7 @@ export function countWork(
 ) {
   const { scope, accounts, showBots } = query;
   const chips: Record<WorkChip, number> = { all: 0, needs: 0, running: 0, done: 0, failed: 0 };
-  const scopes = { mine: 0, others: 0, all: 0 };
+  const scopes = { ...EMPTY_SCOPE_COUNTS };
   for (const workspace of workspaces) {
     for (const item of workItemsOf(workspace, sessionsOf(workspace), showBots)) {
       const ownership = resolveOwnership({ createdBy: item.createdBy, accounts });

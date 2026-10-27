@@ -148,22 +148,42 @@ lines are dimmed and the percent gets a `~` prefix.
 
 ## For me / Others / All
 
-`resolveOwnership({ createdBy, accounts, watched })` returns `mine` or `others`:
+`resolveOwnership({ createdBy, accounts, watched })` returns `mine`, `others` or `unknown`:
 
-- No author, a non-user author (automation, system), or a user author with no Hub origin (a
-  direct connection): **mine** (provisional, brief 1.3).
-- A user author from a Hub this device is not signed in to: **mine** — the app cannot tell.
-- A user author matching that Hub's signed-in account (`isOwnActor`: member id, else user id):
-  **mine**; any other user: **others**.
+- No author, a non-user author (automation, system), or a user author with no Hub scope (a direct
+  connection): **mine** (provisional, brief 1.3). A Host older than session authorship sends no
+  `createdBy`, so all of its work lands here.
+- A user author from a Hub with a known reader on this device: **mine** when that account made
+  it (`isOwnActor`: member id, else user id), else **others**.
+- A user author from a Hub with no known reader (not signed in, never signed in, or the account
+  not resolved yet): **unknown**, "cannot tell". Never **mine**: that listed other members' work
+  under For me.
 - `watched === true` (Round 2) makes anything **mine**; the predicate already takes the input.
+
+**Unknown** is in All only. It is in neither For me nor Others, so those two stay claims the app
+can back. The counts are For me + Others + Unknown = All; the tabs show the three counts they
+always did, so an All larger than the other two added up is the unknown ones. It is a transient
+state: it ends when the Hub's account resolves, and the reader is remembered across it (below).
+
+**The reader on a Hub** (`reader.ts`, `reader-accounts.ts`, `hub/reader-memory.ts`) is the live
+signed-in account, else the last one this device verified for that Hub (persisted per Hub origin,
+`clisbot-hub-readers`). A moment with no live answer (the Hub unreachable, the account loading, a
+lapsed sign-in) therefore reclassifies nothing. A different account signing in replaces it; an
+explicit sign-out forgets it. It classifies authorship and authorizes nothing.
+
+**Which Hub an author belongs to.** A session's `createdBy.hubOrigin` is the Hub's public HTTPS
+address; a paired Hub's account is scoped as `hub://<hubId>` and reached by an HTTPS route. The
+author matches the reader's Hub by `hubIdentity` against that `hubId` when both exist, else by the
+canonical origin (scheme, host and port, no trailing slash) against the account's origin or its
+connection route. Two Hubs at one address with different identities are two Hubs.
 
 Authors: a session's own `createdBy` (the agent snapshot and `AgentDirectoryEntry` carry it), else
 its workspace's; a Bot DM its Chat's (`ChatPayload.record.createdBy`); a Bot row without a chat the
 Host's `isOwner` projection, else the Bot's `owner`. Home, the Workspace list, pin tags and global
 search all read the session's author, so a teammate's session in a workspace the reader created is
-Others. Gaps: Hosts older than session authorship send no `createdBy`, so all of their work is For
-me; a channel-started session is the reader's only when its snapshot carries the reader's verified
-`memberId`.
+Others. A channel-started session is the reader's only when its snapshot carries the reader's
+verified `memberId`. In pin tags an unknown pin folds in with the others; in search it ranks with
+them and is hidden by For me.
 
 The scope applies first everywhere; pins only reorder inside it. A pin (a resource pin, or a
 workspace pinned on the Host, which every reader sees) never brings another member's session into
@@ -172,6 +192,24 @@ For me.
 Global search reads the same rule: For me ranks first, Others rows are labelled, and opening an
 item a list hides leaves the list's filter alone and shows a notice above it
 ([global search wiring](../global-search/README.md#navigation-v2-wiring)).
+
+## Sources removed and cached
+
+A source is a Host. Navigation V2 draws only what a source can say now
+(`source-liveness.ts`, `use-navigation-agents.ts`; states from
+[source health](../offline/connection-resilience.md#source-health)):
+
+| Source                                                                            | Its sessions                                                                                                          |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Removed**: not in the Host registry (deleted, or its Hub signed out or revoked) | Not listed anywhere. Nothing stored is cleared.                                                                       |
+| **Cached**: registered, but offline, sign-in needed, revoked, or not answered yet | Listed with their last facts. Not Running, no approval to give; a failure and an unread reply stay, they are history. |
+| **Live**                                                                          | As the Host reports.                                                                                                  |
+
+A cached row shows as an ordinary row in Recent; the connection notice already names the source
+and why. The issue records keep reading the last report, so an approval a Host asked for before
+it dropped is still seen or unseen when it returns. The Running chip and its count, the Needs me
+chip and the badge read the same quiet rows. The Workspace list's status dots and the Chats
+list read their own sources and are not changed by this.
 
 ## Home
 

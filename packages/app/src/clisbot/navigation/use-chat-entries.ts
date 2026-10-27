@@ -11,6 +11,7 @@ import { useHosts } from "@/runtime/host-runtime";
 import type { ChatListEntry } from "./chat-list";
 import { resolveDirectChatOwnership, resolveOwnership } from "./ownership";
 import { useReaderAccounts } from "./reader";
+import { registeredAgents } from "./source-liveness";
 
 export type ChatsEntry = ChatListEntry<BotsSidebarBot, ChatsSidebarChat>;
 
@@ -34,9 +35,15 @@ function useCompanyHosts(): ReadonlySet<string> {
 
 function useUnreadAgents(): ReadonlySet<string> {
   const { agents } = useAggregatedAgents({ demand: false });
+  const hosts = useHosts();
   return useMemo(
-    () => new Set(agents.filter(isUnreadReply).map((agent) => `${agent.serverId}:${agent.id}`)),
-    [agents],
+    () =>
+      new Set(
+        registeredAgents(agents, hosts)
+          .filter(isUnreadReply)
+          .map((agent) => `${agent.serverId}:${agent.id}`),
+      ),
+    [agents, hosts],
   );
 }
 

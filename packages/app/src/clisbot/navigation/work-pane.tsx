@@ -31,6 +31,7 @@ import { RenderProfile } from "@/utils/render-profiler";
 import { useHostsReachability } from "./hosts-status";
 import { HostsUnreachableState } from "./hosts-unreachable-state";
 import { OutsideFilterNotice } from "./outside-filter-notice";
+import { EMPTY_SCOPE_COUNTS } from "./ownership";
 import { SectionControls } from "./section-controls";
 import {
   HeaderMenuIcon,
@@ -151,7 +152,7 @@ function useOpenSearch() {
 
 const EMPTY_COUNTS = {
   chips: { all: 0, needs: 0, running: 0, done: 0, failed: 0 },
-  scopes: { mine: 0, others: 0, all: 0 },
+  scopes: EMPTY_SCOPE_COUNTS,
 };
 
 function WorkControls() {
