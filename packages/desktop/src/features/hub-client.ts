@@ -10,6 +10,8 @@ const HUB_ACCESS_SCOPE = "hub:access";
 const CALLBACK_PATH = "/hub-auth/callback";
 const AUTHORIZATION_TIMEOUT_MS = 5 * 60_000;
 const CREDENTIALS_FILENAME = "hub-client-credentials.json";
+/** The renderer stops waiting at the same deadline for a Hub request (`request-deadline.ts`). */
+const TOKEN_EXCHANGE_TIMEOUT_MS = 15_000;
 const ALLOWED_ACCOUNT_PATHS = new Set([
   "/api/auth/clisbot/state",
   "/api/auth/clisbot/select-organization",
@@ -100,6 +102,30 @@ interface HubClientDependencies {
   decrypt(value: Buffer): string;
   encryptionAvailable(): boolean;
   fetch(input: string | URL, init?: RequestInit): Promise<Response>;
+}
+
+/** The Hub answered a token exchange with a non-success status. */
+class HubTokenExchangeError extends Error {
+  constructor(
+    readonly status: number,
+    readonly oauthError: string | null,
+  ) {
+    super(
+      `Hub credential exchange failed (${status}${oauthError === null ? "" : ` ${oauthError}`}).`,
+    );
+  }
+
+  /** The Hub no longer honors this refresh token: the only answer that ends the sign-in. */
+  get refreshTokenRejected(): boolean {
+    return this.status === 400 && this.oauthError === "invalid_grant";
+  }
+}
+
+/** A refresh that got no usable answer (network, timeout, 5xx, 429). The sign-in is intact. */
+class HubUnreachableError extends Error {
+  constructor(origin: string, cause: unknown) {
+    super(`Cannot reach the Hub at ${origin}; the sign-in is kept and will be retried.`, { cause });
+  }
 }
 
 /**
@@ -256,6 +282,12 @@ export class DesktopHubClient {
     return refresh;
   }
 
+  /**
+   * Null only when this device holds no credential for the Hub or the Hub rejected it
+   * (`invalid_grant`); both mean "sign in again". Any other failure throws and keeps the
+   * credential: access tokens last 5 minutes, so a refresh runs every few minutes and a
+   * network blip must not end the sign-in.
+   */
   private async performRefresh(origin: string): Promise<string | null> {
     const refreshToken = await this.readRefreshCredential(origin);
     if (refreshToken === null) return null;
@@ -269,30 +301,50 @@ export class DesktopHubClient {
           refresh_token: refreshToken,
         }),
       );
-      if (token.refresh_token === undefined)
+      if (token.refresh_token === undefined) {
         throw new Error("Hub did not rotate the refresh token.");
+      }
       await this.saveRefreshCredential(origin, token.refresh_token);
       return token.access_token;
-    } catch {
+    } catch (error) {
       this.access.delete(origin);
-      await this.deleteRefreshCredential(origin);
-      return null;
+      if (error instanceof HubTokenExchangeError && error.refreshTokenRejected) {
+        console.warn(
+          `[hub-client] ${origin} rejected the refresh token; signing out: ${error.message}`,
+        );
+        await this.deleteRefreshCredential(origin);
+        return null;
+      }
+      console.warn(
+        `[hub-client] refresh for ${origin} failed; sign-in kept: ${describeError(error)}`,
+      );
+      throw new HubUnreachableError(origin, error);
     }
   }
 
   private async exchange(origin: string, body: URLSearchParams) {
-    const response = await this.dependencies.fetch(new URL("/api/auth/oauth2/token", origin), {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body,
-    });
-    if (!response.ok) throw new Error(`Hub credential exchange failed (${response.status}).`);
-    const token = OAuthTokenResponseSchema.parse(await response.json());
-    this.access.set(origin, {
-      accessToken: token.access_token,
-      expiresAt: Date.now() + token.expires_in * 1_000,
-    });
-    return token;
+    // fetch is the injected dependency, so the deadline is ours: abort covers a stalled body too.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TOKEN_EXCHANGE_TIMEOUT_MS);
+    try {
+      const response = await this.dependencies.fetch(new URL("/api/auth/oauth2/token", origin), {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new HubTokenExchangeError(response.status, await readOAuthError(response));
+      }
+      const token = OAuthTokenResponseSchema.parse(await response.json());
+      this.access.set(origin, {
+        accessToken: token.access_token,
+        expiresAt: Date.now() + token.expires_in * 1_000,
+      });
+      return token;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private async readRefreshCredential(origin: string): Promise<string | null> {
@@ -390,6 +442,19 @@ export function requireTrustedRenderer(event: IpcMainInvokeEvent): void {
     (url.protocol === "clisbot:" && url.host === "app") ||
     (!app.isPackaged && url.origin === (process.env.EXPO_DEV_URL ?? "http://localhost:8081"));
   if (!trusted) throw new Error("Hub client IPC is available only to the Clisbot renderer.");
+}
+
+async function readOAuthError(response: Response): Promise<string | null> {
+  try {
+    const parsed = z.object({ error: z.string() }).safeParse(await response.json());
+    return parsed.success ? parsed.data.error : null;
+  } catch {
+    return null;
+  }
+}
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function allowedHubPath(value: string): string {
