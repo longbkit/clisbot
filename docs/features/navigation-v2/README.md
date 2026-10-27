@@ -169,9 +169,12 @@ state: it ends when the Hub's account resolves, and the reader is remembered acr
 signed-in account, else the last one this device verified for that Hub (persisted per Hub origin,
 `clisbot-hub-readers`). A moment with no live answer (the Hub unreachable, the account loading, a
 lapsed sign-in) therefore reclassifies nothing. A different account signing in replaces it; an
-explicit sign-out forgets it, and that wins over any signed-in answer that is still in flight or
-failed to refresh, until the Hub itself answers that nobody is signed in (`signedOut` in
-`reader-memory.ts`). Storage is read after the app starts: what happened meanwhile wins, and a
+explicit sign-out forgets it, and the mark it leaves (`signedOut` in `reader-memory.ts`) wins over
+the account query for that account: an answer that still says signed in (a refetch in flight, or
+one that failed) is not the reader, in the hook as well as in storage. The mark ends when another
+account signs in, when a sign-in or other account action completes with a current answer from the
+Hub (`run` in `hub/account-provider.tsx`, a session change elsewhere), or when the Hub answers that
+nobody is signed in. Storage is read after the app starts: what happened meanwhile wins, and a
 reader signed out meanwhile is also removed from storage. It classifies authorship and authorizes
 nothing.
 
@@ -225,9 +228,15 @@ sessions only does not hide them. A Host with no health entry yet counts as cach
 records keep reading the last report, so an approval a Host asked for before it dropped is still
 seen or unseen when it returns.
 
-Not covered: the Workspace row's own status dot and the By status grouping read the daemon's
-workspace status (`createSidebarWorkspaceEntry`), and the agent tabs' dots read the raw agent;
-both are upstream paths and still show the last reported status.
+Not covered, and why: the Workspace row's status badge and the By status grouping read the
+daemon's workspace status (`createSidebarWorkspaceEntry`), and the agent tabs' dots read the raw
+agent. Those render in upstream components (`project-leading-visual.tsx`, `agent-status-dot.tsx`,
+three row call sites) and still show the last reported status. [design.md](../../design.md) §13
+has no stale or cached status token, and §13's dots are one family, so a dimmed or hollow dot is a
+new visual convention for the Owner to decide, not a local tweak. If it is approved, one
+`cached` prop on the dot components read through `useIsSourceCached(serverId)` covers every call
+site; until then a cached Host's workspace badge can still look live, and the connection notice
+and the Hosts rail dot are what say the Host is out of reach.
 
 ## Home
 

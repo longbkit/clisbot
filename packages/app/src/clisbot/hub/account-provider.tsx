@@ -264,12 +264,17 @@ function EnabledHubAccountController({
     retry: false,
     staleTimeMs: 15_000,
   });
-  const refresh = useCallback(async () => {
-    await Promise.all([
+  /** Reads the account again; true when the Hub answered, so the state is current. */
+  const refetchAccount = useCallback(async () => {
+    const [result] = await Promise.all([
       account.refetch(),
       ...(configuration.deviceProfile ? [connection.refetch()] : []),
     ]);
+    return !result.isError;
   }, [account, configuration.deviceProfile, connection]);
+  const refresh = useCallback(async () => {
+    await refetchAccount();
+  }, [refetchAccount]);
   // Signing in again as the same account keeps the daemon-list query key, so a list the Hub
   // refused (401) would stay refused until its backed-off poll. Read it again at once; a read
   // still in flight carries the old credential and is replaced.
@@ -291,16 +296,27 @@ function EnabledHubAccountController({
   useEffect(
     () =>
       transport.subscribeSessionChange?.(() => {
-        void refresh().then(readDaemonListAgain);
+        // A session change made elsewhere (a sign-in in another tab): a current answer ends any
+        // sign-out marked here (reader-memory.ts).
+        void (async () => {
+          const current = await refetchAccount();
+          if (current) useReaderMemory.getState().acknowledgeSignIn(configuration.origin);
+          readDaemonListAgain();
+        })();
       }),
-    [transport, refresh, readDaemonListAgain],
+    [transport, refetchAccount, readDaemonListAgain, configuration.origin],
   );
   const run = useCallback(
-    async (operation: () => Promise<void>) => {
+    async (operation: () => Promise<void>, options?: { signsOut?: true }) => {
       setMutationError(null);
       try {
         await operation();
-        await refresh();
+        const current = await refetchAccount();
+        // A completed action followed by a current answer means the Hub accepted this session:
+        // what the account query says now is the reader, whatever an earlier sign-out left
+        // marked (reader-memory.ts).
+        if (current && !options?.signsOut)
+          useReaderMemory.getState().acknowledgeSignIn(configuration.origin);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : i18n.t("hub.account.errors.requestFailed");
@@ -308,7 +324,7 @@ function EnabledHubAccountController({
         throw error;
       }
     },
-    [refresh],
+    [refetchAccount, configuration.origin],
   );
   const signIn = useCallback(
     (input?: { email: string; password: string }) =>
@@ -343,11 +359,12 @@ function EnabledHubAccountController({
       const link = await registrationLinkRequest(transport, "complete", input);
       if (link.status === "registered") {
         dismissRegistration();
-        await account.refetch();
+        const current = await account.refetch();
+        if (!current.isError) useReaderMemory.getState().acknowledgeSignIn(configuration.origin);
       }
       return link;
     },
-    [account, dismissRegistration, transport],
+    [account, configuration.origin, dismissRegistration, transport],
   );
   const recoverOwnerSetup = useCallback(
     async (error: unknown) => {
@@ -431,19 +448,28 @@ function EnabledHubAccountController({
   );
   const signOut = useCallback(
     () =>
-      run(async () => {
-        try {
-          await transport.signOut();
-        } catch (error) {
-          await refresh();
-          throw error;
-        }
-        // Signing out hides this Hub's Hosts even while the Hub cannot confirm it.
-        getHubDaemonListCache().forget(configuration.origin);
-        // Only an explicit sign-out forgets who the reader was on this Hub.
-        useReaderMemory.getState().forget(configuration.origin);
-      }),
-    [run, transport, refresh, configuration.origin],
+      run(
+        async () => {
+          const state = queryClient.getQueryData<HubAccountState>(accountQueryKey);
+          const signedInId =
+            state?.status === "active" || state?.status === "appSetupRequired"
+              ? state.account.id
+              : null;
+          try {
+            await transport.signOut();
+          } catch (error) {
+            await refresh();
+            throw error;
+          }
+          // Signing out hides this Hub's Hosts even while the Hub cannot confirm it.
+          getHubDaemonListCache().forget(configuration.origin);
+          // Only an explicit sign-out forgets who the reader was on this Hub. It holds against
+          // an account answer that is still stale, until a sign-in completes.
+          useReaderMemory.getState().forget(configuration.origin, signedInId);
+        },
+        { signsOut: true },
+      ),
+    [run, transport, refresh, configuration.origin, queryClient, accountQueryKey],
   );
   const updateProfile = useCallback(
     (input: { name?: string; image?: string | null }) =>

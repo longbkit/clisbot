@@ -71,6 +71,19 @@ describe("sign-out", () => {
     expect(Object.keys(store().readers)).toEqual([hubA.origin]);
   });
 
+  it("lets a different account in, and the same one only after its sign-in completes", () => {
+    store().remember(hubA);
+    store().forget(hubA.origin, hubA.id);
+    store().remember({ ...hubA, id: "u-other" });
+    expect(store().readers[hubA.origin]?.id).toBe("u-other");
+    store().forget(hubA.origin, "u-other");
+    store().remember({ ...hubA, id: "u-other" });
+    expect(store().readers).toEqual({});
+    store().acknowledgeSignIn(hubA.origin);
+    store().remember({ ...hubA, id: "u-other" });
+    expect(store().readers[hubA.origin]?.id).toBe("u-other");
+  });
+
   it("forgets only the Hub that signed out", () => {
     store().remember(hubA);
     store().remember(hubB);

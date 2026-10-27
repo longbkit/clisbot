@@ -52,18 +52,42 @@ const PersistedSchema = z.object({
   ),
 });
 
+/** A Hub signed out explicitly on this device; `accountId` is who, when that was known. */
+export interface SignOutMark {
+  accountId: string | null;
+}
+export type SignOutMarks = Readonly<Record<string, SignOutMark>>;
+
+/**
+ * Whether `reader` is the account that signed out and so must not be read as the reader: while a
+ * sign-out is marked, a signed-in answer for that same account is stale (a refetch still in
+ * flight, or one that failed). Another account is a new sign-in.
+ */
+export function isSignedOutReader(
+  marks: SignOutMarks,
+  reader: { origin: string | null; id: string | null | undefined },
+): boolean {
+  const mark = reader.origin === null ? undefined : marks[reader.origin];
+  return mark !== undefined && (mark.accountId === null || mark.accountId === reader.id);
+}
+
 interface ReaderMemoryState {
   readers: RememberedReaders;
-  /**
-   * Hubs signed out explicitly on this device, until the Hub confirms nobody is signed in. While
-   * set, a signed-in answer is stale (a refetch still in flight, or one that failed) and must
-   * not bring the reader back. Never persisted.
-   */
-  signedOut: Readonly<Record<string, true>>;
+  /** Never persisted. Ends with a different account, a completed sign-in or the Hub's word. */
+  signedOut: SignOutMarks;
   remember: (reader: RememberedReader) => void;
-  forget: (origin: string) => void;
+  /** An explicit sign-out. `accountId` is the account that was signed in, if known. */
+  forget: (origin: string, accountId?: string | null) => void;
+  /** An explicit sign-in on this Hub completed: what the account query says now is current. */
+  acknowledgeSignIn: (origin: string) => void;
   /** The Hub answered that nobody is signed in: a later signed-in answer is a new sign-in. */
   confirmSignedOut: (origin: string) => void;
+}
+
+function withoutMark(marks: SignOutMarks, origin: string): SignOutMarks {
+  if (!(origin in marks)) return marks;
+  const { [origin]: _ended, ...rest } = marks;
+  return rest;
 }
 
 /** Set by a merge that changed what storage holds, so hydration writes it back. */
@@ -76,20 +100,30 @@ export const useReaderMemory = create<ReaderMemoryState>()(
       signedOut: {},
       remember: (reader) =>
         set((state) => {
-          if (state.signedOut[reader.origin]) return state;
+          const marks = state.signedOut;
+          if (isSignedOutReader(marks, reader)) return state;
+          // A different account than the one that signed out is necessarily a new sign-in.
+          const signedOut = withoutMark(marks, reader.origin);
           const readers = rememberReader(state.readers, reader);
-          return readers === state.readers ? state : { readers };
+          return readers === state.readers && signedOut === marks ? state : { readers, signedOut };
         }),
-      forget: (origin) =>
+      forget: (origin, accountId) =>
         set((state) => ({
           readers: forgetReader(state.readers, origin),
-          signedOut: { ...state.signedOut, [origin]: true },
+          signedOut: {
+            ...state.signedOut,
+            [origin]: { accountId: accountId ?? state.readers[origin]?.id ?? null },
+          },
         })),
+      acknowledgeSignIn: (origin) =>
+        set((state) => {
+          const signedOut = withoutMark(state.signedOut, origin);
+          return signedOut === state.signedOut ? state : { signedOut };
+        }),
       confirmSignedOut: (origin) =>
         set((state) => {
-          if (!state.signedOut[origin]) return state;
-          const { [origin]: _confirmed, ...signedOut } = state.signedOut;
-          return { signedOut };
+          const signedOut = withoutMark(state.signedOut, origin);
+          return signedOut === state.signedOut ? state : { signedOut };
         }),
     }),
     {
