@@ -187,6 +187,90 @@ describe("durable projected timeline", () => {
       selectProjectedTimelinePage({ rows, direction: "tail", limit: 40 }).entries,
     );
   });
+  it("pages a history larger than the read budget when a plugin identity prevents bounding", async () => {
+    const { store } = await fixture();
+    const text = "x".repeat(256 * 1024);
+    const plugin = (seq: number, version: number): AgentTimelineRow => ({
+      seq,
+      timestamp: "2026-09-11T00:00:00Z",
+      turnId: "turn",
+      item: { type: "plugin", id: "card", pluginId: "demo", kind: "card", version, data: {} },
+    });
+    // 160 distinct 256 KiB messages project to ~80 MiB, past the 32 MiB read budget.
+    const rows = [plugin(1, 1), ...Array.from({ length: 160 }, (_, i) => message(i + 2, text))];
+    rows.push(plugin(rows.length + 1, 2));
+    for (const row of rows) await store.bulkInsert("a", [row]);
+    const maxSeq = rows.length;
+
+    for (const pagingMode of ["source_ranges", undefined] as const) {
+      const seen: string[] = [];
+      let page = await store.fetchProjectedCommitted("a", { pagingMode, limit: 20 });
+      expect(page.endSeq).toBe(maxSeq);
+      expect(page.hasOlder).toBe(true);
+      while (true) {
+        for (const entry of page.entries)
+          if (entry.item.type === "assistant_message") seen.push(entry.item.messageId!);
+        if (!page.hasOlder || page.startSeq === null) break;
+        page = await store.fetchProjectedCommitted("a", {
+          pagingMode,
+          direction: "before",
+          cursor: { epoch: await store.getEpoch("a"), seq: page.startSeq },
+          limit: 20,
+        });
+      }
+      const expected = rows.flatMap((row) =>
+        row.item.type === "assistant_message" ? [row.item.messageId!] : [],
+      );
+      expect([...seen].sort(), `${pagingMode ?? "legacy"} sees each message once`).toEqual(
+        [...expected].sort(),
+      );
+    }
+  }, 120_000);
+  it("keeps merged messages whole across fallback ranges in a history past the window cap", async () => {
+    const { store } = await fixture();
+    // 9,000 rows exceed the 8,192-row window, so the plugin row forces a bounded fallback.
+    const rows: AgentTimelineRow[] = Array.from({ length: 9000 }, (_, index) => ({
+      ...message(index + 1),
+      item: {
+        type: "assistant_message" as const,
+        text: ".",
+        messageId: `m-${Math.floor(index / 50)}`,
+      },
+    }));
+    rows.push({
+      seq: 9001,
+      timestamp: "2026-09-11T00:00:00Z",
+      turnId: "turn",
+      item: { type: "plugin", id: "card", pluginId: "demo", kind: "card", version: 1, data: {} },
+    });
+    for (let index = 0; index < rows.length; index += 128)
+      await store.bulkInsert("a", rows.slice(index, index + 128));
+    const epoch = await store.getEpoch("a");
+    const expected = new Map<string, string>();
+    for (const row of rows)
+      if (row.item.type === "assistant_message")
+        expected.set(row.item.messageId!, (expected.get(row.item.messageId!) ?? "") + ".");
+
+    for (const pagingMode of ["source_ranges", undefined] as const) {
+      const seen = new Map<string, string>();
+      let page = await store.fetchProjectedCommitted("a", { pagingMode, limit: 200 });
+      while (true) {
+        for (const entry of page.entries)
+          if (entry.item.type === "assistant_message") {
+            expect(seen.has(entry.item.messageId!), entry.item.messageId).toBe(false);
+            seen.set(entry.item.messageId!, entry.item.text);
+          }
+        if (!page.hasOlder || page.startSeq === null) break;
+        page = await store.fetchProjectedCommitted("a", {
+          pagingMode,
+          direction: "before",
+          cursor: { epoch, seq: page.startSeq },
+          limit: 200,
+        });
+      }
+      expect(seen, `${pagingMode ?? "legacy"} merges every message whole`).toEqual(expected);
+    }
+  }, 120_000);
   it("source-range pages recover every item around an ancient updated tool without certifying its gap", async () => {
     const { store } = await fixture();
     const rows = [
