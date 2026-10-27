@@ -1,8 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { BOT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { observeIssues, markIssueSeen } from "./issues";
-import { buildHomeFeed, homeBadgeCount, homeRows, type HomeFeedFilters } from "./home-feed";
+import {
+  buildHomeFeed,
+  createHomeRowCache,
+  homeBadgeCount,
+  homeRows,
+  type HomeFeedFilters,
+} from "./home-feed";
 
 const NOW = Date.parse("2026-10-25T10:00:00Z");
 function agent(id: string, overrides: Partial<AggregatedAgent> = {}): AggregatedAgent {
@@ -124,5 +130,57 @@ describe("Home feed", () => {
     const other = [...agents, agent("remote", { serverId: "h2" })];
     const otherRows = homeRows({ agents: other, ownershipOf, records, now: NOW });
     expect(ids(buildHomeFeed(otherRows, filters({ serverIds: ["h2"] })))).toEqual(["remote"]);
+  });
+});
+
+describe("Home row cache", () => {
+  const entry = (id: string, extra: Partial<AggregatedAgent> = {}) =>
+    ({
+      id,
+      serverId: "h",
+      status: "idle",
+      lastActivityAt: new Date(0),
+      pendingPermissionCount: 0,
+      ...extra,
+    }) as AggregatedAgent;
+
+  const NONE = {};
+
+  it("re-derives only the session that changed", () => {
+    const list = Array.from({ length: 200 }, (_, i) => entry(`a${i}`));
+    const ownerOf = vi.fn(() => "mine" as const);
+    const rowsOf = createHomeRowCache();
+    const first = rowsOf({ agents: list, ownershipOf: ownerOf, records: NONE, now: 1 });
+    ownerOf.mockClear();
+    const next = [...list];
+    next[7] = { ...list[7]!, title: "renamed" };
+    const second = rowsOf({ agents: next, ownershipOf: ownerOf, records: NONE, now: 1 });
+    expect(ownerOf).toHaveBeenCalledTimes(1);
+    expect(second[7]!.agent.title).toBe("renamed");
+    expect(second[8]).toBe(first[8]);
+  });
+
+  it("hands back the same array when nothing changed, and rebuilds when an input does", () => {
+    const list = [entry("a"), entry("b")];
+    const ownerOf = vi.fn(() => "mine" as const);
+    const rowsOf = createHomeRowCache();
+    const first = rowsOf({ agents: list, ownershipOf: ownerOf, records: NONE, now: 1 });
+    expect(rowsOf({ agents: [...list], ownershipOf: ownerOf, records: NONE, now: 1 })).toBe(first);
+    ownerOf.mockClear();
+    rowsOf({ agents: list, ownershipOf: ownerOf, records: NONE, now: 2 });
+    expect(ownerOf).toHaveBeenCalledTimes(2);
+  });
+
+  it("always rebuilds a session with pending requests, whose request ids can change unseen", () => {
+    const pending = entry("p", { pendingPermissionCount: 1 });
+    let requestKey = "r1";
+    const subjectOf = (item: AggregatedAgent) => ({ ...item, requestKey });
+    const rowsOf = createHomeRowCache();
+    const input = { agents: [pending], ownershipOf: () => "mine" as const, records: NONE, now: 1 };
+    const first = rowsOf({ ...input, subjectOf })[0]!;
+    requestKey = "r2";
+    const second = rowsOf({ ...input, subjectOf })[0]!;
+    expect(first.issue?.occurrence).toBe("request:r1");
+    expect(second.issue?.occurrence).toBe("request:r2");
   });
 });

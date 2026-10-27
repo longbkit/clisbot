@@ -17,7 +17,7 @@ import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useHosts } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
 import { NAVIGATION_V2_ENABLED } from "./feature";
-import { homeBadgeCount, homeRows, type HomeRow } from "./home-feed";
+import { createHomeRowCache, homeBadgeCount, type HomeRow } from "./home-feed";
 import { selectIssueRecords, useIssueStore } from "./issue-store";
 import {
   dismissIssue,
@@ -73,12 +73,16 @@ function ObservedNavigationActivity({ children }: { children: ReactNode }) {
   const update = useIssueStore((state) => state.update);
   const subjectOf = useIssueSubjects();
   useEffect(() => {
-    const subjects = observed.map(subjectOf);
+    // Only a session with pending requests needs its request ids spread onto its subject.
+    const subjects = observed.map((agent) =>
+      (agent.pendingPermissionCount ?? 0) > 0 ? subjectOf(agent) : agent,
+    );
     update(scope, (current) => observeIssues(current, subjects, Date.now()));
   }, [observed, scope, subjectOf, update]);
+  const rowsOf = useMemo(createHomeRowCache, []);
   const rows = useMemo(
-    () => homeRows({ agents, ownershipOf: ownership.ownershipOf, records, now, subjectOf }),
-    [agents, ownership.ownershipOf, records, now, subjectOf],
+    () => rowsOf({ agents, ownershipOf: ownership.ownershipOf, records, now, subjectOf }),
+    [agents, ownership.ownershipOf, records, now, rowsOf, subjectOf],
   );
   const transition = useCallback(
     (apply: (current: typeof records) => typeof records) => update(scope, apply),

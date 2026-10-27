@@ -41,21 +41,65 @@ export function matchesMode(agent: Pick<AggregatedAgent, "labels">, mode: HomeMo
   return isChatAgent(agent) === (mode === "chat");
 }
 
-/** Rows before the scope is applied: ownership and the issue each agent shows now. */
-export function homeRows(input: {
+interface HomeRowsInput {
   agents: readonly AggregatedAgent[];
   ownershipOf: (agent: AggregatedAgent) => Ownership;
   records: IssueRecords;
   now: number;
   /** Adds what the directory entry lacks, such as the pending requests' ids. */
   subjectOf?: (agent: AggregatedAgent) => IssueSubject;
-}): HomeRow[] {
-  const subjectOf = input.subjectOf ?? ((agent: AggregatedAgent) => agent);
-  return input.agents.map((agent) => ({
+}
+
+function buildRow(
+  agent: AggregatedAgent,
+  subject: IssueSubject,
+  input: Pick<HomeRowsInput, "ownershipOf" | "records" | "now">,
+): HomeRow {
+  return {
     agent,
     ownership: input.ownershipOf(agent),
-    issue: resolveIssue(subjectOf(agent), input.records[issueSessionKey(agent)], input.now),
-  }));
+    issue: resolveIssue(subject, input.records[issueSessionKey(agent)], input.now),
+  };
+}
+
+/** Rows before the scope is applied: ownership and the issue each agent shows now. */
+export function homeRows(input: HomeRowsInput): HomeRow[] {
+  const subjectOf = input.subjectOf ?? ((agent: AggregatedAgent) => agent);
+  return input.agents.map((agent) => buildRow(agent, subjectOf(agent), input));
+}
+
+/**
+ * `homeRows` for a stream of directory updates: a directory entry is replaced only when it
+ * changes, so the row of every other session is reused, along with the reader and Hub matching
+ * its ownership costs. A session with pending requests is always rebuilt, because its request ids
+ * (the issue's occurrence) can change while its entry stays equal. The array itself is reused when
+ * no row changed, so memoized readers downstream stay quiet.
+ */
+export function createHomeRowCache() {
+  let sharedInputs: readonly unknown[] = [];
+  let cached = new Map<AggregatedAgent, HomeRow>();
+  let lastRows: HomeRow[] = [];
+  return (input: HomeRowsInput): HomeRow[] => {
+    const inputs = [input.ownershipOf, input.records, input.now];
+    if (inputs.some((value, index) => value !== sharedInputs[index])) {
+      sharedInputs = inputs;
+      cached = new Map();
+    }
+    const next = new Map<AggregatedAgent, HomeRow>();
+    const rows = input.agents.map((agent) => {
+      if ((agent.pendingPermissionCount ?? 0) > 0) {
+        return buildRow(agent, input.subjectOf ? input.subjectOf(agent) : agent, input);
+      }
+      const row = cached.get(agent) ?? buildRow(agent, agent, input);
+      next.set(agent, row);
+      return row;
+    });
+    cached = next;
+    const unchanged =
+      rows.length === lastRows.length && rows.every((row, i) => row === lastRows[i]);
+    if (!unchanged) lastRows = rows;
+    return lastRows;
+  };
 }
 
 /**
