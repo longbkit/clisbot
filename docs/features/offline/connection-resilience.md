@@ -69,6 +69,12 @@ body that stalls after the headers (`transport/request-deadline.ts`). The Electr
 be aborted from the renderer, so the renderer stops waiting at the same deadline. Paired Hubs
 already had 8 s handshake and 16 s request deadlines in `HubDeviceTransport`.
 
+The desktop main process refreshes the Hub sign-in itself (`packages/desktop/src/features/hub-client.ts`).
+Access tokens last 5 minutes, so it refreshes every few minutes, and it ends the sign-in only when
+the Hub answers `400 invalid_grant`, as the browser and native transports do. A network error,
+timeout (15 s), 5xx or 429 keeps the stored credential, fails that request as unreachable and
+retries on the next one. It logs the reason either way (`[hub-client]` in the main-process log).
+
 A request with no HTTP answer fails as `HubUnreachableError`. `classifyHubFailure` maps 401 to
 needs-sign-in, 403 to revoked, and everything else (network, timeout, 5xx) to unreachable.
 Unreachable never hides or wipes data.
