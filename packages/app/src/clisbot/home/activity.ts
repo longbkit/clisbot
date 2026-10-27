@@ -34,21 +34,19 @@ export function activitySections(
     (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime(),
   );
   const take = (rows: AggregatedAgent[]) => (limit ? rows.slice(0, limit) : rows);
+  // One classification per agent, whatever the number of buckets; each keeps the sorted order.
+  const buckets = { needs: [], active: [], recent: [], seen: [] } as Record<
+    ReturnType<ActivityBucketOf>,
+    AggregatedAgent[]
+  >;
+  for (const agent of sorted) buckets[bucketOf(agent)].push(agent);
   const sections: ActivitySection[] = [
-    {
-      key: "needs",
-      title: i18n.t("home.activity.needsYou"),
-      agents: take(sorted.filter((a) => bucketOf(a) === "needs")),
-    },
-    {
-      key: "active",
-      title: i18n.t("home.activity.active"),
-      agents: take(sorted.filter((a) => bucketOf(a) === "active")),
-    },
+    { key: "needs", title: i18n.t("home.activity.needsYou"), agents: take(buckets.needs) },
+    { key: "active", title: i18n.t("home.activity.active"), agents: take(buckets.active) },
   ];
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const recent = take(sorted.filter((a) => bucketOf(a) === "recent"));
+  const recent = take(buckets.recent);
   if (recent.length)
     sections.push({ key: "recent", title: i18n.t("home.activity.recent"), agents: [] });
   let dateFormatter: Intl.DateTimeFormat | undefined;
@@ -74,7 +72,7 @@ export function activitySections(
     }
     section.agents.push(agent);
   }
-  const seen = take(sorted.filter((a) => bucketOf(a) === "seen"));
+  const seen = take(buckets.seen);
   if (seen.length)
     sections.push({ key: "seen", title: i18n.t("home.activity.seenIssues"), agents: seen });
   return sections.filter((s) => s.agents.length || s.key === "recent");

@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { activityLayout, activityLayoutChanges, visibleActivityLayout } from "./activity-layout";
 
@@ -60,4 +60,19 @@ test("Recent's limit spans dates and grows without resorting the accepted order"
   );
   expect(keys(visibleActivityLayout(layout, 20))).toHaveLength(14);
   expect(activityLayoutChanges(layout, activityLayout(rows.toReversed(), now, layout))).toBe(0);
+});
+
+test("a layout pass classifies each agent once and never uses locale collation", () => {
+  const list = Array.from({ length: 300 }, (_, i) => agent(`a${i}`, i));
+  const bucketOf = vi.fn(() => "recent" as const);
+  const compare = vi.spyOn(Intl.Collator.prototype, "compare", "get");
+  activityLayout(list, now, [], bucketOf);
+  expect(bucketOf).toHaveBeenCalledTimes(list.length);
+  expect(compare).not.toHaveBeenCalled();
+  compare.mockRestore();
+});
+
+test("equal timestamps order by Host and id, whichever Host answered first", () => {
+  const same = [agent("b", 5, "idle", "z"), agent("a", 5, "idle", "z"), agent("c", 5, "idle", "a")];
+  expect(keys(activityLayout(same, now))).toEqual(keys(activityLayout(same.toReversed(), now)));
 });

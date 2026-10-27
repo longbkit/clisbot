@@ -1,10 +1,6 @@
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { activitySections, type ActivityBucketOf } from "./activity";
 
-// Hermes creates a platform collator for each localeCompare call. Reuse the same default
-// collation while sorting a directory burst instead of creating thousands of ICU objects.
-const identityCollator = new Intl.Collator();
-
 /** Home remembers placement only. Every row's contents still come from the live directory. */
 export interface ActivityLayoutSection {
   key: string;
@@ -14,16 +10,24 @@ export interface ActivityLayoutSection {
 export const activityKey = (agent: Pick<AggregatedAgent, "serverId" | "id">) =>
   `${agent.serverId}:${agent.id}`;
 
+function compareText(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
 export function activityLayout(
   agents: AggregatedAgent[],
   now: Date,
   previous: ActivityLayoutSection[] = [],
   bucketOf?: ActivityBucketOf,
 ): ActivityLayoutSection[] {
-  // Equal timestamps must not inherit the order in which independent Hosts answered.
-  const ordered = [...agents].sort((a, b) =>
-    identityCollator.compare(activityKey(a), activityKey(b)),
-  );
+  // Equal timestamps must not inherit the order in which independent Hosts answered. Any fixed
+  // order will do, so the key is built once per agent and compared as plain text: a locale
+  // collator costs an ICU call per comparison on Hermes.
+  const ordered = agents
+    .map((agent) => ({ agent, key: activityKey(agent) }))
+    .sort((a, b) => compareText(a.key, b.key))
+    .map((entry) => entry.agent);
   return activitySections(ordered, now, undefined, bucketOf).map((section) => {
     let keys = section.agents.map(activityKey);
     if (section.key === "active" || section.key === "needs" || section.key === "seen") {
