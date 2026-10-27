@@ -39,8 +39,7 @@ import {
   useDropdownMenuClose,
 } from "@/components/ui/dropdown-menu";
 import type { MenuTriggerState } from "@/components/ui/menu/menu-root";
-import { ConnectionStatusDot } from "@/components/host-status-dot";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
 import { openHostOverview } from "@/navigation/settings-navigation";
@@ -182,13 +181,21 @@ function RailHosts({ section }: { section: BuiltinSection }) {
   const status = useHostsStatus();
   const filter = useHostFilter();
   const { t } = useTranslation();
-  // The tooltip and the Hosts picker say how many are online; the icon only carries the dot.
+  // The badge says how many are online; the tooltip and the Hosts picker give the total.
   const countsLabel = t("navigation.hostFilter.online", {
     online: filter.online,
     total: filter.total,
   });
   const addHost = useCallback(() => router.push(buildSettingsAddHostRoute(Date.now())), [router]);
-  const dot = useMemo(() => <ConnectionStatusDot status={status} small />, [status]);
+  // The same pill as Home's count, coloured by the Hosts' status as the dot was.
+  const badge = useMemo(
+    () => (
+      <View testID="rail-host-count">
+        <StatusBadge label={String(filter.online)} variant={HOST_BADGE_VARIANT[status]} size="xs" />
+      </View>
+    ),
+    [filter.online, status],
+  );
   const renderTrigger = useCallback(
     (trigger: SidebarHostPickerTrigger) => (
       <View ref={trigger.ref} collapsable={false}>
@@ -197,12 +204,12 @@ function RailHosts({ section }: { section: BuiltinSection }) {
           label={label}
           tooltip={`${trigger.label} · ${countsLabel}`}
           onPress={trigger.onPress}
-          dot={dot}
+          badge={badge}
           testID="sidebar-hosts-trigger"
         />
       </View>
     ),
-    [countsLabel, dot, label],
+    [badge, countsLabel, label],
   );
   return (
     <>
@@ -310,7 +317,6 @@ function RailButton({
   active = false,
   onPress,
   badge,
-  dot,
   caption,
   testID,
 }: {
@@ -322,7 +328,6 @@ function RailButton({
   active?: boolean;
   onPress: () => void;
   badge?: ReactNode;
-  dot?: ReactNode;
   testID: string;
 }) {
   const state = useMemo(() => ({ selected: active }), [active]);
@@ -345,7 +350,6 @@ function RailButton({
               active={active}
               hovered={Boolean(hovered) || pressed}
               badge={badge}
-              dot={dot}
               caption={caption}
             />
           )}
@@ -364,7 +368,6 @@ function RailContent({
   active,
   hovered,
   badge,
-  dot,
   caption,
 }: {
   Icon: LucideIcon;
@@ -372,14 +375,12 @@ function RailContent({
   active: boolean;
   hovered: boolean;
   badge?: ReactNode;
-  dot?: ReactNode;
   caption?: ReactNode;
 }) {
   return (
     <>
       <View style={[styles.glyph, hovered && styles.glyphHovered, active && styles.glyphActive]}>
         <ThemedIcon Icon={Icon} uniProps={active || hovered ? strongColor : mutedColor} />
-        {dot ? <View style={styles.dot}>{dot}</View> : null}
         {badge ? <View style={styles.badge}>{badge}</View> : null}
       </View>
       <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>
@@ -492,7 +493,12 @@ const styles = StyleSheet.create((theme) => ({
     ...RAIL_MICRO_TEXT,
   },
   badge: { position: "absolute", top: -theme.spacing[1.5], right: -theme.spacing[2] },
-  dot: { position: "absolute", top: theme.spacing[1], right: theme.spacing[1.5] },
   tooltip: { color: theme.colors.popoverForeground, fontSize: theme.fontSize.sm },
   pluginMenu: { padding: theme.spacing[1] },
 }));
+
+const HOST_BADGE_VARIANT: Record<ReturnType<typeof useHostsStatus>, StatusBadgeVariant> = {
+  online: "success",
+  connecting: "warning",
+  error: "error",
+};
