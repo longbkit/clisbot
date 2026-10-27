@@ -7,6 +7,10 @@ import { z } from "zod";
 import { expandTilde } from "../utils/path.js";
 import { resolveBotsConfig, resolveBotsOverridePaths } from "./bots/bots-config.js";
 import { resolveConnectorsConfig } from "./connectors/connectors-config.js";
+import {
+  resolveAgentColdStorageConfig,
+  resolveAgentColdStorageOverridePaths,
+} from "./agent/agent-cold-storage.js";
 
 import type { ClisbotDaemonConfig } from "./bootstrap.js";
 import {
@@ -658,6 +662,10 @@ export function resolveConfigFromPersisted(
       env.CLISBOT_AGENT_SESSION_STORAGE,
       persisted.features,
     ),
+    agentColdStorage: resolveAgentColdStorageConfig({
+      env,
+      persisted: persisted.features?.agentColdStorage,
+    }),
     staticDir: "public",
     agentClients: {},
     relayEnabled: relay.enabled,
@@ -763,6 +771,7 @@ function resolveDaemonOverrideControlledPaths(
     ...resolveRelayOverridePaths(env, cli),
     ...resolveServiceAndWebUiOverridePaths(env, cli),
     ...resolveBotsOverridePaths(env),
+    ...resolveAgentColdStorageOverridePaths(env),
   ];
 }
 

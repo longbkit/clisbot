@@ -38,6 +38,8 @@ export interface BotServiceDeps {
   /** Archives the bot's Workspace the way `archive_workspace_request` does; the directory stays. */
   archiveWorkspace(workspaceId: string): Promise<void>;
   isProviderAvailable(provider: string): boolean;
+  /** Reuse `bot.list` reads between writes; on with agent cold storage. */
+  listCache?: boolean;
 }
 
 export interface BotUpdatePatch {
@@ -78,7 +80,13 @@ export function createBotServiceFromConfig(
 }
 
 export function createBotService(deps: BotServiceDeps): BotService {
-  const store = new BotStore(join(deps.clisbotHome, "bots"), deps.logger.child({ module: "bots" }));
+  const store = new BotStore(
+    join(deps.clisbotHome, "bots"),
+    deps.logger.child({ module: "bots" }),
+    {
+      listCache: deps.listCache,
+    },
+  );
   const provisioning: BotProvisioningDeps = { ...deps, store };
   // Slug allocation, the directory and the record are decided under one queue so two
   // `bot.create` calls cannot pick the same home.
