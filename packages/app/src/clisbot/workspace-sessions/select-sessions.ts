@@ -5,8 +5,12 @@ import { isWorkspaceRootAgent } from "@/subagents/policies";
 import { resolveTurnPresentation } from "@/timeline/turn-liveness";
 import { deriveSidebarStateBucket, type SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
+import { withoutLiveFacts } from "@/clisbot/navigation/source-liveness";
 
-export type WorkspaceSessionSource = Pick<SessionState, "agents" | "messageSubmissions">;
+export type WorkspaceSessionSource = Pick<SessionState, "agents" | "messageSubmissions"> & {
+  /** The source is out of reach: its sessions keep their last facts but nothing live. */
+  cached?: boolean;
+};
 
 /** One session line under a workspace row. `agent` is the store's reference, so memo can key on it. */
 export interface WorkspaceSessionItem {
@@ -14,6 +18,8 @@ export interface WorkspaceSessionItem {
   /** Null until the session has a name — see `resolveWorkspaceAgentTabLabel`. */
   title: string | null;
   statusBucket: SidebarStateBucket;
+  /** Its live state was dropped because the source is out of reach: unknown, not finished. */
+  unverified?: boolean;
 }
 
 /**
@@ -58,7 +64,8 @@ export function hasWorkspaceSessionLine(input: {
   if (!agent || !isWorkspaceSessionAgent(agent, input.source.agents, input.workspaceId)) {
     return false;
   }
-  return passesActiveOnly(input, agent.id, deriveSessionStatusBucket(agent, input.source));
+  const status = deriveSessionStatus(agent, input.source);
+  return passesActiveOnly(input, agent.id, status.bucket, status.unverified);
 }
 
 /**
@@ -70,8 +77,15 @@ function passesActiveOnly(
   input: { activeOnly: boolean; keepAgentIds?: ReadonlySet<string> },
   agentId: string,
   bucket: SidebarStateBucket,
+  unverified = false,
 ): boolean {
-  return !input.activeOnly || bucket !== "done" || (input.keepAgentIds?.has(agentId) ?? false);
+  // A session whose live state is unknown is not "done".
+  return (
+    !input.activeOnly ||
+    bucket !== "done" ||
+    unverified ||
+    (input.keepAgentIds?.has(agentId) ?? false)
+  );
 }
 
 /**
@@ -83,15 +97,25 @@ export function deriveSessionStatusBucket(
   agent: Agent,
   source: WorkspaceSessionSource,
 ): SidebarStateBucket {
+  return deriveSessionStatus(agent, source).bucket;
+}
+
+/** The bucket, and whether it is `unverified`: a cached source's running turn or approval was dropped. */
+export function deriveSessionStatus(
+  agent: Agent,
+  source: WorkspaceSessionSource,
+): { bucket: SidebarStateBucket; unverified: boolean } {
   const hasActiveSubmission =
     getActiveMessageSubmissions(source.messageSubmissions.get(agent.id)).length > 0;
   const turnActive = resolveTurnPresentation(agent.turn, hasActiveSubmission).isActive;
-  return deriveSidebarStateBucket({
-    status: turnActive ? "running" : agent.status,
+  const facts = {
+    status: turnActive ? ("running" as const) : agent.status,
     pendingPermissionCount: agent.pendingPermissions.length,
     requiresAttention: agent.requiresAttention ?? false,
     attentionReason: agent.attentionReason ?? null,
-  });
+  };
+  const shown = source.cached ? withoutLiveFacts(facts) : facts;
+  return { bucket: deriveSidebarStateBucket(shown), unverified: shown !== facts };
 }
 
 export function selectWorkspaceSessions(input: {
@@ -103,14 +127,19 @@ export function selectWorkspaceSessions(input: {
   /** The list owner's own rule (Navigation V2's Workspace scope); absent lists every line. */
   include?: (session: WorkspaceSessionItem) => boolean;
 }): WorkspaceSessionItem[] {
-  const sessions = listWorkspaceRootAgents(input.source.agents, input.workspaceId).map((agent) => ({
-    agent,
-    title: resolveWorkspaceAgentTabLabel(agent.title),
-    statusBucket: deriveSessionStatusBucket(agent, input.source),
-  }));
+  const sessions = listWorkspaceRootAgents(input.source.agents, input.workspaceId).map((agent) => {
+    const status = deriveSessionStatus(agent, input.source);
+    const item: WorkspaceSessionItem = {
+      agent,
+      title: resolveWorkspaceAgentTabLabel(agent.title),
+      statusBucket: status.bucket,
+    };
+    if (status.unverified) item.unverified = true;
+    return item;
+  });
   return sessions.filter(
     (session) =>
-      passesActiveOnly(input, session.agent.id, session.statusBucket) &&
+      passesActiveOnly(input, session.agent.id, session.statusBucket, session.unverified) &&
       (input.include?.(session) ?? true),
   );
 }

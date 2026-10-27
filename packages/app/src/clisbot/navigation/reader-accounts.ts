@@ -1,5 +1,10 @@
 import type { HubAccountContextValue } from "@/clisbot/hub/account-provider";
 import type { RememberedReader } from "@/clisbot/hub/reader-memory";
+
+interface ReaderMemoryActions {
+  remember(reader: RememberedReader): void;
+  confirmSignedOut(origin: string): void;
+}
 import type { ReaderAccount } from "./ownership";
 
 type SignedInAccount = Pick<HubAccountContextValue, "origin" | "connectionOrigin" | "signedIn">;
@@ -43,4 +48,21 @@ export function mergeReaderAccounts(
 ): ReaderAccount[] {
   const liveOrigins = new Set(live.map((reader) => reader.origin));
   return [...live, ...remembered.filter((reader) => !liveOrigins.has(reader.origin))];
+}
+
+/**
+ * Keeps the memory in step with what each Hub account says now. A signed-in answer remembers the
+ * reader (the memory ignores it after an explicit sign-out); an answer that nobody is signed in
+ * confirms that sign-out. A Hub that could not answer changes nothing.
+ */
+export function recordVerifiedReaders(
+  accounts: readonly (SignedInAccount & { state: unknown })[],
+  memory: Pick<ReaderMemoryActions, "remember" | "confirmSignedOut">,
+): void {
+  for (const account of accounts) {
+    const reader = readerAccountOf(account);
+    const verified = reader && rememberedOf(reader);
+    if (verified) memory.remember(verified);
+    else if (account.state !== null && account.origin) memory.confirmSignedOut(account.origin);
+  }
 }

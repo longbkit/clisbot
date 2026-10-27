@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useHubAccounts } from "@/clisbot/hub/account-provider";
 import { useReaderMemory } from "@/clisbot/hub/reader-memory";
 import type { ReaderAccount } from "./ownership";
-import { mergeReaderAccounts, readerAccountOf, rememberedOf } from "./reader-accounts";
+import { mergeReaderAccounts, readerAccountOf, recordVerifiedReaders } from "./reader-accounts";
 
 function useLiveReaders(): readonly ReaderAccount[] {
   const accounts = useHubAccounts();
@@ -19,14 +19,8 @@ export function useReaderAccounts(): readonly ReaderAccount[] {
   return useMemo(() => mergeReaderAccounts(live, Object.values(remembered)), [live, remembered]);
 }
 
-/** Mounted once: every verified sign-in becomes the Hub's remembered reader. */
+/** Mounted once: every Hub account's answer keeps the remembered readers in step. */
 export function useRememberVerifiedReaders(): void {
-  const live = useLiveReaders();
-  const remember = useReaderMemory((state) => state.remember);
-  useEffect(() => {
-    for (const reader of live) {
-      const verified = rememberedOf(reader);
-      if (verified) remember(verified);
-    }
-  }, [live, remember]);
+  const accounts = useHubAccounts();
+  useEffect(() => recordVerifiedReaders(accounts, useReaderMemory.getState()), [accounts]);
 }

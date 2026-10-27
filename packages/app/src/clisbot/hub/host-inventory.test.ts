@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/runtime/host-runtime", () => ({ useHosts: () => [] }));
 vi.mock("./account-provider", () => ({ useHubAccount: () => ({}), useHubAccounts: () => [] }));
 
-const { isAccountHost, hubListPollIntervalMs } = await import("./host-inventory");
+const { isAccountHost, hubListPollIntervalMs, inventoryHosts } = await import("./host-inventory");
+const { cachedListForAccount } = await import("./hub-daemon-list-cache");
 
 const management = (managedAccessMode: "off" | "external", hubOrigin = "hub://old") => ({
   kind: "hub" as const,
@@ -69,5 +70,63 @@ describe("hubListPollIntervalMs", () => {
       60_000, 120_000, 240_000, 300_000, 300_000, 300_000,
     ]);
     expect(hubListPollIntervalMs(3, () => 0)).toBe(120_000);
+  });
+});
+
+describe("inventoryHosts: which registered Hosts the picker (and so Home and Work) lists", () => {
+  const external = (hubOrigin = "https://hub.example") => ({
+    serverId: "srv-managed",
+    management: { ...management("external", hubOrigin), organizationId: "org-1" },
+  });
+  const direct = { serverId: "srv-own", management: undefined };
+  const remembered = {
+    origin: "https://hub.example",
+    accountId: "acc-1",
+    organizationId: "org-1",
+    syncedAt: "2026-10-27T00:00:00Z",
+    daemons: [{ id: "daemon-1", connectionOffer: { serverId: "srv-managed" } }] as never,
+  };
+  const account = (state: unknown, signedIn: unknown) => ({
+    origin: "https://hub.example",
+    state,
+    signedIn: signedIn as never,
+  });
+
+  it("keeps a Host the Hub listed last time while the Hub is temporarily unreachable", () => {
+    // The Hub's answer could not be read: no state, no live list; the remembered one stands.
+    const unreachable = account(null, null);
+    const shown = inventoryHosts({
+      accounts: [unreachable],
+      lists: [undefined],
+      remembered: [cachedListForAccount(remembered, unreachable)],
+      registeredHosts: [direct, external()],
+      localServerIds: [],
+    });
+    expect(shown.map((host) => host.serverId)).toEqual(["srv-own", "srv-managed"]);
+  });
+
+  it("hides an external Host once the Hub answered that this device is signed out", () => {
+    const signedOut = account({ status: "signedOut" }, null);
+    const shown = inventoryHosts({
+      accounts: [signedOut],
+      lists: [undefined],
+      remembered: [cachedListForAccount(remembered, signedOut)],
+      registeredHosts: [direct, external()],
+      localServerIds: [],
+    });
+    expect(shown.map((host) => host.serverId)).toEqual(["srv-own"]);
+  });
+
+  it("lists every registered Host when no Hub account is saved", () => {
+    const registered = [direct, external()];
+    expect(
+      inventoryHosts({
+        accounts: [],
+        lists: [],
+        remembered: [],
+        registeredHosts: registered,
+        localServerIds: [],
+      }),
+    ).toBe(registered);
   });
 });

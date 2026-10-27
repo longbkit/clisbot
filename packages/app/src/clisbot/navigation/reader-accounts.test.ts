@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { forgetReader, rememberReader, type RememberedReader } from "@/clisbot/hub/reader-memory";
 import { resolveOwnership } from "./ownership";
-import { mergeReaderAccounts, readerAccountOf } from "./reader-accounts";
+import { useReaderMemory } from "@/clisbot/hub/reader-memory";
+import { mergeReaderAccounts, readerAccountOf, recordVerifiedReaders } from "./reader-accounts";
 
 const signedIn = (id: string, memberId: string) =>
   ({ account: { id }, membership: { id: memberId } }) as never;
@@ -109,5 +110,45 @@ describe("last verified reader", () => {
   it("does not rewrite a record that has not changed", () => {
     const readers = rememberReader({}, verified);
     expect(rememberReader(readers, { ...verified })).toBe(readers);
+  });
+});
+
+describe("recording verified readers", () => {
+  const hub = "https://hub.example";
+  const signedInAccount = {
+    origin: hub,
+    connectionOrigin: hub,
+    state: { status: "active" } as never,
+    signedIn: signedIn("u-me", "m-me"),
+  };
+  const signedOutAccount = {
+    ...signedInAccount,
+    state: { status: "signedOut" } as never,
+    signedIn: null,
+  };
+  const unreadableAccount = { ...signedInAccount, state: null, signedIn: null };
+  const memory = () => useReaderMemory.getState();
+  const record = (accounts: Parameters<typeof recordVerifiedReaders>[0]) =>
+    recordVerifiedReaders(accounts, memory());
+
+  it("remembers a verified sign-in and keeps it through a Hub that cannot answer", () => {
+    useReaderMemory.setState({ readers: {}, signedOut: {} });
+    record([signedInAccount]);
+    record([unreadableAccount]);
+    expect(Object.keys(memory().readers)).toEqual([hub]);
+  });
+
+  it("lets an explicit sign-out win over a signed-in answer that is still in flight", () => {
+    useReaderMemory.setState({ readers: {}, signedOut: {} });
+    record([signedInAccount]);
+    memory().forget(hub);
+    // The refetch after sign-out failed, or an older one landed: still shows signed in.
+    record([signedInAccount]);
+    record([unreadableAccount]);
+    expect(memory().readers).toEqual({});
+    // The Hub answers that nobody is signed in; a later sign-in is a new one.
+    record([signedOutAccount]);
+    record([signedInAccount]);
+    expect(Object.keys(memory().readers)).toEqual([hub]);
   });
 });

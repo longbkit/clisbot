@@ -1,67 +1,118 @@
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
-import type { SourceHealth } from "@/runtime/source-health";
+import type { SourceState } from "@/runtime/source-health";
 
 /**
  * What Navigation V2 may show as happening now. A source is a Host.
  *
- * - **Removed**: no longer in the Host registry (its Hub is signed out, or the Host was deleted).
- *   Its sessions are not listed. Nothing stored is cleared; the runtime already drops a removed
- *   Host's replica, and this only keeps a late leftover from being drawn.
- * - **Cached**: still registered but not reachable now (offline, a sign-in lapsed, access
- *   revoked) or not yet answered on this connection. Its sessions stay listed with their last
- *   known facts, but nothing about them is live: not Running, and no approval to give.
+ * - **Not listable**: registered, but the Host picker does not list it either (a Hub-managed Host
+ *   that no Hub account here lists, or whose Hub answered that this device is signed out), or no
+ *   longer registered. Its sessions are not listed. Nothing stored is cleared. Until the registry,
+ *   every Hub and the remembered Hub lists have all loaded this cannot be judged, so nothing is
+ *   hidden: work that is valid offline must not disappear during a cold start.
+ * - **Cached**: listable but not reachable now (offline, a sign-in lapsed, access revoked), not
+ *   yet answered on this connection, or not yet measured. Its sessions stay listed with their
+ *   last known facts, but nothing live is claimed: not Running, no approval to give, and not
+ *   "Done" either, because what a cached session was doing is unknown, not finished.
  *
  * See docs/features/navigation-v2/README.md#sources-removed-and-cached.
  */
 
-/** The sessions of Hosts still in the registry. Returns `agents` itself when none is dropped. */
-export function registeredAgents<T extends { serverId: string }>(
+/**
+ * The Hosts whose sessions may be listed: the picker's own list once it can be judged, else every
+ * registered Host.
+ */
+export function listableServerIds(input: {
+  registered: readonly string[];
+  inventory: readonly string[];
+  settled: boolean;
+}): ReadonlySet<string> {
+  return new Set(input.settled ? input.inventory : input.registered);
+}
+
+/** The sessions of listable Hosts. Returns `agents` itself when none is dropped. */
+export function listedAgents<T extends { serverId: string }>(
   agents: readonly T[],
-  hosts: readonly { serverId: string }[],
+  listable: ReadonlySet<string>,
 ): readonly T[] {
-  const registered = new Set(hosts.map((host) => host.serverId));
-  return agents.every((agent) => registered.has(agent.serverId))
+  return agents.every((agent) => listable.has(agent.serverId))
     ? agents
-    : agents.filter((agent) => registered.has(agent.serverId));
+    : agents.filter((agent) => listable.has(agent.serverId));
+}
+
+/** One source as its health reads after a Hub's sign-in or revocation has overridden it. */
+export interface SourceStatusLike {
+  serverId: string;
+  effectiveState: SourceState;
+  agents: { loaded: boolean };
 }
 
 /**
- * Hosts whose sessions are cached. `degraded` is the health summary's list of unreachable
- * sources, which already lets a Hub's sign-in or revocation override its Hosts; a source that is
- * still on its first connection has shown no live directory yet.
+ * Whether a source's sessions are cached. Offline, a lapsed sign-in and revoked access are not
+ * live; a source still on its first connection has shown no live directory; one with no health
+ * entry yet has not been measured. None of those is live.
  */
+export function isCachedSource(status: SourceStatusLike | null | undefined): boolean {
+  if (!status) return true;
+  if (status.effectiveState === "live") return false;
+  if (status.effectiveState === "syncing") return !status.agents.loaded;
+  return true;
+}
+
+/** The listable Hosts whose sessions are cached. */
 export function cachedServerIds(input: {
-  entries: readonly SourceHealth[];
-  degraded: readonly { serverId: string }[];
+  statuses: readonly SourceStatusLike[];
+  listable: ReadonlySet<string>;
 }): ReadonlySet<string> {
-  const cached = new Set(input.degraded.map((source) => source.serverId));
-  for (const entry of input.entries) {
-    if (entry.state === "syncing" && !entry.agents.loaded) cached.add(entry.serverId);
-  }
-  return cached;
+  const byId = new Map(input.statuses.map((status) => [status.serverId, status]));
+  return new Set([...input.listable].filter((serverId) => isCachedSource(byId.get(serverId))));
+}
+
+/** The facts a status is read from; `status` is a plain string so any agent shape fits. */
+export interface LiveFacts {
+  status: string;
+  pendingPermissionCount?: number;
+  requiresAttention?: boolean | null;
+  attentionReason?: "finished" | "error" | "permission" | null;
+}
+
+/**
+ * `facts` minus what only a live source can say: a running turn and a pending approval. Returns
+ * `facts` itself when it holds none. Failures and unread replies are history and stay.
+ */
+export function withoutLiveFacts<T extends LiveFacts>(facts: T): T {
+  const running = facts.status === "running" || facts.status === "initializing";
+  const asking = (facts.pendingPermissionCount ?? 0) > 0 || facts.attentionReason === "permission";
+  if (!running && !asking) return facts;
+  return {
+    ...facts,
+    status: running ? "idle" : facts.status,
+    pendingPermissionCount: 0,
+    requiresAttention: facts.attentionReason === "permission" ? false : facts.requiresAttention,
+    attentionReason: facts.attentionReason === "permission" ? null : facts.attentionReason,
+  };
 }
 
 const quiet = new WeakMap<AggregatedAgent, AggregatedAgent>();
+const unverified = new WeakSet<AggregatedAgent>();
 
-/**
- * A session as its source last reported it, minus what only a live source can say: a running
- * turn and a pending approval. Failures and unread replies are facts and stay.
- */
+/** Whether `agent` is a cached copy whose live state was dropped (so it is unknown, not done). */
+export function isCachedAgent(agent: AggregatedAgent): boolean {
+  return unverified.has(agent);
+}
+
+/** A session as its source last reported it, minus its live facts (see `withoutLiveFacts`). */
 export function asCachedAgent(agent: AggregatedAgent): AggregatedAgent {
-  const running = agent.status === "running" || agent.status === "initializing";
-  const asking = (agent.pendingPermissionCount ?? 0) > 0 || agent.attentionReason === "permission";
-  if (!running && !asking && agent.turn.phase !== "open") return agent;
   const known = quiet.get(agent);
   if (known) return known;
+  const facts = withoutLiveFacts(agent);
+  const open = agent.turn.phase === "open";
+  if (facts === agent && !open) return agent;
   const cached: AggregatedAgent = {
-    ...agent,
-    status: running ? "idle" : agent.status,
-    turn: agent.turn.phase === "open" ? { phase: "idle", cancellationRequestId: null } : agent.turn,
-    pendingPermissionCount: 0,
-    requiresAttention: agent.attentionReason === "permission" ? false : agent.requiresAttention,
-    attentionReason: agent.attentionReason === "permission" ? null : agent.attentionReason,
+    ...facts,
+    turn: open ? { phase: "idle", cancellationRequestId: null } : agent.turn,
   };
   quiet.set(agent, cached);
+  unverified.add(cached);
   return cached;
 }
 

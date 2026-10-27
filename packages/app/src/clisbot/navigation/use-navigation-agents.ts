@@ -1,11 +1,10 @@
 import { useMemo } from "react";
 import { useAggregatedAgents, type AggregatedAgent } from "@/hooks/use-aggregated-agents";
-import { useSourceHealthEntries, useSourceHealthSummary } from "@/hooks/use-source-health";
-import { useHosts } from "@/runtime/host-runtime";
-import { cachedServerIds, quietCachedAgents, registeredAgents } from "./source-liveness";
+import { listedAgents, quietCachedAgents } from "./source-liveness";
+import { useSourceLiveness } from "./use-source-liveness";
 
 /**
- * Navigation V2's sessions: those of Hosts still in the registry, in two views.
+ * Navigation V2's sessions: those of listable Hosts, in two views.
  * `observed` is what the Hosts last said, for the issue records, which must not forget an
  * approval because its Host is out of reach. `display` is what may be drawn as happening now.
  */
@@ -15,18 +14,8 @@ export function useNavigationAgents(): {
   cached: ReadonlySet<string>;
 } {
   const { agents } = useAggregatedAgents({ demand: false });
-  const hosts = useHosts();
-  const entries = useSourceHealthEntries();
-  const { degraded } = useSourceHealthSummary();
-  const observed = useMemo(() => registeredAgents(agents, hosts), [agents, hosts]);
-  const cachedKey = useMemo(
-    () => [...cachedServerIds({ entries, degraded })].sort().join("\n"),
-    [entries, degraded],
-  );
-  const cached = useMemo<ReadonlySet<string>>(
-    () => new Set(cachedKey ? cachedKey.split("\n") : []),
-    [cachedKey],
-  );
+  const { listable, cached } = useSourceLiveness();
+  const observed = useMemo(() => listedAgents(agents, listable), [agents, listable]);
   const display = useMemo(() => quietCachedAgents(observed, cached), [observed, cached]);
   return { observed, display, cached };
 }

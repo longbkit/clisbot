@@ -37,6 +37,7 @@ import {
 import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
 import type { SidebarProjection } from "@/components/sidebar/sidebar-projection";
 import { useSidebarViewStore, type SidebarGroupMode } from "@/stores/sidebar-view-store";
+import { useCachedServerIds, useIsSourceCached } from "@/clisbot/navigation/use-source-liveness";
 import { listsSessions, resolveSidebarGroupMode } from "./grouping";
 import type { SidebarShortcutModel } from "@/utils/sidebar-shortcuts";
 
@@ -184,7 +185,8 @@ export function useWorkspaceSessions(input: {
   keepAgentIds: ReadonlySet<string>;
   include?: (session: WorkspaceSessionItem) => boolean;
 }): WorkspaceSessionItem[] {
-  const source = useSessionStore(
+  const cached = useIsSourceCached(input.serverId);
+  const stored = useSessionStore(
     useShallow((state) => {
       const session = state.sessions[input.serverId];
       return session
@@ -192,6 +194,7 @@ export function useWorkspaceSessions(input: {
         : EMPTY_SOURCE;
     }),
   );
+  const source = useMemo(() => (cached ? { ...stored, cached } : stored), [stored, cached]);
   return useMemo(
     () =>
       selectWorkspaceSessions({
@@ -343,13 +346,15 @@ function useDisplayGroups(input: {
   const submissionMaps = useSessionStore(
     useShallow((state) => serverIds.map((id) => state.sessions[id]?.messageSubmissions ?? null)),
   );
+  const cached = useCachedServerIds();
   return useMemo(() => {
     if (!sessionsShown) return workspaceStatusDisplayGroups(groups);
     const sources = new Map<string, WorkspaceSessionSource>();
     serverIds.forEach((serverId, index) => {
       const agents = agentMaps[index];
       const messageSubmissions = submissionMaps[index];
-      if (agents && messageSubmissions) sources.set(serverId, { agents, messageSubmissions });
+      if (agents && messageSubmissions)
+        sources.set(serverId, { agents, messageSubmissions, cached: cached.has(serverId) });
     });
     return sessionDisplayGroups({
       groups,
@@ -370,6 +375,7 @@ function useDisplayGroups(input: {
     serverIds,
     agentMaps,
     submissionMaps,
+    cached,
     t,
   ]);
 }

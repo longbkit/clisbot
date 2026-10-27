@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
-import type { SourceHealth } from "@/runtime/source-health";
 import { buildHomeFeed, homeBadgeCount, homeRows, type HomeFeedFilters } from "./home-feed";
 import { observeIssues } from "./issues";
 import {
   asCachedAgent,
   cachedServerIds,
+  isCachedAgent,
+  isCachedSource,
+  listableServerIds,
+  listedAgents,
   quietCachedAgents,
-  registeredAgents,
+  withoutLiveFacts,
+  type SourceStatusLike,
 } from "./source-liveness";
 
 const NOW = Date.parse("2026-10-27T10:00:00Z");
@@ -52,60 +56,79 @@ const failure = (id: string, serverId: string) =>
     attentionTimestamp: new Date(NOW - 1000),
   });
 
-function health(serverId: string, overrides: Partial<SourceHealth> = {}): SourceHealth {
-  return {
-    serverId,
-    label: serverId,
-    hubOrigin: null,
-    state: "live",
-    online: true,
-    lastSyncedAt: null,
-    error: null,
-    agents: { loaded: true, syncing: false, pending: false, error: null },
-    workspaces: { loaded: true, syncing: false, pending: false, error: null },
-    ...overrides,
-  };
+function status(serverId: string, overrides: Partial<SourceStatusLike> = {}): SourceStatusLike {
+  return { serverId, effectiveState: "live", agents: { loaded: true }, ...overrides };
 }
 
-describe("sources that no longer exist", () => {
-  it("drops the sessions of a Host that left the registry, without touching the input", () => {
-    const kept = running("kept", "registered");
-    const orphan = running("orphan", "removed-hub-host");
-    const input = Object.freeze([kept, orphan]);
-    const result = registeredAgents(input, [{ serverId: "registered" }]);
-    expect(result).toEqual([kept]);
-    expect(result[0]).toBe(kept);
-    expect(orphan.status).toBe("running");
+describe("which sources may be listed", () => {
+  const registered = ["own", "managed", "hub-hidden"];
+  const inventory = ["own", "managed"];
+
+  it("follows the Host picker once the registry and every Hub have settled", () => {
+    expect([...listableServerIds({ registered, inventory, settled: true })].sort()).toEqual([
+      "managed",
+      "own",
+    ]);
   });
 
-  it("returns the same array while every source is still registered", () => {
+  it("hides nothing while it cannot be judged: cold start, registry or Hubs still loading", () => {
+    expect([...listableServerIds({ registered, inventory: [], settled: false })].sort()).toEqual([
+      "hub-hidden",
+      "managed",
+      "own",
+    ]);
+  });
+
+  it("drops the sessions of a source that is not listable, without touching the input", () => {
+    const kept = running("kept", "own");
+    const hidden = running("hidden", "hub-hidden");
+    const input = Object.freeze([kept, hidden]);
+    const result = listedAgents(input, new Set(["own"]));
+    expect(result).toEqual([kept]);
+    expect(result[0]).toBe(kept);
+    expect(hidden.status).toBe("running");
+  });
+
+  it("returns the same array while every source is still listable", () => {
     const list = [running("a", "h1"), running("b", "h2")];
-    expect(registeredAgents(list, [{ serverId: "h1" }, { serverId: "h2" }])).toBe(list);
+    expect(listedAgents(list, new Set(["h1", "h2"]))).toBe(list);
   });
 });
 
 describe("sources that are registered but not reachable", () => {
   it("marks offline, signed-out, revoked and never-yet-loaded sources as cached", () => {
-    const entries = [
-      health("live"),
-      health("catching-up", { state: "syncing" }),
-      health("first-connect", {
-        state: "syncing",
-        agents: { loaded: false, syncing: true, pending: false, error: null },
-      }),
-      health("offline", { state: "offline", online: false }),
-      health("host-sign-in", { state: "needs-sign-in" }),
-      health("revoked", { state: "revoked" }),
+    const statuses = [
+      status("live"),
+      status("catching-up", { effectiveState: "syncing" }),
+      status("first-connect", { effectiveState: "syncing", agents: { loaded: false } }),
+      status("offline", { effectiveState: "offline" }),
+      status("host-sign-in", { effectiveState: "needs-sign-in" }),
+      status("revoked", { effectiveState: "revoked" }),
     ];
-    const degraded = entries
-      .filter((entry) => ["offline", "needs-sign-in", "revoked"].includes(entry.state))
-      .map((entry) => ({ serverId: entry.serverId }));
-    expect([...cachedServerIds({ entries, degraded })].sort()).toEqual([
+    const listable = new Set(statuses.map((entry) => entry.serverId));
+    expect([...cachedServerIds({ statuses, listable })].sort()).toEqual([
       "first-connect",
       "host-sign-in",
       "offline",
       "revoked",
     ]);
+  });
+
+  it("never takes a source with no health entry yet as live", () => {
+    const listable = new Set(["live", "not-measured-yet"]);
+    expect([...cachedServerIds({ statuses: [status("live")], listable })]).toEqual([
+      "not-measured-yet",
+    ]);
+    expect(isCachedSource(undefined)).toBe(true);
+    expect(isCachedSource(null)).toBe(true);
+  });
+
+  it("does not make a removed source cached; it is simply not listed", () => {
+    const cached = cachedServerIds({
+      statuses: [status("gone", { effectiveState: "offline" })],
+      listable: new Set(["live"]),
+    });
+    expect(cached.has("gone")).toBe(false);
   });
 
   it("shows a cached running session as an ordinary one, and keeps what is a fact", () => {
@@ -121,6 +144,38 @@ describe("sources that are registered but not reachable", () => {
     expect(asCachedAgent(failed)).toBe(failed);
     const idle = agent("i", "h1");
     expect(asCachedAgent(idle)).toBe(idle);
+  });
+
+  it("marks a session whose liveness was dropped, so it is never read as finished", () => {
+    const original = running("r", "h1");
+    const quieted = asCachedAgent(original);
+    expect(isCachedAgent(quieted)).toBe(true);
+    expect(isCachedAgent(original)).toBe(false);
+    // A row with nothing live to drop was never unverified.
+    expect(isCachedAgent(asCachedAgent(agent("i", "h1")))).toBe(false);
+  });
+
+  it("drops live facts from any status input the same way", () => {
+    const facts = {
+      status: "running",
+      pendingPermissionCount: 2,
+      requiresAttention: true,
+      attentionReason: "permission" as const,
+    };
+    expect(withoutLiveFacts(facts)).toEqual({
+      status: "idle",
+      pendingPermissionCount: 0,
+      requiresAttention: false,
+      attentionReason: null,
+    });
+    const settled = {
+      ...facts,
+      status: "error",
+      pendingPermissionCount: 0,
+      requiresAttention: false,
+      attentionReason: null,
+    };
+    expect(withoutLiveFacts(settled)).toBe(settled);
   });
 
   it("clears no stored data: the cached copy is new and the original stays running", () => {
@@ -156,10 +211,12 @@ describe("Home over registered, cached and removed sources", () => {
   const everything = [live, cachedRun, cachedAsk, cachedFail, orphan];
 
   function feed(chip: HomeFeedFilters["chip"]) {
-    const observed = registeredAgents(everything, [
-      { serverId: "live" },
-      { serverId: "unreachable" },
-    ]);
+    const listable = listableServerIds({
+      registered: ["live", "unreachable", "removed"],
+      inventory: ["live", "unreachable"],
+      settled: true,
+    });
+    const observed = listedAgents(everything, listable);
     const display = quietCachedAgents(observed, new Set(["unreachable"]));
     const records = observeIssues({}, observed, NOW);
     const rows = homeRows({ agents: display, ownershipOf: () => "mine", records, now: NOW });

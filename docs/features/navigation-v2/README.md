@@ -169,7 +169,11 @@ state: it ends when the Hub's account resolves, and the reader is remembered acr
 signed-in account, else the last one this device verified for that Hub (persisted per Hub origin,
 `clisbot-hub-readers`). A moment with no live answer (the Hub unreachable, the account loading, a
 lapsed sign-in) therefore reclassifies nothing. A different account signing in replaces it; an
-explicit sign-out forgets it. It classifies authorship and authorizes nothing.
+explicit sign-out forgets it, and that wins over any signed-in answer that is still in flight or
+failed to refresh, until the Hub itself answers that nobody is signed in (`signedOut` in
+`reader-memory.ts`). Storage is read after the app starts: what happened meanwhile wins, and a
+reader signed out meanwhile is also removed from storage. It classifies authorship and authorizes
+nothing.
 
 **Which Hub an author belongs to.** A session's `createdBy.hubOrigin` is the Hub's public HTTPS
 address; a paired Hub's account is scoped as `hub://<hubId>` and reached by an HTTPS route. The
@@ -195,21 +199,35 @@ item a list hides leaves the list's filter alone and shows a notice above it
 
 ## Sources removed and cached
 
-A source is a Host. Navigation V2 draws only what a source can say now
-(`source-liveness.ts`, `use-navigation-agents.ts`; states from
-[source health](../offline/connection-resilience.md#source-health)):
+A source is a Host. Navigation V2 lists only what a source can say now (`source-liveness.ts`,
+`use-source-liveness.ts`; states from [source health](../offline/connection-resilience.md#source-health)).
+Home, the Chats unread marks and the Workspace list read the one answer.
 
-| Source                                                                            | Its sessions                                                                                                          |
-| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **Removed**: not in the Host registry (deleted, or its Hub signed out or revoked) | Not listed anywhere. Nothing stored is cleared.                                                                       |
-| **Cached**: registered, but offline, sign-in needed, revoked, or not answered yet | Listed with their last facts. Not Running, no approval to give; a failure and an unread reply stay, they are history. |
-| **Live**                                                                          | As the Host reports.                                                                                                  |
+| Source                                                                                            | Its sessions                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Not listable**: the Host picker does not list it (`inventoryHosts`), or it was removed          | Not listed anywhere. Nothing stored is cleared.                                                                                                         |
+| **Cached**: listable, but offline, sign-in needed, revoked, not answered yet, or not yet measured | Listed with their last facts. Not Running, no approval to give, and not Done either: what they were doing is unknown. Failures and unread replies stay. |
+| **Live**                                                                                          | As the Host reports.                                                                                                                                    |
 
-A cached row shows as an ordinary row in Recent; the connection notice already names the source
-and why. The issue records keep reading the last report, so an approval a Host asked for before
-it dropped is still seen or unseen when it returns. The Running chip and its count, the Needs me
-chip and the badge read the same quiet rows. The Workspace list's status dots and the Chats
-list read their own sources and are not changed by this.
+**Listable is the picker's list.** The registry (`useHosts`) holds more than the picker shows: a
+Hub-managed Host that no Hub account here lists, or whose Hub answered that this device is signed
+out, is registered and still reconnecting, and its replica rows are restored at start. Those rows
+used to appear on Home for a Host the picker did not offer. Once the registry, every Hub and the
+remembered Hub lists (`hub-daemon-list-cache`) have loaded, Home and Workspace list the picker's
+Hosts. Until then nothing is hidden, so a cold start never drops offline work. A Hub that is only
+unreachable keeps its Hosts listed through its remembered list; a Host with a verified local
+connection is listed regardless.
+
+**Cached sessions are unknown, not finished.** Their running turn and pending approval are
+dropped; they sit in Recent on Home (no "Finished" label), and in Workspace they are under no
+status chip (not Running, Needs me or Done) and the session line shows no live dot. Active
+sessions only does not hide them. A Host with no health entry yet counts as cached. The issue
+records keep reading the last report, so an approval a Host asked for before it dropped is still
+seen or unseen when it returns.
+
+Not covered: the Workspace row's own status dot and the By status grouping read the daemon's
+workspace status (`createSidebarWorkspaceEntry`), and the agent tabs' dots read the raw agent;
+both are upstream paths and still show the last reported status.
 
 ## Home
 
