@@ -1,4 +1,4 @@
-import type { Ownership, OwnershipScope } from "./ownership";
+import { countByScope, type Ownership, type OwnershipScope, type ScopeCounts } from "./ownership";
 import { inScope } from "./ownership";
 
 /** One row of the Chats list: a Bot's direct chat or a group chat (brief C3). */
@@ -101,10 +101,8 @@ export function holdOrder<T extends { key: string }>(
   return [...arrived, ...known];
 }
 
-export function chatScopeCounts(entries: readonly ChatListEntry[]) {
-  let mine = 0;
-  for (const entry of entries) if (entry.ownership === "mine") mine += 1;
-  return { mine, others: entries.length - mine, all: entries.length };
+export function chatScopeCounts(entries: readonly ChatListEntry[]): ScopeCounts {
+  return countByScope(entries.map((entry) => entry.ownership));
 }
 
 export type ChatsListItem<T extends ChatListEntry> =

@@ -133,6 +133,11 @@ summary (`useSourceHealthSummary`) re-render only when what a source shows chang
   refresh and `loading` only when none has anything to show; `degraded` lists the sources that
   cannot refresh.
 
+Navigation V2 reads these states to decide what is live: a listable source that is `offline`,
+`needs-sign-in`, `revoked`, still on its first connection or not measured yet is cached, and its
+sessions are not shown as Running, as an approval to give, or as Done
+([Sources removed and cached](../navigation-v2/README.md#sources-removed-and-cached)).
+
 Copy names the source and the next step. For a Hub that cannot be reached it suggests checking a
 VPN without claiming the VPN is off (`describeSourceProblem`, `describeHubFailure`). The strings
 live in their own `offline` i18n namespace (`packages/app/src/i18n/offline/`, en and vi; other

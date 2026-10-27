@@ -314,6 +314,7 @@ function toSessionLineFilter(
         labels: session.agent.labels,
         createdBy: session.agent.createdBy,
         statusBucket: session.statusBucket,
+        unverified: session.unverified,
       },
       workspace,
     );

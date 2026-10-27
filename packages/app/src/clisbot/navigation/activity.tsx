@@ -13,7 +13,7 @@ import { getChatIdFromLabels } from "@clisbot/protocol/bots/labels";
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { useResourcePrincipalScope } from "@/clisbot/bots/data/resource-principal-scope";
 import { useBotCatalog } from "@/clisbot/bots/data/runtime";
-import { useAggregatedAgents, type AggregatedAgent } from "@/hooks/use-aggregated-agents";
+import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useHosts } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
 import { NAVIGATION_V2_ENABLED } from "./feature";
@@ -32,7 +32,8 @@ import { usePathname } from "expo-router";
 import { parseChatRouteFromPathname } from "@/clisbot/bots/routes";
 import { parseHostWorkspaceRouteFromPathname } from "@/utils/host-routes";
 import { resolveOwnership, type Ownership } from "./ownership";
-import { useReaderAccounts } from "./reader";
+import { useReaderAccounts, useRememberVerifiedReaders } from "./reader";
+import { useNavigationAgents } from "./use-navigation-agents";
 
 const MINUTE = 60_000;
 
@@ -61,7 +62,10 @@ export function NavigationActivityProvider({ children }: { children: ReactNode }
 }
 
 function ObservedNavigationActivity({ children }: { children: ReactNode }) {
-  const { agents } = useAggregatedAgents({ demand: false });
+  // `observed` feeds the issue records (an out-of-reach Host keeps its approvals); `agents` is
+  // what may be drawn as live (source-liveness.ts).
+  const { observed, display: agents } = useNavigationAgents();
+  useRememberVerifiedReaders();
   const now = useMinuteClock();
   const ownership = useOwnership();
   const scope = useResourcePrincipalScope();
@@ -69,9 +73,9 @@ function ObservedNavigationActivity({ children }: { children: ReactNode }) {
   const update = useIssueStore((state) => state.update);
   const subjectOf = useIssueSubjects();
   useEffect(() => {
-    const subjects = agents.map(subjectOf);
+    const subjects = observed.map(subjectOf);
     update(scope, (current) => observeIssues(current, subjects, Date.now()));
-  }, [agents, scope, subjectOf, update]);
+  }, [observed, scope, subjectOf, update]);
   const rows = useMemo(
     () => homeRows({ agents, ownershipOf: ownership.ownershipOf, records, now, subjectOf }),
     [agents, ownership.ownershipOf, records, now, subjectOf],

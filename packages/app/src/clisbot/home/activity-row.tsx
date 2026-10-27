@@ -12,6 +12,7 @@ import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-bad
 import { activityBucket, isUnreadReply } from "./activity";
 import { traceInstant } from "@/performance/native-trace";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import { isCachedAgent } from "@/clisbot/navigation/source-liveness";
 import {
   FLAT_ROW_FILL_INSET,
   SIDEBAR_TWO_LINE_ROW_HEIGHT,
@@ -137,6 +138,8 @@ export function heldActivityStatus(
   homeBucket?: string,
 ): ReturnType<typeof activityStatus> {
   if (!homeBucket) return null;
+  // A cached session's turn is unknown, not finished (navigation/source-liveness.ts).
+  if (isCachedAgent(agent)) return null;
   const current = activityBucket(agent);
   if (current === "active" && homeBucket !== "active")
     return { label: i18n.t("home.activity.status.running"), variant: "muted" };

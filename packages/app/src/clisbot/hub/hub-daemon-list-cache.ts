@@ -36,6 +36,7 @@ export class HubDaemonListCache {
   private lists = new Map<string, CachedHubDaemonList>();
   private readonly listeners = new Set<() => void>();
   private loaded: Promise<void> | null = null;
+  private restored = false;
   private writes: Promise<void> = Promise.resolve();
   private version = 0;
 
@@ -53,7 +54,13 @@ export class HubDaemonListCache {
     // A list remembered while loading is newer than the stored one.
     for (const list of stored?.lists ?? [])
       if (!this.lists.has(list.origin)) this.lists.set(list.origin, list);
+    this.restored = true;
     this.emit();
+  }
+
+  /** Whether the stored lists have been read; before that, "no remembered list" is unknown. */
+  isRestored(): boolean {
+    return this.restored;
   }
 
   get(origin: string): CachedHubDaemonList | undefined {
@@ -116,6 +123,11 @@ export function useHubDaemonListCache(): HubDaemonListCache {
   const cache = getHubDaemonListCache();
   useSyncExternalStore(cache.subscribe, cache.getVersion, cache.getVersion);
   return cache;
+}
+
+/** Re-renders once the stored lists have been read. */
+export function useHubDaemonListsLoaded(): boolean {
+  return useHubDaemonListCache().isRestored();
 }
 
 /**

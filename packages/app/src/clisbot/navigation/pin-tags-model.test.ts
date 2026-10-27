@@ -7,6 +7,7 @@ const tags: PinTag[] = [
   { key: "ws:theirs", title: "Their release", area: "work", ownership: "others" },
   { key: "chat:theirs", title: "Their group", area: "chat", ownership: "others" },
   { key: "ws:untitled", title: "", area: "work", ownership: "mine" },
+  { key: "ws:unplaced", title: "Nobody can tell", area: "work", ownership: "unknown" },
 ];
 const keys = (list: PinTag[]) => list.map((tag) => tag.key);
 
@@ -14,12 +15,13 @@ describe("splitPinTags", () => {
   it("shows only my pins by default and folds others into one count", () => {
     const { mine, others } = splitPinTags(tags, "hybrid");
     expect(keys(mine)).toEqual(["bot:nia", "ws:fix"]);
-    expect(keys(others)).toEqual(["ws:theirs", "chat:theirs"]);
+    // A pin nobody can place yet is not the reader's own: it folds in with the others.
+    expect(keys(others)).toEqual(["ws:theirs", "chat:theirs", "ws:unplaced"]);
   });
 
   it("follows Home's mode", () => {
     expect(keys(splitPinTags(tags, "chat").mine)).toEqual(["bot:nia"]);
-    expect(keys(splitPinTags(tags, "work").others)).toEqual(["ws:theirs"]);
+    expect(keys(splitPinTags(tags, "work").others)).toEqual(["ws:theirs", "ws:unplaced"]);
   });
 });
 

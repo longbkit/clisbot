@@ -111,4 +111,21 @@ describe("Workspace items", () => {
     expect(hidden.scopes).toEqual({ mine: 1, others: 2, all: 3 });
     expect(hidden.chips.done).toBe(1);
   });
+
+  it("lists an item whose Hub has no known reader under Others and All", () => {
+    const stranger: SessionActor = { kind: "user", id: "u-9", hubOrigin: "https://other.example" };
+    const unplaced = workspace("unplaced", stranger);
+    const rows = [sandbox, unplaced];
+    const none = (ws: WorkWorkspace) =>
+      ws === unplaced ? [session("u", { createdBy: stranger })] : [];
+    const counts = countWork(rows, none, { scope: "mine", accounts: [reader], showBots: true });
+    expect(counts.scopes).toEqual({ mine: 1, others: 1, all: 2 });
+    for (const [scope, listed] of [
+      ["mine", false],
+      ["others", true],
+      ["all", true],
+    ] as const) {
+      expect(createWorkFilter(query({ scope }), none).workspace(unplaced)).toBe(listed);
+    }
+  });
 });

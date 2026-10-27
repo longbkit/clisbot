@@ -1,18 +1,34 @@
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { isOwnActor, type HubAccountIdentity } from "@/clisbot/session-storage/actor-presentation";
 
-export type Ownership = "mine" | "others";
+/**
+ * `unknown` is "cannot tell": the author is a Hub member but this device has no reader for that
+ * Hub to compare with. It is never `mine` (that listed other members' work under For me); the
+ * scopes list it under Others and All, since it is not the reader's own work.
+ */
+export type Ownership = "mine" | "others" | "unknown";
 export type OwnershipScope = "mine" | "others" | "all";
 
 /** A signed-in Hub account on this device, by origin. */
 export interface ReaderAccount extends HubAccountIdentity {
   origin: string | null;
+  /** Other addresses the same Hub is known by, such as a paired Hub's HTTPS route. */
+  aliases?: readonly string[];
+  /** The Hub's stable identity (`SessionActor.hubIdentity`); a paired Hub's `hub://<id>`. */
+  hubId?: string;
 }
 
 /**
- * Who an item belongs to, from the author recorded today. Unknown authors are provisionally the
- * reader's (brief 1.3): no author, a non-user author, a direct-connection author without a Hub
- * origin, or a user from a Hub this device is not signed in to. `watched` is the Round 2 input; it already makes anything the reader's.
+ * Who an item belongs to, from the author recorded today.
+ *
+ * - No author, a non-user author (automation, system) or a user author with no Hub origin (a
+ *   direct connection, the device owner's): **mine**, as the brief's provisional rule.
+ * - A Hub member whose Hub has a known reader on this device: **mine** when the reader made it,
+ *   else **others**.
+ * - A Hub member whose Hub has no known reader (not signed in, never signed in, or the account
+ *   not resolved): **unknown**.
+ *
+ * `watched` is the Round 2 input; it already makes anything the reader's.
  */
 export function resolveOwnership(input: {
   createdBy: SessionActor | null | undefined;
@@ -22,15 +38,39 @@ export function resolveOwnership(input: {
   if (input.watched) return "mine";
   const actor = input.createdBy;
   if (!actor || actor.kind !== "user") return "mine";
-  const account = readerFor(actor, input.accounts);
-  if (!account?.id) return "mine";
-  return isOwnActor(actor, account) ? "mine" : "others";
+  // A snapshot without a Hub scope comes from a direct (no Hub) connection: the device owner's.
+  if (!actor.hubOrigin && !actor.hubIdentity) return "mine";
+  const account = input.accounts.find((candidate) => isSameHub(actor, candidate));
+  if (!account?.id) return "unknown";
+  // The Hub is matched; the address no longer needs to agree, whatever form each side wrote.
+  return isOwnActor(actor, { ...account, origin: null }) ? "mine" : "others";
 }
 
-function readerFor(actor: SessionActor, accounts: readonly ReaderAccount[]) {
-  // A snapshot without an origin comes from a direct (no Hub) connection: the device owner's.
-  if (!actor.hubOrigin) return undefined;
-  return accounts.find((account) => account.origin === actor.hubOrigin);
+const PAIRED_HUB_SCHEME = "hub://";
+
+/** Whether `actor` was stamped by the Hub `account` is signed in to. */
+function isSameHub(actor: SessionActor, account: ReaderAccount): boolean {
+  const hubId = account.hubId ?? hubIdOfOrigin(account.origin);
+  if (actor.hubIdentity && hubId) return actor.hubIdentity === hubId;
+  if (!actor.hubOrigin) return false;
+  const origin = canonicalOrigin(actor.hubOrigin);
+  return [account.origin, ...(account.aliases ?? [])].some(
+    (known) => known !== null && canonicalOrigin(known) === origin,
+  );
+}
+
+function hubIdOfOrigin(origin: string | null): string | undefined {
+  return origin?.startsWith(PAIRED_HUB_SCHEME) ? origin.slice(PAIRED_HUB_SCHEME.length) : undefined;
+}
+
+/** `https://Hub.example:443/` and `https://hub.example` are one Hub. */
+function canonicalOrigin(origin: string): string {
+  try {
+    const url = new URL(origin);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : origin;
+  } catch {
+    return origin;
+  }
 }
 
 /** A Bot's direct chat is whoever's chat it is; before there is one, the Bot's owner decides. */
@@ -57,20 +97,27 @@ export function resolveBotOwnership(
 }
 
 export function inScope(scope: OwnershipScope, ownership: Ownership): boolean {
-  return scope === "all" || scope === ownership;
+  if (scope === "all") return true;
+  return scope === "mine" ? ownership === "mine" : ownership !== "mine";
 }
 
+/** `all` is `mine` + `others`; work that cannot be told apart is counted under `others`. */
 export interface ScopeCounts {
   mine: number;
   others: number;
   all: number;
 }
 
+export const EMPTY_SCOPE_COUNTS: Readonly<ScopeCounts> = { mine: 0, others: 0, all: 0 };
+
+/** Adds one item to the counts of the scopes it is listed under. */
+export function addToScopeCounts(counts: ScopeCounts, ownership: Ownership): void {
+  counts[ownership === "mine" ? "mine" : "others"] += 1;
+  counts.all += 1;
+}
+
 export function countByScope(ownerships: Iterable<Ownership>): ScopeCounts {
-  const counts = { mine: 0, others: 0, all: 0 };
-  for (const ownership of ownerships) {
-    counts[ownership] += 1;
-    counts.all += 1;
-  }
+  const counts = { ...EMPTY_SCOPE_COUNTS };
+  for (const ownership of ownerships) addToScopeCounts(counts, ownership);
   return counts;
 }

@@ -10,6 +10,7 @@ import {
   cachedListForAccount,
   getHubDaemonListCache,
   useHubDaemonListCache,
+  type CachedHubDaemonList,
 } from "./hub-daemon-list-cache";
 import { hubResourceQueryKey } from "./query-keys";
 
@@ -124,6 +125,33 @@ export function isAccountHost(
   );
 }
 
+/**
+ * The registered Hosts the Host picker lists: each judged against the Hub that manages it, using
+ * that Hub's live list, else the list it last returned for this account. Navigation V2's Home and
+ * Workspace list the same Hosts, so a Host the picker hides never has sessions listed.
+ */
+export function inventoryHosts<H extends Pick<RegisteredHost, "serverId" | "management">>(input: {
+  accounts: readonly {
+    origin: string | null;
+    signedIn: { organization: { id: string } } | null;
+  }[];
+  lists: readonly (HubDaemons | undefined)[];
+  remembered: readonly (CachedHubDaemonList | undefined)[];
+  registeredHosts: H[];
+  localServerIds: readonly string[];
+}): H[] {
+  const { accounts, lists, remembered, registeredHosts } = input;
+  if (accounts.length === 0) return registeredHosts;
+  const listings = accounts.map((account, index) => ({
+    origin: account.origin,
+    organizationId: account.signedIn?.organization.id ?? remembered[index]?.organizationId ?? null,
+    daemons: lists[index]?.daemons ?? remembered[index]?.daemons,
+  }));
+  return registeredHosts.filter((host) =>
+    isAccountHost(host, listings, input.localServerIds.includes(host.serverId)),
+  );
+}
+
 /** `useQueries` returns a new array every render; keep the previous one while its items match. */
 function useStableItems<T>(items: readonly T[]): readonly T[] {
   const ref = useRef(items);
@@ -158,18 +186,10 @@ export function useHostInventory() {
         : undefined,
     ),
   );
-  const hosts = useMemo(() => {
-    if (accounts.length === 0) return registeredHosts;
-    const listings = accounts.map((account, index) => ({
-      origin: account.origin,
-      organizationId:
-        account.signedIn?.organization.id ?? remembered[index]?.organizationId ?? null,
-      daemons: lists[index]?.daemons ?? remembered[index]?.daemons,
-    }));
-    return registeredHosts.filter((host) =>
-      isAccountHost(host, listings, localServerIds.includes(host.serverId)),
-    );
-  }, [accounts, lists, remembered, registeredHosts, localServerIds]);
+  const hosts = useMemo(
+    () => inventoryHosts({ accounts, lists, remembered, registeredHosts, localServerIds }),
+    [accounts, lists, remembered, registeredHosts, localServerIds],
+  );
   /** Hubs whose Hosts are shown from a remembered list, with the time it was read. */
   const lastSyncedAtByOrigin = useMemo(() => {
     const result = new Map<string, string>();

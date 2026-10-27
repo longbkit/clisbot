@@ -1,16 +1,17 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
-  deriveSessionStatusBucket,
+  deriveSessionStatus,
   type WorkspaceSessionSource,
 } from "@/clisbot/workspace-sessions/select-sessions";
-import { useHosts, getHostRuntimeStore } from "@/runtime/host-runtime";
+import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
 import { isWorkspaceRootAgent } from "@/subagents/workspace-root-policy";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useResourcePins } from "@/clisbot/bots/sidebar/pins";
 import { NAVIGATION_V2_ENABLED } from "./feature";
 import { useReaderAccounts } from "./reader";
+import { useSourceLiveness } from "./use-source-liveness";
 import { useNavigationStore } from "./store";
 import {
   createWorkFilter,
@@ -44,11 +45,13 @@ export function indexWorkSessions(
       if (!isWorkspaceRootAgent(agent, parent)) continue;
       const key = `${serverId}:${workspaceId}`;
       const list = index.get(key) ?? [];
+      const status = deriveSessionStatus(agent, source);
       list.push({
         id: agent.id,
         labels: agent.labels,
         createdBy: agent.createdBy,
-        statusBucket: deriveSessionStatusBucket(agent, source),
+        statusBucket: status.bucket,
+        ...(status.unverified ? { unverified: true } : {}),
       });
       index.set(key, list);
     }
@@ -69,12 +72,9 @@ function useLoadedSessionHosts(serverIds: readonly string[]): ReadonlySet<string
 
 /** Every Host's root sessions by workspace, rebuilt once per agents or submissions change. */
 export function useWorkSessionsOf(): WorkSessionsOf {
-  const hosts = useHosts();
+  const { listable, cached } = useSourceLiveness();
   // Outside Navigation V2 nothing reads the index; it subscribes to no Host.
-  const serverIds = useMemo(
-    () => (NAVIGATION_V2_ENABLED ? hosts.map((host) => host.serverId) : []),
-    [hosts],
-  );
+  const serverIds = useMemo(() => (NAVIGATION_V2_ENABLED ? [...listable] : []), [listable]);
   const agentMaps = useSessionStore(
     useShallow((state) => serverIds.map((id) => state.sessions[id]?.agents ?? null)),
   );
@@ -87,10 +87,11 @@ export function useWorkSessionsOf(): WorkSessionsOf {
     serverIds.forEach((serverId, i) => {
       const agents = agentMaps[i];
       const messageSubmissions = submissionMaps[i];
-      if (agents && messageSubmissions) sources.set(serverId, { agents, messageSubmissions });
+      if (agents && messageSubmissions)
+        sources.set(serverId, { agents, messageSubmissions, cached: cached.has(serverId) });
     });
     return indexWorkSessions(sources);
-  }, [agentMaps, serverIds, submissionMaps]);
+  }, [agentMaps, cached, serverIds, submissionMaps]);
   return useMemo<WorkSessionsOf>(
     () => (workspace) => {
       const sessions = index.get(
@@ -109,7 +110,18 @@ export function useWorkQuery() {
   const chip = useNavigationStore((state) => state.workChip);
   const showBots = useNavigationStore((state) => state.workShowBots);
   const accounts = useReaderAccounts();
-  return useMemo(() => ({ scope, chip, accounts, showBots }), [scope, chip, accounts, showBots]);
+  const { listable, cached } = useSourceLiveness();
+  return useMemo(
+    () => ({
+      scope,
+      chip,
+      accounts,
+      showBots,
+      cachedServerIds: cached,
+      listableServerIds: listable,
+    }),
+    [scope, chip, accounts, showBots, cached, listable],
+  );
 }
 
 /**

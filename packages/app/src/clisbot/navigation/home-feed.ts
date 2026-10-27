@@ -8,7 +8,14 @@ import {
   type IssueRecords,
   type IssueSubject,
 } from "./issues";
-import { inScope, type Ownership, type OwnershipScope, type ScopeCounts } from "./ownership";
+import {
+  EMPTY_SCOPE_COUNTS,
+  addToScopeCounts,
+  inScope,
+  type Ownership,
+  type OwnershipScope,
+  type ScopeCounts,
+} from "./ownership";
 
 export type HomeMode = "chat" | "work" | "hybrid";
 export type HomeChip = "all" | "needs" | "running" | "updated" | "failed";
@@ -110,11 +117,10 @@ export function buildHomeFeed(rows: readonly HomeRow[], filters: HomeFeedFilters
 }
 
 function countScopes(rows: readonly HomeRow[], chip: HomeChip): ScopeCounts {
-  const counts = { mine: 0, others: 0, all: 0 };
+  const counts = { ...EMPTY_SCOPE_COUNTS };
   for (const row of rows) {
     if (!homeBucket(row, chip)) continue;
-    counts[row.ownership] += 1;
-    counts.all += 1;
+    addToScopeCounts(counts, row.ownership);
   }
   return counts;
 }

@@ -29,6 +29,7 @@ import { createHubTransport } from "./transport/create";
 import type { HubTransport } from "./transport/contract";
 import { updateHubProfile } from "@/device-access/hub-profiles";
 import { getHubDaemonListCache } from "./hub-daemon-list-cache";
+import { useReaderMemory } from "./reader-memory";
 import { hubResourceQueryKey } from "./query-keys";
 import { HubAccountRequestError, needsOwnerSetupRecovery } from "@/device-access/hub-account-error";
 import { PairedHubTransport } from "@/device-access/hub-transport";
@@ -263,12 +264,34 @@ function EnabledHubAccountController({
     retry: false,
     staleTimeMs: 15_000,
   });
-  const refresh = useCallback(async () => {
-    await Promise.all([
+  /** Reads the account again; true when the Hub answered, so the state is current. */
+  const refetchAccount = useCallback(async () => {
+    const [result] = await Promise.all([
       account.refetch(),
       ...(configuration.deviceProfile ? [connection.refetch()] : []),
     ]);
+    return !result.isError;
   }, [account, configuration.deviceProfile, connection]);
+  const refresh = useCallback(async () => {
+    await refetchAccount();
+  }, [refetchAccount]);
+  /**
+   * Ends the sign-out marked for this Hub, if `current` (the Hub answered) and no sign-out
+   * happened since `generation` was read: an answer to something that began before a sign-out is
+   * not evidence of a sign-in after it.
+   */
+  const acknowledgeSignIn = useCallback(
+    (generation: number, current: boolean) => {
+      const memory = useReaderMemory.getState();
+      if (current && (memory.signOutGeneration[configuration.origin] ?? 0) === generation)
+        memory.acknowledgeSignIn(configuration.origin);
+    },
+    [configuration.origin],
+  );
+  const signOutGeneration = useCallback(
+    () => useReaderMemory.getState().signOutGeneration[configuration.origin] ?? 0,
+    [configuration.origin],
+  );
   // Signing in again as the same account keeps the daemon-list query key, so a list the Hub
   // refused (401) would stay refused until its backed-off poll. Read it again at once; a read
   // still in flight carries the old credential and is replaced.
@@ -290,16 +313,27 @@ function EnabledHubAccountController({
   useEffect(
     () =>
       transport.subscribeSessionChange?.(() => {
-        void refresh().then(readDaemonListAgain);
+        // A session change made elsewhere (a sign-in in another tab): a current answer ends any
+        // sign-out marked here (reader-memory.ts).
+        void (async () => {
+          const generation = signOutGeneration();
+          acknowledgeSignIn(generation, await refetchAccount());
+          readDaemonListAgain();
+        })();
       }),
-    [transport, refresh, readDaemonListAgain],
+    [transport, refetchAccount, readDaemonListAgain, acknowledgeSignIn, signOutGeneration],
   );
   const run = useCallback(
-    async (operation: () => Promise<void>) => {
+    async (operation: () => Promise<void>, options?: { signsOut?: true }) => {
       setMutationError(null);
+      const generation = signOutGeneration();
       try {
         await operation();
-        await refresh();
+        const current = await refetchAccount();
+        // A completed action followed by a current answer means the Hub accepted this session:
+        // what the account query says now is the reader, whatever an earlier sign-out left
+        // marked (reader-memory.ts).
+        if (!options?.signsOut) acknowledgeSignIn(generation, current);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : i18n.t("hub.account.errors.requestFailed");
@@ -307,7 +341,7 @@ function EnabledHubAccountController({
         throw error;
       }
     },
-    [refresh],
+    [refetchAccount, acknowledgeSignIn, signOutGeneration],
   );
   const signIn = useCallback(
     (input?: { email: string; password: string }) =>
@@ -339,14 +373,16 @@ function EnabledHubAccountController({
   );
   const completeRegistration = useCallback(
     async (input: { token: string; name: string; password: string }) => {
+      const generation = signOutGeneration();
       const link = await registrationLinkRequest(transport, "complete", input);
       if (link.status === "registered") {
         dismissRegistration();
-        await account.refetch();
+        const current = await account.refetch();
+        acknowledgeSignIn(generation, !current.isError);
       }
       return link;
     },
-    [account, dismissRegistration, transport],
+    [account, acknowledgeSignIn, signOutGeneration, dismissRegistration, transport],
   );
   const recoverOwnerSetup = useCallback(
     async (error: unknown) => {
@@ -430,17 +466,28 @@ function EnabledHubAccountController({
   );
   const signOut = useCallback(
     () =>
-      run(async () => {
-        try {
-          await transport.signOut();
-        } catch (error) {
-          await refresh();
-          throw error;
-        }
-        // Signing out hides this Hub's Hosts even while the Hub cannot confirm it.
-        getHubDaemonListCache().forget(configuration.origin);
-      }),
-    [run, transport, refresh, configuration.origin],
+      run(
+        async () => {
+          const state = queryClient.getQueryData<HubAccountState>(accountQueryKey);
+          const signedInId =
+            state?.status === "active" || state?.status === "appSetupRequired"
+              ? state.account.id
+              : null;
+          try {
+            await transport.signOut();
+          } catch (error) {
+            await refresh();
+            throw error;
+          }
+          // Signing out hides this Hub's Hosts even while the Hub cannot confirm it.
+          getHubDaemonListCache().forget(configuration.origin);
+          // Only an explicit sign-out forgets who the reader was on this Hub. It holds against
+          // an account answer that is still stale, until a sign-in completes.
+          useReaderMemory.getState().forget(configuration.origin, signedInId);
+        },
+        { signsOut: true },
+      ),
+    [run, transport, refresh, configuration.origin, queryClient, accountQueryKey],
   );
   const updateProfile = useCallback(
     (input: { name?: string; image?: string | null }) =>

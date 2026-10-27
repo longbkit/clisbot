@@ -6,10 +6,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HubAccountProvider, useHubAccount } from "./account-provider";
 import { HubAccountRequestError } from "@/device-access/hub-account-error";
 import { hubClientAuthorizationContinuation } from "./account-entry-route";
+import { useReaderMemory } from "./reader-memory";
+import { useReaderAccounts, useRememberVerifiedReaders } from "@/clisbot/navigation/reader";
 
+const INVITATION_URL =
+  "https://hub.example.test/settings/hub/account?invitation=invite&client_id=clisbot-client&redirect_uri=clisbot%3A%2F%2Fhub-auth%2Fcallback&state=pkce-state&code_challenge=challenge";
 const testState = vi.hoisted(() => ({
-  url: "https://hub.example.test/settings/hub/account?invitation=invite&client_id=clisbot-client&redirect_uri=clisbot%3A%2F%2Fhub-auth%2Fcallback&state=pkce-state&code_challenge=challenge",
+  url: "",
   request: vi.fn(),
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+  sessionChanged: undefined as (() => void) | undefined,
   setParams: vi.fn(),
   configured: true,
   google: undefined as (() => Promise<void>) | undefined,
@@ -25,6 +32,14 @@ vi.mock("./transport/create", () => ({
   createHubTransport: () => ({
     signInKind: "password",
     request: testState.request,
+    signIn: (...input: unknown[]) => testState.signIn(...input),
+    signOut: () => testState.signOut(),
+    subscribeSessionChange: (listener: () => void) => {
+      testState.sessionChanged = listener;
+      return () => {
+        testState.sessionChanged = undefined;
+      };
+    },
     signInWithGoogle: testState.google,
   }),
 }));
@@ -91,8 +106,10 @@ function setup() {
 beforeEach(() => {
   vi.stubGlobal("React", React);
   vi.resetAllMocks();
+  testState.url = INVITATION_URL;
   testState.configured = true;
   testState.google = undefined;
+  testState.sessionChanged = undefined;
 });
 afterEach(cleanup);
 
@@ -254,4 +271,161 @@ it("Google owner setup claimed elsewhere uses the same account-entry recovery", 
     );
   });
   await waitFor(() => expect(result.current.state?.status).toBe("signedOut"));
+});
+
+/**
+ * The real controller, a real QueryClient and a faked transport: what a sign-out does to the
+ * reader the app remembers (hub/reader-memory.ts), driven only by the controller's own actions.
+ */
+describe("the reader across an explicit sign-out", () => {
+  const ORIGIN = "https://hub.example.test";
+  const STATE_PATH = "/api/auth/clisbot/state";
+  const as = (id: string) => ({
+    ...active("org"),
+    account: { ...account, id },
+    membership: { id: `m-${id}`, role: "member" },
+  });
+  const server = {
+    answer: () => Promise.resolve(Response.json(as("a"))) as Promise<Response>,
+    readerA: () => Promise.resolve(Response.json(as("a"))) as Promise<Response>,
+  };
+  const failing = () => Promise.resolve(Response.json({ error: "down" }, { status: 503 }));
+  const memory = () => useReaderMemory.getState();
+  const deferred = () => {
+    let release!: (response: Response) => void;
+    const promise = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    return { promise, release };
+  };
+
+  async function signedInAsA() {
+    testState.url = "https://hub.example.test/settings/hub/account";
+    server.answer = server.readerA;
+    testState.request.mockImplementation(async (path: string) =>
+      path === STATE_PATH ? server.answer() : Response.json({}),
+    );
+    testState.signOut.mockResolvedValue(undefined);
+    testState.signIn.mockResolvedValue(undefined);
+    useReaderMemory.setState({ readers: {}, signedOut: {}, signOutGeneration: {} });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(
+      () => {
+        useRememberVerifiedReaders();
+        return { hub: useHubAccount(), readers: useReaderAccounts() };
+      },
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>
+            <HubAccountProvider>{children}</HubAccountProvider>
+          </QueryClientProvider>
+        ),
+      },
+    );
+    await waitFor(() => expect(view.result.current.readers.map((r) => r.id)).toEqual(["a"]));
+    return view;
+  }
+  const readerIds = (view: Awaited<ReturnType<typeof signedInAsA>>) =>
+    view.result.current.readers.map((reader) => reader.id);
+
+  async function signedOutWhileRefreshFails() {
+    const view = await signedInAsA();
+    server.answer = failing;
+    await act(() => view.result.current.hub.signOut());
+    return view;
+  }
+
+  it("keeps the sign-out when the refresh after it fails and the query still holds the account", async () => {
+    const view = await signedOutWhileRefreshFails();
+    expect(view.result.current.hub.signedIn?.account.id).toBe("a");
+    expect(memory().signedOut[ORIGIN]).toEqual({ accountId: "a" });
+    expect(readerIds(view)).toEqual([]);
+  });
+
+  it("opens it when the same account signs in again and the Hub answers with it", async () => {
+    const view = await signedOutWhileRefreshFails();
+    server.answer = server.readerA;
+    await act(() => view.result.current.hub.signIn({ email: "a@x.test", password: "secret" }));
+    await waitFor(() => expect(memory().signedOut[ORIGIN]).toBeUndefined());
+    await waitFor(() => expect(readerIds(view)).toEqual(["a"]));
+  });
+
+  it("keeps it when the sign-in fails", async () => {
+    const view = await signedOutWhileRefreshFails();
+    testState.signIn.mockRejectedValue(new Error("wrong password"));
+    await act(async () => {
+      await expect(
+        view.result.current.hub.signIn({ email: "a@x.test", password: "nope" }),
+      ).rejects.toThrow("wrong password");
+    });
+    expect(memory().signedOut[ORIGIN]).toBeDefined();
+    expect(readerIds(view)).toEqual([]);
+  });
+
+  it("keeps it when the sign-in succeeds but the account cannot be read afterwards", async () => {
+    const view = await signedOutWhileRefreshFails();
+    server.answer = failing;
+    await act(() => view.result.current.hub.signIn({ email: "a@x.test", password: "secret" }));
+    expect(memory().signedOut[ORIGIN]).toBeDefined();
+    expect(readerIds(view)).toEqual([]);
+  });
+
+  it("is not reopened by a session-change read that began before the sign-out", async () => {
+    const view = await signedInAsA();
+    const early = deferred();
+    server.answer = () => early.promise;
+    await act(async () => testState.sessionChanged?.());
+    server.answer = failing;
+    await act(() => view.result.current.hub.signOut());
+    // The read that began before the sign-out now answers, still with the account.
+    await act(async () => early.release(Response.json(as("a"))));
+    expect(memory().signedOut[ORIGIN]).toBeDefined();
+    expect(readerIds(view)).toEqual([]);
+  });
+
+  it("is not reopened by an action that began before the sign-out and ends after it", async () => {
+    const view = await signedInAsA();
+    const slow = deferred();
+    testState.request.mockImplementation(async (path: string) =>
+      path === "/api/auth/change-password" ? slow.promise : server.answer(),
+    );
+    let finished!: Promise<unknown>;
+    await act(async () => {
+      finished = view.result.current.hub.changePassword({ currentPassword: "a", newPassword: "b" });
+    });
+    server.answer = failing;
+    await act(() => view.result.current.hub.signOut());
+    // The Hub still reports the account when the old action reads it back.
+    server.answer = server.readerA;
+    await act(async () => {
+      slow.release(Response.json({}));
+      await finished;
+    });
+    expect(memory().signedOut[ORIGIN]).toBeDefined();
+    expect(readerIds(view)).toEqual([]);
+  });
+
+  it("is not reopened by an unrelated action whose read-back fails", async () => {
+    const view = await signedOutWhileRefreshFails();
+    await act(() =>
+      view.result.current.hub.changePassword({ currentPassword: "a", newPassword: "b" }),
+    );
+    expect(memory().signedOut[ORIGIN]).toBeDefined();
+    expect(readerIds(view)).toEqual([]);
+  });
+
+  it("is opened by a completed self-registration that the Hub then confirms", async () => {
+    const view = await signedOutWhileRefreshFails();
+    server.answer = server.readerA;
+    testState.request.mockImplementation(async (path: string) =>
+      path === "/api/auth/clisbot/registration/complete"
+        ? Response.json({ status: "registered" })
+        : server.answer(),
+    );
+    await act(() =>
+      view.result.current.hub.completeRegistration({ token: "t", name: "A", password: "secret" }),
+    );
+    await waitFor(() => expect(memory().signedOut[ORIGIN]).toBeUndefined());
+    await waitFor(() => expect(readerIds(view)).toEqual(["a"]));
+  });
 });

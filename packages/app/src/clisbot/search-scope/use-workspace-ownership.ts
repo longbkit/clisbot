@@ -15,12 +15,12 @@ export function workspaceOwnershipKey(serverId: string, workspaceId: string): st
 
 /**
  * Whose each workspace is, by the same rule Work's For me / Others tabs use: the recorded author
- * against the signed-in Hub accounts. Only workspaces that are someone else's are listed, so the
- * map stays empty, and costs nothing, for a reader with no Hub account or no Navigation V2.
+ * against the reader on each Hub. Only workspaces that are not the reader's (someone else's, or
+ * nobody can tell) are listed, so the map stays empty, and costs nothing, without Navigation V2.
  */
 export function useWorkspaceOwnership(enabled: boolean): WorkspaceOwnership {
   const accounts = useReaderAccounts();
-  const active = enabled && NAVIGATION_V2_ENABLED && accounts.length > 0;
+  const active = enabled && NAVIGATION_V2_ENABLED;
   const workspaces = useSessionStore(
     useShallow((state) => {
       const result: Record<string, Map<string, WorkspaceDescriptor> | undefined> = {};
@@ -33,15 +33,16 @@ export function useWorkspaceOwnership(enabled: boolean): WorkspaceOwnership {
   );
   return useMemo(() => {
     if (!active) return NONE;
-    const others = new Map<string, Ownership>();
+    const notMine = new Map<string, Ownership>();
     for (const [serverId, byId] of Object.entries(workspaces)) {
       for (const workspace of byId?.values() ?? []) {
-        if (resolveOwnership({ createdBy: workspace.createdBy, accounts }) === "others") {
-          others.set(workspaceOwnershipKey(serverId, workspace.id), "others");
+        const ownership = resolveOwnership({ createdBy: workspace.createdBy, accounts });
+        if (ownership !== "mine") {
+          notMine.set(workspaceOwnershipKey(serverId, workspace.id), ownership);
         }
       }
     }
-    return others;
+    return notMine;
   }, [accounts, active, workspaces]);
 }
 
