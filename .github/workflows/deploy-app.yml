@@ -65,6 +65,8 @@ jobs:
         run: npx expo export --platform web
         env:
           CLISBOT_WEB_UTF8_EXPORT: "1"
+          # Cloudflare's 25 MiB per-asset limit: split the bundle by route.
+          CLISBOT_WEB_SPLIT_ROUTES: "1"
 
       - name: Check Cloudflare Worker access
         working-directory: packages/app

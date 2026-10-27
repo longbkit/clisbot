@@ -12,6 +12,11 @@ const appVariant = process.env.APP_VARIANT ?? "production";
 const isFdroidBuild = process.env.CLISBOT_FDROID_BUILD === "1";
 const isWatchdogBuild = process.env.CLISBOT_WATCHDOG_BUILD === "1";
 const isProfileBuild = process.env.CLISBOT_PROFILE_BUILD === "1";
+// Cloudflare Workers Static Assets rejects any uncompressed asset over 25 MiB, and the
+// single-bundle web export outgrew that. The `Deploy App` workflow sets this so Expo Router
+// loads each route's code on first visit; other web exports (Desktop, the daemon-served UI)
+// and every native build keep one bundle. See docs/release.md "Website behavior".
+const splitWebRoutes = process.env.CLISBOT_WEB_SPLIT_ROUTES === "1";
 const {
   isSyntheticReactProfileBuild,
 } = require("./scripts/native-performance/react-profile-config.cjs");
@@ -182,7 +187,9 @@ export default {
       searchPaths: ["../../node_modules", "./node_modules"],
     },
     plugins: [
-      "expo-router",
+      splitWebRoutes
+        ? ["expo-router", { asyncRoutes: { web: true, default: false } }]
+        : "expo-router",
       "expo-secure-store",
       "expo-web-browser",
       withPasteInput,
