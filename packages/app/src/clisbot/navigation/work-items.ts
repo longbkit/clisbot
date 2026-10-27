@@ -2,6 +2,7 @@ import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { getBotIdFromLabels } from "@clisbot/protocol/bots/labels";
 import {
   EMPTY_SCOPE_COUNTS,
+  addToScopeCounts,
   inScope,
   resolveOwnership,
   type OwnershipScope,
@@ -176,8 +177,7 @@ export function countWork(
     const cachedSource = cachedServerIds?.has(workspace.serverId);
     for (const item of workItemsOf(workspace, sessionsOf(workspace), showBots, cachedSource)) {
       const ownership = resolveOwnership({ createdBy: item.createdBy, accounts });
-      scopes[ownership] += 1;
-      scopes.all += 1;
+      addToScopeCounts(scopes, ownership);
       if (!inScope(scope, ownership)) continue;
       for (const chip of WORK_CHIPS) if (matchesWorkChip(item, chip)) chips[chip] += 1;
     }

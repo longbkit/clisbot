@@ -10,6 +10,7 @@ import {
 } from "./issues";
 import {
   EMPTY_SCOPE_COUNTS,
+  addToScopeCounts,
   inScope,
   type Ownership,
   type OwnershipScope,
@@ -119,8 +120,7 @@ function countScopes(rows: readonly HomeRow[], chip: HomeChip): ScopeCounts {
   const counts = { ...EMPTY_SCOPE_COUNTS };
   for (const row of rows) {
     if (!homeBucket(row, chip)) continue;
-    counts[row.ownership] += 1;
-    counts.all += 1;
+    addToScopeCounts(counts, row.ownership);
   }
   return counts;
 }

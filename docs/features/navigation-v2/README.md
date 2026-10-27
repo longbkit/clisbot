@@ -160,10 +160,10 @@ lines are dimmed and the percent gets a `~` prefix.
   under For me.
 - `watched === true` (Round 2) makes anything **mine**; the predicate already takes the input.
 
-**Unknown** is in All only. It is in neither For me nor Others, so those two stay claims the app
-can back. The counts are For me + Others + Unknown = All; the tabs show the three counts they
-always did, so an All larger than the other two added up is the unknown ones. It is a transient
-state: it ends when the Hub's account resolves, and the reader is remembered across it (below).
+**Unknown** is listed under Others and All, never For me: it is not the reader's own work, and
+For me stays a claim the app can back. Its count joins Others, so For me + Others = All. It is a
+transient state: it ends when the Hub's account resolves, and the reader is remembered across it
+(below).
 
 **The reader on a Hub** (`reader.ts`, `reader-accounts.ts`, `hub/reader-memory.ts`) is the live
 signed-in account, else the last one this device verified for that Hub (persisted per Hub origin,
@@ -191,8 +191,7 @@ its workspace's; a Bot DM its Chat's (`ChatPayload.record.createdBy`); a Bot row
 Host's `isOwner` projection, else the Bot's `owner`. Home, the Workspace list, pin tags and global
 search all read the session's author, so a teammate's session in a workspace the reader created is
 Others. A channel-started session is the reader's only when its snapshot carries the reader's
-verified `memberId`. In pin tags an unknown pin folds in with the others; in search it ranks with
-them and is hidden by For me.
+verified `memberId`. In pin tags and in search an unknown item is one of the others, hidden by For me.
 
 The scope applies first everywhere; pins only reorder inside it. A pin (a resource pin, or a
 workspace pinned on the Host, which every reader sees) never brings another member's session into

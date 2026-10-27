@@ -3,7 +3,8 @@ import { isOwnActor, type HubAccountIdentity } from "@/clisbot/session-storage/a
 
 /**
  * `unknown` is "cannot tell": the author is a Hub member but this device has no reader for that
- * Hub to compare with. It is never `mine` (that listed other members' work under For me).
+ * Hub to compare with. It is never `mine` (that listed other members' work under For me); the
+ * scopes list it under Others and All, since it is not the reader's own work.
  */
 export type Ownership = "mine" | "others" | "unknown";
 export type OwnershipScope = "mine" | "others" | "all";
@@ -96,29 +97,27 @@ export function resolveBotOwnership(
 }
 
 export function inScope(scope: OwnershipScope, ownership: Ownership): boolean {
-  return scope === "all" || scope === ownership;
+  if (scope === "all") return true;
+  return scope === "mine" ? ownership === "mine" : ownership !== "mine";
 }
 
-/** `all` is the sum of the three: an `unknown` item is counted only there. */
+/** `all` is `mine` + `others`; work that cannot be told apart is counted under `others`. */
 export interface ScopeCounts {
   mine: number;
   others: number;
-  unknown: number;
   all: number;
 }
 
-export const EMPTY_SCOPE_COUNTS: Readonly<ScopeCounts> = {
-  mine: 0,
-  others: 0,
-  unknown: 0,
-  all: 0,
-};
+export const EMPTY_SCOPE_COUNTS: Readonly<ScopeCounts> = { mine: 0, others: 0, all: 0 };
+
+/** Adds one item to the counts of the scopes it is listed under. */
+export function addToScopeCounts(counts: ScopeCounts, ownership: Ownership): void {
+  counts[ownership === "mine" ? "mine" : "others"] += 1;
+  counts.all += 1;
+}
 
 export function countByScope(ownerships: Iterable<Ownership>): ScopeCounts {
   const counts = { ...EMPTY_SCOPE_COUNTS };
-  for (const ownership of ownerships) {
-    counts[ownership] += 1;
-    counts.all += 1;
-  }
+  for (const ownership of ownerships) addToScopeCounts(counts, ownership);
   return counts;
 }

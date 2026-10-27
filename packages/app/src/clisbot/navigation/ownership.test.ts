@@ -102,15 +102,15 @@ describe("resolveOwnership", () => {
 });
 
 describe("scopes", () => {
-  it("lists a session nobody can place only under All", () => {
+  it("lists a session nobody can place under Others and All, never For me", () => {
     expect(inScope("all", "unknown")).toBe(true);
     expect(inScope("mine", "unknown")).toBe(false);
-    expect(inScope("others", "unknown")).toBe(false);
+    expect(inScope("others", "unknown")).toBe(true);
   });
 
-  it("counts scopes so All is For me, Others and the ones nobody can place", () => {
+  it("counts scopes so All is For me plus Others, which holds the ones nobody can place", () => {
     const counts = countByScope(["mine", "others", "mine", "unknown"]);
-    expect(counts).toEqual({ mine: 2, others: 1, unknown: 1, all: 4 });
+    expect(counts).toEqual({ mine: 2, others: 2, all: 4 });
     expect(inScope("all", "others") && inScope("mine", "mine") && !inScope("mine", "others")).toBe(
       true,
     );

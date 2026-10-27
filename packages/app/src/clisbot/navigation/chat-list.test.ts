@@ -69,11 +69,10 @@ describe("orderChatList", () => {
   });
 
   it("counts scopes consistently", () => {
-    expect(chatScopeCounts(entries)).toEqual({ mine: 5, others: 1, unknown: 0, all: 6 });
+    expect(chatScopeCounts(entries)).toEqual({ mine: 5, others: 1, all: 6 });
     expect(chatScopeCounts([...entries, entry("unplaced", { ownership: "unknown" })])).toEqual({
       mine: 5,
-      others: 1,
-      unknown: 1,
+      others: 2,
       all: 7,
     });
   });
