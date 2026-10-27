@@ -75,6 +75,11 @@ interface ReaderMemoryState {
   readers: RememberedReaders;
   /** Never persisted. Ends with a different account, a completed sign-in or the Hub's word. */
   signedOut: SignOutMarks;
+  /**
+   * Counts explicit sign-outs per Hub, never persisted. An action or read that began before a
+   * sign-out and ends after it carries an answer from before it: compare this at both ends.
+   */
+  signOutGeneration: Readonly<Record<string, number>>;
   remember: (reader: RememberedReader) => void;
   /** An explicit sign-out. `accountId` is the account that was signed in, if known. */
   forget: (origin: string, accountId?: string | null) => void;
@@ -98,6 +103,7 @@ export const useReaderMemory = create<ReaderMemoryState>()(
     (set) => ({
       readers: {},
       signedOut: {},
+      signOutGeneration: {},
       remember: (reader) =>
         set((state) => {
           const marks = state.signedOut;
@@ -113,6 +119,10 @@ export const useReaderMemory = create<ReaderMemoryState>()(
           signedOut: {
             ...state.signedOut,
             [origin]: { accountId: accountId ?? state.readers[origin]?.id ?? null },
+          },
+          signOutGeneration: {
+            ...state.signOutGeneration,
+            [origin]: (state.signOutGeneration[origin] ?? 0) + 1,
           },
         })),
       acknowledgeSignIn: (origin) =>

@@ -174,7 +174,9 @@ the account query for that account: an answer that still says signed in (a refet
 one that failed) is not the reader, in the hook as well as in storage. The mark ends when another
 account signs in, when a sign-in or other account action completes with a current answer from the
 Hub (`run` in `hub/account-provider.tsx`, a session change elsewhere), or when the Hub answers that
-nobody is signed in. Storage is read after the app starts: what happened meanwhile wins, and a
+nobody is signed in. An action or read that began before the sign-out and ends after it never ends
+the mark: each sign-out bumps a per-Hub generation (`signOutGeneration`) that is compared at both
+ends, because its answer predates the sign-out. Storage is read after the app starts: what happened meanwhile wins, and a
 reader signed out meanwhile is also removed from storage. It classifies authorship and authorizes
 nothing.
 

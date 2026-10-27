@@ -275,6 +275,23 @@ function EnabledHubAccountController({
   const refresh = useCallback(async () => {
     await refetchAccount();
   }, [refetchAccount]);
+  /**
+   * Ends the sign-out marked for this Hub, if `current` (the Hub answered) and no sign-out
+   * happened since `generation` was read: an answer to something that began before a sign-out is
+   * not evidence of a sign-in after it.
+   */
+  const acknowledgeSignIn = useCallback(
+    (generation: number, current: boolean) => {
+      const memory = useReaderMemory.getState();
+      if (current && (memory.signOutGeneration[configuration.origin] ?? 0) === generation)
+        memory.acknowledgeSignIn(configuration.origin);
+    },
+    [configuration.origin],
+  );
+  const signOutGeneration = useCallback(
+    () => useReaderMemory.getState().signOutGeneration[configuration.origin] ?? 0,
+    [configuration.origin],
+  );
   // Signing in again as the same account keeps the daemon-list query key, so a list the Hub
   // refused (401) would stay refused until its backed-off poll. Read it again at once; a read
   // still in flight carries the old credential and is replaced.
@@ -299,24 +316,24 @@ function EnabledHubAccountController({
         // A session change made elsewhere (a sign-in in another tab): a current answer ends any
         // sign-out marked here (reader-memory.ts).
         void (async () => {
-          const current = await refetchAccount();
-          if (current) useReaderMemory.getState().acknowledgeSignIn(configuration.origin);
+          const generation = signOutGeneration();
+          acknowledgeSignIn(generation, await refetchAccount());
           readDaemonListAgain();
         })();
       }),
-    [transport, refetchAccount, readDaemonListAgain, configuration.origin],
+    [transport, refetchAccount, readDaemonListAgain, acknowledgeSignIn, signOutGeneration],
   );
   const run = useCallback(
     async (operation: () => Promise<void>, options?: { signsOut?: true }) => {
       setMutationError(null);
+      const generation = signOutGeneration();
       try {
         await operation();
         const current = await refetchAccount();
         // A completed action followed by a current answer means the Hub accepted this session:
         // what the account query says now is the reader, whatever an earlier sign-out left
         // marked (reader-memory.ts).
-        if (current && !options?.signsOut)
-          useReaderMemory.getState().acknowledgeSignIn(configuration.origin);
+        if (!options?.signsOut) acknowledgeSignIn(generation, current);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : i18n.t("hub.account.errors.requestFailed");
@@ -324,7 +341,7 @@ function EnabledHubAccountController({
         throw error;
       }
     },
-    [refetchAccount, configuration.origin],
+    [refetchAccount, acknowledgeSignIn, signOutGeneration],
   );
   const signIn = useCallback(
     (input?: { email: string; password: string }) =>
@@ -356,15 +373,16 @@ function EnabledHubAccountController({
   );
   const completeRegistration = useCallback(
     async (input: { token: string; name: string; password: string }) => {
+      const generation = signOutGeneration();
       const link = await registrationLinkRequest(transport, "complete", input);
       if (link.status === "registered") {
         dismissRegistration();
         const current = await account.refetch();
-        if (!current.isError) useReaderMemory.getState().acknowledgeSignIn(configuration.origin);
+        acknowledgeSignIn(generation, !current.isError);
       }
       return link;
     },
-    [account, configuration.origin, dismissRegistration, transport],
+    [account, acknowledgeSignIn, signOutGeneration, dismissRegistration, transport],
   );
   const recoverOwnerSetup = useCallback(
     async (error: unknown) => {
