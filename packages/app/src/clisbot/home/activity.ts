@@ -49,25 +49,36 @@ export function activitySections(
   const recent = take(buckets.recent);
   if (recent.length)
     sections.push({ key: "recent", title: i18n.t("home.activity.recent"), agents: [] });
+  // Titles are looked up once per day, not once per conversation: a translation or a date format
+  // per row dominated Home's layout pass at a few thousand sessions.
+  const titleOfDay = new Map<number, string>();
+  const dateSections = new Map<string, ActivitySection>();
   let dateFormatter: Intl.DateTimeFormat | undefined;
+  const titleFor = (date: Date): string => {
+    if (date >= today) return i18n.t("home.activity.today");
+    if (date >= yesterday) return i18n.t("home.activity.yesterday");
+    if (Number.isNaN(date.getTime())) return date.toLocaleDateString();
+    // Construct once per grouping pass, rather than once for every older conversation.
+    dateFormatter ??= new Intl.DateTimeFormat(i18n.resolvedLanguage, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    return dateFormatter.format(date);
+  };
   for (const agent of recent) {
     const date = agent.lastActivityAt;
-    let title: string;
-    if (date >= today) title = i18n.t("home.activity.today");
-    else if (date >= yesterday) title = i18n.t("home.activity.yesterday");
-    else if (Number.isNaN(date.getTime())) title = date.toLocaleDateString();
-    else {
-      // Construct once per grouping pass, rather than once for every older conversation.
-      dateFormatter ??= new Intl.DateTimeFormat(i18n.resolvedLanguage, {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-      title = dateFormatter.format(date);
+    const day = date.getFullYear() * 10_000 + date.getMonth() * 100 + date.getDate();
+    let title = titleOfDay.get(day);
+    if (title === undefined) {
+      title = titleFor(date);
+      // An invalid date has no day; every one of them shares a title anyway.
+      titleOfDay.set(day, title);
     }
-    let section = sections.find((s) => s.key === `date:${title}`);
+    let section = dateSections.get(title);
     if (!section) {
       section = { key: `date:${title}`, title, agents: [] };
+      dateSections.set(title, section);
       sections.push(section);
     }
     section.agents.push(agent);

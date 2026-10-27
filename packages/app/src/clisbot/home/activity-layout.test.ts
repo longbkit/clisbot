@@ -1,5 +1,6 @@
 import { expect, test, vi } from "vitest";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
+import { i18n } from "@/i18n/i18next";
 import { activityLayout, activityLayoutChanges, visibleActivityLayout } from "./activity-layout";
 
 const now = new Date(2026, 9, 12, 12);
@@ -75,4 +76,12 @@ test("a layout pass classifies each agent once and never uses locale collation",
 test("equal timestamps order by Host and id, whichever Host answered first", () => {
   const same = [agent("b", 5, "idle", "z"), agent("a", 5, "idle", "z"), agent("c", 5, "idle", "a")];
   expect(keys(activityLayout(same, now))).toEqual(keys(activityLayout(same.toReversed(), now)));
+});
+
+test("section titles are translated once per day, not once per conversation", () => {
+  const list = Array.from({ length: 300 }, (_, i) => agent(`a${i}`, -i * 60_000));
+  const translate = vi.spyOn(i18n, "t");
+  activityLayout(list, now);
+  expect(translate.mock.calls.length).toBeLessThanOrEqual(8);
+  translate.mockRestore();
 });
