@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Agent } from "@/stores/session-store";
 import {
   createAggregatedAgentProjector,
@@ -125,4 +125,47 @@ describe("shared aggregated agent projection", () => {
     expect(sharedAggregatedAgentProjector(false)).toBe(sharedAggregatedAgentProjector(false));
     expect(sharedAggregatedAgentProjector(true)).not.toBe(sharedAggregatedAgentProjector(false));
   });
+});
+
+it("projects participant identities once per immutable source, never profiles or authored arrays", () => {
+  const own = { kind: "user" as const, id: "me", hubOrigin: "https://hub" };
+  const profile = vi.fn(() => {
+    throw new Error("participant profile traversed");
+  });
+  const participants = Array.from({ length: 500 }, (_, index) => ({
+    ...own,
+    id: String(index),
+    get displayName(): string {
+      return profile();
+    },
+  }));
+  const read = vi.fn(() => participants);
+  const legacy = agent({ id: "legacy" });
+  Object.defineProperty(legacy, "participantActors", { get: read });
+  const authored = agent({ id: "authored", createdBy: own });
+  const forbidden = vi.fn(() => {
+    throw new Error("authored participants read");
+  });
+  Object.defineProperty(authored, "participantActors", { get: forbidden });
+  const project = createMemoizedAggregatedAgentProjector();
+  const sources = input(legacy, authored);
+  const first = project(sources);
+  for (let i = 0; i < 5; i++) expect(project({ ...sources })).toBe(first);
+  expect(read).toHaveBeenCalledTimes(1);
+  expect(forbidden).not.toHaveBeenCalled();
+  expect(profile).not.toHaveBeenCalled();
+  expect(first.find((row) => row.id === "legacy")?.participationKey).toBeTypeOf("string");
+  expect(first.every((row) => !("participantActors" in row))).toBe(true);
+  const renamed = agent({
+    ...legacy,
+    participantActors: participants.map(({ kind, id, hubOrigin }) => ({
+      kind,
+      id,
+      hubOrigin,
+      displayName: "New profile",
+    })),
+  });
+  expect(project(input(renamed, authored))).toBe(first);
+  const changed = agent({ ...renamed, participantActors: [own] });
+  expect(project(input(changed, authored))).not.toBe(first);
 });

@@ -1,3 +1,4 @@
+import { participationKeyOf } from "@/clisbot/navigation/ownership-key";
 import equal from "fast-deep-equal";
 import type { Agent } from "@/stores/session-store";
 import type { HostProfile } from "@/types/host-connection";
@@ -43,6 +44,7 @@ function projectAgent({
     labels: source.labels,
     projectPlacement: source.projectPlacement,
     createdBy: source.createdBy,
+    participationKey: participationKeyOf(source),
   };
 }
 
