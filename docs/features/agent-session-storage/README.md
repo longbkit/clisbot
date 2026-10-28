@@ -66,6 +66,25 @@ session this way. Existing records are not backfilled from titles, labels, proje
 current reader. Rolling back to a daemon that rewrites records without these optional fields can
 lose the added attribution, but must leave the schedule runnable.
 
+## Workflow session ownership
+
+A Hub workflow's owner is the verified Member who authored its **pinned configuration revision**,
+not whoever last edited the active workflow or manually started the run. Before a new execution
+is persisted, the Hub resolves that revision's `createdByUserId` against membership in the same
+organization and stores optional `ownerActor` inside the durable `launchIntent`. Recovery reuses
+that snapshot, including an absent owner on legacy intents; it never looks up the current revision
+again for an existing execution. Imported revisions without authors and unverified membership
+remain unknown. Existing author-access checks and pause/deny behavior are unchanged.
+
+Daemon creation receives that snapshot beside the actual manual/channel initiator, or beside an
+`automation(workflowId)` actor for other triggers. An owner supplied in trigger data is ignored.
+This is attribution only; it neither delegates access nor overrides an existing reused session's
+creator. The Hub writes it when its database runtime and public Hub origin are available; other
+compositions omit the resolver and retain prior behavior. The field extends existing JSON data,
+so no database migration or required wire field is added. Both the Hub producer and the daemon
+session-storage support must be updated for the metadata to survive end to end. Older daemons
+may ignore it, and older persisted executions are not backfilled.
+
 ## File schema
 
 **`events.jsonl`** — one JSON object per line, appended, never rewritten in place. An update to an

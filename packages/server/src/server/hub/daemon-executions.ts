@@ -121,6 +121,14 @@ export class DaemonExecutions implements HubExecutionAgents {
               ...input.sessionIdentity.actor,
               hubOrigin: new URL(this.options.hubOrigin).origin,
             },
+            ...(input.sessionIdentity.ownerActor
+              ? {
+                  ownerActor: {
+                    ...input.sessionIdentity.ownerActor,
+                    hubOrigin: new URL(this.options.hubOrigin).origin,
+                  },
+                }
+              : {}),
             ...(input.sessionIdentity.channel
               ? {
                   channel: {

@@ -1,3 +1,4 @@
+import type { ResolveWorkflowOwner } from "../triggers/workflow-owner.js";
 import { isDeepStrictEqual } from "node:util";
 import { DatabaseUnavailableError } from "../db/errors.js";
 import type {
@@ -83,6 +84,8 @@ export interface DurableWorkflowEngineOptions {
    * `author_access_lost`; absent means every run is accepted.
    */
   authorizeWorkflowRun?: AuthorizeWorkflowRun;
+  /** Snapshot attribution once per new execution; existing persisted intents remain unchanged. */
+  resolveWorkflowOwner?: ResolveWorkflowOwner;
   configurationRevisionId?: string;
   leaseMs?: number;
   workerIntervalMs?: number;
@@ -778,7 +781,15 @@ export class DurableWorkflowEngine {
     if (durableExecutionId(intent) !== executionId) {
       throw new Error("workflow execution identity changed during context materialization");
     }
-    return { executionId, intent };
+    const ownerActor = await this.options.resolveWorkflowOwner?.({
+      organizationId: run.organizationId,
+      workflowId: run.workflowId,
+      configurationRevisionId: run.configurationRevisionId,
+    });
+    return {
+      executionId,
+      intent: ownerActor ? { ...intent, ownerActor: structuredClone(ownerActor) } : intent,
+    };
   }
 
   private async failInvalidLaunchIntent(

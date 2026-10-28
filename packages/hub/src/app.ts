@@ -1,3 +1,4 @@
+import { createWorkflowOwnerResolver } from "./triggers/workflow-owner.js";
 import { embeddedWorkflowNextPoll } from "./workflows/idle-poll.js";
 import { automationMemberIdentity } from "./managed-access/automation-session-identity.js";
 import { createExecutionCapabilityServer } from "./execution-capabilities/server.js";
@@ -43,7 +44,10 @@ import {
   handleManualTriggerRequest,
 } from "./triggers/manual/source.js";
 import { createManualRunProvider } from "./triggers/manual/provider.js";
-import { composeAutomationAuthorAccessCheck } from "./triggers/author-access.js";
+import {
+  createAuthorResolver,
+  composeAutomationAuthorAccessCheck,
+} from "./triggers/author-access.js";
 import { composeNotificationMailer } from "./invitations/index.js";
 import { createWorkflowConfigurationResolver } from "./triggers/configuration.js";
 import {
@@ -269,6 +273,15 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
     entitlements: options.entitlements,
     providers,
     ...(authorizeWorkflowRun === undefined ? {} : { authorizeWorkflowRun }),
+    ...(options.database && options.databaseRuntime && options.publicBaseUrl
+      ? {
+          resolveWorkflowOwner: createWorkflowOwnerResolver({
+            database: options.database,
+            resolveAuthor: createAuthorResolver(options.databaseRuntime),
+            hubOrigin: options.publicBaseUrl,
+          }),
+        }
+      : {}),
     ...(options.configurationRevisionId === undefined
       ? {}
       : { configurationRevisionId: options.configurationRevisionId }),
