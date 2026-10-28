@@ -1,4 +1,4 @@
-import type { Ownership } from "@/clisbot/navigation/ownership";
+import { inScope, type Ownership } from "@/clisbot/navigation/ownership";
 import type { SearchViewContext } from "./candidates";
 import { inSearchScope, type ResolvedSearchScope } from "./model";
 
@@ -35,7 +35,7 @@ export function hiddenBy(
   if (view.projectKeys && (!placement.projectKey || !view.projectKeys.has(placement.projectKey))) {
     return "project";
   }
-  if (view.ownership && view.ownership !== "all" && placement.ownership !== view.ownership) {
+  if (view.ownership && !inScope(view.ownership, placement.ownership)) {
     return "others";
   }
   return null;
