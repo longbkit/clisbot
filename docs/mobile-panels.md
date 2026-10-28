@@ -61,8 +61,8 @@ it on Back. The shared overlay’s explicit presentation guard hides the actual 
 accessibility without collapsing retained scroll ranges; close gestures and sidebar demand are
 inactive too. Cold global screens still do not mount the sidebar. Compact web and desktop keep
 their existing mount policies. On Android phones, the retained overlay keeps its host but releases
-Workspace list content while hidden; returning rebuilds that content and currently resets its list
-scroll position. Chats keeps its existing retention policy.
+Chats and Workspace list content while hidden; returning rebuilds that content and currently resets
+its list scroll position. Chats' search state remains outside the released pane.
 
 ## Ownership
 

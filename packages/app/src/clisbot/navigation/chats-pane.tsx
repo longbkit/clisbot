@@ -1,4 +1,11 @@
-import { memo, useCallback, useMemo, useState, type ComponentProps } from "react";
+import {
+  memo,
+  useCallback,
+  useMemo,
+  type ComponentProps,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import equal from "fast-deep-equal";
 import { Text, View } from "react-native";
 import { FlatList } from "@/components/ui/scroll-view";
@@ -62,18 +69,28 @@ const CHIP_LABELS: Record<ChatsChip, string> = {
 };
 
 /** Chats (brief C3): one Telegram-style list of Bot DMs and group chats, pins on top. */
-export function ChatsPane({ onBeforeNavigate }: { onBeforeNavigate?: ChatListAdmission }) {
+export function ChatsPane({
+  onBeforeNavigate,
+  searchOpen,
+  setSearchOpen,
+  search,
+  setSearch,
+}: {
+  onBeforeNavigate?: ChatListAdmission;
+  searchOpen: boolean;
+  setSearchOpen: Dispatch<SetStateAction<boolean>>;
+  search: string;
+  setSearch: Dispatch<SetStateAction<string>>;
+}) {
   const { t } = useTranslation();
   const { entries, catalog } = useChatEntries();
   const scope = useNavigationStore((state) => state.scopes.chats);
   const chip = useNavigationStore((state) => state.chatsChip);
   const setChip = useNavigationStore((state) => state.setChatsChip);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [search, setSearch] = useState("");
   const toggleSearch = useCallback(() => {
     setSearchOpen((open) => !open);
     setSearch("");
-  }, []);
+  }, [setSearch, setSearchOpen]);
   const sort = useNavigationStore((state) => state.chatsSort);
   const split = useNavigationStore((state) => state.chatsSplit);
   const { serverIds } = useHostFilter();

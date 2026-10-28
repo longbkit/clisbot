@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import React, { useSyncExternalStore } from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import React, { useCallback, useState, useSyncExternalStore } from "react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@react-native-async-storage/async-storage", () => ({
@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
   os: "android",
   sessions: ["mine"],
   listeners: new Set<() => void>(),
+  chats: ["first"],
+  chatListeners: new Set<() => void>(),
 }));
 vi.mock("react-native", () => ({
   Platform: {
@@ -54,7 +56,53 @@ vi.mock("./work-pane", () => ({
     );
   },
 }));
-vi.mock("./chats-pane", () => ({ ChatsPane: () => <div>Chats</div> }));
+vi.mock("./chats-pane", () => ({
+  ChatsPane: (props: {
+    search?: string;
+    setSearch?: (value: string) => void;
+    searchOpen?: boolean;
+    setSearchOpen?: (value: boolean) => void;
+  }) => {
+    const [localSearch, setLocalSearch] = useState("");
+    const [localSearchOpen, setLocalSearchOpen] = useState(false);
+    const scope = useNavigationStore((value) => value.scopes.chats);
+    const chip = useNavigationStore((value) => value.chatsChip);
+    const lastList = useNavigationStore((value) => value.lastList);
+    const chats = useSyncExternalStore(
+      (listener) => {
+        state.chatListeners.add(listener);
+        return () => state.chatListeners.delete(listener);
+      },
+      () => state.chats,
+    );
+    const search = props.search ?? localSearch;
+    const searchOpen = props.searchOpen ?? localSearchOpen;
+    const setSearchOpen = props.setSearchOpen ?? setLocalSearchOpen;
+    const setSearch = props.setSearch ?? setLocalSearch;
+    const openSearch = useCallback(() => setSearchOpen(true), [setSearchOpen]);
+    const changeSearch = useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => setSearch(event.target.value),
+      [setSearch],
+    );
+    return (
+      <div data-testid="chats">
+        <div>Chats</div>
+        <div data-testid="chats-preferences">{`${scope}:${chip}:${lastList}`}</div>
+        <button type="button" onClick={openSearch}>
+          Search
+        </button>
+        {searchOpen ? (
+          <input aria-label="Chat search" value={search} onChange={changeSearch} />
+        ) : null}
+        {chats.map((chat) => (
+          <div key={chat} data-testid="chat-row">
+            {chat}
+          </div>
+        ))}
+      </div>
+    );
+  },
+}));
 vi.mock("@/clisbot/bots/feature", () => ({
   useBotsFeatureHosts: () => [],
   useBotCreationHosts: () => [],
@@ -84,13 +132,63 @@ import { useNavigationStore } from "./store";
 afterEach(() => {
   cleanup();
   state.listeners.clear();
+  state.chatListeners.clear();
   state.sessions = ["mine"];
+  state.chats = ["first"];
   state.compact = true;
   state.os = "android";
   useNavigationStore.setState({
     scopes: { home: "mine", chats: "mine", work: "mine" },
     workChip: "all",
+    chatsChip: "all",
     lastList: "work",
+  });
+});
+
+describe("retained Chats list activity", () => {
+  it("does not mount or rebuild rows while hidden and shows current rows on return", () => {
+    const view = render(<ListContent section="chats" active />);
+    expect(screen.getByTestId("chat-row").textContent).toBe("first");
+    view.rerender(<ListContent section="chats" active={false} />);
+    expect(screen.queryByTestId("chats")).toBeNull();
+    expect(state.chatListeners.size).toBe(0);
+    state.chats = ["first", "new"];
+    for (const notify of state.chatListeners) notify();
+    expect(screen.queryAllByTestId("chat-row")).toHaveLength(0);
+    view.rerender(<ListContent section="chats" active />);
+    expect(screen.getAllByTestId("chat-row").map((row) => row.textContent)).toEqual([
+      "first",
+      "new",
+    ]);
+  });
+
+  it("keeps scope, chip and an open search across release and return", () => {
+    useNavigationStore.setState({
+      scopes: { home: "mine", chats: "others", work: "mine" },
+      chatsChip: "unread",
+      lastList: "chats",
+    });
+    const view = render(<ListContent section="chats" active />);
+    fireEvent.click(screen.getByText("Search"));
+    fireEvent.change(screen.getByLabelText("Chat search"), { target: { value: "project" } });
+    view.rerender(<ListContent section="work" active />);
+    expect(screen.queryByTestId("chats")).toBeNull();
+    view.rerender(<ListContent section="chats" active />);
+    expect(screen.getByTestId("chats-preferences").textContent).toBe("others:unread:chats");
+    expect((screen.getByLabelText("Chat search") as HTMLInputElement).value).toBe("project");
+  });
+
+  it("retains Chats on desktop and iOS", () => {
+    state.compact = false;
+    const desktop = render(<ListContent section="chats" active />);
+    desktop.rerender(<ListContent section="work" active={false} />);
+    expect(screen.getByTestId("chat-row").textContent).toBe("first");
+    desktop.unmount();
+    state.compact = true;
+    state.os = "ios";
+    const ios = render(<ListContent section="chats" active />);
+    ios.rerender(<ListContent section="work" active={false} />);
+    expect(screen.getByTestId("chat-row").textContent).toBe("first");
   });
 });
 

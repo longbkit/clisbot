@@ -67,10 +67,10 @@ The primary navigation says where you are; each section owns its header, filters
   component. A `FlatList`'s `contentContainerStyle` gets no Unistyles class on web
   ([unistyles](../../unistyles.md#main-gotcha-contentcontainerstyle)), so Chats and the flat
   Workspace list use theme-free `SPACING` insets.
-- **List retention** (`ListContent` in `list-panel.tsx`): Chats stays mounted once opened.
-  Workspace stays mounted on desktop, web and iOS. On Android phones its hidden content unmounts
-  to release row subscriptions and native views; returning rebuilds it and resets its scroll
-  position. Its performance and scroll restoration still need device verification.
+- **List retention** (`ListContent` in `list-panel.tsx`): Chats and Workspace stay mounted on
+  desktop, web and iOS. On Android phones hidden list content unmounts to release row subscriptions
+  and native views; returning rebuilds it and resets its scroll position. Scope, chips and Chats'
+  open search remain outside the released panes. Performance still needs device verification.
 
 ## Change map
 

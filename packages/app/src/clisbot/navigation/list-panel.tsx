@@ -75,8 +75,8 @@ function useListSection(): ListSection {
 }
 
 /**
- * Desktop keeps both lists mounted. On Android phones, a hidden Work list releases its rows
- * and subscriptions, so Host updates cannot render thousands of off-screen session lines.
+ * Desktop keeps both lists mounted. On Android phones, hidden lists release their rows and
+ * subscriptions; list preferences and the Chats search remain owned outside the released panes.
  */
 export function ListContent({
   section,
@@ -88,19 +88,29 @@ export function ListContent({
   active: boolean;
 }) {
   const compact = useIsCompactFormFactor();
-  const releaseHiddenWork = compact && Platform.OS === "android";
+  const releaseHiddenLists = compact && Platform.OS === "android";
+  const [chatSearchOpen, setChatSearchOpen] = useState(false);
+  const [chatSearch, setChatSearch] = useState("");
   const [visited, setVisited] = useState<ReadonlySet<ListSection>>(() => new Set([section]));
   if (!visited.has(section)) setVisited(new Set([...visited, section]));
   return (
     <>
       {visited.has("chats") ? (
         <RetainedPanel active={section === "chats"} style={styles.content}>
-          <ChatsPane onBeforeNavigate={onBeforeNavigate} />
+          {!releaseHiddenLists || (active && section === "chats") ? (
+            <ChatsPane
+              onBeforeNavigate={onBeforeNavigate}
+              searchOpen={chatSearchOpen}
+              setSearchOpen={setChatSearchOpen}
+              search={chatSearch}
+              setSearch={setChatSearch}
+            />
+          ) : null}
         </RetainedPanel>
       ) : null}
       {visited.has("work") ? (
         <RetainedPanel active={section === "work"} style={styles.content}>
-          {!releaseHiddenWork || (active && section === "work") ? (
+          {!releaseHiddenLists || (active && section === "work") ? (
             <WorkPane onBeforeNavigate={onBeforeNavigate} active={active && section === "work"} />
           ) : null}
         </RetainedPanel>
