@@ -471,7 +471,9 @@ function allowedHubPath(value: string): string {
   if (!ALLOWED_ACCOUNT_PATHS.has(pathname) && !pathname.startsWith("/api/management/v1/")) {
     throw new Error("Hub request path is unavailable.");
   }
-  if (url.search !== "") {
+  // Management endpoints validate their own query parameters on the Hub.
+  // Keep the account endpoints restricted to the existing invitation flow.
+  if (url.search !== "" && !pathname.startsWith("/api/management/v1/")) {
     const invitation = url.searchParams.getAll("invitation");
     const onlyInvitation = [...url.searchParams.keys()].every((key) => key === "invitation");
     if (
