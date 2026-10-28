@@ -18,7 +18,7 @@ import {
 } from "./ownership";
 import { participationKeyOf } from "./ownership-key";
 import { splitPinTags } from "./pin-tags-model";
-import { countWork, createWorkFilter } from "./work-items";
+import { countWork, createWorkCounter, createWorkFilter } from "./work-items";
 
 const seeds = [0x109, 0x22371, 0xabcdef];
 const hostKinds: OwnershipHostKind[] = ["hub", "direct", "unknown"];
@@ -104,6 +104,7 @@ describe.each(seeds)("ownership properties, seed %i", (seed) => {
   const agents = sources.map(agentOf);
 
   it.each(hostKinds)("partitions the same session IDs on every consumer, Host %s", (hostKind) => {
+    const countCached = createWorkCounter();
     for (const accounts of readers) {
       const context = { accounts, hostKind };
       const owner = (agent: AggregatedAgent) =>
@@ -189,6 +190,7 @@ describe.each(seeds)("ownership properties, seed %i", (seed) => {
         };
         const filter = createWorkFilter(query, sessionsOf);
         expect(countWork(workspaces, sessionsOf, query).scopes).toEqual(counts);
+        expect(countCached(workspaces, sessionsOf, query).scopes).toEqual(counts);
         expect(
           sorted(
             sessions
