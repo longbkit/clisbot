@@ -61,7 +61,7 @@ export const useNavigationStore = create<NavigationState>()(
   persist(
     (set) => ({
       homeMode: "hybrid",
-      scopes: { home: "all", chats: "mine", work: "mine" },
+      scopes: { home: "mine", chats: "mine", work: "mine" },
       lastList: "work",
       homeChip: "all",
       chatsChip: "all",
@@ -90,7 +90,9 @@ export const useNavigationStore = create<NavigationState>()(
       // default) — Bot sessions now show in the list, so the old choice is not carried over.
       // v2: Home opens on All (Owner, 2026-10-26); a stored Home scope moves to All once.
       // v3: Chats' own Host filter gave way to the app-wide one (Owner, 2026-10-26).
-      version: 3,
+      // v4: every list opens on For me and keeps the reader's last choice (Owner, 2026-10-28);
+      // v2's Home-to-All move was not a choice, so a stored Home scope goes back to For me once.
+      version: 4,
       migrate: (persisted, version) => {
         const state = { ...((persisted ?? {}) as Record<string, unknown>) };
         if (version < 1) {
@@ -99,6 +101,7 @@ export const useNavigationStore = create<NavigationState>()(
         }
         const scopes = state.scopes as Record<string, unknown> | undefined;
         if (version < 2 && scopes) state.scopes = { ...scopes, home: "all" };
+        if (version < 4) state.scopes = { ...(state.scopes as object), home: "mine" };
         delete state.chatsHosts;
         return state as unknown as NavigationState;
       },

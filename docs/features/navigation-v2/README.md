@@ -241,7 +241,7 @@ and the Hosts rail dot are what say the Host is out of reach.
 
 ## Home
 
-Home opens on the All scope (Owner, 2026-10-26); Chats and Workspace open on For me.
+Home, Chats and Workspace all open on For me and keep the last choice the reader made (Owner, 2026-10-28; it replaces Home opening on All from 2026-10-26).
 
 Order: header (mode switch, 🔍) → a connection notice only when something is wrong → composer and
 its context row → Status & Setup and Import session → quick starts → the Host chip → scope tabs →
@@ -314,7 +314,7 @@ The list's unit is the root session (`work-items.ts`); a workspace with no sessi
   switch.
 - **No Active filter.** Ordering by last update covers it; V2 ignores the stored `activeOnly`.
 - The navigation store's persist version 1 drops `showBotProjectsInWork` and sets `workShowBots`;
-  the scope, mode and Chats choices carry over. Version 2 moves a stored Home scope to All once.
+  the scope, mode and Chats choices carry over. Version 2 moved a stored Home scope to All once; version 4 returns it to For me once.
 
 ## Failure and needs-action lifecycle (3.1c)
 

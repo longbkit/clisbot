@@ -24,8 +24,12 @@ describe("Navigation V2 preferences", () => {
     expect(migrated).toMatchObject({ homeMode: "work", chatsSplit: true, workShowBots: true });
   });
 
-  it("opens Home on All, and moves a stored Home scope to All once (v1 → v2)", () => {
-    expect(useNavigationStore.getState().scopes.home).toBe("all");
+  it("opens every list on For me, and a stored Home scope ends on For me (v1 → v4)", () => {
+    expect(useNavigationStore.getState().scopes).toEqual({
+      home: "mine",
+      chats: "mine",
+      work: "mine",
+    });
     const migrate = useNavigationStore.persist.getOptions().migrate!;
     const migrated = migrate(
       { scopes: { home: "mine", chats: "others", work: "mine" }, workShowBots: false },
@@ -33,7 +37,7 @@ describe("Navigation V2 preferences", () => {
     ) as Record<string, unknown>;
     // The reader's other choices stay, the Bots chip included.
     expect(migrated).toMatchObject({
-      scopes: { home: "all", chats: "others", work: "mine" },
+      scopes: { home: "mine", chats: "others", work: "mine" },
       workShowBots: false,
     });
   });
@@ -46,6 +50,15 @@ describe("Navigation V2 preferences", () => {
     ) as Record<string, unknown>;
     expect(migrated).not.toHaveProperty("chatsHosts");
     expect(migrated.scopes).toMatchObject({ home: "mine" });
+  });
+
+  it("returns a Home scope that v2 forced to All to For me once, then keeps the choice (v3 → v4)", () => {
+    const migrate = useNavigationStore.persist.getOptions().migrate!;
+    const stored = { scopes: { home: "all", chats: "others", work: "all" } };
+    expect(migrate(stored, 3)).toMatchObject({
+      scopes: { home: "mine", chats: "others", work: "all" },
+    });
+    expect(migrate(stored, 4)).toMatchObject({ scopes: stored.scopes });
   });
 
   it("persists the Bots chip", () => {

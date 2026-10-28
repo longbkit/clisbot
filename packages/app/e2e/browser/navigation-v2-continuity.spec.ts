@@ -129,10 +129,10 @@ test.describe("Navigation V2 continuity", () => {
     await expect(work.getByTestId("work-bots-chip")).toHaveAccessibleName("Hide Bot sessions");
     await expect
       .poll(async () => (await storedJson(page, "clisbot-navigation-preferences"))?.version)
-      .toBe(3);
+      .toBe(4);
     const stored = await storedJson(page, "clisbot-navigation-preferences");
-    // Home opens on All (v2); the Workspace scope the reader chose stays.
-    expect(stored.state.scopes).toMatchObject({ home: "all", work: "others" });
+    // Home returns to For me once (v4); the Workspace scope the reader chose stays.
+    expect(stored.state.scopes).toMatchObject({ home: "mine", work: "others" });
     expect(stored.state).toMatchObject({
       homeMode: "work",
       chatsSort: "name",
