@@ -411,10 +411,9 @@ export class ScheduleService {
     fields: { name: string | null; prompt: string; target: ScheduleTarget },
   ): Omit<StoredSchedule, "id"> {
     const now = this.now();
-    const actor =
-      this.agentManager.sessionStorageEnabled && fields.target.type === "new-agent"
-        ? currentSessionOperationIdentity()?.actor
-        : undefined;
+    const actor = this.agentManager.sessionStorageEnabled
+      ? currentSessionOperationIdentity()?.actor
+      : undefined;
     const runOnCreate = input.runOnCreate ?? input.cadence.type === "every";
     const nextRunAt = runOnCreate ? now : computeNextRunAt(input.cadence, now);
     return {
@@ -1247,6 +1246,7 @@ export class ScheduleService {
         runId,
         run: countCompletedRuns(schedule) + 1,
         title,
+        sessionStorageEnabled: this.agentManager.sessionStorageEnabled,
       }),
     );
     if (result.status === "gone") throw new ScheduleTargetGoneError(result.reason);

@@ -1,3 +1,4 @@
+import type { SessionOperationIdentity } from "../agent/session-authorship.js";
 // A Chat's `transcript.jsonl`: append-only, one line per message, seq allocated
 // here (docs/features/bots-and-chats/README.md, D5). Reuses `SessionEventLog`
 // for the file pair, the fsync'd append, the rebuildable index and seq-window
@@ -11,6 +12,8 @@ export type TranscriptLine = ChatMessagePayload & {
   attachmentContentDigest?: string;
   /** Internal durable delivery metadata; never included in the rendered user text. */
   spokenInputAgentId?: string;
+  /** Trusted heartbeat creation identity; persisted for delivery/recovery, never taken from user text. */
+  sessionIdentity?: SessionOperationIdentity;
 };
 /** What a caller appends: the line without the seq the log allocates. */
 export type TranscriptLineInput = Omit<TranscriptLine, "seq">;

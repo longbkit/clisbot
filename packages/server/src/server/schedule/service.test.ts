@@ -432,7 +432,7 @@ describe("ScheduleService", () => {
     expect(record?.ownerActor).toBeUndefined();
   });
 
-  test("schedule ownership stays disabled with session storage and does not change heartbeat records", async () => {
+  test("schedule ownership stays disabled with session storage and captures heartbeat creators", async () => {
     const disabled = ownershipService(false);
     const created = await withSessionOperationIdentity({ actor: creator }, () =>
       disabled.create(ownedScheduleInput()),
@@ -450,7 +450,55 @@ describe("ScheduleService", () => {
         target: { type: "agent", agentId: run.agentId! },
       }),
     );
-    expect(heartbeat.createdBy).toBeUndefined();
+    expect(heartbeat.createdBy).toEqual(creator);
+  });
+
+  test("heartbeat creators survive edits and restart without changing the existing session owner", async () => {
+    const agentId = "77777777-7777-4777-8777-777777777777";
+    await agentStorage.upsert({
+      ...buildAgentRecord({
+        id: agentId,
+        cwd: tempDir,
+        iso: now.toISOString(),
+        labels: { "clisbot.bot-id": "bot_a", "clisbot.chat-id": "chat_1" },
+      }),
+      createdBy: operator,
+    });
+    const posts: import("./chat-delivery.js").ScheduleChatPost[] = [];
+    const chats = {
+      postScheduled: async (post: import("./chat-delivery.js").ScheduleChatPost) => {
+        posts.push(post);
+        return { status: "posted" as const, agentId };
+      },
+    };
+    const service = ownershipService();
+    service.attachChats(chats);
+    const input = {
+      ...ownedScheduleInput(),
+      name: "Heartbeat ownership",
+      target: { type: "agent" as const, agentId, chatId: "chat_1" },
+    };
+    const created = await withSessionOperationIdentity({ actor: creator }, () =>
+      service.createOrReplace(input),
+    );
+    await withSessionOperationIdentity({ actor: operator }, () =>
+      service.createOrReplace({ ...input, prompt: "Updated heartbeat" }),
+    );
+    const restarted = ownershipService();
+    restarted.attachChats(chats);
+    expect((await restarted.inspect(created.id)).createdBy).toEqual(creator);
+    await withSessionOperationIdentity({ actor: operator }, () => restarted.runOnce(created.id));
+    expect(posts).toHaveLength(1);
+    expect(posts[0]?.sessionIdentity).toMatchObject({
+      actor: { kind: "automation", id: created.id },
+      ownerActor: creator,
+    });
+    expect(posts[0]?.actor).toMatchObject({
+      kind: "automation",
+      id: created.id,
+      hubOrigin: creator.hubOrigin,
+    });
+    expect((await agentStorage.get(agentId))?.createdBy).toEqual(operator);
   });
 
   test("ticks due schedules and records run history on disk", async () => {

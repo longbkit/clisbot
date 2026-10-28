@@ -44,10 +44,11 @@ not permanently delete its canonical store before the first prompt writes to it.
 
 ## Scheduled session ownership
 
-With `agentSessionStorage` enabled, a new-agent schedule records optional `createdBy` from the
-trusted session operation context when it is first created. Request/MCP arguments cannot supply
+With `agentSessionStorage` enabled, schedules and heartbeats record optional `createdBy` from the
+trusted session operation context when first created. Request/MCP arguments cannot supply
 that snapshot. Updating or idempotently replacing the schedule does not transfer its owner; old
-records without a creator remain unowned. Heartbeat, Chat and workflow ownership are unchanged.
+records without a creator remain unowned. Updating the schedule does not change the creator of an
+existing target session.
 
 Each new-agent run records `createdBy` as an `automation` actor whose id is the schedule id. Its
 optional `ownerActor` is a copy of the schedule creator when that creator is a Hub-scoped user
@@ -60,6 +61,15 @@ and operation identities; schedule `createdBy` is optional too. Older parsers ig
 and new parsers accept old records without inventing owners. The existing session-storage toggle
 owns writing this metadata; disabling it preserves previous behavior. No additional RPC or timeline
 fetch is needed. Consumers that do not read `ownerActor` retain their existing scope rules.
+
+A heartbeat targeting an existing agent resumes that session and preserves its creator. A heartbeat
+posted through a Chat may create a Bot session after `/new`, archive or failed resume. Its trusted
+automation/owner identity is persisted as optional internal transcript delivery metadata and passed
+only to new-session creation. In a group, each Bot uses the latest triggering user/heartbeat line,
+so a later Bot reply does not erase the initiating heartbeat's ownership. Duplicate posts cannot
+replace the stored identity. Ordinary Chat creation retains its existing behavior; client message
+arguments cannot supply heartbeat creation metadata. With session storage disabled, none of this
+metadata is stamped and the prior Chat behavior remains.
 
 These producer changes require a daemon update: 2.1.8 does not stamp a timer-created new-agent
 session this way. Existing records are not backfilled from titles, labels, project owners or the

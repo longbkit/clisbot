@@ -1,3 +1,4 @@
+import { currentSessionOperationIdentity } from "../agent/session-operation-context.js";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -84,6 +85,8 @@ async function harness(
         labels: input.kind === "mcp" ? (input.labels ?? {}) : {},
         lastStatus: "idle",
         config: {},
+        createdBy: currentSessionOperationIdentity()?.actor,
+        ownerActor: currentSessionOperationIdentity()?.ownerActor,
       } as StoredAgentRecord);
       return { snapshot: { id } } as never;
     },
@@ -367,6 +370,66 @@ describe("ChatEngine", () => {
     await h.engine.idle();
     expect(await h.lines("cht_1")).toHaveLength(1);
     expect(h.sent).toHaveLength(1);
+  });
+
+  test("a heartbeat keeps its creator on replacement sessions and durable group delivery", async () => {
+    const h = await harness();
+    await h.store.create({ id: "cht_1", botIds: [alpha.id, beta.id] });
+    const owner = {
+      kind: "user" as const,
+      id: "schedule-creator",
+      memberId: "member-creator",
+      hubOrigin: "https://hub.example",
+    };
+    const heartbeat = { kind: "automation" as const, id: "schedule", hubOrigin: owner.hubOrigin };
+    const identity = { actor: heartbeat, ownerActor: owner };
+    const post = (id: string) =>
+      h.engine.postScheduled({
+        chatId: "cht_1",
+        botId: alpha.id,
+        mentionBotIds: [alpha.id, beta.id],
+        text: "Fixture heartbeat",
+        messageId: id,
+        actor: heartbeat,
+        scheduleRun: { scheduleId: "schedule", run: 1 },
+        sessionIdentity: identity,
+      });
+    await post("heartbeat-1");
+    await h.engine.idle();
+    expect(h.agents.get("agent-bot_a-1")).toMatchObject({
+      createdBy: heartbeat,
+      ownerActor: owner,
+    });
+    await h.completeTurn("agent-bot_a-1", "Fixture reply");
+    expect(h.agents.get("agent-bot_b-2")).toMatchObject({
+      createdBy: heartbeat,
+      ownerActor: owner,
+    });
+    await h.completeTurn("agent-bot_b-2", "Fixture done");
+    const before = h.agents.get("agent-bot_a-1")!;
+    h.agents.set(before.id, { ...before, archivedAt: new Date().toISOString() });
+    await post("heartbeat-2");
+    await h.engine.idle();
+    expect(h.agents.get("agent-bot_a-3")).toMatchObject({
+      createdBy: heartbeat,
+      ownerActor: owner,
+    });
+    // A duplicate schedule line cannot overwrite the immutable stored owner or start another session.
+    await h.engine.postScheduled({
+      chatId: "cht_1",
+      botId: alpha.id,
+      text: "Fixture heartbeat",
+      messageId: "heartbeat-2",
+      actor: heartbeat,
+      scheduleRun: { scheduleId: "schedule", run: 1 },
+      sessionIdentity: { actor: heartbeat, ownerActor: { ...owner, id: "operator" } },
+    });
+    await h.engine.idle();
+    expect(h.agents.size).toBe(3);
+    await SessionEventLog.flushAll();
+    SessionEventLog.forgetAll();
+    const reopened = new TranscriptLog(h.store.directory("cht_1"));
+    expect((await reopened.findById("heartbeat-2"))?.sessionIdentity).toEqual(identity);
   });
 
   test("a heartbeat run reaches only the Bots it was set to tag, whatever its text says", async () => {
