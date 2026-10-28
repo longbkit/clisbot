@@ -28,6 +28,9 @@ const en = {
     others: "Others",
     all: "All",
     label: "Show",
+    unknownLabel: "About unknown ownership",
+    unknownHint:
+      "There isn't enough information to tell whether you created or participated in this item.",
   },
   mode: {
     chat: "Chat",
@@ -148,7 +151,14 @@ const vi: typeof en = {
     title: "Thiết kế đang được phát triển",
     body: "Bản thiết kế và prototype làm cùng agent sẽ nằm ở đây. Hiện chưa lưu dữ liệu nào.",
   },
-  scope: { mine: "Của tôi", others: "Người khác", all: "Tất cả", label: "Hiển thị" },
+  scope: {
+    mine: "Của tôi",
+    others: "Người khác",
+    all: "Tất cả",
+    label: "Hiển thị",
+    unknownLabel: "Về mục chưa xác định",
+    unknownHint: "Chưa đủ dữ liệu để xác định bạn đã tạo hoặc tham gia mục này.",
+  },
   mode: { chat: "Chat", work: "Workspace", hybrid: "Tất cả", label: "Trang chủ hiển thị" },
   chips: {
     all: "Tất cả",

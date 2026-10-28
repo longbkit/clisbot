@@ -53,3 +53,30 @@ it("subscribes to identity changes only, then reclassifies on reader or Host cha
   expect(view.result.current.chatOwnership(chat)).toBe("unknown");
   view.unmount();
 });
+
+it("updates an authored chat when verified participation arrives, without profile rerenders", () => {
+  context.accounts = [{ origin: "https://hub", id: "me" }];
+  context.kinds = new Map([["host", "hub"]]);
+  const own = { kind: "user" as const, id: "me", hubOrigin: "https://hub" };
+  const other = { ...own, id: "creator" };
+  const chat = {
+    id: "authored-chat",
+    serverId: "host",
+    record: { createdBy: other },
+    participants: [{ botId: "bot", agentId: "child" }],
+  } as HostTagged<ChatPayload>;
+  const chats = [chat];
+  const set = (source: SessionAuthorship) =>
+    act(() => state.setState({ sessions: { host: { agents: new Map([["child", source]]) } } }));
+  set({ createdBy: other });
+  const view = renderHook(() => useChatOwnership(chats));
+  expect(view.result.current.chatOwnership(chat)).toBe("others");
+  set({ createdBy: other, participantActors: [own] });
+  expect(view.result.current.chatOwnership(chat)).toBe("mine");
+  const matched = view.result.current;
+  set({ createdBy: other, participantActors: [{ ...own, displayName: "Renamed" }] });
+  expect(view.result.current).toBe(matched);
+  set({ createdBy: other, lastInteractionBy: own });
+  expect(view.result.current.chatOwnership(chat)).toBe("others");
+  view.unmount();
+});

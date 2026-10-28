@@ -156,15 +156,16 @@ A Host is **Hub-bound** when its registered `HostProfile.management` binding exi
 managed-access mode `off` and a direct TCP transport. A personal Hub follows the same rule as a
 company Hub. On these Hosts:
 
-- A recorded user author matching the reader on that Hub is **mine** (`isOwnActor`: member id,
-  else user id). Another user is **others**; an unresolved reader is **unknown**. Channel actors
-  need a verified Member link; their provider id alone cannot match a Hub account.
-- Only when `createdBy` is absent, a matching `lastMessageBy` **or** `participantActors` entry
-  makes the session **mine**: "I participated" is accepted for this case. With no matching
-  participant it is **unknown**. `lastInteractionBy` is not participation evidence.
-- A known creator wins over participation. Joining another person's session does not make it
-  mine. Automation, system and unscoped user actors (including `LOCAL_OWNER`) are **unknown**;
-  their snapshots do not prove which reader owns them.
+- A verified relationship through the creator **or any participant** makes the item **mine**:
+  its `createdBy`, `lastMessageBy` or any `participantActors` entry matches the reader on that Hub
+  (`isOwnActor`: member id, else user id). Participation counts even when another person or an
+  automation created the session. `lastInteractionBy` is not participation evidence.
+- Channel actors need a verified Member link; a provider id alone cannot match a Hub account.
+  An unresolved reader or an actor from another Hub does not prove a relationship.
+- Without matching creator or participation evidence, a verified other user creator is **others**.
+  Missing creators, automation, system and unscoped user creators (including `LOCAL_OWNER`) are
+  **unknown** when participation also cannot prove a relationship. Neither titles nor a parent
+  workspace/chat author supply that evidence.
 
 A registered Host without a management binding keeps the previous direct-Host behavior for now:
 missing creators, automation, system and unscoped users are mine. This is a compatibility exception,
@@ -179,8 +180,10 @@ reader can resolve later using the remembered account below.
 **Why the provisional rule was removed.** On 2026-10-29, a watchdog-only app probe of 14 real
 Hub-bound Hosts found 38 of 3,359 sessions admitted to For me solely because `createdBy` was absent.
 All 38 reported authorship `ready`; none matched the reader through last sender or participants.
-The same snapshot changes from 181/3,178/3,359 to 143/3,216/3,359 (mine/others/all) under this rule.
-These are classifications on one diagnostic snapshot, not a claim of post-install verification.
+The initial fix, which accepted participation only for creatorless sessions, changed that snapshot
+from 181/3,178/3,359 to 143/3,216/3,359 (mine/others/all). That probe did not collect participation
+for authored sessions, so these historical totals do not predict the broader creator-or-participant
+rule above.
 No direct Host was present in that sample. The probe reads aggregate metadata already in the app;
 no timeline fetch or diagnostic probe ships with the ownership fix.
 
@@ -206,16 +209,18 @@ canonical origin (scheme, host and port, no trailing slash) against the account'
 connection route. Two Hubs at one address with different identities are two Hubs.
 
 A session never inherits its workspace's or chat's author. Empty workspaces use their own
-`createdBy`. A Bot DM uses its Chat's `record.createdBy`; if absent, already loaded participant
+`createdBy`. A Bot DM uses its Chat's `record.createdBy` and already loaded participant
 sessions can supply sender evidence, but not their creators. A Bot without a chat uses its owner
 snapshot. The Host's `isOwner` flag alone does not establish ownership on a Hub-bound Host.
 
-`AgentDirectoryEntry` projects only a scalar `participationKey`, and only for creatorless sessions.
+`AgentDirectoryEntry` projects a scalar `participationKey` for every session with sender evidence.
 It contains deduplicated sender identity fields, not names, avatars or whole actor arrays. The
 resolver compares these with current readers, so a reader change does not require reprojection.
 A bounded 2,048-entry cache uses the shared `ownershipKey` (creator, participation, immutable reader
 accounts identity and Host kind); changing a binding or reader invalidates the result. Projector
-caches retain immutable source identities and skip participant traversal on authored sessions.
+caches retain immutable source identities and compute participant identities once per source;
+profile-only changes do not alter the key. Workspace count caches compare participation even
+when a creator exists.
 
 The scope applies first everywhere; pins only reorder inside it. A pin (a resource pin, or a
 workspace pinned on the Host, which every reader sees) never brings another member's session into

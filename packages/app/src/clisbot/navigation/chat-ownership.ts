@@ -8,13 +8,11 @@ export function chatOwnershipEvidence(
   agents: ReadonlyMap<string, SessionAuthorship> | undefined,
 ) {
   const createdBy = chat.record?.createdBy;
-  const participationKey = createdBy
-    ? undefined
-    : mergeParticipationKeys(
-        chat.participants.map(({ agentId }) => {
-          const agent = agentId ? agents?.get(agentId) : undefined;
-          return agent ? participantIdentityKey(agent) : undefined;
-        }),
-      );
+  const participationKey = mergeParticipationKeys(
+    chat.participants.map(({ agentId }) => {
+      const agent = agentId ? agents?.get(agentId) : undefined;
+      return agent ? participantIdentityKey(agent) : undefined;
+    }),
+  );
   return { createdBy, participationKey };
 }

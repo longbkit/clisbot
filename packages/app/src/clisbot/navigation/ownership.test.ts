@@ -171,8 +171,35 @@ describe("scopes", () => {
 
 const own = { kind: "user" as const, id: "u-me", hubOrigin: HUB, memberId: "m-me" };
 
+describe("verified participation with a recorded creator", () => {
+  it.each([
+    teammate,
+    { kind: "automation" as const, id: "schedule" },
+    { kind: "system" as const, id: "system" },
+    { kind: "user" as const, id: "owner" },
+  ])("includes a reader who participated despite creator $kind/$id", (createdBy) => {
+    for (const evidence of [{ lastMessageBy: own }, { participantActors: [teammate, own] }]) {
+      const participationKey = participationKeyOf({ createdBy, ...evidence });
+      expect(participationKey).toBeTypeOf("string");
+      expect(resolveOwnership({ createdBy, participationKey, accounts, hostKind: "hub" })).toBe(
+        "mine",
+      );
+    }
+  });
+
+  it("invalidates authored ownership when participation arrives or leaves", () => {
+    const resolve = createOwnershipResolver();
+    const input = { createdBy: teammate, accounts, hostKind: "hub" as const };
+    expect(resolve(input)).toBe("others");
+    const participated = { ...input, participationKey: participationKeyOf({ lastMessageBy: own }) };
+    expect(ownershipKey(participated)).not.toBe(ownershipKey(input));
+    expect(resolve(participated)).toBe("mine");
+    expect(resolve(input)).toBe("others");
+  });
+});
+
 describe("ownership evidence and cache", () => {
-  it("accepts participation only without a recorded creator", () => {
+  it("accepts verified participation regardless of the recorded creator", () => {
     const context = { accounts, hostKind: "hub" as const };
     for (const source of [
       { lastMessageBy: own },
@@ -181,9 +208,7 @@ describe("ownership evidence and cache", () => {
     ]) {
       const participationKey = participationKeyOf(source);
       expect(resolveOwnership({ ...context, createdBy: undefined, participationKey })).toBe("mine");
-      expect(resolveOwnership({ ...context, createdBy: teammate, participationKey })).toBe(
-        "others",
-      );
+      expect(resolveOwnership({ ...context, createdBy: teammate, participationKey })).toBe("mine");
     }
     for (const source of [
       {},
@@ -241,7 +266,9 @@ describe("ownership evidence and cache", () => {
     expect(
       participationKeyOf({ participantActors: [own, { ...teammate, displayName: "Renamed" }] }),
     ).toBe(first);
-    expect(participationKeyOf({ createdBy: teammate, participantActors: [own] })).toBeUndefined();
+    expect(participationKeyOf({ createdBy: teammate, participantActors: [own] })).toBe(
+      participationKeyOf({ participantActors: [own] }),
+    );
   });
 
   it("invalidates the same actor when accounts, participation or Host binding change", () => {

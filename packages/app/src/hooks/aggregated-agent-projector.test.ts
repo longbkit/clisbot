@@ -127,7 +127,7 @@ describe("shared aggregated agent projection", () => {
   });
 });
 
-it("projects participant identities once per immutable source, never profiles or authored arrays", () => {
+it("projects all participant identities once per immutable source without comparing profiles or arrays", () => {
   const own = { kind: "user" as const, id: "me", hubOrigin: "https://hub" };
   const profile = vi.fn(() => {
     throw new Error("participant profile traversed");
@@ -143,18 +143,17 @@ it("projects participant identities once per immutable source, never profiles or
   const legacy = agent({ id: "legacy" });
   Object.defineProperty(legacy, "participantActors", { get: read });
   const authored = agent({ id: "authored", createdBy: own });
-  const forbidden = vi.fn(() => {
-    throw new Error("authored participants read");
-  });
-  Object.defineProperty(authored, "participantActors", { get: forbidden });
+  const authoredRead = vi.fn(() => participants);
+  Object.defineProperty(authored, "participantActors", { get: authoredRead });
   const project = createMemoizedAggregatedAgentProjector();
   const sources = input(legacy, authored);
   const first = project(sources);
   for (let i = 0; i < 5; i++) expect(project({ ...sources })).toBe(first);
   expect(read).toHaveBeenCalledTimes(1);
-  expect(forbidden).not.toHaveBeenCalled();
+  expect(authoredRead).toHaveBeenCalledTimes(1);
   expect(profile).not.toHaveBeenCalled();
   expect(first.find((row) => row.id === "legacy")?.participationKey).toBeTypeOf("string");
+  expect(first.find((row) => row.id === "authored")?.participationKey).toBeTypeOf("string");
   expect(first.every((row) => !("participantActors" in row))).toBe(true);
   const renamed = agent({
     ...legacy,

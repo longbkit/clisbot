@@ -34,7 +34,7 @@ const scopes: OwnershipScope[] = ["mine", "others", "all"];
 describe.each<OwnershipHostKind>(["hub", "direct", "unknown"])(
   "ownership across consumers on %s",
   (hostKind) => {
-    const expectedMine = { hub: 3, direct: 8, unknown: 0 }[hostKind];
+    const expectedMine = { hub: 4, direct: 9, unknown: 0 }[hostKind];
     const expected = { mine: expectedMine, others: 11 - expectedMine, all: 11 };
     const context = { accounts, hostKind };
     const agents = Object.entries(fixture).map(
@@ -109,7 +109,7 @@ describe.each<OwnershipHostKind>(["hub", "direct", "unknown"])(
       );
       const authored = { ...chat, record: { createdBy: other } } as ChatPayload;
       expect(resolveOwnership({ ...chatOwnershipEvidence(authored, source), ...context })).toBe(
-        hostKind === "unknown" ? "unknown" : "others",
+        hostKind === "unknown" ? "unknown" : "mine",
       );
     });
 

@@ -21,6 +21,6 @@ export type AgentDirectoryEntry = Pick<
   | "createdBy"
 > & {
   pendingPermissionCount?: number;
-  /** Compact sender identities, only when no creator was recorded. */
+  /** Compact sender identities for creator-or-participant ownership. */
   participationKey?: string;
 };

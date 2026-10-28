@@ -12,11 +12,10 @@ import { useReaderAccounts } from "./reader";
 export function useChatOwnership(chats: readonly HostTagged<ChatPayload>[]) {
   const accounts = useReaderAccounts();
   const hostKinds = useOwnershipHosts();
-  const needed = useMemo(() => chats.filter((chat) => !chat.record?.createdBy), [chats]);
-  // Subscribe only to compact identities for creatorless chats, not whole session maps.
+  // Subscribe to compact sender identities for all chats, not whole session maps.
   const keys = useSessionStore(
     useShallow((state) =>
-      needed.map(
+      chats.map(
         (chat) =>
           chatOwnershipEvidence(chat, state.sessions[chat.serverId]?.agents).participationKey,
       ),
@@ -24,7 +23,7 @@ export function useChatOwnership(chats: readonly HostTagged<ChatPayload>[]) {
   );
   return useMemo(() => {
     const participation = new Map(
-      needed.map((chat, index) => [`${chat.serverId}:${chat.id}`, keys[index]]),
+      chats.map((chat, index) => [`${chat.serverId}:${chat.id}`, keys[index]]),
     );
     const context = (serverId: string) => ({
       accounts,
@@ -46,5 +45,5 @@ export function useChatOwnership(chats: readonly HostTagged<ChatPayload>[]) {
           context(bot.serverId),
         ),
     };
-  }, [accounts, hostKinds, keys, needed]);
+  }, [accounts, hostKinds, keys, chats]);
 }

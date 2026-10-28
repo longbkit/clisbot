@@ -37,9 +37,9 @@ export function participantIdentityKey(source: SessionAuthorship): string | unde
   return key;
 }
 
-/** The common authored case does not traverse, copy or compare participants. */
+/** Every session can be relevant through its already loaded sender identities. */
 export function participationKeyOf(source: SessionAuthorship): string | undefined {
-  return source.createdBy ? undefined : participantIdentityKey(source);
+  return participantIdentityKey(source);
 }
 
 export function actorsFromParticipationKey(key: string): SessionActor[] {
@@ -66,7 +66,7 @@ export function ownershipKey(input: OwnershipKeyInput): string {
   }
   return JSON.stringify([
     input.createdBy ? actorIdentity(input.createdBy) : null,
-    input.createdBy ? null : input.participationKey,
+    input.participationKey,
     identity,
     input.hostKind,
     input.watched === true,

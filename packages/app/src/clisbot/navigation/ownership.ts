@@ -39,13 +39,14 @@ function classify(input: OwnershipInput, keepDirectLegacy: boolean): Ownership {
     if (input.directOwner !== undefined) return input.directOwner ? "mine" : "others";
     if (!actor || actor.kind !== "user" || (!actor.hubOrigin && !actor.hubIdentity)) return "mine";
   }
-  if (actor) return actorOwnership(actor, input.accounts);
-  return input.participationKey &&
+  const creatorOwnership = actor ? actorOwnership(actor, input.accounts) : "unknown";
+  if (creatorOwnership === "mine") return "mine";
+  const participated =
+    input.participationKey &&
     actorsFromParticipationKey(input.participationKey).some(
       (participant) => actorOwnership(participant, input.accounts) === "mine",
-    )
-    ? "mine"
-    : "unknown";
+    );
+  return participated ? "mine" : creatorOwnership;
 }
 
 /** One bounded resolver for every surface; reader arrays are immutable identity snapshots. */

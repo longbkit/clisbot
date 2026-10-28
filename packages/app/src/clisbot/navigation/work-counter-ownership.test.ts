@@ -143,7 +143,7 @@ describe("incremental ownership evidence", () => {
     expect(counter([workspace], () => sessions, options).scopes.mine).toBe(0);
   });
 
-  it("ignores participation and profile edits on an authored session", () => {
+  it("updates authored participation and ignores profile-only edits", () => {
     let calls = 0;
     const counter = createWorkCounter((input) => {
       calls++;
@@ -157,8 +157,15 @@ describe("incremental ownership evidence", () => {
       createdBy: { ...other, displayName: "New profile" },
       participationKey: participationKeyOf({ lastMessageBy: own }),
     };
-    expect(counter([workspace], () => [edited], options)).toBe(initial);
     expect(initial.scopes).toEqual({ mine: 0, others: 1, all: 1 });
-    expect(calls).toBe(1);
+    const participated = counter([workspace], () => [edited], options);
+    expect(participated.scopes).toEqual({ mine: 1, others: 0, all: 1 });
+    expect(calls).toBe(2);
+    const renamed = { ...edited, createdBy: { ...other, displayName: "Renamed again" } };
+    expect(counter([workspace], () => [renamed], options)).toBe(participated);
+    expect(calls).toBe(2);
+    expect(counter([workspace], () => [session], options).scopes).toEqual(initial.scopes);
+    // The original evidence key can reuse its cached classification after removal.
+    expect(calls).toBe(2);
   });
 });

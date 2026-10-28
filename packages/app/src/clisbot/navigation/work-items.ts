@@ -252,7 +252,7 @@ export function createWorkCounter(resolve: OwnershipResolver = resolveOwnership)
         item.statusBucket === other.statusBucket &&
         item.unverified === other.unverified &&
         sameActor(item.createdBy, other.createdBy) &&
-        (Boolean(item.createdBy) || item.participationKey === other.participationKey) &&
+        item.participationKey === other.participationKey &&
         (showBots || isChatSession(item) === isChatSession(other))
       );
     });

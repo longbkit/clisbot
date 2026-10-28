@@ -274,31 +274,44 @@ describe.each(seeds)("ownership properties, seed %i", (seed) => {
     },
   );
 
-  it("participation and profile edits cannot override a known creator", () => {
+  it("includes the union of verified creators and participants, independent of profile edits", () => {
     for (const source of sources) {
-      if (!source.createdBy) continue;
       for (const accounts of readers) {
-        const input = { createdBy: source.createdBy, accounts, hostKind: "hub" as const };
-        const expected = resolveOwnership(input);
+        const context = { accounts, hostKind: "hub" as const };
+        const creator = resolveOwnership({ createdBy: source.createdBy, ...context });
+        const participants = [source.lastMessageBy, ...(source.participantActors ?? [])];
+        const matched = participants.some(
+          (actor) => actor && resolveOwnership({ createdBy: actor, ...context }) === "mine",
+        );
+        const expected = creator === "mine" || matched ? "mine" : creator;
+        const participationKey = participationKeyOf(source);
+        expect(
+          resolveOwnership({ ...context, createdBy: source.createdBy, participationKey }),
+        ).toBe(expected);
+        const renamed = {
+          ...source,
+          createdBy: source.createdBy && { ...source.createdBy, displayName: "Edited creator" },
+          lastMessageBy: source.lastMessageBy && {
+            ...source.lastMessageBy,
+            displayName: "Edited sender",
+          },
+          participantActors: source.participantActors?.map((actor) =>
+            Object.assign({}, actor, { avatarUrl: "https://example.invalid/avatar" }),
+          ),
+        };
+        expect(participationKeyOf(renamed)).toBe(participationKey);
         expect(
           resolveOwnership({
-            ...input,
-            participationKey: participationKeyOf({
-              lastMessageBy: own,
-              participantActors: [other],
-            }),
+            ...context,
+            createdBy: renamed.createdBy,
+            participationKey: participationKeyOf(renamed),
           }),
         ).toBe(expected);
-        expect(
-          resolveOwnership({
-            ...input,
-            createdBy: {
-              ...source.createdBy,
-              displayName: "Edited profile",
-              avatarUrl: "https://example.invalid/avatar",
-            },
-          }),
-        ).toBe(expected);
+        if (expected === "unknown") {
+          expect(inScope("mine", expected)).toBe(false);
+          expect(inScope("others", expected)).toBe(true);
+          expect(inScope("all", expected)).toBe(true);
+        }
       }
     }
   });
