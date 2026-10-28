@@ -195,3 +195,44 @@ test("offline refresh preserves credentials; invalid_grant clears only its Hub",
   expect(secrets.has(oauthCredentialKey(work))).toBe(false);
   expect(secrets.has(oauthCredentialKey(collision))).toBe(true);
 });
+
+test("native request takes a new token once when the Hub refuses the cached one, then asks again", async () => {
+  save(work);
+  let issued = 0;
+  fetch.mockReset().mockImplementation(async (url: URL, input: RequestInit) => {
+    if (url.pathname.endsWith("/token")) {
+      issued += 1;
+      return Response.json({
+        access_token: `access-${issued}`,
+        refresh_token: `rotated-${issued}`,
+        expires_in: 300,
+        token_type: "Bearer",
+      });
+    }
+    const bearer = new Headers(input.headers).get("authorization");
+    return bearer === "Bearer access-2"
+      ? Response.json({ ok: true })
+      : Response.json({ error: "invalid_token" }, { status: 401 });
+  });
+  const response = await createHubTransport({ origin: work }).request("/api/management/v1/x");
+  expect(response.status).toBe(200);
+  expect(issued).toBe(2);
+});
+
+test("native request returns a second 401 instead of looping", async () => {
+  save(work);
+  fetch.mockReset().mockImplementation(async (url: URL) =>
+    url.pathname.endsWith("/token")
+      ? Response.json({
+          access_token: "access",
+          refresh_token: "rotated",
+          expires_in: 300,
+          token_type: "Bearer",
+        })
+      : Response.json({ error: "invalid_token" }, { status: 401 }),
+  );
+  const response = await createHubTransport({ origin: work }).request("/api/management/v1/x");
+  expect(response.status).toBe(401);
+  const apiCalls = fetch.mock.calls.filter(([url]) => !(url as URL).pathname.endsWith("/token"));
+  expect(apiCalls).toHaveLength(2);
+});

@@ -37,6 +37,15 @@ class NativeHubTransport implements HubTransport {
 
   async request(path: string, input: HubRequestInput = {}): Promise<Response> {
     const accessToken = await this.currentAccessToken();
+    const response = await this.send(path, input, accessToken);
+    // The Hub refused a token the app still believed valid. Take a new one once and ask again; a
+    // second 401 is returned so the caller shows "sign in" instead of treating it as a revocation.
+    if (response.status !== 401 || accessToken === null) return response;
+    const refreshed = await this.refreshRejectedAccessToken(accessToken);
+    return refreshed === null ? response : this.send(path, input, refreshed);
+  }
+
+  private send(path: string, input: HubRequestInput, accessToken: string | null) {
     return fetchWithDeadline(new URL(assertHubPath(path), this.origin), {
       method: input.method ?? "GET",
       credentials: "omit",
@@ -46,6 +55,23 @@ class NativeHubTransport implements HubTransport {
         ...(accessToken === null ? {} : { authorization: `Bearer ${accessToken}` }),
       },
       ...(input.body === undefined ? {} : { body: input.body }),
+    });
+  }
+
+  /** One refresh per rejected token: concurrent 401s share the token the first one obtained. */
+  private async refreshRejectedAccessToken(rejected: string): Promise<string | null> {
+    return lockSecret(this.refreshKey, async () => {
+      const credential = parseOAuthCredential(await readSecret(this.refreshKey), this.origin);
+      if (!credential) return null;
+      if (this.access !== null && this.access.accessToken !== rejected) {
+        return this.access.accessToken;
+      }
+      this.access = null;
+      const token = await this.exchange(
+        tokenRequestBody({ origin: this.origin, refreshToken: credential.refreshToken }),
+        credential.generation,
+      );
+      return token?.access_token ?? null;
     });
   }
 

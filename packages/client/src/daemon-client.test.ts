@@ -570,8 +570,23 @@ test.each([
     revoked: false,
   },
   {
+    name: "a Hub 401 (our token was refused)",
+    failure: Object.assign(new Error("Unauthorized"), { status: 401 }),
+    revoked: false,
+  },
+  {
+    name: "a Hub 400 (our request was wrong)",
+    failure: Object.assign(new Error("Bad request"), { status: 400 }),
+    revoked: false,
+  },
+  {
     name: "a Hub 403",
     failure: Object.assign(new Error("Forbidden"), { status: 403 }),
+    revoked: true,
+  },
+  {
+    name: "a Hub 404",
+    failure: Object.assign(new Error("Not found"), { status: 404 }),
     revoked: true,
   },
 ])(

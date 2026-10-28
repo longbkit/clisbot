@@ -85,6 +85,13 @@ Signing in again (password, Google, or a sign-in in another tab) reads the list 
 replaces a read still in flight: the account keeps the same query key, so a list refused with
 401 would otherwise stay refused until the backed-off poll (`clisbot/hub/account-provider.tsx`).
 
+A Hub answer of 401 or 400 to a ticket request never removes a Host: 401 says the app's token was
+refused and 400 that the request was wrong, so the Host stays and the Hub shows "sign in"
+(`isAccessRevocation` in `packages/protocol/src/managed-access.ts`). Only a 403, 404 or 410 (or the
+Host's own revocation close) ends the account's access to the Host. On Android, a request the Hub
+refuses with 401 takes a new access token once and asks again, as the desktop client does; a second
+401 is returned to the caller (`NativeHubTransport.request`).
+
 A Hub Host removed while the Hub still lists its daemon (a refused ticket) is added back with a
 doubling wait. The removal reads the list again, once per account however many Hosts were
 removed (each joins the read in flight), and the wait starts only when that read answers. While
