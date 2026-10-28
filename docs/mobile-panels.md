@@ -60,7 +60,9 @@ Once native compact chrome has mounted, global screens retain it inactive instea
 it on Back. The shared overlay’s explicit presentation guard hides the actual host, input and
 accessibility without collapsing retained scroll ranges; close gestures and sidebar demand are
 inactive too. Cold global screens still do not mount the sidebar. Compact web and desktop keep
-their existing mount policies.
+their existing mount policies. On Android phones, the retained overlay keeps its host but releases
+Workspace list content while hidden; returning rebuilds that content and currently resets its list
+scroll position. Chats keeps its existing retention policy.
 
 ## Ownership
 

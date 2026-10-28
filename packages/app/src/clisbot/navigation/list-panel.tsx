@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
@@ -75,10 +75,10 @@ function useListSection(): ListSection {
 }
 
 /**
- * Chats and Work stay mounted once opened and only swap visibility, so switching between them
- * shows the list on the next frame instead of rebuilding it (acceptance P2).
+ * Desktop keeps both lists mounted. On Android phones, a hidden Work list releases its rows
+ * and subscriptions, so Host updates cannot render thousands of off-screen session lines.
  */
-function ListContent({
+export function ListContent({
   section,
   onBeforeNavigate,
   active,
@@ -87,6 +87,8 @@ function ListContent({
   onBeforeNavigate?: ChatListAdmission;
   active: boolean;
 }) {
+  const compact = useIsCompactFormFactor();
+  const releaseHiddenWork = compact && Platform.OS === "android";
   const [visited, setVisited] = useState<ReadonlySet<ListSection>>(() => new Set([section]));
   if (!visited.has(section)) setVisited(new Set([...visited, section]));
   return (
@@ -98,7 +100,9 @@ function ListContent({
       ) : null}
       {visited.has("work") ? (
         <RetainedPanel active={section === "work"} style={styles.content}>
-          <WorkPane onBeforeNavigate={onBeforeNavigate} active={active && section === "work"} />
+          {!releaseHiddenWork || (active && section === "work") ? (
+            <WorkPane onBeforeNavigate={onBeforeNavigate} active={active && section === "work"} />
+          ) : null}
         </RetainedPanel>
       ) : null}
     </>
