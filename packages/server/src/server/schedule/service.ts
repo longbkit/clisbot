@@ -14,6 +14,11 @@ import { type BoundCreateAgentCommand, formatProviderModel } from "../agent/crea
 import type { PersistedWorkspaceRecord } from "../workspace-registry.js";
 import type { CreateClisbotWorktreeWorkflowResult } from "../worktree-session.js";
 import { ScheduleStore } from "./store.js";
+import { scheduleSessionIdentity } from "./session-identity.js";
+import {
+  currentSessionOperationIdentity,
+  withSessionOperationIdentity,
+} from "../agent/session-operation-context.js";
 import {
   chatHeartbeatBotId,
   chatHeartbeatPost,
@@ -292,6 +297,7 @@ type ScheduleAgentManager = Pick<
     | "waitForAgentEvent"
     | "waitForAgentClose"
     | "appendTimelineItem"
+    | "sessionStorageEnabled"
   >;
 
 interface ScheduleWorkspaceCreateInput {
@@ -405,6 +411,10 @@ export class ScheduleService {
     fields: { name: string | null; prompt: string; target: ScheduleTarget },
   ): Omit<StoredSchedule, "id"> {
     const now = this.now();
+    const actor =
+      this.agentManager.sessionStorageEnabled && fields.target.type === "new-agent"
+        ? currentSessionOperationIdentity()?.actor
+        : undefined;
     const runOnCreate = input.runOnCreate ?? input.cadence.type === "every";
     const nextRunAt = runOnCreate ? now : computeNextRunAt(input.cadence, now);
     return {
@@ -414,6 +424,7 @@ export class ScheduleService {
       target: fields.target,
       status: "active",
       createdAt: now.toISOString(),
+      ...(actor ? { createdBy: structuredClone(actor) } : {}),
       updatedAt: now.toISOString(),
       nextRunAt: nextRunAt.toISOString(),
       lastRunAt: null,
@@ -1050,6 +1061,12 @@ export class ScheduleService {
     requireSchedule(updatedSchedule, params.scheduleId);
   }
 
+  private creationIdentity(schedule: StoredSchedule) {
+    return this.agentManager.sessionStorageEnabled
+      ? scheduleSessionIdentity(schedule)
+      : currentSessionOperationIdentity();
+  }
+
   private async executeSchedule(
     schedule: StoredSchedule,
     runId: string,
@@ -1125,24 +1142,28 @@ export class ScheduleService {
         agentId: null,
       });
       const runConfig = { ...config, cwd: workspace.cwd };
-      const created = await this.createAgent({
-        kind: "mcp",
-        provider: formatScheduleProviderModel(runConfig),
-        config: buildScheduleAgentConfig(runConfig),
-        cwd: workspace.cwd,
-        workspaceId: workspace.workspaceId,
-        title: resolveScheduleAgentTitle(config, schedule.prompt),
-        labels: {
-          "clisbot.schedule-id": schedule.id,
-          "clisbot.schedule-run": runId,
-        },
-        mode: config.modeId,
-        thinking: config.thinkingOptionId,
-        features: config.featureValues,
-        unattended: true,
-        promptFailure: "return-error",
-        notifyOnFinish: false,
-      });
+      const runWorkspace = workspace;
+      const identity = this.creationIdentity(schedule);
+      const created = await withSessionOperationIdentity(identity, () =>
+        this.createAgent({
+          kind: "mcp",
+          provider: formatScheduleProviderModel(runConfig),
+          config: buildScheduleAgentConfig(runConfig),
+          cwd: runWorkspace.cwd,
+          workspaceId: runWorkspace.workspaceId,
+          title: resolveScheduleAgentTitle(config, schedule.prompt),
+          labels: {
+            "clisbot.schedule-id": schedule.id,
+            "clisbot.schedule-run": runId,
+          },
+          mode: config.modeId,
+          thinking: config.thinkingOptionId,
+          features: config.featureValues,
+          unattended: true,
+          promptFailure: "return-error",
+          notifyOnFinish: false,
+        }),
+      );
       const agent = created.snapshot;
       agentId = agent.id;
       await this.recordRunWorkspace({
@@ -1154,7 +1175,9 @@ export class ScheduleService {
       if (created.initialPromptError) {
         throw created.initialPromptError;
       }
-      const result = await this.agentManager.runAgent(agent.id, schedule.prompt);
+      const result = await withSessionOperationIdentity(identity, () =>
+        this.agentManager.runAgent(agent.id, schedule.prompt),
+      );
       const waitResult = await this.agentManager.waitForAgentEvent(agent.id, {
         waitForActive: true,
       });

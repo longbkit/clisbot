@@ -42,6 +42,30 @@ A persisted draft with no provider handle and no committed timeline starts its f
 session under the same Clisbot ID. Creation clears only retained memory for that draft; it must
 not permanently delete its canonical store before the first prompt writes to it.
 
+## Scheduled session ownership
+
+With `agentSessionStorage` enabled, a new-agent schedule records optional `createdBy` from the
+trusted session operation context when it is first created. Request/MCP arguments cannot supply
+that snapshot. Updating or idempotently replacing the schedule does not transfer its owner; old
+records without a creator remain unowned. Heartbeat, Chat and workflow ownership are unchanged.
+
+Each new-agent run records `createdBy` as an `automation` actor whose id is the schedule id. Its
+optional `ownerActor` is a copy of the schedule creator when that creator is a Hub-scoped user
+(a channel sender also needs a verified Member link). The automation does not receive the user's
+Member id. A manual run by another operator cannot change this creation attribution. Both fields
+survive session persistence and authorship recovery; later participants cannot replace them.
+
+`ownerActor` is descriptive metadata, never an access grant. It is optional on session authorship
+and operation identities; schedule `createdBy` is optional too. Older parsers ignore the new fields,
+and new parsers accept old records without inventing owners. The existing session-storage toggle
+owns writing this metadata; disabling it preserves previous behavior. No additional RPC or timeline
+fetch is needed. Consumers that do not read `ownerActor` retain their existing scope rules.
+
+These producer changes require a daemon update: 2.1.8 does not stamp a timer-created new-agent
+session this way. Existing records are not backfilled from titles, labels, project owners or the
+current reader. Rolling back to a daemon that rewrites records without these optional fields can
+lose the added attribution, but must leave the schedule runnable.
+
 ## File schema
 
 **`events.jsonl`** — one JSON object per line, appended, never rewritten in place. An update to an

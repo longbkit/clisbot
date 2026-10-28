@@ -61,6 +61,8 @@ export interface AgentPermissionResponseRecord {
 export const SessionAuthorshipShape = {
   authorshipStatus: z.enum(["pending", "recovering", "ready", "error"]).optional(),
   createdBy: SessionActorSchema.optional(),
+  /** Verified owner of an automated creation; attribution only, never an access grant. */
+  ownerActor: SessionActorSchema.optional(),
   lastMessageBy: SessionActorSchema.optional(),
   lastInteractionBy: SessionActorSchema.optional(),
   lastInteractionAt: z.string().optional(),
@@ -70,6 +72,7 @@ export const SessionAuthorshipShape = {
 export interface SessionAuthorship {
   authorshipStatus?: "pending" | "recovering" | "ready" | "error";
   createdBy?: SessionActor;
+  ownerActor?: SessionActor;
   lastMessageBy?: SessionActor;
   lastInteractionBy?: SessionActor;
   lastInteractionAt?: string;

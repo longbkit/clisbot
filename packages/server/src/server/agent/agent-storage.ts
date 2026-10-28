@@ -330,6 +330,7 @@ export class AgentStorage {
     const materialize = (record: StoredAgentRecord) => ({
       ...copySessionAuthorship(value.summary),
       createdBy: record.createdBy,
+      ownerActor: record.ownerActor,
       participantActors:
         record.createdBy &&
         !value.summary.participantActors?.some((actor) =>

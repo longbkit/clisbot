@@ -102,6 +102,7 @@ const journalOperationSchema = z.object({
   order: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   timestamp: z.string().datetime({ offset: true }),
   actor: SessionActorSchema.optional(),
+  ownerActor: SessionActorSchema.optional(),
   channel: SessionChannelReferenceSchema.optional(),
 });
 function validateOperation(operation: unknown): void {

@@ -11,6 +11,7 @@ export function copySessionAuthorship(source: SessionAuthorship): SessionAuthors
   return {
     ...(source.authorshipStatus !== undefined ? { authorshipStatus: source.authorshipStatus } : {}),
     ...(source.createdBy !== undefined ? { createdBy: source.createdBy } : {}),
+    ...(source.ownerActor !== undefined ? { ownerActor: source.ownerActor } : {}),
     ...(source.lastMessageBy !== undefined ? { lastMessageBy: source.lastMessageBy } : {}),
     ...(source.lastInteractionBy !== undefined
       ? { lastInteractionBy: source.lastInteractionBy }
@@ -27,6 +28,7 @@ export function copySessionAuthorship(source: SessionAuthorship): SessionAuthors
 
 export interface SessionOperationIdentity {
   actor?: SessionActor;
+  ownerActor?: SessionActor;
   channel?: SessionChannelReference;
 }
 
