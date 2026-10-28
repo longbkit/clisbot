@@ -725,6 +725,7 @@
     "source": "源代码",
     "screenshot": "{{name}} 截图 {{index}}",
     "video": "{{name}} 视频 {{index}}",
+    "pages": "页码",
     "previous": "上一个",
     "next": "下一个",
     "untranslatedOverview": "该插件的概览尚未翻译为你的语言，因此以英文显示。",

@@ -13,15 +13,22 @@ export interface BrowseQuery {
   window: InstallWindow;
   /** Search term; absent when not searching. */
   q?: string;
+  /** One-based page; omitted for the first page. */
+  page?: number;
 }
 
 export const DEFAULT_WINDOW: InstallWindow = "week";
+export const PAGE_SIZE = 40;
 
 export function parseWindow(value: unknown): InstallWindow | undefined {
   return value === "month" || value === "all" ? value : undefined;
 }
 export function parseSearchTerm(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+export function parsePage(value: unknown): number | undefined {
+  const page = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(page) && page > 1 ? page : undefined;
 }
 export function parseSort(value: unknown): BrowseSort | undefined {
   return value === "new" || value === "updated" ? value : undefined;
@@ -36,10 +43,11 @@ export function pluginOwnerHref(owner: string): string {
 export function categoryHref(category: CategorySlug): string {
   return `/plugins/category/${category}`;
 }
-export function browseHref({ category, sort, window, q }: BrowseQuery): string {
+export function browseHref({ category, sort, window, q }: BrowseQuery, page?: number): string {
   const path = category ? categoryHref(category) : "/plugins/all";
   const params = new URLSearchParams();
   if (q) params.set("q", q);
+  if (page && page > 1) params.set("page", String(page));
   if (sort !== "installs") params.set("sort", sort);
   else if (window !== DEFAULT_WINDOW) params.set("window", window);
   const search = params.toString();

@@ -5,7 +5,7 @@ import { SiteShell } from "~/components/site-shell";
 import { useLocale, useLocalizePath } from "~/i18n";
 import { ContributeLinks } from "./contribute-links";
 import type { InstallCounts } from "./installs";
-import { type BrowseQuery, browseHref } from "./links";
+import { type BrowseQuery, browseHref, PAGE_SIZE } from "./links";
 import { InstallCount } from "./install-count";
 import { PLUGIN_GRID_CLASS, PluginCard } from "./plugin-card";
 import { PluginSearch } from "./plugin-search";
@@ -59,6 +59,9 @@ export function BrowsePage({
   // Search ranks by relevance; the tab's order breaks ties.
   const matches = query.q ? searchPlugins(ordered, query.q, locale) : ordered;
   const results = category ? getPluginsInCategory(matches, category) : matches;
+  const pageCount = Math.max(1, Math.ceil(results.length / PAGE_SIZE));
+  const page = Math.min(query.page ?? 1, pageCount);
+  const visibleResults = results.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const categoryLabel = category ? t(`plugins.categories.${category}.label`) : undefined;
   const title = categoryLabel ?? t("plugins.allPlugins");
   const clearHref = localize(browseHref({ ...query, q: undefined }));
@@ -103,12 +106,28 @@ export function BrowsePage({
             )}
             {results.length > 0 && (
               <div className={PLUGIN_GRID_CLASS}>
-                {results.map((plugin) => (
+                {visibleResults.map((plugin) => (
                   <PluginCard key={plugin.id} plugin={plugin}>
                     <CardDetail plugin={plugin} installs={installs} now={now} query={query} />
                   </PluginCard>
                 ))}
               </div>
+            )}
+            {pageCount > 1 && (
+              <nav
+                aria-label={t("plugins.pages")}
+                className="mt-8 flex items-center justify-center gap-6"
+              >
+                {page > 1 && (
+                  <a href={localize(browseHref(query, page - 1))}>{t("plugins.previous")}</a>
+                )}
+                <span aria-current="page">
+                  {page} / {pageCount}
+                </span>
+                {page < pageCount && (
+                  <a href={localize(browseHref(query, page + 1))}>{t("plugins.next")}</a>
+                )}
+              </nav>
             )}
           </PluginSection>
         </div>

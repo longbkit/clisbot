@@ -727,6 +727,7 @@
     "source": "Source",
     "screenshot": "{{name}} screenshot {{index}}",
     "video": "{{name}} video {{index}}",
+    "pages": "Pages",
     "previous": "Previous",
     "next": "Next",
     "untranslatedOverview": "This plugin’s overview has not been translated into your language yet, so it is shown in English.",

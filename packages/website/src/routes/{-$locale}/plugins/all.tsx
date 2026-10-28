@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { getTranslator, routeLocale } from "~/i18n";
-import { pageMeta } from "~/meta";
+import { browseMeta } from "~/plugins/browse-meta";
 import { getRegistry } from "~/plugins";
 import { BrowsePage } from "~/plugins/browse-page";
 import {
   type BrowseQuery,
   DEFAULT_WINDOW,
+  parsePage,
   parseSearchTerm,
   parseSort,
   parseWindow,
@@ -18,14 +19,21 @@ export const Route = createFileRoute("/{-$locale}/plugins/all")({
     sort: parseSort(search.sort),
     window: parseWindow(search.window),
     q: parseSearchTerm(search.q),
+    page: parsePage(search.page),
   }),
-  head: ({ params }) => {
+  head: ({ params, match, loaderData }) => {
     const locale = routeLocale(params);
     const t = getTranslator(locale);
-    return pageMeta({
+    return browseMeta({
       title: t("plugins.meta.allTitle"),
       description: t("plugins.meta.allDescription"),
-      path: "/plugins/all",
+      query: {
+        sort: match.search.sort ?? "installs",
+        window: match.search.window ?? DEFAULT_WINDOW,
+        q: match.search.q,
+        page: match.search.page,
+      },
+      plugins: loaderData?.plugins ?? [],
       locale,
     });
   },
@@ -41,8 +49,9 @@ function AllPluginsPage() {
       sort: search.sort ?? "installs",
       window: search.window ?? DEFAULT_WINDOW,
       q: search.q,
+      page: search.page,
     }),
-    [search.sort, search.window, search.q],
+    [search.sort, search.window, search.q, search.page],
   );
   return <BrowsePage plugins={plugins} installs={installs} now={now} query={query} />;
 }

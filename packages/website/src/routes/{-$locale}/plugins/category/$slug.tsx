@@ -2,11 +2,13 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { getTranslator, routeLocale } from "~/i18n";
 import { pageMeta } from "~/meta";
+import { browseMeta } from "~/plugins/browse-meta";
 import { getCategory, getRegistry } from "~/plugins";
 import { BrowsePage } from "~/plugins/browse-page";
 import {
   type BrowseQuery,
   DEFAULT_WINDOW,
+  parsePage,
   parseSearchTerm,
   parseSort,
   parseWindow,
@@ -19,13 +21,14 @@ export const Route = createFileRoute("/{-$locale}/plugins/category/$slug")({
     sort: parseSort(search.sort),
     window: parseWindow(search.window),
     q: parseSearchTerm(search.q),
+    page: parsePage(search.page),
   }),
   loader: async ({ params }) => {
     const category = getCategory(params.slug);
     if (!category) throw notFound();
     return { ...(await getRegistry()), category };
   },
-  head: ({ params, loaderData }) => {
+  head: ({ params, match, loaderData }) => {
     const locale = routeLocale(params);
     const t = getTranslator(locale);
     const path = `/plugins/category/${params.slug}`;
@@ -36,12 +39,19 @@ export const Route = createFileRoute("/{-$locale}/plugins/category/$slug")({
         path,
         locale,
       });
-    return pageMeta({
+    return browseMeta({
       title: t("plugins.meta.categoryTitle", {
         category: t(`plugins.categories.${loaderData.category}.label`),
       }),
       description: t(`plugins.categories.${loaderData.category}.description`),
-      path,
+      query: {
+        category: loaderData.category,
+        sort: match.search.sort ?? "installs",
+        window: match.search.window ?? DEFAULT_WINDOW,
+        q: match.search.q,
+        page: match.search.page,
+      },
+      plugins: loaderData.plugins,
       locale,
     });
   },
@@ -58,8 +68,9 @@ function CategoryPage() {
       sort: search.sort ?? "installs",
       window: search.window ?? DEFAULT_WINDOW,
       q: search.q,
+      page: search.page,
     }),
-    [category, search.sort, search.window, search.q],
+    [category, search.sort, search.window, search.q, search.page],
   );
   return <BrowsePage plugins={plugins} installs={installs} now={now} query={query} />;
 }

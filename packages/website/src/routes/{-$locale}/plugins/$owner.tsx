@@ -11,10 +11,8 @@ import {
   authorGitHubUrl,
   authorNpmUrl,
   getAuthor,
-  getRegistry,
-  getPluginsByAuthor,
+  getAuthorRegistry,
   mostInstalled,
-  pluginOwner,
 } from "~/plugins";
 import { AuthorAvatar } from "~/plugins/author-link";
 import { PluginsNotFound } from "~/plugins/not-found";
@@ -24,8 +22,8 @@ import "~/styles.css";
 
 export const Route = createFileRoute("/{-$locale}/plugins/$owner")({
   loader: async ({ params }) => {
-    const registry = await getRegistry();
-    const first = registry.plugins.find((plugin) => pluginOwner(plugin) === params.owner);
+    const registry = await getAuthorRegistry({ data: params.owner });
+    const first = registry.plugins[0];
     if (!first) throw notFound();
     return { plugins: registry.plugins, installs: registry.installs, author: getAuthor(first) };
   },
@@ -56,14 +54,14 @@ const LINK_CLASS =
   "inline-flex items-center gap-1 text-xs text-extra-muted-foreground transition-colors hover:text-muted-foreground";
 
 function AuthorPage() {
-  const { plugins: allPlugins, installs, author } = Route.useLoaderData();
+  const { plugins: authorPlugins, installs, author } = Route.useLoaderData();
   const { t } = useTranslation();
   const crumbs = useMemo<BreadcrumbItem[]>(
     () => [{ label: t("plugins.title"), href: "/plugins" }, { label: author.name }],
     [author, t],
   );
 
-  const plugins = mostInstalled(getPluginsByAuthor(allPlugins, author.username), installs, "all");
+  const plugins = mostInstalled(authorPlugins, installs, "all");
   const github = authorGitHubUrl(author);
 
   return (
