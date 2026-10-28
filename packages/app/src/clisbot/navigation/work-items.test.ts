@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
+import { resolveOwnership } from "./ownership";
 import { BOT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import {
   countWork,
+  createWorkCounter,
   createWorkFilter,
   isChatSession,
   workItemsOf,
@@ -127,5 +129,53 @@ describe("Workspace items", () => {
     ] as const) {
       expect(createWorkFilter(query({ scope }), none).workspace(unplaced)).toBe(listed);
     }
+  });
+});
+
+describe("incremental Workspace counts", () => {
+  it("reuses unchanged workspaces and author classifications, and invalidates changed inputs", () => {
+    let resolutions = 0;
+    const resolve = (input: Parameters<typeof resolveOwnership>[0]) => {
+      resolutions += 1;
+      return resolveOwnership(input);
+    };
+    const counter = createWorkCounter(resolve);
+    const accounts = [reader];
+    const first = workspace("first", me);
+    const second = workspace("second", { ...me });
+    let firstSessions = [session("a", { statusBucket: "running" })];
+    let secondSessions = [session("b", { statusBucket: "done" })];
+    const read = (ws: WorkWorkspace) =>
+      ws.workspaceId === "first" ? firstSessions : secondSessions;
+    const options = { scope: "mine" as const, accounts, showBots: true };
+    const expected = () => countWork([first, second], read, options);
+
+    const initial = counter([first, second], read, options);
+    expect(initial).toEqual(expected());
+    expect(resolutions).toBe(1); // Equivalent author snapshots share one classification.
+    firstSessions = firstSessions.map((item) => Object.assign({}, item));
+    secondSessions = secondSessions.map((item) => Object.assign({}, item));
+    expect(counter([first, second], read, options)).toBe(initial);
+    expect(resolutions).toBe(1);
+
+    secondSessions = [session("b", { statusBucket: "failed", createdBy: teammate })];
+    expect(counter([first, second], read, options)).toEqual(expected());
+    expect(resolutions).toBe(2);
+    const changedReaders = { ...options, accounts: [{ ...reader, id: "other" }] };
+    expect(counter([first, second], read, changedReaders)).toEqual(
+      countWork([first, second], read, changedReaders),
+    );
+    expect(resolutions).toBe(4);
+
+    const botsHidden = { ...changedReaders, showBots: false };
+    firstSessions = [session("bot", { labels: bot })];
+    expect(counter([first, second], read, botsHidden)).toEqual(
+      countWork([first, second], read, botsHidden),
+    );
+    const offline = { ...botsHidden, cachedServerIds: new Set(["srv"]) };
+    expect(counter([first, second], read, offline)).toEqual(
+      countWork([first, second], read, offline),
+    );
+    expect(counter([first], read, offline)).toEqual(countWork([first], read, offline));
   });
 });

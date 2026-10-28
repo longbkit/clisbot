@@ -40,7 +40,8 @@ import {
   SectionHeader,
 } from "./section-header";
 import { useNavigationStore, type WorkChip } from "./store";
-import { countWork, useWorkQuery, WORK_CHIPS } from "./work-filter";
+import { useWorkQuery, WORK_CHIPS } from "./work-filter";
+import { createWorkCounter } from "./work-items";
 
 const CHIP_LABELS: Record<WorkChip, string> = {
   all: "navigation.chips.all",
@@ -161,12 +162,13 @@ function WorkControls() {
   const query = useWorkQuery();
   const setChip = useNavigationStore((state) => state.setWorkChip);
   // Once per change of the entries, the sessions or the query; the same items the list shows.
+  const countWork = useMemo(createWorkCounter, []);
   const counts = useMemo(
     () =>
       workList
         ? countWork(allWorkspaceEntriesByKey.values(), workList.sessionsOf, query)
         : EMPTY_COUNTS,
-    [allWorkspaceEntriesByKey, workList, query],
+    [allWorkspaceEntriesByKey, workList, query, countWork],
   );
   const chips = useMemo<FilterChip<WorkChip>[]>(
     () =>
