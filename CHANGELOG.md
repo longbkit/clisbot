@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.2.1 - 2026-10-28
+
+### Changed
+
+- Home, Chats and Workspace all open on For me and remember your last choice
+
+### Improved
+
+- Improved Home speed with many Hosts connected: the session list is computed once per update and only the sessions that changed are rebuilt
+
+### Fixed
+
+- Fixed the desktop app asking you to sign in to a Hub again after a brief network error or a Hub restart
+- Fixed work with no known author appearing under For me; it now appears under Others and All
+- Fixed cached sessions from a Host that cannot be reached being shown as live
+- Fixed Home and Workspace listing Hosts that were not selected in the Host picker
+- Fixed signing out of a Hub leaving its sessions classified by the previous account
+- Fixed the Hosts icon in the rail not showing how many Hosts are online
+
 ## 2.2.0 - 2026-10-27
 
 ### Added
