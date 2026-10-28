@@ -148,22 +148,41 @@ lines are dimmed and the percent gets a `~` prefix.
 
 ## For me / Others / All
 
-`resolveOwnership({ createdBy, accounts, watched })` returns `mine`, `others` or `unknown`:
+`resolveOwnership({ createdBy, participationKey, accounts, hostKind, watched })` is the shared
+predicate for Home (including its badge), Chats, Workspace, pin tags, search and tab counts.
+It returns `mine`, `others` or `unknown`.
 
-- No author, a non-user author (automation, system), or a user author with no Hub scope (a direct
-  connection): **mine** (provisional, brief 1.3). A Host older than session authorship sends no
-  `createdBy`, so all of its work lands here.
-- A user author from a Hub with a known reader on this device: **mine** when that account made
-  it (`isOwnActor`: member id, else user id), else **others**.
-- A user author from a Hub with no known reader (not signed in, never signed in, or the account
-  not resolved yet): **unknown**, "cannot tell". Never **mine**: that listed other members' work
-  under For me.
-- `watched === true` (Round 2) makes anything **mine**; the predicate already takes the input.
+A Host is **Hub-bound** when its registered `HostProfile.management` binding exists, including
+managed-access mode `off` and a direct TCP transport. A personal Hub follows the same rule as a
+company Hub. On these Hosts:
 
-**Unknown** is listed under Others and All, never For me: it is not the reader's own work, and
-For me stays a claim the app can back. Its count joins Others, so For me + Others = All. It is a
-transient state: it ends when the Hub's account resolves, and the reader is remembered across it
-(below).
+- A recorded user author matching the reader on that Hub is **mine** (`isOwnActor`: member id,
+  else user id). Another user is **others**; an unresolved reader is **unknown**. Channel actors
+  need a verified Member link; their provider id alone cannot match a Hub account.
+- Only when `createdBy` is absent, a matching `lastMessageBy` **or** `participantActors` entry
+  makes the session **mine**: "I participated" is accepted for this case. With no matching
+  participant it is **unknown**. `lastInteractionBy` is not participation evidence.
+- A known creator wins over participation. Joining another person's session does not make it
+  mine. Automation, system and unscoped user actors (including `LOCAL_OWNER`) are **unknown**;
+  their snapshots do not prove which reader owns them.
+
+A registered Host without a management binding keeps the previous direct-Host behavior for now:
+missing creators, automation, system and unscoped users are mine. This is a compatibility exception,
+not proof of daemon ownership (pairing can delegate access). `KEEP_DIRECT_LEGACY_OWNERSHIP` is its
+single switch, tested both ways. A Host missing from the registry is always **unknown**.
+`watched === true` is the explicit Round 2 override on a registered Host; no live caller sets it.
+
+**Unknown** is listed under Others and All, never For me. Its count joins Others, so For me +
+Others = All. It may persist for legacy sessions without identity evidence; a temporarily missing
+reader can resolve later using the remembered account below.
+
+**Why the provisional rule was removed.** On 2026-10-29, a watchdog-only app probe of 14 real
+Hub-bound Hosts found 38 of 3,359 sessions admitted to For me solely because `createdBy` was absent.
+All 38 reported authorship `ready`; none matched the reader through last sender or participants.
+The same snapshot changes from 181/3,178/3,359 to 143/3,216/3,359 (mine/others/all) under this rule.
+These are classifications on one diagnostic snapshot, not a claim of post-install verification.
+No direct Host was present in that sample. The probe reads aggregate metadata already in the app;
+no timeline fetch or diagnostic probe ships with the ownership fix.
 
 **The reader on a Hub** (`reader.ts`, `reader-accounts.ts`, `hub/reader-memory.ts`) is the live
 signed-in account, else the last one this device verified for that Hub (persisted per Hub origin,
@@ -186,12 +205,17 @@ author matches the reader's Hub by `hubIdentity` against that `hubId` when both 
 canonical origin (scheme, host and port, no trailing slash) against the account's origin or its
 connection route. Two Hubs at one address with different identities are two Hubs.
 
-Authors: a session's own `createdBy` (the agent snapshot and `AgentDirectoryEntry` carry it), else
-its workspace's; a Bot DM its Chat's (`ChatPayload.record.createdBy`); a Bot row without a chat the
-Host's `isOwner` projection, else the Bot's `owner`. Home, the Workspace list, pin tags and global
-search all read the session's author, so a teammate's session in a workspace the reader created is
-Others. A channel-started session is the reader's only when its snapshot carries the reader's
-verified `memberId`. In pin tags and in search an unknown item is one of the others, hidden by For me.
+A session never inherits its workspace's or chat's author. Empty workspaces use their own
+`createdBy`. A Bot DM uses its Chat's `record.createdBy`; if absent, already loaded participant
+sessions can supply sender evidence, but not their creators. A Bot without a chat uses its owner
+snapshot. The Host's `isOwner` flag alone does not establish ownership on a Hub-bound Host.
+
+`AgentDirectoryEntry` projects only a scalar `participationKey`, and only for creatorless sessions.
+It contains deduplicated sender identity fields, not names, avatars or whole actor arrays. The
+resolver compares these with current readers, so a reader change does not require reprojection.
+A bounded 2,048-entry cache uses the shared `ownershipKey` (creator, participation, immutable reader
+accounts identity and Host kind); changing a binding or reader invalidates the result. Projector
+caches retain immutable source identities and skip participant traversal on authored sessions.
 
 The scope applies first everywhere; pins only reorder inside it. A pin (a resource pin, or a
 workspace pinned on the Host, which every reader sees) never brings another member's session into
