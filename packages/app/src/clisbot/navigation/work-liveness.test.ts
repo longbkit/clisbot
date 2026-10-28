@@ -111,6 +111,7 @@ describe("Workspace counts over registered Hosts", () => {
     scope: "all",
     chip,
     accounts: [reader],
+    hostKinds: new Map([["srv", "direct"]]),
     showBots: true,
     cachedServerIds: new Set(["offline"]),
   });

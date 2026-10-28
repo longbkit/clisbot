@@ -1,5 +1,10 @@
+import { useOwnershipHosts } from "@/clisbot/navigation/use-ownership-hosts";
 import { useCallback, useLayoutEffect, useMemo } from "react";
-import { resolveOwnership, type ReaderAccount } from "@/clisbot/navigation/ownership";
+import {
+  resolveOwnership,
+  type OwnershipHostKind,
+  type ReaderAccount,
+} from "@/clisbot/navigation/ownership";
 import { useReaderAccounts } from "@/clisbot/navigation/reader";
 import type {
   CommandCenterAgentResult,
@@ -101,13 +106,12 @@ function workspacePlacement(
 }
 
 /**
- * A session is whoever started it — the same rule as the Workspace list's scope; its workspace's
- * author stands in only when it records none, and one outside any workspace is the reader's.
+ * Session scope uses its own evidence, including outside a workspace; no parent author fallback.
  */
 function agentPlacement(
   row: CommandCenterAgentResult,
   catalog: SearchScopeCatalog,
-  owners: WorkspaceOwnership,
+  hostKinds: ReadonlyMap<string, OwnershipHostKind>,
   accounts: readonly ReaderAccount[],
 ): ItemPlacement {
   const agent = row.agent;
@@ -121,23 +125,27 @@ function agentPlacement(
       placementProjectName: agent.projectPlacement?.projectName ?? null,
     }),
     workspaceId,
-    ownership: agent.createdBy
-      ? resolveOwnership({ createdBy: agent.createdBy, accounts })
-      : ownershipOf(owners, agent.serverId, workspaceId),
+    ownership: resolveOwnership({
+      createdBy: agent.createdBy,
+      participationKey: agent.participationKey,
+      accounts,
+      hostKind: hostKinds.get(agent.serverId) ?? "unknown",
+    }),
   };
 }
 
 function usePlacements(active: boolean) {
   const owners = useWorkspaceOwnership(active);
   const accounts = useReaderAccounts();
+  const hostKinds = useOwnershipHosts();
   return useMemo(
     () => ({
       workspace: (row: CommandCenterWorkspaceResult, catalog: SearchScopeCatalog) =>
         workspacePlacement(row, catalog, owners),
       agent: (row: CommandCenterAgentResult, catalog: SearchScopeCatalog) =>
-        agentPlacement(row, catalog, owners, accounts),
+        agentPlacement(row, catalog, hostKinds, accounts),
     }),
-    [accounts, owners],
+    [accounts, hostKinds, owners],
   );
 }
 

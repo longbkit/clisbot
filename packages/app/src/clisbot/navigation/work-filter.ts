@@ -10,6 +10,8 @@ import { isWorkspaceRootAgent } from "@/subagents/workspace-root-policy";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useResourcePins } from "@/clisbot/bots/sidebar/pins";
 import { NAVIGATION_V2_ENABLED } from "./feature";
+import { participationKeyOf } from "./ownership-key";
+import { useOwnershipHosts } from "./use-ownership-hosts";
 import { useReaderAccounts } from "./reader";
 import { useSourceLiveness } from "./use-source-liveness";
 import { useNavigationStore } from "./store";
@@ -50,6 +52,7 @@ export function indexWorkSessions(
         id: agent.id,
         labels: agent.labels,
         createdBy: agent.createdBy,
+        participationKey: participationKeyOf(agent),
         statusBucket: status.bucket,
         ...(status.unverified ? { unverified: true } : {}),
       });
@@ -110,17 +113,19 @@ export function useWorkQuery() {
   const chip = useNavigationStore((state) => state.workChip);
   const showBots = useNavigationStore((state) => state.workShowBots);
   const accounts = useReaderAccounts();
+  const hostKinds = useOwnershipHosts();
   const { listable, cached } = useSourceLiveness();
   return useMemo(
     () => ({
       scope,
       chip,
       accounts,
+      hostKinds,
       showBots,
       cachedServerIds: cached,
       listableServerIds: listable,
     }),
-    [scope, chip, accounts, showBots, cached, listable],
+    [scope, chip, accounts, hostKinds, showBots, cached, listable],
   );
 }
 

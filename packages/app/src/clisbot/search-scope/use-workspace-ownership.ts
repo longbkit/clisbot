@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/shallow";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { resolveOwnership, type Ownership } from "@/clisbot/navigation/ownership";
+import { useOwnershipHosts } from "@/clisbot/navigation/use-ownership-hosts";
 import { useReaderAccounts } from "@/clisbot/navigation/reader";
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
 
@@ -14,12 +15,12 @@ export function workspaceOwnershipKey(serverId: string, workspaceId: string): st
 }
 
 /**
- * Whose each workspace is, by the same rule Work's For me / Others tabs use: the recorded author
- * against the reader on each Hub. Only workspaces that are not the reader's (someone else's, or
- * nobody can tell) are listed, so the map stays empty, and costs nothing, without Navigation V2.
+ * Workspace resources use their own author and Host binding. Missing resources stay unknown;
+ * sessions never fall back to this map. Outside Navigation V2 the map is empty.
  */
 export function useWorkspaceOwnership(enabled: boolean): WorkspaceOwnership {
   const accounts = useReaderAccounts();
+  const hostKinds = useOwnershipHosts();
   const active = enabled && NAVIGATION_V2_ENABLED;
   const workspaces = useSessionStore(
     useShallow((state) => {
@@ -33,17 +34,19 @@ export function useWorkspaceOwnership(enabled: boolean): WorkspaceOwnership {
   );
   return useMemo(() => {
     if (!active) return NONE;
-    const notMine = new Map<string, Ownership>();
+    const owners = new Map<string, Ownership>();
     for (const [serverId, byId] of Object.entries(workspaces)) {
       for (const workspace of byId?.values() ?? []) {
-        const ownership = resolveOwnership({ createdBy: workspace.createdBy, accounts });
-        if (ownership !== "mine") {
-          notMine.set(workspaceOwnershipKey(serverId, workspace.id), ownership);
-        }
+        const ownership = resolveOwnership({
+          createdBy: workspace.createdBy,
+          accounts,
+          hostKind: hostKinds.get(serverId) ?? "unknown",
+        });
+        owners.set(workspaceOwnershipKey(serverId, workspace.id), ownership);
       }
     }
-    return notMine;
-  }, [accounts, active, workspaces]);
+    return owners;
+  }, [accounts, active, hostKinds, workspaces]);
 }
 
 export function ownershipOf(
@@ -51,6 +54,6 @@ export function ownershipOf(
   serverId: string,
   workspaceId: string | null,
 ): Ownership {
-  if (!workspaceId) return "mine";
-  return map.get(workspaceOwnershipKey(serverId, workspaceId)) ?? "mine";
+  if (!workspaceId) return "unknown";
+  return map.get(workspaceOwnershipKey(serverId, workspaceId)) ?? "unknown";
 }

@@ -1,3 +1,4 @@
+import { participationKeyOf } from "@/clisbot/navigation/ownership-key";
 import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
 import { useTranslation } from "react-i18next";
 import {
@@ -306,16 +307,17 @@ function toSessionLineFilter(
   filter: WorkFilter,
   pinned: ReadonlySet<string>,
 ): WorkspaceSessionFilter {
-  return (session, workspace) =>
+  return (session) =>
     !pinned.has(`${session.agent.serverId}:${session.agent.id}`) &&
     filter.session(
       {
         id: session.agent.id,
         labels: session.agent.labels,
         createdBy: session.agent.createdBy,
+        participationKey: participationKeyOf(session.agent),
         statusBucket: session.statusBucket,
         unverified: session.unverified,
       },
-      workspace,
+      { serverId: session.agent.serverId },
     );
 }

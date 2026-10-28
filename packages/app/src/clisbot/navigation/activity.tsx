@@ -12,7 +12,6 @@ import { useStoreWithEqualityFn } from "zustand/traditional";
 import { getChatIdFromLabels } from "@clisbot/protocol/bots/labels";
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { useResourcePrincipalScope } from "@/clisbot/bots/data/resource-principal-scope";
-import { useBotCatalog } from "@/clisbot/bots/data/runtime";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useHosts } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
@@ -31,6 +30,7 @@ import {
 import { usePathname } from "expo-router";
 import { parseChatRouteFromPathname } from "@/clisbot/bots/routes";
 import { parseHostWorkspaceRouteFromPathname } from "@/utils/host-routes";
+import { useOwnershipHosts } from "./use-ownership-hosts";
 import { resolveOwnership, type Ownership } from "./ownership";
 import { useReaderAccounts, useRememberVerifiedReaders } from "./reader";
 import { useNavigationAgents } from "./use-navigation-agents";
@@ -41,7 +41,9 @@ interface NavigationActivity {
   rows: HomeRow[];
   badge: number;
   now: number;
-  ownershipOf: (agent: Pick<AggregatedAgent, "serverId" | "workspaceId" | "labels">) => Ownership;
+  ownershipOf: (
+    agent: Pick<AggregatedAgent, "serverId" | "createdBy" | "participationKey">,
+  ) => Ownership;
   /** Author lookup for a workspace, the source of ownership for Work rows and pins. */
   workspaceAuthor: (serverId: string, workspaceId: string) => SessionActor | undefined;
   markSeen: (agent: AggregatedAgent) => void;
@@ -196,14 +198,7 @@ function useOwnership() {
     (state) => serverIds.map((id) => state.sessions[id]?.workspaces ?? null),
     shallow,
   );
-  const { chats } = useBotCatalog();
-  const chatAuthors = useMemo(() => {
-    const map = new Map<string, SessionActor | undefined>();
-    if (chats.loadState.status !== "loaded") return map;
-    for (const chat of chats.loadState.data)
-      map.set(`${chat.serverId}:${chat.id}`, chat.record?.createdBy);
-    return map;
-  }, [chats.loadState]);
+  const hostKinds = useOwnershipHosts();
   const workspaceAuthor = useCallback(
     (serverId: string, workspaceId: string) => {
       const index = serverIds.indexOf(serverId);
@@ -212,19 +207,14 @@ function useOwnership() {
     [serverIds, workspaceMaps],
   );
   const ownershipOf = useCallback(
-    (
-      agent: Pick<AggregatedAgent, "serverId" | "workspaceId" | "labels" | "createdBy">,
-    ): Ownership => {
-      // A session's own author decides; its chat's or workspace's author only stands in for a
-      // session that records none (the same rule the Workspace list scopes by).
-      const chatId = getChatIdFromLabels(agent.labels);
-      let createdBy: SessionActor | undefined = agent.createdBy;
-      if (!createdBy && chatId) createdBy = chatAuthors.get(`${agent.serverId}:${chatId}`);
-      else if (!createdBy && agent.workspaceId)
-        createdBy = workspaceAuthor(agent.serverId, agent.workspaceId);
-      return resolveOwnership({ createdBy, accounts });
-    },
-    [accounts, chatAuthors, workspaceAuthor],
+    (agent: Pick<AggregatedAgent, "serverId" | "createdBy" | "participationKey">): Ownership =>
+      resolveOwnership({
+        createdBy: agent.createdBy,
+        participationKey: agent.participationKey,
+        accounts,
+        hostKind: hostKinds.get(agent.serverId) ?? "unknown",
+      }),
+    [accounts, hostKinds],
   );
   return useMemo(() => ({ ownershipOf, workspaceAuthor }), [ownershipOf, workspaceAuthor]);
 }

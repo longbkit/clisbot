@@ -6,9 +6,11 @@ import {
   inScope,
   resolveOwnership,
   type OwnershipScope,
+  type OwnershipHostKind,
   type ReaderAccount,
 } from "./ownership";
 import type { WorkChip } from "./store";
+import { ownershipKey } from "./ownership-key";
 
 /**
  * A session is Chat iff it carries a Bot label; everything else is Work. Home's mode, the
@@ -24,6 +26,7 @@ export interface WorkSession {
   id: string;
   labels?: Record<string, unknown> | null;
   createdBy?: SessionActor;
+  participationKey?: string;
   statusBucket: string;
   /** Its live state was dropped (the source is out of reach): unknown, so not Running or Done. */
   unverified?: boolean;
@@ -57,13 +60,14 @@ export function matchesWorkChip(
 }
 
 /**
- * The Workspace list's items. A session's author is its own `createdBy`; a workspace's author
- * covers only the sessions that record none. A workspace with no root session is one item itself.
+ * The Workspace list's items. Sessions keep their own authorship and participation evidence.
+ * A workspace with no root session is one item itself.
  * With Bots off, Bot sessions are no items, and a workspace holding only those is not listed.
  */
 export interface WorkItem {
   key: string;
   createdBy?: SessionActor;
+  participationKey?: string;
   statusBucket: string;
   unverified?: boolean;
 }
@@ -100,7 +104,8 @@ export function workItemsOf(
       : [
           {
             key: `${workspace.workspaceKey}:${session.id}`,
-            createdBy: session.createdBy ?? workspace.createdBy,
+            createdBy: session.createdBy,
+            participationKey: session.participationKey,
             statusBucket: session.statusBucket,
             ...(session.unverified ? { unverified: true } : {}),
           },
@@ -112,6 +117,7 @@ export interface WorkQuery {
   scope: OwnershipScope;
   chip: WorkChip;
   accounts: readonly ReaderAccount[];
+  hostKinds: ReadonlyMap<string, OwnershipHostKind>;
   /** The Bots chip: Bot-labelled sessions are listed (the default) or hidden. */
   showBots: boolean;
   /** Hosts out of reach: a workspace with no session list shows no live status either. */
@@ -125,8 +131,13 @@ function isListed(query: Pick<WorkQuery, "listableServerIds">, serverId: string)
 }
 
 /** Scope first, then the chip: an item another member started is never "For me". */
-export function workItemPasses(item: WorkItem, query: WorkQuery): boolean {
-  const ownership = resolveOwnership({ createdBy: item.createdBy, accounts: query.accounts });
+export function workItemPasses(item: WorkItem, query: WorkQuery, serverId: string): boolean {
+  const ownership = resolveOwnership({
+    createdBy: item.createdBy,
+    participationKey: item.participationKey,
+    accounts: query.accounts,
+    hostKind: query.hostKinds.get(serverId) ?? "unknown",
+  });
   return inScope(query.scope, ownership) && matchesWorkChip(item, query.chip);
 }
 
@@ -136,7 +147,7 @@ export function workItemPasses(item: WorkItem, query: WorkQuery): boolean {
  */
 export interface WorkFilter {
   workspace(workspace: WorkWorkspace): boolean;
-  session(session: WorkSession, workspace: Pick<WorkWorkspace, "createdBy">): boolean;
+  session(session: WorkSession, workspace: Pick<WorkWorkspace, "serverId">): boolean;
 }
 
 export function createWorkFilter(query: WorkQuery, sessionsOf: WorkSessionsOf): WorkFilter {
@@ -148,17 +159,19 @@ export function createWorkFilter(query: WorkQuery, sessionsOf: WorkSessionsOf): 
         sessionsOf(workspace),
         query.showBots,
         query.cachedServerIds?.has(workspace.serverId),
-      ).some((item) => workItemPasses(item, query)),
+      ).some((item) => workItemPasses(item, query, workspace.serverId)),
     session: (session, workspace) =>
       (query.showBots || !isChatSession(session)) &&
       workItemPasses(
         {
           key: session.id,
-          createdBy: session.createdBy ?? workspace.createdBy,
+          createdBy: session.createdBy,
+          participationKey: session.participationKey,
           statusBucket: session.statusBucket,
           unverified: session.unverified,
         },
         query,
+        workspace.serverId,
       ),
   };
 }
@@ -188,7 +201,12 @@ function countWorkWithOwnership(
     if (!isListed(query, workspace.serverId)) continue;
     const cachedSource = cachedServerIds?.has(workspace.serverId);
     for (const item of workItemsOf(workspace, sessionsOf(workspace), showBots, cachedSource)) {
-      const ownership = ownershipOf({ createdBy: item.createdBy, accounts });
+      const ownership = ownershipOf({
+        createdBy: item.createdBy,
+        participationKey: item.participationKey,
+        accounts,
+        hostKind: query.hostKinds.get(workspace.serverId) ?? "unknown",
+      });
       addToScopeCounts(scopes, ownership);
       if (!inScope(scope, ownership)) continue;
       for (const chip of WORK_CHIPS) if (matchesWorkChip(item, chip)) chips[chip] += 1;
@@ -209,17 +227,16 @@ export function createWorkCounter(resolve: OwnershipResolver = resolveOwnership)
   const maxAuthors = 2048;
   let authors = new Map<string, ReturnType<OwnershipResolver>>();
   let previousAccounts: WorkCountQuery["accounts"] | undefined;
+  let previousHostKinds: WorkCountQuery["hostKinds"] | undefined;
   let previousScope: WorkCountQuery["scope"] | undefined;
   let previousShowBots: boolean | undefined;
   let previous = new Map<string, CachedWorkspace>();
   let lastResult: Counts | undefined;
 
-  // Only these fields are read by resolveOwnership. JSON encoding keeps optional fields distinct
-  // without relying on a delimiter being absent from an opaque Hub or member identifier.
-  const actorKey = (actor: SessionActor | null | undefined) =>
-    actor
-      ? JSON.stringify([actor.kind, actor.id, actor.memberId, actor.hubOrigin, actor.hubIdentity])
-      : "null";
+  // Keep identity fields owned by the resolver's key, including verified channel membership.
+  const actorContext = { accounts: [] as readonly ReaderAccount[], hostKind: "unknown" as const };
+  const actorKey = (createdBy: SessionActor | undefined) =>
+    ownershipKey({ createdBy, ...actorContext });
   const sameActor = (a: SessionActor | undefined, b: SessionActor | undefined) =>
     a === b || actorKey(a) === actorKey(b);
   const sameSessions = (
@@ -235,6 +252,7 @@ export function createWorkCounter(resolve: OwnershipResolver = resolveOwnership)
         item.statusBucket === other.statusBucket &&
         item.unverified === other.unverified &&
         sameActor(item.createdBy, other.createdBy) &&
+        (Boolean(item.createdBy) || item.participationKey === other.participationKey) &&
         (showBots || isChatSession(item) === isChatSession(other))
       );
     });
@@ -264,10 +282,11 @@ export function createWorkCounter(resolve: OwnershipResolver = resolveOwnership)
     sessionsOf: WorkSessionsOf,
     query: WorkCountQuery,
   ) => {
-    if (query.accounts !== previousAccounts) {
+    if (query.accounts !== previousAccounts || query.hostKinds !== previousHostKinds) {
       authors = new Map();
       previous = new Map();
       previousAccounts = query.accounts;
+      previousHostKinds = query.hostKinds;
     }
     if (query.scope !== previousScope || query.showBots !== previousShowBots) {
       previous = new Map();
@@ -275,7 +294,7 @@ export function createWorkCounter(resolve: OwnershipResolver = resolveOwnership)
       previousShowBots = query.showBots;
     }
     const ownershipOf: OwnershipResolver = (input) => {
-      const key = actorKey(input.createdBy);
+      const key = ownershipKey(input);
       const cached = authors.get(key);
       if (cached) return cached;
       const ownership = resolve(input);

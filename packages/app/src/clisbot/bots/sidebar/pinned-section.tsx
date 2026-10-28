@@ -1,3 +1,4 @@
+import { participationKeyOf } from "@/clisbot/navigation/ownership-key";
 import { UnavailablePinRow } from "./unavailable-pin-row";
 import type { ResourcePin } from "./pins";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
@@ -133,6 +134,7 @@ function admitsPin(
         id: row.session.agent.id,
         labels: row.session.agent.labels,
         createdBy: row.session.agent.createdBy,
+        participationKey: participationKeyOf(row.session.agent),
         statusBucket: row.session.statusBucket,
       },
       row.workspace,

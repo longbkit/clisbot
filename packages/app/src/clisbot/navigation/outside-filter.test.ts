@@ -109,19 +109,16 @@ describe("a chat opened from search", () => {
       memberId: "m-someone",
     };
     expect(
-      resolveDirectChatOwnership(
-        { directChatCreatedBy: undefined, bot: { isOwner: false } },
-        accounts,
-      ),
+      resolveDirectChatOwnership({ bot: { isOwner: false } }, { accounts, hostKind: "direct" }),
     ).toBe("others");
     expect(
-      resolveDirectChatOwnership(
-        { directChatCreatedBy: undefined, bot: { isOwner: true } },
-        accounts,
-      ),
+      resolveDirectChatOwnership({ bot: { isOwner: true } }, { accounts, hostKind: "direct" }),
     ).toBe("mine");
     expect(
-      resolveDirectChatOwnership({ directChatCreatedBy: other, bot: { isOwner: true } }, accounts),
+      resolveDirectChatOwnership(
+        { directChat: { createdBy: other }, bot: { isOwner: true } },
+        { accounts, hostKind: "hub" },
+      ),
     ).toBe("others");
   });
 });

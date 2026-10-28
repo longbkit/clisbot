@@ -9,8 +9,7 @@ import type { ChatsSidebarChat } from "@/clisbot/bots/sidebar/chats-section";
 import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
 import { useHosts } from "@/runtime/host-runtime";
 import type { ChatListEntry } from "./chat-list";
-import { resolveDirectChatOwnership, resolveOwnership } from "./ownership";
-import { useReaderAccounts } from "./reader";
+import { useChatOwnership } from "./use-chat-ownership";
 import { listedAgents } from "./source-liveness";
 import { useSourceLiveness } from "./use-source-liveness";
 
@@ -56,7 +55,7 @@ export function useChatEntries() {
   const catalog = useSidebarCatalog();
   const { hosts, botRows, chatRows } = catalog;
   const { isPinned, pins } = useResourcePins(chatRows);
-  const accounts = useReaderAccounts();
+  const { chatOwnership, botOwnership } = useChatOwnership(chatRows);
   const company = useCompanyHosts();
   const unread = useUnreadAgents();
   const entries = useMemo(() => {
@@ -79,10 +78,7 @@ export function useChatEntries() {
         updatedAt: bot.updatedAt,
         pinned: isPinned({ kind: "bot", serverId: bot.serverId, id: bot.botId }),
         pinIndex: pinIndex("bot", bot.serverId, bot.botId),
-        ownership: resolveDirectChatOwnership(
-          { directChatCreatedBy: direct?.record?.createdBy, bot: payload ?? {} },
-          accounts,
-        ),
+        ownership: botOwnership(payload ?? { serverId: bot.serverId }, direct),
         unread: Boolean(bot.agentId && unread.has(`${bot.serverId}:${bot.agentId}`)),
         company: company.has(bot.serverId),
         bot,
@@ -97,16 +93,13 @@ export function useChatEntries() {
         updatedAt: chat.updatedAt,
         pinned: isPinned({ kind: "chat", serverId: chat.serverId, id: chat.chatId }),
         pinIndex: pinIndex("chat", chat.serverId, chat.chatId),
-        ownership: resolveOwnership({
-          createdBy: chatById.get(chat.key)?.record?.createdBy,
-          accounts,
-        }),
+        ownership: chatById.has(chat.key) ? chatOwnership(chatById.get(chat.key)!) : "unknown",
         unread: (chat.agentIds ?? []).some((id) => unread.has(`${chat.serverId}:${id}`)),
         company: company.has(chat.serverId),
         group: chat,
       }),
     );
     return [...botEntries, ...groupEntries];
-  }, [accounts, botRows, chatRows, company, hosts, isPinned, pins, unread]);
+  }, [chatOwnership, botOwnership, botRows, chatRows, company, hosts, isPinned, pins, unread]);
   return { entries, catalog };
 }
