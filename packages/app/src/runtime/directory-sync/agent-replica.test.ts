@@ -478,4 +478,29 @@ describe("AgentDirectoryReplica", () => {
     expect(useSessionStore.getState().sessions[serverId]?.agents.has("agent")).toBe(true);
     store.clearSession(serverId);
   });
+
+  it("commits nothing when a live update repeats the agent it already holds", () => {
+    const serverId = "agent-replica-repeated-update";
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, null);
+    const replica = new AgentDirectoryReplica(
+      serverId,
+      () => undefined,
+      () => undefined,
+    );
+    const update = entry(payload("same"));
+    replica.applyDelta({ kind: "upsert", ...update });
+    const before = useSessionStore.getState().sessions[serverId];
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    replica.applyDelta({ kind: "upsert", ...update });
+
+    unsubscribe();
+    expect(notifications).toBe(0);
+    expect(useSessionStore.getState().sessions[serverId]).toBe(before);
+    store.clearSession(serverId);
+  });
 });

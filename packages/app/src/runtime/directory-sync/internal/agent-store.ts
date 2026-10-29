@@ -1,6 +1,7 @@
 import equal from "fast-deep-equal";
 import type { FetchAgentsEntry } from "@clisbot/client/internal/daemon-client";
 import { useSessionStore, type Agent } from "@/stores/session-store";
+import type { PendingPermission } from "@/types/shared";
 import { acceptAgentDirectoryUpdate } from "@/utils/agent-directory-update-policy";
 import { buildAgentDirectoryState, type AgentDirectoryDelta } from "@/utils/agent-directory-sync";
 import { derivePendingPermissionKey, normalizeAgentSnapshot } from "@/utils/agent-snapshots";
@@ -29,6 +30,28 @@ function mergeSnapshotTurn(previous: Agent | undefined, incoming: Agent): Agent 
       : null;
   const turn = reduceTurnLiveness(previous.turn, { type: "snapshot", activeTurn });
   return turn === incoming.turn ? incoming : { ...incoming, turn };
+}
+
+/** The agent's requests replace its old ones; the same map comes back when none changed. */
+function replaceAgentPermissions(
+  current: Map<string, PendingPermission>,
+  agent: Agent,
+): Map<string, PendingPermission> {
+  const next = new Map(current);
+  for (const [key, entry] of next) if (entry.agentId === agent.id) next.delete(key);
+  for (const request of agent.pendingPermissions) {
+    const key = derivePendingPermissionKey(agent.id, request);
+    const previous = current.get(key);
+    next.set(
+      key,
+      previous?.agentId === agent.id && equal(previous.request, request)
+        ? previous
+        : { key, agentId: agent.id, request },
+    );
+  }
+  if (next.size !== current.size) return next;
+  for (const [key, entry] of next) if (current.get(key) !== entry) return next;
+  return current;
 }
 
 export class AgentStoreProjection {
@@ -60,6 +83,7 @@ export class AgentStoreProjection {
     useSessionStore.getState().setAgents(this.serverId, (current) => {
       const previous = current.get(agent.id);
       accepted = acceptAgentDirectoryUpdate(previous, mergeSnapshotTurn(previous, agent));
+      if (previous && equal(previous, accepted)) accepted = previous;
       if (accepted === previous) return current;
       const next = new Map(current);
       next.set(agent.id, accepted);
@@ -141,13 +165,9 @@ export class AgentStoreProjection {
   }
 
   replacePendingPermissions(agent: Agent): void {
-    const pending = new Map(useSessionStore.getState().sessions[this.serverId]?.pendingPermissions);
-    for (const [key, entry] of pending) if (entry.agentId === agent.id) pending.delete(key);
-    for (const request of agent.pendingPermissions) {
-      const key = derivePendingPermissionKey(agent.id, request);
-      pending.set(key, { key, agentId: agent.id, request });
-    }
-    useSessionStore.getState().setPendingPermissions(this.serverId, pending);
+    useSessionStore
+      .getState()
+      .setPendingPermissions(this.serverId, (current) => replaceAgentPermissions(current, agent));
   }
 
   removeFromDirectory(agentId: string): void {
