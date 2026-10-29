@@ -101,6 +101,16 @@ with an expired sign-in every Host of that Hub looped through remove and re-add.
 the Hub serves again, after signing in, adds the Host back after the base wait of 1 s
 (`clisbot/hub/host-synchronization.tsx`).
 
+**Known issue (2026-10-30, Android, open):** after the app is force-stopped or reinstalled over
+itself (`adb install -r`), it can come back showing the Hub as **Cần đăng nhập / Needs sign-in**
+with 0 Hosts, and the home screen as "No Host connected" or the Welcome screen. Pressing
+**Continue in browser** opened a Chrome custom tab once, which closed at once; later presses did
+nothing and showed no error. Force-stopping and reopening the app again restored the sign-in and
+all 14 Hosts with no other action, so the stored credential was intact. Two faults to fix: the
+transient needs-sign-in state after a cold start, and a sign-in button that stays silent while an
+earlier browser auth session is still registered. When measuring on a device, a needs-sign-in
+screen after a reinstall is this issue, not lost data: reopen the app before anything else.
+
 ## Remembered Hub daemon list
 
 `hub-daemon-list-cache.ts` stores, per Hub origin, the last list the signed-in account read:
