@@ -206,18 +206,31 @@ export function useSidebarWorkspacesList(options?: {
   // Read pending state independently of demand activation: the first visible retained frame
   // can precede activation, and must not claim a ready empty directory.
   const isLoading = health.status === "loading" || health.status === "refreshing";
-  const loadingState = {
-    isLoading,
-    isInitialLoad: isLoading && !health.hasAcceptedResult,
-    isRevalidating: isLoading && (health.hasAcceptedResult || projects.length > 0),
-  };
+  const isInitialLoad = isLoading && !health.hasAcceptedResult;
+  const isRevalidating = isLoading && (health.hasAcceptedResult || projects.length > 0);
 
-  return {
-    workspaceSortSupported,
-    workspacePlacements,
-    projects,
-    projectNamesByViewKey,
-    ...loadingState,
-    refreshAll,
-  };
+  // Clisbot: SidebarModelProvider spreads this into its context value; a fresh object every render
+  // re-rendered the whole Work tree.
+  return useMemo(
+    () => ({
+      workspaceSortSupported,
+      workspacePlacements,
+      projects,
+      projectNamesByViewKey,
+      isLoading,
+      isInitialLoad,
+      isRevalidating,
+      refreshAll,
+    }),
+    [
+      workspaceSortSupported,
+      workspacePlacements,
+      projects,
+      projectNamesByViewKey,
+      isLoading,
+      isInitialLoad,
+      isRevalidating,
+      refreshAll,
+    ],
+  );
 }

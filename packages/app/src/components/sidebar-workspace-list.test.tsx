@@ -417,6 +417,17 @@ describe("sidebar workspace render isolation", () => {
     });
   });
 
+  it("hands the sidebar model the same list result when a re-render changes nothing", () => {
+    const hostFilters = [SERVER_ID];
+    const hook = renderHook(() => useSidebarWorkspacesList({ hostFilters }));
+    const first = hook.result.current;
+
+    hook.rerender();
+
+    expect(hook.result.current).toBe(first);
+    hook.unmount();
+  });
+
   it("updates active selection probes from the active workspace route", async () => {
     const counts: RenderCounts = {
       frame: 0,
