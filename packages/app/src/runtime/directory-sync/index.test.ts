@@ -16,7 +16,8 @@ import {
   normalizeWorkspaceDescriptor,
   useSessionStore,
 } from "@/stores/session-store";
-import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
+import { normalizeAgentSnapshot, projectAgentSnapshot } from "@/utils/agent-snapshots";
+import { createManualFrameClock } from "./frame-clock-fixture";
 import { selectWorkspaceDirectoryServerIds } from "@/stores/session-store-hooks/selectors";
 import { useWorkspaceLabels } from "@/workspace-labels";
 import type { DirectoryReplicaMutation } from "@/runtime/replica-cache";
@@ -2062,6 +2063,139 @@ describe("directory demand cancellation", () => {
     await expect(directory.refreshDemand()).rejects.toThrow("Backend denied directory");
     expect(client.fetchAgentsCalls).toBe(1);
     expect(client.fetchWorkspacesCalls).toBe(1);
+    directory.dispose();
+  });
+});
+
+function liveAgentUpdate(
+  serverId: string,
+  id: string,
+  title: string,
+): Extract<SessionOutboundMessage, { type: "agent_update" }> {
+  return {
+    type: "agent_update",
+    payload: {
+      kind: "upsert",
+      agent: projectAgentSnapshot({
+        ...createAgent(serverId, id),
+        title,
+        updatedAt: new Date("2026-08-27T00:00:00.000Z"),
+      }),
+      project: null,
+    },
+  };
+}
+
+async function createFramedDirectory(serverId: string) {
+  serverIds.add(serverId);
+  const clock = createManualFrameClock();
+  const client = new FakeDirectoryClient();
+  const directory = new DirectorySync(
+    serverId,
+    {
+      onAgentStoppedRunning: () => undefined,
+      markAgentLoading: () => undefined,
+      markAgentReady: () => undefined,
+      markAgentError: () => undefined,
+      markWorkspaceLoading: () => undefined,
+      markWorkspaceReady: () => undefined,
+      markWorkspaceError: () => undefined,
+    },
+    undefined,
+    { frameClock: clock },
+  );
+  const connection = {
+    client: client as unknown as DaemonClient,
+    status: "online" as const,
+    source: { clientGeneration: 1, connectionEpoch: 1 },
+  };
+  directory.connectionChanged(connection);
+  const store = useSessionStore.getState();
+  store.initializeSession(serverId, client as unknown as DaemonClient, 1);
+  store.updateSessionServerInfo(serverId, {
+    serverId,
+    hostname: null,
+    version: "test",
+    features: { workspaceMultiplicity: true },
+  });
+  await directory.refreshAll();
+  const titleOf = (agentId: string) =>
+    useSessionStore.getState().sessions[serverId]?.agents.get(agentId)?.title;
+  return { client, clock, connection, directory, titleOf };
+}
+
+describe("live directory updates within a frame", () => {
+  it("applies a frame's agent and workspace updates in order as one store commit", async () => {
+    const serverId = "framed-live-updates";
+    const { client, clock, directory, titleOf } = await createFramedDirectory(serverId);
+    client.emit(liveAgentUpdate(serverId, "a", "first"));
+    client.emit(liveAgentUpdate(serverId, "b", "kept"));
+    client.emit({
+      type: "workspace_update",
+      payload: { kind: "upsert", workspace: createWorkspaceEntry("w") },
+    });
+    client.emit(liveAgentUpdate(serverId, "a", "second"));
+    client.emit({ type: "agent_update", payload: { kind: "remove", agentId: "b" } });
+    expect(titleOf("a")).toBeUndefined();
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    clock.tick();
+
+    unsubscribe();
+    const session = useSessionStore.getState().sessions[serverId];
+    expect({
+      notifications,
+      title: titleOf("a"),
+      agentIds: [...(session?.agents.keys() ?? [])],
+      workspaceIds: [...(session?.workspaces.keys() ?? [])],
+    }).toEqual({ notifications: 1, title: "second", agentIds: ["a"], workspaceIds: ["w"] });
+    directory.dispose();
+  });
+
+  it("applies held updates before a fetch response is committed", async () => {
+    const serverId = "framed-before-fetch";
+    const { client, directory, titleOf } = await createFramedDirectory(serverId);
+    const releaseAgents = client.holdAgentFetch();
+    const refresh = directory.refreshAgents();
+    await expect.poll(() => client.fetchAgentsCalls).toBe(2);
+    client.emit(liveAgentUpdate(serverId, "live", "from the live stream"));
+
+    releaseAgents({
+      requestId: "agents",
+      entries: [],
+      pageInfo: { hasMore: false, nextCursor: null, prevCursor: null },
+    });
+    await refresh;
+
+    expect(titleOf("live")).toBe("from the live stream");
+    directory.dispose();
+  });
+
+  it("applies held updates before the connection changes", async () => {
+    const serverId = "framed-before-reconnect";
+    const { client, connection, directory, titleOf } = await createFramedDirectory(serverId);
+    client.emit(liveAgentUpdate(serverId, "held", "before reconnect"));
+
+    directory.connectionChanged({
+      ...connection,
+      source: { clientGeneration: 1, connectionEpoch: 2 },
+    });
+
+    expect(titleOf("held")).toBe("before reconnect");
+    directory.dispose();
+  });
+
+  it("applies held updates when the app goes to the background", async () => {
+    const serverId = "framed-flush";
+    const { client, directory, titleOf } = await createFramedDirectory(serverId);
+    client.emit(liveAgentUpdate(serverId, "held", "before background"));
+
+    directory.flushLiveUpdates();
+
+    expect(titleOf("held")).toBe("before background");
     directory.dispose();
   });
 });

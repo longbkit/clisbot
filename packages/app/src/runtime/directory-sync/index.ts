@@ -7,6 +7,7 @@ import type {
 } from "@clisbot/client/internal/daemon-client";
 import { fetchAgentTimelineOnce } from "@/timeline/fetch-agent-timeline-once";
 import {
+  batchSessionStoreUpdates,
   normalizeProjectDescriptor,
   normalizeWorkspaceDescriptor,
   useSessionStore,
@@ -26,6 +27,7 @@ import {
   type DirectorySourceToken,
   type DirectoryTransaction,
 } from "./transaction";
+import { createLiveUpdateBatch, type FrameClock, type LiveUpdateBatch } from "./live-batch";
 import { workspaceLabels } from "@/workspace-labels";
 import type {
   CachedDirectory,
@@ -121,6 +123,15 @@ export interface DirectoryCheckpointStorage {
   replaceDirectoryBaseline?(serverId: string, directory: CachedDirectory): void;
 }
 
+export interface DirectorySyncOptions {
+  /** Paces live updates (`createDirectoryFrameClock`); without one each applies on arrival. */
+  frameClock?: FrameClock | null;
+}
+
+type LiveDirectoryUpdate =
+  | { kind: "agent"; source: DirectorySourceToken; delta: AgentDirectoryDelta }
+  | { kind: "workspace"; source: DirectorySourceToken; delta: WorkspaceDirectoryDelta };
+
 export interface RefreshAgentDirectoryInput {
   filter?: FetchAgentsOptions["filter"];
   subscribe?: FetchAgentsOptions["subscribe"];
@@ -143,6 +154,7 @@ export class DirectorySync {
   >();
   private readonly agents: AgentDirectoryReplica;
   private readonly workspaces: WorkspaceDirectoryReplica;
+  private readonly liveUpdates: LiveUpdateBatch<LiveDirectoryUpdate>;
   private connection: DirectoryConnection = {
     client: null,
     status: "offline",
@@ -177,11 +189,24 @@ export class DirectorySync {
       markWorkspaceError: (error: string) => void;
     },
     private readonly checkpoints?: DirectoryCheckpointStorage,
+    options: DirectorySyncOptions = {},
   ) {
     const persist = (mutations: readonly DirectoryReplicaMutation[]) =>
       this.checkpoints?.commitDirectoryMutations(this.serverId, mutations);
     this.agents = new AgentDirectoryReplica(serverId, callbacks.onAgentStoppedRunning, persist);
     this.workspaces = new WorkspaceDirectoryReplica(serverId);
+    this.liveUpdates = createLiveUpdateBatch(options.frameClock ?? null, (updates) =>
+      this.applyLiveUpdates(updates),
+    );
+  }
+
+  /**
+   * Applies the live updates held for the next frame. Every other write to the directory calls
+   * this first, so a held update never lands after a fetch, cache read or reconnect it preceded;
+   * the app calls it on going to the background, where frames stop.
+   */
+  flushLiveUpdates(): void {
+    this.liveUpdates.flush();
   }
 
   connectionChanged(connection: DirectoryConnection): boolean {
@@ -289,12 +314,10 @@ export class DirectorySync {
     this.scriptStatusSubscription = null;
   }
 
+  // Revisions move on arrival: a cache read racing a held update must still lose to it.
   private receiveAgentDelta(source: DirectorySourceToken, delta: AgentDirectoryDelta): void {
     this.revision += 1;
-    if (this.agentTransactions.record(source, delta)) return;
-    this.agents.applyDelta(delta);
-    this.noteLiveCursor("agents", delta);
-    this.persistCheckpoint();
+    this.liveUpdates.push({ kind: "agent", source, delta });
   }
 
   private receiveWorkspaceDelta(
@@ -303,14 +326,43 @@ export class DirectorySync {
   ): void {
     this.revision += 1;
     this.workspaceRevision += 1;
-    if (this.workspaceTransactions.record(source, delta)) return;
+    this.liveUpdates.push({ kind: "workspace", source, delta });
+  }
+
+  private applyLiveUpdates(updates: readonly LiveDirectoryUpdate[]): void {
+    let applied = false;
+    batchSessionStoreUpdates(() => {
+      for (const update of updates) {
+        const appliedNow =
+          update.kind === "agent"
+            ? this.applyLiveAgentDelta(update.source, update.delta)
+            : this.applyLiveWorkspaceDelta(update.source, update.delta);
+        applied ||= appliedNow;
+      }
+    });
+    if (applied) this.persistCheckpoint();
+  }
+
+  /** False when an open fetch transaction took the delta instead. */
+  private applyLiveAgentDelta(source: DirectorySourceToken, delta: AgentDirectoryDelta): boolean {
+    if (this.agentTransactions.record(source, delta)) return false;
+    this.agents.applyDelta(delta);
+    this.noteLiveCursor("agents", delta);
+    return true;
+  }
+
+  private applyLiveWorkspaceDelta(
+    source: DirectorySourceToken,
+    delta: WorkspaceDirectoryDelta,
+  ): boolean {
+    if (this.workspaceTransactions.record(source, delta)) return false;
     this.applyWorkspaceDelta(delta);
     if (delta.kind !== "script_status")
       this.noteLiveCursor(
         "projectId" in delta || "project" in delta ? "projects" : "workspaces",
         delta,
       );
-    this.persistCheckpoint();
+    return true;
   }
 
   private observeDirectoryEvents(): void {
@@ -417,6 +469,7 @@ export class DirectorySync {
     if (!agent) return;
     const session = useSessionStore.getState().sessions[this.serverId];
     if (!session || session.agents.has(agentId)) return;
+    this.liveUpdates.flush();
     this.agents.commitCachedAgent(token, agent);
   }
 
@@ -439,6 +492,7 @@ export class DirectorySync {
     if (this.workspaceRevision !== revision) return;
     const session = useSessionStore.getState().sessions[this.serverId];
     if (!session) return;
+    this.liveUpdates.flush();
     this.workspaces.commitCachedWorkspace(cached.workspace, cached.project);
   }
 
@@ -450,6 +504,7 @@ export class DirectorySync {
       const cached = await checkpoints.readDirectory(this.serverId);
       if (this.cacheAccepted) return;
       if (!useSessionStore.getState().sessions[this.serverId]) return;
+      this.liveUpdates.flush();
       this.agents.commitCached(cached.agents);
       this.workspaces.commitCached(cached);
       if (this.revision === revision) this.cursors = cached.checkpoint ?? {};
@@ -466,10 +521,12 @@ export class DirectorySync {
     agentId: string,
     transition: TurnLivenessTransition | readonly TurnLivenessTransition[],
   ): void {
+    this.liveUpdates.flush();
     this.agents.applyTurnLiveness(agentId, transition);
   }
 
   acceptAgent(agent: Agent): Agent {
+    this.liveUpdates.flush();
     return this.agents.accept(agent);
   }
 
@@ -489,6 +546,7 @@ export class DirectorySync {
         ? { ...request, pagingMode: "source_ranges" }
         : request,
     );
+    this.liveUpdates.flush();
     if (page.agent && this.agents.submitTimelineAgent(token, page.agent)) {
       this.revision += 1;
       this.persistCheckpoint();
@@ -519,6 +577,7 @@ export class DirectorySync {
       };
     }
     const { client, source } = onlineConnection;
+    this.liveUpdates.flush();
     const transaction = this.agentTransactions.begin(source, () => ({
       entries: [],
       subscriptionId: null,
@@ -531,6 +590,7 @@ export class DirectorySync {
       if (!this.isCurrent(client, source) || !this.hasMatchingSession(client, source)) {
         throw new DirectoryRefreshSupersededError("agent completion no longer current");
       }
+      this.liveUpdates.flush();
       const completion = this.agentTransactions.complete(transaction);
       if (completion.kind === "stale") {
         throw new DirectoryRefreshSupersededError("agent completion was superseded");
@@ -542,6 +602,7 @@ export class DirectorySync {
       this.callbacks.markAgentReady();
       return { agents, subscriptionId: completion.snapshot.subscriptionId };
     } catch (error) {
+      this.liveUpdates.flush();
       const deltas = this.agentTransactions.fail(transaction);
       if (deltas) for (const delta of deltas) this.agents.applyDelta(delta);
       if (!(error instanceof DirectoryRefreshSupersededError)) {
@@ -563,6 +624,7 @@ export class DirectorySync {
     const onlineConnection = this.getOnlineConnection();
     if (!onlineConnection) return;
     const { client, source } = onlineConnection;
+    this.liveUpdates.flush();
     const transaction = this.workspaceTransactions.begin(source, () => {
       const baseline = this.workspaces.snapshot();
       return {
@@ -605,6 +667,7 @@ export class DirectorySync {
       this.completeWorkspaceRefresh(client, source, transaction);
       this.callbacks.markWorkspaceReady();
     } catch (error) {
+      this.liveUpdates.flush();
       const deltas = this.workspaceTransactions.fail(transaction);
       if (deltas) for (const delta of deltas) this.applyWorkspaceDelta(delta);
       if (
@@ -695,24 +758,29 @@ export class DirectorySync {
   }
 
   acceptWorkspaces(workspaces: readonly WorkspaceDescriptor[]): void {
+    this.liveUpdates.flush();
     const mutations = this.workspaces.acceptWorkspaces(workspaces);
     this.checkpoints?.commitDirectoryMutations(this.serverId, mutations);
   }
 
   archiveAgent(agentId: string, archivedAt: string): void {
+    this.liveUpdates.flush();
     this.agents.archive(agentId, archivedAt);
   }
 
   removeAgent(agentId: string): void {
+    this.liveUpdates.flush();
     this.agents.remove(agentId);
   }
 
   acceptProject(project: ProjectDescriptor): void {
+    this.liveUpdates.flush();
     const mutations = this.workspaces.acceptProject(project);
     this.checkpoints?.commitDirectoryMutations(this.serverId, mutations);
   }
 
   removeWorkspace(workspaceId: string): void {
+    this.liveUpdates.flush();
     const mutations = this.workspaces.removeWorkspaceSnapshot(workspaceId);
     this.checkpoints?.commitDirectoryMutations(this.serverId, mutations);
   }
@@ -802,6 +870,7 @@ export class DirectorySync {
   private primeAgentTransactionForCacheLoad(): void {
     const connection = this.getOnlineConnection();
     if (!connection) return;
+    this.liveUpdates.flush();
     this.agentTransactions.begin(connection.source, () => ({
       entries: [],
       subscriptionId: null,
@@ -872,6 +941,7 @@ export class DirectorySync {
     if (!this.isCurrent(client, source) || !this.hasMatchingSession(client, source)) {
       throw new DirectoryRefreshSupersededError("workspace completion no longer current");
     }
+    this.liveUpdates.flush();
     const completion = this.workspaceTransactions.complete(transaction);
     if (completion.kind === "stale") {
       throw new DirectoryRefreshSupersededError("workspace completion was superseded");
@@ -1034,6 +1104,7 @@ export class DirectorySync {
   }
 
   private flushAbortedTransactions(): void {
+    this.liveUpdates.flush();
     for (const delta of this.agentTransactions.abort()) this.agents.applyDelta(delta);
     for (const delta of this.workspaceTransactions.abort()) this.applyWorkspaceDelta(delta);
   }

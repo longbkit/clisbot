@@ -110,6 +110,7 @@ import { createMessageSubmissionWriter } from "@/composer/submission/writer";
 import { resolveComposerAttachmentSubmitFormat } from "@/composer/attachments/submit";
 import { encodeImages } from "@/utils/encode-images";
 import { DirectorySync, type RefreshAgentDirectoryResult } from "@/runtime/directory-sync";
+import { createDirectoryFrameClock, type FrameClock } from "@/runtime/directory-sync/live-batch";
 import { diagnosticStack, recordHostDiagnostic } from "@/runtime/host-diagnostics";
 import { ReplicaCache } from "@/runtime/replica-cache";
 import type { ReplicaRowStore } from "@/runtime/replica-cache/row-store";
@@ -2098,12 +2099,15 @@ export class HostRuntimeStore {
   private storage: HostRuntimeStorage;
   private replicaCache: ReplicaCache;
   private readonly revokePushNotifications: typeof revokePushNotifications;
+  private readonly directoryFrameClock: FrameClock | null;
 
   constructor(input?: {
     deps?: HostRuntimeControllerDeps;
     storage?: HostRuntimeStorage;
     replicaRowStore?: ReplicaRowStore;
     revokePushNotifications?: typeof revokePushNotifications;
+    /** Clisbot: paces each Host's live directory updates to one commit per frame. */
+    directoryFrameClock?: FrameClock | null;
   }) {
     const deps =
       input?.deps ??
@@ -2121,6 +2125,7 @@ export class HostRuntimeStore {
     this.storage = input?.storage ?? AsyncStorage;
     this.replicaCache = new ReplicaCache(input?.replicaRowStore ?? createReplicaRowStore());
     this.revokePushNotifications = input?.revokePushNotifications ?? revokePushNotifications;
+    this.directoryFrameClock = input?.directoryFrameClock ?? null;
   }
 
   // --- Host registry ---
@@ -2390,6 +2395,7 @@ export class HostRuntimeStore {
         markWorkspaceError: (error) => controller.markWorkspaceDirectorySyncError(error),
       },
       this.replicaCache,
+      { frameClock: this.directoryFrameClock },
     );
     this.directorySyncByServer.set(newServerId, directory);
     this.timelineReplicaByServer.set(
@@ -3131,6 +3137,7 @@ export class HostRuntimeStore {
           markWorkspaceError: (error) => controller.markWorkspaceDirectorySyncError(error),
         },
         this.replicaCache,
+        { frameClock: this.directoryFrameClock },
       );
       this.directorySyncByServer.set(host.serverId, directory);
       this.timelineReplicaByServer.set(
@@ -3480,6 +3487,8 @@ export class HostRuntimeStore {
     // Keep normal reconnect backoff running while hidden, for as long as the OS
     // lets us execute. Foregrounding bypasses that backoff without closing healthy sockets.
     if (!visible) {
+      // Frames stop in the background; held live directory updates land now, then persist.
+      for (const directory of this.directorySyncByServer.values()) directory.flushLiveUpdates();
       void this.replicaCache.flush();
       return;
     }
@@ -3620,7 +3629,7 @@ export function getHostRuntimeStore(): HostRuntimeStore {
     return existing;
   }
 
-  const store = new HostRuntimeStore();
+  const store = new HostRuntimeStore({ directoryFrameClock: createDirectoryFrameClock() });
   singletonHostRuntimeStore = store;
   Reflect.set(globalThis, HOST_RUNTIME_STORE_GLOBAL_KEY, store);
   // The app store lives for the process; it follows OS network changes where the platform has them.
