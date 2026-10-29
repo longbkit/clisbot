@@ -9,6 +9,8 @@ import type { ChatMessage } from "./contracts";
 export interface ChatTranscript {
   messages: ChatMessage[];
   hasOlder: boolean;
+  /** Painted from the device's offline cache; the first accepted page replaces it. */
+  cached?: true;
 }
 
 /** Object identity is the read admission: clear/recreate and a newer read invalidate it. */
@@ -30,6 +32,8 @@ interface TranscriptStoreState {
   prependOlder: (key: string, messages: readonly ChatMessage[], hasOlder: boolean) => void;
   /** A pushed line; a repeat of an id already held is ignored. */
   append: (key: string, message: ChatMessage) => void;
+  /** Paints the offline tail while nothing has arrived from the Host for this key. */
+  hydrateCached: (key: string, page: ChatTranscript) => void;
   clear: (key: string) => void;
 }
 
@@ -129,6 +133,12 @@ export const useTranscriptStore = create<TranscriptStoreState>()((set, get) => (
       const messages = mergeTranscriptMessages(current.messages, [message]);
       if (messages === current.messages) return state;
       return { transcripts: { ...state.transcripts, [key]: { ...current, messages } } };
+    }),
+  hydrateCached: (key, page) =>
+    set((state) => {
+      if (state.transcripts[key]) return state;
+      const transcript: ChatTranscript = { ...page, cached: true };
+      return { transcripts: { ...state.transcripts, [key]: transcript } };
     }),
   clear: (key) =>
     set((state) => {

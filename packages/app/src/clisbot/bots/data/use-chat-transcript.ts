@@ -86,7 +86,9 @@ export function useChatTranscriptQuery(input: {
   const previous =
     !blocked && retained.current?.owner === owner ? retained.current.transcript : undefined;
   const acceptedCurrent = query.data !== undefined && samePrincipal;
-  let presented = acceptedCurrent ? transcript : (previous ?? EMPTY_PRESENTATION);
+  // The offline tail paints until a page is accepted; a refusal below still hides it.
+  const offlineTail = transcript.cached ? transcript : undefined;
+  let presented = acceptedCurrent ? transcript : (previous ?? offlineTail ?? EMPTY_PRESENTATION);
   if (blocked) presented = EMPTY_PRESENTATION;
   useLayoutEffect(() => {
     if (blocked || retained.current?.owner !== owner) retained.current = null;

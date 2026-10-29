@@ -78,3 +78,33 @@ it("preserves a live push arriving before a stale page response", () => {
     1, 2, 3,
   ]);
 });
+
+describe("cached transcript hydration", () => {
+  it("shows a cached tail until the first accepted page replaces it", () => {
+    const store = useTranscriptStore.getState();
+    store.hydrateCached(KEY, { messages: [line(1), line(2)], hasOlder: true });
+
+    expect(selectTranscript(useTranscriptStore.getState(), KEY)).toEqual({
+      messages: [line(1), line(2)],
+      hasOlder: true,
+      cached: true,
+    });
+
+    const read = useTranscriptStore.getState().beginRead(KEY);
+    useTranscriptStore
+      .getState()
+      .acceptRead(KEY, read, { messages: [line(2), line(3)], hasOlder: false }, false);
+    expect(selectTranscript(useTranscriptStore.getState(), KEY)).toEqual({
+      messages: [line(2), line(3)],
+      hasOlder: false,
+    });
+  });
+
+  it("never replaces lines the Host already delivered", () => {
+    const store = useTranscriptStore.getState();
+    store.append(KEY, line(5));
+    store.hydrateCached(KEY, { messages: [line(1)], hasOlder: false });
+
+    expect(selectTranscript(useTranscriptStore.getState(), KEY).messages).toEqual([line(5)]);
+  });
+});

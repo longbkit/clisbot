@@ -17,6 +17,14 @@ it("defines every English key in Vietnamese", () => {
   expect(keys(offlineResources.vi!).sort()).toEqual(keys(offlineResources.en!).sort());
 });
 
+it("translates the Storage copy in every app locale", async () => {
+  expect(offlineT("storage.used", { size: "3.1 MB" })).toBe("3.1 MB used");
+  await i18n.changeLanguage("fr");
+  expect(offlineT("storage.confirmTitle")).toBe("Vider le cache hors ligne ?");
+  await i18n.changeLanguage("ja");
+  expect(offlineT("chat.image")).toBe("[画像]");
+});
+
 it("translates in the current language and falls back to English elsewhere", async () => {
   const values = { source: "build-03", hub: "Company" };
   expect(offlineT("source.hubUnreachable", values)).toBe(

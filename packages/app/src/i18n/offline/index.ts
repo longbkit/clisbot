@@ -1,5 +1,6 @@
 import { i18n } from "@/i18n/i18next";
 import { offlineResources } from "./resources";
+import { offlineStorageResources } from "./storage-resources";
 
 export const OFFLINE_NAMESPACE = "offline";
 
@@ -9,6 +10,8 @@ function register(): void {
   if (registered) return;
   registered = true;
   for (const [language, resources] of Object.entries(offlineResources))
+    i18n.addResourceBundle(language, OFFLINE_NAMESPACE, resources, true, false);
+  for (const [language, resources] of Object.entries(offlineStorageResources))
     i18n.addResourceBundle(language, OFFLINE_NAMESPACE, resources, true, false);
 }
 

@@ -8,6 +8,7 @@ import { ConversationWorkspace } from "./conversation-workspace";
 import { useChatVisibility } from "./use-chat-visibility";
 import { acceptedChatRecord, useChatRecord } from "./use-chat-record";
 import { useChatSend } from "./use-chat-send";
+import { useOfflineChatTail, useSaveChatTail } from "./use-chat-offline-tail";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { scopedTranscriptKey } from "../data/session-scope";
 import { useIsFocused } from "expo-router/react-navigation";
@@ -96,12 +97,14 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   const client = useHostRuntimeClient(serverId);
   const online = useHostRuntimeConnectionStatus(serverId) === "online";
   const catalog = useBotCatalog();
+  const offlineChat = useOfflineChatTail(serverId, chatId, key);
   const { chat, setChat, error, setError, authorized, transportInterrupted } = useChatRecord(
     client,
     online,
     chatId,
     key,
     acceptedChatRecord(catalog.chats, serverId, chatId),
+    offlineChat,
   );
   const transcript = useChatTranscriptQuery({
     serverId,
@@ -110,6 +113,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
     presentationScope: principalScope,
     presentationAllowed: chat !== null,
   });
+  useSaveChatTail({ serverId, chatId, chat, authorized, transcript });
   useChatVisibility(serverId, chatId, chat, focused);
   const heads = useChatLiveHeads(serverId, chat?.participants ?? EMPTY_PARTICIPANTS);
   const { botRows, identities, workspaceByBotId } = useChatIdentities(

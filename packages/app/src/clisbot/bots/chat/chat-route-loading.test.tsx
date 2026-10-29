@@ -84,6 +84,10 @@ vi.mock("../data/runtime", () => ({
   botsRuntime: {},
   useBotCatalog: () => ({ bots: { loadState: { status: "loading" } }, chats: {} }),
 }));
+vi.mock("./use-chat-offline-tail", () => ({
+  useOfflineChatTail: () => null,
+  useSaveChatTail: () => undefined,
+}));
 vi.mock("./use-chat-record", () => ({
   acceptedChatRecord: () => null,
   useChatRecord: () => ({

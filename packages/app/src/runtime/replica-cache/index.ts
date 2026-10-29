@@ -25,7 +25,14 @@ import {
 } from "@/types/stream";
 import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
 import { clearLegacyReplicaCache } from "./legacy-cleanup";
+import {
+  StoredChatTailSchema,
+  deserializeChatTail,
+  serializeChatTail,
+  type CachedChatTail,
+} from "./chat-tail";
 import { OFFLINE_CACHE_ENABLED } from "./offline-flag";
+import { isReplicaTailKind } from "./row-store-schema";
 import { TAIL_MAX_AGE_MS, TAIL_SAVE_WINDOW_MS, selectTailEvictions } from "./tail-retention";
 import { TAIL_MAX_BYTES, compactTailItem, keepNewestWithinBytes } from "./timeline-tail";
 import {
@@ -395,6 +402,7 @@ type StructuredReplicaUpsert =
   | { serverId: string; kind: "workspace"; id: string; value: WorkspaceDescriptor }
   | { serverId: string; kind: "project"; id: string; value: ProjectDescriptor }
   | { serverId: string; kind: "timeline"; id: string; value: CachedTimeline; openedAt?: number }
+  | { serverId: string; kind: "transcript"; id: string; value: CachedChatTail; openedAt: number }
   | { serverId: string; kind: "checkpoint"; id: string; value: DirectoryCheckpoint };
 
 const DirectoryCursorSchema = z.strictObject({
@@ -1262,12 +1270,14 @@ export class ReplicaCache {
   replaceDirectoryBaseline(serverId: string, directory: CachedDirectory): void {
     if (!this.activeServerIds.has(serverId)) return;
     this.invalidateHostReads(serverId, ["agent", "workspace", "project", "checkpoint"]);
-    // Replacing the directory must not discard independently accepted timeline changes.
+    // Replacing the directory must not discard independently accepted tail changes.
     for (const [key, row] of this.pendingUpserts) {
-      if (row.serverId === serverId && row.kind !== "timeline") this.pendingUpserts.delete(key);
+      if (row.serverId === serverId && !isReplicaTailKind(row.kind))
+        this.pendingUpserts.delete(key);
     }
     for (const [key, row] of this.pendingDeletes) {
-      if (row.serverId === serverId && row.kind !== "timeline") this.pendingDeletes.delete(key);
+      if (row.serverId === serverId && !isReplicaTailKind(row.kind))
+        this.pendingDeletes.delete(key);
     }
     this.pendingBaselines.add(serverId);
     for (const [id, value] of directory.agents) {
@@ -1301,6 +1311,31 @@ export class ReplicaCache {
     const openedAt = this.tailSaveOpenedAt(serverId, "timeline", agentId);
     if (openedAt === undefined) return;
     this.queueUpsert({ serverId, kind: "timeline", id: agentId, value: timeline, openedAt });
+    this.schedulePersist();
+  }
+
+  /** Reading a chat tail is opening the chat: it renews the tail's save window. */
+  async readChatTail(serverId: string, chatId: string): Promise<CachedChatTail | undefined> {
+    this.markTailOpened(serverId, "transcript", chatId);
+    const row = (await this.readRows(serverId, ["transcript"], [chatId]))[0];
+    if (!row) return undefined;
+    try {
+      const stored = parseStoredPayload(StoredChatTailSchema, row.payload);
+      if (stored.chat.id !== chatId) throw new Error("Replica chat row id mismatch");
+      return deserializeChatTail(stored);
+    } catch {
+      await this.deleteInvalidRow(row);
+      return undefined;
+    }
+  }
+
+  /** Saves an accepted chat record and transcript; a no-op with offline tails off. */
+  commitChatTail(serverId: string, chatId: string, tail: CachedChatTail): void {
+    if (!this.offlineTails || !this.activeServerIds.has(serverId)) return;
+    if (tail.chat.id !== chatId) throw new Error("Chat cache key does not match payload");
+    const openedAt = this.tailSaveOpenedAt(serverId, "transcript", chatId);
+    if (openedAt === undefined) return;
+    this.queueUpsert({ serverId, kind: "transcript", id: chatId, value: tail, openedAt });
     this.schedulePersist();
   }
 
@@ -1425,7 +1460,7 @@ export class ReplicaCache {
   private hasPendingReadChanges(read: ReplicaRead): boolean {
     if (
       this.pendingBaselines.has(read.serverId) &&
-      read.kinds.some((kind) => kind !== "timeline")
+      read.kinds.some((kind) => !isReplicaTailKind(kind))
     ) {
       return true;
     }
@@ -1485,10 +1520,12 @@ export class ReplicaCache {
     }
     for (const serverId of pending.baselines) {
       const replacementKeys = new Set(
-        upserts.filter((row) => row.serverId === serverId && row.kind !== "timeline").map(rowKey),
+        upserts
+          .filter((row) => row.serverId === serverId && !isReplicaTailKind(row.kind))
+          .map(rowKey),
       );
       for (const row of this.storedRows.get(serverId)?.values() ?? []) {
-        if (row.kind !== "timeline" && !replacementKeys.has(rowKey(row))) {
+        if (!isReplicaTailKind(row.kind) && !replacementKeys.has(rowKey(row))) {
           deletes.set(pendingRowKey(row), row);
         }
       }
@@ -1514,11 +1551,15 @@ export class ReplicaCache {
           : serializeTimeline(upsert.value);
         if (!value) return null;
         break;
+      case "transcript":
+        value = serializeChatTail(upsert.value);
+        break;
       case "checkpoint":
         value = serializeDirectoryCheckpoint(upsert.value);
         break;
     }
-    const openedAt = upsert.kind === "timeline" ? upsert.openedAt : undefined;
+    const openedAt =
+      upsert.kind === "timeline" || upsert.kind === "transcript" ? upsert.openedAt : undefined;
     return {
       serverId: upsert.serverId,
       kind: upsert.kind,

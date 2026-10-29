@@ -3544,6 +3544,11 @@ export class HostRuntimeStore {
     await directory.prepareWorkspaceRoute(workspaceId);
   }
 
+  /** The device's offline cache: chat tails and Settings → Storage read and clear it here. */
+  getReplicaCache(): ReplicaCache {
+    return this.replicaCache;
+  }
+
   async prepareAgentTimeline(serverId: string, agentId: string): Promise<void> {
     const replica = this.timelineReplicaByServer.get(serverId);
     if (!replica) throw new Error(`Unknown host runtime for serverId ${serverId}`);
