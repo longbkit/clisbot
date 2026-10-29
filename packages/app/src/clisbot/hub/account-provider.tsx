@@ -29,6 +29,7 @@ import { createHubTransport } from "./transport/create";
 import type { HubTransport } from "./transport/contract";
 import { updateHubProfile } from "@/device-access/hub-profiles";
 import { getHubDaemonListCache } from "./hub-daemon-list-cache";
+import { clearHubOfflineData } from "@/clisbot/offline-storage/hub";
 import { useReaderMemory } from "./reader-memory";
 import { hubResourceQueryKey } from "./query-keys";
 import { HubAccountRequestError, needsOwnerSetupRecovery } from "@/device-access/hub-account-error";
@@ -479,11 +480,14 @@ function EnabledHubAccountController({
             await refresh();
             throw error;
           }
+          // Read from the remembered list, so it starts before that list is forgotten.
+          const clearing = clearHubOfflineData(configuration.origin);
           // Signing out hides this Hub's Hosts even while the Hub cannot confirm it.
           getHubDaemonListCache().forget(configuration.origin);
           // Only an explicit sign-out forgets who the reader was on this Hub. It holds against
           // an account answer that is still stale, until a sign-in completes.
           useReaderMemory.getState().forget(configuration.origin, signedInId);
+          await clearing;
         },
         { signsOut: true },
       ),

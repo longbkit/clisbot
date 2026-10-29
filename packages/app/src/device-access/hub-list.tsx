@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useHubAccounts } from "@/clisbot/hub/account-provider";
+import { clearHubOfflineData } from "@/clisbot/offline-storage/hub";
 import { useToast } from "@/contexts/toast-api-context";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { settingsStyles } from "@/styles/settings";
@@ -183,7 +184,11 @@ function SavedHubRow({
       }))
     )
       return;
-    await removeHubProfile(profile.hubId).catch((error: unknown) =>
+    // The Hub's Hosts are found from its remembered list, so they are cleared as it is removed.
+    await Promise.all([
+      clearHubOfflineData(hubProfileOrigin(profile)),
+      removeHubProfile(profile.hubId),
+    ]).catch((error: unknown) =>
       toast.error(error instanceof Error ? error.message : String(error)),
     );
   }, [profile, t, toast]);

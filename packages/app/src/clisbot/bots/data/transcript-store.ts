@@ -35,6 +35,21 @@ interface TranscriptStoreState {
   /** Paints the offline tail while nothing has arrived from the Host for this key. */
   hydrateCached: (key: string, page: ChatTranscript) => void;
   clear: (key: string) => void;
+  /** Forgets every chat of one source (sign-out, Hub profile removal). */
+  clearSource: (serverId: string) => void;
+  /** Forgets every chat (Settings → Storage → Clear offline cache). */
+  clearAll: () => void;
+}
+
+function keepOtherSources<Value>(
+  entries: Record<string, Value>,
+  serverId: string,
+): Record<string, Value> {
+  // Admission-scoped keys are `serverId@scope:chatId`; plain `transcriptKey` ones `serverId:chatId`.
+  const prefixes = [`${serverId}@`, `${serverId}:`];
+  return Object.fromEntries(
+    Object.entries(entries).filter(([key]) => !prefixes.some((prefix) => key.startsWith(prefix))),
+  );
 }
 
 export function transcriptKey(serverId: string, chatId: string): string {
@@ -146,6 +161,12 @@ export const useTranscriptStore = create<TranscriptStoreState>()((set, get) => (
       const { [key]: _read, ...reads } = state.reads;
       return { transcripts, reads };
     }),
+  clearSource: (serverId) =>
+    set((state) => ({
+      transcripts: keepOtherSources(state.transcripts, serverId),
+      reads: keepOtherSources(state.reads, serverId),
+    })),
+  clearAll: () => set({ transcripts: {}, reads: {} }),
 }));
 
 export function selectTranscript(state: TranscriptStoreState, key: string): ChatTranscript {

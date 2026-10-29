@@ -16,12 +16,16 @@ const testState = vi.hoisted(() => ({
   request: vi.fn(),
   signIn: vi.fn(),
   signOut: vi.fn(),
+  clearOffline: vi.fn(async (_origin: string) => undefined),
   sessionChanged: undefined as (() => void) | undefined,
   setParams: vi.fn(),
   configured: true,
   google: undefined as (() => Promise<void>) | undefined,
 }));
 vi.mock("expo-linking", () => ({ useURL: () => testState.url }));
+vi.mock("@/clisbot/offline-storage/hub", () => ({
+  clearHubOfflineData: (origin: string) => testState.clearOffline(origin),
+}));
 vi.mock("expo-router", () => ({
   useRouter: () => ({ setParams: testState.setParams }),
 }));
@@ -334,6 +338,12 @@ describe("the reader across an explicit sign-out", () => {
     await act(() => view.result.current.hub.signOut());
     return view;
   }
+
+  it("clears what this Hub's Hosts left on the device when signing out", async () => {
+    testState.clearOffline.mockClear();
+    await signedOutWhileRefreshFails();
+    expect(testState.clearOffline).toHaveBeenCalledWith(ORIGIN);
+  });
 
   it("keeps the sign-out when the refresh after it fails and the query still holds the account", async () => {
     const view = await signedOutWhileRefreshFails();

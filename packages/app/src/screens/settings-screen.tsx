@@ -58,6 +58,8 @@ import { TerminalSection } from "@/screens/settings/terminal/terminal-section";
 import { ChatSection } from "@/screens/settings/chat/chat-section";
 import { SidebarNavSection } from "@/screens/settings/sidebar/sidebar-nav-section";
 import { SendingSection } from "@/screens/settings/general/sending-section";
+import { StorageSection } from "@/clisbot/offline-storage/storage-section";
+import { OFFLINE_CACHE_ENABLED } from "@/runtime/replica-cache/offline-flag";
 import { HubPicker } from "@/device-access/hub-picker";
 import { SettingsPageTitleContext } from "@/components/settings/headings/settings-section";
 import { useHubSwitchLocked } from "@/device-access/hub-edit-lock";
@@ -1489,6 +1491,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
                 <SendingSection />
                 <ProductAnalyticsSettings />
                 {isDesktopApp ? <OpenLocationSection /> : null}
+                {OFFLINE_CACHE_ENABLED ? <StorageSection /> : null}
               </>
             );
           case "diagnostics":

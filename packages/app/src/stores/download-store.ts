@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { File as FSFile, Paths } from "expo-file-system";
+import { downloadTargetFile } from "@/stores/downloaded-files";
 import * as LegacyFileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import type { HostProfile } from "@/types/host-connection";
@@ -157,7 +157,7 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
       }
 
       const downloadStartTime = Date.now();
-      const targetFile = resolveDownloadTargetFile(resolvedFileName);
+      const targetFile = downloadTargetFile(resolvedFileName);
       const downloadResumable = LegacyFileSystem.createDownloadResumable(
         downloadUrl,
         targetFile.uri,
@@ -370,7 +370,7 @@ async function saveDownloadedBytes({
     return null;
   }
   // Resolve and write in one tick so two downloads of the same name cannot pick the same path.
-  const targetFile = resolveDownloadTargetFile(fileName);
+  const targetFile = downloadTargetFile(fileName);
   targetFile.write(bytes);
   return targetFile.uri;
 }
@@ -405,44 +405,6 @@ function triggerBrowserDownload(url: string, fileName: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
-}
-
-function resolveDownloadTargetFile(fileName: string): FSFile {
-  const directory = Paths.cache ?? Paths.document;
-  if (!directory) {
-    throw new Error("No download directory available.");
-  }
-
-  const safeName = sanitizeDownloadFileName(fileName);
-  const split = splitFileName(safeName);
-  let targetFile = new FSFile(directory, safeName);
-  let suffix = 1;
-
-  while (targetFile.exists) {
-    targetFile = new FSFile(directory, `${split.base} (${suffix})${split.ext}`);
-    suffix += 1;
-  }
-
-  return targetFile;
-}
-
-function sanitizeDownloadFileName(fileName: string): string {
-  const trimmed = fileName.trim();
-  if (!trimmed) {
-    return "download";
-  }
-  return trimmed.replace(/[\\/:*?"<>|]+/g, "_");
-}
-
-function splitFileName(fileName: string): { base: string; ext: string } {
-  const lastDot = fileName.lastIndexOf(".");
-  if (lastDot <= 0) {
-    return { base: fileName, ext: "" };
-  }
-  return {
-    base: fileName.slice(0, lastDot),
-    ext: fileName.slice(lastDot),
-  };
 }
 
 export function formatSpeed(bytesPerSecond: number): string {

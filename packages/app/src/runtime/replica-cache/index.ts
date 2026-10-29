@@ -1381,6 +1381,53 @@ export class ReplicaCache {
     await this.syncPending();
   }
 
+  /** UTF-8 bytes of every saved row, after pending writes land. */
+  async usedBytes(): Promise<number> {
+    await this.syncPending();
+    await this.prepareStore();
+    await this.ensureStoredIndex();
+    return this.totalBytes;
+  }
+
+  /** Forgets every saved row on this device (Settings → Storage). Rejects if the store fails. */
+  clearAll(): Promise<void> {
+    return this.clearRows([...this.storedRows.keys(), ...this.activeServerIds], () =>
+      this.rowStore.clear(),
+    );
+  }
+
+  /** Forgets one source's rows, on sign-out or when its Hub profile is removed. */
+  clearSource(serverId: string): Promise<void> {
+    return this.clearRows([serverId], () => this.rowStore.deleteHost(serverId));
+  }
+
+  private clearRows(serverIds: string[], drop: () => Promise<void>): Promise<void> {
+    for (const serverId of serverIds) {
+      this.invalidateHostReads(serverId);
+      this.dropPendingHostChanges(serverId);
+      // A connected Host keeps committing directory deltas; until its next full baseline those
+      // would checkpoint a partial directory, so it is invalidated exactly like an eviction.
+      if (this.activeServerIds.has(serverId)) this.invalidatedHosts.add(serverId);
+    }
+    const prefixes = serverIds.map((serverId) => `${serverId}\u0000`);
+    for (const key of this.tailOpens.keys())
+      if (prefixes.some((prefix) => key.startsWith(prefix))) this.tailOpens.delete(key);
+    const operation = this.writeQueue
+      .catch(() => undefined)
+      .then(async () => {
+        await this.prepareStore();
+        await this.ensureStoredIndex();
+        await drop();
+        for (const serverId of serverIds) this.removeStoredHost(serverId);
+        return undefined;
+      });
+    this.writeQueue = operation.then(
+      () => undefined,
+      () => undefined,
+    );
+    return operation;
+  }
+
   /** Resolves to whether every pending change reached the store. */
   private async syncPending(): Promise<boolean> {
     const persisted = await this.persist();

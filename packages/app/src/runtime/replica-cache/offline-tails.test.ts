@@ -204,6 +204,37 @@ describe("offline timeline tails", () => {
     expect([...storage.rows.keys()]).toEqual([`${SERVER_ID}:agent:big`]);
   });
 
+  it("reports the bytes it holds and clears one source without touching another", async () => {
+    const storage = new MemoryStorage();
+    const cache = createCache(storage);
+    cache.setHosts([SERVER_ID, "host-2"]);
+    cache.commitTimeline(SERVER_ID, "agent-1", tail([message(1)]));
+    cache.commitTimeline("host-2", "agent-1", tail([message(1)]));
+    await cache.flush();
+    const both = await cache.usedBytes();
+
+    await cache.clearSource(SERVER_ID);
+
+    expect([...storage.rows.keys()]).toEqual(["host-2:timeline:agent-1"]);
+    expect(await cache.usedBytes()).toBe(both / 2);
+    expect(await cache.readTimeline(SERVER_ID, "agent-1")).toBeUndefined();
+  });
+
+  it("clears everything and rebuilds a cleared directory only from a full baseline", async () => {
+    const storage = new MemoryStorage();
+    const cache = createCache(storage);
+    cache.commitTimeline(SERVER_ID, "agent-1", tail([message(1)]));
+    await cache.flush();
+
+    await cache.clearAll();
+    expect(storage.rows.size).toBe(0);
+    expect(await cache.usedBytes()).toBe(0);
+
+    cache.commitDirectoryMutations(SERVER_ID, [], { agents: { generation: "g", afterSeq: 4 } });
+    await cache.flush();
+    expect(storage.rows.size).toBe(0);
+  });
+
   it("keeps the 50-item tail when the offline cache flag is off", async () => {
     const items = Array.from({ length: 120 }, (_, index) => message(index + 1));
 
