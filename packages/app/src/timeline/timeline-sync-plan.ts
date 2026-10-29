@@ -1,3 +1,4 @@
+import { OFFLINE_CACHE_ENABLED } from "@/runtime/replica-cache/offline-flag";
 import { TIMELINE_FETCH_PAGE_SIZE } from "@/timeline/timeline-fetch-policy";
 
 export interface TimelineSyncCursor {
@@ -57,6 +58,18 @@ export function planTimelineResumeFetch(
   return range
     ? planTimelineCatchUpAfter({ epoch: range.epoch, seq: range.endSeq })
     : planTimelineTailFetch();
+}
+
+/**
+ * The fetch that opens a session. Entries above the daemon's inline limit arrive as descriptors
+ * that load through `agent.timeline.payload.get` when shown, so the open stays small; the client
+ * drops the option for a Host without readable session storage.
+ */
+export function openTimelineFetch<Plan extends ProjectedTimelineForwardFetchPlan>(
+  plan: Plan,
+  deferPayloads = OFFLINE_CACHE_ENABLED,
+): Plan & { allowDeferredPayloads?: true } {
+  return deferPayloads ? { ...plan, allowDeferredPayloads: true } : plan;
 }
 
 export function planTimelineOlderFetch(cursor: TimelineSyncCursor) {

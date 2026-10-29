@@ -13,7 +13,7 @@ import {
 } from "@/hooks/use-agent-initialization";
 import type { StreamItem } from "@/types/stream";
 import { deriveAgentStreamTurnLiveness } from "@/timeline/session-stream-reducers";
-import { planTimelineTailFetch } from "@/timeline/timeline-sync-plan";
+import { openTimelineFetch, planTimelineTailFetch } from "@/timeline/timeline-sync-plan";
 import { requestTimelineReplacement } from "@/timeline/timeline-replacement";
 import { type ViewedTimelineOwner } from "@/timeline/viewed-timeline-sync";
 import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
@@ -437,7 +437,11 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
           setAgentInitializing(agentId, true);
         }
         try {
-          const page = await getHostRuntimeStore().fetchAgentTimeline(serverId, agentId, request);
+          const page = await getHostRuntimeStore().fetchAgentTimeline(
+            serverId,
+            agentId,
+            openTimelineFetch(request),
+          );
           if (shouldInitialize && getInitDeferred(initKey)) {
             refreshAgentInitializationTimeout({ key: initKey, agentId, setAgentInitializing });
           }
@@ -461,7 +465,11 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
         });
       },
       fetchLatestTail: (agentId) =>
-        getHostRuntimeStore().fetchAgentTimeline(serverId, agentId, planTimelineTailFetch()),
+        getHostRuntimeStore().fetchAgentTimeline(
+          serverId,
+          agentId,
+          openTimelineFetch(planTimelineTailFetch()),
+        ),
       reportError: (error) => {
         console.warn("[Session] viewed timeline synchronization failed", { serverId, error });
       },

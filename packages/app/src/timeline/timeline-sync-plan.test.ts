@@ -3,6 +3,8 @@ import { TIMELINE_FETCH_PAGE_SIZE } from "@/timeline/timeline-fetch-policy";
 import {
   isTimelineCatchUpComplete,
   isTimelineResumeSnapshotAuthoritative,
+  openTimelineFetch,
+  planTimelineCatchUpAfter,
   planTimelineOlderFetch,
   planTimelinePromptJump,
   planTimelineResumeFetch,
@@ -18,6 +20,23 @@ describe("timeline sync planning", () => {
       limit: TIMELINE_FETCH_PAGE_SIZE,
       projection: "projected",
     });
+  });
+
+  test("opening a session lets large tool payloads load on demand", () => {
+    expect(openTimelineFetch(planTimelineTailFetch())).toEqual({
+      direction: "tail",
+      limit: TIMELINE_FETCH_PAGE_SIZE,
+      projection: "projected",
+      allowDeferredPayloads: true,
+    });
+    expect(openTimelineFetch(planTimelineCatchUpAfter({ epoch: "epoch-1", seq: 4 }))).toEqual({
+      direction: "after",
+      cursor: { epoch: "epoch-1", seq: 4 },
+      limit: TIMELINE_FETCH_PAGE_SIZE,
+      projection: "projected",
+      allowDeferredPayloads: true,
+    });
+    expect(openTimelineFetch(planTimelineTailFetch(), false)).toEqual(planTimelineTailFetch());
   });
 
   test("a restored canonical range catches up after its exact end", () => {
