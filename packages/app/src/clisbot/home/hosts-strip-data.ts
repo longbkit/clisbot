@@ -5,8 +5,8 @@ import { useHubAccounts, type HubAccountContextValue } from "@/clisbot/hub/accou
 import { buildHubSettingsRoute } from "@/clisbot/hub/navigation";
 import { selectHubProfile, useHubProfiles } from "@/device-access/hub-profiles";
 import { isHubUnreachable } from "@/device-access/unavailable-hub";
-import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
+import { useSessionStore } from "@/stores/session-store";
 import {
   getHostRuntimeConnectionStatusSince,
   getHostRuntimeStore,
@@ -17,7 +17,9 @@ import {
   SMALL_HUB_HOSTS,
   connectionIssues,
   effectiveHostStatus,
+  hostsWithSessionsKey,
   onlineSummary,
+  parseHostsWithSessionsKey,
   pickStripHosts,
   type StripHost,
   type StripHub,
@@ -70,8 +72,9 @@ export function useHostsStrip() {
   const localServerId = useLocalDaemonServerId();
   const serverIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
   const statuses = useEffectiveStatuses(serverIds);
-  // Home already loads the directory; the strip only reads it.
-  const { agents } = useAggregatedAgents({ demand: false });
+  // Home already loads the directory; the strip only asks which Hosts have sessions, so an agent
+  // update re-renders it only when that set changes.
+  const withSessionsKey = useSessionStore((state) => hostsWithSessionsKey(state.sessions));
   const accounts = useHubAccounts();
   const { profiles } = useHubProfiles();
   return useMemo(() => {
@@ -80,11 +83,7 @@ export function useHostsStrip() {
         .filter((account) => account.connection?.accountAuthentication === "personal")
         .map((account) => account.origin),
     );
-    const latest = new Map<string, number>();
-    for (const agent of agents) {
-      const at = agent.lastActivityAt.getTime();
-      if (at > (latest.get(agent.serverId) ?? 0)) latest.set(agent.serverId, at);
-    }
+    const withSessions = parseHostsWithSessionsKey(withSessionsKey);
     const hubSize = new Map<string, number>();
     for (const host of hosts) {
       const origin = host.management?.hubOrigin;
@@ -99,7 +98,7 @@ export function useHostsStrip() {
         label: host.label,
         local,
         status: statuses.get(host.serverId) ?? "connecting",
-        lastActivity: latest.get(host.serverId) ?? null,
+        hasSessions: withSessions.has(host.serverId),
         hubOrigin,
         named: local || !hubOrigin || (hubSize.get(hubOrigin) ?? 0) <= SMALL_HUB_HOSTS,
       };
@@ -126,7 +125,7 @@ export function useHostsStrip() {
       issues: connectionIssues(stripHosts, hubs),
       summary: onlineSummary(stripHosts),
     };
-  }, [hosts, localServerId, statuses, agents, accounts, profiles]);
+  }, [hosts, localServerId, statuses, withSessionsKey, accounts, profiles]);
 }
 
 /** Opens a Hub's settings, selecting that Hub first so the page shows the right one. */

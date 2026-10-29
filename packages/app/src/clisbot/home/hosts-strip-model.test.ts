@@ -3,8 +3,10 @@ import {
   CONNECT_STALL_MS,
   connectionIssues,
   effectiveHostStatus,
+  hostsWithSessionsKey,
   hubSubtitle,
   onlineSummary,
+  parseHostsWithSessionsKey,
   pickStripHosts,
   type StripHost,
   type StripHub,
@@ -16,7 +18,7 @@ function host(serverId: string, extra: Partial<StripHost> = {}): StripHost {
     label: serverId,
     local: false,
     status: "online",
-    lastActivity: null,
+    hasSessions: false,
     hubOrigin: null,
     named: !extra.hubOrigin,
     ...extra,
@@ -35,8 +37,8 @@ test("a small Hub's Hosts are listed by name and count as yours", () => {
 test("this computer leads, then named Hosts in stable name order; shared Hub Hosts stay in their entry", () => {
   const hosts = [
     host("company-a", { hubOrigin: "hub://co" }),
-    host("company-used", { hubOrigin: "hub://co", lastActivity: 50 }),
-    host("dev-server", { lastActivity: 100 }),
+    host("company-used", { hubOrigin: "hub://co", hasSessions: true }),
+    host("dev-server", { hasSessions: true }),
     host("studio", { status: "offline" }),
     host("this-mac", { local: true }),
   ];
@@ -57,7 +59,7 @@ test("activity, connection flapping and directory arrival order never replace or
   expect(before).toEqual(["a", "b", "c"]);
   const changed = hosts.toReversed().map((entry, index) =>
     host(entry.serverId, {
-      lastActivity: index * 1000,
+      hasSessions: index % 2 === 0,
       status: "offline" as const,
     }),
   );
@@ -73,7 +75,7 @@ test("issues are only what the user can act on", () => {
   const hosts = [
     host("studio", { status: "offline" }),
     host("unused-company", { status: "offline", hubOrigin: "hub://co" }),
-    host("used-company", { status: "error", hubOrigin: "hub://co", lastActivity: 1 }),
+    host("used-company", { status: "error", hubOrigin: "hub://co", hasSessions: true }),
     host("connecting", { status: "connecting" }),
   ];
   const hubs: StripHub[] = [
@@ -108,6 +110,39 @@ test("issues are only what the user can act on", () => {
   expect(connectionIssues([], [{ ...fresh, state: "setup" }])).toEqual([
     { kind: "setup", origin: "hub://new", name: "New" },
   ]);
+});
+
+test("Hosts with a live session, keyed so a session update elsewhere keeps the same key", () => {
+  const live: { archivedAt: Date | null } = { archivedAt: null };
+  const archived: { archivedAt: Date | null } = {
+    archivedAt: new Date("2026-10-01T00:00:00.000Z"),
+  };
+  const sessions = {
+    used: {
+      agents: new Map([
+        ["a", archived],
+        ["b", live],
+      ]),
+    },
+    archivedOnly: { agents: new Map([["a", archived]]) },
+    empty: { agents: new Map() },
+    another: { agents: new Map([["a", live]]) },
+    missing: undefined,
+  };
+  const key = hostsWithSessionsKey(sessions);
+  expect(key).toBe("another\nused");
+  expect(parseHostsWithSessionsKey(key)).toEqual(new Set(["another", "used"]));
+  const updated = {
+    ...sessions,
+    used: {
+      agents: new Map([
+        ["b", live],
+        ["c", live],
+      ]),
+    },
+  };
+  expect(hostsWithSessionsKey(updated)).toBe(key);
+  expect(parseHostsWithSessionsKey("")).toEqual(new Set());
 });
 
 test("a Host stuck connecting, or retrying after an error, counts as unreachable", () => {
