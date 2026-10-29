@@ -22,6 +22,7 @@ import {
   View,
   Text,
   Pressable,
+  Platform,
   ScrollView,
   type GestureResponderEvent,
   type PressableStateCallbackType,
@@ -126,6 +127,7 @@ import { SidebarSectionHeader } from "@/components/sidebar/sidebar-section-heade
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
 import { PinMark, usePinnedRow } from "@/components/ui/pin-mark";
 import { SidebarStatusFlatList } from "@/components/sidebar/sidebar-status-flat-list";
+import { useBatchedProjectContent } from "@/components/sidebar/use-batched-project-content";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { createSidebarWorkspaceVisibilityPolicy } from "@/components/sidebar/sidebar-group-visibility";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
@@ -1726,6 +1728,9 @@ function ProjectBlock({
   supportsMultiplicityByServerId,
   supportsPinningByServerId,
   onToggleWorkspacePin,
+  childrenReady = true,
+  onBatchDragBegin,
+  onBatchDragSettled,
 }: {
   project: SidebarProjectEntry;
   workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
@@ -1753,6 +1758,9 @@ function ProjectBlock({
   supportsMultiplicityByServerId: ReadonlyMap<string, boolean>;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
+  childrenReady?: boolean;
+  onBatchDragBegin?: () => void;
+  onBatchDragSettled?: () => void;
 }) {
   const fusion = useBotsFeatureHosts().length > 0;
   const visibilityPolicy = useMemo(
@@ -1765,6 +1773,10 @@ function ProjectBlock({
     canToggle: canToggleWorkspaces,
     toggleExpanded: toggleWorkspacesExpanded,
   } = useLimitedSidebarGroup(project.workspaces, visibilityPolicy);
+  const pendingChildrenStyle = useMemo(
+    () => ({ height: (visibleWorkspaces.length + Number(canToggleWorkspaces)) * 64 }),
+    [visibleWorkspaces.length, canToggleWorkspaces],
+  );
   const activeServerId = activeWorkspaceSelection?.serverId ?? null;
   const activeHostStatus = useHostRuntimeConnectionStatus(activeServerId ?? "");
   const preferredServerId = activeHostStatus === "online" ? activeServerId : null;
@@ -1923,7 +1935,18 @@ function ProjectBlock({
 
   let projectChildren = null;
   if (!collapsed) {
-    if (project.workspaces.length > 0) {
+    if (project.workspaces.length > 0 && !childrenReady) {
+      // Retain approximate scroll geometry until this project's rows mount. All project headers
+      // and draggable data remain present; the first projects mount immediately.
+      projectChildren = (
+        <View
+          accessible
+          accessibilityLabel={t("common.loading")}
+          testID="sidebar-project-children-pending"
+          style={pendingChildrenStyle}
+        />
+      );
+    } else if (project.workspaces.length > 0) {
       projectChildren = (
         <>
           {manualSort ? (
@@ -1933,6 +1956,8 @@ function ProjectBlock({
               keyExtractor={workspaceKeyExtractor}
               renderItem={renderWorkspace}
               onDragEnd={handleWorkspaceDragEnd}
+              onDragBegin={onBatchDragBegin}
+              onDragSettled={onBatchDragSettled}
               extraData={activeWorkspaceSelectionKey(activeWorkspaceSelection)}
               scrollEnabled={false}
               useDragHandle
@@ -2025,6 +2050,9 @@ function areProjectBlockPropsEqual(previous: ProjectBlockProps, next: ProjectBlo
     previous.supportsMultiplicityByServerId === next.supportsMultiplicityByServerId &&
     previous.supportsPinningByServerId === next.supportsPinningByServerId &&
     previous.onToggleWorkspacePin === next.onToggleWorkspacePin &&
+    previous.childrenReady === next.childrenReady &&
+    previous.onBatchDragBegin === next.onBatchDragBegin &&
+    previous.onBatchDragSettled === next.onBatchDragSettled &&
     previous.onToggleCollapsed === next.onToggleCollapsed &&
     previous.onPinnedPress === next.onPinnedPress &&
     previous.onWorkspacePress === next.onWorkspacePress &&
@@ -2445,6 +2473,10 @@ function SidebarGroupedModeList({
   );
 }
 
+function shouldBatchProjectContent(compact: boolean, pinPresentation?: "section" | "float") {
+  return Platform.OS === "android" && compact && pinPresentation === "float";
+}
+
 function ProjectModeList({
   projects,
   pinnedGroups,
@@ -2514,6 +2546,33 @@ function ProjectModeList({
   const selectionEnabled = isWorkspaceRoute;
   const activeWorkspaceSelection = useSidebarWorkspaceSelection();
   const { pinnedChats, unpinnedProjects } = pinnedGroups;
+  const compact = useIsCompactFormFactor();
+  const batchProjectChildren = shouldBatchProjectContent(compact, pinPresentation);
+  const projectKeys = useMemo(
+    () => unpinnedProjects.map((project) => project.viewKey),
+    [unpinnedProjects],
+  );
+  const [activeBatchDrags, setActiveBatchDrags] = useState(0);
+  const activeBatchDragCount = useRef(0);
+  const batchDragActive = useRef(false);
+  const readyProjectChildren = useBatchedProjectContent(
+    projectKeys,
+    batchProjectChildren,
+    activeBatchDrags > 0,
+    batchDragActive,
+  );
+  const onBatchDragBegin = useCallback(() => {
+    activeBatchDragCount.current += 1;
+    batchDragActive.current = true;
+    setActiveBatchDrags(activeBatchDragCount.current);
+  }, []);
+  const onBatchDragSettled = useCallback(() => {
+    activeBatchDragCount.current = Math.max(0, activeBatchDragCount.current - 1);
+    batchDragActive.current = activeBatchDragCount.current > 0;
+    setActiveBatchDrags(activeBatchDragCount.current);
+  }, []);
+  // Track every drag, including one that started before a Host introduces new projects.
+  const needsBatchDragTracking = batchProjectChildren;
   const hasBotsFeature = useBotsFeatureHosts().length > 0;
   const [storedProjectsCollapsed] = useSectionCollapsed("projects");
   const projectsCollapsed = pinPresentation !== "float" && storedProjectsCollapsed;
@@ -2693,6 +2752,9 @@ function ProjectModeList({
           supportsMultiplicityByServerId={supportsMultiplicityByServerId}
           supportsPinningByServerId={supportsPinningByServerId}
           onToggleWorkspacePin={onToggleWorkspacePin}
+          childrenReady={readyProjectChildren.has(item.viewKey)}
+          onBatchDragBegin={needsBatchDragTracking ? onBatchDragBegin : undefined}
+          onBatchDragSettled={needsBatchDragTracking ? onBatchDragSettled : undefined}
         />
       );
     },
@@ -2708,6 +2770,10 @@ function ProjectModeList({
       supportsMultiplicityByServerId,
       supportsPinningByServerId,
       onToggleWorkspacePin,
+      readyProjectChildren,
+      needsBatchDragTracking,
+      onBatchDragBegin,
+      onBatchDragSettled,
       onWorkspacePress,
       onToggleProjectCollapsed,
       projectIconByProjectViewKey,
@@ -2778,6 +2844,8 @@ function ProjectModeList({
       keyExtractor={projectViewKeyExtractor}
       renderItem={renderProject}
       onDragEnd={handleProjectDragEnd}
+      onDragBegin={needsBatchDragTracking ? onBatchDragBegin : undefined}
+      onDragSettled={needsBatchDragTracking ? onBatchDragSettled : undefined}
       extraData={activeWorkspaceSelectionKey(activeWorkspaceSelection)}
       scrollEnabled={false}
       useDragHandle
@@ -2813,6 +2881,8 @@ function ProjectModeList({
                 keyExtractor={workspaceKeyExtractor}
                 renderItem={renderPinnedChat}
                 onDragEnd={onPinnedWorkspaceReorder}
+                onDragBegin={needsBatchDragTracking ? onBatchDragBegin : undefined}
+                onDragSettled={needsBatchDragTracking ? onBatchDragSettled : undefined}
                 extraData={activeWorkspaceSelectionKey(activeWorkspaceSelection)}
                 scrollEnabled={false}
                 useDragHandle
