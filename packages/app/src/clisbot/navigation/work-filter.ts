@@ -1,12 +1,13 @@
-import { useMemo, useSyncExternalStore } from "react";
+import equal from "fast-deep-equal";
+import { useMemo, useRef, useSyncExternalStore } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
   deriveSessionStatus,
   type WorkspaceSessionSource,
 } from "@/clisbot/workspace-sessions/select-sessions";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
-import { useSessionStore } from "@/stores/session-store";
-import { isWorkspaceRootAgent } from "@/subagents/workspace-root-policy";
+import { useSessionStore, type Agent } from "@/stores/session-store";
+import { workspaceRootAgentsOf } from "@/stores/workspace-root-agents";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useResourcePins } from "@/clisbot/bots/sidebar/pins";
 import { NAVIGATION_V2_ENABLED } from "./feature";
@@ -34,32 +35,67 @@ type Source = WorkspaceSessionSource;
 
 const NONE: readonly WorkSession[] = [];
 
-/** `serverId:workspaceId` → its unarchived root sessions, with the status each dot shows. */
+/**
+ * `serverId:workspaceId` → its unarchived root sessions, with the status each dot shows. Reads the
+ * store's per-workspace root-agent lists, and keeps `previous`'s list for a workspace whose
+ * sessions say the same, and `previous` itself when every list does.
+ */
 export function indexWorkSessions(
   sources: ReadonlyMap<string, Source>,
+  previous?: ReadonlyMap<string, WorkSession[]>,
 ): ReadonlyMap<string, WorkSession[]> {
   const index = new Map<string, WorkSession[]>();
+  let changed = false;
   for (const [serverId, source] of sources) {
-    for (const agent of source.agents.values()) {
-      const workspaceId = normalizeWorkspaceOpaqueId(agent.workspaceId);
-      if (agent.archivedAt || !workspaceId) continue;
-      const parent = agent.parentAgentId ? source.agents.get(agent.parentAgentId) : undefined;
-      if (!isWorkspaceRootAgent(agent, parent)) continue;
+    for (const [workspaceId, agents] of workspaceRootAgentsOf(source.agents)) {
       const key = `${serverId}:${workspaceId}`;
-      const list = index.get(key) ?? [];
-      const status = deriveSessionStatus(agent, source);
-      list.push({
-        id: agent.id,
-        labels: agent.labels,
-        createdBy: agent.createdBy,
-        participationKey: participationKeyOf(agent),
-        statusBucket: status.bucket,
-        ...(status.unverified ? { unverified: true } : {}),
-      });
-      index.set(key, list);
+      const before = previous?.get(key);
+      const sessions = workSessionsOf(agents, source, before);
+      if (sessions !== before) changed = true;
+      index.set(key, sessions);
     }
   }
-  return index;
+  if (!previous || changed || previous.size !== index.size) return index;
+  return previous;
+}
+
+interface WorkSessionsMemo {
+  source: Source;
+  sessions: WorkSession[];
+}
+
+// One entry per root-agent list: its sessions only change with the list or the Host's submissions.
+const workSessionsMemo = new WeakMap<readonly Agent[], WorkSessionsMemo>();
+
+function workSessionsOf(
+  agents: readonly Agent[],
+  source: Source,
+  previous: WorkSession[] | undefined,
+): WorkSession[] {
+  const memo = workSessionsMemo.get(agents);
+  if (
+    memo &&
+    memo.source.messageSubmissions === source.messageSubmissions &&
+    memo.source.cached === source.cached
+  ) {
+    return memo.sessions;
+  }
+  const built = agents.map((agent) => workSessionOf(agent, source));
+  const sessions = previous && equal(previous, built) ? previous : built;
+  workSessionsMemo.set(agents, { source, sessions });
+  return sessions;
+}
+
+function workSessionOf(agent: Agent, source: Source): WorkSession {
+  const status = deriveSessionStatus(agent, source);
+  return {
+    id: agent.id,
+    labels: agent.labels,
+    createdBy: agent.createdBy,
+    participationKey: participationKeyOf(agent),
+    statusBucket: status.bucket,
+    ...(status.unverified ? { unverified: true } : {}),
+  };
 }
 
 /** Hosts whose session directory has arrived at least once; their workspaces can be judged. */
@@ -85,6 +121,8 @@ export function useWorkSessionsOf(): WorkSessionsOf {
     useShallow((state) => serverIds.map((id) => state.sessions[id]?.messageSubmissions ?? null)),
   );
   const loaded = useLoadedSessionHosts(serverIds);
+  // The last index, so an agent update that changes no session hands the Work tree the same one.
+  const previous = useRef<ReadonlyMap<string, WorkSession[]> | undefined>(undefined);
   const index = useMemo(() => {
     const sources = new Map<string, Source>();
     serverIds.forEach((serverId, i) => {
@@ -93,7 +131,8 @@ export function useWorkSessionsOf(): WorkSessionsOf {
       if (agents && messageSubmissions)
         sources.set(serverId, { agents, messageSubmissions, cached: cached.has(serverId) });
     });
-    return indexWorkSessions(sources);
+    previous.current = indexWorkSessions(sources, previous.current);
+    return previous.current;
   }, [agentMaps, cached, serverIds, submissionMaps]);
   return useMemo<WorkSessionsOf>(
     () => (workspace) => {

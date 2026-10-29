@@ -1,7 +1,7 @@
 import { getActiveMessageSubmissions } from "@/composer/submission/model";
 import { resolveWorkspaceAgentTabLabel } from "@/panels/agent-tab-label";
 import type { Agent, SessionState } from "@/stores/session-store";
-import { isWorkspaceRootAgent } from "@/subagents/policies";
+import { isWorkspaceSessionAgent, workspaceRootAgentsOf } from "@/stores/workspace-root-agents";
 import { resolveTurnPresentation } from "@/timeline/turn-liveness";
 import { deriveSidebarStateBucket, type SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
@@ -22,30 +22,29 @@ export interface WorkspaceSessionItem {
   unverified?: boolean;
 }
 
+const NO_AGENTS: readonly Agent[] = [];
+
 /**
  * The sessions a workspace's tab bar would auto-open: unarchived root agents of the workspace.
- * Creation order, so a line never jumps while you reach for it.
+ * Creation order, so a line never jumps while you reach for it. The list is the store's index
+ * entry: the same array until one of the workspace's agents changes.
  */
 export function listWorkspaceRootAgents(
   agents: ReadonlyMap<string, Agent> | undefined,
   workspaceId: string,
-): Agent[] {
-  if (!agents) return [];
-  return [...agents.values()]
-    .filter((agent) => isWorkspaceSessionAgent(agent, agents, workspaceId))
-    .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+): readonly Agent[] {
+  const key = normalizeWorkspaceOpaqueId(workspaceId);
+  if (!agents || !key) return NO_AGENTS;
+  return workspaceRootAgentsOf(agents).get(key) ?? NO_AGENTS;
 }
 
-function isWorkspaceSessionAgent(
+function isWorkspaceSessionLineAgent(
   agent: Agent,
   agents: ReadonlyMap<string, Agent>,
   workspaceId: string,
 ): boolean {
-  const normalizedWorkspaceId = normalizeWorkspaceOpaqueId(workspaceId);
-  if (agent.archivedAt || !normalizedWorkspaceId) return false;
-  if (normalizeWorkspaceOpaqueId(agent.workspaceId) !== normalizedWorkspaceId) return false;
-  const parent = agent.parentAgentId ? agents.get(agent.parentAgentId) : undefined;
-  return isWorkspaceRootAgent(agent, parent);
+  const key = normalizeWorkspaceOpaqueId(workspaceId);
+  return key !== null && isWorkspaceSessionAgent(agent, agents, key);
 }
 
 /**
@@ -61,7 +60,7 @@ export function hasWorkspaceSessionLine(input: {
   keepAgentIds?: ReadonlySet<string>;
 }): boolean {
   const agent = input.source.agents.get(input.agentId);
-  if (!agent || !isWorkspaceSessionAgent(agent, input.source.agents, input.workspaceId)) {
+  if (!agent || !isWorkspaceSessionLineAgent(agent, input.source.agents, input.workspaceId)) {
     return false;
   }
   const status = deriveSessionStatus(agent, input.source);
@@ -95,15 +94,18 @@ function passesActiveOnly(
  */
 export function deriveSessionStatusBucket(
   agent: Agent,
-  source: WorkspaceSessionSource,
+  source: SessionStatusSource,
 ): SidebarStateBucket {
   return deriveSessionStatus(agent, source).bucket;
 }
 
+/** What a session's status reads besides the agent itself. */
+export type SessionStatusSource = Pick<WorkspaceSessionSource, "messageSubmissions" | "cached">;
+
 /** The bucket, and whether it is `unverified`: a cached source's running turn or approval was dropped. */
 export function deriveSessionStatus(
   agent: Agent,
-  source: WorkspaceSessionSource,
+  source: SessionStatusSource,
 ): { bucket: SidebarStateBucket; unverified: boolean } {
   const hasActiveSubmission =
     getActiveMessageSubmissions(source.messageSubmissions.get(agent.id)).length > 0;
@@ -118,16 +120,31 @@ export function deriveSessionStatus(
   return { bucket: deriveSidebarStateBucket(shown), unverified: shown !== facts };
 }
 
-export function selectWorkspaceSessions(input: {
-  source: WorkspaceSessionSource;
-  workspaceId: string;
+interface WorkspaceSessionsQuery {
   activeOnly: boolean;
   /** Sessions a pane shows, kept by Active sessions only — see `passesActiveOnly`. */
   keepAgentIds?: ReadonlySet<string>;
   /** The list owner's own rule (Navigation V2's Workspace scope); absent lists every line. */
   include?: (session: WorkspaceSessionItem) => boolean;
-}): WorkspaceSessionItem[] {
-  const sessions = listWorkspaceRootAgents(input.source.agents, input.workspaceId).map((agent) => {
+}
+
+export function selectWorkspaceSessions(
+  input: WorkspaceSessionsQuery & { source: WorkspaceSessionSource; workspaceId: string },
+): WorkspaceSessionItem[] {
+  return describeWorkspaceSessions({
+    ...input,
+    agents: listWorkspaceRootAgents(input.source.agents, input.workspaceId),
+  });
+}
+
+/** The lines for a workspace's root agents, as `listWorkspaceRootAgents` lists them. */
+export function describeWorkspaceSessions(
+  input: WorkspaceSessionsQuery & {
+    agents: readonly Agent[];
+    source: SessionStatusSource;
+  },
+): WorkspaceSessionItem[] {
+  const sessions = input.agents.map((agent) => {
     const status = deriveSessionStatus(agent, input.source);
     const item: WorkspaceSessionItem = {
       agent,

@@ -15,9 +15,9 @@ import type {
   SidebarWorkspaceSessions,
 } from "./preferences";
 import {
+  describeWorkspaceSessions,
   hasWorkspaceSessionLine,
   listWorkspaceRootAgents,
-  selectWorkspaceSessions,
   type WorkspaceSessionItem,
   type WorkspaceSessionSource,
 } from "./select-sessions";
@@ -41,7 +41,7 @@ import { useCachedServerIds, useIsSourceCached } from "@/clisbot/navigation/use-
 import { listsSessions, resolveSidebarGroupMode } from "./grouping";
 import type { SidebarShortcutModel } from "@/utils/sidebar-shortcuts";
 
-const EMPTY_SOURCE: WorkspaceSessionSource = { agents: new Map(), messageSubmissions: new Map() };
+const EMPTY_SUBMISSIONS: WorkspaceSessionSource["messageSubmissions"] = new Map();
 
 interface WorkspaceRef {
   serverId: string;
@@ -174,9 +174,9 @@ export function useWorkspaceSessionsManualToggle(workspaceKey: string): {
 }
 
 /**
- * The session lines for an open workspace. Subscribes to the two maps a line reads rather than
- * the whole store; both are replaced only when an agent or a submission changes, so other store
- * updates, such as timeline items, never re-run the list.
+ * The session lines for an open workspace. Subscribes to this workspace's root-agent list, which
+ * the store replaces only when one of its agents changes, and to the Host's submissions; agent
+ * updates elsewhere on the Host, or timeline items, never re-run the list.
  */
 export function useWorkspaceSessions(input: {
   serverId: string;
@@ -186,25 +186,22 @@ export function useWorkspaceSessions(input: {
   include?: (session: WorkspaceSessionItem) => boolean;
 }): WorkspaceSessionItem[] {
   const cached = useIsSourceCached(input.serverId);
-  const stored = useSessionStore(
-    useShallow((state) => {
-      const session = state.sessions[input.serverId];
-      return session
-        ? { agents: session.agents, messageSubmissions: session.messageSubmissions }
-        : EMPTY_SOURCE;
-    }),
+  const agents = useSessionStore((state) =>
+    listWorkspaceRootAgents(state.sessions[input.serverId]?.agents, input.workspaceId),
   );
-  const source = useMemo(() => (cached ? { ...stored, cached } : stored), [stored, cached]);
+  const messageSubmissions = useSessionStore(
+    (state) => state.sessions[input.serverId]?.messageSubmissions ?? EMPTY_SUBMISSIONS,
+  );
   return useMemo(
     () =>
-      selectWorkspaceSessions({
-        source,
-        workspaceId: input.workspaceId,
+      describeWorkspaceSessions({
+        agents,
+        source: { messageSubmissions, cached },
         activeOnly: input.activeOnly,
         keepAgentIds: input.keepAgentIds,
         include: input.include,
       }),
-    [source, input.workspaceId, input.activeOnly, input.keepAgentIds, input.include],
+    [agents, messageSubmissions, cached, input.activeOnly, input.keepAgentIds, input.include],
   );
 }
 
@@ -213,10 +210,9 @@ export function useWorkspaceSessions(input: {
  * chevron must not appear and vanish as sessions go idle and busy.
  */
 export function useWorkspaceHasSessions(input: { serverId: string; workspaceId: string }): boolean {
-  const agents = useSessionStore((state) => state.sessions[input.serverId]?.agents);
-  return useMemo(
-    () => listWorkspaceRootAgents(agents, input.workspaceId).length > 0,
-    [agents, input.workspaceId],
+  return useSessionStore(
+    (state) =>
+      listWorkspaceRootAgents(state.sessions[input.serverId]?.agents, input.workspaceId).length > 0,
   );
 }
 
