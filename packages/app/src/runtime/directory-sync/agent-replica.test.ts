@@ -479,6 +479,35 @@ describe("AgentDirectoryReplica", () => {
     store.clearSession(serverId);
   });
 
+  it("commits a fetched snapshot that removes and changes agents as one store update", () => {
+    const serverId = "agent-replica-one-snapshot-commit";
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, null);
+    const replica = new AgentDirectoryReplica(
+      serverId,
+      () => undefined,
+      () => undefined,
+    );
+    const agentWithId = (id: string, title: string) => entry({ ...payload(title), id });
+    replica.commitSnapshot([agentWithId("kept", "old"), agentWithId("gone-1", "x")], []);
+    replica.commitSnapshot([agentWithId("kept", "old"), agentWithId("gone-2", "x")], []);
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    replica.commitSnapshot([agentWithId("kept", "new")], []);
+
+    unsubscribe();
+    const agents = useSessionStore.getState().sessions[serverId]?.agents;
+    expect({ notifications, ids: [...(agents?.keys() ?? [])] }).toEqual({
+      notifications: 1,
+      ids: ["kept"],
+    });
+    expect(agents?.get("kept")?.title).toBe("new");
+    store.clearSession(serverId);
+  });
+
   it("commits nothing when a live update repeats the agent it already holds", () => {
     const serverId = "agent-replica-repeated-update";
     const store = useSessionStore.getState();

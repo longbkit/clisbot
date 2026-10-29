@@ -146,9 +146,10 @@ describe("replaceFetchedAgentDirectory", () => {
     store.initializeSession(serverId, null as unknown as DaemonClient);
     store.setInitializingAgents(serverId, new Map([["agent", true]]));
 
-    new AgentStoreProjection(serverId).replaceFetched([
-      createEntry(createAgentPayload({ id: "agent" })),
-    ]);
+    new AgentStoreProjection(serverId).replaceFetched(
+      [createEntry(createAgentPayload({ id: "agent" }))],
+      [],
+    );
 
     expect(useSessionStore.getState().sessions[serverId]?.initializingAgents.get("agent")).toBe(
       true,
@@ -162,23 +163,29 @@ describe("replaceFetchedAgentDirectory", () => {
     store.initializeSession(serverId, null as unknown as DaemonClient);
 
     const projection = new AgentStoreProjection(serverId);
-    projection.replaceFetched([
-      createEntry(
-        createAgentPayload({
-          id: "child-1",
-          labels: { [PARENT_AGENT_ID_LABEL]: "parent-a" },
-        }),
-      ),
-    ]);
+    projection.replaceFetched(
+      [
+        createEntry(
+          createAgentPayload({
+            id: "child-1",
+            labels: { [PARENT_AGENT_ID_LABEL]: "parent-a" },
+          }),
+        ),
+      ],
+      [],
+    );
 
-    projection.replaceFetched([
-      createEntry(
-        createAgentPayload({
-          id: "child-1",
-          labels: { [PARENT_AGENT_ID_LABEL]: "parent-b" },
-        }),
-      ),
-    ]);
+    projection.replaceFetched(
+      [
+        createEntry(
+          createAgentPayload({
+            id: "child-1",
+            labels: { [PARENT_AGENT_ID_LABEL]: "parent-b" },
+          }),
+        ),
+      ],
+      [],
+    );
 
     expect(
       useSessionStore.getState().sessions[serverId]?.agents.get("child-1")?.parentAgentId,

@@ -1,6 +1,6 @@
 import equal from "fast-deep-equal";
 import type { FetchAgentsEntry } from "@clisbot/client/internal/daemon-client";
-import { useSessionStore, type Agent } from "@/stores/session-store";
+import { batchSessionStoreUpdates, useSessionStore, type Agent } from "@/stores/session-store";
 import type { PendingPermission } from "@/types/shared";
 import { acceptAgentDirectoryUpdate } from "@/utils/agent-directory-update-policy";
 import { buildAgentDirectoryState, type AgentDirectoryDelta } from "@/utils/agent-directory-sync";
@@ -130,7 +130,17 @@ export class AgentStoreProjection {
     };
   }
 
-  replaceFetched(entries: FetchAgentsEntry[]): Map<string, Agent> {
+  /** Replaces the fetched directory and drops `removedIds`, published as one store update. */
+  replaceFetched(entries: FetchAgentsEntry[], removedIds: readonly string[]): Map<string, Agent> {
+    let agents = new Map<string, Agent>();
+    batchSessionStoreUpdates(() => {
+      for (const agentId of removedIds) this.removeFromDirectory(agentId);
+      agents = this.commitFetched(entries);
+    });
+    return agents;
+  }
+
+  private commitFetched(entries: FetchAgentsEntry[]): Map<string, Agent> {
     const { agents: fetched, pendingPermissions } = buildAgentDirectoryState({
       serverId: this.serverId,
       entries,
@@ -171,9 +181,20 @@ export class AgentStoreProjection {
   }
 
   removeFromDirectory(agentId: string): void {
+    clearArchiveAgentPending({ queryClient, serverId: this.serverId, agentId });
+    batchSessionStoreUpdates(() => this.removeFromSession(agentId));
+    useDraftStore.getState().clearDraftInput({
+      draftKey: buildDraftStoreKey({ serverId: this.serverId, agentId }),
+    });
+    const initKey = getInitKey(this.serverId, agentId);
+    if (getInitDeferred(initKey)) {
+      rejectInitDeferred(initKey, new Error("Agent was removed during initialization"));
+    }
+  }
+
+  private removeFromSession(agentId: string): void {
     const store = useSessionStore.getState();
     const removeKey = withoutAgent(agentId);
-    clearArchiveAgentPending({ queryClient, serverId: this.serverId, agentId });
     store.setAgents(this.serverId, removeKey);
     store.setAgentDetails(this.serverId, removeKey);
     store.setQueuedMessages(this.serverId, removeKey);
@@ -189,13 +210,6 @@ export class AgentStoreProjection {
       agentLastActivity.delete(agentId);
       return { ...state, agentLastActivity };
     });
-    useDraftStore.getState().clearDraftInput({
-      draftKey: buildDraftStoreKey({ serverId: this.serverId, agentId }),
-    });
-    const initKey = getInitKey(this.serverId, agentId);
-    if (getInitDeferred(initKey)) {
-      rejectInitDeferred(initKey, new Error("Agent was removed during initialization"));
-    }
   }
 
   remove(agentId: string): void {

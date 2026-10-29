@@ -2,6 +2,7 @@ import type { SessionAuthorship } from "@clisbot/protocol/session-authorship";
 import equal from "fast-deep-equal";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
+import { createStoreBatching, type StoreInitializer } from "./store-batching";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { ViewedTimelineOwner } from "@/timeline/viewed-timeline-sync";
 import type { AgentDirectoryEntry } from "@/types/agent-directory";
@@ -754,8 +755,17 @@ function isSessionServerInfoUnchanged(input: {
   );
 }
 
+const sessionStoreBatching = createStoreBatching<SessionStore>();
+
+/** Clisbot: publishes every session write inside `commit` as one store notification. */
+export const batchSessionStoreUpdates = sessionStoreBatching.batch;
+
+function batchedSubscribeWithSelector(initializer: StoreInitializer<SessionStore>) {
+  return subscribeWithSelector(sessionStoreBatching.wrap(initializer));
+}
+
 export const useSessionStore = create<SessionStore>()(
-  subscribeWithSelector((set, get) => {
+  batchedSubscribeWithSelector((set, get) => {
     const commitActivityUpdates: AgentLastActivityCommitter = (updates) => {
       set((prev) => {
         let nextActivity: Map<string, Date> | null = null;
@@ -1539,7 +1549,10 @@ export const useSessionStore = create<SessionStore>()(
           if (!session) {
             return prev;
           }
-          const nextAgents = typeof agents === "function" ? agents(session.agents) : agents;
+          const nextAgents = preserveMapIdentity(
+            session.agents,
+            typeof agents === "function" ? agents(session.agents) : agents,
+          );
           if (session.agents === nextAgents) {
             return prev;
           }

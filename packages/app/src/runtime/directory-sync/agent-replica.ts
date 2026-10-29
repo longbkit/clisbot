@@ -147,13 +147,11 @@ export class AgentDirectoryReplica {
     for (const agentId of nextIds) {
       if (!this.members.has(agentId)) this.advance(agentId);
     }
-    for (const agentId of previous.keys()) {
-      if (!nextIds.has(agentId)) this.storeProjection.removeFromDirectory(agentId);
-    }
+    const removedIds = [...previous.keys()].filter((agentId) => !nextIds.has(agentId));
     this.members.clear();
     this.pendingCacheReads.clear();
     for (const agentId of nextIds) this.members.add(agentId);
-    const agents = this.storeProjection.replaceFetched(reconciled);
+    const agents = this.storeProjection.replaceFetched(reconciled, removedIds);
     for (const [agentId, previousAgent] of previous) {
       if (previousAgent.turn.phase === "open" && agents.get(agentId)?.turn.phase === "idle") {
         this.onStoppedRunning(agentId);
