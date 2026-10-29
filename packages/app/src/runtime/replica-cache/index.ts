@@ -25,6 +25,8 @@ import {
 } from "@/types/stream";
 import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
 import { clearLegacyReplicaCache } from "./legacy-cleanup";
+import { OFFLINE_CACHE_ENABLED } from "./offline-flag";
+import { TAIL_MAX_BYTES, compactTailItem, keepNewestWithinBytes } from "./timeline-tail";
 import {
   REPLICA_SINGLETON_ROW_ID,
   type ReplicaRow,
@@ -381,6 +383,8 @@ type StoredProject = z.infer<typeof StoredProjectSchema>;
 interface ReplicaCacheOptions {
   maxBytes?: number;
   clearLegacyCache?: () => Promise<void>;
+  /** Defaults to `OFFLINE_CACHE_ENABLED`. */
+  offlineTails?: boolean;
 }
 
 type StructuredReplicaUpsert =
@@ -784,33 +788,71 @@ function isTimelineItemStoredLosslessly(item: StreamItem): boolean {
   }
 }
 
-function serializeTimeline(timeline: CachedTimeline): StoredTimeline | null {
-  const canonicalItems = timeline.items.filter(
+function canonicalTimelineItems(timeline: CachedTimeline): StreamItem[] {
+  return timeline.items.filter(
     (item) => item.kind !== "user_message" || !isUnreconciledLocalUserMessage(item),
   );
-  const items = canonicalItems.map(serializeTimelineItem).filter((item) => item !== null);
-  const range = timeline.range;
-  const canPersistCoverage =
-    range !== null &&
-    range.retainedRanges === undefined &&
-    canonicalItems.length <= MAX_TIMELINE_ITEMS &&
-    items.length === canonicalItems.length &&
-    canonicalItems.every(
+}
+
+/** The range the stored items prove, or null when the tail must be refetched on open. */
+function coveredRange(
+  range: AgentTimelineCursorState | null,
+  items: readonly StreamItem[],
+): StoredTimeline["range"] {
+  if (range === null || range.retainedRanges !== undefined) return null;
+  const covered =
+    items.every(
       (item) =>
-        isTimelineItemStoredLosslessly(item) &&
         item.timelineCursor?.epoch === range.epoch &&
         item.timelineCursor.seq >= range.startSeq &&
         item.timelineCursor.seq <= range.endSeq,
-    ) &&
-    canonicalItems.some((item) => item.timelineCursor?.seq === range.endSeq);
+    ) && items.some((item) => item.timelineCursor?.seq === range.endSeq);
+  return covered ? { epoch: range.epoch, startSeq: range.startSeq, endSeq: range.endSeq } : null;
+}
+
+function storedTimeline(
+  timeline: CachedTimeline,
+  items: StoredTimelineItem[],
+  range: StoredTimeline["range"],
+): StoredTimeline {
   return {
     agentId: timeline.agentId,
-    items: items.slice(-MAX_TIMELINE_ITEMS),
-    range: canPersistCoverage
-      ? { epoch: range.epoch, startSeq: range.startSeq, endSeq: range.endSeq }
-      : null,
-    hasOlder: canPersistCoverage ? timeline.hasOlder : false,
+    items,
+    range,
+    hasOlder: range ? timeline.hasOlder : false,
   };
+}
+
+function serializeTimeline(timeline: CachedTimeline): StoredTimeline | null {
+  const canonicalItems = canonicalTimelineItems(timeline);
+  const items = canonicalItems.map(serializeTimelineItem).filter((item) => item !== null);
+  const lossless =
+    canonicalItems.length <= MAX_TIMELINE_ITEMS &&
+    items.length === canonicalItems.length &&
+    canonicalItems.every(isTimelineItemStoredLosslessly);
+  const range = lossless ? coveredRange(timeline.range, canonicalItems) : null;
+  return storedTimeline(timeline, items.slice(-MAX_TIMELINE_ITEMS), range);
+}
+
+// Room for the row's envelope (agent id, range, flags) inside the per-tail cap.
+const TAIL_ENVELOPE_BYTES = 1024;
+
+/** The offline tail: compacted items, newest first within 256 KB; lossy tails claim no range. */
+function serializeOfflineTail(timeline: CachedTimeline): StoredTimeline {
+  const canonicalItems = canonicalTimelineItems(timeline);
+  const compacted = canonicalItems.map(compactTailItem);
+  const items = compacted.map(serializeTimelineItem).filter((item) => item !== null);
+  const kept = keepNewestWithinBytes(
+    items,
+    // One extra byte for the separating comma.
+    (item) => utf8ByteLength(JSON.stringify(item)) + 1,
+    TAIL_MAX_BYTES - TAIL_ENVELOPE_BYTES,
+  );
+  const lossless =
+    kept.length === canonicalItems.length &&
+    compacted.every((item, index) => item === canonicalItems[index]);
+  const range = lossless ? coveredRange(timeline.range, canonicalItems) : null;
+  return storedTimeline(timeline, kept, range);
 }
 
 function rowKey(key: Pick<ReplicaRowKey, "kind" | "id">): string {
@@ -952,7 +994,10 @@ export class ReplicaCache {
   ) {
     this.maxBytes = Math.max(options.maxBytes ?? MAX_CACHE_BYTES, 0);
     this.clearLegacyCache = options.clearLegacyCache ?? clearLegacyReplicaCache;
+    this.offlineTails = options.offlineTails ?? OFFLINE_CACHE_ENABLED;
   }
+
+  private readonly offlineTails: boolean;
 
   private readonly clearLegacyCache: () => Promise<void>;
 
@@ -1430,7 +1475,9 @@ export class ReplicaCache {
         value = serializeProject(upsert.value);
         break;
       case "timeline":
-        value = serializeTimeline(upsert.value);
+        value = this.offlineTails
+          ? serializeOfflineTail(upsert.value)
+          : serializeTimeline(upsert.value);
         if (!value) return null;
         break;
       case "checkpoint":
