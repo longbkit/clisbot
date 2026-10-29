@@ -24,10 +24,12 @@ set to `"0"` turns it off (`"1"` or absent leaves the build's choice). Native bu
 env. New code lives in `clisbot/navigation/`. Old and new navigation are separate components; shared
 files branch on the flag at their entry point only (see [Flag removal](#flag-removal)).
 
-**Names.** The section the code calls `work` reads **Workspace** in every locale; its route
-(`/work`), ids and test ids keep `work`. Home's mode switch reads Chat · Workspace · All (vi: Chat ·
-Workspace · Tất cả). Tasks is Tasks / Công việc, and in Vietnamese "Công việc" names Tasks only.
-Other locales use their word for workspace and a different word for tasks
+**Names.** The section the code calls `work` reads **Work** in the rail, the phone tab and Home's
+mode switch (Chat · Work · All; vi: Chat · Work · Tất cả); its route (`/work`), ids and test ids keep
+`work`. It was Workspace until 2026-10-29. Tasks is Tasks / Công việc, and in Vietnamese "Công việc"
+names Tasks only. Korean and Vietnamese keep the English word because their natural word for work is
+the word they use for Tasks.
+Other locales use their word for work and a different word for tasks
 (`i18n/resources/navigation.ts`; `navigation-naming.test.ts` checks that every locale has every key
 and that the two never collide). The mode switch's All and the scope tabs' All share one word; each
 sits in its own labelled control.
