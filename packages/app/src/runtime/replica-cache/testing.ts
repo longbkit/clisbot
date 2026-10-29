@@ -87,6 +87,11 @@ export class MemoryStorage implements ReplicaRowStore {
     }
   }
 
+  async deleteOpenedBefore(cutoff: number): Promise<void> {
+    for (const [key, row] of this.rows)
+      if (row.openedAt !== undefined && row.openedAt < cutoff) this.rows.delete(key);
+  }
+
   async clear(): Promise<void> {
     this.rows.clear();
   }

@@ -24,10 +24,11 @@ function deferred(): { promise: Promise<void>; resolve(): void } {
 
 const noLegacyCleanup = { clearLegacyCache: async () => undefined };
 
+/** A `maxBytes` budget pins the whole-Host eviction these tests were written for. */
 function createCache(storage: MemoryStorage, maxBytes?: number): ReplicaCache {
   const cache = new ReplicaCache(storage, {
     ...noLegacyCleanup,
-    ...(maxBytes ? { maxBytes } : {}),
+    ...(maxBytes ? { maxBytes, offlineTails: false } : {}),
   });
   cache.setHosts([SERVER_ID]);
   return cache;
@@ -972,9 +973,13 @@ describe("ReplicaCache", () => {
     ]);
   });
 
-  it("rebuilds every directory row before restoring its checkpoint after eviction", async () => {
+  it("rebuilds every directory row before restoring its checkpoint after whole-Host eviction", async () => {
     const storage = new MemoryStorage();
-    const cache = new ReplicaCache(storage, { ...noLegacyCleanup, maxBytes: 2_500 });
+    const cache = new ReplicaCache(storage, {
+      ...noLegacyCleanup,
+      maxBytes: 2_500,
+      offlineTails: false,
+    });
     cache.setHosts([SERVER_ID, "other-host"]);
     const cachedDirectory = directory();
     commitDirectory(cache, SERVER_ID, cachedDirectory);

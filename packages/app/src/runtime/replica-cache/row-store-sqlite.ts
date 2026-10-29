@@ -16,12 +16,16 @@ export interface ReplicaSqliteDriver {
 const CREATE_ROWS_SQL = `
   CREATE TABLE IF NOT EXISTS rows (
     server_id TEXT NOT NULL,
-    kind TEXT NOT NULL CHECK (kind IN ('agent', 'workspace', 'project', 'timeline', 'checkpoint')),
+    kind TEXT NOT NULL
+      CHECK (kind IN ('agent', 'workspace', 'project', 'timeline', 'transcript', 'checkpoint')),
     id TEXT NOT NULL,
     payload TEXT NOT NULL,
+    opened_at INTEGER,
     PRIMARY KEY (server_id, kind, id)
   )
 `;
+
+const SELECT_COLUMNS = "server_id, kind, id, payload, opened_at";
 
 const CREATE_META_SQL = `
   CREATE TABLE IF NOT EXISTS meta (
@@ -39,6 +43,17 @@ interface StoredRow {
   kind: ReplicaRow["kind"];
   id: string;
   payload: string;
+  opened_at: number | null;
+}
+
+function toReplicaRow(row: StoredRow): ReplicaRow {
+  return {
+    serverId: row.server_id,
+    kind: row.kind,
+    id: row.id,
+    payload: row.payload,
+    ...(row.opened_at === null ? {} : { openedAt: row.opened_at }),
+  };
 }
 
 export function createSqliteReplicaRowStore(
@@ -91,17 +106,12 @@ export function createSqliteReplicaRowStore(
 
   async function readAll(): Promise<ReplicaHostRows[]> {
     const storedRows = await getConnection().all<StoredRow>(
-      "SELECT server_id, kind, id, payload FROM rows ORDER BY server_id, kind, id",
+      `SELECT ${SELECT_COLUMNS} FROM rows ORDER BY server_id, kind, id`,
     );
     const hosts = new Map<string, ReplicaRow[]>();
     for (const storedRow of storedRows) {
       const rows = hosts.get(storedRow.server_id) ?? [];
-      rows.push({
-        serverId: storedRow.server_id,
-        kind: storedRow.kind,
-        id: storedRow.id,
-        payload: storedRow.payload,
-      });
+      rows.push(toReplicaRow(storedRow));
       hosts.set(storedRow.server_id, rows);
     }
     return Array.from(hosts, ([serverId, rows]) => ({ serverId, rows }));
@@ -116,17 +126,12 @@ export function createSqliteReplicaRowStore(
     const placeholders = kinds.map(() => "?").join(", ");
     const idClause = ids ? ` AND id IN (${ids.map(() => "?").join(", ")})` : "";
     const storedRows = await getConnection().all<StoredRow>(
-      `SELECT server_id, kind, id, payload FROM rows
+      `SELECT ${SELECT_COLUMNS} FROM rows
        WHERE server_id = ? AND kind IN (${placeholders})${idClause}
        ORDER BY kind, id`,
       [serverId, ...kinds, ...(ids ?? [])],
     );
-    return storedRows.map((row) => ({
-      serverId: row.server_id,
-      kind: row.kind,
-      id: row.id,
-      payload: row.payload,
-    }));
+    return storedRows.map(toReplicaRow);
   }
 
   async function apply(changes: ReplicaRowChanges): Promise<void> {
@@ -140,9 +145,10 @@ export function createSqliteReplicaRowStore(
       }
       for (const row of changes.upserts) {
         await transaction.run(
-          `INSERT INTO rows (server_id, kind, id, payload) VALUES (?, ?, ?, ?)
-           ON CONFLICT (server_id, kind, id) DO UPDATE SET payload = excluded.payload`,
-          [row.serverId, row.kind, row.id, row.payload],
+          `INSERT INTO rows (server_id, kind, id, payload, opened_at) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT (server_id, kind, id)
+           DO UPDATE SET payload = excluded.payload, opened_at = excluded.opened_at`,
+          [row.serverId, row.kind, row.id, row.payload, row.openedAt ?? null],
         );
       }
     });
@@ -156,18 +162,23 @@ export function createSqliteReplicaRowStore(
     if (oldServerId === newServerId) return;
     await getConnection().transaction(async (transaction) => {
       await transaction.run(
-        `INSERT INTO rows (server_id, kind, id, payload)
-         SELECT ?, kind, id, payload FROM rows WHERE server_id = ?
-         ON CONFLICT (server_id, kind, id) DO UPDATE SET payload = excluded.payload`,
+        `INSERT INTO rows (server_id, kind, id, payload, opened_at)
+         SELECT ?, kind, id, payload, opened_at FROM rows WHERE server_id = ?
+         ON CONFLICT (server_id, kind, id)
+         DO UPDATE SET payload = excluded.payload, opened_at = excluded.opened_at`,
         [newServerId, oldServerId],
       );
       await transaction.run("DELETE FROM rows WHERE server_id = ?", [oldServerId]);
     });
   }
 
+  async function deleteOpenedBefore(cutoff: number): Promise<void> {
+    await getConnection().run("DELETE FROM rows WHERE opened_at < ?", [cutoff]);
+  }
+
   async function clear(): Promise<void> {
     await getConnection().run("DELETE FROM rows");
   }
 
-  return { open, read, readAll, apply, deleteHost, renameHost, clear };
+  return { open, read, readAll, apply, deleteHost, renameHost, deleteOpenedBefore, clear };
 }

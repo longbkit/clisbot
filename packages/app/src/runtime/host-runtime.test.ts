@@ -690,6 +690,10 @@ function createMemoryReplicaRowStore(): ReplicaRowStore {
         rows.set(keyOf(renamed), renamed);
       }
     },
+    deleteOpenedBefore: async (cutoff) => {
+      for (const [key, row] of rows)
+        if (row.openedAt !== undefined && row.openedAt < cutoff) rows.delete(key);
+    },
     clear: async () => rows.clear(),
   };
 }

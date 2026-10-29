@@ -16,6 +16,19 @@ function createCache(storage: MemoryStorage, offlineTails = true): ReplicaCache 
   return cache;
 }
 
+const DAY = 24 * 60 * 60 * 1000;
+
+function clockedCache(storage: MemoryStorage, clock: { now: number }, maxBytes?: number) {
+  const cache = new ReplicaCache(storage, {
+    clearLegacyCache: async () => undefined,
+    offlineTails: true,
+    now: () => clock.now,
+    ...(maxBytes ? { maxBytes } : {}),
+  });
+  cache.setHosts([SERVER_ID]);
+  return cache;
+}
+
 function message(seq: number, text = `message ${seq}`): StreamItem {
   return {
     kind: "assistant_message",
@@ -99,6 +112,96 @@ describe("offline timeline tails", () => {
     expect(restored?.items.at(-1)?.id).toBe("message-40");
     expect(restored?.items.length).toBeLessThan(40);
     expect(restored?.range).toBeNull();
+  });
+
+  it("records when the session was opened on its tail row", async () => {
+    const storage = new MemoryStorage();
+    const clock = { now: DAY * 100 };
+    const cache = clockedCache(storage, clock);
+    await cache.readTimeline(SERVER_ID, "agent-1");
+    clock.now += 60_000;
+    cache.commitTimeline(SERVER_ID, "agent-1", tail([message(1)]));
+    await cache.flush();
+
+    expect(storage.rows.get(`${SERVER_ID}:timeline:agent-1`)?.openedAt).toBe(DAY * 100);
+  });
+
+  it("stops saving a tail whose session was last opened more than 7 days ago", async () => {
+    const storage = new MemoryStorage();
+    const clock = { now: DAY * 100 };
+    const cache = clockedCache(storage, clock);
+    await cache.readTimeline(SERVER_ID, "agent-1");
+    clock.now += 8 * DAY;
+    cache.commitTimeline(SERVER_ID, "agent-1", tail([message(1)]));
+    await cache.flush();
+
+    expect(storage.rows.has(`${SERVER_ID}:timeline:agent-1`)).toBe(false);
+  });
+
+  it("drops tails not opened for 30 days when the store is first used", async () => {
+    const storage = new MemoryStorage();
+    storage.rows.set(`${SERVER_ID}:timeline:old`, {
+      serverId: SERVER_ID,
+      kind: "timeline",
+      id: "old",
+      payload: "{}",
+      openedAt: DAY * 60,
+    });
+    storage.rows.set(`${SERVER_ID}:agent:old`, {
+      serverId: SERVER_ID,
+      kind: "agent",
+      id: "old",
+      payload: "{}",
+    });
+    const cache = clockedCache(storage, { now: DAY * 100 });
+
+    await cache.readTimeline(SERVER_ID, "another-session");
+
+    expect([...storage.rows.keys()]).toEqual([`${SERVER_ID}:agent:old`]);
+  });
+
+  it("evicts the least recently opened tails, never metadata or another Host", async () => {
+    const storage = new MemoryStorage();
+    const clock = { now: DAY * 100 };
+    const cache = clockedCache(storage, clock, 40_000);
+    cache.setHosts([SERVER_ID, "host-2"]);
+    storage.rows.set("host-2:agent:a", {
+      serverId: "host-2",
+      kind: "agent",
+      id: "a",
+      payload: "m".repeat(5_000),
+    });
+    for (const agentId of ["oldest", "middle", "newest"]) {
+      await cache.readTimeline(SERVER_ID, agentId);
+      cache.commitTimeline(SERVER_ID, agentId, {
+        ...tail([message(1, "t".repeat(15_000))]),
+        agentId,
+      });
+      await cache.flush();
+      clock.now += 1_000;
+    }
+
+    expect([...storage.rows.keys()].sort()).toEqual([
+      "host-1:timeline:middle",
+      "host-1:timeline:newest",
+      "host-2:agent:a",
+    ]);
+  });
+
+  it("keeps session metadata even when it alone is over budget", async () => {
+    const storage = new MemoryStorage();
+    storage.rows.set(`${SERVER_ID}:agent:big`, {
+      serverId: SERVER_ID,
+      kind: "agent",
+      id: "big",
+      payload: "m".repeat(2_000),
+    });
+    const cache = clockedCache(storage, { now: DAY * 100 }, 1_000);
+    await cache.readTimeline(SERVER_ID, "agent-1");
+    cache.commitTimeline(SERVER_ID, "agent-1", tail([message(1)]));
+    await cache.flush();
+
+    expect([...storage.rows.keys()]).toEqual([`${SERVER_ID}:agent:big`]);
   });
 
   it("keeps the 50-item tail when the offline cache flag is off", async () => {

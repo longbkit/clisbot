@@ -181,6 +181,37 @@ export function runReplicaRowStoreContract(
       expect(await store.readAll()).toEqual([]);
     });
 
+    it("round-trips a tail's opened time and leaves metadata rows without one", async () => {
+      const tail = { ...row("server-a", "transcript", "chat-1", "lines"), openedAt: 1_000 };
+      await store.apply({
+        upserts: [row("server-a", "agent", "agent-1", "agent"), tail],
+        deletes: [],
+      });
+
+      expect(await store.read("server-a", ["transcript"])).toEqual([tail]);
+      expect(await store.readAll()).toEqual([
+        { serverId: "server-a", rows: [row("server-a", "agent", "agent-1", "agent"), tail] },
+      ]);
+    });
+
+    it("deletes tails opened before a cutoff and never metadata", async () => {
+      const recent = { ...row("server-a", "transcript", "chat-1", "recent"), openedAt: 500 };
+      await store.apply({
+        upserts: [
+          row("server-a", "agent", "agent-1", "agent"),
+          { ...row("server-a", "timeline", "agent-1", "old"), openedAt: 100 },
+          recent,
+        ],
+        deletes: [],
+      });
+
+      await store.deleteOpenedBefore(200);
+
+      expect(await store.readAll()).toEqual([
+        { serverId: "server-a", rows: [row("server-a", "agent", "agent-1", "agent"), recent] },
+      ]);
+    });
+
     it("wipes cached rows when the schema version changes on open", async () => {
       await store.apply({
         upserts: [row("server-a", "agent", "agent-1", "stale")],

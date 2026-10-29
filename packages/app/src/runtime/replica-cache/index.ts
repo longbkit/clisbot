@@ -26,6 +26,7 @@ import {
 import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
 import { clearLegacyReplicaCache } from "./legacy-cleanup";
 import { OFFLINE_CACHE_ENABLED } from "./offline-flag";
+import { TAIL_MAX_AGE_MS, TAIL_SAVE_WINDOW_MS, selectTailEvictions } from "./tail-retention";
 import { TAIL_MAX_BYTES, compactTailItem, keepNewestWithinBytes } from "./timeline-tail";
 import {
   REPLICA_SINGLETON_ROW_ID,
@@ -34,6 +35,7 @@ import {
   type ReplicaRowKey,
   type ReplicaRowKind,
   type ReplicaRowStore,
+  type ReplicaTailKind,
 } from "./row-store";
 
 export type DirectoryReplicaMutation =
@@ -385,13 +387,14 @@ interface ReplicaCacheOptions {
   clearLegacyCache?: () => Promise<void>;
   /** Defaults to `OFFLINE_CACHE_ENABLED`. */
   offlineTails?: boolean;
+  now?: () => number;
 }
 
 type StructuredReplicaUpsert =
   | { serverId: string; kind: "agent"; id: string; value: Agent }
   | { serverId: string; kind: "workspace"; id: string; value: WorkspaceDescriptor }
   | { serverId: string; kind: "project"; id: string; value: ProjectDescriptor }
-  | { serverId: string; kind: "timeline"; id: string; value: CachedTimeline }
+  | { serverId: string; kind: "timeline"; id: string; value: CachedTimeline; openedAt?: number }
   | { serverId: string; kind: "checkpoint"; id: string; value: DirectoryCheckpoint };
 
 const DirectoryCursorSchema = z.strictObject({
@@ -995,9 +998,31 @@ export class ReplicaCache {
     this.maxBytes = Math.max(options.maxBytes ?? MAX_CACHE_BYTES, 0);
     this.clearLegacyCache = options.clearLegacyCache ?? clearLegacyReplicaCache;
     this.offlineTails = options.offlineTails ?? OFFLINE_CACHE_ENABLED;
+    this.now = options.now ?? Date.now;
   }
 
   private readonly offlineTails: boolean;
+  private readonly now: () => number;
+  /** When each tail was last opened in this app run; the stored row carries older opens. */
+  private readonly tailOpens = new Map<string, number>();
+
+  private markTailOpened(serverId: string, kind: ReplicaTailKind, id: string): void {
+    this.tailOpens.set(pendingRowKey({ serverId, kind, id }), this.now());
+  }
+
+  /** The tail's last open, or undefined when it was not opened within the save window. */
+  private tailSaveOpenedAt(
+    serverId: string,
+    kind: ReplicaTailKind,
+    id: string,
+  ): number | undefined {
+    const key = { serverId, kind, id };
+    const openedAt =
+      this.tailOpens.get(pendingRowKey(key)) ??
+      this.storedRows.get(serverId)?.get(rowKey(key))?.openedAt ??
+      this.now();
+    return this.now() - openedAt > TAIL_SAVE_WINDOW_MS ? undefined : openedAt;
+  }
 
   private readonly clearLegacyCache: () => Promise<void>;
 
@@ -1071,7 +1096,9 @@ export class ReplicaCache {
     return result;
   }
 
+  /** Reading a timeline is opening its session: it renews the tail's save window. */
   async readTimeline(serverId: string, agentId: string): Promise<CachedTimeline | undefined> {
+    this.markTailOpened(serverId, "timeline", agentId);
     const rows = await this.readRows(serverId, ["timeline"], [agentId]);
     const row = rows[0];
     if (!row) return undefined;
@@ -1266,7 +1293,14 @@ export class ReplicaCache {
   commitTimeline(serverId: string, agentId: string, timeline: CachedTimeline): void {
     if (!this.activeServerIds.has(serverId)) return;
     if (timeline.agentId !== agentId) throw new Error("Timeline cache key does not match payload");
-    this.queueUpsert({ serverId, kind: "timeline", id: agentId, value: timeline });
+    if (!this.offlineTails) {
+      this.queueUpsert({ serverId, kind: "timeline", id: agentId, value: timeline });
+      this.schedulePersist();
+      return;
+    }
+    const openedAt = this.tailSaveOpenedAt(serverId, "timeline", agentId);
+    if (openedAt === undefined) return;
+    this.queueUpsert({ serverId, kind: "timeline", id: agentId, value: timeline, openedAt });
     this.schedulePersist();
   }
 
@@ -1484,11 +1518,13 @@ export class ReplicaCache {
         value = serializeDirectoryCheckpoint(upsert.value);
         break;
     }
+    const openedAt = upsert.kind === "timeline" ? upsert.openedAt : undefined;
     return {
       serverId: upsert.serverId,
       kind: upsert.kind,
       id: upsert.id,
       payload: JSON.stringify(value),
+      ...(openedAt === undefined ? {} : { openedAt }),
     };
   }
 
@@ -1560,6 +1596,7 @@ export class ReplicaCache {
   private async fitChangesToBudget(
     changes: ReplicaRowChanges,
   ): Promise<{ changes: ReplicaRowChanges; evicted: Set<string> }> {
+    if (this.offlineTails) return { changes: this.fitTailsToBudget(changes), evicted: new Set() };
     const touchedServerIds = new Set<string>();
     for (const key of changes.deletes) touchedServerIds.add(key.serverId);
     for (const row of changes.upserts) touchedServerIds.add(row.serverId);
@@ -1609,6 +1646,37 @@ export class ReplicaCache {
     };
   }
 
+  private storedRow(key: ReplicaRowKey): ReplicaRow | undefined {
+    return this.storedRows.get(key.serverId)?.get(rowKey(key));
+  }
+
+  /** Drops tails, least recently opened first, so metadata always keeps its place. */
+  private fitTailsToBudget(changes: ReplicaRowChanges): ReplicaRowChanges {
+    let total = this.totalBytes;
+    const replaced = new Set<string>();
+    for (const key of changes.deletes) {
+      const previous = this.storedRow(key);
+      if (previous) total -= rowBytes(previous);
+      replaced.add(pendingRowKey(key));
+    }
+    for (const row of changes.upserts) {
+      const previous = this.storedRow(row);
+      total += rowBytes(row) - (previous ? rowBytes(previous) : 0);
+      replaced.add(pendingRowKey(row));
+    }
+    if (total <= this.maxBytes) return changes;
+    const candidates = [...changes.upserts];
+    for (const rows of this.storedRows.values()) {
+      for (const row of rows.values()) if (!replaced.has(pendingRowKey(row))) candidates.push(row);
+    }
+    const evicted = selectTailEvictions(candidates, total, this.maxBytes, rowBytes);
+    const evictedKeys = new Set(evicted.map(pendingRowKey));
+    return {
+      upserts: changes.upserts.filter((row) => !evictedKeys.has(pendingRowKey(row))),
+      deletes: [...changes.deletes, ...evicted.filter((row) => this.storedRow(row))],
+    };
+  }
+
   private removeStoredHost(serverId: string): void {
     this.totalBytes -= this.hostBytes.get(serverId) ?? 0;
     this.storedRows.delete(serverId);
@@ -1645,6 +1713,9 @@ export class ReplicaCache {
       await this.rowStore.open();
       // COMPAT(replica-blob-cache): remove after 2026-11
       await this.clearLegacyCache().catch(() => undefined);
+      // A failed sweep leaves old tails for the next start; it never blocks reading the cache.
+      if (this.offlineTails)
+        await this.rowStore.deleteOpenedBefore(this.now() - TAIL_MAX_AGE_MS).catch(() => undefined);
     })();
     return this.preparePromise;
   }
