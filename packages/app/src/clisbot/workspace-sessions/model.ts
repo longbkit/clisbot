@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import type { WorkspaceSessionFilter } from "./session-filter";
 import { useTranslation } from "react-i18next";
@@ -30,7 +30,7 @@ import {
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import {
   buildStatusSessionShortcutModel,
-  sessionDisplayGroups,
+  createSessionDisplayGroupsMemo,
   workspaceStatusDisplayGroups,
   type StatusDisplayGroup,
 } from "./status-sessions";
@@ -343,6 +343,8 @@ function useDisplayGroups(input: {
     useShallow((state) => serverIds.map((id) => state.sessions[id]?.messageSubmissions ?? null)),
   );
   const cached = useCachedServerIds();
+  // Rebuilds only the workspaces whose root agents or submissions moved; the rest keep their lines.
+  const [displayGroupsOf] = useState(createSessionDisplayGroupsMemo);
   return useMemo(() => {
     if (!sessionsShown) return workspaceStatusDisplayGroups(groups);
     const sources = new Map<string, WorkspaceSessionSource>();
@@ -352,7 +354,7 @@ function useDisplayGroups(input: {
       if (agents && messageSubmissions)
         sources.set(serverId, { agents, messageSubmissions, cached: cached.has(serverId) });
     });
-    return sessionDisplayGroups({
+    return displayGroupsOf({
       groups,
       sources,
       activeOnly,
@@ -373,6 +375,7 @@ function useDisplayGroups(input: {
     submissionMaps,
     cached,
     t,
+    displayGroupsOf,
   ]);
 }
 
