@@ -18,6 +18,7 @@ import {
 } from "@/stores/session-store";
 import { normalizeAgentSnapshot, projectAgentSnapshot } from "@/utils/agent-snapshots";
 import { createManualFrameClock } from "./frame-clock-fixture";
+import { shareFrames, type FrameClock } from "./live-batch";
 import { selectWorkspaceDirectoryServerIds } from "@/stores/session-store-hooks/selectors";
 import { useWorkspaceLabels } from "@/workspace-labels";
 import type { DirectoryReplicaMutation } from "@/runtime/replica-cache";
@@ -2086,9 +2087,10 @@ function liveAgentUpdate(
   };
 }
 
-async function createFramedDirectory(serverId: string) {
+async function createFramedDirectory(serverId: string, frames?: FrameClock) {
   serverIds.add(serverId);
-  const clock = createManualFrameClock();
+  const manual = createManualFrameClock();
+  const clock = frames ?? manual;
   const client = new FakeDirectoryClient();
   const directory = new DirectorySync(
     serverId,
@@ -2121,10 +2123,52 @@ async function createFramedDirectory(serverId: string) {
   await directory.refreshAll();
   const titleOf = (agentId: string) =>
     useSessionStore.getState().sessions[serverId]?.agents.get(agentId)?.title;
-  return { client, clock, connection, directory, titleOf };
+  return { client, clock: manual, connection, directory, titleOf };
 }
 
 describe("live directory updates within a frame", () => {
+  it("publishes every Host's updates in a frame as one store commit", async () => {
+    const manual = createManualFrameClock();
+    const frames = shareFrames(manual);
+    const first = await createFramedDirectory("shared-frame-a", frames);
+    const second = await createFramedDirectory("shared-frame-b", frames);
+    first.client.emit(liveAgentUpdate("shared-frame-a", "a", "from a"));
+    second.client.emit(liveAgentUpdate("shared-frame-b", "b", "from b"));
+    first.client.emit(liveAgentUpdate("shared-frame-a", "a", "from a, later"));
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    manual.tick();
+
+    unsubscribe();
+    expect({
+      notifications,
+      a: first.titleOf("a"),
+      b: second.titleOf("b"),
+    }).toEqual({ notifications: 1, a: "from a, later", b: "from b" });
+    first.directory.dispose();
+    second.directory.dispose();
+  });
+
+  it("applies one Host's held updates on its own flush and leaves the other's for the frame", async () => {
+    const manual = createManualFrameClock();
+    const frames = shareFrames(manual);
+    const first = await createFramedDirectory("shared-flush-a", frames);
+    const second = await createFramedDirectory("shared-flush-b", frames);
+    first.client.emit(liveAgentUpdate("shared-flush-a", "a", "held a"));
+    second.client.emit(liveAgentUpdate("shared-flush-b", "b", "held b"));
+
+    first.directory.flushLiveUpdates();
+
+    expect([first.titleOf("a"), second.titleOf("b")]).toEqual(["held a", undefined]);
+    manual.tick();
+    expect(second.titleOf("b")).toBe("held b");
+    first.directory.dispose();
+    second.directory.dispose();
+  });
+
   it("applies a frame's agent and workspace updates in order as one store commit", async () => {
     const serverId = "framed-live-updates";
     const { client, clock, directory, titleOf } = await createFramedDirectory(serverId);

@@ -9,6 +9,7 @@ import {
 import { useSessionStore } from "@/stores/session-store";
 import { subscriptionFixture } from "../subscription-fixture";
 import { createManualFrameClock } from "./frame-clock-fixture";
+import { shareFrames } from "./live-batch";
 import { DirectorySync } from "./index";
 
 type WorkspaceEntry = Awaited<ReturnType<DaemonClient["fetchWorkspaces"]>>["entries"][number];
@@ -274,8 +275,10 @@ afterEach(() => {
 });
 
 describe("a burst of live directory updates across many Hosts", () => {
-  it("lands as one store commit per Host per frame and leaves untouched rows alone", async () => {
+  it("lands as one store commit per frame and leaves untouched rows alone", async () => {
     const clock = createManualFrameClock();
+    // One frame for every Host, as the app's HostRuntimeStore builds it.
+    const frames = shareFrames(clock);
     const hosts = serverIds.map((serverId, host) => {
       const client = new FakeHost(host);
       const store = useSessionStore.getState();
@@ -298,7 +301,7 @@ describe("a burst of live directory updates across many Hosts", () => {
           markWorkspaceError: () => undefined,
         },
         undefined,
-        { frameClock: clock },
+        { frameClock: frames },
       );
       directory.connectionChanged({
         client: client as unknown as DaemonClient,
@@ -323,11 +326,12 @@ describe("a burst of live directory updates across many Hosts", () => {
     expect(session(0).agents.get("h0-a0")?.title).toBe("live 0");
     expect(session(2).workspaces.has("h2-ws9")).toBe(false);
     // Before frame batching and the root-agent index (2026-10-30) the same burst cost 498 store
-    // notifications, 200 index recomputations, 200 sidebar model changes and 4,000 row recomputations.
+    // notifications, 200 index recomputations, 200 sidebar model changes and 4,000 row recomputations;
+    // with a frame per Host instead of one shared frame, 191, 138, 57 and 151.
     expect(probe.counts).toEqual({
-      storeNotifications: 191,
-      sidebarIndexRecomputations: 138,
-      sidebarModelChanges: 57,
+      storeNotifications: 15,
+      sidebarIndexRecomputations: 15,
+      sidebarModelChanges: 10,
       sessionRowRecomputations: 151,
     });
     for (const { directory } of hosts) directory.dispose();

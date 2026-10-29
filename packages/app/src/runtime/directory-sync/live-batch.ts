@@ -1,8 +1,9 @@
 import { Platform } from "react-native";
+import { batchSessionStoreUpdates } from "@/stores/session-store";
 
 /**
- * Clisbot: a Host's live `agent_update` / `workspace_update` messages land once per frame as one
- * store commit, instead of one or more commits per message. Off applies each message on arrival.
+ * Clisbot: live `agent_update` / `workspace_update` messages from every Host land once per frame as
+ * one store commit, instead of one or more commits per message. Off applies each on arrival.
  */
 export const DIRECTORY_FRAME_BATCHING_ENABLED = true;
 
@@ -14,9 +15,39 @@ export interface FrameClock {
   request(callback: () => void): () => void;
 }
 
-/** The app's frame clock for live directory updates; null while the flag is off. */
+/** The app's frame clock for live directory updates, shared by every Host; null while off. */
 export function createDirectoryFrameClock(): FrameClock | null {
-  return DIRECTORY_FRAME_BATCHING_ENABLED ? { request: requestFrame } : null;
+  return DIRECTORY_FRAME_BATCHING_ENABLED ? shareFrames({ request: requestFrame }) : null;
+}
+
+/**
+ * One frame for every Host: callbacks requested before it fires run together, in request order,
+ * inside one session-store batch, so a frame publishes one commit however many Hosts sent updates.
+ * A callback cancelled before the frame (its Host flushed early) does not run.
+ */
+export function shareFrames(clock: FrameClock): FrameClock {
+  const pending = new Set<() => void>();
+  let cancelFrame: (() => void) | null = null;
+  function runFrame(): void {
+    cancelFrame = null;
+    const callbacks = [...pending];
+    pending.clear();
+    batchSessionStoreUpdates(() => {
+      for (const callback of callbacks) callback();
+    });
+  }
+  return {
+    request(callback) {
+      pending.add(callback);
+      cancelFrame ??= clock.request(runFrame);
+      return () => {
+        // A callback the frame already took is no longer pending; it must not cancel the next frame.
+        if (!pending.delete(callback) || pending.size > 0 || !cancelFrame) return;
+        cancelFrame();
+        cancelFrame = null;
+      };
+    },
+  };
 }
 
 function requestFrame(callback: () => void): () => void {
