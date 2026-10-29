@@ -1,0 +1,21 @@
+diff --git a/node_modules/react-native-reanimated/android/src/main/java/com/swmansion/reanimated/NativeProxy.kt b/node_modules/react-native-reanimated/android/src/main/java/com/swmansion/reanimated/NativeProxy.kt
+--- a/node_modules/react-native-reanimated/android/src/main/java/com/swmansion/reanimated/NativeProxy.kt
++++ b/node_modules/react-native-reanimated/android/src/main/java/com/swmansion/reanimated/NativeProxy.kt
+@@ -253,7 +253,16 @@
+         SynchronousPropsBufferParser.parse(intBuffer, doubleBuffer) { viewTag, props ->
+             if (BuildConfig.IS_REACT_NATIVE_86_OR_NEWER) {
+                 try {
+-                    updatePropsSynchronouslyMethod.invoke(mountingManager, viewTag, props)
++                    // COMPAT(reanimated-stale-tag): added in 2.2.1; remove when upstream safely skips removed Fabric tags.
++                    // A UI-thread update can outlive its Fabric view during unmount. Resolve on
++                    // that same thread and drop only targets that are already unavailable.
++                    val mounted = try {
++                        mFabricUIManager.resolveView(viewTag) != null
++                    } catch (e: IllegalViewOperationException) {
++                        // Preallocated tags can still accept props before a View exists.
++                        true
++                    }
++                    if (mounted) updatePropsSynchronouslyMethod.invoke(mountingManager, viewTag, props)
+                 } catch (e: Exception) {
+                     Log.w("Reanimated", "synchronouslyUpdateUIProps failed for tag $viewTag", e)
+                 }

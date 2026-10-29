@@ -183,6 +183,15 @@ the result. Preserve URL and ownership semantics, including invalid input and ac
 not replace URL parsing with string-prefix matching. Profile the actual path before attributing a
 CPU sample to it.
 
+### Reanimated stale Fabric tags
+
+`COMPAT(reanimated-stale-tag)` patches Reanimated 4.5.1 on React Native 0.86 to skip a
+synchronous update when its Fabric view is already gone. It preserves updates for tags being
+preallocated and continues to report other failures. Remove the patch and its postinstall version
+guard after upstream safely handles removed Fabric tags, then verify repeated Android pane
+unmounts, valid animations, and preallocation on a real device. A Reanimated version change must
+fail the install until this compatibility patch has been reviewed for that version.
+
 ## Running on an emulator against a worktree daemon
 
 `npm run android` builds and installs the dev client, but two connections have to reach your Mac from inside the emulator — Metro (the JS bundle) and the Clisbot daemon — and **the emulator does not share the host's loopback**: `localhost` inside the emulator is the emulator itself. Reach the host at `10.0.2.2` (the standard AVD's host alias) for both:
