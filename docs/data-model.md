@@ -603,9 +603,10 @@ Right-sidebar client state splits on whether it is determined by the directory o
 ### Replica row store
 
 The durable client replica uses IndexedDB on browser/Electron and expo-sqlite on native. Rows use the
-compound key `(serverId, kind, id)`; kinds are `agent`, `workspace`, `project`, `timeline`, and
-`checkpoint`. Directory entities have individual rows, timelines use the agent id, and the checkpoint
-uses the singleton id.
+compound key `(serverId, kind, id)`; kinds are `agent`, `workspace`, `project`, `timeline`,
+`transcript`, and `checkpoint`. Directory entities have individual rows, timelines use the agent id,
+chat transcripts the chat id, and the checkpoint uses the singleton id. Tail rows (`timeline`,
+`transcript`) also carry `opened_at`, the last time the user opened them.
 
 The store is a typed persistence boundary. It returns values to directory and timeline owners and
 accepts their explicit commits; it never reads or writes UI state. Reads are scoped to the requested
@@ -618,10 +619,13 @@ then retry only when a requested row changes during the read. Unrelated agent st
 invalidate the read. Directory baseline replacements and host removal or renaming still invalidate
 the affected reads.
 
-The cache is capped at 32 MiB and evicts whole hosts in least-recently-written order. Budget
-bookkeeping may scan opaque row sizes during a deferred write, never during host registry startup or
-before a requested cache row can paint. The row store is not encrypted. A cached timeline can contain
-source code, prompts, and tool output; encrypted-at-rest storage is a separate security decision.
+The cache is capped at 32 MiB. It evicts tails least recently opened first and keeps directory rows
+while their Host is registered; what a tail keeps, the save window, the 30-day sweep and clearing
+are in [offline cache](features/offline/offline-cache.md). With that slice's flag off it evicts whole
+hosts in least-recently-written order. Budget bookkeeping may scan opaque row sizes during a deferred
+write, never during host registry startup or before a requested cache row can paint. The row store
+is not encrypted. A cached tail can contain source code and prompts (tool output is no longer
+written); encrypted-at-rest storage is a separate security decision.
 
 ### Draft Store
 

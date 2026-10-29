@@ -4,7 +4,8 @@ A company Hub can front a hundred or more sandbox Hosts. At that scale something
 unreachable, so the unit of failure is one source (a Host or a Hub), never the app. This doc
 records the parameters and rules the app follows so one bad source cannot freeze, hide or
 flicker everything else. Problem statement and later phases live outside the repo in the
-Offline Experience proposal (O1 → O2 → O3, approved 2026-10-25).
+Offline Experience proposal (O1 → O2 → O3, approved 2026-10-25). O2's first slice, the bounded
+tail cache and Settings → Storage, is [offline cache](offline-cache.md).
 
 ## Reconnect pacing
 
