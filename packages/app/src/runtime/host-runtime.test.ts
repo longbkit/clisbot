@@ -39,6 +39,7 @@ vi.mock("@/device-access/credentials", async (importOriginal) => ({
 import { registerHostAccessTicketResolver } from "./host-session-access";
 
 import { subscriptionFixture } from "./subscription-fixture";
+import { createManualFrameClock } from "./directory-sync/frame-clock-fixture";
 import { readDesktopManagedLocalCredential } from "@/desktop/daemon/local-credential";
 import type { HostConfirmationRequest } from "./host-confirmation";
 
@@ -3603,6 +3604,62 @@ describe("HostRuntimeStore", () => {
       useSessionStore.getState().sessions[host.serverId]?.agents.get("agent-pre-session")?.title,
     ).toBe("before-session");
 
+    store.syncHosts([]);
+    useSessionStore.getState().clearSession(host.serverId);
+  });
+
+  it("applies live directory updates held for the next frame when the app goes to the background", async () => {
+    const host = makeHost({
+      serverId: "srv_background_flush",
+      connections: [{ id: "direct:lan:6868", type: "directTcp", endpoint: "lan:6868" }],
+    });
+    const fakeClient = new FakeDaemonClient();
+    fakeClient.setConnectionState({ status: "connected" });
+    const entry = makeFetchAgentsEntry({
+      id: "agent-held",
+      cwd: "/repo",
+      updatedAt: "2026-07-12T10:00:00.000Z",
+      title: "snapshot",
+    });
+    fakeClient.fetchAgentsResponses.push(makeFetchAgentsPayload({ entries: [entry] }));
+    // A frame that never comes: only the background flush can apply what is held.
+    const frames = createManualFrameClock();
+    const store = new HostRuntimeStore({
+      deps: {
+        createClient: () => fakeClient as unknown as DaemonClient,
+        connectToDaemon: async () => ({
+          client: fakeClient as unknown as DaemonClient,
+          serverId: host.serverId,
+          hostname: null,
+        }),
+        getClientId: async () => "cid_background_flush",
+      },
+      directoryFrameClock: frames,
+    });
+    store.syncHosts([host]);
+    await waitForHostOnline(store, host.serverId);
+    useSessionStore.getState().updateSessionServerInfo(host.serverId, {
+      serverId: host.serverId,
+      hostname: null,
+      version: "test",
+    });
+    await store.refreshAgentDirectory({
+      serverId: host.serverId,
+      subscribe: {},
+      page: { limit: 200 },
+    });
+    const titleOf = () =>
+      useSessionStore.getState().sessions[host.serverId]?.agents.get("agent-held")?.title;
+    fakeClient.agentUpdate({
+      kind: "upsert",
+      agent: { ...entry.agent, title: "held", updatedAt: "2026-07-12T11:00:00.000Z" },
+      project: entry.project,
+    });
+    expect(titleOf()).toBe("snapshot");
+
+    store.setAppVisible(false);
+
+    expect(titleOf()).toBe("held");
     store.syncHosts([]);
     useSessionStore.getState().clearSession(host.serverId);
   });
