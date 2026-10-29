@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import React, { useCallback, useState, useSyncExternalStore } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import React, { memo, useCallback, useEffect, useSyncExternalStore } from "react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@react-native-async-storage/async-storage", () => ({
@@ -8,19 +8,20 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 }));
 const state = vi.hoisted(() => ({
   compact: true,
-  os: "android",
   sessions: ["mine"],
-  listeners: new Set<() => void>(),
   chats: ["first"],
-  chatListeners: new Set<() => void>(),
+  listeners: new Set<() => void>(),
+  mounts: { work: 0, chats: 0 },
+  bodyRenders: { work: 0, chats: 0 },
 }));
 vi.mock("react-native", () => ({
-  Platform: {
-    get OS() {
-      return state.os;
-    },
+  StyleSheet: {
+    compose: (base: object, extra: object) => [base, extra],
+    create: (styles: object) => styles,
   },
-  View: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  View: ({ children, pointerEvents }: { children: React.ReactNode; pointerEvents?: string }) => (
+    <div data-pointer-events={pointerEvents}>{children}</div>
+  ),
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({ content: {}, panel: {}, desktop: {} }) },
@@ -28,22 +29,32 @@ vi.mock("react-native-unistyles", () => ({
 vi.mock("expo-router", () => ({ usePathname: () => "/work" }));
 vi.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0 }) }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => state.compact }));
-vi.mock("@/components/retained-panel", () => ({
-  RetainedPanel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  RetainedPanelActivity: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-vi.mock("./work-pane", () => ({
-  WorkPane: () => {
+
+/** The fake Host store both panes read; `publish` is one Host update. */
+function subscribe(listener: () => void) {
+  state.listeners.add(listener);
+  return () => state.listeners.delete(listener);
+}
+function publish(next: { sessions?: string[]; chats?: string[] }) {
+  act(() => {
+    if (next.sessions) state.sessions = next.sessions;
+    if (next.chats) state.chats = next.chats;
+    for (const notify of state.listeners) notify();
+  });
+}
+
+/**
+ * Both panes mirror the production shape: an owner reads the store and holds it while its retained
+ * panel is hidden, and a memoized body renders the rows.
+ */
+vi.mock("./work-pane", async () => {
+  const { useRetainedPanelActive } = await import("@/components/retained-panel");
+  const { useHeldWhileInactive } = await import("@/hooks/use-held-while-inactive");
+  const WorkBody = memo(function WorkBody({ sessions }: { sessions: string[] }) {
+    state.bodyRenders.work += 1;
     const scope = useNavigationStore((value) => value.scopes.work);
     const chip = useNavigationStore((value) => value.workChip);
     const lastList = useNavigationStore((value) => value.lastList);
-    const sessions = useSyncExternalStore(
-      (listener) => {
-        state.listeners.add(listener);
-        return () => state.listeners.delete(listener);
-      },
-      () => state.sessions,
-    );
     return (
       <div data-testid="work">
         <div data-testid="work-preferences">{`${scope}:${chip}:${lastList}`}</div>
@@ -54,31 +65,34 @@ vi.mock("./work-pane", () => ({
         ))}
       </div>
     );
-  },
-}));
-vi.mock("./chats-pane", () => ({
-  ChatsPane: (props: {
-    search?: string;
-    setSearch?: (value: string) => void;
-    searchOpen?: boolean;
-    setSearchOpen?: (value: boolean) => void;
-  }) => {
-    const [localSearch, setLocalSearch] = useState("");
-    const [localSearchOpen, setLocalSearchOpen] = useState(false);
+  });
+  return {
+    WorkPane: () => {
+      useEffect(() => {
+        state.mounts.work += 1;
+      }, []);
+      const active = useRetainedPanelActive();
+      const sessions = useSyncExternalStore(subscribe, () => state.sessions);
+      return <WorkBody sessions={useHeldWhileInactive(sessions, active)} />;
+    },
+  };
+});
+vi.mock("./chats-pane", async () => {
+  const { useRetainedPanelActive } = await import("@/components/retained-panel");
+  const { useHeldWhileInactive } = await import("@/hooks/use-held-while-inactive");
+  interface ChatsBodyProps {
+    chats: string[];
+    search: string;
+    setSearch: (value: string) => void;
+    searchOpen: boolean;
+    setSearchOpen: (value: boolean) => void;
+  }
+  const ChatsBody = memo(function ChatsBody(props: ChatsBodyProps) {
+    state.bodyRenders.chats += 1;
     const scope = useNavigationStore((value) => value.scopes.chats);
     const chip = useNavigationStore((value) => value.chatsChip);
     const lastList = useNavigationStore((value) => value.lastList);
-    const chats = useSyncExternalStore(
-      (listener) => {
-        state.chatListeners.add(listener);
-        return () => state.chatListeners.delete(listener);
-      },
-      () => state.chats,
-    );
-    const search = props.search ?? localSearch;
-    const searchOpen = props.searchOpen ?? localSearchOpen;
-    const setSearchOpen = props.setSearchOpen ?? setLocalSearchOpen;
-    const setSearch = props.setSearch ?? setLocalSearch;
+    const { setSearchOpen, setSearch } = props;
     const openSearch = useCallback(() => setSearchOpen(true), [setSearchOpen]);
     const changeSearch = useCallback(
       (event: React.ChangeEvent<HTMLInputElement>) => setSearch(event.target.value),
@@ -86,23 +100,32 @@ vi.mock("./chats-pane", () => ({
     );
     return (
       <div data-testid="chats">
-        <div>Chats</div>
         <div data-testid="chats-preferences">{`${scope}:${chip}:${lastList}`}</div>
         <button type="button" onClick={openSearch}>
           Search
         </button>
-        {searchOpen ? (
-          <input aria-label="Chat search" value={search} onChange={changeSearch} />
+        {props.searchOpen ? (
+          <input aria-label="Chat search" value={props.search} onChange={changeSearch} />
         ) : null}
-        {chats.map((chat) => (
+        {props.chats.map((chat) => (
           <div key={chat} data-testid="chat-row">
             {chat}
           </div>
         ))}
       </div>
     );
-  },
-}));
+  });
+  return {
+    ChatsPane: (props: Omit<ChatsBodyProps, "chats">) => {
+      useEffect(() => {
+        state.mounts.chats += 1;
+      }, []);
+      const active = useRetainedPanelActive();
+      const chats = useSyncExternalStore(subscribe, () => state.chats);
+      return <ChatsBody {...props} chats={useHeldWhileInactive(chats, active)} />;
+    },
+  };
+});
 vi.mock("@/clisbot/bots/feature", () => ({
   useBotsFeatureHosts: () => [],
   useBotCreationHosts: () => [],
@@ -126,17 +149,36 @@ vi.mock("./search-integration", () => ({}));
 vi.mock("./use-open-section", () => ({}));
 vi.mock("./opened-session", () => ({}));
 
+import { RetainedPanelActivity } from "@/components/retained-panel";
 import { ListContent } from "./list-panel";
-import { useNavigationStore } from "./store";
+import { useNavigationStore, type ListSection } from "./store";
+
+/** The list panel as the phone and desktop chrome mount it: an activity gate around the lists. */
+function Lists({ section, active }: { section: ListSection; active: boolean }) {
+  return (
+    <RetainedPanelActivity active={active}>
+      <ListContent section={section} active={active} />
+    </RetainedPanelActivity>
+  );
+}
+
+function rows(testId: string): string[] {
+  return screen.queryAllByTestId(testId).map((row) => row.textContent ?? "");
+}
+
+function resetRenderCounts() {
+  state.bodyRenders.work = 0;
+  state.bodyRenders.chats = 0;
+}
 
 afterEach(() => {
   cleanup();
   state.listeners.clear();
-  state.chatListeners.clear();
   state.sessions = ["mine"];
   state.chats = ["first"];
   state.compact = true;
-  state.os = "android";
+  state.mounts = { work: 0, chats: 0 };
+  resetRenderCounts();
   useNavigationStore.setState({
     scopes: { home: "mine", chats: "mine", work: "mine" },
     workChip: "all",
@@ -145,108 +187,90 @@ afterEach(() => {
   });
 });
 
-describe("retained Chats list activity", () => {
-  it("does not mount or rebuild rows while hidden and shows current rows on return", () => {
-    const view = render(<ListContent section="chats" active />);
-    expect(screen.getByTestId("chat-row").textContent).toBe("first");
-    view.rerender(<ListContent section="chats" active={false} />);
-    expect(screen.queryByTestId("chats")).toBeNull();
-    expect(state.chatListeners.size).toBe(0);
-    state.chats = ["first", "new"];
-    for (const notify of state.chatListeners) notify();
-    expect(screen.queryAllByTestId("chat-row")).toHaveLength(0);
-    view.rerender(<ListContent section="chats" active />);
-    expect(screen.getAllByTestId("chat-row").map((row) => row.textContent)).toEqual([
-      "first",
-      "new",
-    ]);
+describe("retained list switching", () => {
+  it("keeps both lists mounted and renders no hidden body while Hosts publish", () => {
+    const view = render(<Lists section="work" active />);
+    view.rerender(<Lists section="chats" active />);
+    expect(state.mounts).toEqual({ work: 1, chats: 1 });
+    const sequence: ListSection[] = ["work", "chats", "work", "chats", "work", "chats"];
+    for (const [index, section] of sequence.entries()) {
+      view.rerender(<Lists section={section} active />);
+      resetRenderCounts();
+      publish({ sessions: [`session-${index}`], chats: [`chat-${index}`] });
+      const hidden = section === "work" ? "chats" : "work";
+      expect(state.bodyRenders[hidden]).toBe(0);
+      expect(state.bodyRenders[section]).toBe(1);
+    }
+    expect(state.mounts).toEqual({ work: 1, chats: 1 });
   });
 
-  it("keeps scope, chip and an open search across release and return", () => {
+  it("renders no list body while the whole panel is hidden behind another tab", () => {
+    const view = render(<Lists section="work" active />);
+    view.rerender(<Lists section="chats" active />);
+    view.rerender(<Lists section="chats" active={false} />);
+    resetRenderCounts();
+    publish({ sessions: ["mine", "new"], chats: ["first", "new"] });
+    publish({ sessions: ["mine", "newer"], chats: ["first", "newer"] });
+    expect(state.bodyRenders).toEqual({ work: 0, chats: 0 });
+    expect(rows("chat-row")).toEqual(["first"]);
+  });
+
+  it("shows the latest rows in the first render after a hidden list returns", () => {
+    const view = render(<Lists section="work" active />);
+    view.rerender(<Lists section="chats" active />);
+    publish({ sessions: ["mine", "new"] });
+    expect(rows("work-row")).toEqual(["mine"]);
+    resetRenderCounts();
+    view.rerender(<Lists section="work" active />);
+    expect(state.bodyRenders.work).toBe(1);
+    expect(rows("work-row")).toEqual(["mine", "new"]);
+  });
+
+  it("does not mount a remembered list until the panel shows it", () => {
+    const view = render(<Lists section="work" active={false} />);
+    expect(state.mounts).toEqual({ work: 0, chats: 0 });
+    expect(screen.queryByTestId("work")).toBeNull();
+    view.rerender(<Lists section="work" active />);
+    expect(state.mounts).toEqual({ work: 1, chats: 0 });
+    expect(rows("work-row")).toEqual(["mine"]);
+  });
+
+  it("keeps the same behavior on desktop", () => {
+    state.compact = false;
+    const view = render(<Lists section="chats" active />);
+    view.rerender(<Lists section="work" active />);
+    view.rerender(<Lists section="chats" active />);
+    expect(state.mounts).toEqual({ work: 1, chats: 1 });
+    expect(rows("chat-row")).toEqual(["first"]);
+    expect(rows("work-row")).toEqual(["mine"]);
+  });
+});
+
+describe("list preferences across switches", () => {
+  it("keeps Chats' scope, chip and open search", () => {
     useNavigationStore.setState({
       scopes: { home: "mine", chats: "others", work: "mine" },
       chatsChip: "unread",
       lastList: "chats",
     });
-    const view = render(<ListContent section="chats" active />);
+    const view = render(<Lists section="chats" active />);
     fireEvent.click(screen.getByText("Search"));
     fireEvent.change(screen.getByLabelText("Chat search"), { target: { value: "project" } });
-    view.rerender(<ListContent section="work" active />);
-    expect(screen.queryByTestId("chats")).toBeNull();
-    view.rerender(<ListContent section="chats" active />);
+    view.rerender(<Lists section="work" active />);
+    view.rerender(<Lists section="chats" active />);
     expect(screen.getByTestId("chats-preferences").textContent).toBe("others:unread:chats");
     expect((screen.getByLabelText("Chat search") as HTMLInputElement).value).toBe("project");
   });
 
-  it("retains Chats on desktop and iOS", () => {
-    state.compact = false;
-    const desktop = render(<ListContent section="chats" active />);
-    desktop.rerender(<ListContent section="work" active={false} />);
-    expect(screen.getByTestId("chat-row").textContent).toBe("first");
-    desktop.unmount();
-    state.compact = true;
-    state.os = "ios";
-    const ios = render(<ListContent section="chats" active />);
-    ios.rerender(<ListContent section="work" active={false} />);
-    expect(screen.getByTestId("chat-row").textContent).toBe("first");
-  });
-});
-
-describe("retained Workspace list activity", () => {
-  it("does not mount or rebuild rows while the compact panel is hidden and shows current rows on return", () => {
-    const view = render(<ListContent section="work" active />);
-    expect(screen.getAllByTestId("work-row").map((row) => row.textContent)).toEqual(["mine"]);
-    view.rerender(<ListContent section="work" active={false} />);
-    expect(screen.queryByTestId("work")).toBeNull();
-    expect(state.listeners.size).toBe(0);
-    state.sessions = ["mine", "new"];
-    for (const notify of state.listeners) notify();
-    expect(screen.queryAllByTestId("work-row")).toHaveLength(0);
-    view.rerender(<ListContent section="work" active />);
-    expect(screen.getAllByTestId("work-row").map((row) => row.textContent)).toEqual([
-      "mine",
-      "new",
-    ]);
-  });
-  it("does not mount a remembered Work list while the panel starts hidden", () => {
-    render(<ListContent section="work" active={false} />);
-    expect(screen.queryByTestId("work")).toBeNull();
-    expect(state.listeners.size).toBe(0);
-  });
-  it("keeps the selected list, scope and chip when Work is released and shown again", () => {
+  it("keeps Work's scope and chip", () => {
     useNavigationStore.setState({
       scopes: { home: "mine", chats: "mine", work: "others" },
       workChip: "running",
       lastList: "work",
     });
-    const view = render(<ListContent section="work" active />);
+    const view = render(<Lists section="work" active />);
+    view.rerender(<Lists section="work" active={false} />);
+    view.rerender(<Lists section="work" active />);
     expect(screen.getByTestId("work-preferences").textContent).toBe("others:running:work");
-    view.rerender(<ListContent section="work" active={false} />);
-    expect(screen.queryByTestId("work")).toBeNull();
-    view.rerender(<ListContent section="work" active />);
-    expect(screen.getByTestId("work-preferences").textContent).toBe("others:running:work");
-  });
-  it("releases Work when switching to Chats on a compact screen", () => {
-    const view = render(<ListContent section="work" active />);
-    view.rerender(<ListContent section="chats" active />);
-    expect(screen.queryByTestId("work")).toBeNull();
-    expect(screen.getByText("Chats").textContent).toBe("Chats");
-    state.sessions = ["other"];
-    for (const notify of state.listeners) notify();
-    expect(screen.queryAllByTestId("work-row")).toHaveLength(0);
-    view.rerender(<ListContent section="work" active />);
-    expect(screen.getAllByTestId("work-row").map((row) => row.textContent)).toEqual(["other"]);
-  });
-  it("keeps the desktop Work list mounted when hidden", () => {
-    state.compact = false;
-    const view = render(<ListContent section="work" active />);
-    view.rerender(<ListContent section="chats" active={false} />);
-    expect(screen.getByTestId("work-row").textContent).toBe("mine");
-  });
-  it("retains Work on iOS", () => {
-    state.os = "ios";
-    const view = render(<ListContent section="work" active />);
-    view.rerender(<ListContent section="chats" active={false} />);
-    expect(screen.getByTestId("work-row").textContent).toBe("mine");
   });
 });

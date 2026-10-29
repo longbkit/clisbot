@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type MutableRefObject } from "react";
+import { memo, useCallback, useMemo, useState, type MutableRefObject } from "react";
 import { View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
@@ -11,7 +11,7 @@ import { SidebarWorkspaceList } from "@/components/sidebar-workspace-list";
 import { SidebarActiveFilters } from "@/components/sidebar/display-preferences/active-filters";
 import { SidebarDisplayPreferencesMenu } from "@/components/sidebar/display-preferences/menu";
 import { SidebarMetadataNotice } from "@/components/sidebar/empty-states";
-import { useSidebarModel } from "@/components/sidebar/sidebar-model";
+import { RetainedSidebarModel, useSidebarModel } from "@/components/sidebar/sidebar-model";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,15 +55,21 @@ const CHIP_LABELS: Record<WorkChip, string> = {
  * Work (brief C4): work sessions only, project → workspace → session as before, pinned work on
  * top with a pin mark. The display menu, grouping tabs and active filters are the sidebar's own.
  */
-export function WorkPane({
-  onBeforeNavigate,
-  parentGestureRef,
-  active,
-}: {
+export const WorkPane = memo(function WorkPane(props: WorkPaneProps) {
+  return (
+    <RetainedSidebarModel>
+      <WorkPaneContent {...props} />
+    </RetainedSidebarModel>
+  );
+});
+
+interface WorkPaneProps {
   onBeforeNavigate?: ChatListAdmission;
   parentGestureRef?: MutableRefObject<GestureType | undefined>;
   active?: boolean;
-}) {
+}
+
+function WorkPaneContent({ onBeforeNavigate, parentGestureRef, active }: WorkPaneProps) {
   const { t } = useTranslation();
   const model = useSidebarModel();
   const openSearch = useOpenSearch();

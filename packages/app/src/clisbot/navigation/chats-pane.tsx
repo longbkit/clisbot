@@ -39,6 +39,8 @@ import {
   type ChatsListItem,
 } from "./chat-list";
 import { ChatsDisplayMenu } from "./chats-display-menu";
+import { useRetainedPanelActive } from "@/components/retained-panel";
+import { useHeldWhileInactive } from "@/hooks/use-held-while-inactive";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { RenderProfile } from "@/utils/render-profiler";
 import { SPACING } from "@/styles/theme";
@@ -47,7 +49,7 @@ import { HostsUnreachableState } from "./hosts-unreachable-state";
 import { ListState } from "./list-state";
 import { OutsideFilterNotice } from "./outside-filter-notice";
 import { useHeldOrder } from "./held-order";
-import { inScope } from "./ownership";
+import { inScope, type OwnershipScope } from "./ownership";
 import { SectionControls } from "./section-controls";
 import {
   HeaderMenuIcon,
@@ -57,7 +59,7 @@ import {
 } from "./section-header";
 import { useNavigationStore } from "./store";
 import { useChatEntries, type ChatsEntry } from "./use-chat-entries";
-import { useHostFilter } from "./host-filter";
+import { useHostFilterIds } from "./host-filter";
 
 const CHIP_LABELS: Record<ChatsChip, string> = {
   all: "navigation.chips.all",
@@ -68,22 +70,37 @@ const CHIP_LABELS: Record<ChatsChip, string> = {
   company: "navigation.chips.company",
 };
 
-/** Chats (brief C3): one Telegram-style list of Bot DMs and group chats, pins on top. */
-export function ChatsPane({
-  onBeforeNavigate,
-  searchOpen,
-  setSearchOpen,
-  search,
-  setSearch,
-}: {
+interface ChatsPaneProps {
   onBeforeNavigate?: ChatListAdmission;
   searchOpen: boolean;
   setSearchOpen: Dispatch<SetStateAction<boolean>>;
   search: string;
   setSearch: Dispatch<SetStateAction<string>>;
-}) {
+}
+
+/**
+ * Chats (brief C3): one Telegram-style list of Bot DMs and group chats, pins on top. This owner
+ * reads the catalog and holds it while the pane's retained panel is hidden, so Host updates skip
+ * the list until it is shown again.
+ */
+export const ChatsPane = memo(function ChatsPane(props: ChatsPaneProps) {
+  const active = useRetainedPanelActive();
+  const { entries, catalog } = useHeldWhileInactive(useChatEntries(active), active);
+  return <ChatsPaneContent {...props} entries={entries} catalog={catalog} />;
+});
+
+type ChatEntries = ReturnType<typeof useChatEntries>;
+
+const ChatsPaneContent = memo(function ChatsPaneContent({
+  onBeforeNavigate,
+  searchOpen,
+  setSearchOpen,
+  search,
+  setSearch,
+  entries,
+  catalog,
+}: ChatsPaneProps & ChatEntries) {
   const { t } = useTranslation();
-  const { entries, catalog } = useChatEntries();
   const scope = useNavigationStore((state) => state.scopes.chats);
   const chip = useNavigationStore((state) => state.chatsChip);
   const setChip = useNavigationStore((state) => state.setChatsChip);
@@ -93,7 +110,7 @@ export function ChatsPane({
   }, [setSearch, setSearchOpen]);
   const sort = useNavigationStore((state) => state.chatsSort);
   const split = useNavigationStore((state) => state.chatsSplit);
-  const { serverIds } = useHostFilter();
+  const serverIds = useHostFilterIds();
   const query = useMemo(
     () => ({ entries, scope, chip, search, sort, serverIds }),
     [entries, scope, chip, search, sort, serverIds],
@@ -105,17 +122,7 @@ export function ChatsPane({
     () => chatListItems(held ? orderChatList({ ...query, held }) : fresh, split),
     [held, fresh, query, split],
   );
-  const chips = useMemo<FilterChip<ChatsChip>[]>(() => {
-    const scoped = entries.filter((entry) => inScope(scope, entry.ownership));
-    return CHATS_CHIPS.map((value) => ({
-      value,
-      label: t(CHIP_LABELS[value]),
-      count:
-        value === "all"
-          ? undefined
-          : scoped.filter((entry) => matchesChatsChip(entry, value)).length,
-    }));
-  }, [entries, scope, t]);
+  const chips = useMemo(() => chatsChips(entries, scope, t), [entries, scope, t]);
   const actions = useChatRowActions(
     catalog.chatRows,
     onBeforeNavigate,
@@ -173,16 +180,30 @@ export function ChatsPane({
       </View>
     </RenderProfile>
   );
-}
+});
 
 const displayMenu = <ChatsDisplayMenu />;
+
+function chatsChips(
+  entries: readonly ChatsEntry[],
+  scope: OwnershipScope,
+  t: (key: string) => string,
+): FilterChip<ChatsChip>[] {
+  const scoped = entries.filter((entry) => inScope(scope, entry.ownership));
+  return CHATS_CHIPS.map((value) => ({
+    value,
+    label: t(CHIP_LABELS[value]),
+    count:
+      value === "all" ? undefined : scoped.filter((entry) => matchesChatsChip(entry, value)).length,
+  }));
+}
 
 /** Chats with no rows: still loading, failed on every Host, or empty (or filtered to nothing). */
 function ChatsListState({
   catalog,
   filtered,
 }: {
-  catalog: ReturnType<typeof useChatEntries>["catalog"];
+  catalog: ChatEntries["catalog"];
   filtered: boolean;
 }) {
   const { t } = useTranslation();

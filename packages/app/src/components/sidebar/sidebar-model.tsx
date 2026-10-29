@@ -27,8 +27,11 @@ import { buildSidebarProjection } from "./sidebar-projection";
 import { useWorkListFilter, type WorkFilter } from "@/clisbot/navigation/work-filter";
 import {
   WorkspaceSessionFilterProvider,
+  useWorkspaceSessionFilter,
   type WorkspaceSessionFilter,
 } from "@/clisbot/workspace-sessions/session-filter";
+import { useRetainedPanelActive } from "@/components/retained-panel";
+import { useHeldWhileInactive } from "@/hooks/use-held-while-inactive";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
 import { filterWorkspacesByLabels } from "./sidebar-labels";
 import {
@@ -285,6 +288,24 @@ export function SidebarModelProvider({
 
   return (
     <SidebarModelContext.Provider value={value}>
+      <WorkspaceSessionFilterProvider value={sessionFilter}>
+        {children}
+      </WorkspaceSessionFilterProvider>
+    </SidebarModelContext.Provider>
+  );
+}
+
+/**
+ * The model as a retained list pane sees it: held while that pane's retained panel is inactive.
+ * The provider stays live for the keyboard shortcuts and the visible chrome; a hidden Work pane
+ * keeps its last model and catches up in its first render back.
+ */
+export function RetainedSidebarModel({ children }: { children: ReactNode }) {
+  const active = useRetainedPanelActive();
+  const model = useHeldWhileInactive(useContext(SidebarModelContext), active);
+  const sessionFilter = useHeldWhileInactive(useWorkspaceSessionFilter(), active);
+  return (
+    <SidebarModelContext.Provider value={model}>
       <WorkspaceSessionFilterProvider value={sessionFilter}>
         {children}
       </WorkspaceSessionFilterProvider>

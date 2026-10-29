@@ -7,6 +7,7 @@ import { pinKey, useResourcePins } from "@/clisbot/bots/sidebar/pins";
 import type { BotsSidebarBot } from "@/clisbot/bots/sidebar/bots-section";
 import type { ChatsSidebarChat } from "@/clisbot/bots/sidebar/chats-section";
 import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
+import { useHeldWhileInactive } from "@/hooks/use-held-while-inactive";
 import { useHosts } from "@/runtime/host-runtime";
 import type { ChatListEntry } from "./chat-list";
 import { useChatOwnership } from "./use-chat-ownership";
@@ -33,8 +34,9 @@ function useCompanyHosts(): ReadonlySet<string> {
   }, [accounts, hosts]);
 }
 
-function useUnreadAgents(): ReadonlySet<string> {
-  const { agents } = useAggregatedAgents({ demand: false });
+/** Every agent update changes `agents`; a hidden Chats list keeps its set until it is shown. */
+function useUnreadAgents(active: boolean): ReadonlySet<string> {
+  const { agents } = useHeldWhileInactive(useAggregatedAgents({ demand: false }), active);
   const { listable } = useSourceLiveness();
   return useMemo(
     () =>
@@ -49,15 +51,16 @@ function useUnreadAgents(): ReadonlySet<string> {
 
 /**
  * Every Chats row (brief C3): each Bot's direct chat and each group chat, with the facts the
- * list orders and filters by. Chats' own Display menu holds the Host filter.
+ * list orders and filters by. Chats' own Display menu holds the Host filter. While `active` is
+ * false the catalog and unread agents are held, so a hidden list skips rebuilding its entries.
  */
-export function useChatEntries() {
-  const catalog = useSidebarCatalog();
+export function useChatEntries(active: boolean) {
+  const catalog = useHeldWhileInactive(useSidebarCatalog(), active);
   const { hosts, botRows, chatRows } = catalog;
   const { isPinned, pins } = useResourcePins(chatRows);
   const { chatOwnership, botOwnership } = useChatOwnership(chatRows);
   const company = useCompanyHosts();
-  const unread = useUnreadAgents();
+  const unread = useUnreadAgents(active);
   const entries = useMemo(() => {
     const multiple = hosts.length > 1;
     const order = new Map(pins.map((pin, index) => [pinKey(pin), index]));

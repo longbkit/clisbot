@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react";
-import { Platform, View } from "react-native";
+import { View } from "react-native";
 import { usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
@@ -75,8 +75,9 @@ function useListSection(): ListSection {
 }
 
 /**
- * Desktop keeps both lists mounted. On Android phones, hidden lists release their rows and
- * subscriptions; list preferences and the Chats search remain owned outside the released panes.
+ * Chats and Work mount on their first visit and stay mounted on every platform, so a tab switch
+ * only flips visibility. Each pane holds its inputs while its retained panel is inactive
+ * (`useHeldWhileInactive`), so a hidden list does not re-render on Host updates.
  */
 export function ListContent({
   section,
@@ -87,32 +88,28 @@ export function ListContent({
   onBeforeNavigate?: ChatListAdmission;
   active: boolean;
 }) {
-  const compact = useIsCompactFormFactor();
-  const releaseHiddenLists = compact && Platform.OS === "android";
   const [chatSearchOpen, setChatSearchOpen] = useState(false);
   const [chatSearch, setChatSearch] = useState("");
-  const [visited, setVisited] = useState<ReadonlySet<ListSection>>(() => new Set([section]));
-  if (!visited.has(section)) setVisited(new Set([...visited, section]));
+  const [visited, setVisited] = useState<ReadonlySet<ListSection>>(() =>
+    active ? new Set([section]) : new Set(),
+  );
+  if (active && !visited.has(section)) setVisited(new Set([...visited, section]));
   return (
     <>
       {visited.has("chats") ? (
         <RetainedPanel active={section === "chats"} style={styles.content}>
-          {!releaseHiddenLists || (active && section === "chats") ? (
-            <ChatsPane
-              onBeforeNavigate={onBeforeNavigate}
-              searchOpen={chatSearchOpen}
-              setSearchOpen={setChatSearchOpen}
-              search={chatSearch}
-              setSearch={setChatSearch}
-            />
-          ) : null}
+          <ChatsPane
+            onBeforeNavigate={onBeforeNavigate}
+            searchOpen={chatSearchOpen}
+            setSearchOpen={setChatSearchOpen}
+            search={chatSearch}
+            setSearch={setChatSearch}
+          />
         </RetainedPanel>
       ) : null}
       {visited.has("work") ? (
         <RetainedPanel active={section === "work"} style={styles.content}>
-          {!releaseHiddenLists || (active && section === "work") ? (
-            <WorkPane onBeforeNavigate={onBeforeNavigate} active={active && section === "work"} />
-          ) : null}
+          <WorkPane onBeforeNavigate={onBeforeNavigate} active={active && section === "work"} />
         </RetainedPanel>
       ) : null}
     </>

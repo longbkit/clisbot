@@ -69,10 +69,13 @@ The primary navigation says where you are; each section owns its header, filters
   component. A `FlatList`'s `contentContainerStyle` gets no Unistyles class on web
   ([unistyles](../../unistyles.md#main-gotcha-contentcontainerstyle)), so Chats and the flat
   Workspace list use theme-free `SPACING` insets.
-- **List retention** (`ListContent` in `list-panel.tsx`): Chats and Workspace stay mounted on
-  desktop, web and iOS. On Android phones hidden list content unmounts to release row subscriptions
-  and native views; returning rebuilds it and resets its scroll position. Scope, chips and Chats'
-  open search remain outside the released panes. Performance still needs device verification.
+- **List retention** (`ListContent` in `list-panel.tsx`): Chats and Workspace mount on their first
+  visit and stay mounted on every platform, so a tab switch only flips visibility and keeps scroll
+  position. A hidden list holds its inputs (`useHeldWhileInactive`): Workspace reads the sidebar
+  model through `RetainedSidebarModel`, Chats holds its catalog and unread agents in `ChatsPane`.
+  Host updates skip a hidden list; its first render back uses the latest data. Unmounting hidden
+  lists on Android (until 2026-10-30) made every switch back rebuild the list, about 2 s for
+  Workspace on a Galaxy S23 with 14 Hosts.
 
 ## Change map
 

@@ -179,6 +179,10 @@ definition, no longer eligible to begin.
   and use the retained-panel active signal to stop timers, polling, and other genuine background work.
   Hidden chat content is suspended on web only, through `retained-chat-content.web.tsx`, where DOM
   nodes carry no Fabric ownership; the native file keeps the chat live.
+- To stop hidden re-renders, hold the pane's inputs at its owner with `useHeldWhileInactive`
+  (`hooks/use-held-while-inactive.ts`) and pass them to a memoized body. The owner still subscribes;
+  the body skips every update until the panel is active, then renders once with the latest value.
+  Hold the derived model, not each row.
 - Catalog-backed surfaces narrow external-store snapshots and preserve unchanged directory row
   identity through the shared aggregation owner ([architecture](architecture.md)). Reducing hidden
   derivation work does not change the native workspace/tab retention limits or visibility ownership.
