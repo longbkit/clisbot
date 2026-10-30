@@ -10,8 +10,13 @@ import {
 import { type BackoffPolicy, ConnectLimiter, DEFAULT_BACKOFF_POLICY } from "./connection-backoff";
 import { hubListPollIntervalMs } from "@/clisbot/hub/host-inventory";
 
+/** Keychain reads: Android serializes them behind one keystore lock. */
+const credentialReads = vi.hoisted(() => ({ count: 0 }));
 vi.mock("@/desktop/daemon/local-credential", () => ({
-  readDesktopManagedLocalCredential: async () => undefined,
+  readDesktopManagedLocalCredential: async () => {
+    credentialReads.count += 1;
+    return undefined;
+  },
 }));
 
 /** Deterministic stand-in for Math.random (Park–Miller LCG). */
@@ -273,6 +278,27 @@ describe("an explicit retry", () => {
     await vi.advanceTimersByTimeAsync(500);
     await retry;
     expect(attemptsOf(fleet.stats, [0])).toEqual([2]);
+    await fleet.controllers[0]!.stop();
+  });
+
+  it("reads the keychain only for an attempt, not on every tick of the backoff", async () => {
+    vi.useFakeTimers({
+      toFake: ["Date", "setTimeout", "clearTimeout", "setInterval", "clearInterval"],
+    });
+    const fleet = startFleet({
+      hosts: 1,
+      unreachable: () => true,
+      policy: { baseDelayMs: 60_000, maxDelayMs: 60_000, random: () => 0.99 },
+    });
+    await vi.advanceTimersByTimeAsync(1_000);
+    credentialReads.count = 0;
+    // About 59 s of backoff is about 30 probe ticks; none of them is an attempt.
+    await vi.advanceTimersByTimeAsync(55_000);
+    expect(attemptsOf(fleet.stats, [0])).toEqual([1]);
+    expect(credentialReads.count).toBe(0);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(attemptsOf(fleet.stats, [0])).toEqual([2]);
+    expect(credentialReads.count).toBe(1);
     await fleet.controllers[0]!.stop();
   });
 });

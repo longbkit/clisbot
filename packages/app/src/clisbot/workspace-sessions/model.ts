@@ -4,6 +4,7 @@ import type { WorkspaceSessionFilter } from "./session-filter";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useAppSettings, type AppSettings } from "@/hooks/use-settings";
+import { useHeldWhileInactive } from "@/hooks/use-held-while-inactive";
 import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
@@ -292,6 +293,8 @@ export function useGroupedSidebarView(input: {
   pinnedCollapsed: boolean;
   collapsedWorkspaceGroupKeys: ReadonlySet<string>;
   sessionFilter?: WorkspaceSessionFilter | null;
+  /** False holds the session lines (a hidden retained pane). */
+  live?: boolean;
 }): { workspaceGroups: StatusDisplayGroup[]; shortcutModel: SidebarShortcutModel } {
   const { visible, activeOnly } = useSidebarWorkspaceSessions();
   const sessionsShown = visible && listsSessions(input.groupMode);
@@ -302,6 +305,7 @@ export function useGroupedSidebarView(input: {
     byStatus: input.groupMode === "status",
     activeOnly,
     sessionFilter: input.sessionFilter ?? null,
+    live: input.live !== false,
   });
   const shortcutModel = useMemo(
     () =>
@@ -328,21 +332,32 @@ function useDisplayGroups(input: {
   byStatus: boolean;
   activeOnly: boolean;
   sessionFilter: WorkspaceSessionFilter | null;
+  live: boolean;
 }): StatusDisplayGroup[] {
-  const { groups, sessionsShown, byStatus, activeOnly, sessionFilter } = input;
+  const { groups, sessionsShown, byStatus, activeOnly, sessionFilter, live } = input;
   const { t } = useTranslation();
-  const keepAgentIds = useOpenWorkspaceShownAgentIds(sessionsShown && activeOnly);
+  const keepAgentIds = useHeldWhileInactive(
+    useOpenWorkspaceShownAgentIds(sessionsShown && activeOnly),
+    live,
+  );
   const serverIds = useMemo(
     () => (sessionsShown ? [...new Set(groups.flatMap((g) => g.rows.map((r) => r.serverId)))] : []),
     [sessionsShown, groups],
   );
-  const agentMaps = useSessionStore(
-    useShallow((state) => serverIds.map((id) => state.sessions[id]?.agents ?? null)),
+  // Held with `serverIds`: the groups they come from are held upstream with the projection.
+  const agentMaps = useHeldWhileInactive(
+    useSessionStore(
+      useShallow((state) => serverIds.map((id) => state.sessions[id]?.agents ?? null)),
+    ),
+    live,
   );
-  const submissionMaps = useSessionStore(
-    useShallow((state) => serverIds.map((id) => state.sessions[id]?.messageSubmissions ?? null)),
+  const submissionMaps = useHeldWhileInactive(
+    useSessionStore(
+      useShallow((state) => serverIds.map((id) => state.sessions[id]?.messageSubmissions ?? null)),
+    ),
+    live,
   );
-  const cached = useCachedServerIds();
+  const cached = useHeldWhileInactive(useCachedServerIds(), live);
   // Rebuilds only the workspaces whose root agents or submissions moved; the rest keep their lines.
   const [displayGroupsOf] = useState(createSessionDisplayGroupsMemo);
   return useMemo(() => {

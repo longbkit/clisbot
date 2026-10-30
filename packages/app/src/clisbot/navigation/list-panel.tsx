@@ -20,6 +20,7 @@ import {
   useRetainedPanelActive,
 } from "@/components/retained-panel";
 import { SidebarModelProvider } from "@/components/sidebar/sidebar-model";
+import { WorkspaceShortcutTargetsSubscriber } from "@/components/workspace-shortcut-targets-subscriber";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { WindowChromeSafeArea } from "@/utils/desktop-window";
 import { ChatsPane } from "./chats-pane";
@@ -112,7 +113,9 @@ export function ListContent({
 /**
  * A phone's Chats or Work tab: the list is the tab screen, with no panel to slide. The tab
  * navigator keeps it mounted and marks it inactive while hidden; each pane holds its inputs then.
- * Work owns its sidebar model here because the sidebar chrome's provider does not reach the routes.
+ * Work owns the phone's only sidebar model (the sidebar chrome mounts none on phone tabs), so it
+ * also feeds the workspace shortcut targets; hidden, the model derives nothing and the targets
+ * stay as Work last showed them.
  */
 export const PhoneListTab = memo(function PhoneListTab({ section }: { section: ListSection }) {
   return (
@@ -139,8 +142,9 @@ function PhoneChats() {
 function PhoneWork() {
   const active = useRetainedPanelActive();
   return (
-    <SidebarModelProvider active={active}>
+    <SidebarModelProvider active={active} holdWhileInactive>
       <WorkPane active={active} />
+      <WorkspaceShortcutTargetsSubscriber enabled />
     </SidebarModelProvider>
   );
 }

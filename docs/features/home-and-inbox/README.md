@@ -103,7 +103,10 @@ Connect offers Connect a computer,
 Add a Hub and Troubleshoot. Problems the user can act on (a Host they use that is down, a Hub to
 sign in to or reach) collapse into one "connections need attention" line whose sheet gives each
 one action. The runtime reports an unreachable Host as connecting forever, so the strip calls a
-connection that errored or stayed connecting past 15 seconds "Can't connect". A Host is drawn the
+connection that errored or stayed connecting past 15 seconds "Can't connect". About ten surfaces
+read that verdict (strip, rail and More dots, each list's reachability), so the 15 s mark is one
+shared timer at the next Host's deadline (`clisbot/home/connect-stall-clock.ts`), not a clock per
+surface: ten 5 s clocks ran on the phone while any Host was connecting. A Host is drawn the
 same way everywhere it is named (`HostMark` in `components/host-status-dot.tsx`): this computer or a
 server glyph with the status dot on its corner, in the strip, the Host trigger and the Host picker.
 

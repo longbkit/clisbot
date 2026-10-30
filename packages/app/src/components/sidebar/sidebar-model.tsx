@@ -3,8 +3,12 @@ import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-mode
 import { useTranslation } from "react-i18next";
 import {
   matchesSessionMetadata,
+  sessionMetadataOptions,
   sessionMetadataRecoveryNotice,
 } from "@/clisbot/session-storage/directory";
+import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
+import { useSessionStore } from "@/stores/session-store";
+import { useShallow } from "zustand/react/shallow";
 import { useGroupedSidebarView, useSidebarGroupMode } from "@/clisbot/workspace-sessions/model";
 import type { StatusDisplayGroup } from "@/clisbot/workspace-sessions/status-sessions";
 import React, { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
@@ -56,6 +60,8 @@ interface SidebarModel extends SidebarWorkspacesListResult {
    */
   allProjects: SidebarProjectEntry[];
   metadataRecoveryNotice: string | null;
+  /** The user and channel filters' options, for the display menu and the active-filter chips. */
+  sessionMetadata: SessionMetadata;
   /** The project filter as it is actually being applied — see `resolveActiveProjectFilters`. */
   resolvedProjectFilters: readonly string[];
   hasProjectsBeforeFilter: boolean;
@@ -77,25 +83,33 @@ const SidebarModelContext = createContext<SidebarModel | null>(null);
 
 export function SidebarModelProvider({
   active,
+  holdWhileInactive = false,
   children,
 }: {
   active?: boolean;
+  /**
+   * For a provider read only by one retained pane (the phone's Work tab): while inactive it
+   * derives nothing and hands out the model it had when hidden; the first active render catches
+   * up. Without it an inactive provider stays live for the keyboard shortcuts.
+   */
+  holdWhileInactive?: boolean;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const list = useSidebarWorkspacesList({ enabled: active });
+  const live = active !== false || !holdWhileInactive;
+  const list = useSidebarWorkspacesList({ enabled: active, held: !live });
   const showBackground = useSidebarViewStore((state) => state.showBackground);
   const groupMode = useSidebarGroupMode();
   const userFilters = useSidebarViewStore((state) => state.userFilters);
   const channelFilters = useSidebarViewStore((state) => state.channelFilters);
   // Clisbot Navigation V2: Work's scope and quick-filter chips narrow workspaces like metadata does.
-  const workFilter = useWorkListFilter();
+  const workFilter = useWorkListFilter(live);
   const hasMetadataFilter = userFilters.length > 0 || channelFilters.length > 0;
   const hasEntryFilter = hasMetadataFilter || workFilter !== null;
   const labelFilter = useSidebarViewStore((state) => state.labelFilter);
   const projectFilters = useSidebarViewStore((state) => state.projectFilters);
   const reconcileLabelFilter = useSidebarViewStore((state) => state.reconcileLabelFilter);
-  const { hosts: labelHosts } = useWorkspaceLabelProjection();
+  const labelHosts = useHeldWhileInactive(useWorkspaceLabelProjection().hosts, live);
   const collapsedProjectKeys = useSidebarCollapsedSectionsStore(
     (state) => state.collapsedProjectKeys,
   );
@@ -136,6 +150,7 @@ export function SidebarModelProvider({
   const workspaceEntriesByKey = useSidebarWorkspaceEntries(
     list.workspacePlacements,
     entriesEnabled,
+    live,
   );
   const filteredWorkspaceEntriesByKey = useMemo(() => {
     const byProject = filterWorkspacesByProjects({
@@ -242,17 +257,20 @@ export function SidebarModelProvider({
     pinnedCollapsed,
     collapsedWorkspaceGroupKeys,
     sessionFilter,
+    live,
   });
   const metadataRecoveryNotice = useMemo(
     () => sessionMetadataRecoveryNotice(workspaceEntriesByKey.values(), hasMetadataFilter),
     [workspaceEntriesByKey, hasMetadataFilter],
   );
+  const sessionMetadata = useSessionMetadata(live);
   const value = useMemo(
     () => ({
       ...list,
       isLoading: list.isLoading || awaitingEntryProjection,
       isInitialLoad: awaitingEntryProjection,
       metadataRecoveryNotice,
+      sessionMetadata,
       projects: filteredProjects,
       allProjects: list.projects,
       resolvedProjectFilters,
@@ -272,6 +290,7 @@ export function SidebarModelProvider({
       workFilter,
       awaitingEntryProjection,
       metadataRecoveryNotice,
+      sessionMetadata,
       resolvedProjectFilters,
       collapsedProjectKeys,
       groupMode,
@@ -310,6 +329,38 @@ export function RetainedSidebarModel({ children }: { children: ReactNode }) {
         {children}
       </WorkspaceSessionFilterProvider>
     </SidebarModelContext.Provider>
+  );
+}
+
+interface SessionMetadata {
+  options: ReturnType<typeof sessionMetadataOptions>;
+  /** Some Host stores session metadata, so the user and channel filters apply. */
+  available: boolean;
+}
+
+/**
+ * Every Host's session users and channels, read once per change for the display menu and the
+ * active-filter chips; each used to rescan all workspaces itself, hidden or not.
+ */
+function useSessionMetadata(live: boolean): SessionMetadata {
+  const metadataHosts = useHeldWhileInactive(
+    useSessionStore(
+      useShallow((state) =>
+        Object.values(state.sessions)
+          .filter((session) => sessionStorageReadable(session.serverInfo))
+          .map((session) => session.workspaces),
+      ),
+    ),
+    live,
+  );
+  return useMemo(
+    () => ({
+      options: sessionMetadataOptions(
+        metadataHosts.flatMap((workspaces) => [...workspaces.values()]),
+      ),
+      available: metadataHosts.length > 0,
+    }),
+    [metadataHosts],
   );
 }
 

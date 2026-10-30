@@ -1,5 +1,4 @@
 import { MetadataFilterPage } from "./metadata-filter-page";
-import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
 import { GROUP_MODE_MENU_ORDER } from "@/clisbot/workspace-sessions/grouping";
 import { BotProjectsToggle } from "@/clisbot/bot-projects/controls";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
@@ -7,9 +6,6 @@ import {
   workspaceSessionsMenuPage,
   WorkspaceSessionsSubTrigger,
 } from "@/clisbot/workspace-sessions/menu-page";
-import { useSessionStore } from "@/stores/session-store";
-import { useShallow } from "zustand/react/shallow";
-import { sessionMetadataOptions } from "@/clisbot/session-storage/directory";
 import { actorLabel } from "@/clisbot/session-storage/actor";
 import { channelConversationLabel } from "@/clisbot/channels/channel-icon";
 import {
@@ -257,24 +253,15 @@ export function SidebarDisplayPreferencesMenu({
   const { t } = useTranslation();
   const preferences = useSidebarDisplayPreferences();
   const hosts = useHosts();
-  const metadataHosts = useSessionStore(
-    useShallow((state) =>
-      Object.values(state.sessions)
-        .filter((session) => sessionStorageReadable(session.serverInfo))
-        .map((session) => session.workspaces),
-    ),
-  );
-  const metadataOptions = useMemo(
-    () => sessionMetadataOptions(metadataHosts.flatMap((workspaces) => [...workspaces.values()])),
-    [metadataHosts],
-  );
-  const showMetadataFilter =
-    metadataHosts.length > 0 ||
-    preferences.userFilters.length > 0 ||
-    preferences.channelFilters.length > 0;
   // `allProjects`, never `projects`: the model's `projects` is already filtered, so a picker fed
   // from it would lose the row that undoes the filter as soon as the filter narrowed to one.
-  const { allProjects, resolvedProjectFilters, workspaceSortSupported } = useSidebarModel();
+  const { allProjects, resolvedProjectFilters, workspaceSortSupported, sessionMetadata } =
+    useSidebarModel();
+  const metadataOptions = sessionMetadata.options;
+  const showMetadataFilter =
+    sessionMetadata.available ||
+    preferences.userFilters.length > 0 ||
+    preferences.channelFilters.length > 0;
   const { labels } = useWorkspaceLabelProjection();
   const [managerOpen, setManagerOpen] = useState(false);
   const openManager = useCallback(() => setManagerOpen(true), []);

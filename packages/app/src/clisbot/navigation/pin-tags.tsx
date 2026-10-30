@@ -9,6 +9,7 @@ import { ChipButton } from "@/components/ui/filter-chips";
 import { CONTROL_HEIGHTS } from "@/components/ui/control-geometry";
 import { SPACING } from "@/styles/theme";
 import { PinMark } from "@/components/ui/pin-mark";
+import { useRetainedPanelActive } from "@/components/retained-panel";
 import { usePinnedRows, type PinRow } from "@/clisbot/bots/sidebar/use-pinned-rows";
 import { rememberChatReturn } from "@/clisbot/home/mobile-navigation";
 import { useBotCatalog } from "@/clisbot/bots/data/runtime";
@@ -36,6 +37,7 @@ function useRowOwnership() {
   const { bots, chats } = useBotCatalog();
   const { chatOwnership, botOwnership } = useChatOwnership(
     chats.loadState.status === "loaded" ? chats.loadState.data : NO_CHATS,
+    useRetainedPanelActive(),
   );
   return useCallback(
     (row: PinRow): Ownership => {

@@ -7,10 +7,6 @@ import { HostStatusDot } from "@/components/host-status-dot";
 import { useSidebarModel } from "@/components/sidebar/sidebar-model";
 import { actorLabel } from "@/clisbot/session-storage/actor";
 import { channelConversationLabel } from "@/clisbot/channels/channel-icon";
-import { sessionMetadataOptions } from "@/clisbot/session-storage/directory";
-import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
-import { useSessionStore } from "@/stores/session-store";
-import { useShallow } from "zustand/react/shallow";
 import { useHosts } from "@/runtime/host-runtime";
 import { SIDEBAR_UNLABELLED_LABEL_KEY, useSidebarViewStore } from "@/stores/sidebar-view-store";
 import { workspaceLabelKey, type WorkspaceLabelColor } from "@clisbot/protocol/workspace-labels";
@@ -30,7 +26,11 @@ const CHIP_ICON_SIZE = 12;
 export function SidebarActiveFilters(): ReactElement | null {
   const { t } = useTranslation();
   const hosts = useHosts();
-  const { allProjects, resolvedProjectFilters } = useSidebarModel();
+  const {
+    allProjects,
+    resolvedProjectFilters,
+    sessionMetadata: { options: metadataOptions },
+  } = useSidebarModel();
   const { labels } = useWorkspaceLabelProjection();
   const hostFilters = useSidebarViewStore((state) => state.hostFilters);
   const labelFilter = useSidebarViewStore((state) => state.labelFilter);
@@ -42,18 +42,6 @@ export function SidebarActiveFilters(): ReactElement | null {
   const toggleUserFilter = useSidebarViewStore((state) => state.toggleUserFilter);
   const toggleChannelFilter = useSidebarViewStore((state) => state.toggleChannelFilter);
   const clearAllFilters = useSidebarViewStore((state) => state.clearAllFilters);
-
-  const metadataHosts = useSessionStore(
-    useShallow((state) =>
-      Object.values(state.sessions)
-        .filter((session) => sessionStorageReadable(session.serverInfo))
-        .map((session) => session.workspaces),
-    ),
-  );
-  const metadataOptions = useMemo(
-    () => sessionMetadataOptions(metadataHosts.flatMap((workspaces) => [...workspaces.values()])),
-    [metadataHosts],
-  );
 
   const chips = useMemo(
     () =>

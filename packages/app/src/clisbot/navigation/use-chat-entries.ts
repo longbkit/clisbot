@@ -58,7 +58,7 @@ export function useChatEntries(active: boolean) {
   const catalog = useHeldWhileInactive(useSidebarCatalog(), active);
   const { hosts, botRows, chatRows } = catalog;
   const { isPinned, pins } = useResourcePins(chatRows);
-  const { chatOwnership, botOwnership } = useChatOwnership(chatRows);
+  const { chatOwnership, botOwnership } = useChatOwnership(chatRows, active);
   const company = useCompanyHosts();
   const unread = useUnreadAgents(active);
   const entries = useMemo(() => {

@@ -19,7 +19,9 @@ tail cache and Settings → Storage, is [offline cache](offline-cache.md).
 | App client auto-reconnect | full jitter, cap 60 s                                      | `createDefaultDeps` (`reconnect.jitter: "full"`) |
 
 - Hub-managed Hosts own their retries in the controller (their clients never auto-retry). The
-  2 s probe tick only attempts a Host whose backoff is due.
+  2 s probe tick only attempts a Host whose backoff is due, and checks that first: the credential
+  check before an attempt reads the keychain, which Android serializes behind one keystore lock,
+  so 14 offline Hosts read it about 7 times a second when it ran on every tick.
 - An online Host's latency comes from its 10 s heartbeat RTT. A reading within max(20 ms, 25%) of
   the published one keeps it (`holdLatencyJitter`): publishing every reading rewrote each Host's
   snapshot every 10 s and re-rendered every Host reader.

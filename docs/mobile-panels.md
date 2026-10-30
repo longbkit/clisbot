@@ -36,8 +36,12 @@ view, not the bottom-tabs view:
   a focus gate unmounts the content on every hide and rebuilds it on every show. Schedules without
   a Hub or Bots Host did that through `SchedulesScreen` (every Host's schedules, agents and
   directory demand); its phone tab renders `SchedulesScreenContent` directly.
-- Chats and Work render their panes directly as the tab screen (`PhoneListTab`). Work owns a
-  `SidebarModelProvider` there, because the sidebar chrome's provider does not reach routes.
+- Chats and Work render their panes directly as the tab screen (`PhoneListTab`). Work owns the
+  phone's only `SidebarModelProvider` there, because the sidebar chrome's provider does not reach
+  routes; the chrome mounts none on phone tabs, and Work also feeds the workspace shortcut targets.
+  The provider takes `holdWhileInactive`: hidden, it derives nothing (O(workspaces) per Host update
+  otherwise) and catches up in its first shown render. Shortcut targets stay as Work last showed
+  them until then.
 
 Route topology, Back and deep links are in [Expo Router](expo-router.md#phone-tabs).
 
@@ -217,8 +221,16 @@ definition, no longer eligible to begin.
 - To stop hidden re-renders, hold the pane's inputs at its owner with `useHeldWhileInactive`
   (`hooks/use-held-while-inactive.ts`) and pass them to a memoized body. The owner still subscribes;
   the body skips every update until the panel is active, then renders once with the latest value.
-  Hold the derived model, not each row. For a context read deep in the pane, wrap the pane in
+  Hold the derived model, not each row. When the owner itself derives the model, hold its inputs
+  instead, so a hidden pane runs no derivation at all (`SidebarModelProvider` with
+  `holdWhileInactive`). A model several pane components need (the display menu and the filter
+  chips both list session users and channels) is derived once in the model, not in each reader.
+  For a context read deep in the pane, wrap the pane in
   `HeldContextValue` (`components/held-context.tsx`) with a stable child element.
+- A retained pane's large components do not read the route (`usePathname`,
+  `useActiveWorkspaceSelection`): the route changes on every navigation, hidden tabs included.
+  Read the narrow fact from a small provider that already subscribes, as the Work list reads
+  `useIsSidebarOnWorkspaceRoute` from `WorkspaceSessionsAutoCollapseProvider`.
 - Catalog-backed surfaces narrow external-store snapshots and preserve unchanged directory row
   identity through the shared aggregation owner ([architecture](architecture.md)). Reducing hidden
   derivation work does not change the native workspace/tab retention limits or visibility ownership.

@@ -3,7 +3,10 @@ import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import type { PinRow } from "@/clisbot/bots/sidebar/use-pinned-rows";
 import { StatusSessionRow } from "@/components/sidebar/sidebar-status-list";
 import { resolveSidebarProjectIconTargets } from "@/utils/sidebar-project-row-model";
-import { useSidebarWorkspaceSelection } from "@/clisbot/workspace-sessions/auto-collapse";
+import {
+  useIsSidebarOnWorkspaceRoute,
+  useSidebarWorkspaceSelection,
+} from "@/clisbot/workspace-sessions/auto-collapse";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { useSidebarHostIds } from "@/hooks/use-sidebar-host-ids";
 import { startArmedHermesSampling, traceInstant } from "@/performance/native-trace";
@@ -43,7 +46,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { router, usePathname, type Href } from "expo-router";
+import { router, type Href } from "expo-router";
 import {
   navigateToWorkspace,
   type ActiveWorkspaceSelection,
@@ -82,11 +85,7 @@ import { useSidebarCollapsedSectionsStore } from "@/stores/sidebar-collapsed-sec
 import { useHostFeatureMap } from "@/runtime/host-features";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useProjectIcons } from "@/projects/icons";
-import {
-  buildNewWorkspaceRoute,
-  buildProjectSettingsRoute,
-  parseHostWorkspaceRouteFromPathname,
-} from "@/utils/host-routes";
+import { buildNewWorkspaceRoute, buildProjectSettingsRoute } from "@/utils/host-routes";
 import {
   shouldShowSidebarHostLabels,
   useSidebarProjectStatusBucket,
@@ -2240,7 +2239,6 @@ export function SidebarWorkspaceList({
   dragGestureHostActive,
   pinPresentation = "section",
 }: SidebarWorkspaceListProps) {
-  const pathname = usePathname();
   const hosts = useHosts();
   const rowItems = useSidebarRowItems();
   const selectedHostIds = useSidebarHostIds();
@@ -2371,7 +2369,6 @@ export function SidebarWorkspaceList({
         hasActiveProjectFilter={hasActiveProjectFilter}
         parentGestureRef={parentGestureRef}
         dragGestureHostActive={dragGestureHostActive}
-        pathname={pathname}
         hostBadgeByServerId={hostBadgeByServerId}
         supportsMultiplicityByServerId={supportsMultiplicityByServerId}
         supportsPinningByServerId={supportsPinningByServerId}
@@ -2493,7 +2490,6 @@ function ProjectModeList({
   hasActiveProjectFilter,
   parentGestureRef,
   dragGestureHostActive,
-  pathname,
   hostBadgeByServerId,
   supportsMultiplicityByServerId,
   supportsPinningByServerId,
@@ -2512,7 +2508,6 @@ function ProjectModeList({
   /** Swaps the list body for the label filter's empty state. Never the header above it. */
   sidebarFilterEmpty: boolean;
   projectIconByProjectViewKey: ReadonlyMap<string, string | null>;
-  pathname: string;
   hostBadgeByServerId: ReadonlyMap<string, HostBadgeModel>;
   supportsMultiplicityByServerId: ReadonlyMap<string, boolean>;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
@@ -2537,11 +2532,7 @@ function ProjectModeList({
   const getProjectOrder = useSidebarOrderStore((state) => state.getProjectOrder);
   const setProjectOrder = useSidebarOrderStore((state) => state.setProjectOrder);
 
-  const isWorkspaceRoute = useMemo(
-    () => Boolean(pathname && parseHostWorkspaceRouteFromPathname(pathname)),
-    [pathname],
-  );
-  const selectionEnabled = isWorkspaceRoute;
+  const selectionEnabled = useIsSidebarOnWorkspaceRoute();
   const activeWorkspaceSelection = useSidebarWorkspaceSelection();
   const { pinnedChats, unpinnedProjects } = pinnedGroups;
   const compact = useIsCompactFormFactor();

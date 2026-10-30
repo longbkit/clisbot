@@ -72,7 +72,8 @@ The primary navigation says where you are; each section owns its header, filters
 - **Retention**: a visited section stays mounted, so a switch only flips visibility and keeps
   scroll position. On desktop Chats and Work are retained panels in the list pane (`ListContent` in
   `list-panel.tsx`); on phones every tab is ([phone tabs][phone-tabs]). A hidden list holds its
-  inputs (`useHeldWhileInactive`): Work reads the sidebar model through `RetainedSidebarModel`,
+  inputs (`useHeldWhileInactive`): desktop Work reads the sidebar model through
+  `RetainedSidebarModel`, a phone's Work tab holds its own provider's inputs (`holdWhileInactive`),
   Chats holds its catalog and unread agents in `ChatsPane`, and a phone's hidden Home holds the
   navigation activity. Host updates skip a hidden section; its first render back uses the latest
   data. Until 2026-10-30 a phone tab switch replaced the route (and Android also unmounted hidden
@@ -232,6 +233,12 @@ accounts identity and Host kind); changing a binding or reader invalidates the r
 caches retain immutable source identities and compute participant identities once per source;
 profile-only changes do not alter the key. Workspace count caches compare participation even
 when a creator exists.
+
+A chat's participation key is cached on its payload (`clisbot/navigation/chat-ownership.ts`), so
+Home's pin tags and the Chats pane derive it once between them. It is recomputed only when the
+chat's Host replaces its agents map and a participant session actually changed; the session store
+replaces that map on every agent update and never edits it in place. A hidden Chats pane or Home
+holds its keys and re-reads them when shown.
 
 The scope applies first everywhere; pins only reorder inside it. A pin (a resource pin, or a
 workspace pinned on the Host, which every reader sees) never brings another member's session into
