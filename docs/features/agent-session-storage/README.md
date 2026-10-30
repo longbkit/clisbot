@@ -162,9 +162,15 @@ Paging checks must measure source bytes for both legacy and `source_ranges` requ
 only the number of returned entries. Keep a history larger than the projection budget in
 regression coverage, including text continuations without message IDs, forward/backward
 cursors, and a tool updated long after it started. A page must not claim an unread gap as
-loaded. The source-range path reads a cursor window and its merge dependencies; plugin
-identities without an occurrence index still require the full-projection fallback and remain
-subject to the read budget. Tool indexes retain every occurrence: a long-running subagent
+loaded. The source-range path reads a cursor window and its merge dependencies. A page that
+cannot be bounded that way (plugin identities without an occurrence index, a merge or tool
+index past 8,192 rows, or rows too large for the budget) projects the whole history only
+while the session has at most 8,192 rows and the read fits the budget. Otherwise it reads a
+fallback range of at most 8,192 rows or 8 MiB outwards from the cursor and reports
+`hasOlder`/`hasNewer` beyond it, so opening a large session returns its newest page and
+older rows load as you scroll. The range certifies only what it read, and its far edge
+never splits a merged message; a tool or plugin entry crossing that edge shows its
+in-range state. Tool indexes retain every occurrence: a long-running subagent
 can emit hundreds of updates, and truncating those pointers makes small pages fall back to
 reading the entire session. Version 3 upgrades a valid v2 checkpoint in place: preserve pointers, anchors, IDs,
 summary, epoch and revision; scan only when an old tool list reached the 256-entry cap,
@@ -174,8 +180,7 @@ Source-range reads fold tool snapshots incrementally and retain their source ran
 32 MiB budget limits retained data, not cumulative bytes read across successive pages.
 A tail containing only repeated subagent updates must still reach earlier main-session
 messages. Child journals remain scoped to their own directories, even when call IDs match
-ones in the parent. Legacy contiguous-envelope reads retain their existing behavior and may still fall back
-on a full read. Source-range paging seeks the next unread interval rather than widening a
+ones in the parent. Legacy contiguous-envelope reads use the same bounded fallback. Source-range paging seeks the next unread interval rather than widening a
 window past 8192 rows. Completed tool entries are reused within a request; dense updates
 across selected tools are read together, without reading unrelated gaps.
 
