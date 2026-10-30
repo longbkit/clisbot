@@ -18,6 +18,8 @@ import type { HostProfile } from "@/types/host-connection";
 import { WorkspaceShortcutTargetsSubscriber } from "./workspace-shortcut-targets-subscriber";
 import { SidebarModelProvider as BaseSidebarModelProvider } from "./sidebar/sidebar-model";
 import { defaultHostAppearance } from "@/hosts/appearance";
+import { RouteSourceProvider } from "@/navigation/route-source";
+import { createTestRouteSource } from "@/test/route-source";
 
 // The sidebar lists only connected Hosts (a disconnected Host's cached directory is not shown), and
 // these fixtures have no live connection, so every registered Host counts as connected here.
@@ -79,13 +81,17 @@ function setHostProfiles(hosts: HostProfile[]): void {
   ).setHostsAndSync(hosts);
 }
 
-// The model reads the Agent sessions setting (Clisbot), which goes through React Query.
+// The model reads the Agent sessions setting (Clisbot), which goes through React Query, and
+// selected route facts, which come from the root layout's route source.
 function SidebarModelProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = React.useState(() => new QueryClient());
+  const [routes] = React.useState(() => createTestRouteSource("/").source);
   return (
-    <QueryClientProvider client={queryClient}>
-      <BaseSidebarModelProvider>{children}</BaseSidebarModelProvider>
-    </QueryClientProvider>
+    <RouteSourceProvider source={routes}>
+      <QueryClientProvider client={queryClient}>
+        <BaseSidebarModelProvider>{children}</BaseSidebarModelProvider>
+      </QueryClientProvider>
+    </RouteSourceProvider>
   );
 }
 
