@@ -126,6 +126,14 @@ export async function scrollChatAwayFromBottom(
   page: Page,
   input: { deltaY: number; minDistanceFromBottom: number },
 ): Promise<ScrollMetrics> {
+  // A session opens on its ready screen with an inline "Loading messages…" row before history
+  // lands, so the composer can be filled while the transcript is still one viewport tall. A
+  // wheel then has nothing to scroll, and the history that arrives after it opens at the bottom
+  // as a fresh open should. Wheel only once the transcript can move the requested distance.
+  await waitForScrollableChat(page, {
+    minScrollableDistance: input.minDistanceFromBottom,
+    timeout: 30_000,
+  });
   const box = await page.evaluate(() => {
     const root = Array.from(
       document.querySelectorAll<HTMLElement>('[data-testid="agent-chat-scroll"]'),
