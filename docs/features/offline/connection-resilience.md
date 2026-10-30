@@ -79,6 +79,14 @@ advertised routes changed. The binding then calls `adoptHostConnection`: an onli
 controller is left alone, anything else gets one immediate attempt. A changed offer still
 reaches the controller through the profile upsert.
 
+Only the Hub's answer removes a Hub-managed Host: signed out, another organization, a daemon the
+list no longer offers, or the saved Hub forgotten (`orphanedManagedHosts`). A binding unmounting
+removes nothing. Removing a Host clears its directory, and the tree under the Hub scope can remount
+while the answer stays the same: on 2026-10-30 an Android resume unmounted all 14 bindings of a
+fleet, and Home fell from 3,597 to 1,001 sessions while every Host showed online. On Android, Back
+on Home moves the task to the back on every version (`plugins/with-android-back-keeps-task.js`),
+and the compact layout holds across a resume (`navigation/compact-resume-hold.ts`).
+
 ## Hub requests
 
 Browser, browser OAuth and native OAuth transports abort a Hub request after 15 s, including a

@@ -10,7 +10,7 @@ import { HubAccountScope, useHubAccount, useHubAccounts } from "./account-provid
 import { HubAccessTicketSchema } from "./contracts";
 import { classifyHubFailure } from "./hub-failure";
 import { hubManagedHostRequiresAccessTicket } from "./managed-host-admission";
-import { orphanedManagedHosts } from "./managed-host-reconciliation";
+import { type HubHostAnswer, orphanedManagedHosts } from "./managed-host-reconciliation";
 import { useHubDaemonsQuery } from "./host-inventory";
 import { cachedListForAccount, useHubDaemonListCache } from "./hub-daemon-list-cache";
 import { deriveHubSourceState, getHubSourceHealthRegistry } from "./hub-source-health";
@@ -32,6 +32,20 @@ function enqueueManagedHostMutation(operation: () => Promise<void>): Promise<voi
   return next;
 }
 
+/** Removes every Host `hubOrigin` manages, once that saved Hub is forgotten on this device. */
+function removeHubManagedHosts(hubOrigin: string): Promise<void> {
+  const store = getHostRuntimeStore();
+  return enqueueManagedHostMutation(async () => {
+    for (const management of orphanedManagedHosts({
+      hosts: store.getHosts(),
+      hubOrigin,
+      answer: { kind: "signedOut" },
+    })) {
+      await store.removeManagedHost(management, "Hub removed from this device");
+    }
+  });
+}
+
 /**
  * Whether the Hub still lists a connectable daemon for `serverId`: `true` while it does (its Host
  * is being registered again), `false` when it does not, `undefined` before the list is known or
@@ -48,18 +62,36 @@ export function useHubListsHost(serverId: string | null): boolean | undefined {
  * personal Hub and a company Hub sit side by side and selecting a Hub never removes the others'.
  */
 export function HubHostSynchronization() {
-  return useHubAccounts().map((account) => (
+  const accounts = useHubAccounts();
+  useForgottenHubHostRemoval(accounts);
+  return accounts.map((account) => (
     <HubAccountScope key={account.origin} account={account}>
       <AccountHostSynchronization />
     </HubAccountScope>
   ));
 }
 
+/**
+ * Removes the Hosts of a saved Hub forgotten while this owner is mounted. It compares the saved
+ * Hubs with the ones it saw last, so mounting again (with nothing seen yet) removes nothing.
+ */
+function useForgottenHubHostRemoval(accounts: readonly { origin: string | null }[]): void {
+  const originsKey = JSON.stringify(accounts.flatMap((account) => account.origin ?? []));
+  const seenRef = useRef<readonly string[] | null>(null);
+  useEffect(() => {
+    const origins: string[] = JSON.parse(originsKey);
+    const seen = seenRef.current;
+    seenRef.current = origins;
+    for (const origin of seen ?? []) {
+      if (!origins.includes(origin)) void removeHubManagedHosts(origin);
+    }
+  }, [originsKey]);
+}
+
 function AccountHostSynchronization() {
   const hub = useHubAccount();
   const signedIn = hub.signedIn;
   const hubOrigin = hub.origin;
-  const organizationId = signedIn?.organization.id ?? null;
   const daemons = useHubDaemonsQuery();
   const hosts = useHosts();
   const listCache = useHubDaemonListCache();
@@ -76,50 +108,7 @@ function AccountHostSynchronization() {
   // already in flight is joined, never cancelled and started again.
   const refetchList = daemons.refetch;
   const readListAgain = useCallback(() => refetchList({ cancelRefetch: false }), [refetchList]);
-  const projectedDaemonIds = useMemo(
-    () =>
-      new Set(
-        (daemons.data?.daemons ?? [])
-          .filter((daemon) => daemon.connectionOffer !== null)
-          .map((daemon) => daemon.id),
-      ),
-    [daemons.data],
-  );
-  // A Host left by a previous enrollment has no binding to unmount, so its
-  // removal never fires. Reconcile the whole Hub-managed set on every Host or
-  // projection change instead of relying on unmount alone.
-  useEffect(() => {
-    if (
-      !hub.enabled ||
-      organizationId === null ||
-      hubOrigin === null ||
-      daemons.data === undefined ||
-      daemons.isPlaceholderData
-    ) {
-      return;
-    }
-    const store = getHostRuntimeStore();
-    for (const management of orphanedManagedHosts({
-      hosts,
-      projectedDaemonIds,
-      hubOrigin,
-      organizationId,
-    })) {
-      void enqueueManagedHostMutation(() =>
-        store
-          .removeManagedHost(management, "Hub no longer lists this Host with a connection offer")
-          .then(() => undefined),
-      );
-    }
-  }, [
-    daemons.data,
-    daemons.isPlaceholderData,
-    hosts,
-    hub.enabled,
-    hubOrigin,
-    organizationId,
-    projectedDaemonIds,
-  ]);
+  useManagedHostReconciliation(hub, daemons, hosts);
 
   if (
     !hub.enabled ||
@@ -153,6 +142,49 @@ function AccountHostSynchronization() {
           />,
         ],
   );
+}
+
+/**
+ * Removes the Hub-managed Hosts this Hub's answer no longer covers, on every Host or answer
+ * change. Only an answer removes a Host: no answer yet (a read in flight, an unreachable Hub)
+ * keeps every Host, and so does a binding unmounting (`orphanedManagedHosts`).
+ */
+function useManagedHostReconciliation(
+  hub: ReturnType<typeof useHubAccount>,
+  daemons: ReturnType<typeof useHubDaemonsQuery>,
+  hosts: ReturnType<typeof useHosts>,
+): void {
+  const hubOrigin = hub.origin;
+  const answered = hub.enabled && hubOrigin !== null && !hub.loading && hub.state !== null;
+  const organizationId = hub.signedIn?.organization.id ?? null;
+  const listed = daemons.data !== undefined && !daemons.isPlaceholderData;
+  const projectedDaemonIds = useMemo(
+    () =>
+      new Set(
+        (daemons.data?.daemons ?? [])
+          .filter((daemon) => daemon.connectionOffer !== null)
+          .map((daemon) => daemon.id),
+      ),
+    [daemons.data],
+  );
+  const answer = useMemo<HubHostAnswer | null>(() => {
+    if (!answered) return null;
+    if (organizationId === null) return { kind: "signedOut" };
+    return listed ? { kind: "listed", organizationId, projectedDaemonIds } : null;
+  }, [answered, listed, organizationId, projectedDaemonIds]);
+  useEffect(() => {
+    if (answer === null || hubOrigin === null) return;
+    const store = getHostRuntimeStore();
+    const reason =
+      answer.kind === "signedOut"
+        ? "Hub answered that this account is signed out"
+        : "Hub no longer lists this Host with a connection offer";
+    for (const management of orphanedManagedHosts({ hosts, hubOrigin, answer })) {
+      void enqueueManagedHostMutation(() =>
+        store.removeManagedHost(management, reason).then(() => undefined),
+      );
+    }
+  }, [answer, hosts, hubOrigin]);
 }
 
 /** This account's daemon-list query is the only observer; it reports the Hub's health. */
@@ -347,20 +379,7 @@ function HubHostBinding({
     synchronizedOffer,
   ]);
 
-  useEffect(() => {
-    const store = getHostRuntimeStore();
-    const management: HubHostManagement = {
-      kind: "hub",
-      hubOrigin,
-      organizationId,
-      daemonId,
-    };
-    return () => {
-      void enqueueManagedHostMutation(() =>
-        store.removeManagedHost(management, "Hub Host binding unmounted").then(() => undefined),
-      );
-    };
-  }, [daemonId, hubOrigin, organizationId]);
+  // Unmounting removes nothing: the Hub's answer owns removal (`useManagedHostReconciliation`).
 
   // The Hub still lists this daemon, so a Host that left the registry while this binding is
   // mounted (a revocation during a Hub blip) is added back rather than left "Registering" until a

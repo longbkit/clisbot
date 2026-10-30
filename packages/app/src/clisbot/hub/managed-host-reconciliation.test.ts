@@ -22,25 +22,50 @@ describe("orphanedManagedHosts", () => {
     expect(
       orphanedManagedHosts({
         hosts: [{ management: management("kept") }, { management: management("gone") }],
-        projectedDaemonIds: new Set(["kept"]),
         hubOrigin,
-        organizationId,
+        answer: { kind: "listed", organizationId, projectedDaemonIds: new Set(["kept"]) },
       }),
     ).toEqual([management("gone")]);
   });
 
-  it("leaves manual Hosts and other Hubs' or organizations' Hosts alone", () => {
+  it("returns this Hub's Hosts managed under an organization the account no longer reads", () => {
     expect(
       orphanedManagedHosts({
         hosts: [
-          {},
-          { management: management("gone", { hubOrigin: "https://other.test" }) },
-          { management: management("gone", { organizationId: "other" }) },
+          { management: management("kept") },
+          { management: management("kept", { organizationId: "previous" }) },
         ],
-        projectedDaemonIds: new Set(),
         hubOrigin,
-        organizationId,
+        answer: { kind: "listed", organizationId, projectedDaemonIds: new Set(["kept"]) },
       }),
-    ).toEqual([]);
+    ).toEqual([management("kept", { organizationId: "previous" })]);
+  });
+
+  it("returns every Host of this Hub once the Hub answers that the account is signed out", () => {
+    expect(
+      orphanedManagedHosts({
+        hosts: [
+          { management: management("a") },
+          { management: management("b", { organizationId: "other" }) },
+        ],
+        hubOrigin,
+        answer: { kind: "signedOut" },
+      }),
+    ).toEqual([management("a"), management("b", { organizationId: "other" })]);
+  });
+
+  it("leaves manual Hosts and other Hubs' Hosts alone", () => {
+    for (const answer of [
+      { kind: "signedOut" as const },
+      { kind: "listed" as const, organizationId, projectedDaemonIds: new Set<string>() },
+    ]) {
+      expect(
+        orphanedManagedHosts({
+          hosts: [{}, { management: management("gone", { hubOrigin: "https://other.test" }) }],
+          hubOrigin,
+          answer,
+        }),
+      ).toEqual([]);
+    }
   });
 });

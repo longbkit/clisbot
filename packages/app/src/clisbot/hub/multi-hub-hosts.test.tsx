@@ -371,7 +371,9 @@ test("Hosts a refused ticket removed read the list once and come back as soon as
 
 afterEach(async () => {
   cleanup();
-  await waitFor(() => expect(state.hosts).toEqual([]));
+  // Unmounting the bindings removes no Host (host-synchronization.tsx): let queued registry
+  // writes settle, then start the next test from an empty registry.
+  await new Promise((resolve) => setTimeout(resolve, 20));
   expect(state.accountListeners.size).toBe(0);
   state.hosts = [];
   state.register.mockClear();
