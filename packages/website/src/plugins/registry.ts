@@ -73,6 +73,20 @@ export function getAuthor(plugin: Plugin): Author {
     npm: author.npm,
   };
 }
+/** Keep author pages small without changing the source registry. */
+export function selectAuthorRegistry(
+  plugins: Plugin[],
+  installs: Record<string, InstallCounts>,
+  owner: string,
+): { plugins: Plugin[]; installs: Record<string, InstallCounts> } {
+  const selected = getPluginsByAuthor(plugins, owner);
+  return {
+    plugins: selected,
+    installs: Object.fromEntries(
+      selected.flatMap((plugin) => (installs[plugin.id] ? [[plugin.id, installs[plugin.id]]] : [])),
+    ),
+  };
+}
 export function getPluginsByAuthor(plugins: Plugin[], owner: string): Plugin[] {
   return plugins.filter((plugin) => pluginOwner(plugin) === owner);
 }

@@ -12,7 +12,7 @@ import {
   firstMediaImage,
   getAuthor,
   getCategory,
-  getRegistry,
+  getPluginInstallCount,
   getRegistryPlugin,
   installCommand,
   npmUrl,
@@ -31,12 +31,13 @@ import "~/styles.css";
 
 export const Route = createFileRoute("/{-$locale}/plugins/$owner_/$slug")({
   loader: async ({ params }) => {
-    const [registry, plugin] = await Promise.all([
-      getRegistry(),
-      getRegistryPlugin({ data: `${params.owner}/${params.slug}` }),
+    const id = `${params.owner}/${params.slug}`;
+    const [installs, plugin] = await Promise.all([
+      getPluginInstallCount({ data: id }),
+      getRegistryPlugin({ data: id }),
     ]);
     if (!plugin) throw notFound();
-    return { plugin, installs: registry.installs[plugin.id]?.all ?? 0 };
+    return { plugin, installs };
   },
   head: ({ params, loaderData }) => {
     const locale = routeLocale(params);
