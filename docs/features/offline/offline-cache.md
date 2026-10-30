@@ -22,6 +22,10 @@ Tapping a row shows its screen in the next frame. What fills it depends on what 
 
 - The agent screen no longer holds an overlay until authoritative history lands; the empty stream
   shows `agent-history-loading-row` (`agent-stream/placeholder.ts`, `isStreamHistoryLoading`).
+- A first load that fails with nothing painted shows the load error and its Retry
+  (`agent-load-error`), not an empty "Start chatting" stream. Having rendered the ready screen does
+  not count as history; a painted tail does, and keeps the refresh callout instead
+  (`deriveAgentScreenViewState`).
 - A chat preview never authorizes anything. Sending needs the accepted record, and a refusal still
   replaces the screen.
 - The open fetch is one bounded page: 40 projected items (`TIMELINE_FETCH_PAGE_SIZE`), tool payloads
@@ -152,6 +156,10 @@ assistant 0.3 KB, 10% reasoning 0.6 KB); not device evidence.
 - Runtime helpers shared by the row stores live in `row-store-schema.ts`. Platform resolution maps
   `./row-store` to `row-store.web.ts` or `.native.ts`, which re-export only types and schema
   values; a function exported from `row-store.ts` is `undefined` at runtime.
+- A test that reloads onto a tail must not assume its size or the first fetch. A text-only session
+  stores every loaded item that fits and reopens with an `after` fetch from the stored range; a
+  lossy tail, or the 50-item cache with the flag off, reopens with `tail`. The browser specs
+  hold "the first answer" (`delayAgentHydrationResponse`) and wait for the Updating toast to clear.
 - Rows are keyed by `serverId`, not account (R10 in the proposal); clearing on sign-out is what
   keeps one account's tails from another for now.
 - Not done in this slice: idle prefetch of For me sessions beyond the top Home rows, an older-page

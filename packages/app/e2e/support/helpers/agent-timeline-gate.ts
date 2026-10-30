@@ -71,11 +71,6 @@ export async function trackPromptJumpRequests(
   };
 }
 
-export interface BootstrapTimelineGate extends AgentTimelineResponseGate {
-  releaseCatchUp(): void;
-  waitForDelayedCatchUp(): Promise<void>;
-}
-
 function parseWebSocketJson(message: WebSocketMessage): unknown {
   const rawMessage = typeof message === "string" ? message : message.toString("utf8");
   try {
@@ -457,21 +452,21 @@ export async function holdAgentOlderTimelinePages(
   };
 }
 
-export async function delayAgentBootstrapTailResponse(
+/**
+ * Holds the Host's first timeline answer for `agentId` after a reload. Its direction depends on the
+ * persisted tail (docs/features/offline/offline-cache.md): a tail that kept its range catches up
+ * with `after`; a lossy one, or the 50-item cache with the offline cache off, fetches `tail`.
+ */
+export async function delayAgentHydrationResponse(
   page: Page,
   agentId: string,
-): Promise<BootstrapTimelineGate> {
-  let tailReleased = false;
-  let catchUpReleased = false;
-  const delayedTailForwards: Array<() => void> = [];
-  const delayedCatchUpForwards: Array<() => void> = [];
-  let resolveDelayedTail: (() => void) | null = null;
-  let resolveDelayedCatchUp: (() => void) | null = null;
-  const delayedTail = new Promise<void>((resolve) => {
-    resolveDelayedTail = resolve;
-  });
-  const delayedCatchUp = new Promise<void>((resolve) => {
-    resolveDelayedCatchUp = resolve;
+): Promise<AgentTimelineResponseGate> {
+  let released = false;
+  let hydrationSeen = false;
+  const delayedForwards: Array<() => void> = [];
+  let resolveDelayedResponse: (() => void) | null = null;
+  const delayedResponse = new Promise<void>((resolve) => {
+    resolveDelayedResponse = resolve;
   });
 
   await page.routeWebSocket(daemonWsRoutePattern(), (ws) => {
@@ -480,35 +475,27 @@ export async function delayAgentBootstrapTailResponse(
     server.onMessage((message) => {
       const sessionMessage = getSessionMessage(message);
       const payload = sessionMessage ? getPayload(sessionMessage) : null;
-      const isTimelineResponse =
-        sessionMessage?.type === "fetch_agent_timeline_response" && payload?.agentId === agentId;
-      if (isTimelineResponse && payload.direction === "tail") {
-        resolveDelayedTail?.();
-        if (tailReleased) ws.send(message);
-        else delayedTailForwards.push(() => ws.send(message));
+      const isHydration =
+        !hydrationSeen &&
+        sessionMessage?.type === "fetch_agent_timeline_response" &&
+        payload?.agentId === agentId &&
+        (payload.direction === "tail" || payload.direction === "after");
+      if (!isHydration || released) {
+        ws.send(message);
         return;
       }
-      if (isTimelineResponse && payload.direction === "after") {
-        resolveDelayedCatchUp?.();
-        if (catchUpReleased) ws.send(message);
-        else delayedCatchUpForwards.push(() => ws.send(message));
-        return;
-      }
-      ws.send(message);
+      hydrationSeen = true;
+      delayedForwards.push(() => ws.send(message));
+      resolveDelayedResponse?.();
     });
   });
 
   return {
     release() {
-      tailReleased = true;
-      for (const forward of delayedTailForwards.splice(0)) forward();
+      released = true;
+      for (const forward of delayedForwards.splice(0)) forward();
     },
-    releaseCatchUp() {
-      catchUpReleased = true;
-      for (const forward of delayedCatchUpForwards.splice(0)) forward();
-    },
-    waitForDelayedResponse: () => delayedTail,
-    waitForDelayedCatchUp: () => delayedCatchUp,
+    waitForDelayedResponse: () => delayedResponse,
   };
 }
 

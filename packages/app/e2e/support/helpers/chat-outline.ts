@@ -28,7 +28,29 @@ export async function withStreamingMarkdownOutline(
 }
 
 export async function expectReadingStreamedMarkdown(page: Page, prompt: string): Promise<void> {
-  await expect(page.getByText("Paragraph 30.", { exact: true }).last()).toBeVisible();
+  // The earlier turn streamed the same paragraphs, so a plain text locator resolves to its
+  // "Paragraph 30." at once. Wait for the paragraph that follows this prompt: the mock sends a
+  // token every 160 ms, so the live turn reaches it about 20 s after the prompt.
+  await expect
+    .poll(
+      () =>
+        page.evaluate((expectedPrompt) => {
+          const timeline = Array.from(
+            document.querySelectorAll<HTMLElement>('[data-testid="agent-chat-scroll"]'),
+          ).find((element) => element.getClientRects().length > 0);
+          const promptRow = Array.from(
+            timeline?.querySelectorAll<HTMLElement>('[data-testid="user-message"]') ?? [],
+          ).find((element) => element.textContent?.includes(expectedPrompt));
+          if (!timeline || !promptRow) return false;
+          return Array.from(timeline.querySelectorAll<HTMLElement>("*")).some(
+            (element) =>
+              element.textContent === "Paragraph 30." &&
+              (promptRow.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+          );
+        }, prompt),
+      { timeout: 45_000 },
+    )
+    .toBe(true);
   await expect
     .poll(() =>
       page.evaluate((expectedPrompt) => {

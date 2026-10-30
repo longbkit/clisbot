@@ -268,6 +268,49 @@ describe("deriveAgentScreenViewState", () => {
     expect(result.memory.hadInitialSyncFailure).toBe(true);
   });
 
+  it("shows the owner error when a cold open's first load fails after the ready frame", () => {
+    const agent = createAgent("agent-1");
+    const opened = deriveAgentScreenViewState({
+      input: {
+        ...createBaseInput(),
+        agent,
+        needsAuthoritativeSync: true,
+        visibilityCatchUpStatus: "pending",
+      },
+      memory: createBaseMemory(),
+    });
+    expectReadyState(opened.state);
+
+    const failed = deriveAgentScreenViewState({
+      input: {
+        ...createBaseInput(),
+        agent,
+        needsAuthoritativeSync: true,
+        visibilityCatchUpStatus: "error",
+        visibilityCatchUpError: "already has an active writer",
+      },
+      memory: opened.memory,
+    });
+
+    expect(failed.state).toEqual({ tag: "error", message: "already has an active writer" });
+  });
+
+  it("keeps a painted tail on screen when its first refresh fails", () => {
+    const agent = createAgent("agent-1");
+    const result = deriveAgentScreenViewState({
+      input: {
+        ...createBaseInput(),
+        agent,
+        hasHydratedHistoryBefore: true,
+        visibilityCatchUpStatus: "error",
+        visibilityCatchUpError: "already has an active writer",
+      },
+      memory: createBaseMemory({ hasRenderedReady: true, lastReadyAgent: agent }),
+    });
+
+    expectSyncErrorSync(expectReadyState(result.state));
+  });
+
   it("keeps sync errors non-blocking once the screen was ready", () => {
     const memory = createBaseMemory({
       hasRenderedReady: true,
