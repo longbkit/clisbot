@@ -255,6 +255,8 @@ export const es: TranslationResources = {
     historyLoadFailed: "No se pudo cargar el historial del agente",
     messageCapped: "Este mensaje fue truncado ({{bytes}} bytes).",
     permission: {
+      reason: "Por qué se necesita aprobación",
+      blockedPath: "Ruta bloqueada",
       rejectedPlan: "Plan rechazado",
       approvedPlan: "Plan aprobado",
       canceledPlan: "Plan cancelado",

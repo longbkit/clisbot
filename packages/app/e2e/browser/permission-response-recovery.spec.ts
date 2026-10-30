@@ -18,7 +18,10 @@ test.use({
           enabled: true,
           command: [process.execPath, path.resolve("e2e/fixtures/permission-codex.mjs")],
         },
-        claude: { enabled: false },
+        claude: {
+          enabled: true,
+          command: [process.execPath, path.resolve("e2e/fixtures/permission-claude.mjs")],
+        },
         copilot: { enabled: false },
         opencode: { enabled: false },
         pi: { enabled: false },
@@ -179,4 +182,127 @@ for (const recovery of ["Skip", "Send", "other-client"] as const) {
       await workspace.cleanup();
     }
   });
+}
+
+// A synthetic CLI speaks Claude's SDK control protocol; the daemon and browser are real.
+test.describe("SDK approval context", () => {
+  for (const [layout, width, height] of [
+    ["desktop", 1440, 1000],
+    ["mobile", 390, 844],
+  ] as const) {
+    test(`shows SDK reason and path with usable controls on ${layout}`, async ({
+      page,
+    }, testInfo) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize({ width, height });
+      const workspace = await seedWorkspace({ repoPrefix: "approval-context-" });
+      try {
+        const agent = await workspace.client.createAgent({
+          provider: "claude",
+          cwd: workspace.repoPath,
+          workspaceId: workspace.workspaceId,
+          title: "Synthetic approval",
+          model: "synthetic",
+          modeId: "bypassPermissions",
+          initialPrompt: "Show a synthetic tool approval.",
+        });
+        await openAgentRoute(page, { workspaceId: workspace.workspaceId, agentId: agent.id });
+        await expect(page.getByTestId("permission-request-question")).toBeVisible({
+          timeout: 90_000,
+        });
+        await expect(page.getByText("Updating messages", { exact: true })).toHaveCount(0);
+        await page.screenshot({ path: testInfo.outputPath(`${layout}-approval.png`) });
+        await expect(page.getByTestId("permission-request-reason")).toContainText(
+          "Synthetic policy requires approval for this path.",
+        );
+        await expect(page.getByTestId("permission-request-blocked-path")).toContainText(
+          "/synthetic/protected/config.json",
+        );
+        await page.reload();
+        await expect(page.getByTestId("permission-request-reason")).toContainText(
+          "Synthetic policy requires approval for this path.",
+        );
+        await page.getByTestId("permission-request-deny").click();
+        await expect(page.getByTestId("permission-request-question")).toHaveCount(0);
+        const observer = await connectDaemonClient<DaemonClient>({
+          clientIdPrefix: "approval-context",
+        });
+        const records = await observer.fetchPermissionResponses(agent.id);
+        await observer.close();
+        expect(records.records[0].request.metadata).toMatchObject({
+          decisionReason: "Synthetic policy requires approval for this path.",
+          blockedPath: "/synthetic/protected/config.json",
+        });
+      } finally {
+        await workspace.cleanup();
+      }
+    });
+  }
+
+  test("long SDK context wraps on mobile and a legacy request has no fabricated reason", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const workspace = await seedWorkspace({ repoPrefix: "approval-context-long-" });
+    const controller = await connectDaemonClient<DaemonClient>({
+      clientIdPrefix: "approval-context-long",
+    });
+    try {
+      const agent = await workspace.client.createAgent({
+        provider: "claude",
+        cwd: workspace.repoPath,
+        workspaceId: workspace.workspaceId,
+        title: "Synthetic long approval",
+        model: "synthetic",
+        modeId: "bypassPermissions",
+        initialPrompt: "Show long-context synthetic approval.",
+      });
+      await openAgentRoute(page, { workspaceId: workspace.workspaceId, agentId: agent.id });
+      const reason = page.getByTestId("permission-request-reason");
+      await expect(reason).toContainText("Review the protected destination", { timeout: 90_000 });
+      await expect(page.getByText("Updating messages", { exact: true })).toHaveCount(0);
+      await page.getByText("Why approval is needed", { exact: true }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: testInfo.outputPath("mobile-long-reason.png") });
+      const blockedPath = page.getByTestId("permission-request-blocked-path");
+      await blockedPath.scrollIntoViewIfNeeded();
+      const box = await blockedPath.boundingBox();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+      await page.getByTestId("scroll-to-bottom-button").click();
+      await expect(page.getByTestId("scroll-to-bottom-button")).toHaveCount(0);
+      for (const action of ["deny", "accept"]) {
+        const button = page.getByTestId(`permission-request-${action}`);
+        await expect(button).toBeInViewport();
+        await expect.poll(() => button.evaluate(ownsCenterPoint)).toBe(true);
+      }
+      await page.screenshot({ path: testInfo.outputPath("mobile-long-controls.png") });
+      await page.getByTestId("permission-request-deny").click();
+      await expect(page.getByTestId("permission-request-question")).toHaveCount(0);
+      await controller.sendMessage(agent.id, "Show legacy synthetic approval.");
+      await expect(page.getByTestId("permission-request-question")).toBeVisible({
+        timeout: 90_000,
+      });
+      await expect(reason).toHaveCount(0);
+      await expect(blockedPath).toHaveCount(0);
+      await page.screenshot({ path: testInfo.outputPath("mobile-legacy.png") });
+      await page.getByTestId("permission-request-deny").click();
+      await expect(page.getByTestId("permission-request-question")).toHaveCount(0);
+      await controller.sendMessage(agent.id, "Show blank-context synthetic approval.");
+      await expect(page.getByTestId("permission-request-question")).toBeVisible();
+      await expect(reason).toHaveCount(0);
+      await expect(blockedPath).toHaveCount(0);
+      await page.getByTestId("permission-request-deny").click();
+      await expect(page.getByTestId("permission-request-question")).toHaveCount(0);
+    } finally {
+      await controller.close();
+      await workspace.cleanup();
+    }
+  });
+});
+
+function ownsCenterPoint(element: HTMLElement | SVGElement): boolean {
+  const rect = element.getBoundingClientRect();
+  const target = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  return target !== null && element.contains(target);
 }
