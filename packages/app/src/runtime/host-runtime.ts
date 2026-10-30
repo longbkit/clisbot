@@ -230,6 +230,28 @@ function setSnapshotPatchField<Key extends keyof HostRuntimeSnapshotPatch>(
   patch[key] = value;
 }
 
+const LATENCY_JITTER_MIN_MS = 20;
+const LATENCY_JITTER_RATIO = 0.25;
+
+/**
+ * Every heartbeat measures a slightly different RTT. Publishing each one rewrote the snapshot of
+ * every online Host every 10 s and re-rendered every Host consumer, so a reading inside the band
+ * keeps the published one. The band stays under the adaptive switch threshold for fast routes.
+ */
+function holdLatencyJitter(
+  previous: ReadonlyMap<string, ConnectionProbeState>,
+  next: Map<string, ConnectionProbeState>,
+): Map<string, ConnectionProbeState> {
+  const held = new Map(next);
+  for (const [connectionId, probe] of next) {
+    const published = previous.get(connectionId);
+    if (probe.status !== "available" || published?.status !== "available") continue;
+    const band = Math.max(LATENCY_JITTER_MIN_MS, published.latencyMs * LATENCY_JITTER_RATIO);
+    if (Math.abs(probe.latencyMs - published.latencyMs) < band) held.set(connectionId, published);
+  }
+  return held;
+}
+
 export function isHostRuntimeConnected(snapshot: HostRuntimeSnapshot | null): boolean {
   return snapshot?.connectionStatus === "online";
 }
@@ -1650,6 +1672,15 @@ export class HostRuntimeController {
   }
 
   private updateSnapshot(patch: HostRuntimeSnapshotPatch): void {
+    if (patch.probeByConnectionId) {
+      patch = {
+        ...patch,
+        probeByConnectionId: holdLatencyJitter(
+          this.snapshot.probeByConnectionId,
+          patch.probeByConnectionId,
+        ),
+      };
+    }
     const preservedPatch: HostRuntimeSnapshotPatch = { ...patch };
     let hasChanged = this.host.serverId !== this.snapshot.serverId;
     for (const key of Object.keys(patch) as (keyof HostRuntimeSnapshotPatch)[]) {
