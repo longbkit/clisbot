@@ -244,11 +244,12 @@ export function deriveAgentScreenViewState({
     };
   }
 
+  // A cold open renders ready from the directory row before history arrives, so having rendered
+  // ready says nothing here: with no history to keep showing, a failed first load is the error view.
   if (
     input.visibilityCatchUpStatus === "error" &&
     input.visibilityCatchUpError &&
-    !input.hasHydratedHistoryBefore &&
-    !nextMemory.hasRenderedReady
+    !input.hasHydratedHistoryBefore
   ) {
     return {
       state: {
