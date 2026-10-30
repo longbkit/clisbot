@@ -3,7 +3,14 @@ import * as Linking from "expo-linking";
 import { readSecret, writeSecret, deleteSecret, lockSecret } from "@/device-access/secret-storage";
 import { oauthCredentialKey, parseOAuthCredential } from "./oauth-credentials";
 import * as WebBrowser from "expo-web-browser";
+import { AppState, Platform } from "react-native";
 import type { HubConfiguration } from "../config";
+import {
+  AuthSessions,
+  HubSignInReplacedError,
+  HubSignInStartError,
+  type AuthSessionResult,
+} from "./auth-session";
 import type { HubRequestInput, HubTransport } from "./contract";
 import {
   authorizationCodeFromCallback,
@@ -106,7 +113,7 @@ class NativeHubTransport implements HubTransport {
     const challenge = encodeBase64Url(challengeBytes);
     const state = encodeBase64Url(Crypto.getRandomBytes(32));
     const redirectUri = Linking.createURL("hub-auth/callback");
-    const result = await WebBrowser.openAuthSessionAsync(
+    const result = await openAuthSession(
       oauthAuthorizeUrl({
         origin: this.origin,
         redirectUri,
@@ -209,6 +216,48 @@ class NativeHubTransport implements HubTransport {
       return token;
     });
   }
+}
+
+/** Custom tabs cannot be closed from the app, and report neither closing nor the redirect. */
+const androidSessions = new AuthSessions({
+  open: async (url) => {
+    await WebBrowser.openBrowserAsync(url);
+  },
+  dismiss: () => undefined,
+  subscribeRedirect: (listener) => {
+    const subscription = Linking.addEventListener("url", (event) => listener(event.url));
+    return () => subscription.remove();
+  },
+  subscribeAppState: (listener) => {
+    const subscription = AppState.addEventListener("change", listener);
+    return () => subscription.remove();
+  },
+});
+
+let iosSessionGeneration = 0;
+let iosSessionOpen = false;
+
+/** ASWebAuthenticationSession always settles; a session still registered is dismissed first. */
+async function openIosAuthSession(url: string, redirectUri: string): Promise<AuthSessionResult> {
+  if (iosSessionOpen) WebBrowser.dismissAuthSession();
+  const generation = ++iosSessionGeneration;
+  iosSessionOpen = true;
+  try {
+    const result = await WebBrowser.openAuthSessionAsync(url, redirectUri);
+    if (generation !== iosSessionGeneration) throw new HubSignInReplacedError();
+    return result.type === "success" ? { type: "success", url: result.url } : { type: "cancel" };
+  } catch (cause) {
+    if (cause instanceof HubSignInReplacedError) throw cause;
+    throw new HubSignInStartError(cause);
+  } finally {
+    if (generation === iosSessionGeneration) iosSessionOpen = false;
+  }
+}
+
+function openAuthSession(url: string, redirectUri: string): Promise<AuthSessionResult> {
+  return Platform.OS === "android"
+    ? androidSessions.open(url, redirectUri)
+    : openIosAuthSession(url, redirectUri);
 }
 
 function assertHubPath(path: string): string {

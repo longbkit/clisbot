@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HubAccountProvider, useHubAccount } from "./account-provider";
 import { HubAccountRequestError } from "@/device-access/hub-account-error";
 import { hubClientAuthorizationContinuation } from "./account-entry-route";
+import { HubSignInReplacedError, HubSignInStartError } from "./transport/auth-session";
 import { useReaderMemory } from "./reader-memory";
 import { useReaderAccounts, useRememberVerifiedReaders } from "@/clisbot/navigation/reader";
 
@@ -439,6 +440,33 @@ describe("the reader across an explicit sign-out", () => {
     );
     await waitFor(() => expect(memory().signedOut[ORIGIN]).toBeUndefined());
     await waitFor(() => expect(readerIds(view)).toEqual(["a"]));
+  });
+});
+
+/** The provider reports the failure through `error`; the rejected promise is not the subject. */
+function ignoreFailure(): void {}
+
+describe("browser sign-in outcomes", () => {
+  beforeEach(() => {
+    testState.url = "";
+    testState.recoverSignIn.mockResolvedValue(false);
+    testState.request.mockImplementation(async () =>
+      Response.json({ status: "signedOut", registration: "invite_only" }),
+    );
+  });
+
+  it("shows the error when the browser cannot open", async () => {
+    testState.signIn.mockRejectedValueOnce(new HubSignInStartError(new Error("no browser")));
+    const { result } = setup();
+    await act(() => result.current.signIn().catch(ignoreFailure));
+    expect(result.current.error).toBe("Couldn't open the browser to sign in to Hub.");
+  });
+
+  it("does not report a sign-in a newer press replaced", async () => {
+    testState.signIn.mockRejectedValueOnce(new HubSignInReplacedError());
+    const { result } = setup();
+    await act(() => result.current.signIn().catch(ignoreFailure));
+    expect(result.current.error).toBeNull();
   });
 });
 

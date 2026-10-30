@@ -32,6 +32,7 @@ import { getHubDaemonListCache } from "./hub-daemon-list-cache";
 import { clearHubOfflineData } from "@/clisbot/offline-storage/hub";
 import { useReaderMemory } from "./reader-memory";
 import { hubResourceQueryKey } from "./query-keys";
+import { HubSignInReplacedError } from "./transport/auth-session";
 import { HubAccountRequestError, needsOwnerSetupRecovery } from "@/device-access/hub-account-error";
 import { PairedHubTransport } from "@/device-access/hub-transport";
 import {
@@ -338,7 +339,8 @@ function EnabledHubAccountController({
       } catch (error) {
         const message =
           error instanceof Error ? error.message : i18n.t("hub.account.errors.requestFailed");
-        setMutationError(message);
+        // A newer browser sign-in replaced this one and reports its own outcome.
+        if (!(error instanceof HubSignInReplacedError)) setMutationError(message);
         throw error;
       }
     },

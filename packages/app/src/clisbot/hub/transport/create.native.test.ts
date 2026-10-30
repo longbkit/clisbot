@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import * as WebBrowser from "expo-web-browser";
 import { createHubTransport } from "./create.native";
 import { oauthCredentialKey } from "./oauth-credentials";
+import { HubSignInStartError } from "./auth-session";
 vi.mock("@/device-access/secret-storage", () =>
   vi.importActual("@/device-access/secret-storage.ts"),
 );
@@ -26,6 +27,7 @@ vi.mock("expo-crypto", () => ({
 vi.mock("expo-linking", () => ({ createURL: () => "clisbot://hub-auth/callback" }));
 vi.mock("expo-web-browser", () => ({
   WebBrowserResultType: { CANCEL: "cancel" },
+  dismissAuthSession: vi.fn(),
   openAuthSessionAsync: vi.fn(async (url: string) => {
     const authorization = new URL(url);
     const callback = new URL(authorization.searchParams.get("redirect_uri")!);
@@ -115,6 +117,17 @@ test("canceling native sign-in leaves the same transport ready for a fresh attem
   expect(secrets.size).toBe(0);
   await transport.signIn?.();
   expect(fetch).toHaveBeenCalledTimes(1);
+  expect(secrets.has(oauthCredentialKey(work))).toBe(true);
+});
+
+test("a browser that cannot open surfaces a start error, and the next press signs in", async () => {
+  vi.mocked(WebBrowser.openAuthSessionAsync).mockRejectedValueOnce(new Error("no browser"));
+  const transport = createHubTransport({ origin: work });
+  const failure = await transport.signIn?.().catch((error: unknown) => error);
+  expect(failure).toBeInstanceOf(HubSignInStartError);
+  expect(failure).toMatchObject({ message: "Couldn't open the browser to sign in to Hub." });
+  expect(fetch).not.toHaveBeenCalled();
+  await transport.signIn?.();
   expect(secrets.has(oauthCredentialKey(work))).toBe(true);
 });
 
