@@ -16,11 +16,19 @@ Navigation V2 phones switch Home, Chats, Work, Schedules and More the way Slack 
 with no remount. `PhoneTabs` (`clisbot/home/phone-tab-navigator.tsx`) is a `TabRouter` with its own
 view, not the bottom-tabs view:
 
-- A tab mounts on its first visit and its route key is never dropped, so a visited tab never
-  unmounts. Each tab is a `RetainedPanel` in route order, a stable sibling order.
-- The tab bar (`MobileTabBar`) dispatches the switch on the tab navigator. The same commit flips
-  which panel is shown and its active signal: no animation, no settlement, no focus-event round
-  trip. Panels are never detached or frozen.
+- After the first paint every unvisited tab mounts hidden, one per idle slot
+  (`requestIdleCallback`, a short timer on Safari), each in a transition a press can interrupt.
+  A first visit is then a visibility flip, not a mount: on 2026-10-30 a first visit to Work (about
+  6,100 items, 14 Hosts) took 833–1033 ms with no change on screen. A mounted tab never unmounts.
+  Each tab is a `RetainedPanel` in route order, a stable sibling order.
+- The tab bar (`MobileTabBar`) dispatches the switch on the tab navigator. The press's commit
+  shows the target as it last rendered (`RetainedPanel`'s `shown`) and hides the old tab; the
+  target's active signal flips in the deferred render after it (`useDeferredValue`). Its held
+  panes render the latest value there, interruptibly, so the press's commit renders no tab body.
+  No animation, no settlement, no focus-event round trip. Panels are never detached or frozen.
+- A pre-mounted tab holds what it rendered at mount until its first visit. If Hosts were still
+  connecting then, the first visit shows that (the skeleton) for a frame and the list arrives in
+  the deferred render.
 - Hidden tabs see an inactive `useRetainedPanelActive`. Chats and Work hold their inputs as below;
   Home holds the navigation activity (`HeldNavigationActivity`); each tab's route renders memoized
   content, so a switch re-renders the routes and not their screens.
@@ -222,7 +230,8 @@ rapid-command, position-settlement, and width-projection sequences through the t
 a sequence there whenever ownership or ordering changes.
 
 `clisbot/home/phone-tab-navigator.browser.test.tsx` runs the phone tab navigator in a real
-`NavigationContainer`: no visited tab unmounts, the target shows active in the press's commit, and
-hidden tabs render zero times on store updates. `home-tab-navigation.test.ts` runs the root stack
+`NavigationContainer`: tabs pre-mount hidden one idle slot at a time, no tab unmounts, the press's
+commit shows the target without rendering its body, the deferred render activates it, and hidden
+tabs render zero times on store updates. `home-tab-navigation.test.ts` runs the root stack
 reducer for detail Back and cold deep links; `e2e/browser/navigation-v2.spec.ts` checks at 390px
 that switches and Back keep the same tab nodes.

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { startTransition, useDeferredValue, useEffect, useState, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import {
   TabRouter,
@@ -18,6 +18,19 @@ export interface PhoneTabBarProps {
   navigation: { navigate: (name: string) => void };
 }
 
+/** Runs `run` when the JS thread is idle; returns a cancel. */
+export type ScheduleIdle = (run: () => void) => () => void;
+
+// Safari has no requestIdleCallback; a short timer still lets the first paint go out first.
+const scheduleIdle: ScheduleIdle = (run) => {
+  if (typeof requestIdleCallback !== "function") {
+    const timer = setTimeout(run, 200);
+    return () => clearTimeout(timer);
+  }
+  const id = requestIdleCallback(run, { timeout: 2000 });
+  return () => cancelIdleCallback(id);
+};
+
 type PhoneTabEventMap = Record<string, { data?: unknown }>;
 
 type PhoneTabNavigatorProps = DefaultNavigatorOptions<
@@ -30,13 +43,15 @@ type PhoneTabNavigatorProps = DefaultNavigatorOptions<
 > &
   TabRouterOptions & {
     tabBar: (props: PhoneTabBarProps) => ReactNode;
+    scheduleIdle?: ScheduleIdle;
   };
 
 /**
- * The phone's peer tabs (docs/mobile-panels.md#phone-tabs). A tab mounts on its first visit and
- * stays mounted: switching flips which retained panel is shown, in the press's own commit, with no
- * animation and no settlement. The hidden ones get an inactive retained-panel signal, so panes that
- * hold their inputs (`useHeldWhileInactive`) skip store updates until shown again.
+ * The phone's peer tabs (docs/mobile-panels.md#phone-tabs). After the first paint each unvisited
+ * tab mounts hidden, one per idle slot, so a first visit is not a mount; a mounted tab never
+ * unmounts. A press shows its tab in the press's own commit as the tab last rendered and
+ * activates it in a deferred render: hidden panes hold their inputs (`useHeldWhileInactive`), so
+ * the press's commit renders no tab body.
  */
 function PhoneTabNavigator({
   id,
@@ -47,6 +62,7 @@ function PhoneTabNavigator({
   screenListeners,
   screenLayout,
   tabBar,
+  scheduleIdle: schedule = scheduleIdle,
 }: PhoneTabNavigatorProps) {
   const { state, descriptors, navigation, NavigationContent } = useNavigationBuilder<
     TabNavigationState<ParamListBase>,
@@ -64,14 +80,19 @@ function PhoneTabNavigator({
     screenLayout,
   });
   const focusedKey = state.routes[state.index]!.key;
-  const visited = useVisitedKeys(focusedKey);
+  const activeKey = useDeferredValue(focusedKey);
+  const mounted = useMountedKeys(focusedKey, state.routes, schedule);
   return (
     <NavigationContent>
       <View style={styles.fill}>
         <View style={styles.fill}>
           {state.routes.map((route) =>
-            visited.has(route.key) ? (
-              <RetainedPanel key={route.key} active={route.key === focusedKey}>
+            mounted.has(route.key) ? (
+              <RetainedPanel
+                key={route.key}
+                shown={route.key === focusedKey}
+                active={route.key === focusedKey && route.key === activeKey}
+              >
                 {descriptors[route.key]!.render()}
               </RetainedPanel>
             ) : null,
@@ -83,13 +104,26 @@ function PhoneTabNavigator({
   );
 }
 
-/** Route keys shown at least once; a key is never removed, so a visited tab never unmounts. */
-function useVisitedKeys(focusedKey: string): ReadonlySet<string> {
-  const [visited, setVisited] = useState<ReadonlySet<string>>(() => new Set([focusedKey]));
-  if (visited.has(focusedKey)) return visited;
-  const next = new Set(visited).add(focusedKey);
-  setVisited(next);
-  return next;
+/**
+ * Route keys whose tab is mounted: the focused one at once, then the others in route order, one
+ * per idle slot, each in a transition a press can interrupt. A key is never removed.
+ */
+function useMountedKeys(
+  focusedKey: string,
+  routes: readonly { key: string }[],
+  schedule: ScheduleIdle,
+): ReadonlySet<string> {
+  const [mounted, setMounted] = useState<ReadonlySet<string>>(() => new Set([focusedKey]));
+  const next = routes.find((route) => !mounted.has(route.key))?.key;
+  useEffect(() => {
+    if (next === undefined) return;
+    const mountNext = () => setMounted(new Set(mounted).add(next));
+    return schedule(() => startTransition(mountNext));
+  }, [mounted, next, schedule]);
+  if (mounted.has(focusedKey)) return mounted;
+  const withFocused = new Set(mounted).add(focusedKey);
+  setMounted(withFocused);
+  return withFocused;
 }
 
 export const createPhoneTabNavigator = createNavigatorFactory(PhoneTabNavigator);
