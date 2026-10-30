@@ -7,9 +7,31 @@ Compact layouts have three mutually exclusive destinations:
 - `file-explorer` on the right
 
 They are one interaction, not two independent drawers. The implementation lives in
-`packages/app/src/mobile-panels/`.
+`packages/app/src/mobile-panels/`. Navigation V2 phones never open `agent-list`: Chats and Work are
+[phone tabs](#phone-tabs).
+
+## Phone tabs
+
+Navigation V2 phones switch Home, Chats, Work, Schedules and More the way Slack does: instantly,
+with no remount. `PhoneTabs` (`clisbot/home/phone-tab-navigator.tsx`) is a `TabRouter` with its own
+view, not the bottom-tabs view:
+
+- A tab mounts on its first visit and its route key is never dropped, so a visited tab never
+  unmounts. Each tab is a `RetainedPanel` in route order, a stable sibling order.
+- The tab bar (`MobileTabBar`) dispatches the switch on the tab navigator. The same commit flips
+  which panel is shown and its active signal: no animation, no settlement, no focus-event round
+  trip. Panels are never detached or frozen.
+- Hidden tabs see an inactive `useRetainedPanelActive`. Chats and Work hold their inputs as below;
+  Home holds the navigation activity (`HeldNavigationActivity`); each tab's route renders memoized
+  content, so a switch re-renders the routes and not their screens.
+- Chats and Work render their panes directly as the tab screen (`PhoneListTab`). Work owns a
+  `SidebarModelProvider` there, because the sidebar chrome's provider does not reach routes.
+
+Route topology, Back and deep links are in [Expo Router](expo-router.md#phone-tabs).
 
 ## Home navigation
+
+This section is the Home V2 layout, which `EXPO_PUBLIC_CLISBOT_NAVIGATION_V2=0` restores.
 
 The Home extension (`HOME_V2_ENABLED`) adds Home / Chat / Inbox / Automations tabs above the
 existing panel model. Chat is a page, not a drawer: `/chat` selects `agent-list`, the switch has no
@@ -60,9 +82,7 @@ Once native compact chrome has mounted, global screens retain it inactive instea
 it on Back. The shared overlay’s explicit presentation guard hides the actual host, input and
 accessibility without collapsing retained scroll ranges; close gestures and sidebar demand are
 inactive too. Cold global screens still do not mount the sidebar. Compact web and desktop keep
-their existing mount policies. On Android phones, the retained overlay keeps its host but releases
-Chats and Workspace list content while hidden; returning rebuilds that content and currently resets
-its list scroll position. Chats' search state remains outside the released pane.
+their existing mount policies.
 
 ## Ownership
 
@@ -182,7 +202,8 @@ definition, no longer eligible to begin.
 - To stop hidden re-renders, hold the pane's inputs at its owner with `useHeldWhileInactive`
   (`hooks/use-held-while-inactive.ts`) and pass them to a memoized body. The owner still subscribes;
   the body skips every update until the panel is active, then renders once with the latest value.
-  Hold the derived model, not each row.
+  Hold the derived model, not each row. For a context read deep in the pane, wrap the pane in
+  `HeldContextValue` (`components/held-context.tsx`) with a stable child element.
 - Catalog-backed surfaces narrow external-store snapshots and preserve unchanged directory row
   identity through the shared aggregation owner ([architecture](architecture.md)). Reducing hidden
   derivation work does not change the native workspace/tab retention limits or visibility ownership.
@@ -192,3 +213,9 @@ definition, no longer eligible to begin.
 `packages/app/src/mobile-panels/model.test.ts` exercises command, drag, cancellation, interruption,
 rapid-command, position-settlement, and width-projection sequences through the transition model. Add
 a sequence there whenever ownership or ordering changes.
+
+`clisbot/home/phone-tab-navigator.browser.test.tsx` runs the phone tab navigator in a real
+`NavigationContainer`: no visited tab unmounts, the target shows active in the press's commit, and
+hidden tabs render zero times on store updates. `home-tab-navigation.test.ts` runs the root stack
+reducer for detail Back and cold deep links; `e2e/browser/navigation-v2.spec.ts` checks at 390px
+that switches and Back keep the same tab nodes.

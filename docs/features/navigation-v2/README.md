@@ -48,10 +48,10 @@ The primary navigation says where you are; each section owns its header, filters
   window's top-left corner. Chats and Workspace open the existing resizable list pane
   (`components/desktop-sidebar-frame.tsx`, shared with the Home V2 sidebar); clicking the active
   one, or ⌘B, hides or shows it. Home, Schedules, Tasks, Connectors and More have no list pane.
-- **Phone** (`clisbot/home/mobile-navigation.tsx`, `mobile-tabs.tsx`): tabs Home · Chats ·
-  Workspace · Lịch · More. Chats and Workspace are both list tabs: the same retained `agent-list`
-  panel shows the Chats or Workspace list, so native presentation, the pending-detail shell and the Back return path
-  stay one implementation (`isListTabPath`, `currentListTabPath`). More is the `/more` page.
+- **Phone** (`clisbot/home/mobile-navigation.tsx`, `mobile-tabs.tsx`, `app/(tabs)`): tabs Home ·
+  Chats · Work · Lịch · More in one retained tab navigator ([phone tabs][phone-tabs]). Chats and
+  Work render their lists as the tab screen (`PhoneListTab`); details push above the tabs and Back
+  pops to them ([route topology][phone-tab-routes]). More is the `/more` tab.
 - **One component per job** across Home, Chats and Workspace: `SectionHeader`, `SectionControls` (For
   me / Others / All, chips, then the Display row, on one inset), `DisplayMenuTrigger`
   ("Display ▾", with a dot while a filter is in force), `HostsDisplayItems`, `ChipRow` /
@@ -69,13 +69,18 @@ The primary navigation says where you are; each section owns its header, filters
   component. A `FlatList`'s `contentContainerStyle` gets no Unistyles class on web
   ([unistyles](../../unistyles.md#main-gotcha-contentcontainerstyle)), so Chats and the flat
   Workspace list use theme-free `SPACING` insets.
-- **List retention** (`ListContent` in `list-panel.tsx`): Chats and Workspace mount on their first
-  visit and stay mounted on every platform, so a tab switch only flips visibility and keeps scroll
-  position. A hidden list holds its inputs (`useHeldWhileInactive`): Workspace reads the sidebar
-  model through `RetainedSidebarModel`, Chats holds its catalog and unread agents in `ChatsPane`.
-  Host updates skip a hidden list; its first render back uses the latest data. Unmounting hidden
-  lists on Android (until 2026-10-30) made every switch back rebuild the list, about 2 s for
-  Workspace on a Galaxy S23 with 14 Hosts.
+- **Retention**: a visited section stays mounted, so a switch only flips visibility and keeps
+  scroll position. On desktop Chats and Work are retained panels in the list pane (`ListContent` in
+  `list-panel.tsx`); on phones every tab is ([phone tabs][phone-tabs]). A hidden list holds its
+  inputs (`useHeldWhileInactive`): Work reads the sidebar model through `RetainedSidebarModel`,
+  Chats holds its catalog and unread agents in `ChatsPane`, and a phone's hidden Home holds the
+  navigation activity. Host updates skip a hidden section; its first render back uses the latest
+  data. Until 2026-10-30 a phone tab switch replaced the route (and Android also unmounted hidden
+  lists), so every switch rebuilt the screen: 2 s or more on a production build, about 2 s for
+  Work on a Galaxy S23 with 14 Hosts.
+
+[phone-tabs]: ../../mobile-panels.md#phone-tabs
+[phone-tab-routes]: ../../expo-router.md#phone-tabs
 
 ## Change map
 
@@ -417,7 +422,7 @@ Delete or collapse to the V2 branch:
 | `screens/sessions-screen.tsx`                                                               | keep only `InboxHistory` (embedded); drop the standalone screen and its `MenuHeader`                                                                                                                                                                                                                                                                                                |
 | `screens/new-workspace-screen.tsx`                                                          | `StartLayout` always uses `NavigationHomeLayout` for Home                                                                                                                                                                                                                                                                                                                           |
 | `clisbot/home/home-header.tsx`                                                              | always `NavigationHomeHeader`; delete `MobileToolbar` (`clisbot/home/mobile-toolbar.tsx`)                                                                                                                                                                                                                                                                                           |
-| `clisbot/home/mobile-navigation.tsx`                                                        | drop `HOME_V2_TABS` and the `/sessions` badge/label branch; `LIST_TAB_PATHS` = Chats, Workspace                                                                                                                                                                                                                                                                                     |
+| `clisbot/home/mobile-navigation.tsx`                                                        | drop `HOME_V2_TABS`, the `/sessions` badge/label branch, `MobileChatPanelTabs` and the panel branch of `Tab`; `usesPhoneTabs` = compact                                                                                                                                                                                                                                             |
 | `clisbot/home/list-tab-page.tsx`                                                            | drop the non-V2 branches                                                                                                                                                                                                                                                                                                                                                            |
 | `clisbot/home/activity-state.tsx`                                                           | Needs link always sets the chip; label "Needs me"                                                                                                                                                                                                                                                                                                                                   |
 | `clisbot/home/activity-preview.tsx`                                                         | delete `HomeActivity` (replaced by `home-feed-view.tsx`)                                                                                                                                                                                                                                                                                                                            |
@@ -512,15 +517,13 @@ Native iOS/Android were not run.
 ## Native
 
 Everything is shared React Native code with Unistyles tokens and the existing primitives; there is
-no DOM path. Phones keep the Home V2 native model: peer tabs replace their route, Chats and Workspace
-are the retained list panel with its pending-detail shell, Android Back follows the tab rules, and
-iOS swipe-back is the native stack's. Chats is a virtualized `FlatList`; Workspace is the existing
+no DOM path. Phones (native and compact web) use the retained [phone tabs][phone-tabs]: a detail
+pushes on the root stack, Android Back pops it to the tab it came from (a tab other than Home goes
+Home; Home leaves the app), and iOS swipe-back is the native stack's. Chats is a virtualized
+`FlatList`; Work is the existing
 workspace list in Project grouping and a virtualized `FlatList` in Session and Workspace grouping;
 the Home feed keeps Home's existing scroller. Chips and pin
-tags stay visually compact and reach 44pt through `hitSlop`. On web only, a tab that opens the
-list panel changes the route one frame after presenting the panel, because the panel presents a
-frame after the store changes and the outgoing page would otherwise leave one blank frame; native
-keeps its own presentation. `HoldReadingPosition` compensates from `onLayout`, which on native can
+tags stay visually compact and reach 44pt through `hitSlop`. `HoldReadingPosition` compensates from `onLayout`, which on native can
 land a frame after the change, so a native recording should confirm S1; the scope and mode switches use the
 44pt segmented size on phones. The issue store persists only when a record changes (a new occurrence or a reader mark), as one small JSON write through AsyncStorage; observing an unchanged directory writes nothing. Native iOS/Android builds were not run for
 Round 1.
