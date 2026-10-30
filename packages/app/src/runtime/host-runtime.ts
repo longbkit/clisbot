@@ -131,6 +131,7 @@ import {
   type BackoffPolicy,
   ConnectLimiter,
   DEFAULT_BACKOFF_POLICY,
+  MAX_CONCURRENT_DIRECTORY_PAGES,
   MAX_CONCURRENT_HOST_CONNECTS,
   RECONNECT_MAX_DELAY_MS,
   ReconnectBackoff,
@@ -1109,19 +1110,24 @@ export class HostRuntimeController {
   }
 
   /**
-   * The device's network came back: an online Host verifies its socket, any other Host drops
-   * its remaining backoff and tries now. Admission and probe connects still take a shared slot.
+   * The network or the app came back (`runtime/reconnect-sweep.ts`): an online Host verifies its
+   * socket, any other Host drops its remaining backoff and tries now. Admission and probe
+   * connects still take a shared slot.
    */
   retryAfterNetworkChange(): void {
-    if (this.snapshot.connectionStatus === "online") {
-      this.activeClient?.verifyConnection();
-      return;
-    }
     if (this.usesSessionAdmission() || !this.activeClient) {
-      void this.runProbeCycleNow();
+      if (this.snapshot.connectionStatus === "online") this.activeClient?.verifyConnection();
+      else void this.runProbeCycleNow();
       return;
     }
-    this.activeClient.ensureConnected();
+    // A self-retrying client verifies a live socket and reconnects a dropped one at once.
+    this.activeClient.ensureConnected({ verify: true });
+  }
+
+  /** Whether `retryAfterNetworkChange` would start a connect that waits for a shared slot. */
+  retryTakesConnectSlot(): boolean {
+    const routedHere = this.usesSessionAdmission() || !this.activeClient;
+    return routedHere && this.snapshot.connectionStatus !== "online";
   }
 
   /** The device lost its network: probe live sockets now so they report offline promptly. */
@@ -1132,20 +1138,6 @@ export class HostRuntimeController {
   /** A changed route is new information, not another failure of the old one. */
   private resetBackoffForChangedRoutes(next: HostProfile): void {
     if (!equal(this.host.connections, next.connections)) this.reconnectBackoff.reset();
-  }
-
-  ensureConnected(options?: { verify?: boolean }): void {
-    if (this.host.management || hostRequiresSessionAdmission(this.host.serverId)) {
-      if (this.snapshot.connectionStatus === "online") {
-        if (options?.verify) this.activeClient?.verifyConnection();
-      } else {
-        // Foreground/network nudges verify live sockets fast; an offline source keeps its
-        // backoff, or a hundred unreachable sandboxes would all reconnect at once.
-        void this.runScheduledProbeCycle();
-      }
-      return;
-    }
-    this.activeClient?.ensureConnected(options);
   }
 
   markAgentDirectorySyncLoading(): void {
@@ -2103,6 +2095,7 @@ export class HostRuntimeStore {
   private replicaCache: ReplicaCache;
   private readonly revokePushNotifications: typeof revokePushNotifications;
   private readonly directoryFrameClock: FrameClock | null;
+  private readonly directoryPageLimiter = new ConnectLimiter(MAX_CONCURRENT_DIRECTORY_PAGES);
 
   constructor(input?: {
     deps?: HostRuntimeControllerDeps;
@@ -2399,7 +2392,7 @@ export class HostRuntimeStore {
         markWorkspaceError: (error) => controller.markWorkspaceDirectorySyncError(error),
       },
       this.replicaCache,
-      { frameClock: this.directoryFrameClock },
+      { frameClock: this.directoryFrameClock, pageFetchLimiter: this.directoryPageLimiter },
     );
     this.directorySyncByServer.set(newServerId, directory);
     this.timelineReplicaByServer.set(
@@ -3142,7 +3135,7 @@ export class HostRuntimeStore {
           markWorkspaceError: (error) => controller.markWorkspaceDirectorySyncError(error),
         },
         this.replicaCache,
-        { frameClock: this.directoryFrameClock },
+        { frameClock: this.directoryFrameClock, pageFetchLimiter: this.directoryPageLimiter },
       );
       this.directorySyncByServer.set(host.serverId, directory);
       this.timelineReplicaByServer.set(
@@ -3507,7 +3500,7 @@ export class HostRuntimeStore {
     recordHostDiagnostic("host-reconnect-sweep", { reason, hosts: controllers.length });
     this.reconnectSweep.run(
       controllers.map(([serverId, controller]) => ({
-        isOnline: () => controller.getSnapshot().connectionStatus === "online",
+        takesConnectSlot: () => controller.retryTakesConnectSlot(),
         retryNow: () => {
           // A Host removed while its staggered turn was pending is stopped; leave it alone.
           if (this.controllers.get(serverId) === controller) controller.retryAfterNetworkChange();

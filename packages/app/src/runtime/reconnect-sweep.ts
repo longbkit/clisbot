@@ -13,7 +13,8 @@ export const RECOVERY_SWEEP_MIN_INTERVAL_MS = 10_000;
 export type ReconnectSweepReason = "network" | "foreground" | "host-recovered";
 
 export interface ReconnectSweepTarget {
-  isOnline(): boolean;
+  /** Staggered when true; a socket check or a self-retrying client goes at once. */
+  takesConnectSlot(): boolean;
   /** Online: verify the socket. Otherwise: drop the remaining backoff and attempt now. */
   retryNow(): void;
 }
@@ -27,12 +28,12 @@ export class ReconnectSweep {
   run(targets: readonly ReconnectSweepTarget[]): void {
     this.cancel();
     this.lastSweepAt = Date.now();
-    const offline: ReconnectSweepTarget[] = [];
+    const connecting: ReconnectSweepTarget[] = [];
     for (const target of targets) {
-      if (target.isOnline()) target.retryNow();
-      else offline.push(target);
+      if (target.takesConnectSlot()) connecting.push(target);
+      else target.retryNow();
     }
-    offline.forEach((target, index) => {
+    connecting.forEach((target, index) => {
       if (index === 0) {
         target.retryNow();
         return;

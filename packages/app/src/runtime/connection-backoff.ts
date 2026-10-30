@@ -8,6 +8,8 @@ export const RECONNECT_BASE_DELAY_MS = 1_000;
 export const RECONNECT_MAX_DELAY_MS = 60_000;
 /** Connect attempts (probe sockets and admission sessions) in flight across every Host. */
 export const MAX_CONCURRENT_HOST_CONNECTS = 4;
+/** Directory pages (agents, workspaces, projects) in flight across every Host. */
+export const MAX_CONCURRENT_DIRECTORY_PAGES = 3;
 
 export interface BackoffPolicy {
   baseDelayMs: number;

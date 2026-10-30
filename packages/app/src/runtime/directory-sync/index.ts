@@ -29,6 +29,7 @@ import {
 } from "./transaction";
 import { createLiveUpdateBatch, type FrameClock, type LiveUpdateBatch } from "./live-batch";
 import { workspaceLabels } from "@/workspace-labels";
+import type { ConnectLimiter } from "../connection-backoff";
 import type {
   CachedDirectory,
   CachedWorkspace,
@@ -126,6 +127,11 @@ export interface DirectoryCheckpointStorage {
 export interface DirectorySyncOptions {
   /** Paces live updates (`createDirectoryFrameClock`); without one each applies on arrival. */
   frameClock?: FrameClock | null;
+  /**
+   * Shared by every Host of a store: a fleet reconnecting together fetches a few directory
+   * pages at a time instead of one per Host at once.
+   */
+  pageFetchLimiter?: ConnectLimiter;
 }
 
 type LiveDirectoryUpdate =
@@ -176,6 +182,7 @@ export class DirectorySync {
   private demandGeneration = 0;
   private satisfiedDemandSource: DirectorySourceToken | null = null;
   private cursors: DirectoryCheckpoint = {};
+  private readonly pageFetchLimiter: ConnectLimiter | null;
 
   constructor(
     private readonly serverId: string,
@@ -198,6 +205,22 @@ export class DirectorySync {
     this.liveUpdates = createLiveUpdateBatch(options.frameClock ?? null, (updates) =>
       this.applyLiveUpdates(updates),
     );
+    this.pageFetchLimiter = options.pageFetchLimiter ?? null;
+  }
+
+  private fetchPage<T>(
+    client: DaemonClient,
+    source: DirectorySourceToken,
+    request: () => Promise<T>,
+  ): Promise<T> {
+    if (!this.pageFetchLimiter) return request();
+    return this.pageFetchLimiter.run(() => {
+      // The connection can change while a page waits its turn; never open a stale subscription.
+      if (!this.isCurrent(client, source)) {
+        throw new DirectoryRefreshSupersededError("directory page no longer current");
+      }
+      return request();
+    });
   }
 
   /**
@@ -700,8 +723,9 @@ export class DirectorySync {
           ? { sync: transaction.snapshot.requestCursors.workspaces ?? {} }
           : {}),
       };
-      let payload: FetchWorkspacesPayload;
-      if (subscribe) {
+      const subscribing = subscribe;
+      const payload: FetchWorkspacesPayload = await this.fetchPage(client, source, () => {
+        if (!subscribing) return client.fetchWorkspaces(query);
         void this.workspaceSubscription?.release().catch(() => undefined);
         const subscription = client.observeWorkspaces(query);
         this.workspaceSubscription = subscription;
@@ -712,8 +736,8 @@ export class DirectorySync {
               this.receiveWorkspaceDelta(source, message.payload);
           },
         });
-        payload = await subscription.ready;
-      } else payload = await client.fetchWorkspaces(query);
+        return subscription.ready;
+      });
       // Fetch both directories together, but apply the project baseline before the
       // workspace page's empty-project overlays, regardless of response order.
       await projectsReady;
@@ -808,9 +832,10 @@ export class DirectorySync {
           ? { sync: this.readCursors().agents ?? {} }
           : {}),
       };
-      let payload: FetchAgentsPayload;
-      if (subscribe) {
-        if (subscribe.subscriptionId) throw new Error("Subscription IDs are assigned by the host");
+      if (subscribe?.subscriptionId) throw new Error("Subscription IDs are assigned by the host");
+      const subscribing = subscribe !== undefined;
+      const payload: FetchAgentsPayload = await this.fetchPage(client, source, () => {
+        if (!subscribing) return client.fetchAgents(query);
         void this.agentSubscription?.release().catch(() => undefined);
         const subscription = client.observeAgents(query);
         this.agentSubscription = subscription;
@@ -821,8 +846,8 @@ export class DirectorySync {
               this.receiveAgentDelta(source, message.payload);
           },
         });
-        payload = await subscription.ready;
-      } else payload = await client.fetchAgents(query);
+        return subscription.ready;
+      });
       this.assertAgentTransactionCurrent(client, source, transaction);
       transaction.snapshot.entries.push(...payload.entries);
       transaction.snapshot.subscriptionId ??= payload.subscriptionId ?? null;
@@ -908,11 +933,10 @@ export class DirectorySync {
     transaction: DirectoryTransaction<WorkspaceRefreshSnapshot, WorkspaceDirectoryDelta>,
     supportsDirectorySync: boolean,
   ): Promise<void> {
-    const payload = await client.listProjects(
-      supportsDirectorySync
-        ? { sync: transaction.snapshot.requestCursors.projects ?? {} }
-        : undefined,
-    );
+    const query = supportsDirectorySync
+      ? { sync: transaction.snapshot.requestCursors.projects ?? {} }
+      : undefined;
+    const payload = await this.fetchPage(client, source, () => client.listProjects(query));
     this.assertWorkspaceTransactionCurrent(client, source, transaction);
     if (payload.sync?.mode !== "changes") transaction.snapshot.projects.clear();
     (transaction.snapshot.syncModes ??= {}).projects = payload.sync?.mode ?? "snapshot";

@@ -269,9 +269,6 @@ describe("an explicit retry", () => {
     expect(attemptsOf(fleet.stats, [0])).toEqual([1]);
     await vi.advanceTimersByTimeAsync(30_000);
     expect(attemptsOf(fleet.stats, [0])).toEqual([1]);
-    fleet.controllers[0]!.ensureConnected({ verify: true });
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(attemptsOf(fleet.stats, [0])).toEqual([1]);
     const retry = fleet.controllers[0]!.runProbeCycleNow();
     await vi.advanceTimersByTimeAsync(500);
     await retry;

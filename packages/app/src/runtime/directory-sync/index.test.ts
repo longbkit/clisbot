@@ -29,6 +29,7 @@ import {
 } from "./index";
 
 import { subscriptionFixture } from "../subscription-fixture";
+import { ConnectLimiter } from "../connection-backoff";
 
 type WorkspaceFetchResult = Awaited<ReturnType<DaemonClient["fetchWorkspaces"]>>;
 type ProjectListResult = Awaited<ReturnType<DaemonClient["listProjects"]>>;
@@ -206,6 +207,7 @@ function createDirectory(
   options?: {
     workspaceLabels?: boolean;
     callbacks?: Partial<ConstructorParameters<typeof DirectorySync>[1]>;
+    pageFetchLimiter?: ConnectLimiter;
   },
 ): {
   client: FakeDirectoryClient;
@@ -214,16 +216,21 @@ function createDirectory(
   serverIds.add(serverId);
   const client = new FakeDirectoryClient();
   client.supportsWorkspaceLabels = options?.workspaceLabels === true;
-  const directory = new DirectorySync(serverId, {
-    onAgentStoppedRunning: () => undefined,
-    markAgentLoading: () => undefined,
-    markAgentReady: () => undefined,
-    markAgentError: () => undefined,
-    markWorkspaceLoading: () => undefined,
-    markWorkspaceReady: () => undefined,
-    markWorkspaceError: () => undefined,
-    ...options?.callbacks,
-  });
+  const directory = new DirectorySync(
+    serverId,
+    {
+      onAgentStoppedRunning: () => undefined,
+      markAgentLoading: () => undefined,
+      markAgentReady: () => undefined,
+      markAgentError: () => undefined,
+      markWorkspaceLoading: () => undefined,
+      markWorkspaceReady: () => undefined,
+      markWorkspaceError: () => undefined,
+      ...options?.callbacks,
+    },
+    undefined,
+    { pageFetchLimiter: options?.pageFetchLimiter },
+  );
   directory.connectionChanged({
     client: client as unknown as DaemonClient,
     status: "online",
@@ -1338,6 +1345,33 @@ describe("DirectorySync session readiness", () => {
       "retained",
     ]);
     directory.dispose();
+  });
+
+  it("shares one page-fetch limit across Hosts, so a fleet reconnect does not fetch at once", async () => {
+    const limiter = new ConnectLimiter(1);
+    const first = createDirectory("paced-pages-a", { pageFetchLimiter: limiter });
+    const second = createDirectory("paced-pages-b", { pageFetchLimiter: limiter });
+    const store = useSessionStore.getState();
+    store.initializeSession("paced-pages-a", first.client as unknown as DaemonClient, 1);
+    store.initializeSession("paced-pages-b", second.client as unknown as DaemonClient, 1);
+    const releaseFirst = first.client.holdAgentFetch();
+    const firstRefresh = first.directory.refreshAgents();
+    await expect.poll(() => first.client.fetchAgentsCalls).toBe(1);
+    const secondRefresh = second.directory.refreshAgents();
+    await vi.waitFor(() => expect(limiter.stats().waiting).toBe(1));
+    expect(second.client.fetchAgentsCalls).toBe(0);
+
+    releaseFirst({
+      requestId: "agents",
+      entries: [],
+      pageInfo: { hasMore: false, nextCursor: null, prevCursor: null },
+    });
+    await Promise.all([firstRefresh, secondRefresh]);
+
+    expect(second.client.fetchAgentsCalls).toBe(1);
+    expect(limiter.stats().peak).toBe(1);
+    first.directory.dispose();
+    second.directory.dispose();
   });
 
   it("rejects a session wait on disconnect so the reconnect can refresh", async () => {
