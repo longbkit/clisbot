@@ -24,6 +24,13 @@ const adapters = vi.hoisted(() => ({
     },
   ],
 }));
+// The cold-start list read (`prefetchRememberedHubDaemons`) needs a client; the account here has
+// already answered, so it never reads.
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-query")>();
+  const client = new actual.QueryClient();
+  return { ...actual, useQueryClient: () => client };
+});
 vi.mock("@/data/query", () => ({
   useFetchQuery: () => ({
     data: {

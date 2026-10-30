@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
 import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
 import { recordHostDiagnostic } from "@/runtime/host-diagnostics";
@@ -12,7 +13,7 @@ import {
   managedHostBindingList,
 } from "./managed-host-binding";
 import { type HubHostAnswer, orphanedManagedHosts } from "./managed-host-reconciliation";
-import { useHubDaemonsQuery } from "./host-inventory";
+import { prefetchRememberedHubDaemons, useHubDaemonsQuery } from "./host-inventory";
 import { cachedListForAccount, useHubDaemonListCache } from "./hub-daemon-list-cache";
 import { deriveHubSourceState, getHubSourceHealthRegistry } from "./hub-source-health";
 import {
@@ -95,6 +96,10 @@ function AccountHostSynchronization() {
       return;
     if (cachedListForAccount(rememberedList, hub) === undefined) listCache.forget(hubOrigin);
   }, [hub, hubOrigin, listCache, rememberedList]);
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    prefetchRememberedHubDaemons(queryClient, hub, rememberedList);
+  }, [hub, queryClient, rememberedList]);
   useHubSourceHealthPublication(hub, daemons, rememberedList?.syncedAt ?? null);
   // Every binding a refused ticket removed asks for the list again. They share one read: a read
   // already in flight is joined, never cancelled and started again.

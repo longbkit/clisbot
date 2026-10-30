@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
 import { useFetchQueries, useFetchQuery } from "@/data/query";
 import { useHosts, useHostRuntimeConnectedServerIds } from "@/runtime/host-runtime";
@@ -45,21 +45,37 @@ export function hubListPollIntervalMs(failures: number, random: () => number = M
  * read the query cancelled (`signal` aborted) still runs to its end but is not counted as a
  * failure: one refused list must not count once per caller that replaced it.
  */
-export async function readHubDaemons(
+export function readHubDaemons(
   hub: HubAccountContextValue,
   signal?: AbortSignal,
 ): Promise<HubDaemons> {
-  const failureKey = JSON.stringify(hubDaemonsQueryKey(hub));
+  return readHubDaemonList(
+    {
+      origin: hub.origin,
+      accountId: hub.signedIn?.account.id ?? null,
+      organizationId: hub.signedIn?.organization.id ?? null,
+    },
+    () => hub.api(),
+    signal,
+  );
+}
+
+async function readHubDaemonList(
+  scope: { origin: string | null; accountId: string | null; organizationId: string | null },
+  api: () => ReturnType<HubAccountContextValue["api"]>,
+  signal?: AbortSignal,
+): Promise<HubDaemons> {
+  const failureKey = JSON.stringify(hubResourceQueryKey(scope, "daemons"));
   const cache = getHubDaemonListCache();
   try {
-    const list = await hub.api().get("daemons", HubDaemonsSchema);
+    const list = await api().get("daemons", HubDaemonsSchema);
     getColdStartConnectTimeline().mark("hubList");
     listFailures.delete(failureKey);
-    if (hub.origin !== null && hub.signedIn !== null)
+    if (scope.origin !== null && scope.accountId !== null && scope.organizationId !== null)
       cache.remember({
-        origin: hub.origin,
-        accountId: hub.signedIn.account.id,
-        organizationId: hub.signedIn.organization.id,
+        origin: scope.origin,
+        accountId: scope.accountId,
+        organizationId: scope.organizationId,
         daemons: list.daemons,
         syncedAt: new Date().toISOString(),
       });
@@ -67,9 +83,41 @@ export async function readHubDaemons(
   } catch (error) {
     if (signal?.aborted !== true)
       listFailures.set(failureKey, (listFailures.get(failureKey) ?? 0) + 1);
-    if (hub.origin !== null && classifyHubFailure(error) === "revoked") cache.forget(hub.origin);
+    if (scope.origin !== null && classifyHubFailure(error) === "revoked")
+      cache.forget(scope.origin);
     throw error;
   }
+}
+
+/**
+ * On a cold start, reads this run's list for the account and organization the remembered list
+ * belongs to while the account read is still in flight, instead of one request after it. When
+ * the account answers as that account, its list query has the same key and joins this read; any
+ * other answer leaves it unused. Returns whether a read started (once per key).
+ */
+export function prefetchRememberedHubDaemons(
+  queryClient: QueryClient,
+  hub: HubAccountContextValue,
+  remembered: CachedHubDaemonList | undefined,
+): boolean {
+  if (!hub.enabled || hub.origin === null || hub.state !== null || remembered === undefined)
+    return false;
+  const scope = {
+    origin: hub.origin,
+    accountId: remembered.accountId,
+    organizationId: remembered.organizationId,
+  };
+  const queryKey = hubResourceQueryKey(scope, "daemons");
+  if (queryClient.getQueryState(queryKey) !== undefined) return false;
+  void queryClient
+    .prefetchQuery({
+      queryKey,
+      retry: false,
+      queryFn: ({ signal }) =>
+        readHubDaemonList(scope, () => hub.api(remembered.organizationId), signal),
+    })
+    .catch(() => undefined);
+  return true;
 }
 
 function hubDaemonsQueryInput(hub: HubAccountContextValue) {

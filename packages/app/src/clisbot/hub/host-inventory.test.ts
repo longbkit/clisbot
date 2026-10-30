@@ -3,8 +3,16 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/runtime/host-runtime", () => ({ useHosts: () => [] }));
 vi.mock("./account-provider", () => ({ useHubAccount: () => ({}), useHubAccounts: () => [] }));
 
-const { isAccountHost, hubListPollIntervalMs, inventoryHosts } = await import("./host-inventory");
+const {
+  isAccountHost,
+  hubListPollIntervalMs,
+  inventoryHosts,
+  prefetchRememberedHubDaemons,
+  readHubDaemons,
+} = await import("./host-inventory");
 const { cachedListForAccount } = await import("./hub-daemon-list-cache");
+const { hubResourceQueryKey } = await import("./query-keys");
+const { QueryClient } = await import("@tanstack/react-query");
 
 const management = (managedAccessMode: "off" | "external", hubOrigin = "hub://old") => ({
   kind: "hub" as const,
@@ -115,6 +123,52 @@ describe("inventoryHosts: which registered Hosts the picker (and so Home and Wor
       localServerIds: [],
     });
     expect(shown.map((host) => host.serverId)).toEqual(["srv-own"]);
+  });
+
+  it("starts this run's list read with the remembered ids, which the account's own list query joins", async () => {
+    const queryClient = new QueryClient();
+    const list = { daemons: [] };
+    const organizations: (string | undefined)[] = [];
+    let release!: () => void;
+    const answered = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const api = (organizationId?: string) => {
+      organizations.push(organizationId);
+      return {
+        get: async () => {
+          await answered;
+          return list;
+        },
+      };
+    };
+    const hub = (state: unknown, signedIn: unknown) =>
+      ({ ...account(state, signedIn), enabled: true, api }) as never;
+    // The account read is still pending: no state yet.
+    expect(prefetchRememberedHubDaemons(queryClient, hub(null, null), remembered)).toBe(true);
+    expect(prefetchRememberedHubDaemons(queryClient, hub(null, null), remembered)).toBe(false);
+    // The account answers as the account the list was remembered for.
+    const signedIn = { account: { id: "acc-1" }, organization: { id: "org-1" } };
+    const live = queryClient.fetchQuery({
+      queryKey: hubResourceQueryKey(
+        { origin: "https://hub.example", organizationId: "org-1", accountId: "acc-1" },
+        "daemons",
+      ),
+      queryFn: () => readHubDaemons(hub(signedIn, signedIn)),
+    });
+    release();
+    expect(await live).toBe(list);
+    expect(organizations).toEqual(["org-1"]);
+  });
+
+  it("does not start a list read once the account answered", () => {
+    const queryClient = new QueryClient();
+    const api = vi.fn();
+    const signedIn = { account: { id: "acc-1" }, organization: { id: "org-1" } };
+    const hub = { ...account(signedIn, signedIn), enabled: true, api } as never;
+    expect(prefetchRememberedHubDaemons(queryClient, hub, remembered)).toBe(false);
+    expect(prefetchRememberedHubDaemons(queryClient, hub, undefined)).toBe(false);
+    expect(api).not.toHaveBeenCalled();
   });
 
   it("lists every registered Host when no Hub account is saved", () => {
