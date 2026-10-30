@@ -9,22 +9,33 @@ tail cache and Settings → Storage, is [offline cache](offline-cache.md).
 
 ## Reconnect pacing
 
-| Parameter                 | Value                                                  | Where                                            |
-| ------------------------- | ------------------------------------------------------ | ------------------------------------------------ |
-| Backoff                   | full jitter, `uniform(0, min(60 s, 1 s · 2^failures))` | `packages/app/src/runtime/connection-backoff.ts` |
-| Reset                     | on success, a changed route, or an explicit retry      | `HostRuntimeController`                          |
-| Connects in flight        | 4 per runtime store                                    | `ConnectLimiter`, shared by every controller     |
-| App client auto-reconnect | full jitter, cap 60 s                                  | `createDefaultDeps` (`reconnect.jitter: "full"`) |
+| Parameter                 | Value                                                      | Where                                            |
+| ------------------------- | ---------------------------------------------------------- | ------------------------------------------------ |
+| Backoff                   | full jitter, `uniform(0, min(60 s, 1 s · 2^failures))`     | `packages/app/src/runtime/connection-backoff.ts` |
+| Reset                     | on success, a changed route, an explicit retry, or a sweep | `HostRuntimeController`                          |
+| Reconnect sweep           | Hosts that need a connect slot start 100 ms apart          | `packages/app/src/runtime/reconnect-sweep.ts`    |
+| Connects in flight        | 4 per runtime store                                        | `ConnectLimiter`, shared by every controller     |
+| Directory pages in flight | 3 per runtime store                                        | `DirectorySync` (`pageFetchLimiter`)             |
+| App client auto-reconnect | full jitter, cap 60 s                                      | `createDefaultDeps` (`reconnect.jitter: "full"`) |
 
 - Hub-managed Hosts own their retries in the controller (their clients never auto-retry). The
   2 s probe tick only attempts a Host whose backoff is due.
-- Foreground and `ensureConnected({ verify: true })` verify live sockets at once. An offline
-  managed Host keeps its backoff, so a hundred unreachable sandboxes do not reconnect together.
-  An explicit retry (`runProbeCycleNow`, the user's Retry) skips the remaining backoff.
-- On web and Electron, the window `online` event makes every offline Host drop its remaining
-  backoff and try now, still through the connect limit; `offline` verifies live sockets so they
-  report offline promptly (`runtime/network-reachability.web.ts`). Native has no network-change
-  signal yet and relies on foreground; NetInfo needs a native rebuild and is deferred to O2.
+- A reconnect sweep runs when there is reason to think Hosts can connect again: the window
+  `online` event (web and Electron, `runtime/network-reachability.web.ts`), the app returning to
+  the foreground, and a Host that had failed connecting again. Online Hosts verify their socket
+  and self-retrying clients reconnect at once; every other Host drops its backoff and tries now,
+  100 ms after the previous one, still through the connect limit. Without a sweep the backoff
+  holds, so a hundred unreachable sandboxes do not retry together.
+- Native has no network-change signal (NetInfo needs a native rebuild). A failed Host connecting
+  again stands in for it: when a VPN comes back, the first Host whose backoff falls due sweeps the
+  rest. A recovered Host sweeps at most once every 10 s, so a fleet coming back sweeps once.
+- The window `offline` event verifies live sockets so they report offline promptly and cancels a
+  sweep still starting Hosts. An explicit retry (`runProbeCycleNow`, the user's Retry) skips the
+  remaining backoff of one Host.
+- A Host that reconnects asks for its directory with the stored cursors when it advertises
+  `directorySync`, so it receives changes, not the whole list. Agent, workspace and project pages
+  share three slots across Hosts, so 14 Hosts coming back do not fetch at once; a page that waited
+  past a connection change is dropped instead of opening a stale subscription.
 - Admission sessions and probe sockets take a connect slot. A self-retrying client's
   `connect()` can stay pending across retries, so it is not gated.
 - `DaemonClient` keeps its unjittered default; only the app opts in, so CLI and daemon timing
@@ -46,6 +57,11 @@ The "before" column replays the old 2 s pacing with the new connect limit still 
 requested once per attempt whose transport to the sandbox opened, so an unreachable
 sandbox costs no ticket requests. Probe intervals stay at one per Host for the whole run and drop
 to zero when Hosts are removed.
+
+For the 2026-10-30 report (14 Hub Hosts behind a VPN, 0/14 for over 2 minutes after the VPN came
+back), the same file holds 14 Hosts that each failed once and wait about 59 s: foreground, the
+`online` event, or one recovered Host brings all 14 online within 5 simulated seconds, at most 4
+connects in flight.
 
 ## Hub access tickets
 
@@ -93,6 +109,12 @@ Host's own revocation close) ends the account's access to the Host. On Android, 
 refuses with 401 takes a new access token once and asks again, as the desktop client does; a second
 401 is returned to the caller (`NativeHubTransport.request`).
 
+The Hub answers an account read sent without a token with `signedOut`. Before the account accepts
+that, the native transport reads the stored sign-in again after 500 ms and refreshes
+(`recoverSignIn`); the read stays pending meanwhile, so it shows syncing, never "sign in". A 401 to
+a request sent without a token takes the same single retry. Only `400 invalid_grant` deletes the
+stored credential.
+
 A Hub Host removed while the Hub still lists its daemon (a refused ticket) is added back with a
 doubling wait. The removal reads the list again, once per account however many Hosts were
 removed (each joins the read in flight), and the wait starts only when that read answers. While
@@ -101,15 +123,24 @@ with an expired sign-in every Host of that Hub looped through remove and re-add.
 the Hub serves again, after signing in, adds the Host back after the base wait of 1 s
 (`clisbot/hub/host-synchronization.tsx`).
 
-**Known issue (2026-10-30, Android, open):** after the app is force-stopped or reinstalled over
-itself (`adb install -r`), it can come back showing the Hub as **Cần đăng nhập / Needs sign-in**
-with 0 Hosts, and the home screen as "No Host connected" or the Welcome screen. Pressing
-**Continue in browser** opened a Chrome custom tab once, which closed at once; later presses did
-nothing and showed no error. Force-stopping and reopening the app again restored the sign-in and
-all 14 Hosts with no other action, so the stored credential was intact. Two faults to fix: the
-transient needs-sign-in state after a cold start, and a sign-in button that stays silent while an
-earlier browser auth session is still registered. When measuring on a device, a needs-sign-in
-screen after a reinstall is this issue, not lost data: reopen the app before anything else.
+**Cold start after a force-stop or reinstall (Android, found and fixed 2026-10-30, device check
+pending):** the app came back showing the Hub as **Cần đăng nhập / Needs sign-in** with 0 Hosts.
+**Continue in browser** opened a custom tab once, which closed at once; later presses did nothing.
+Reopening restored the sign-in and all 14 Hosts, so the credential was intact. Two faults, both
+fixed:
+
+- The account read went out without a token when the keystore read came back empty, and the Hub
+  answered `signedOut`. The read now tries the stored sign-in once more first (above).
+- expo-web-browser's Android auth session keeps module-private state and ignores the first
+  AppState change after a cold start, so the closed tab left it registered: the sign-in never
+  settled, the button stayed pending, and every later attempt failed as "already open". Android
+  now runs the session itself (`clisbot/hub/transport/auth-session.ts`): closing the browser ends
+  it after a 1 s grace for a late redirect, and a new press replaces a session still registered.
+  iOS dismisses a registered `ASWebAuthenticationSession` before opening another. A browser that
+  cannot open shows the error in the section and a toast with Retry.
+
+Not yet confirmed on the Galaxy S23. If a needs-sign-in screen still appears after a reinstall,
+reopen the app before treating it as lost data, and record it here.
 
 ## Remembered Hub daemon list
 
@@ -172,5 +203,6 @@ failure becomes a named Host error. A fetch id keeps a late answer out of a newe
 
 - Lazy connections and Hub multiplexing (fewer sockets and tickets): O4, needs an ADR and Hub
   work.
-- Native OS network-change events (NetInfo): O2.
+- Native OS network-change events (NetInfo): need a native rebuild; a recovered Host sweeps the
+  others instead.
 - Timeline tail cache, outbox: O2 and O3.
