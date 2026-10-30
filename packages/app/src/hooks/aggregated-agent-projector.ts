@@ -3,16 +3,35 @@ import equal from "fast-deep-equal";
 import type { Agent } from "@/stores/session-store";
 import type { HostProfile } from "@/types/host-connection";
 import type { AggregatedAgent } from "./use-aggregated-agents";
+import { applyOrderedChanges } from "./aggregated-agent-order";
 
 export interface AggregatedAgentSources {
   sessionAgents: Record<string, Map<string, Agent> | undefined>;
   hosts: readonly Pick<HostProfile, "serverId" | "label">[];
   includeArchived: boolean;
 }
+/** One session as last seen: its source, where its Map put it, and the row shown for it. */
 interface CachedAgent {
   source: Agent;
-  serverLabel: string;
-  projected: AggregatedAgent;
+  /** Map position: arrival order within the Host, renumbered when a directory reorders. */
+  seq: number;
+  /** Null while archived sessions are hidden. */
+  projected: AggregatedAgent | null;
+}
+
+/** One Host as last seen. Its rows are recomputed only when its Map or its label changes. */
+interface HostSlice {
+  sources: ReadonlyMap<string, Agent>;
+  label: string;
+  /** Position among the store's Hosts, which is the order of equal timestamps across Hosts. */
+  rank: number;
+  agents: Map<string, CachedAgent>;
+}
+
+/** The rows one projection call removed and added; a changed row appears in both. */
+interface RowChanges {
+  removed: AggregatedAgent[];
+  added: AggregatedAgent[];
 }
 
 function projectAgent({
@@ -55,41 +74,194 @@ function compareAgents(left: AggregatedAgent, right: AggregatedAgent): number {
   return right.lastActivityAt.getTime() - left.lastActivityAt.getTime();
 }
 
-/** One bounded identity cache per consumer; dropped/archived sources leave the cache. */
+interface ProjectionState {
+  hosts: Map<string, HostSlice>;
+  /** Where each shown row sits among equal timestamps. */
+  positions: Map<AggregatedAgent, { rank: number; seq: number }>;
+  sorted: AggregatedAgent[];
+  includeArchived: boolean;
+  counter: number;
+}
+
+/** Thrown inside a pass when the store's Host or Map order moved; the pass starts again. */
+class OrderMoved extends Error {}
+
+/**
+ * One bounded identity cache per consumer; dropped/archived sources leave the cache.
+ *
+ * Incremental: a Host whose Map and label did not change is skipped, a changed Host is compared
+ * by reference to find the sessions that changed, and only their rows move in the sorted list.
+ * Equal timestamps keep the order a full sort of the store gave them: Host order, then each
+ * Host's Map order. When either order moves, the pass renumbers everything, keeping every row
+ * whose content did not change.
+ */
 export function createAggregatedAgentProjector() {
-  let previous = new Map<string, CachedAgent>();
-  let sorted: AggregatedAgent[] = [];
+  let state = emptyState(false);
   return (input: AggregatedAgentSources): AggregatedAgent[] => {
-    const labels = new Map(input.hosts.map((host) => [host.serverId, host.label]));
-    const next = new Map<string, CachedAgent>();
-    const agents: AggregatedAgent[] = [];
-    for (const [serverId, sources] of Object.entries(input.sessionAgents)) {
-      if (!sources) continue;
-      const label = labels.get(serverId) ?? serverId;
-      for (const source of sources.values()) {
-        if (!input.includeArchived && source.archivedAt) continue;
-        const key = `${serverId}:${source.id}`;
-        let entry = previous.get(key);
-        // Directory entries are immutable; a Host rename still invalidates its labels.
-        if (!entry || entry.source !== source || entry.serverLabel !== label) {
-          const projected = projectAgent({ source, serverId, serverLabel: label });
-          entry = {
-            source,
-            serverLabel: label,
-            projected: entry && equal(entry.projected, projected) ? entry.projected : projected,
-          };
-        }
-        next.set(key, entry);
-        agents.push(entry.projected);
-      }
+    if (input.includeArchived !== state.includeArchived) state = renumbered(state, input);
+    const changes: RowChanges = { removed: [], added: [] };
+    try {
+      syncHosts(state, input, changes);
+    } catch (error) {
+      if (!(error instanceof OrderMoved)) throw error;
+      state = renumbered(state, input);
+      return state.sorted;
     }
-    agents.sort(compareAgents);
-    previous = next;
-    const unchanged =
-      agents.length === sorted.length && agents.every((agent, index) => agent === sorted[index]);
-    if (!unchanged) sorted = agents;
-    return sorted;
+    applyChanges(state, changes);
+    return state.sorted;
   };
+}
+
+function emptyState(includeArchived: boolean): ProjectionState {
+  return { hosts: new Map(), positions: new Map(), sorted: [], includeArchived, counter: 0 };
+}
+
+/** A fresh numbering of `input` that reuses `previous`'s rows, and its sorted array if unchanged. */
+function renumbered(previous: ProjectionState, input: AggregatedAgentSources): ProjectionState {
+  const state = emptyState(input.includeArchived);
+  const changes: RowChanges = { removed: [], added: [] };
+  syncHosts(state, input, changes, previous.hosts);
+  applyChanges(state, changes);
+  if (sameRows(state.sorted, previous.sorted)) state.sorted = previous.sorted;
+  return state;
+}
+
+function sameRows(left: readonly AggregatedAgent[], right: readonly AggregatedAgent[]): boolean {
+  return left.length === right.length && left.every((row, index) => row === right[index]);
+}
+
+function syncHosts(
+  state: ProjectionState,
+  input: AggregatedAgentSources,
+  changes: RowChanges,
+  inherited?: ReadonlyMap<string, HostSlice>,
+): void {
+  const labels = new Map(input.hosts.map((host) => [host.serverId, host.label]));
+  let lastRank = -1;
+  for (const [serverId, sources] of Object.entries(input.sessionAgents)) {
+    if (!sources) continue;
+    let slice = state.hosts.get(serverId);
+    if (slice && slice.rank < lastRank) throw new OrderMoved();
+    if (!slice) {
+      slice = { sources: new Map(), label: "", rank: ++state.counter, agents: new Map() };
+      state.hosts.set(serverId, slice);
+    }
+    lastRank = slice.rank;
+    const label = labels.get(serverId) ?? serverId;
+    // Directory entries are immutable and Maps are replaced; a Host rename relabels its rows.
+    if (slice.sources === sources && slice.label === label) continue;
+    syncHost(
+      state,
+      { serverId, slice, sources, label, inherited: inherited?.get(serverId) },
+      changes,
+    );
+  }
+  for (const [serverId, slice] of state.hosts) {
+    if (input.sessionAgents[serverId]) continue;
+    for (const entry of slice.agents.values())
+      if (entry.projected) changes.removed.push(entry.projected);
+    state.hosts.delete(serverId);
+  }
+}
+
+interface HostSync {
+  serverId: string;
+  slice: HostSlice;
+  sources: ReadonlyMap<string, Agent>;
+  label: string;
+  /** The same Host before a renumbering, whose unchanged rows are kept. */
+  inherited: HostSlice | undefined;
+}
+
+function syncHost(state: ProjectionState, sync: HostSync, changes: RowChanges): void {
+  const { slice, sources } = sync;
+  const relabel = slice.label !== sync.label;
+  const known = slice.agents.size;
+  let seen = 0;
+  let lastSeq = -1;
+  for (const source of sources.values()) {
+    let entry = slice.agents.get(source.id);
+    if (entry) {
+      seen += 1;
+      if (entry.seq < lastSeq) throw new OrderMoved();
+      if (entry.source !== source || relabel) updateRow(state, sync, entry, source, changes);
+    } else {
+      const inherited = sync.inherited?.agents.get(source.id);
+      const reusable = inherited && { ...inherited, label: sync.inherited!.label };
+      const projected = projectRow(state, sync, source, reusable);
+      entry = { source, seq: ++state.counter, projected };
+      slice.agents.set(source.id, entry);
+      if (projected) addRow(state, slice, entry, changes);
+    }
+    lastSeq = entry.seq;
+  }
+  if (seen < known) dropDeleted(slice, sources, changes);
+  slice.sources = sources;
+  slice.label = sync.label;
+}
+
+function dropDeleted(slice: HostSlice, sources: ReadonlyMap<string, Agent>, changes: RowChanges) {
+  for (const [id, entry] of slice.agents) {
+    if (sources.has(id)) continue;
+    if (entry.projected) changes.removed.push(entry.projected);
+    slice.agents.delete(id);
+  }
+}
+
+/** A row seen before (or before a renumbering), with the label it was projected under. */
+interface ReusableRow {
+  source: Agent;
+  label: string;
+  projected: AggregatedAgent | null;
+}
+
+/** The row `source` shows, or null while archived rows are hidden; unchanged content keeps its object. */
+function projectRow(
+  state: ProjectionState,
+  sync: HostSync,
+  source: Agent,
+  reusable: ReusableRow | undefined,
+): AggregatedAgent | null {
+  if (!state.includeArchived && source.archivedAt) return null;
+  const previous = reusable?.projected ?? null;
+  if (previous && reusable!.source === source && reusable!.label === sync.label) return previous;
+  const next = projectAgent({ source, serverId: sync.serverId, serverLabel: sync.label });
+  return previous && equal(previous, next) ? previous : next;
+}
+
+function updateRow(
+  state: ProjectionState,
+  sync: HostSync,
+  entry: CachedAgent,
+  source: Agent,
+  changes: RowChanges,
+): void {
+  const previous = entry.projected;
+  const next = projectRow(state, sync, source, { ...entry, label: sync.slice.label });
+  entry.source = source;
+  if (next === previous) return;
+  if (previous) changes.removed.push(previous);
+  entry.projected = next;
+  if (next) addRow(state, sync.slice, entry, changes);
+}
+
+function addRow(state: ProjectionState, slice: HostSlice, entry: CachedAgent, changes: RowChanges) {
+  const row = entry.projected!;
+  state.positions.set(row, { rank: slice.rank, seq: entry.seq });
+  changes.added.push(row);
+}
+
+function applyChanges(state: ProjectionState, changes: RowChanges): void {
+  const { positions } = state;
+  function compareRows(left: AggregatedAgent, right: AggregatedAgent): number {
+    const byActivity = compareAgents(left, right);
+    if (byActivity !== 0) return byActivity;
+    const a = positions.get(left)!;
+    const b = positions.get(right)!;
+    return a.rank - b.rank || a.seq - b.seq;
+  }
+  state.sorted = applyOrderedChanges(state.sorted, changes, compareRows);
+  for (const row of changes.removed) positions.delete(row);
 }
 
 /** The same sources as the last call: the maps are replaced, never mutated, on every update. */

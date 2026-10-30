@@ -1,5 +1,6 @@
 import { isChatSession } from "./work-items";
-import { activityBucket, isUnreadReply } from "@/clisbot/home/activity";
+import { activityBucket, isUnreadReply, type ActivityBucketOf } from "@/clisbot/home/activity";
+import { activityKey } from "@/clisbot/home/activity-layout";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import {
   issueSessionKey,
@@ -147,7 +148,10 @@ function recordOf(agent: AggregatedAgent, input: HomeRowsInput): IssueRecord | u
  * reads as an ordinary row.
  */
 export function homeBucket(row: HomeRow, chip: HomeChip): HomeBucket | null {
-  const { agent, issue } = row;
+  return bucketUnder(row.agent, row.issue, chip);
+}
+
+function bucketUnder(agent: AggregatedAgent, issue: Issue | null, chip: HomeChip) {
   if (chip === "failed") return issue?.kind === "failure" ? issueBucket(issue) : null;
   // Needs me is the existing Needs you bucket: approvals and failures the reader has not seen.
   if (chip === "needs") return issue?.state === "unseen" ? "needs" : null;
@@ -176,48 +180,117 @@ export interface HomeFeedFilters {
   serverIds: readonly string[];
 }
 
-function matchesBase(row: HomeRow, filters: Omit<HomeFeedFilters, "chip" | "scope">) {
+function matchesBase(agent: AggregatedAgent, filters: Omit<HomeFeedFilters, "chip" | "scope">) {
   return (
-    matchesMode(row.agent, filters.mode) &&
-    (filters.serverIds.length === 0 || filters.serverIds.includes(row.agent.serverId))
+    matchesMode(agent, filters.mode) &&
+    (filters.serverIds.length === 0 || filters.serverIds.includes(agent.serverId))
   );
 }
 
-/** Rows the feed shows with their buckets, plus every count the Home header and chips read. */
-export function buildHomeFeed(rows: readonly HomeRow[], filters: HomeFeedFilters) {
-  const base = rows.filter((row) => matchesBase(row, filters));
-  const scoped = base.filter((row) => inScope(filters.scope, row.ownership));
-  const visible: { row: HomeRow; bucket: HomeBucket }[] = [];
-  for (const row of scoped) {
-    const bucket = homeBucket(row, filters.chip);
-    if (bucket) visible.push({ row, bucket });
+export interface HomeFeedItem {
+  row: HomeRow;
+  bucket: HomeBucket;
+}
+
+/** Everything Home reads from its rows: what it shows, in what bucket, and its counts. */
+export interface HomeFeed {
+  visible: HomeFeedItem[];
+  scopeCounts: ScopeCounts;
+  chipCounts: Record<HomeChip, number>;
+  /** The visible sessions in feed order, for Home's activity layout. */
+  agents: AggregatedAgent[];
+  bucketOf: ActivityBucketOf;
+  /** The visible rows by `activityKey`. */
+  byKey: ReadonlyMap<string, HomeRow>;
+  /** The visible sessions with an unseen issue, for Mark all as seen. */
+  unseen: AggregatedAgent[];
+}
+
+/**
+ * Rows the feed shows with their buckets, plus every count the Home header and chips read, in
+ * one pass over the rows: a store update must not walk thousands of rows once per output.
+ */
+export function buildHomeFeed(rows: readonly HomeRow[], filters: HomeFeedFilters): HomeFeed {
+  const visible: HomeFeedItem[] = [];
+  const agents: AggregatedAgent[] = [];
+  const buckets = new Map<AggregatedAgent, HomeBucket>();
+  const byKey = new Map<string, HomeRow>();
+  const unseen: AggregatedAgent[] = [];
+  const scopeCounts = { ...EMPTY_SCOPE_COUNTS };
+  const counts = emptyChipCounts();
+  for (const row of rows) {
+    const { agent, issue } = row;
+    if (!matchesBase(agent, filters)) continue;
+    const bucket = bucketUnder(agent, issue, filters.chip);
+    if (bucket) addToScopeCounts(scopeCounts, row.ownership);
+    if (!inScope(filters.scope, row.ownership)) continue;
+    addToChipCounts(counts, agent, issue);
+    if (!bucket) continue;
+    visible.push({ row, bucket });
+    agents.push(agent);
+    buckets.set(agent, bucket);
+    byKey.set(activityKey(agent), row);
+    if (issue?.state === "unseen") unseen.push(agent);
   }
-  return {
-    visible,
-    scopeCounts: countScopes(base, filters.chip),
-    chipCounts: chipCounts(scoped),
+  const bucketOf: ActivityBucketOf = (agent) => buckets.get(agent) ?? "recent";
+  return { visible, scopeCounts, chipCounts: counts, agents, bucketOf, byKey, unseen };
+}
+
+/**
+ * `buildHomeFeed` for a stream of row updates. Whatever did not change keeps its object: the
+ * counts when they are equal, and the shown rows, their buckets and lookups when every shown row
+ * and bucket is the same. The whole feed is reused when both hold, so an update to a session
+ * Home does not show re-renders nothing on Home.
+ */
+export function createHomeFeedCache() {
+  let previous: HomeFeed | null = null;
+  return (rows: readonly HomeRow[], filters: HomeFeedFilters): HomeFeed => {
+    const next = buildHomeFeed(rows, filters);
+    const last = previous;
+    if (!last) return (previous = next);
+    const sameShown = sameItems(last.visible, next.visible);
+    const sameScopes = sameScopeCounts(last.scopeCounts, next.scopeCounts);
+    const sameChips = HOME_CHIPS.every((chip) => last.chipCounts[chip] === next.chipCounts[chip]);
+    if (sameShown && sameScopes && sameChips) return last;
+    const shown = sameShown ? last : next;
+    const scopes = sameScopes ? last.scopeCounts : next.scopeCounts;
+    const chips = sameChips ? last.chipCounts : next.chipCounts;
+    previous = { ...shown, scopeCounts: scopes, chipCounts: chips };
+    return previous;
   };
 }
 
-function countScopes(rows: readonly HomeRow[], chip: HomeChip): ScopeCounts {
-  const counts = { ...EMPTY_SCOPE_COUNTS };
-  for (const row of rows) {
-    if (!homeBucket(row, chip)) continue;
-    addToScopeCounts(counts, row.ownership);
-  }
-  return counts;
+function sameItems(left: readonly HomeFeedItem[], right: readonly HomeFeedItem[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((item, i) => item.row === right[i]!.row && item.bucket === right[i]!.bucket)
+  );
+}
+
+function sameScopeCounts(left: ScopeCounts, right: ScopeCounts): boolean {
+  return left.mine === right.mine && left.others === right.others && left.all === right.all;
+}
+
+function emptyChipCounts(): Record<HomeChip, number> {
+  return { all: 0, needs: 0, running: 0, updated: 0, failed: 0 };
+}
+
+function addToChipCounts(
+  counts: Record<HomeChip, number>,
+  agent: AggregatedAgent,
+  issue: Issue | null,
+): void {
+  counts.all += 1;
+  if (issue?.state === "unseen") counts.needs += 1;
+  if (issue?.kind === "failure" && issue.state === "unseen") counts.failed += 1;
+  if (bucketUnder(agent, issue, "running")) counts.running += 1;
+  if (bucketUnder(agent, issue, "updated")) counts.updated += 1;
 }
 
 /** Needs me counts every unseen issue, Failed the unseen failures; seen ones never count (3.1c). */
 export function chipCounts(rows: readonly HomeRow[]): Record<HomeChip, number> {
-  const counts: Record<HomeChip, number> = { all: 0, needs: 0, running: 0, updated: 0, failed: 0 };
-  for (const row of rows) {
-    counts.all += 1;
-    if (row.issue?.state === "unseen") counts.needs += 1;
-    if (row.issue?.kind === "failure" && row.issue.state === "unseen") counts.failed += 1;
-    if (homeBucket(row, "running")) counts.running += 1;
-    if (homeBucket(row, "updated")) counts.updated += 1;
-  }
+  const counts = emptyChipCounts();
+  for (const row of rows) addToChipCounts(counts, row.agent, row.issue);
   return counts;
 }
 

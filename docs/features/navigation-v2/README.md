@@ -306,7 +306,11 @@ the mode switch and search (the tab bar already says Home).
   bucket — approvals and failures — limited to unseen issues; Failed lists failures with seen ones
   below, dimmed. Counts are the reader's scope; Needs me and Failed count unseen only.
 - **Feed**. Home's activity layout (`useActivityLayout`) takes the filtered rows and a bucket per
-  row, adding a `seen` group. Background changes still wait behind Show updates; a change the
+  row, adding a `seen` group. `buildHomeFeed` derives the shown rows, their buckets, Mark all as
+  seen and every count in one pass, and its cache keeps whatever did not change, so an update to a
+  session the feed does not show re-renders nothing on Home. The layout does not sort: the
+  aggregated list is already newest first apart from open turns and ties, so it merges those runs
+  (ties by `serverId:id`). Background changes still wait behind Show updates; a change the
   reader makes (a filter, Mark as seen, Dismiss, Archive) applies at once. The feed has no caption:
   loading is the skeleton, and the directory line appears only when a connected Host's list fails —
   a Host that drops is the connection notice's to say. The feed renders one frame after the

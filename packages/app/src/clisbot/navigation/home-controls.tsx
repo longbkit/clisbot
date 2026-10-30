@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { FilterChip } from "@/components/ui/filter-chips";
 import { HOME_CHIPS, type HomeChip } from "./home-feed";
@@ -20,7 +20,7 @@ const CHIP_LABELS: Record<HomeChip, string> = {
  * Home's filters, widest first: the app-wide Host filter, scope, quick-filter chips over the
  * existing activity buckets, then the reader's pins (C7, C8, C12; Owner, 2026-10-26).
  */
-export function HomeFeedControls({
+export const HomeFeedControls = memo(function HomeFeedControls({
   scopeCounts,
   chipCounts,
 }: {
@@ -52,6 +52,6 @@ export function HomeFeedControls({
       <HomePinTags />
     </SectionControls>
   );
-}
+});
 
 const hostFilterChip = <HostFilterChip />;

@@ -153,10 +153,19 @@ resume behavior.
 
 Cross-Host activity surfaces use `useAggregatedAgents`. Its runtime snapshot contains only directory readiness, connection state and actionable errors,
 not the Host runtime's version counter; workspace, transport and timeline
-notifications must not invalidate an unchanged agent catalog. Each consumer keeps a bounded
-projection cache keyed by Host and agent, using the directory owner's immutable entries. Unchanged
-directory fields preserve row and sorted-array identity; Host labels, permissions, attention, turns,
-archive state and activity order still update. Dropped sources leave the cache. See
+notifications must not invalidate an unchanged agent catalog. Every consumer of a view shares one
+projector (`hooks/aggregated-agent-projector.ts`), a bounded cache keyed by Host and agent over the
+directory owner's immutable entries. It is incremental: a Host whose Map and label are unchanged is
+skipped, a changed Host's Map is compared by reference to find the changed sessions, and only
+their rows move in the sorted list, by binary search (one merge pass past 32 changes). Equal
+timestamps keep the order a full sort of the store gave them, the store's Host order and then each
+Host's Map order; when either order moves, the projector renumbers and keeps every unchanged row.
+On a 14-Host, 3,600-session fleet one update went from about 66,000 timestamp reads (1.8 ms in
+Node) to 44 (0.03 ms); `aggregated-agent-projector.fleet.test.ts` keeps the old full sort as its
+oracle. The store still copies the changed Host's Map, so an update stays linear in that Host's
+sessions, not the fleet's. Unchanged directory fields preserve row and sorted-array identity; Host
+labels, permissions, attention, turns, archive state and activity order still update. Dropped
+sources leave the cache. See
 [native profiling](mobile-testing.md#native-switching-performance) before widening this subscription. Accepted workspace directory rows remain in the sidebar during transient
 transport loss; registry removal and directory tombstones still remove their rows. Managed revocation retains the existing runtime policy, including manual-profile restoration for adopted Hosts. Display sorting reuses numeric collators
 so a loading burst does not construct one for every comparison.

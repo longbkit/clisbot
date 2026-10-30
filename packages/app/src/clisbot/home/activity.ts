@@ -33,6 +33,16 @@ export function activitySections(
   const sorted = [...agents].sort(
     (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime(),
   );
+  return groupActivity(sorted, now, limit, bucketOf);
+}
+
+/** `activitySections` for sessions already newest first. */
+export function groupActivity(
+  sorted: readonly AggregatedAgent[],
+  now: Date,
+  limit: number | undefined,
+  bucketOf: ActivityBucketOf,
+): ActivitySection[] {
   const take = (rows: AggregatedAgent[]) => (limit ? rows.slice(0, limit) : rows);
   // One classification per agent, whatever the number of buckets; each keeps the sorted order.
   const buckets = { needs: [], active: [], recent: [], seen: [] } as Record<
