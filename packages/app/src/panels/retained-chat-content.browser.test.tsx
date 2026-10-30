@@ -275,11 +275,14 @@ for (const [runtime, Chat] of [
       show(true);
       expect(container.textContent).toBe("unsent draft:first chunk");
       show(false);
+      // A hidden chat keeps the transcript it showed; an emptied list loses its scroll range.
+      expect(container.textContent).toBe("unsent draft:first chunk");
       const hiddenCommits = profile.commits;
       for (let index = 0; index < 10; index++) {
         await act(async () => publish(`chunk ${index}`));
       }
       expect(profile.commits).toBe(hiddenCommits);
+      expect(container.textContent).toBe("unsent draft:first chunk");
       show(true);
       expect(container.textContent).toBe("unsent draft:chunk 9");
       await act(async () => publish("live after reveal"));

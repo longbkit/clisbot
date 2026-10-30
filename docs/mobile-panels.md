@@ -233,7 +233,10 @@ definition, no longer eligible to begin.
   ownership and can detach descendants. Keep the tree mounted, stabilize its subscriptions/selectors,
   and use the retained-panel active signal to stop timers, polling, and other genuine background work.
   Hidden chat content is suspended on web only, through `retained-chat-content.web.tsx`, where DOM
-  nodes carry no Fabric ownership; the native file keeps the chat live.
+  nodes carry no Fabric ownership; the native file keeps the chat live. A hidden chat's stream
+  tail holds the rows it last showed (`agent-stream/use-agent-stream-tail.ts`), never an empty
+  list: the web freeze lands one commit after the hide, and a list emptied in that commit loses
+  its scroll range, so the reading position was gone on return.
 - To stop hidden re-renders, hold the pane's inputs at its owner with `useHeldWhileInactive`
   (`hooks/use-held-while-inactive.ts`) and pass them to a memoized body. The owner still subscribes;
   the body skips every update until the panel is active, then renders once with the latest value.
