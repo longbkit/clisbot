@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectionState, DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { defaultHostAppearance } from "@/hosts/appearance";
 import type { HostProfile } from "@/types/host-connection";
-import { HostRuntimeController, type HostRuntimeControllerDeps } from "./host-runtime";
+import {
+  HostRuntimeController,
+  type HostRuntimeControllerDeps,
+  HostRuntimeStore,
+} from "./host-runtime";
 import { type BackoffPolicy, ConnectLimiter, DEFAULT_BACKOFF_POLICY } from "./connection-backoff";
 import { hubListPollIntervalMs } from "@/clisbot/hub/host-inventory";
 
@@ -48,6 +52,9 @@ class FleetClient {
   }
   getConnectionState(): ConnectionState {
     return this.state;
+  }
+  getLastServerInfoMessage(): null {
+    return null;
   }
   verifyConnection(): void {}
   subscribeConnectionStatus(listener: (state: ConnectionState) => void): () => void {
@@ -382,4 +389,109 @@ describe("Hub load and resource bounds over a long run (acceptance P7, P8)", () 
       `[P7] timers per minute: ${samples.join(",")}; after removal ${vi.getTimerCount()}`,
     );
   }, 60_000);
+});
+
+/** The app's store over a Hub fleet: one deps object and one connect limit for every Host. */
+function startStoreFleet(input: {
+  hosts: number;
+  reachable: () => boolean;
+  policy: BackoffPolicy;
+}) {
+  const stats: FleetStats = {
+    attemptsByServerId: new Map(),
+    inFlight: 0,
+    peakInFlight: 0,
+    ticketCalls: 0,
+  };
+  const attemptTimes: number[] = [];
+  const limiter = new ConnectLimiter(4);
+  const store = new HostRuntimeStore({
+    storage: {
+      getItem: async () => null,
+      setItem: async () => undefined,
+      removeItem: async () => undefined,
+    },
+    deps: {
+      getClientId: async () => "fleet-client",
+      connectToDaemon: async () => {
+        throw new Error("Hub-managed Hosts never open probe sockets");
+      },
+      createClient: ({ host }) => {
+        attemptTimes.push(Date.now());
+        stats.attemptsByServerId.set(
+          host.serverId,
+          (stats.attemptsByServerId.get(host.serverId) ?? 0) + 1,
+        );
+        return new FleetClient(input.reachable, stats, 200) as unknown as DaemonClient;
+      },
+      connectLimiter: limiter,
+      backoffPolicy: input.policy,
+    },
+  });
+  const hosts = Array.from({ length: input.hosts }, (_, index) => managedHost(index));
+  store.syncHosts(hosts);
+  const onlineCount = () =>
+    hosts.filter((host) => store.getSnapshot(host.serverId)?.connectionStatus === "online").length;
+  return { store, hosts, stats, attemptTimes, limiter, onlineCount };
+}
+
+describe("reconnecting the whole fleet after the network or app comes back", () => {
+  // Every Host has failed once and waits ~59 s; the triggers below must not wait it out.
+  const longBackoff: BackoffPolicy = {
+    baseDelayMs: 60_000,
+    maxDelayMs: 60_000,
+    random: () => 0.99,
+  };
+  let fleet: ReturnType<typeof startStoreFleet> | null = null;
+  let reachable = false;
+
+  beforeEach(async () => {
+    vi.useFakeTimers({
+      toFake: ["Date", "setTimeout", "clearTimeout", "setInterval", "clearInterval"],
+    });
+    reachable = false;
+    fleet = startStoreFleet({ hosts: 14, reachable: () => reachable, policy: longBackoff });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fleet.limiter.stats().granted).toBe(14);
+    expect(fleet.onlineCount()).toBe(0);
+    reachable = true;
+  });
+
+  afterEach(() => {
+    fleet?.store.syncHosts([]);
+    fleet = null;
+    vi.useRealTimers();
+  });
+
+  it("returning to the foreground retries every offline Host within seconds", async () => {
+    fleet!.store.setAppVisible(true);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fleet!.onlineCount()).toBe(14);
+    expect(fleet!.stats.peakInFlight).toBe(4);
+  });
+
+  it("the device network coming back retries every offline Host within seconds", async () => {
+    fleet!.store.handleNetworkChange("online");
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fleet!.onlineCount()).toBe(14);
+    expect(fleet!.stats.peakInFlight).toBe(4);
+  });
+
+  it("staggers the retries instead of starting them on one tick", async () => {
+    const before = fleet!.attemptTimes.length;
+    const sweepAt = Date.now();
+    fleet!.store.handleNetworkChange("online");
+    await vi.advanceTimersByTimeAsync(5_000);
+    const offsets = fleet!.attemptTimes.slice(before).map((at) => at - sweepAt);
+    expect(offsets).toHaveLength(14);
+    // The first starts at once; no two start on the same tick.
+    expect(offsets[0]).toBe(0);
+    expect(new Set(offsets).size).toBe(14);
+  });
+
+  it("one Host coming back retries the rest, for platforms without a network signal", async () => {
+    void fleet!.store.runProbeCycleNow(fleet!.hosts[0]!.serverId);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fleet!.onlineCount()).toBe(14);
+  });
 });

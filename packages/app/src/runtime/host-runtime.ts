@@ -136,6 +136,7 @@ import {
   ReconnectBackoff,
 } from "./connection-backoff";
 import { type NetworkReachability, subscribeNetworkReachability } from "./network-reachability";
+import { ReconnectSweep, type ReconnectSweepReason } from "./reconnect-sweep";
 
 export type HostRuntimeConnectionStatus = "idle" | "connecting" | "online" | "offline" | "error";
 export type PairingNavigationTarget = "openProject" | "hostRoot" | "hostSettings";
@@ -2088,6 +2089,8 @@ export class HostRuntimeStore {
   private deps: HostRuntimeControllerDeps;
   private lastConnectionStatusByServer = new Map<string, HostRuntimeConnectionStatus>();
   private connectionStatusStartedAtByServer = new Map<string, number>();
+  private readonly reconnectSweep = new ReconnectSweep();
+  private readonly failedSinceOnline = new Set<string>();
   private queuedAgentDrainInFlight = new Set<string>();
   private directorySyncByServer = new Map<string, DirectorySync>();
   private nextCancellationRequestId = 0;
@@ -2378,6 +2381,7 @@ export class HostRuntimeStore {
     rekeyMap(this.controllers, oldServerId, newServerId);
     rekeyMap(this.lastConnectionStatusByServer, oldServerId, newServerId);
     rekeyMap(this.connectionStatusStartedAtByServer, oldServerId, newServerId);
+    if (this.failedSinceOnline.delete(oldServerId)) this.failedSinceOnline.add(newServerId);
     this.replicaCache.reconcileServerId(oldServerId, newServerId);
     projectIconCache.reconcileServerId(oldServerId, newServerId);
     this.directorySyncByServer.get(oldServerId)?.dispose();
@@ -3097,6 +3101,7 @@ export class HostRuntimeStore {
       this.controllers.delete(serverId);
       this.lastConnectionStatusByServer.delete(serverId);
       this.connectionStatusStartedAtByServer.delete(serverId);
+      this.failedSinceOnline.delete(serverId);
       this.directorySyncByServer.get(serverId)?.dispose();
       this.directorySyncByServer.delete(serverId);
       this.timelineReplicaByServer.delete(serverId);
@@ -3272,9 +3277,13 @@ export class HostRuntimeStore {
       this.connectionStatusStartedAtByServer.set(serverId, Date.now());
     }
     this.lastConnectionStatusByServer.set(serverId, snapshot.connectionStatus);
+    if (snapshot.connectionStatus === "offline" || snapshot.connectionStatus === "error") {
+      this.failedSinceOnline.add(serverId);
+    }
     const didTransitionOnline =
       snapshot.connectionStatus === "online" && previousStatus !== "online";
     if (didTransitionOnline) {
+      this.noteHostRecovered(serverId);
       useSessionStore.getState().bumpHistorySyncGeneration(serverId);
       // Availability no longer changes history membership/query identity. Recovery uses the
       // same invalidation roots as archive/restore actions to revalidate accepted history.
@@ -3448,12 +3457,6 @@ export class HostRuntimeStore {
     return earliestServerId;
   }
 
-  ensureConnectedAll(options?: { verify?: boolean }): void {
-    for (const controller of this.controllers.values()) {
-      controller.ensureConnected(options);
-    }
-  }
-
   async restartHostConnection(serverId: string): Promise<void> {
     const controller = this.controllers.get(serverId);
     if (controller === undefined) return;
@@ -3474,18 +3477,20 @@ export class HostRuntimeStore {
     await controller.runProbeCycleNow();
   }
 
-  /** OS network changes (web and Electron; native relies on foreground for now). */
+  /** OS network changes (web and Electron; native relies on foreground and recovered Hosts). */
   handleNetworkChange(state: NetworkReachability): void {
     recordHostDiagnostic("network-change", { state });
-    for (const controller of this.controllers.values()) {
-      if (state === "online") controller.retryAfterNetworkChange();
-      else controller.verifyIfOnline();
+    if (state === "online") {
+      this.sweepReconnect("network");
+      return;
     }
+    this.reconnectSweep.cancel();
+    for (const controller of this.controllers.values()) controller.verifyIfOnline();
   }
 
   setAppVisible(visible: boolean): void {
     // Keep normal reconnect backoff running while hidden, for as long as the OS
-    // lets us execute. Foregrounding bypasses that backoff without closing healthy sockets.
+    // lets us execute. Foregrounding drops that backoff without closing healthy sockets.
     if (!visible) {
       // Frames stop in the background; held live directory updates land now, then persist.
       for (const directory of this.directorySyncByServer.values()) directory.flushLiveUpdates();
@@ -3493,7 +3498,33 @@ export class HostRuntimeStore {
       return;
     }
 
-    this.ensureConnectedAll({ verify: true });
+    this.sweepReconnect("foreground");
+  }
+
+  /** Clisbot: every offline Host tries now, staggered and within the shared connect limit. */
+  private sweepReconnect(reason: ReconnectSweepReason): void {
+    const controllers = Array.from(this.controllers);
+    recordHostDiagnostic("host-reconnect-sweep", { reason, hosts: controllers.length });
+    this.reconnectSweep.run(
+      controllers.map(([serverId, controller]) => ({
+        isOnline: () => controller.getSnapshot().connectionStatus === "online",
+        retryNow: () => {
+          // A Host removed while its staggered turn was pending is stopped; leave it alone.
+          if (this.controllers.get(serverId) === controller) controller.retryAfterNetworkChange();
+        },
+      })),
+    );
+  }
+
+  /** A Host that had failed connected: the network is likely back for its siblings too. */
+  private noteHostRecovered(serverId: string): void {
+    if (!this.failedSinceOnline.delete(serverId)) return;
+    if (!this.reconnectSweep.shouldSweepAfterRecovery()) return;
+    const othersOffline = Array.from(this.controllers).some(
+      ([id, controller]) =>
+        id !== serverId && controller.getSnapshot().connectionStatus !== "online",
+    );
+    if (othersOffline) this.sweepReconnect("host-recovered");
   }
 
   runProbeCycleNow(serverId?: string): Promise<void> {
