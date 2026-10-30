@@ -78,6 +78,24 @@ export async function resolveHostAccessTicket(
   return binding?.resolveAccessTicket(clientId);
 }
 
+/**
+ * Requests a ticket now, while the transport to the Host opens, instead of after it: on a
+ * 400 ms VPN that is one round trip off every connect. The first hello takes this ticket; a
+ * later hello requests its own, since tickets are single use.
+ */
+export function prefetchedAccessTicket(
+  request: () => Promise<string | undefined>,
+): () => Promise<string | undefined> {
+  let prefetched: Promise<string | undefined> | null = request();
+  // The hello that takes it reports the failure; one that never comes leaves nothing to report.
+  prefetched.catch(() => undefined);
+  return () => {
+    const ticket = prefetched ?? request();
+    prefetched = null;
+    return ticket;
+  };
+}
+
 export function hostSessionHubManagement(serverId: string): HubHostManagement | undefined {
   return registry().get(serverId)?.management;
 }

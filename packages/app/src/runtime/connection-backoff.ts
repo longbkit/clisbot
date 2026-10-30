@@ -6,8 +6,12 @@
 
 export const RECONNECT_BASE_DELAY_MS = 1_000;
 export const RECONNECT_MAX_DELAY_MS = 60_000;
-/** Connect attempts (probe sockets and admission sessions) in flight across every Host. */
-export const MAX_CONCURRENT_HOST_CONNECTS = 4;
+/**
+ * Connect attempts (probe sockets and admission sessions) in flight across every Host. An attempt
+ * mostly waits on round trips, so a company fleet behind a VPN (14 Hosts, 400 ms) connects in one
+ * wave; a hundred sandboxes still start in waves, and retries are paced by the backoff.
+ */
+export const MAX_CONCURRENT_HOST_CONNECTS = 16;
 /** Directory pages (agents, workspaces, projects) in flight across every Host. */
 export const MAX_CONCURRENT_DIRECTORY_PAGES = 3;
 

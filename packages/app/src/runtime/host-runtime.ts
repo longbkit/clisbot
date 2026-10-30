@@ -97,6 +97,7 @@ import {
   hostAdvertisedConnections,
   matchesAdvertisedHostConnection,
   subscribeHostSessionAccess,
+  prefetchedAccessTicket,
   resolveHostAccessTicket,
 } from "@/runtime/host-session-access";
 import {
@@ -136,6 +137,11 @@ import {
   RECONNECT_MAX_DELAY_MS,
   ReconnectBackoff,
 } from "./connection-backoff";
+import {
+  type ColdStartConnectTimeline,
+  type ColdStartPhase,
+  getColdStartConnectTimeline,
+} from "./cold-start-connect";
 import { type NetworkReachability, subscribeNetworkReachability } from "./network-reachability";
 import { ReconnectSweep, type ReconnectSweepReason } from "./reconnect-sweep";
 
@@ -311,6 +317,8 @@ export interface HostRuntimeControllerDeps {
     clientId: string;
     runtimeGeneration: number;
     onAdmissionFailure?: (revoked: boolean) => boolean;
+    /** Request the Hub ticket while the transport opens (`prefetchedAccessTicket`). */
+    prefetchAccessTicket?: boolean;
   }) => DaemonClient;
   connectToDaemon: (input: {
     host: HostProfile;
@@ -704,7 +712,28 @@ function createDefaultDeps(
   };
 
   return {
-    createClient: ({ host, connection, clientId, runtimeGeneration, onAdmissionFailure }) => {
+    createClient: ({
+      host,
+      connection,
+      clientId,
+      runtimeGeneration,
+      onAdmissionFailure,
+      prefetchAccessTicket,
+    }) => {
+      const requestAccessTicket = async () => {
+        // Electron validates the live local target; this authority does not depend on Hub.
+        if (await readDesktopManagedLocalCredential(connection).catch(() => undefined))
+          return undefined;
+        return resolveHostAccessTicket(
+          host.serverId,
+          clientId,
+          host.management,
+          usesDeviceCredential(host),
+        );
+      };
+      const takeAccessTicket = prefetchAccessTicket
+        ? prefetchedAccessTicket(requestAccessTicket)
+        : requestAccessTicket;
       const desktopTransportFactory = createDesktopDaemonTransportFactory();
       const webSocketConfig = { webSocketFactory: createAppWebSocketFactory() };
       const base = {
@@ -738,16 +767,8 @@ function createDefaultDeps(
         // registration races host hydration, so a client born before its
         // binding must still present a ticket once admission is required.
         resolveAccessTicket: async () => {
-          // Electron validates the live local target; this authority does not depend on Hub.
-          if (await readDesktopManagedLocalCredential(connection).catch(() => undefined))
-            return undefined;
           try {
-            return await resolveHostAccessTicket(
-              host.serverId,
-              clientId,
-              host.management,
-              usesDeviceCredential(host),
-            );
+            return await takeAccessTicket();
           } catch (error) {
             onAdmissionFailure?.(false);
             throw error;
@@ -1811,6 +1832,10 @@ export class HostRuntimeController {
     }
 
     const nextGeneration = this.snapshot.clientGeneration + 1;
+    // A Host that has been failing may be unreachable: its ticket waits for the transport, so
+    // an unreachable sandbox costs the Hub no ticket per retry.
+    const prefetchAccessTicket =
+      this.usesSessionAdmission() && this.reconnectBackoff.failureCount === 0;
     const client =
       existingClient ??
       this.deps.createClient({
@@ -1818,6 +1843,7 @@ export class HostRuntimeController {
         connection,
         clientId,
         runtimeGeneration: nextGeneration,
+        prefetchAccessTicket,
         onAdmissionFailure: (revoked) => {
           if (!this.isCurrentSwitchRequest(requestVersion)) return false;
           this.admissionAttemptFailed = true;
@@ -2096,6 +2122,7 @@ export class HostRuntimeStore {
   private readonly revokePushNotifications: typeof revokePushNotifications;
   private readonly directoryFrameClock: FrameClock | null;
   private readonly directoryPageLimiter = new ConnectLimiter(MAX_CONCURRENT_DIRECTORY_PAGES);
+  private readonly coldStartTimeline: ColdStartConnectTimeline;
 
   constructor(input?: {
     deps?: HostRuntimeControllerDeps;
@@ -2104,6 +2131,7 @@ export class HostRuntimeStore {
     revokePushNotifications?: typeof revokePushNotifications;
     /** Clisbot: paces each Host's live directory updates to one commit per frame. */
     directoryFrameClock?: FrameClock | null;
+    coldStartTimeline?: ColdStartConnectTimeline;
   }) {
     const deps =
       input?.deps ??
@@ -2122,6 +2150,7 @@ export class HostRuntimeStore {
     this.replicaCache = new ReplicaCache(input?.replicaRowStore ?? createReplicaRowStore());
     this.revokePushNotifications = input?.revokePushNotifications ?? revokePushNotifications;
     this.directoryFrameClock = input?.directoryFrameClock ?? null;
+    this.coldStartTimeline = input?.coldStartTimeline ?? getColdStartConnectTimeline();
   }
 
   // --- Host registry ---
@@ -2147,6 +2176,15 @@ export class HostRuntimeStore {
 
   isHostRegistryLoaded(): boolean {
     return this.hostRegistryLoaded;
+  }
+
+  markColdStartPhase(phase: ColdStartPhase): void {
+    this.coldStartTimeline.mark(phase);
+  }
+
+  /** Resolves once the stored registry is loaded; a write before that would replace it. */
+  whenHostRegistryLoaded(): Promise<void> {
+    return this.loadRegistry();
   }
 
   boot(): Promise<void> {
@@ -2246,6 +2284,9 @@ export class HostRuntimeStore {
       console.error("[HostRuntime] Failed to load host registry from storage", error);
     } finally {
       this.hostRegistryStatus = "ready";
+      this.coldStartTimeline.registryRestored(
+        this.hosts.filter((host) => host.management).map((host) => host.serverId),
+      );
       this.emitHostList();
       if (shouldPersistHosts) {
         void this.persistHosts().catch((error) =>
@@ -3272,10 +3313,12 @@ export class HostRuntimeStore {
     this.lastConnectionStatusByServer.set(serverId, snapshot.connectionStatus);
     if (snapshot.connectionStatus === "offline" || snapshot.connectionStatus === "error") {
       this.failedSinceOnline.add(serverId);
+      if (statusChanged) this.coldStartTimeline.attemptFailed(serverId);
     }
     const didTransitionOnline =
       snapshot.connectionStatus === "online" && previousStatus !== "online";
     if (didTransitionOnline) {
+      this.coldStartTimeline.hostOnline(serverId);
       this.noteHostRecovered(serverId);
       useSessionStore.getState().bumpHistorySyncGeneration(serverId);
       // Availability no longer changes history membership/query identity. Recovery uses the

@@ -6,6 +6,7 @@ import {
   hostAdvertisedConnections,
   matchesAdvertisedHostConnection,
   hostRequiresSessionAdmission,
+  prefetchedAccessTicket,
   registerHostAccessTicketResolver,
   resolveHostAccessTicket,
   subscribeHostSessionAccess,
@@ -120,4 +121,25 @@ it("does not authorize a changed Relay endpoint or pinned key just because the I
   expect(
     matchesAdvertisedHostConnection(relay, { ...relay, daemonPublicKeyB64: "changed-key" }),
   ).toBe(false);
+});
+
+it("hands the ticket requested with the attempt to the first hello, and asks again after", async () => {
+  const requested: string[] = [];
+  const takeTicket = prefetchedAccessTicket(async () => {
+    requested.push(`ticket-${requested.length + 1}`);
+    return requested.at(-1);
+  });
+
+  expect(requested).toEqual(["ticket-1"]);
+  await expect(takeTicket()).resolves.toBe("ticket-1");
+  await expect(takeTicket()).resolves.toBe("ticket-2");
+});
+
+it("leaves a prefetched ticket failure to the hello that takes it", async () => {
+  const takeTicket = prefetchedAccessTicket(async () => {
+    throw new Error("Hub unreachable");
+  });
+  // Nothing awaited it yet; it must not surface as an unhandled rejection.
+  await Promise.resolve();
+  await expect(takeTicket()).rejects.toThrow("Hub unreachable");
 });
