@@ -37,6 +37,9 @@ function useRelativeTimeLabel(
   date: Date | null,
   describe: (date: Date) => RelativeTimeLabel,
 ): string {
+  // The label reads the wall clock in render, which no dependency shows: compiled, it would be
+  // memoized on the instant alone and never age on a tick or a reshow.
+  "use no memo";
   const active = useRetainedPanelActive();
   // A tick that changes the label only asks for a render; the render reads the wall clock.
   const [, setTick] = useState(0);

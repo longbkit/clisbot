@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Text } from "react-native";
 import { RetainedPanel } from "@/components/retained-panel";
 import { activeRelativeTimeTickerCount } from "@/utils/relative-time-ticker";
-import { describeCompactTimeAgo } from "@/utils/time";
-import { useCompactTimeAgo } from "./use-time-ago";
+import { describeCompactTimeAgo, describeTimeAgo } from "@/utils/time";
+import { useCompactTimeAgo, useTimeAgo } from "./use-time-ago";
 
 const MINUTE = 60_000;
 const START = new Date("2026-10-30T12:00:00.000Z");
@@ -15,6 +15,10 @@ let renders = 0;
 function Label() {
   renders += 1;
   return <Text testID="label">{useCompactTimeAgo(createdAt)}</Text>;
+}
+
+function ProseLabel({ date }: { date: Date }) {
+  return <Text testID="label">{useTimeAgo(date)}</Text>;
 }
 
 let container: HTMLDivElement;
@@ -52,13 +56,24 @@ afterEach(() => {
 describe("useCompactTimeAgo in a retained panel", () => {
   it("ticks while shown", () => {
     render(true);
-    expect(label()).toBe(describeCompactTimeAgo(createdAt).label);
+    const before = label();
+    expect(before).toBe(describeCompactTimeAgo(createdAt).label);
     expect(activeRelativeTimeTickerCount()).toBe(1);
 
     act(() => vi.advanceTimersByTime(MINUTE));
 
     expect(label()).toBe(describeCompactTimeAgo(createdAt).label);
-    expect(label()).not.toBe(describeCompactTimeAgo(new Date(createdAt.getTime() + MINUTE)).label);
+    expect(label()).not.toBe(before);
+  });
+
+  it("ages a fresh prose label outside any retained panel", () => {
+    act(() => root.render(<ProseLabel date={new Date(START.getTime())} />));
+    expect(label()).toBe(describeTimeAgo(START).label);
+
+    act(() => vi.advanceTimersByTime(3 * MINUTE));
+
+    expect(label()).toBe(describeTimeAgo(START).label);
+    expect(label()).not.toBe(describeTimeAgo(START, START).label);
   });
 
   it("runs no timer and renders nothing while hidden, and shows the current label when shown", () => {
@@ -71,6 +86,7 @@ describe("useCompactTimeAgo in a retained panel", () => {
 
     render(true);
     expect(label()).toBe(describeCompactTimeAgo(createdAt).label);
+    expect(label()).not.toBe(describeCompactTimeAgo(createdAt, START).label);
     expect(activeRelativeTimeTickerCount()).toBe(1);
   });
 });

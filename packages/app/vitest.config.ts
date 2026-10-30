@@ -9,6 +9,14 @@ import {
   enrichedMarkdownWasmOptimizer,
 } from "./test-stubs/enriched-markdown-wasm";
 
+const COMPILED_CLOCK_HOOKS = ["/src/hooks/use-time-ago.ts", "/src/usage/use-relative-time-tick.ts"];
+
+function isCompiledRelativeTimeModule(id: string): boolean {
+  if (id.includes(".test.")) return false;
+  if (id.includes("/src/usage/") && id.endsWith(".tsx")) return true;
+  return COMPILED_CLOCK_HOOKS.some((hook) => id.endsWith(hook));
+}
+
 // Set this before Vite resolves dependencies and Vitest starts its workers.
 Object.assign(process.env, { NODE_ENV: "test" });
 
@@ -24,11 +32,12 @@ const resolvePackageEntry = (packageName: string) => {
 export default defineConfig({
   plugins: [
     {
-      name: "compile-usage-components",
+      name: "compile-relative-time",
       enforce: "pre",
       transform(source, id) {
-        // These labels must react to time and language in the compiled app too.
-        if (!id.includes("/src/usage/") || !id.endsWith(".tsx") || id.includes(".test.")) return;
+        // These labels must react to time and language in the compiled app too: the compiler
+        // memoizes a value derived in render, so a clock read the deps don't show goes stale.
+        if (!isCompiledRelativeTimeModule(id)) return;
         const result = transformSync(source, {
           filename: id,
           babelrc: false,
