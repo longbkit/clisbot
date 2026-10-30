@@ -26,9 +26,11 @@ export function applyOrderedChanges<T>(
   }
   const next = sorted.slice();
   for (const row of removed) {
-    const index = lowerBound(next, row, compare);
-    if (next[index] !== row) throw new Error("An ordered row was not where its order puts it");
-    next.splice(index, 1);
+    let index = lowerBound(next, row, compare);
+    // A row its order no longer places (a NaN timestamp) is found by identity; a missing one is
+    // skipped. Throwing here would take Home down for one bad row.
+    if (next[index] !== row) index = next.indexOf(row);
+    if (index !== -1) next.splice(index, 1);
   }
   for (const row of added) next.splice(lowerBound(next, row, compare), 0, row);
   return next;
