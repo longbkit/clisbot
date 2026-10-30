@@ -664,7 +664,22 @@ export function useHubAccounts(): readonly HubAccountContextValue[] {
   return useContext(HubAccountsContext);
 }
 
+/**
+ * A request without a usable token reads as "signed out". The query stays pending while the
+ * transport reads the stored sign-in once more, so a credential read that missed on a cold start
+ * never shows "sign in" (connection-resilience.md).
+ */
 async function readAccountState(
+  transport: HubTransport,
+  invitationId: string | null,
+): Promise<HubAccountState> {
+  const state = await requestAccountState(transport, invitationId);
+  if (state.status !== "signedOut" || !transport.recoverSignIn) return state;
+  if (!(await transport.recoverSignIn())) return state;
+  return requestAccountState(transport, invitationId);
+}
+
+async function requestAccountState(
   transport: HubTransport,
   invitationId: string | null,
 ): Promise<HubAccountState> {

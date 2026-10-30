@@ -16,6 +16,8 @@ import {
 import { i18n } from "@/i18n/i18next";
 import { fetchWithDeadline } from "./request-deadline";
 
+const CREDENTIAL_REREAD_DELAY_MS = 500;
+
 interface AccessCredential {
   accessToken: string;
   expiresAt: number;
@@ -38,11 +40,28 @@ class NativeHubTransport implements HubTransport {
   async request(path: string, input: HubRequestInput = {}): Promise<Response> {
     const accessToken = await this.currentAccessToken();
     const response = await this.send(path, input, accessToken);
-    // The Hub refused a token the app still believed valid. Take a new one once and ask again; a
-    // second 401 is returned so the caller shows "sign in" instead of treating it as a revocation.
-    if (response.status !== 401 || accessToken === null) return response;
-    const refreshed = await this.refreshRejectedAccessToken(accessToken);
+    // The Hub refused a token the app still believed valid, or a request that went out with none.
+    // Take a new one once and ask again; a second 401 is returned so the caller shows "sign in"
+    // instead of treating it as a revocation.
+    if (response.status !== 401) return response;
+    const refreshed =
+      accessToken === null
+        ? await this.recoverAccessToken()
+        : await this.refreshRejectedAccessToken(accessToken);
     return refreshed === null ? response : this.send(path, input, refreshed);
+  }
+
+  async recoverSignIn(): Promise<boolean> {
+    return (await this.recoverAccessToken()) !== null;
+  }
+
+  /**
+   * Android's keystore can answer empty once on a cold start (after a force-stop or `install -r`)
+   * although the credential is intact. Read it again after a moment, then refresh.
+   */
+  private async recoverAccessToken(): Promise<string | null> {
+    await new Promise((resolve) => setTimeout(resolve, CREDENTIAL_REREAD_DELAY_MS));
+    return this.currentAccessToken();
   }
 
   private send(path: string, input: HubRequestInput, accessToken: string | null) {

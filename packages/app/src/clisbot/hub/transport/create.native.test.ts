@@ -236,3 +236,57 @@ test("native request returns a second 401 instead of looping", async () => {
   const apiCalls = fetch.mock.calls.filter(([url]) => !(url as URL).pathname.endsWith("/token"));
   expect(apiCalls).toHaveLength(2);
 });
+
+/** Android's keystore can answer empty once on a cold start although the credential is intact. */
+function missNextSecretRead() {
+  const stored = new Map(secrets);
+  secrets.clear();
+  setTimeout(() => {
+    for (const [key, value] of stored) secrets.set(key, value);
+  }, 0);
+}
+
+test("a sign-in the keystore missed on a cold start is read again before the account shows signed out", async () => {
+  vi.useFakeTimers();
+  save(work);
+  missNextSecretRead();
+  const transport = createHubTransport({ origin: work });
+  const unsigned = await (await transport.request("/api/auth/clisbot/state")).json();
+  expect(unsigned).toEqual({ authorization: null });
+  const recovering = transport.recoverSignIn!();
+  await vi.runAllTimersAsync();
+  expect(await recovering).toBe(true);
+  expect(await (await transport.request("/api/auth/clisbot/state")).json()).toEqual({
+    authorization: `Bearer access:${work}`,
+  });
+});
+
+test("recovering a sign-in that was never stored reports signed out without a token request", async () => {
+  vi.useFakeTimers();
+  const transport = createHubTransport({ origin: work });
+  const recovering = transport.recoverSignIn!();
+  await vi.runAllTimersAsync();
+  expect(await recovering).toBe(false);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test("a 401 to a request sent without a token reads the sign-in again once, then asks again", async () => {
+  vi.useFakeTimers();
+  save(work);
+  missNextSecretRead();
+  fetch.mockReset().mockImplementation(async (url: URL, input: RequestInit) => {
+    if (url.pathname.endsWith("/token"))
+      return Response.json({
+        access_token: "access",
+        refresh_token: "rotated",
+        expires_in: 300,
+        token_type: "Bearer",
+      });
+    return new Headers(input.headers).get("authorization") === "Bearer access"
+      ? Response.json({ ok: true })
+      : Response.json({ error: "unauthorized" }, { status: 401 });
+  });
+  const response = createHubTransport({ origin: work }).request("/api/management/v1/daemons");
+  await vi.runAllTimersAsync();
+  expect((await response).status).toBe(200);
+});

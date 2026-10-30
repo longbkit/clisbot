@@ -14,6 +14,7 @@ const INVITATION_URL =
 const testState = vi.hoisted(() => ({
   url: "",
   request: vi.fn(),
+  recoverSignIn: vi.fn(),
   signIn: vi.fn(),
   signOut: vi.fn(),
   clearOffline: vi.fn(async (_origin: string) => undefined),
@@ -36,6 +37,7 @@ vi.mock("./transport/create", () => ({
   createHubTransport: () => ({
     signInKind: "password",
     request: testState.request,
+    recoverSignIn: () => testState.recoverSignIn(),
     signIn: (...input: unknown[]) => testState.signIn(...input),
     signOut: () => testState.signOut(),
     subscribeSessionChange: (listener: () => void) => {
@@ -437,5 +439,56 @@ describe("the reader across an explicit sign-out", () => {
     );
     await waitFor(() => expect(memory().signedOut[ORIGIN]).toBeUndefined());
     await waitFor(() => expect(readerIds(view)).toEqual(["a"]));
+  });
+});
+
+describe("a cold start with a stored sign-in", () => {
+  const signedOut = { status: "signedOut", registration: "invite_only" };
+
+  function renderColdStart() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>
+        <HubAccountProvider>{children}</HubAccountProvider>
+      </QueryClientProvider>
+    );
+    const seen: Array<string | undefined> = [];
+    const rendered = renderHook(
+      () => {
+        const value = useHubAccount();
+        seen.push(value.state?.status);
+        return value;
+      },
+      { wrapper },
+    );
+    return { ...rendered, seen };
+  }
+
+  beforeEach(() => {
+    testState.url = "";
+  });
+
+  it("reads the sign-in again before showing signed out, and never shows it meanwhile", async () => {
+    let recovered = false;
+    testState.recoverSignIn.mockImplementation(async () => {
+      recovered = true;
+      return true;
+    });
+    testState.request.mockImplementation(async () =>
+      Response.json(recovered ? active("org") : signedOut),
+    );
+    const { result, seen } = renderColdStart();
+    await waitFor(() => expect(result.current.state?.status).toBe("active"));
+    expect(testState.recoverSignIn).toHaveBeenCalledTimes(1);
+    expect(seen).not.toContain("signedOut");
+  });
+
+  it("shows signed out when no sign-in is stored", async () => {
+    testState.recoverSignIn.mockResolvedValue(false);
+    testState.request.mockImplementation(async () => Response.json(signedOut));
+    const { result } = renderColdStart();
+    await waitFor(() => expect(result.current.state?.status).toBe("signedOut"));
+    expect(testState.recoverSignIn).toHaveBeenCalledTimes(1);
+    expect(testState.request).toHaveBeenCalledTimes(1);
   });
 });

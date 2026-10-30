@@ -21,6 +21,11 @@ export interface HubTransport {
   ): Promise<void>;
   signOut(): Promise<void>;
   subscribeSessionChange?(listener: () => void): () => void;
+  /**
+   * Reads the stored sign-in again and takes a new token; true when one is available. Called
+   * before the account accepts "signed out", where a credential read can miss on a cold start.
+   */
+  recoverSignIn?(): Promise<boolean>;
   /** Present only where the client runs on the Hub origin. System-browser transports reach
    * Google through the Hub sign-in page instead. */
   signInWithGoogle?(context?: GoogleSignInContext): Promise<void>;
