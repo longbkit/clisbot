@@ -157,7 +157,7 @@ export interface StartupScheduler {
 }
 
 const defaultStartupScheduler: StartupScheduler = {
-  now: Date.now,
+  now: () => Date.now(),
   yieldToEventLoop,
   afterNextFrame: (run) => {
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => run());

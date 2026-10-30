@@ -74,6 +74,10 @@ export class AgentStoreProjection {
     return merged;
   }
 
+  markHydrated(): void {
+    useSessionStore.getState().setHasHydratedAgents(this.serverId, true);
+  }
+
   publishActivity(agent: Agent): void {
     useSessionStore.getState().setAgentLastActivity(agent.id, agent.lastActivityAt);
   }

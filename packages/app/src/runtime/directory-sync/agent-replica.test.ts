@@ -57,6 +57,48 @@ function entry(agent: AgentSnapshotPayload): FetchAgentsEntry {
 }
 
 describe("AgentDirectoryReplica", () => {
+  it("leaves the store and the cache alone when a live answer carries no changes", () => {
+    const serverId = "agent-replica-empty-changes";
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, null);
+    const persisted: DirectoryReplicaMutation[][] = [];
+    const replica = new AgentDirectoryReplica(
+      serverId,
+      () => undefined,
+      (mutations) => persisted.push([...mutations]),
+    );
+    const cached = new Map(
+      Array.from({ length: 50 }, (_, index) => {
+        const agent = {
+          ...normalizeAgentSnapshot(
+            { ...payload(`cached ${index}`), id: `agent-${index}` },
+            serverId,
+          ),
+          projectPlacement: entry(payload("placement")).project,
+        };
+        return [agent.id, agent] as const;
+      }),
+    );
+    replica.commitCached(cached);
+    const before = useSessionStore.getState().sessions[serverId]!;
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    const agents = replica.commitChanges([], [], []);
+    unsubscribe();
+
+    const after = useSessionStore.getState().sessions[serverId]!;
+    expect(agents).toBe(before.agents);
+    expect(after.agents).toBe(before.agents);
+    expect(after.pendingPermissions).toBe(before.pendingPermissions);
+    expect(after.hasHydratedAgents).toBe(true);
+    // Only the hydration flag changed, in one notification; nothing was written to the cache.
+    expect(notifications).toBe(1);
+    expect(persisted).toEqual([]);
+  });
+
   it.each(["delta", "snapshot"] as const)(
     "does not erase freshly fetched history when the active directory removes it by %s",
     (removal) => {
