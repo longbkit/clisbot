@@ -257,6 +257,8 @@ export const ru: TranslationResources = {
     historyLoadFailed: "Не удалось загрузить историю агента",
     messageCapped: "Это сообщение было обрезано ({{bytes}} байт).",
     permission: {
+      reason: "Почему требуется разрешение",
+      blockedPath: "Заблокированный путь",
       rejectedPlan: "Отклонённый план",
       approvedPlan: "Одобренный план",
       canceledPlan: "Отменённый план",

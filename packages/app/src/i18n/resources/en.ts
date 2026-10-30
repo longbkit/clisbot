@@ -251,6 +251,8 @@ export const en = {
     historyLoadFailed: "Couldn't load agent history",
     messageCapped: "This message was capped ({{bytes}} bytes).",
     permission: {
+      reason: "Why approval is needed",
+      blockedPath: "Blocked path",
       rejectedPlan: "Rejected plan",
       approvedPlan: "Approved plan",
       canceledPlan: "Canceled plan",

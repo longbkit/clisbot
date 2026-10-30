@@ -5102,6 +5102,13 @@ class ClaudeAgentSession implements AgentSession {
     if (options.toolUseID) {
       metadata.toolUseId = options.toolUseID;
     }
+    // Preserve the SDK's explanation; the active mode alone cannot explain an approval.
+    if (options.decisionReason !== undefined) {
+      metadata.decisionReason = options.decisionReason;
+    }
+    if (options.blockedPath !== undefined) {
+      metadata.blockedPath = options.blockedPath;
+    }
     if (toolName === "ExitPlanMode" && typeof input.plan === "string") {
       metadata.planText = input.plan;
     }

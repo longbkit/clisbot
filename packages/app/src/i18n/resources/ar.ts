@@ -254,6 +254,8 @@ export const ar: TranslationResources = {
     historyLoadFailed: "تعذر تحميل سجل الوكيل",
     messageCapped: "تم اقتطاع هذه الرسالة ({{bytes}} بايت).",
     permission: {
+      reason: "سبب الحاجة إلى الموافقة",
+      blockedPath: "المسار المحظور",
       rejectedPlan: "خطة مرفوضة",
       approvedPlan: "خطة معتمدة",
       canceledPlan: "خطة ملغاة",

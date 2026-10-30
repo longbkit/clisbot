@@ -255,6 +255,8 @@ export const ptBR: TranslationResources = {
     historyLoadFailed: "Não foi possível carregar o histórico do agente",
     messageCapped: "Esta mensagem foi truncada ({{bytes}} bytes).",
     permission: {
+      reason: "Por que a aprovação é necessária",
+      blockedPath: "Caminho bloqueado",
       rejectedPlan: "Plano rejeitado",
       approvedPlan: "Plano aprovado",
       canceledPlan: "Plano cancelado",
