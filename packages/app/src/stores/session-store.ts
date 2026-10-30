@@ -230,12 +230,15 @@ function preserveMapIdentity<Key, Value>(
 
   const next = new Map<Key, Value>();
   let changed = existing.size !== incoming.size;
+  // Whether `next` differs from `incoming` by keeping an equal stored value.
+  let kept = false;
   const existingEntries = existing.entries();
 
   for (const [key, workspace] of incoming) {
     const existingWorkspace = existing.get(key);
     const nextWorkspace =
       existingWorkspace && equal(existingWorkspace, workspace) ? existingWorkspace : workspace;
+    if (nextWorkspace !== workspace) kept = true;
     next.set(key, nextWorkspace);
     const existingEntry = existingEntries.next().value;
     if (!existingEntry || existingEntry[0] !== key || existingEntry[1] !== nextWorkspace) {
@@ -243,7 +246,8 @@ function preserveMapIdentity<Key, Value>(
     }
   }
 
-  return changed ? next : existing;
+  if (!changed) return existing;
+  return kept ? next : incoming;
 }
 
 export type ExplorerEntryKind = "file" | "directory";
