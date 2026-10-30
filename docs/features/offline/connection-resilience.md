@@ -134,6 +134,10 @@ fleet, and Home fell from 3,597 to 1,001 sessions while every Host showed online
 on Home moves the task to the back on every version (`plugins/with-android-back-keeps-task.js`),
 and the compact layout holds across a resume (`navigation/compact-resume-hold.ts`).
 
+Home's composer follows the same rule: it opens on the remembered Host and project from storage
+and keeps them while Hosts connect; it moves only when the Host leaves the registry
+([Home and Inbox](../home-and-inbox/README.md)).
+
 ## Hub requests
 
 Browser, browser OAuth and native OAuth transports abort a Hub request after 15 s, including a

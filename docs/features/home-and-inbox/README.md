@@ -126,6 +126,16 @@ The picker lists every online Host's projects and Bots, the selected Host's firs
 row reads name, then Host · short path, a Bot row name and Host. Search runs across all of them.
 Picking an entry on another Host switches the Host first and selects the entry once that Host's
 own list has it (`clisbot/home/use-cross-host-picker.ts`), so the composer loads that Host's agents.
+Home opens on the remembered start: the Host and project last picked on Home (a project, Bot or
+Quick chat), or the last opened workspace's when one was opened since
+(`clisbot/home/remembered-start.ts`, `@clisbot:home-remembered-start:v1`). The project is stored
+with its placement, so a cold start shows it before its Host connects. The remembered Host stays
+selected whatever its connection status, even before a Hub list makes the inventory show it; only
+its removal from the registry, which only the Hub's answer causes, falls back to another Host. The
+project is dropped only when its Host is online with its workspaces loaded and lists no such
+project. Before this, Home picked the first online Host with projects, so on a cold start with 14
+Hub Hosts the chips changed several times as Hosts connected. The `/new` screen keeps that
+online-first choice.
 A Host with no ordinary project opens on Quick chat, but only after its workspaces loaded (the
 project list is empty, not absent, before that) and only while no choice was made on this screen.
 Home never picks an agent on its own: agent choices are remembered per Host, and a Host without

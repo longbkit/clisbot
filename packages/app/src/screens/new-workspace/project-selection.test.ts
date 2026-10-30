@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { filterWorkspaceProjectsForHost, type HostProjectListItem } from "@/projects/host-projects";
+import {
+  filterWorkspaceProjectsForHost,
+  hostProjectFromRoute,
+  resolveInitialWorkspaceProject,
+  type HostProjectListItem,
+} from "@/projects/host-projects";
 import {
   createManualProjectSelectionContextKey,
   createProjectSelectionContextKey,
@@ -675,5 +680,55 @@ describe("reconcileProjectSelection", () => {
     });
 
     expect(resolveProjectSelection(current, selectionContext)).toEqual(manual);
+  });
+});
+
+describe("remembered start project", () => {
+  it("stays selected while its Host connects and its project list fills in", () => {
+    const remembered = hostProjectFromRoute({
+      serverId: "host",
+      projectId: "vai-clisbot",
+      sourceDirectory: "/work/vai-clisbot",
+      displayName: "vai-clisbot",
+    });
+    if (!remembered) throw new Error("remembered project must build");
+    const loaded = { ...project("vai-clisbot"), viewKey: remembered.viewKey };
+    const waves: Array<{ projects: HostProjectListItem[]; allowAllProjects: boolean }> = [
+      { projects: [], allowAllProjects: false },
+      { projects: [project("default")], allowAllProjects: false },
+      { projects: [project("default"), project("head-clisbot")], allowAllProjects: true },
+      { projects: [project("default"), loaded], allowAllProjects: true },
+    ];
+    let selection: ProjectSelection | null = null;
+    for (const wave of waves) {
+      const projects = filterWorkspaceProjectsForHost({
+        projects: wave.projects,
+        serverId: "host",
+        allowAllProjects: wave.allowAllProjects,
+      });
+      const initialProject = resolveInitialWorkspaceProject({
+        routeProject: null,
+        lastActiveProject: remembered,
+        projects,
+        serverId: "host",
+        allowAllProjects: wave.allowAllProjects,
+      });
+      const selectionContext = context({
+        contextKey: createProjectSelectionContextKey({
+          selectedServerId: "host",
+          routeProjectViewKey: null,
+          allowAllProjects: wave.allowAllProjects,
+        }),
+        initialProject,
+        projects,
+        lastActiveProject: remembered,
+      });
+      selection = selection
+        ? reconcileProjectSelection(selection, selectionContext)
+        : createProjectSelection(selectionContext);
+      expect(resolveProjectSelection(selection, selectionContext)?.viewKey).toBe(
+        remembered.viewKey,
+      );
+    }
   });
 });
