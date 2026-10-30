@@ -8,6 +8,8 @@ import { readHostTailscale, setUpHostTailscale } from "./network/host-tailscale.
 import { createPublishedConnectionOffer } from "./device-access/connection-offer.js";
 import { assertNotBotProjectRoot } from "./bots/bot-project-root.js";
 import { recoverStoredSessionAuthorship } from "./agent/session-storage/recover-session-authorship.js";
+import { isColdAgentRecord } from "./agent/agent-cold-storage.js";
+import type { DeferredAuthorshipProbes } from "./agent/session-storage/deferred-authorship-probes.js";
 import { deleteSessionDirectory } from "./file-upload/session-files.js";
 import { startSessionFileMaintenance } from "./file-upload/session-file-maintenance.js";
 import { FileAgentTimelineStore } from "./agent/session-storage/file-agent-timeline-store.js";
@@ -462,6 +464,7 @@ export interface ClisbotDaemonConfig {
   agentClients: Partial<Record<AgentProvider, AgentClient>>;
   agentStoragePath: string;
   agentSessionStorage?: boolean;
+  agentColdStorage?: import("./agent/agent-cold-storage.js").AgentColdStorageConfig;
   hostInputQueue?: boolean;
   relayEnabled?: boolean;
   relayEnabledMutable?: boolean;
@@ -1064,6 +1067,7 @@ export async function createClisbotDaemon(
   const agentStorage = new AgentStorage(config.agentStoragePath, logger, {
     sessionLayout: config.agentSessionStorage === true,
     removeSessionData: (_id, directory) => deleteSessionDirectory(directory),
+    coldStorage: config.agentColdStorage,
   });
   await agentStorage.initialize();
   const stopSessionFileMaintenance = startSessionFileMaintenance({
@@ -1184,12 +1188,12 @@ export async function createClisbotDaemon(
     agentStorage,
   );
   await closeStaleAgentRecords(agentStorage);
-  if (sessionStorage.durable)
-    await recoverStoredSessionAuthorship(
-      agentStorage,
-      sessionStorage.timelineStorage,
-      agentManager,
-    );
+  const deferredAuthorshipProbes = await recoverAuthorshipAtStartup(
+    logger,
+    agentStorage,
+    sessionStorage,
+    agentManager,
+  );
   logger.info({ elapsed: elapsed() }, "Agent storage initialized");
   await bootstrapWorkspaceRegistries({
     serverId,
@@ -1698,6 +1702,7 @@ export async function createClisbotDaemon(
   // Clisbot Bots (docs/features/bots-and-chats/README.md, D10): null keeps the daemon upstream-equivalent.
   const botService = createBotServiceFromConfig(config.bots, {
     clisbotHome: config.clisbotHome,
+    listCache: agentStorage.coldStorage !== undefined,
     logger,
     projectRegistry,
     workspaceRegistry,
@@ -2309,6 +2314,9 @@ export async function createClisbotDaemon(
       // model loading doesn't block the server from accepting connections.
       speechService.start();
       scriptHealthMonitor.start();
+      void deferredAuthorshipProbes?.drain((agentId, probe) =>
+        sessionStorage.timelineStorage.exclusive(agentId, probe),
+      );
     } catch (error) {
       stopHubProjectPublishing();
       localCredential = null;
@@ -2334,6 +2342,7 @@ export async function createClisbotDaemon(
     // down, so plugin shutdown cannot withdraw a provider from under an agent
     // that is still open. Plugins themselves stop after agent closure below.
     unsubscribePluginProviders();
+    deferredAuthorshipProbes?.stop();
     await hubRelationships.stop();
     workspaceReconciliation.dispose();
     scriptHealthMonitor.stop();
@@ -2395,6 +2404,30 @@ export async function createClisbotDaemon(
     getListenTarget: () => boundListenTarget,
     getServerId: () => serverId,
   };
+}
+
+/** Warm records are probed now; cold ones wait for their first history open or the drain. */
+async function recoverAuthorshipAtStartup(
+  logger: Logger,
+  agentStorage: AgentStorage,
+  sessionStorage: { durable: boolean; timelineStorage: FileAgentTimelineStore },
+  agentManager: AgentManager,
+): Promise<DeferredAuthorshipProbes | null> {
+  if (!sessionStorage.durable) return null;
+  const coldStorage = agentStorage.coldStorage;
+  const startedAt = Date.now();
+  const probes = await recoverStoredSessionAuthorship(
+    agentStorage,
+    sessionStorage.timelineStorage,
+    agentManager,
+    coldStorage && {
+      isCold: (record) => isColdAgentRecord(record, coldStorage, startedAt),
+      logger,
+    },
+  );
+  if (probes)
+    logger.info({ deferred: probes.size }, "Cold agent records deferred their authorship probe");
+  return probes;
 }
 
 async function closeStaleAgentRecords(agentStorage: AgentStorage): Promise<void> {

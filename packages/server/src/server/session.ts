@@ -1323,6 +1323,7 @@ export class Session {
       workspaces: this.workspaceRegistry,
       projectLive: (agent) => this.buildAgentPayload(agent),
       projectStored: (record) => this.buildStoredAgentPayload(record),
+      storedProjectionKey: () => this.storedProjectionKey(),
       isProviderVisible: (provider) => this.isProviderVisibleToClient(provider),
       isStoredProviderAvailable: (record) =>
         isStoredAgentProviderAvailable(
@@ -2392,6 +2393,12 @@ export class Session {
 
   private buildAgentPayload(agent: ManagedAgent): Promise<AgentSnapshotPayload> {
     return this.enrichAgentPayload(toAgentPayload(agent));
+  }
+
+  /** Cold storage caches stored payloads per record; they depend on the registered providers. */
+  private storedProjectionKey(): string | undefined {
+    if (!this.agentStorage.coldStorage) return undefined;
+    return this.providerSnapshotManager.listRegisteredProviderIds().join("\n");
   }
 
   private buildStoredAgentPayload(

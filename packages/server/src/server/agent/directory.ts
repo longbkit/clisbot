@@ -3,6 +3,16 @@ import type { WorkspaceRegistry } from "../workspace-registry.js";
 import type { AgentManager, ManagedAgent } from "./agent-manager.js";
 import type { AgentStorage, StoredAgentRecord } from "./agent-storage.js";
 
+/**
+ * Stored payloads keyed by record identity, shared by every client session. Storage replaces a
+ * record object on every write, so an unchanged record keeps its payload and a changed one misses
+ * (docs/features/agent-session-storage/cold-storage.md).
+ */
+const storedPayloads = new WeakMap<
+  StoredAgentRecord,
+  { key: string; payload: AgentSnapshotPayload }
+>();
+
 /** Public agent discovery owns workspace visibility for live and durable records. */
 export class AgentDirectory {
   constructor(
@@ -12,6 +22,8 @@ export class AgentDirectory {
       workspaces: Pick<WorkspaceRegistry, "get" | "list">;
       projectLive(agent: ManagedAgent): Promise<AgentSnapshotPayload>;
       projectStored(record: StoredAgentRecord): AgentSnapshotPayload;
+      /** Everything besides the record that a stored payload depends on; undefined = no cache. */
+      storedProjectionKey?(): string | undefined;
       isProviderVisible(provider: string): boolean;
       isStoredProviderAvailable(record: StoredAgentRecord): boolean;
     },
@@ -55,6 +67,7 @@ export class AgentDirectory {
     const live = this.deps.manager.listAgents();
     const liveIds = new Set(live.map((agent) => agent.id));
     const labels = Object.entries(filter?.labels ?? {});
+    const projectionKey = this.deps.storedProjectionKey?.();
     const backgroundIds = new Set(
       filter?.includeBackground
         ? []
@@ -76,12 +89,22 @@ export class AgentDirectory {
         (record) =>
           filter?.includeUnavailablePersisted || this.deps.isStoredProviderAvailable(record),
       )
-      .map((record) => this.deps.projectStored(record));
+      .map((record) => this.projectStored(record, projectionKey));
     const active = await Promise.all(
       live.filter(matches).map((agent) => this.deps.projectLive(agent)),
     );
     return [...active, ...stored]
       .filter(matches)
       .filter((agent) => this.deps.isProviderVisible(agent.provider));
+  }
+
+  /** A shallow copy, so a caller that edits its payload never edits the cached one. */
+  private projectStored(record: StoredAgentRecord, key: string | undefined): AgentSnapshotPayload {
+    if (key === undefined) return this.deps.projectStored(record);
+    const cached = storedPayloads.get(record);
+    if (cached?.key === key) return { ...cached.payload };
+    const payload = this.deps.projectStored(record);
+    storedPayloads.set(record, { key, payload });
+    return { ...payload };
   }
 }

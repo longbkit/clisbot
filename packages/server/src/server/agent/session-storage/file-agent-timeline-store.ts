@@ -77,6 +77,7 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
   });
   private readonly deleting = new Set<string>();
   private authorshipObserver?: (agentId: string, value: DurableSessionSummary) => Promise<void>;
+  private openObserver?: (agentId: string) => Promise<void>;
   private readonly recovery = new AuthorshipRecoveryQueue({
     recover: (agentId) => this.recoverAuthorship(agentId),
     isDeleting: (agentId) => this.deleting.has(agentId),
@@ -88,6 +89,14 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
     observer: (agentId: string, value: DurableSessionSummary) => Promise<void>,
   ): void {
     this.authorshipObserver = observer;
+  }
+  /** Runs before every log open, inside that agent's operation order; cold storage hydrates here. */
+  setOpenObserver(observer: (agentId: string) => Promise<void>): void {
+    this.openObserver = observer;
+  }
+  /** Runs `operation` in order with every other operation for the same agent. */
+  exclusive<T>(agentId: string, operation: () => Promise<T>): Promise<T> {
+    return this.schedule(agentId, operation);
   }
   setAuthorshipRecoveryObserver(
     observer: (agentId: string, status: AuthorshipRecoveryStatus) => Promise<void>,
@@ -143,6 +152,7 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
 
   /** Opens the session's one log, importing a pre-canonical segmented session on first touch. */
   private async open(agentId: string): Promise<SessionEventLog> {
+    await this.openObserver?.(agentId);
     const directory = await this.resolveDirectory(agentId);
     const log = SessionEventLog.for(directory);
     await importSegmentedSession(log, directory);

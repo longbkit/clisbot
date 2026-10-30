@@ -8,11 +8,11 @@ import { BotStore } from "./bot-store.js";
 
 const dirs: string[] = [];
 
-async function createStore() {
+async function createStore(options?: { listCache?: boolean }) {
   const home = await mkdtemp(path.join(tmpdir(), "bot-store-"));
   dirs.push(home);
   const dir = path.join(home, "bots");
-  return { dir, store: new BotStore(dir, pino({ level: "silent" })) };
+  return { dir, store: new BotStore(dir, pino({ level: "silent" }), options) };
 }
 
 function record(slug: string): Omit<StoredBot, "id"> {
@@ -89,4 +89,45 @@ it("rejects path traversal Bot ids before reading outside the store", async () =
   const { store } = await createStore();
   await expect(store.get("../config")).rejects.toThrow("Invalid Bot id");
   await expect(store.update("../config", (bot) => bot)).rejects.toThrow("Invalid Bot id");
+});
+
+describe("BotStore list cache", () => {
+  it("serves repeated lists without rereading files and refreshes after its own writes", async () => {
+    const { dir, store } = await createStore({ listCache: true });
+    const created = await store.create(record("ops"));
+    expect((await store.list()).map((bot) => bot.name)).toEqual(["ops"]);
+
+    // An in-place edit keeps the directory mtime, so the cached read is still served.
+    const filePath = path.join(dir, `${created.id}.json`);
+    await writeFile(filePath, JSON.stringify({ ...created, name: "edited in place" }));
+    expect((await store.list()).map((bot) => bot.name)).toEqual(["ops"]);
+
+    await store.update(created.id, (bot) => ({ ...bot, name: "Ops" }));
+    expect((await store.list()).map((bot) => bot.name)).toEqual(["Ops"]);
+  });
+
+  it("rereads when a file is added to the directory outside the store", async () => {
+    const { dir, store } = await createStore({ listCache: true });
+    const created = await store.create(record("ops"));
+    await store.list();
+    const added = { ...created, id: "bot_00000000000000aa", slug: "qa", name: "qa" };
+    await writeFile(path.join(dir, `${added.id}.json`), JSON.stringify(added));
+    expect((await store.list()).map((bot) => bot.slug).sort()).toEqual(["ops", "qa"]);
+  });
+
+  it("rereads on every list with the cache off", async () => {
+    const { dir, store } = await createStore();
+    const created = await store.create(record("ops"));
+    await store.list();
+    const filePath = path.join(dir, `${created.id}.json`);
+    await writeFile(filePath, JSON.stringify({ ...created, name: "edited in place" }));
+    expect((await store.list()).map((bot) => bot.name)).toEqual(["edited in place"]);
+  });
+
+  it("does not let a caller's array edit reach the cached list", async () => {
+    const { store } = await createStore({ listCache: true });
+    await store.create(record("ops"));
+    (await store.list()).pop();
+    expect(await store.list()).toHaveLength(1);
+  });
 });
