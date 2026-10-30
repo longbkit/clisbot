@@ -2,6 +2,7 @@ import { selectChatStatusBucket } from "./row-status";
 import type { Rect } from "@/components/ui/anchor";
 import { ChatAvatar } from "../chat/chat-avatar";
 import type { GroupMarkMember } from "../chat/group-mark";
+import { rememberChatOpenPreview } from "../chat/open-preview";
 import { useSessionStore } from "@/stores/session-store";
 import { memo, useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "expo-router";
@@ -74,6 +75,7 @@ export const ChatsSection = memo(function ChatsSection({
   const openChat = useCallback(
     (chat: ChatsSidebarChat) => {
       setDirectory(false);
+      rememberChatOpenPreview({ serverId: chat.serverId, chatId: chat.chatId, title: chat.title });
       const destination = buildHostChatRoute(chat.serverId, chat.chatId);
       const go = () => router.push(destination);
       if (!onBeforeNavigate?.(destination, go)) go();

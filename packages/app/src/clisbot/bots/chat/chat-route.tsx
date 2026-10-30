@@ -18,7 +18,8 @@ import { ChatHeartbeatsButton } from "@/clisbot/heartbeats/chat-heartbeats-butto
 import { isGroupChat } from "./chat-kind";
 import { ParticipantActions } from "./participant-actions";
 import { StopAllAction } from "./stop-all-action";
-import { useCallback, useLayoutEffect, useMemo, type ReactNode } from "react";
+import { useCallback, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { readChatOpenPreview } from "./open-preview";
 import { useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View, Text } from "react-native";
@@ -183,9 +184,10 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
       error: String(Boolean(error) || loadStatus === "error"),
     });
   }, [key, chat, messageCount, loadStatus, focused, error]);
+  const [preview] = useState(() => readChatOpenPreview(serverId, chatId));
   const title = chat
     ? (chat.title ?? identities.map((b) => b.name).join(", "))
-    : t("bots.chat.route.loading");
+    : (preview?.title ?? t("bots.chat.route.loading"));
   return (
     <View style={styles.root}>
       <ChatToolsContext.Provider value={chatTools}>
@@ -204,6 +206,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
             >
               <ChatRouteBody
                 chat={chat}
+                hasPreview={preview !== null}
                 online={online}
                 error={error}
                 transcript={transcript}
@@ -221,7 +224,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
                     transcript={transcript.transcript.messages}
                     liveHeads={heads}
                     discussionActive={chat?.discussionActive === true}
-                    canSend={online && authorized && !sending}
+                    canSend={chat !== null && online && authorized && !sending}
                     onSubmitMessage={send}
                     onReachTop={reachTop}
                     toolDisplay={toolDisplay}
@@ -239,6 +242,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
 /** Keep navigation and the accepted body mounted independently of refresh status. */
 function ChatRouteBody({
   chat,
+  hasPreview,
   online,
   error,
   transcript,
@@ -246,6 +250,7 @@ function ChatRouteBody({
   children,
 }: {
   chat: ChatPayload | null;
+  hasPreview: boolean;
   online: boolean;
   error: string | null;
   transcript: UseChatTranscriptResult;
@@ -254,7 +259,9 @@ function ChatRouteBody({
 }) {
   const failure = transcript.loadState.status === "error" ? transcript.loadState : null;
   const blocked = failure && !failure.retainAccepted ? failure.message : null;
-  if (!chat || blocked) return <ChatEmptyBody error={blocked ?? error} online={online} />;
+  const kind = chatBodyKind({ hasChat: chat !== null, hasPreview, online, error, blocked });
+  if (kind === "preview") return <ChatPreviewBody>{children}</ChatPreviewBody>;
+  if (kind === "empty") return <ChatEmptyBody error={blocked ?? error} online={online} />;
   const visibleError = transportInterrupted ? null : error;
   const visibleFailure = failure?.retainAccepted ? null : failure;
   const initialLoading =
@@ -277,6 +284,36 @@ function ChatRouteBody({
         }
         online={online}
       />
+    </View>
+  );
+}
+
+function chatBodyKind(input: {
+  hasChat: boolean;
+  hasPreview: boolean;
+  online: boolean;
+  error: string | null;
+  blocked: string | null;
+}): "accepted" | "preview" | "empty" {
+  if (input.blocked) return "empty";
+  if (input.hasChat) return "accepted";
+  const canPreview = input.hasPreview && input.online && !input.error;
+  return canPreview ? "preview" : "empty";
+}
+
+/**
+ * The pressed row's chat before its record is accepted: the screen with no transcript, sending
+ * off (the record is null), and a loading row that never intercepts touches.
+ */
+function ChatPreviewBody({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.body}>
+      <View testID="chat-preview-loading" style={styles.previewLoading} pointerEvents="none">
+        <ThemedLoadingSpinner size="small" uniProps={loadingColor} />
+        <Text style={styles.loadingText}>{t("bots.chat.route.loading")}</Text>
+      </View>
+      {children}
     </View>
   );
 }
@@ -448,6 +485,13 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
   },
   loadingText: { color: theme.colors.foregroundMuted },
+  previewLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing[2],
+    paddingVertical: theme.spacing[2],
+  },
   syncStatus: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0 },
   actions: {
     flexDirection: "row",

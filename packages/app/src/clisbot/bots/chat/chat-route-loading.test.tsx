@@ -136,13 +136,26 @@ vi.mock("./conversation-workspace", () => ({
   },
 }));
 vi.mock("./chat-screen", () => ({
-  ChatScreen: ({ transcript }: { transcript: { id: string }[] }) => (
-    <article>{transcript[0]?.id}</article>
+  ChatScreen: ({
+    transcript,
+    title,
+    canSend,
+  }: {
+    transcript: { id: string }[];
+    title: string;
+    canSend: boolean;
+  }) => (
+    <article data-testid="chat-screen" data-can-send={String(canSend)}>
+      <h1>{title}</h1>
+      {transcript[0]?.id}
+    </article>
   ),
 }));
 import ChatRoute from "./chat-route";
+import { forgetChatOpenPreviews, rememberChatOpenPreview } from "./open-preview";
 afterEach(() => {
   cleanup();
+  forgetChatOpenPreviews();
   state.chat = null;
   state.error = null;
   state.transcriptError = null;
@@ -171,6 +184,19 @@ it("keeps the same conversation chrome through metadata loading, accepted conten
   expect(screen.queryByText("accepted-message")).toBeNull();
   expect(screen.getByRole("button", { name: "Back" })).toBe(back);
   expect(state.workspaceMounts).toBe(1);
+});
+it("renders the chat screen from the pressed row before the chat record arrives", () => {
+  state.empty = true;
+  state.fetching = true;
+  rememberChatOpenPreview({ serverId: "host", chatId: "chat", title: "Release room" });
+  render(<ChatRoute />);
+  const chatScreen = screen.getByTestId("chat-screen");
+  expect(chatScreen.querySelector("h1")?.textContent).toBe("Release room");
+  expect(chatScreen.getAttribute("data-can-send")).toBe("false");
+  expect(screen.getByTestId("chat-preview-loading").getAttribute("data-pointer-events")).toBe(
+    "none",
+  );
+  expect(screen.queryByText("accepted-message")).toBeNull();
 });
 it("keeps navigation for unavailable/offline content without remounting on a same-client epoch", () => {
   state.error = "Unavailable";
