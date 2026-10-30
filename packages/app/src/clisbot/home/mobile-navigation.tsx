@@ -11,7 +11,7 @@ import {
   type PressableStateCallbackType,
 } from "react-native";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import { usePathname, useRouter, type Href } from "expo-router";
+import { useNavigationContainerRef, usePathname, useRouter, type Href } from "expo-router";
 import { create } from "zustand";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -36,7 +36,7 @@ import {
   traceInstant,
   traceBackNavigation,
 } from "@/performance/native-trace";
-import { navigateHomeTab } from "./home-tab-navigation";
+import { navigateHomeTab, returnToPhoneTabs } from "./home-tab-navigation";
 const useReturn = create<{ path: string }>(() => ({ path: "/chat" }));
 export function rememberChatReturn(path: string) {
   useReturn.setState({ path });
@@ -68,15 +68,40 @@ export function isListTabPath(path: string) {
 export function currentListTabPath(): string {
   return NAVIGATION_V2_ENABLED ? lastListTabPath() : "/chat";
 }
-/** All peer-tab entry points share the native stack policy; browser history stays ordinary. */
+/**
+ * Navigation V2 phones keep their peer tabs in one retained tab navigator (`app/(tabs)`);
+ * desktop, tablets and the Home V2 rollback keep the stack.
+ */
+export function usesPhoneTabs(compact: boolean): boolean {
+  return NAVIGATION_V2_ENABLED && compact;
+}
+export function useUsesPhoneTabs(): boolean {
+  return usesPhoneTabs(useIsCompactFormFactor());
+}
+/** All peer-tab entry points share one policy: phone tabs, native stack, or browser history. */
 export function useNavigateHomeTab() {
   const router = useRouter();
+  const root = useNavigationContainerRef();
   const compact = useIsCompactFormFactor();
   const nativeTab = HOME_V2_ENABLED && compact && !isWeb;
+  const phoneTabs = usesPhoneTabs(compact) ? root : null;
   return useCallback(
-    (href: Href) => navigateHomeTab({ router, href, nativeTab }),
-    [nativeTab, router],
+    (href: Href) => navigateHomeTab({ router, href, nativeTab, phoneTabs }),
+    [nativeTab, phoneTabs, router],
   );
+}
+/**
+ * A detail's Back to the surface it opened from. Phone tabs pop back onto the retained tabs; the
+ * stack keeps the host route underneath the entry page, which owns retained workspace/tab state.
+ */
+function useReturnFromDetail(target: string) {
+  const router = useRouter();
+  const root = useNavigationContainerRef();
+  const phoneTabs = useUsesPhoneTabs();
+  return useCallback(() => {
+    if (phoneTabs) returnToPhoneTabs(root, router, target as Href);
+    else router.navigate(target as Href);
+  }, [phoneTabs, root, router, target]);
 }
 /** A Home V2 phone tab page: the tab bar is its navigation, so its header has no leading button. */
 export function useIsMobileTabPage() {
@@ -90,7 +115,14 @@ function isChatDetail(path: string) {
 function tabStyle({ pressed }: PressableStateCallbackType) {
   return [styles.tab, pressed && styles.tabPressed];
 }
-function Tab({ entry, selected, count }: { entry: TabEntry; selected: boolean; count?: number }) {
+interface TabProps {
+  entry: TabEntry;
+  selected: boolean;
+  count?: number;
+  /** Phone tabs: the tab navigator switches; no panel moves and no route is replaced. */
+  onSelect?: (path: string) => void;
+}
+function Tab({ entry, selected, count, onSelect }: TabProps) {
   const navigate = useNavigateHomeTab();
   const router = useRouter();
   const inboxLabel = useInboxActivityLabel();
@@ -102,6 +134,15 @@ function Tab({ entry, selected, count }: { entry: TabEntry; selected: boolean; c
         path: entry.path,
         eventMs: String(event.nativeEvent.timestamp),
       });
+      if (onSelect) {
+        if (selected) return;
+        if (isListTabPath(entry.path)) {
+          rememberChatReturn(entry.path);
+          rememberListSection(entry.path);
+        }
+        onSelect(entry.path);
+        return;
+      }
       const panels = usePanelStore.getState();
       const pending = !isWeb && nativePresentation.isPending(panels.mobilePanel);
       if (selected && !isWeb) {
@@ -125,7 +166,7 @@ function Tab({ entry, selected, count }: { entry: TabEntry; selected: boolean; c
       } else panels.showMobileAgent();
       navigate(entry.path as Href);
     },
-    [entry.path, navigate, router, selected],
+    [entry.path, navigate, onSelect, router, selected],
   );
   return (
     <Pressable
@@ -177,6 +218,7 @@ function useMobileHardwareBack(path: string, compact: boolean, departing: boolea
   const router = useRouter();
   const navigate = useNavigateHomeTab();
   const returnPath = useReturn((s) => s.path);
+  const returnFromDetail = useReturnFromDetail(returnPath);
   const detail = isChatDetail(path);
   const tab = isHomeTabPath(path);
   useEffect(() => {
@@ -193,12 +235,12 @@ function useMobileHardwareBack(path: string, compact: boolean, departing: boolea
         return true;
       }
       panels.showMobileAgent();
-      if (detail) router.navigate(returnPath as Href);
+      if (detail) returnFromDetail();
       else navigate(HOME_TAB_PATH as Href);
       return true;
     });
     return () => listener.remove();
-  }, [compact, departing, detail, navigate, path, returnPath, router, tab]);
+  }, [compact, departing, detail, navigate, path, returnFromDetail, router, tab]);
 }
 export function MobileHomeTabs() {
   const compact = useIsCompactFormFactor();
@@ -209,6 +251,8 @@ export function MobileHomeTabs() {
     traceInstant("clisbot.route.commit", { path });
   }, [path]);
   useMobileHardwareBack(path, compact, departing);
+  // Phone tabs draw their own bar (`phone-tabs.tsx`); this owner keeps Back and tracing.
+  if (usesPhoneTabs(compact)) return null;
   // Chat's bar belongs to the actual list panel. Keeping it outside that panel leaves a
   // footer on the destination between its UI-thread close and the settled JS notification.
   if (isListTabPath(path) || !isHomeTabPath(path)) return null;
@@ -223,7 +267,13 @@ export function MobileChatPanelTabs() {
   return <MobileTabBar path={isListTabPath(path) ? path : currentListTabPath()} />;
 }
 
-function MobileTabBar({ path }: { path: string }) {
+export function MobileTabBar({
+  path,
+  onSelect,
+}: {
+  path: string;
+  onSelect?: (path: string) => void;
+}) {
   const compact = useIsCompactFormFactor();
   const insets = useSafeAreaInsets();
   const inset = useMemo(() => ({ paddingBottom: Math.max(insets.bottom, 6) }), [insets.bottom]);
@@ -238,6 +288,7 @@ function MobileTabBar({ path }: { path: string }) {
           entry={entry}
           selected={path === entry.path}
           count={entry.path === "/sessions" && !NAVIGATION_V2_ENABLED ? needsCount : undefined}
+          onSelect={onSelect}
         />
       ))}
     </View>
@@ -249,9 +300,9 @@ function MobileTabBar({ path }: { path: string }) {
  */
 export function MobileBack() {
   const path = usePathname();
-  const router = useRouter();
   const compact = useIsCompactFormFactor();
   const target = useReturn((s) => s.path);
+  const returnFromDetail = useReturnFromDetail(target);
   const committedPath = useRef(path);
   useLayoutEffect(() => {
     committedPath.current = path;
@@ -271,15 +322,14 @@ export function MobileBack() {
       target,
       usePanelStore.getState().mobilePanel,
     );
-    // Keep the host route underneath the entry page: it owns retained workspace/tab state.
-    router.navigate(target as Href);
+    returnFromDetail();
     traceBackNavigation(
       "dispatchReturned",
       committedPath.current,
       target,
       usePanelStore.getState().mobilePanel,
     );
-  }, [router, target]);
+  }, [returnFromDetail, target]);
   if (!HOME_V2_ENABLED || !compact || isHomeTabPath(path)) return null;
   return <HeaderBackButton onBack={back} testID="chat-back" />;
 }

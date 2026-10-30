@@ -8,7 +8,8 @@ import {
 } from "expo-router/build/react-navigation/routers/index.js";
 import type { Href } from "expo-router";
 import { describe, expect, it } from "vitest";
-import { navigateHomeTab } from "./home-tab-navigation";
+import { navigateHomeTab, returnToPhoneTabs } from "./home-tab-navigation";
+import { PHONE_TABS_ROUTE, phoneTabRouteName } from "./phone-tab-routes";
 
 // Exercise the installed Expo Router navigation reducer: navigate without getId retains a fresh native
 // stack page on each cycle. No React trees or app state owners are mocked.
@@ -65,5 +66,77 @@ describe("Home tab stack ownership", () => {
       expect(nav.state().routes[0].key).toBe(workspace.key);
       expect(nav.state().routes[1].name).toBe("open-project");
     }
+  });
+});
+
+// Navigation V2 phones: the peer tabs are one `(tabs)` route on the root stack; details push above.
+function phoneRoot() {
+  const stack = StackRouter({ initialRouteName: PHONE_TABS_ROUTE });
+  const options = {
+    routeNames: [PHONE_TABS_ROUTE, "h/[serverId]", "settings"],
+    routeParamList: {},
+    routeGetIdList: {},
+  };
+  let state = stack.getInitialState(options);
+  const apply = (action: StackActionType | ReturnType<typeof CommonActions.navigate>) => {
+    const next = stack.getStateForAction(state, action, options);
+    if (!next) throw new Error("Unhandled navigation action");
+    state = stack.getRehydratedState(next, options);
+  };
+  const name = (href: Href) => {
+    const path = String(href);
+    if (path.startsWith("/h/")) return "h/[serverId]";
+    return phoneTabRouteName(path) ? PHONE_TABS_ROUTE : path.slice(1);
+  };
+  return {
+    state: () => state,
+    root: {
+      getRootState: () => state,
+      dispatch: (action: { type: "POP"; payload: { count: number }; target: string }) =>
+        apply(StackActions.pop(action.payload.count)),
+    },
+    router: {
+      navigate: (href: Href) => apply(CommonActions.navigate(name(href))),
+      replace: (href: Href) => apply(StackActions.replace(name(href))),
+      dismissTo: (href: Href) => apply(StackActions.popTo(name(href))),
+    },
+  };
+}
+
+const routeNames = (nav: ReturnType<typeof phoneRoot>) =>
+  nav.state().routes.map((route) => route.name);
+
+describe("phone tabs under the root stack", () => {
+  it("pops every detail back onto the same retained tabs route", () => {
+    const nav = phoneRoot();
+    const tabs = nav.state().routes[0]!;
+    for (let index = 0; index < 50; index++) {
+      nav.router.navigate("/h/s/workspace/w");
+      expect(routeNames(nav)).toEqual([PHONE_TABS_ROUTE, "h/[serverId]"]);
+      returnToPhoneTabs(nav.root, nav.router, "/chat");
+      expect(nav.state().routes).toEqual([tabs]);
+    }
+  });
+
+  it("switches in place, and reaches a tab from a detail without a second tabs route", () => {
+    const nav = phoneRoot();
+    const tabs = nav.state().routes[0]!;
+    navigateHomeTab({ router: nav.router, href: "/work", nativeTab: true, phoneTabs: nav.root });
+    expect(nav.state().routes).toHaveLength(1);
+    nav.router.navigate("/h/s/workspace/w");
+    navigateHomeTab({
+      router: nav.router,
+      href: "/open-project",
+      nativeTab: true,
+      phoneTabs: nav.root,
+    });
+    expect(nav.state().routes.map((route) => route.key)).toEqual([tabs.key]);
+  });
+
+  it("turns a cold deep-linked detail into the tabs on Back", () => {
+    const nav = phoneRoot();
+    nav.router.replace("/h/s/workspace/w");
+    returnToPhoneTabs(nav.root, nav.router, "/chat");
+    expect(routeNames(nav)).toEqual([PHONE_TABS_ROUTE]);
   });
 });

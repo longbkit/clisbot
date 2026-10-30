@@ -133,15 +133,8 @@ vi.mock("@/clisbot/bots/feature", () => ({
 vi.mock("@/clisbot/bots/sidebar/sections", () => ({}));
 vi.mock("@/clisbot/bots/sidebar/use-section-actions", () => ({}));
 vi.mock("@/clisbot/bots/sidebar/use-sidebar-actions", () => ({}));
-vi.mock("@/clisbot/home/mobile-navigation", () => ({ MobileChatPanelTabs: () => null }));
-vi.mock("@/clisbot/home/pending-chat-presentation", () => ({
-  PendingChatPresentation: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-vi.mock("@/clisbot/home/use-chat-list-navigation", () => ({}));
+vi.mock("@/components/sidebar/sidebar-model", () => ({}));
 vi.mock("@/components/desktop-sidebar-frame", () => ({}));
-vi.mock("@/mobile-panels/gestures", () => ({}));
-vi.mock("@/mobile-panels/presentation", () => ({}));
-vi.mock("@/stores/panel-store", () => ({}));
 vi.mock("@/utils/desktop-window", () => ({}));
 vi.mock("./rail", () => ({}));
 vi.mock("./sections", () => ({ CHATS_PATH: "/chat", WORK_PATH: "/work" }));

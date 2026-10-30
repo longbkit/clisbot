@@ -6,7 +6,7 @@ import { NavigationChrome } from "@/clisbot/navigation/list-panel";
 import { resolveNavigationChrome } from "@/clisbot/navigation/chrome-layout";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import { profileNativeRegion } from "@/utils/render-profiler";
-import { MobileHomeTabs } from "@/clisbot/home/mobile-navigation";
+import { MobileHomeTabs, usesPhoneTabs } from "@/clisbot/home/mobile-navigation";
 import { OfferLinkListener } from "@/device-access/offer-link-listener";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
@@ -356,6 +356,8 @@ interface AppContainerProps {
 
 const WINDOW_SIDEBAR_TOGGLE_HORIZONTAL_PADDING = 12;
 
+function ignoreAgentListToggle() {}
+
 function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppContainerProps) {
   const keyboardActionDispatcher = useKeyboardActionDispatcher();
   const daemons = useHosts();
@@ -381,7 +383,9 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   const isWorkspaceFocusModeEnabled = isWorkspaceRoute && isFocusModeEnabled;
   const chromeEnabled = chromeEnabledOverride ?? daemons.length > 0;
   const hasMountedSidebar = useLatchedBoolean(chromeEnabled);
-  const toggleAgentList = isCompactLayout ? toggleMobileAgentList : toggleDesktopAgentList;
+  // Phone tabs have no list panel to slide in: Chats and Work are tabs.
+  let toggleAgentList = isCompactLayout ? toggleMobileAgentList : toggleDesktopAgentList;
+  if (usesPhoneTabs(isCompactLayout)) toggleAgentList = ignoreAgentListToggle;
   const toggleDesktopSidebars = useCallback(() => {
     // The focused workspace owns its layout key, its checkout, and therefore the
     // only correct answer to "is the explorer open". Let it decide when there is
@@ -605,7 +609,7 @@ function SidebarChrome({
   let chrome: ReactNode = null;
   if (mounted)
     chrome = NAVIGATION_V2_ENABLED ? (
-      <NavigationChrome active={active} presented={visible} railVisible={railVisible} />
+      <NavigationChrome active={active} railVisible={railVisible} />
     ) : (
       <LeftSidebar active={active} presented={visible} />
     );
@@ -832,7 +836,7 @@ const ROOT_STACK_SCREEN_OPTIONS = {
   headerShown: false,
   animation: "none" as const,
 };
-const ROOT_STACK_NESTED_NAVIGATOR_SCREENS = ["h/[serverId]"] as const;
+const ROOT_STACK_NESTED_NAVIGATOR_SCREENS = ["h/[serverId]", "(tabs)"] as const;
 
 function RootStack() {
   const storeReady = useStoreReady();
@@ -851,13 +855,9 @@ function RootStack() {
         <Stack.Screen name="settings/[section]" />
         <Stack.Screen name="settings/hub/[hubSection]" />
         <Stack.Screen name="new" />
-        <Stack.Screen name="open-project" />
-        <Stack.Screen name="chat" />
-        <Stack.Screen name="work" />
-        <Stack.Screen name="more" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen name="tasks" />
         <Stack.Screen name="sessions" />
-        <Stack.Screen name="schedules" />
         <Stack.Screen name="automations" />
         <Stack.Screen name="connectors" />
         <Stack.Screen name="pair-scan" />

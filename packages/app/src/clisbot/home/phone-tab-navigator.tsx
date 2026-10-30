@@ -45,6 +45,7 @@ function PhoneTabNavigator({
   children,
   screenOptions,
   screenListeners,
+  screenLayout,
   tabBar,
 }: PhoneTabNavigatorProps) {
   const { state, descriptors, navigation, NavigationContent } = useNavigationBuilder<
@@ -60,6 +61,7 @@ function PhoneTabNavigator({
     children,
     screenOptions,
     screenListeners,
+    screenLayout,
   });
   const focusedKey = state.routes[state.index]!.key;
   const visited = useVisitedKeys(focusedKey);

@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useState } from "react";
 import { View } from "react-native";
 import { usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,18 +12,15 @@ import {
 import { useCreationActions } from "@/clisbot/bots/sidebar/use-section-actions";
 import { useBotSidebarActions } from "@/clisbot/bots/sidebar/use-sidebar-actions";
 import { useBotCreationHosts } from "@/clisbot/bots/feature";
-import { MobileChatPanelTabs } from "@/clisbot/home/mobile-navigation";
-import { PendingChatPresentation } from "@/clisbot/home/pending-chat-presentation";
-import {
-  useChatListNavigation,
-  type ChatListAdmission,
-} from "@/clisbot/home/use-chat-list-navigation";
+import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 import { DesktopSidebarFrame } from "@/components/desktop-sidebar-frame";
-import { RetainedPanel, RetainedPanelActivity } from "@/components/retained-panel";
+import {
+  RetainedPanel,
+  RetainedPanelActivity,
+  useRetainedPanelActive,
+} from "@/components/retained-panel";
+import { SidebarModelProvider } from "@/components/sidebar/sidebar-model";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { useCloseAgentListGesture } from "@/mobile-panels/gestures";
-import { MobilePanelOverlay } from "@/mobile-panels/presentation";
-import { usePanelStore } from "@/stores/panel-store";
 import { WindowChromeSafeArea } from "@/utils/desktop-window";
 import { ChatsPane } from "./chats-pane";
 import { NavigationRail } from "./rail";
@@ -36,16 +33,14 @@ import { useTrackOpenedSession } from "./opened-session";
 
 /**
  * Navigation V2's chrome in place of the sidebar (docs/features/navigation-v2/README.md): the
- * desktop rail beside the Chats/Work list pane, or the phone's retained list panel. Both keep the
- * sidebar's panel ownership, so presentation, Back and retained state stay one implementation.
+ * desktop rail beside the Chats/Work list pane. Phones have no list chrome: Chats and Work are
+ * tab screens (`PhoneListTab`).
  */
 export const NavigationChrome = memo(function NavigationChrome({
   active,
-  presented,
   railVisible,
 }: {
   active: boolean;
-  presented: boolean;
   railVisible: boolean;
 }) {
   const compact = useIsCompactFormFactor();
@@ -53,9 +48,7 @@ export const NavigationChrome = memo(function NavigationChrome({
   useTrackOpenedSession();
   return (
     <>
-      {compact ? (
-        <MobileListPanel active={active} presented={presented} />
-      ) : (
+      {compact ? null : (
         <View style={styles.desktop}>
           {railVisible ? <NavigationRail /> : null}
           <DesktopListPane active={active} />
@@ -116,6 +109,42 @@ export function ListContent({
   );
 }
 
+/**
+ * A phone's Chats or Work tab: the list is the tab screen, with no panel to slide. The tab
+ * navigator keeps it mounted and marks it inactive while hidden; each pane holds its inputs then.
+ * Work owns its sidebar model here because the sidebar chrome's provider does not reach the routes.
+ */
+export const PhoneListTab = memo(function PhoneListTab({ section }: { section: ListSection }) {
+  return (
+    <View style={styles.phoneList}>
+      <WindowChromeSafeArea placement="below" />
+      {section === "chats" ? <PhoneChats /> : <PhoneWork />}
+    </View>
+  );
+});
+
+function PhoneChats() {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  return (
+    <ChatsPane
+      searchOpen={searchOpen}
+      setSearchOpen={setSearchOpen}
+      search={search}
+      setSearch={setSearch}
+    />
+  );
+}
+
+function PhoneWork() {
+  const active = useRetainedPanelActive();
+  return (
+    <SidebarModelProvider active={active}>
+      <WorkPane active={active} />
+    </SidebarModelProvider>
+  );
+}
+
 function DesktopListPane({ active }: { active: boolean }) {
   const insets = useSafeAreaInsets();
   const section = useListSection();
@@ -126,33 +155,6 @@ function DesktopListPane({ active }: { active: boolean }) {
       <DesktopSidebarFrame active={shown} insetsTop={insets.top}>
         <ListContent section={section} active={shown} />
       </DesktopSidebarFrame>
-    </RetainedPanelActivity>
-  );
-}
-
-function MobileListPanel({ active, presented }: { active: boolean; presented: boolean }) {
-  const closeList = usePanelStore((state) => state.showMobileAgent);
-  const admission = useChatListNavigation(closeList);
-  const section = useListSection();
-  // The list is a tab page: no close gesture, and the tab bar under it owns the bottom inset.
-  const { gesture } = useCloseAgentListGesture(false);
-  const panelStyle = useMemo(() => [styles.panel], []);
-  return (
-    <RetainedPanelActivity active={active}>
-      <MobilePanelOverlay
-        panel="agent-list"
-        presented={presented}
-        closeGesture={gesture}
-        panelStyle={panelStyle}
-      >
-        <PendingChatPresentation>
-          <View style={styles.content} pointerEvents="auto">
-            <WindowChromeSafeArea placement="below" />
-            <ListContent section={section} onBeforeNavigate={admission} active={active} />
-            <MobileChatPanelTabs />
-          </View>
-        </PendingChatPresentation>
-      </MobilePanelOverlay>
     </RetainedPanelActivity>
   );
 }
@@ -194,6 +196,6 @@ function EnabledCreationHost() {
 
 const styles = StyleSheet.create((theme) => ({
   desktop: { flexDirection: "row", height: "100%" },
-  panel: { backgroundColor: theme.colors.surfaceSidebar },
+  phoneList: { flex: 1, minHeight: 0, backgroundColor: theme.colors.surfaceSidebar },
   content: { flex: 1, minHeight: 0 },
 }));

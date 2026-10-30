@@ -47,6 +47,7 @@ vi.mock("@/stores/navigation-active-workspace-store", () => ({
 vi.mock("expo-router", () => ({
   usePathname: () => env.path,
   useRouter: () => ({ navigate: env.navigate, replace: env.replace }),
+  useNavigationContainerRef: () => ({ getRootState: () => undefined, dispatch: () => {} }),
 }));
 vi.mock("@/components/ui/control-geometry", () => ({ MIN_TOUCH_TARGET_SIZE: 48 }));
 vi.mock("@/components/headers/header-back-button", () => ({ HeaderBackButton: () => null }));
