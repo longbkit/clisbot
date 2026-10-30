@@ -1,4 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { isNative } from "@/constants/platform";
+import { OFFLINE_CACHE_ENABLED } from "@/runtime/replica-cache/offline-flag";
 
 /** Runs `run` in a later JS task; returns a cancel. */
 export type ScheduleAfterPaint = (run: () => void) => () => void;
@@ -17,7 +20,7 @@ const scheduleAfterPaint: ScheduleAfterPaint = (run) => {
  * never renders. Once shown, `children` stays. `enabled` is read at mount: off renders `children`
  * at once, in the same tree position, so it never remounts them.
  */
-export function WorkspaceOpenGate({
+export function OpenGate({
   enabled,
   shell,
   children,
@@ -34,4 +37,13 @@ export function WorkspaceOpenGate({
     return schedule(() => setOpened(true));
   }, [opened, schedule]);
   return opened ? children : shell;
+}
+
+/**
+ * Native phones paint a session's or a chat's shell in the press's frame and mount its screen in
+ * the next task (docs/features/offline/offline-cache.md#the-open-shell). Off with the O2 flag.
+ */
+export function useOpenShellEnabled(): boolean {
+  const compact = useIsCompactFormFactor();
+  return isNative && compact && OFFLINE_CACHE_ENABLED;
 }

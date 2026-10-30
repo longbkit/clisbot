@@ -1,80 +1,18 @@
 import React, { act, useCallback, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, Text } from "react-native";
 import {
   NavigationContainer,
-  StackRouter,
   createNavigationContainerRef,
-  createNavigatorFactory,
   useNavigation,
-  useNavigationBuilder,
-  type DefaultNavigatorOptions,
   type NavigationProp,
   type ParamListBase,
-  type StackActionHelpers,
-  type StackNavigationState,
-  type StackRouterOptions,
 } from "expo-router/react-navigation";
-import { WorkspaceOpenGate, type ScheduleAfterPaint } from "./workspace-open-gate";
+import { createManualSchedule, createRetainingStack } from "@/test/retaining-stack";
+import { OpenGate } from "./open-gate";
 
-/**
- * A stack that keeps every pushed screen mounted, as the native stack does. React Navigation
- * renders a pushed screen in the commit of the action that pushed it.
- */
-type TestStackEventMap = Record<string, { data?: unknown }>;
-
-function TestStack({
-  children,
-  initialRouteName,
-}: DefaultNavigatorOptions<
-  ParamListBase,
-  string | undefined,
-  StackNavigationState<ParamListBase>,
-  object,
-  TestStackEventMap,
-  NavigationProp<ParamListBase>
-> &
-  StackRouterOptions) {
-  const { state, descriptors, NavigationContent } = useNavigationBuilder<
-    StackNavigationState<ParamListBase>,
-    StackRouterOptions,
-    StackActionHelpers<ParamListBase>,
-    object,
-    TestStackEventMap
-  >(StackRouter, { children, initialRouteName });
-  return (
-    <NavigationContent>
-      {state.routes.map((route, index) => (
-        <View key={route.key} style={index === state.index ? undefined : hidden}>
-          {descriptors[route.key]!.render()}
-        </View>
-      ))}
-    </NavigationContent>
-  );
-}
-const hidden = { display: "none" } as const;
-const Stack = createNavigatorFactory(TestStack)();
-
-/** What the scheduler would run after the shell's frame; the test decides when. */
-function createManualSchedule() {
-  const queued = new Set<() => void>();
-  const schedule: ScheduleAfterPaint = (run) => {
-    queued.add(run);
-    return () => queued.delete(run);
-  };
-  return {
-    schedule,
-    get queued() {
-      return queued.size;
-    },
-    runAll: () => {
-      const runs = [...queued];
-      queued.clear();
-      for (const run of runs) run();
-    },
-  };
-}
+const Stack = createRetainingStack();
 
 let screenRenders = 0;
 let manual = createManualSchedule();
@@ -90,9 +28,9 @@ const shell = <Text testID="session-shell">shell</Text>;
 
 function WorkspaceRoute(): ReactNode {
   return (
-    <WorkspaceOpenGate enabled={gateEnabled} shell={shell} schedule={manual.schedule}>
+    <OpenGate enabled={gateEnabled} shell={shell} schedule={manual.schedule}>
       <SessionScreen />
-    </WorkspaceOpenGate>
+    </OpenGate>
   );
 }
 

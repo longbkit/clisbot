@@ -62,6 +62,11 @@ vi.mock("@/components/headers/menu-header", () => ({
   MenuHeader: () => <button type="button">Back</button>,
 }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
+vi.mock("@/clisbot/home/header-navigation", () => ({ HomeHeaderNavigation: () => null }));
+vi.mock("@/navigation/open-gate", () => ({ useOpenShellEnabled: () => false }));
+vi.mock("./chat-open-gate", () => ({
+  ChatOpenGate: ({ children }: React.PropsWithChildren) => children,
+}));
 vi.mock("@/stores/session-store", () => ({ useSessionStore: () => false }));
 vi.mock("@/components/host-route-bootstrap-boundary", () => ({
   HostRouteBootstrapBoundary: ({ children }: { children: React.ReactNode }) => children,

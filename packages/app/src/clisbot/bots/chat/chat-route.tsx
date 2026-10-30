@@ -1,4 +1,7 @@
 import { MenuHeader } from "@/components/headers/menu-header";
+import { HomeHeaderNavigation } from "@/clisbot/home/header-navigation";
+import { useOpenShellEnabled } from "@/navigation/open-gate";
+import { ChatOpenGate } from "./chat-open-gate";
 import { profileNativeRegion } from "@/utils/render-profiler";
 import { traceConversationPhase } from "@/performance/conversation-trace";
 import { ChatToolsContext, useChatToolsValue } from "@/clisbot/connectors/chat-tools";
@@ -54,12 +57,26 @@ const UPDATING = { status: "catching_up", ui: "status" } as const;
 const RECONNECTING = { status: "reconnecting" } as const;
 const EMPTY_PARTICIPANTS: ChatPayload["participants"] = [];
 
+const HEADER_NAVIGATION = <HomeHeaderNavigation />;
+
 export default function ChatRoute() {
+  const { serverId = "", chatId = "" } = useLocalSearchParams<{
+    serverId: string;
+    chatId: string;
+  }>();
+  const openShellEnabled = useOpenShellEnabled();
   return profileNativeRegion(
     "BotChatRoute",
-    <HostRouteBootstrapBoundary>
-      <Gate />
-    </HostRouteBootstrapBoundary>,
+    <ChatOpenGate
+      serverId={serverId}
+      chatId={chatId}
+      enabled={openShellEnabled}
+      navigation={HEADER_NAVIGATION}
+    >
+      <HostRouteBootstrapBoundary>
+        <Gate />
+      </HostRouteBootstrapBoundary>
+    </ChatOpenGate>,
   );
 }
 function Gate() {
