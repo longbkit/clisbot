@@ -160,9 +160,13 @@ function flushPendingIntent(): void {
 
   const { route, deps } = pendingIntent;
   pendingIntent = null;
+  // Clisbot phone tabs: a workspace pushes above them and Back pops to them. Checked first: a
+  // POP_TO, to a host route left below the tabs or to one not in the stack (which replaces the
+  // current route), would unmount every retained tab.
+  if (deps.push && arePhoneTabsFocused(navigation.getRootState())) {
+    deps.push(route);
+    return;
+  }
   if (dispatchHostWorkspacePopTo(route, navigation)) return;
-  // Clisbot phone tabs: POP_TO a route that is not in the stack replaces the current one, which
-  // would unmount every retained tab. A workspace pushes above them; Back pops to them.
-  if (deps.push && arePhoneTabsFocused(navigation.getRootState())) deps.push(route);
-  else deps.dismissTo(route);
+  deps.dismissTo(route);
 }

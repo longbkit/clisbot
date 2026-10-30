@@ -92,6 +92,26 @@ describe("navigateToHostWorkspaceRoute", () => {
     expect(push).toHaveBeenCalledWith("/h/server-1/workspace/workspace-a");
   });
 
+  it("pushes above focused phone tabs even when a host route sits below them", () => {
+    const { navigationRef, dispatch } = createNavigationRef({
+      key: "root-stack",
+      index: 1,
+      routeNames: ["(tabs)", "h/[serverId]"],
+      routes: [
+        { key: "host-server-1", name: "h/[serverId]", params: { serverId: "server-1" } },
+        { key: "tabs", name: "(tabs)", state: tabsState },
+      ],
+    });
+    registerWorkspaceRouteNavigationRef(navigationRef);
+    const dismissTo = vi.fn();
+    const push = vi.fn();
+
+    navigateToHostWorkspaceRoute("/h/server-1/workspace/workspace-a", { dismissTo, push });
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(push).toHaveBeenCalledWith("/h/server-1/workspace/workspace-a");
+  });
+
   it("keeps replacing the peer page when the (tabs) group is desktop's stack", () => {
     const { navigationRef } = createNavigationRef({
       key: "root-stack",

@@ -194,8 +194,8 @@ or more on a production Android build.
   (`returnToPhoneTabs`), which still shows the tab the detail came from, at its scroll position.
   Never `navigate` back to a tab from a detail: the root stack pushes a second `(tabs)` and remounts
   every tab. Never `dismissTo` a route that is not in the stack either: POP_TO then replaces the
-  current route, which is `(tabs)`. `navigateToHostWorkspaceRoute` pushes instead while the phone
-  tabs are focused.
+  current route, which is `(tabs)`. `navigateToHostWorkspaceRoute` pushes while the phone tabs are
+  focused, before trying POP_TO: a host route left below the tabs would otherwise be popped to.
 - **Expo Router nests the app's root stack** under its own `__root` route. `getRootState()` is the
   container's state, so `phone-tab-routes.ts` finds the stack holding `(tabs)` along the focused
   routes.
