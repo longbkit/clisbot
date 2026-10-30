@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { useHeldWhileInactive } from "./use-held-while-inactive";
+import { useActiveAfterShow, useHeldWhileInactive } from "./use-held-while-inactive";
 
 afterEach(cleanup);
 
@@ -66,5 +66,35 @@ describe("useHeldWhileInactive", () => {
     view.rerender({ value: second, active: false });
     view.rerender({ value: { rows: ["d"] }, active: false });
     expect(view.result.current).toBe(second);
+  });
+});
+
+describe("useActiveAfterShow", () => {
+  function renderActive(active: boolean) {
+    const results: boolean[] = [];
+    const view = renderHook(
+      ({ active: current }: { active: boolean }) => {
+        const shown = useActiveAfterShow(current);
+        results.push(shown);
+        return shown;
+      },
+      { initialProps: { active } },
+    );
+    return { ...view, results };
+  }
+
+  it("reaches a show one render after the show's own", () => {
+    const view = renderActive(false);
+    view.results.length = 0;
+    view.rerender({ active: true });
+    expect(view.results).toEqual([false, true]);
+  });
+
+  it("reaches a hide in the hide's own render", () => {
+    const view = renderActive(true);
+    view.results.length = 0;
+    view.rerender({ active: false });
+    expect(view.results[0]).toBe(false);
+    expect(view.result.current).toBe(false);
   });
 });

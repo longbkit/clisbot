@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React, { memo, useCallback, useEffect, useSyncExternalStore } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: { getItem: vi.fn(async () => null), setItem: vi.fn(), removeItem: vi.fn() },
@@ -13,6 +13,8 @@ const state = vi.hoisted(() => ({
   listeners: new Set<() => void>(),
   mounts: { work: 0, chats: 0 },
   bodyRenders: { work: 0, chats: 0 },
+  /** The `active` prop of each Work pane render. */
+  workActive: [] as (boolean | undefined)[],
 }));
 vi.mock("react-native", () => ({
   StyleSheet: {
@@ -67,7 +69,8 @@ vi.mock("./work-pane", async () => {
     );
   });
   return {
-    WorkPane: () => {
+    WorkPane: ({ active: paneActive }: { active?: boolean }) => {
+      state.workActive.push(paneActive);
       useEffect(() => {
         state.mounts.work += 1;
       }, []);
@@ -133,17 +136,24 @@ vi.mock("@/clisbot/bots/feature", () => ({
 vi.mock("@/clisbot/bots/sidebar/sections", () => ({}));
 vi.mock("@/clisbot/bots/sidebar/use-section-actions", () => ({}));
 vi.mock("@/clisbot/bots/sidebar/use-sidebar-actions", () => ({}));
-vi.mock("@/components/sidebar/sidebar-model", () => ({}));
+vi.mock("@/components/sidebar/sidebar-model", () => ({
+  SidebarModelProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+vi.mock("@/components/workspace-shortcut-targets-subscriber", () => ({
+  WorkspaceShortcutTargetsSubscriber: () => null,
+}));
 vi.mock("@/components/desktop-sidebar-frame", () => ({}));
-vi.mock("@/utils/desktop-window", () => ({}));
+vi.mock("@/utils/desktop-window", () => ({ WindowChromeSafeArea: () => null }));
 vi.mock("./rail", () => ({}));
 vi.mock("./sections", () => ({ CHATS_PATH: "/chat", WORK_PATH: "/work" }));
 vi.mock("./search-integration", () => ({}));
 vi.mock("./use-open-section", () => ({}));
 vi.mock("./opened-session", () => ({}));
 
+import { flushSync } from "react-dom";
+import { createRoot, type Root } from "react-dom/client";
 import { RetainedPanelActivity } from "@/components/retained-panel";
-import { ListContent } from "./list-panel";
+import { ListContent, PhoneListTab } from "./list-panel";
 import { useNavigationStore, type ListSection } from "./store";
 
 /** The list panel as the phone and desktop chrome mount it: an activity gate around the lists. */
@@ -171,6 +181,7 @@ afterEach(() => {
   state.chats = ["first"];
   state.compact = true;
   state.mounts = { work: 0, chats: 0 };
+  state.workActive = [];
   resetRenderCounts();
   useNavigationStore.setState({
     scopes: { home: "mine", chats: "mine", work: "mine" },
@@ -236,6 +247,35 @@ describe("retained list switching", () => {
     expect(state.mounts).toEqual({ work: 1, chats: 1 });
     expect(rows("chat-row")).toEqual(["first"]);
     expect(rows("work-row")).toEqual(["mine"]);
+  });
+});
+
+function unmountWhenFinished(root: Root) {
+  const unmount = () => root.unmount();
+  onTestFinished(() => act(unmount));
+}
+
+describe("phone Work tab", () => {
+  it("keeps the Work list's props unchanged in the tab press's commit", async () => {
+    const root = createRoot(document.createElement("div"));
+    unmountWhenFinished(root);
+    const tab = (shown: boolean) => (
+      <RetainedPanelActivity active={shown}>
+        <PhoneListTab section="work" />
+      </RetainedPanelActivity>
+    );
+    act(() => root.render(tab(false)));
+    state.workActive = [];
+    // The press is discrete and committed synchronously, outside act, as on the device.
+    const environment = globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean };
+    environment.IS_REACT_ACT_ENVIRONMENT = false;
+    try {
+      flushSync(() => root.render(tab(true)));
+      expect(state.workActive.every((active) => active === false)).toBe(true);
+      await vi.waitFor(() => expect(state.workActive.at(-1)).toBe(true));
+    } finally {
+      environment.IS_REACT_ACT_ENVIRONMENT = true;
+    }
   });
 });
 

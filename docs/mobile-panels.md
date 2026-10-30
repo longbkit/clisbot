@@ -28,12 +28,12 @@ view, not the bottom-tabs view:
   pressed before then mounts on the press.
 - The tab bar (`MobileTabBar`) dispatches the switch on the tab navigator. The press's commit
   shows and activates the target and hides the old tab; its held panes render the latest value in
-  that commit. No animation, no settlement, no focus-event round trip. Panels are never detached
-  or frozen. Do not defer activation (`useDeferredValue`): on 2026-10-30 a busy JS thread
+  that commit, except Work's model (below). No animation, no settlement, no focus-event round
+  trip. Panels are never detached or frozen. Do not defer activation (`useDeferredValue`): on 2026-10-30 a busy JS thread
   postponed the deferred render until the next input, and that input, the first row tap on the
   tab, was lost.
 - A pre-mounted tab holds what it rendered at mount until its first visit, then catches up in the
-  press's commit.
+  press's commit. Work is the exception below.
 - Hidden tabs see an inactive `useRetainedPanelActive`. Chats and Work hold their inputs as below;
   Home holds the navigation activity (`HeldNavigationActivity`); each tab's route renders memoized
   content, so a switch re-renders the routes and not their screens.
@@ -45,8 +45,19 @@ view, not the bottom-tabs view:
   phone's only `SidebarModelProvider` there, because the sidebar chrome's provider does not reach
   routes; the chrome mounts none on phone tabs, and Work also feeds the workspace shortcut targets.
   The provider takes `holdWhileInactive`: hidden, it derives nothing (O(workspaces) per Host update
-  otherwise) and catches up in its first shown render. Shortcut targets stay as Work last showed
-  them until then.
+  otherwise). Shortcut targets stay as Work last showed them until it catches up.
+- Work's catch-up does not run in the press's commit. On 2026-10-30, re-deriving the model over
+  about 6,100 workspaces and re-rendering the list held every switch to Work for 167–367 ms with
+  nothing on screen. The press shows Work with the held model and rows; `useActiveAfterShow`
+  (`hooks/use-held-while-inactive.ts`) moves the provider's catch-up and the list's drag-host
+  flag to a low-priority render after it, which input interrupts. Only the content waits. The
+  panel's activation stays in the press, so the first row tap is not lost. A tap on a held row
+  opens that row's workspace: rows are keyed by Host and workspace id, and the catch-up keeps the
+  keys. A row for a workspace removed while Work was hidden can open until the catch-up lands.
+- Keep the provider's inputs referentially stable. Each provider render that changes one reruns
+  the placement build, which compares every workspace. `useAggregatedQuery` used to return a new
+  `loadState` on every render. The Bot project keys derive from it, so every Work render, the
+  press included, rebuilt all placements.
 
 Route topology, Back and deep links are in [Expo Router](expo-router.md#phone-tabs).
 

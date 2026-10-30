@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 
 /**
  * The value a hidden retained pane last rendered with. While `active` is false the hook returns
@@ -19,4 +19,15 @@ export function useHeldWhileInactive<T>(value: T, active: boolean): T {
 
 interface HeldValue<T> {
   value: T;
+}
+
+/**
+ * `active` for a held pane whose catch-up is too costly for the show's own commit: a show reaches
+ * it in a low-priority render after that commit, which input can interrupt; a hide reaches it at
+ * once. Never gate the retained panel itself on it (docs/mobile-panels.md#phone-tabs): the panel
+ * shows in the press's commit with its held content, and only the catch-up waits.
+ */
+export function useActiveAfterShow(active: boolean): boolean {
+  const deferred = useDeferredValue(active);
+  return active && deferred;
 }

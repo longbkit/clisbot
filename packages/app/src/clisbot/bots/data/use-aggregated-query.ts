@@ -62,8 +62,10 @@ export function useAggregatedQuery<T>(input: AggregatedQueryInput<T>): Aggregate
     enabled: input.enabled ?? true,
   });
   const data = useHeldRows(query.data, serverIds);
+  // Callers memoize on it: a fresh object per render re-ran the Work model's placement build.
+  const loadState = useMemo(() => toAggregateLoadState(data), [data]);
   return {
-    loadState: toAggregateLoadState(data),
+    loadState,
     hostErrors: data?.status === "loaded" ? data.hostErrors : [],
     acceptedServerIds:
       data?.status === "loaded" ? (data.acceptedServerIds ?? EMPTY_SERVER_IDS) : EMPTY_SERVER_IDS,

@@ -22,6 +22,7 @@ import {
 import { SidebarModelProvider } from "@/components/sidebar/sidebar-model";
 import { WorkspaceShortcutTargetsSubscriber } from "@/components/workspace-shortcut-targets-subscriber";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { useActiveAfterShow } from "@/hooks/use-held-while-inactive";
 import { WindowChromeSafeArea } from "@/utils/desktop-window";
 import { ChatsPane } from "./chats-pane";
 import { NavigationRail } from "./rail";
@@ -139,11 +140,17 @@ function PhoneChats() {
   );
 }
 
+/**
+ * The tab shows in the press's commit with the held model. The model's catch-up and the list's
+ * drag-host flag follow in a low-priority render (`useActiveAfterShow`): the flag reaches every
+ * project block, so flipping it in the press re-rendered the whole list there.
+ */
 function PhoneWork() {
   const active = useRetainedPanelActive();
+  const caughtUp = useActiveAfterShow(active);
   return (
     <SidebarModelProvider active={active} holdWhileInactive>
-      <WorkPane active={active} />
+      <WorkPane active={caughtUp} />
       <WorkspaceShortcutTargetsSubscriber enabled />
     </SidebarModelProvider>
   );

@@ -35,7 +35,7 @@ import {
   type WorkspaceSessionFilter,
 } from "@/clisbot/workspace-sessions/session-filter";
 import { useRetainedPanelActive } from "@/components/retained-panel";
-import { useHeldWhileInactive } from "@/hooks/use-held-while-inactive";
+import { useActiveAfterShow, useHeldWhileInactive } from "@/hooks/use-held-while-inactive";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
 import { filterWorkspacesByLabels } from "./sidebar-labels";
 import {
@@ -89,15 +89,19 @@ export function SidebarModelProvider({
   active?: boolean;
   /**
    * For a provider read only by one retained pane (the phone's Work tab): while inactive it
-   * derives nothing and hands out the model it had when hidden; the first active render catches
-   * up. Without it an inactive provider stays live for the keyboard shortcuts.
+   * derives nothing and hands out the model it had when hidden. A show commits that held model and
+   * catches up in a low-priority render after it (`useActiveAfterShow`): over thousands of
+   * workspaces the catch-up took 167–367 ms inside the tab press. Without it an inactive provider
+   * stays live for the keyboard shortcuts.
    */
   holdWhileInactive?: boolean;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const live = active !== false || !holdWhileInactive;
-  const list = useSidebarWorkspacesList({ enabled: active, held: !live });
+  const caughtUp = useActiveAfterShow(holdWhileInactive && active !== false);
+  const shown = holdWhileInactive ? caughtUp : active;
+  const live = caughtUp || !holdWhileInactive;
+  const list = useSidebarWorkspacesList({ enabled: shown, held: !live });
   const showBackground = useSidebarViewStore((state) => state.showBackground);
   const groupMode = useSidebarGroupMode();
   const userFilters = useSidebarViewStore((state) => state.userFilters);
@@ -146,7 +150,7 @@ export function SidebarModelProvider({
   // live session-store subscription over every workspace on every visible host, so widening this
   // for a filter that does not need it costs a retained-but-inactive sidebar real work.
   const needsWorkspaceEntries = groupMode !== "project" || hasActiveLabelFilter || hasEntryFilter;
-  const entriesEnabled = active !== false || needsWorkspaceEntries;
+  const entriesEnabled = shown !== false || needsWorkspaceEntries;
   const workspaceEntriesByKey = useSidebarWorkspaceEntries(
     list.workspacePlacements,
     entriesEnabled,
