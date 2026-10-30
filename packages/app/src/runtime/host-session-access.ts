@@ -4,6 +4,7 @@ import {
   shouldUseTlsForDefaultHostedRelay,
 } from "@clisbot/protocol/daemon-endpoints";
 import type { HostConnection, HubHostManagement } from "@/types/host-connection";
+import { getColdStartConnectTimeline } from "./cold-start-connect";
 
 export type HostAccessTicketResolver = (clientId: string) => Promise<string | undefined>;
 
@@ -75,7 +76,9 @@ export async function resolveHostAccessTicket(
     if (ownCredential) return undefined;
     throw new Error("Sign in to the Hub managing this Host to connect.");
   }
-  return binding?.resolveAccessTicket(clientId);
+  const ticket = await binding?.resolveAccessTicket(clientId);
+  if (ticket !== undefined) getColdStartConnectTimeline().mark("hubTicket");
+  return ticket;
 }
 
 /**

@@ -767,6 +767,7 @@ function createDefaultDeps(
         // registration races host hydration, so a client born before its
         // binding must still present a ticket once admission is required.
         resolveAccessTicket: async () => {
+          if (host.management) getColdStartConnectTimeline().mark("hostTransportOpen");
           try {
             return await takeAccessTicket();
           } catch (error) {
@@ -2274,12 +2275,14 @@ export class HostRuntimeStore {
       projectIconCache.setHosts(profiles.map((profile) => profile.serverId));
       await projectIconCache.restore();
       this.syncHosts(profiles);
-      for (const profile of profiles) {
-        void this.directorySyncByServer
-          .get(profile.serverId)
-          ?.restoreCachedDirectory()
-          .catch(() => undefined);
-      }
+      void Promise.all(
+        profiles.map((profile) =>
+          this.directorySyncByServer
+            .get(profile.serverId)
+            ?.restoreCachedDirectory()
+            .catch(() => undefined),
+        ),
+      ).then(() => this.coldStartTimeline.mark("cachedDirectories"));
     } catch (error) {
       console.error("[HostRuntime] Failed to load host registry from storage", error);
     } finally {
