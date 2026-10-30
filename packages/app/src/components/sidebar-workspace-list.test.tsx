@@ -53,6 +53,8 @@ import { seedRuntimeWorkspaces } from "@/test/seed-session";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
+import { RouteSourceProvider } from "@/navigation/route-source";
+import { createReadRouteSource } from "@/test/route-source";
 import { defaultHostAppearance } from "@/hosts/appearance";
 
 vi.mock("@react-native-async-storage/async-storage", () => ({
@@ -336,8 +338,14 @@ async function renderProbe(counts: RenderCounts): Promise<{ root: Root; containe
   return { root, container };
 }
 
+const routes = createReadRouteSource(() => pathnameState.value);
+
 function renderSidebarFrame(root: Root, counts: RenderCounts) {
-  root.render(<SidebarFrameProbe counts={counts} />);
+  root.render(
+    <RouteSourceProvider source={routes}>
+      <SidebarFrameProbe counts={counts} />
+    </RouteSourceProvider>,
+  );
 }
 
 describe("sidebar workspace render isolation", () => {

@@ -132,10 +132,10 @@ import {
   WindowChromeRegion,
   WindowChromeSafeArea,
 } from "@/utils/desktop-window";
-import {
-  parseHostWorkspaceRouteFromPathname,
-  parseServerIdFromPathname,
-} from "@/utils/host-routes";
+import { parseServerIdFromPathname } from "@/utils/host-routes";
+import { expoRouteSource } from "@/navigation/expo-route-source";
+import { useIsOnWorkspaceRoute } from "@/navigation/route-facts";
+import { RouteSourceProvider, useRoutePath } from "@/navigation/route-source";
 import { PluginCatalogSync } from "@/plugins";
 import { HubAccountProvider } from "@/clisbot/hub/account-provider";
 import { HubAccountEntryNavigation } from "@/clisbot/hub/account-entry-navigation";
@@ -378,8 +378,9 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
 
   const isCompactLayout = useIsCompactFormFactor();
   useCompactWebViewportZoomLock(isCompactLayout);
-  const pathname = usePathname();
-  const isWorkspaceRoute = parseHostWorkspaceRouteFromPathname(pathname) !== null;
+  const isWorkspaceRoute = useIsOnWorkspaceRoute();
+  const isSettingsPage = useRoutePath(isSettingsPagePath);
+  const isSettingsRoute = useRoutePath(isSettingsRoutePath);
   const isWorkspaceFocusModeEnabled = isWorkspaceRoute && isFocusModeEnabled;
   const chromeEnabled = chromeEnabledOverride ?? daemons.length > 0;
   const hasMountedSidebar = useLatchedBoolean(chromeEnabled);
@@ -401,7 +402,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   // conflate workspace/project-specific chrome (sidebar, mobile gesture) with
   // global concerns like keyboard shortcuts. Split those out so settings (and
   // other non-workspace routes) don't need a special-case to keep shortcuts alive.
-  const keyboardShortcutsEnabled = chromeEnabled || pathname.startsWith("/settings");
+  const keyboardShortcutsEnabled = chromeEnabled || isSettingsPage;
 
   useKeyboardShortcuts({
     enabled: keyboardShortcutsEnabled,
@@ -425,7 +426,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   });
   const appContentMinimumWidth = resolveDesktopAppContentMinimum({
     explorerVisible: isWorkspaceRoute && explorerVisible,
-    isSettingsRoute: pathname.includes("/settings"),
+    isSettingsRoute,
   });
   const desktopSidebarMounted = hasMountedSidebar && !isWorkspaceFocusModeEnabled;
   const desktopSidebarVisible = resolveDesktopSidebarVisibility({
@@ -804,29 +805,42 @@ function OpenProjectListener() {
 }
 
 function AppWithSidebar({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
   const hosts = useHosts();
   const storeReady = useStoreReady();
-  const routeServerId = useMemo(() => parseServerIdFromPathname(pathname), [pathname]);
-  const routeHasKnownHost =
-    routeServerId !== null && hosts.some((host) => host.serverId === routeServerId);
-  const shouldShowAppChrome =
-    storeReady &&
-    (pathname === "/open-project" ||
-      pathname === "/new" ||
-      (HOME_V2_ENABLED && pathname === "/chat") ||
-      (NAVIGATION_V2_ENABLED &&
-        (pathname === "/work" ||
-          pathname === "/more" ||
-          pathname === "/tasks" ||
-          pathname === "/design")) ||
-      pathname === "/sessions" ||
-      pathname === "/schedules" ||
-      pathname === "/automations" ||
-      pathname === "/connectors" ||
-      routeHasKnownHost);
+  // A selected boolean: a push or pop that keeps the chrome re-renders nothing here.
+  const routeShowsChrome = useRoutePath((pathname) => showsAppChrome(pathname, hosts));
+  return <AppContainer chromeEnabled={storeReady && routeShowsChrome}>{children}</AppContainer>;
+}
 
-  return <AppContainer chromeEnabled={shouldShowAppChrome}>{children}</AppContainer>;
+function showsAppChrome(pathname: string, hosts: readonly { serverId: string }[]): boolean {
+  if (isAppPagePath(pathname)) return true;
+  const routeServerId = parseServerIdFromPathname(pathname);
+  return routeServerId !== null && hosts.some((host) => host.serverId === routeServerId);
+}
+
+function isAppPagePath(pathname: string): boolean {
+  return (
+    pathname === "/open-project" ||
+    pathname === "/new" ||
+    (HOME_V2_ENABLED && pathname === "/chat") ||
+    (NAVIGATION_V2_ENABLED &&
+      (pathname === "/work" ||
+        pathname === "/more" ||
+        pathname === "/tasks" ||
+        pathname === "/design")) ||
+    pathname === "/sessions" ||
+    pathname === "/schedules" ||
+    pathname === "/automations" ||
+    pathname === "/connectors"
+  );
+}
+
+function isSettingsPagePath(pathname: string): boolean {
+  return pathname.startsWith("/settings");
+}
+
+function isSettingsRoutePath(pathname: string): boolean {
+  return pathname.includes("/settings");
 }
 
 function FaviconStatusSync() {
@@ -1003,7 +1017,11 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, []);
 
-  return <RootAppTree />;
+  return (
+    <RouteSourceProvider source={expoRouteSource}>
+      <RootAppTree />
+    </RouteSourceProvider>
+  );
 }
 
 const layoutStyles = StyleSheet.create((theme) => ({

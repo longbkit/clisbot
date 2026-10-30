@@ -28,7 +28,7 @@ import {
   type IssueRecords,
   type IssueSubject,
 } from "./issues";
-import { usePathname } from "expo-router";
+import { useRoutePath } from "@/navigation/route-source";
 import { parseChatRouteFromPathname } from "@/clisbot/bots/routes";
 import { parseHostWorkspaceRouteFromPathname } from "@/utils/host-routes";
 import { useOwnershipHosts } from "./use-ownership-hosts";
@@ -144,18 +144,27 @@ function useIssueSubjects(): (agent: AggregatedAgent) => IssueSubject {
  * the issues of the sessions it shows. The daemon clears a failure's attention on its own; a
  * request has no daemon signal, so this is what sees it.
  */
+function openedSessionPath(pathname: string): string | null {
+  const opened =
+    parseHostWorkspaceRouteFromPathname(pathname) !== null ||
+    parseChatRouteFromPathname(pathname) !== null;
+  return opened ? pathname : null;
+}
+
 function useMarkOpenedSeen(
   rows: readonly HomeRow[],
   subjectOf: (agent: AggregatedAgent) => IssueSubject,
   transition: (apply: (current: IssueRecords) => IssueRecords) => void,
 ) {
-  const pathname = usePathname();
-  const routeServerId = parseHostWorkspaceRouteFromPathname(pathname)?.serverId;
+  // Tab switches and app pages open no session; only a session route re-renders this provider.
+  const pathname = useRoutePath(openedSessionPath);
+  const routeServerId = parseHostWorkspaceRouteFromPathname(pathname ?? "")?.serverId;
   // A workspace holds many sessions; only the one on screen has been opened.
   const focusedAgentId = useSessionStore((state) =>
     routeServerId ? (state.sessions[routeServerId]?.focusedAgentId ?? null) : null,
   );
   useEffect(() => {
+    if (pathname === null) return;
     const workspace = parseHostWorkspaceRouteFromPathname(pathname);
     const chat = parseChatRouteFromPathname(pathname);
     if (!workspace && !chat) return;

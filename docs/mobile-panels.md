@@ -232,9 +232,9 @@ definition, no longer eligible to begin.
   chips both list session users and channels) is derived once in the model, not in each reader.
   For a context read deep in the pane, wrap the pane in
   `HeldContextValue` (`components/held-context.tsx`) with a stable child element.
-- A retained pane's large components do not read the route (`usePathname`,
-  `useActiveWorkspaceSelection`): the route changes on every navigation, hidden tabs included.
-  Read the narrow fact from a small provider that already subscribes, as the Work list reads
+- A retained pane's components do not read the whole route: it changes on every navigation,
+  hidden tabs included. Select the fact they render ([route reads](expo-router.md#route-reads)),
+  or read it from a small provider that already selects it, as the Work list reads
   `useIsSidebarOnWorkspaceRoute` from `WorkspaceSessionsAutoCollapseProvider`.
 - Catalog-backed surfaces narrow external-store snapshots and preserve unchanged directory row
   identity through the shared aggregation owner ([architecture](architecture.md)). Reducing hidden

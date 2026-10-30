@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { usePathname } from "expo-router";
+import { useRoutePath } from "@/navigation/route-source";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { z } from "zod";
 import { create } from "zustand";
@@ -58,17 +58,34 @@ function same(a: OpenedSession | null, b: OpenedSession | null) {
   return a?.serverId === b?.serverId && a?.agentId === b?.agentId;
 }
 
-function useRouteSession(): OpenedSession | null {
-  const pathname = usePathname();
+/** A workspace route's Host, or a chat route's Host and chat. */
+interface SessionRoute {
+  serverId: string;
+  chatId: string | null;
+}
+
+function sessionRoute(pathname: string): SessionRoute | null {
   const workspace = parseHostWorkspaceRouteFromPathname(pathname);
-  const chat = workspace ? null : parseChatRouteFromPathname(pathname);
-  const serverId = workspace?.serverId ?? chat?.serverId ?? null;
+  if (workspace) return { serverId: workspace.serverId, chatId: null };
+  const chat = parseChatRouteFromPathname(pathname);
+  return chat ? { serverId: chat.serverId, chatId: chat.chatId } : null;
+}
+
+function sameSessionRoute(a: SessionRoute | null, b: SessionRoute | null): boolean {
+  return a?.serverId === b?.serverId && a?.chatId === b?.chatId;
+}
+
+function useRouteSession(): OpenedSession | null {
+  // Mounted with the chrome: a tab switch or an app page must not re-render it.
+  const route = useRoutePath(sessionRoute, sameSessionRoute);
+  const serverId = route?.serverId ?? null;
+  const chatId = route?.chatId ?? null;
   const agentId = useSessionStore((state) => {
     if (!serverId) return null;
     const session = state.sessions[serverId];
     if (!session) return null;
-    if (workspace) return session.focusedAgentId;
-    return chat ? chatSessionAgent(session.agents.values(), chat.chatId) : null;
+    if (chatId === null) return session.focusedAgentId;
+    return chatSessionAgent(session.agents.values(), chatId);
   });
   return serverId && agentId ? { serverId, agentId } : null;
 }

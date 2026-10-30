@@ -1,4 +1,4 @@
-import { usePathname } from "expo-router";
+import { useRoutePath } from "@/navigation/route-source";
 import { useMemo } from "react";
 import { useCommandCenterActions } from "@/command-center/provider";
 import { useToast } from "@/contexts/toast-context";
@@ -16,9 +16,10 @@ import { getFocusedAgentId } from "./context";
 import { createPluginNavigation } from "../navigation";
 
 export function PluginCommandCenterActions() {
-  const pathname = usePathname();
   const selection = useActiveWorkspaceSelection();
-  const serverId = selection?.serverId ?? hostIdFromPathname(pathname);
+  // Root chrome: a push that keeps the route's Host re-renders nothing here.
+  const routeHostId = useRoutePath(hostIdFromPathname);
+  const serverId = selection?.serverId ?? routeHostId;
   const workspaceId = selection?.workspaceId ?? null;
   const workspaceExists = useWorkspaceExists(serverId, workspaceId);
   const workspaceKey = serverId && workspaceId ? `${serverId}:${workspaceId}` : null;

@@ -1,7 +1,8 @@
 import { revealWorkspaceTab } from "@/workspace-tabs/navigation";
 import { usePanelStore } from "@/stores/panel-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useLocalSearchParams, usePathname } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
+import { useRoutePath } from "@/navigation/route-source";
 import { useEffect, useSyncExternalStore } from "react";
 import {
   createLastWorkspaceSelectionStore,
@@ -12,6 +13,7 @@ import {
 import {
   navigateToLastWorkspace as navigateToLastWorkspacePure,
   navigateToWorkspace as navigateToWorkspacePure,
+  isSameWorkspaceSelection,
   parseActiveWorkspaceSelection,
   type NavigateToWorkspaceDeps,
   type NavigateToWorkspaceInput,
@@ -83,12 +85,19 @@ export function navigateToLastWorkspace(): boolean {
   });
 }
 
+/**
+ * The workspace route on screen. Its callers sit in always-mounted chrome, so it re-renders them
+ * only when the selected workspace changes, and returns the same object until then.
+ */
 export function useActiveWorkspaceSelection(): ActiveWorkspaceSelection | null {
   const params = useLocalSearchParams<{
     serverId?: string | string[];
     workspaceId?: string | string[];
   }>();
-  const selection = parseActiveWorkspaceSelection({ pathname: usePathname(), params });
+  const selection = useRoutePath(
+    (pathname) => parseActiveWorkspaceSelection({ pathname, params }),
+    isSameWorkspaceSelection,
+  );
   const serverId = selection?.serverId ?? null;
   const workspaceId = selection?.workspaceId ?? null;
   useEffect(() => {

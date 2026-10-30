@@ -140,6 +140,8 @@ import { PendingChatPresentation } from "./pending-chat-presentation";
 import { nativePresentation } from "./chat-list-presentation";
 import { MobileChatPanelTabs, MobileHomeTabs } from "./mobile-navigation";
 import { startNativeInputTracing } from "@/performance/native-trace";
+import { RouteSourceProvider } from "@/navigation/route-source";
+import { createReadRouteSource } from "@/test/route-source";
 import {
   WorkspaceSessionsAutoCollapseProvider,
   useSidebarWorkspaceSelection,
@@ -164,9 +166,10 @@ const Row = memo(function Row() {
   );
 });
 const row = <Row />;
+const routes = createReadRouteSource(() => env.path);
 function Page() {
   return (
-    <>
+    <RouteSourceProvider source={routes}>
       <div data-testid="root-footer-owner">
         <MobileHomeTabs />
       </div>
@@ -174,7 +177,7 @@ function Page() {
         <MobileChatPanelTabs />
         <WorkspaceSessionsAutoCollapseProvider>{row}</WorkspaceSessionsAutoCollapseProvider>
       </div>
-    </>
+    </RouteSourceProvider>
   );
 }
 beforeEach(() => {

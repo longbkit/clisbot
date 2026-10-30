@@ -26,6 +26,7 @@ import {
 } from "@/clisbot/navigation/mobile-tabs";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isWeb, isNative } from "@/constants/platform";
+import { useRoutePath } from "@/navigation/route-source";
 import { usePanelStore } from "@/stores/panel-store";
 import { HOME_V2_ENABLED } from "./feature";
 import type { Theme } from "@/styles/theme";
@@ -106,8 +107,8 @@ function useReturnFromDetail(target: string) {
 /** A Home V2 phone tab page: the tab bar is its navigation, so its header has no leading button. */
 export function useIsMobileTabPage() {
   const compact = useIsCompactFormFactor();
-  const path = usePathname();
-  return HOME_V2_ENABLED && compact && isHomeTabPath(path);
+  const onTabPath = useRoutePath(isHomeTabPath);
+  return HOME_V2_ENABLED && compact && onTabPath;
 }
 function isChatDetail(path: string) {
   return path.startsWith("/h/") && (path.includes("/workspace/") || path.includes("/chat/"));

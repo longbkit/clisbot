@@ -51,3 +51,7 @@ export function parseChatRouteFromPathname(
   if (!match) return null;
   return { serverId: decodeSegment(match[1]!), chatId: decodeSegment(match[2]!) };
 }
+
+export function isSameChatRoute(left: ChatRouteMatch | null, right: ChatRouteMatch | null) {
+  return left?.serverId === right?.serverId && left?.chatId === right?.chatId;
+}

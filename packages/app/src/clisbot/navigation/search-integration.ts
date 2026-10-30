@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { usePathname, useRouter, type Href } from "expo-router";
+import { useRouter, type Href } from "expo-router";
+import { useRoutePathEffect } from "@/navigation/route-source";
 import {
   dismissOutsideFilterReveal,
   getOutsideFilterReveal,
@@ -53,11 +54,10 @@ function useWorkOpenInWork(): void {
 
 /** Opening another item ends the reveal (R3): the notice is about the item search opened. */
 function useEndRevealOnNavigation(): void {
-  const pathname = usePathname();
-  useEffect(() => {
+  useRoutePathEffect((pathname) => {
     const reveal = getOutsideFilterReveal();
     if (reveal && revealEndsOnPath(reveal, pathname)) dismissOutsideFilterReveal();
-  }, [pathname]);
+  });
 }
 
 /** Wires global search to Navigation V2's Work list; mounted with the V2 chrome. */

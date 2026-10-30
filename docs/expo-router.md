@@ -209,10 +209,48 @@ or more on a production Android build.
   are focused, then replaces the `(tabs)` route on the tab it shows (`phoneTabsRemountAction`), so
   the other kind mounts fresh. Visited tabs remount once at that point.
 
+- **The `(tabs)` layout reads no focus.** A push above the tabs blurs the `(tabs)` route and a pop
+  focuses it. A focus read in the layout re-rendered the tab navigator and the whole tab bar on
+  both, so the breakpoint remount reads it in its own null-rendering child, and the navigator draws
+  the bar through a memoized slot that re-renders only when the tab state changes.
+
 The stack layouts keep the earlier policy: a native Home V2 peer page replaces the current one,
 browser and desktop entry points keep ordinary history, and detail Back navigates to its entry
 surface so the host route underneath keeps its retained workspace deck. See
 [the native measurement harness](mobile-testing.md#native-switching-performance).
+
+## Route reads
+
+`usePathname`, `useSegments` and `useGlobalSearchParams` subscribe to Expo Router's route store,
+which notifies on every push, pop and tab switch. The notification comes from the navigation
+container's state-change effect, so on native it lands in the same JS task as the push, and React
+Native mounts all of a task's commits together. On 2026-10-30 (production APK, Galaxy S23, 14
+Hosts) a chat row showed nothing for 1,000 ms and then the whole chat: the root chrome
+(`AppContainer` and about ten hosts below it), the Chats pane, Work's providers and Home's start
+screen all re-rendered with the push, and the chat's open shell waited for them.
+
+In a tree that stays mounted (the root layout and its chrome, a phone tab, the tab bar), read a
+selected fact through `navigation/route-source.tsx`:
+
+| Need                                   | Use                                                                        |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| A value that renders (boolean, id)     | `useRoutePath(select)`, or `useRouteSelector(select)` for params           |
+| The path inside a handler or async end | `useReadRoutePath()`                                                       |
+| An effect on navigation                | `useRoutePathEffect(onChange)`                                             |
+| Common facts                           | `navigation/route-facts.ts` (`useIsOnWorkspaceRoute`, `useFocusedChatKey`) |
+
+The caller re-renders only when the selected value changes; an object needs an `isEqual`
+(`isSameWorkspaceSelection`, `isSameChatRoute`). `useActiveWorkspaceSelection` returns the same
+object until the workspace changes. Leaf screens may keep reading the whole route.
+
+The source is Expo Router's own store, read through internal modules (`expo-route-source.ts`),
+because Expo Router 57 exports no selector; check it when upgrading. `RouteSourceProvider` wraps
+the root layout, and a read outside it throws. `navigation/route-reads.test.ts` lists every
+remaining whole-route read with its reason and fails on a new one;
+`navigation/route-source.browser.test.tsx` pushes and pops a chat and a session above real phone
+tabs and counts zero renders of Home rows, hidden tab bodies and the tab bar.
+
+`useRootNavigationState` does not subscribe: it reads the state when its caller renders.
 
 ## Agent Targets
 

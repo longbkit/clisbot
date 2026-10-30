@@ -77,6 +77,12 @@ vi.mock("./group-chat-settings", () => ({
 vi.mock("./conversation-project-actions", () => ({ ConversationProjectActions: () => null }));
 vi.mock("./chat-participant-settings", () => ({ ChatParticipantSettings: () => null }));
 import { ChatOptions } from "./chat-options";
+import { RouteSourceProvider } from "@/navigation/route-source";
+import { createTestRouteSource } from "@/test/route-source";
+const routes = createTestRouteSource();
+function RootRoute({ children }: { children: React.ReactNode }) {
+  return <RouteSourceProvider source={routes.source}>{children}</RouteSourceProvider>;
+}
 const chat = {
   id: "chat",
   kind: "group",
@@ -86,7 +92,7 @@ const chat = {
 afterEach(cleanup);
 it("dismisses route-owned sheets and clears their mounted draft when the conversation becomes inactive", () => {
   const element = <ChatOptions serverId="host" chat={chat} bots={[]} />;
-  const view = render(element);
+  const view = render(element, { wrapper: RootRoute });
   fireEvent.click(screen.getByText("Group settings"));
   expect(screen.getByTestId("sheet").getAttribute("data-visible")).toBe("true");
   fireEvent.change(screen.getByLabelText("Pending group name"), { target: { value: "Unsaved" } });

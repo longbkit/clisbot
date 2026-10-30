@@ -15,7 +15,7 @@ import { useResourcePrincipalScope } from "@/clisbot/bots/data/resource-principa
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { Bot, Hash, SquarePen } from "lucide-react-native";
-import { usePathname } from "expo-router";
+import { useRoutePath } from "@/navigation/route-source";
 import { BotRow, type BotsSidebarBot } from "@/clisbot/bots/sidebar/bots-section";
 import { BotsSidebarRowSkeleton } from "@/clisbot/bots/sidebar/row";
 import { ChatRow, type ChatsSidebarChat } from "@/clisbot/bots/sidebar/chats-section";
@@ -25,7 +25,7 @@ import { useBotSidebarActions } from "@/clisbot/bots/sidebar/use-sidebar-actions
 import { useCreationRequest } from "@/clisbot/bots/sidebar/creation-request";
 import { refreshBotsAndChats } from "@/clisbot/bots/data/runtime";
 import { useBotCreationHosts } from "@/clisbot/bots/feature";
-import { parseChatRouteFromPathname } from "@/clisbot/bots/routes";
+import { isSameChatRoute, parseChatRouteFromPathname } from "@/clisbot/bots/routes";
 import { selectedDirectBotKey } from "@/clisbot/bots/sidebar/sidebar-model";
 import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -311,8 +311,8 @@ function useChatRowActions(
   loaded: boolean,
 ) {
   const { t } = useTranslation();
-  const pathname = usePathname();
-  const current = useMemo(() => parseChatRouteFromPathname(pathname), [pathname]);
+  // The open chat, selected: a push that opens no chat re-renders neither the pane nor its rows.
+  const current = useRoutePath(parseChatRouteFromPathname, isSameChatRoute);
   const selectedBot = selectedDirectBotKey(chatRows, current);
   const { openBot, navigate } = useBotSidebarActions(chatRows, onBeforeNavigate, loaded);
   const menu = useSidebarPinMenu(onBeforeNavigate, chatRows);

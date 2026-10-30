@@ -60,6 +60,12 @@ to first change.
   holds the shell and zero renders of the screen; the screen renders in the scheduled task; Back
   before it means the screen never renders. `chat-open-gate.browser.test.tsx` does the same for a
   chat row, with the row's title in the shell, and again after Back.
+- The shell paints only if nothing heavy renders in the same JS task. On 2026-10-30 a chat row
+  still showed nothing for 1,000 ms and then the whole chat: Expo Router notifies every route
+  reader from the push's state-change effect, inside the press's task, and the root chrome, the
+  Chats pane, Work and Home's start screen read the whole route. They read a selected fact now
+  ([route reads](../../expo-router.md#route-reads)); `navigation/route-source.browser.test.tsx`
+  checks that the push's commit holds the shell and no tab, tab bar or Home row render.
 - A device trace shows `clisbot.workspace.shell`, then `clisbot.workspace.mount`, and
   `clisbot.chat.shell` for a chat. Not yet measured on the S23 after these changes.
 

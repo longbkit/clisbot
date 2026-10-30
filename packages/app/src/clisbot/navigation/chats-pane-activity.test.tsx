@@ -123,7 +123,10 @@ vi.mock("@/clisbot/bots/sidebar/use-sidebar-actions", () => ({
 vi.mock("@/clisbot/bots/sidebar/creation-request", () => ({ useCreationRequest: () => 0 }));
 vi.mock("@/clisbot/bots/data/runtime", () => ({ refreshBotsAndChats: () => {} }));
 vi.mock("@/clisbot/bots/feature", () => ({ useBotCreationHosts: () => [] }));
-vi.mock("@/clisbot/bots/routes", () => ({ parseChatRouteFromPathname: () => null }));
+vi.mock("@/clisbot/bots/routes", () => ({
+  parseChatRouteFromPathname: () => null,
+  isSameChatRoute: (left: unknown, right: unknown) => left === right,
+}));
 vi.mock("@/clisbot/bots/sidebar/sidebar-model", () => ({ selectedDirectBotKey: () => null }));
 vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenu: () => null,
@@ -150,15 +153,26 @@ vi.mock("./host-filter", () => ({ useHostFilterIds: () => [] }));
 
 import { RetainedPanelActivity } from "@/components/retained-panel";
 import { ChatsPane } from "./chats-pane";
+import { RouteSourceProvider } from "@/navigation/route-source";
+import { createReadRouteSource } from "@/test/route-source";
 
 const setSearch = vi.fn();
 const setSearchOpen = vi.fn();
 
+const routes = createReadRouteSource(() => "/chat");
+
 function Chats({ shown }: { shown: boolean }) {
   return (
-    <RetainedPanelActivity active={shown}>
-      <ChatsPane searchOpen={false} setSearchOpen={setSearchOpen} search="" setSearch={setSearch} />
-    </RetainedPanelActivity>
+    <RouteSourceProvider source={routes}>
+      <RetainedPanelActivity active={shown}>
+        <ChatsPane
+          searchOpen={false}
+          setSearchOpen={setSearchOpen}
+          search=""
+          setSearch={setSearch}
+        />
+      </RetainedPanelActivity>
+    </RouteSourceProvider>
   );
 }
 

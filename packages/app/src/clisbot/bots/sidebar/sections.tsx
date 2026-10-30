@@ -5,7 +5,9 @@ import { projectGroupSidebar, projectBotSidebar, selectedDirectBotKey } from "./
 import { useMemo } from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { useGlobalSearchParams, usePathname } from "expo-router";
+import { usePathname } from "expo-router";
+import { useRoutePath } from "@/navigation/route-source";
+import { parseServerIdFromPathname } from "@/utils/host-routes";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { useBotsFeatureHosts, useBotCreationHosts } from "../feature";
 import { useBotCatalog } from "../data/runtime";
@@ -135,11 +137,21 @@ export function useDefaultCreationServerId(
   creationHosts: { serverId: string }[],
   recentChats: readonly { serverId: string }[],
 ): string | undefined {
-  const params = useGlobalSearchParams<{ serverId?: string }>();
+  // The creation host stays mounted with the chrome: select the route's Host, not every param.
+  const routeServerId = useRoutePath(routeServerIdParam) ?? undefined;
   const eligible = (serverId: string | undefined) =>
     creationHosts.some((host) => host.serverId === serverId);
-  if (eligible(params.serverId)) return params.serverId;
+  if (eligible(routeServerId)) return routeServerId;
   return recentChats.find((chat) => eligible(chat.serverId))?.serverId;
+}
+
+/** The `serverId` route param: a Host route's, or a Host settings page's. */
+function routeServerIdParam(pathname: string): string | null {
+  return parseServerIdFromPathname(pathname) ?? parseHostSettingsServerId(pathname);
+}
+
+function parseHostSettingsServerId(pathname: string): string | null {
+  return pathname.match(/^\/settings\/hosts\/([^/?#]+)/)?.[1] ?? null;
 }
 
 export function CreationSheets({

@@ -1,5 +1,6 @@
 import { useCallback } from "react";
-import { usePathname, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import { useReadRoutePath } from "@/navigation/route-source";
 import { useTranslation } from "react-i18next";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { buildHostRootRoute } from "@/utils/host-routes";
@@ -14,7 +15,7 @@ import { parseChatRouteFromPathname } from "../routes";
 export function useArchiveChat() {
   const { t } = useTranslation();
   const router = useRouter();
-  const pathname = usePathname();
+  const readPathname = useReadRoutePath();
   return useCallback(
     async (serverId: string, chatId: string): Promise<boolean> => {
       const confirmed = await confirmDialog({
@@ -29,11 +30,11 @@ export function useArchiveChat() {
       const result = await client.archiveChat({ chatId });
       if (result.error) throw new Error(result.error);
       refreshBotsAndChats();
-      const open = parseChatRouteFromPathname(pathname);
+      const open = parseChatRouteFromPathname(readPathname());
       if (open?.serverId === serverId && open.chatId === chatId)
         router.replace(buildHostRootRoute(serverId));
       return true;
     },
-    [pathname, router, t],
+    [readPathname, router, t],
   );
 }

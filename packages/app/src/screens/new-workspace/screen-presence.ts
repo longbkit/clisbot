@@ -1,5 +1,5 @@
-import { usePathname } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
+import { useReadRoutePath } from "@/navigation/route-source";
 
 const NEW_WORKSPACE_PATHNAME = "/new";
 
@@ -17,10 +17,12 @@ export function isNewWorkspaceScreenActive(input: NewWorkspaceScreenPresence): b
   return input.isMounted && input.pathname === NEW_WORKSPACE_PATHNAME;
 }
 
+/**
+ * Reads the route when asked rather than subscribing: the Home tab renders this screen, and a
+ * subscription re-rendered all of it on every push and pop above the tabs.
+ */
 export function useNewWorkspaceScreenPresence(activePath = NEW_WORKSPACE_PATHNAME): () => boolean {
-  const pathname = usePathname();
-  const pathnameRef = useRef(pathname);
-  pathnameRef.current = pathname;
+  const readPathname = useReadRoutePath();
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -31,8 +33,8 @@ export function useNewWorkspaceScreenPresence(activePath = NEW_WORKSPACE_PATHNAM
   }, []);
 
   return useCallback(
-    () => isMountedRef.current && pathnameRef.current === activePath,
-    [activePath],
+    () => isMountedRef.current && readPathname() === activePath,
+    [activePath, readPathname],
   );
 }
 

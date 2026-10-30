@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useReducer, type ReactNode } from "react";
-import { usePathname } from "expo-router";
+import { useIsOnWorkspaceRoute } from "@/navigation/route-facts";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { parseHostWorkspaceRouteFromPathname } from "@/utils/host-routes";
 import { useIsChatListDeparting } from "@/clisbot/home/use-chat-list-departure";
 import {
   useActiveWorkspaceSelection,
@@ -50,8 +49,8 @@ function reduceAutoCollapse(
 /** Shared by the row's press target, selected fill and session list, including pinned rows. */
 export function WorkspaceSessionsAutoCollapseProvider({ children }: { children: ReactNode }) {
   const actualSelection = useActiveWorkspaceSelection();
-  // The same subscription `useActiveWorkspaceSelection` already holds.
-  const onWorkspaceRoute = parseHostWorkspaceRouteFromPathname(usePathname()) !== null;
+  // Selected facts: neither re-renders the Work list on a push that keeps them.
+  const onWorkspaceRoute = useIsOnWorkspaceRoute();
   const pending = useIsChatListDeparting();
   const departing = useIsCompactFormFactor() && pending;
   const serverId = departing ? null : actualSelection?.serverId;

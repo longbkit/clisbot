@@ -1,5 +1,6 @@
 import { useCallback } from "react";
-import { usePathname, useRouter, type Href } from "expo-router";
+import { useRouter, type Href } from "expo-router";
+import { useReadRoutePath, useRoutePath } from "@/navigation/route-source";
 import { buildSettingsRoute } from "@/utils/host-routes";
 import { usePanelStore } from "@/stores/panel-store";
 import { useNavigationStore, type ListSection } from "./store";
@@ -15,9 +16,8 @@ const LIST_PATHS: Record<ListSection, string> = { chats: CHATS_PATH, work: WORK_
 
 /** The section the reader is in, with session details counted under the list they came from. */
 export function useActiveSection(): ReturnType<typeof sectionForPath> {
-  const pathname = usePathname();
   const lastList = useNavigationStore((state) => state.lastList);
-  return sectionForPath(pathname, lastList);
+  return useRoutePath((pathname) => sectionForPath(pathname, lastList));
 }
 
 /**
@@ -27,11 +27,12 @@ export function useActiveSection(): ReturnType<typeof sectionForPath> {
  */
 export function useOpenRailSection() {
   const router = useRouter();
-  const pathname = usePathname();
+  const readPathname = useReadRoutePath();
   const active = useActiveSection();
   return useCallback(
     (section: BuiltinSection) => {
       const id: BuiltinSectionId = section.id;
+      const pathname = readPathname();
       if (id === "chats" || id === "work") {
         const panels = usePanelStore.getState();
         const store = useNavigationStore.getState();
@@ -52,6 +53,6 @@ export function useOpenRailSection() {
       }
       if (section.href) router.navigate(section.href as Href);
     },
-    [active, pathname, router],
+    [active, readPathname, router],
   );
 }

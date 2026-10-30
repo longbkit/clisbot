@@ -3,6 +3,7 @@ import type { ActiveWorkspaceSelection } from "@/stores/last-workspace-selection
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { parseHostWorkspaceRouteFromPathname } from "@/utils/host-routes";
 import {
+  isSameWorkspaceSelection,
   navigateToLastWorkspace,
   navigateToWorkspace,
   parseActiveWorkspaceSelection,
@@ -261,6 +262,26 @@ describe("workspace navigation", () => {
     });
 
     expect(selection).toBeNull();
+  });
+
+  it("treats the same workspace from two navigations as one selection", () => {
+    const chat = parseActiveWorkspaceSelection({ pathname: "/h/server-1/chat/c", params: {} });
+    const first = parseActiveWorkspaceSelection({
+      pathname: "/h/server-1/workspace/workspace-a",
+      params: {},
+    });
+    const again = parseActiveWorkspaceSelection({
+      pathname: "/h/server-1/workspace/workspace-a",
+      params: {},
+    });
+    const other = parseActiveWorkspaceSelection({
+      pathname: "/h/server-1/workspace/workspace-b",
+      params: {},
+    });
+    expect(isSameWorkspaceSelection(first, again)).toBe(true);
+    expect(isSameWorkspaceSelection(first, other)).toBe(false);
+    expect(isSameWorkspaceSelection(first, chat)).toBe(false);
+    expect(isSameWorkspaceSelection(chat, null)).toBe(true);
   });
 
   it("navigates to the last workspace once a route observation has been remembered", () => {
