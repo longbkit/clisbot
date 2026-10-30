@@ -268,6 +268,11 @@ workspace screen consumes it once after hydration. Archived-workspace recovery
 reads the same pending target, so startup redirects cannot discard it and a
 retained screen cannot consume another workspace's request.
 
+Tab reconciliation waits while a workspace has a pending open. Agents and
+workspaces hydrate separately, so agents can arrive first; reconciling then
+focused another agent, showed it for a moment, and kept it mounted behind the
+opened one.
+
 Legacy `?open=` links seed this model state at the matched route boundary and
 then lose the query parameter. Internal navigation does not use the query as a
 handoff. Read matched route params locally; global search params let retained

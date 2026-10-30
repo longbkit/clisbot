@@ -5238,6 +5238,43 @@ describe("pending workspace opens", () => {
     expect(store.getState().pinnedAgentIdsByWorkspace["server:beta"]).toEqual(new Set(["b"]));
     expect(store.getState().pendingOpenByWorkspace).toEqual({});
   });
+
+  it("leaves the workspace's tabs to its pending open, so an opened link never shows another agent first", () => {
+    const store = createWorkspaceLayoutStore(createDeterministicWorkspaceLayoutIds(), {
+      getItem: async () => null,
+      setItem: async () => {},
+      removeItem: async () => {},
+    });
+    const workspaceKey = "server:links";
+    const snapshot = {
+      agentsHydrated: true,
+      terminalsHydrated: true,
+      activeAgentIds: ["linked", "newest"],
+      autoOpenAgentIds: ["linked", "newest"],
+      knownTerminalIds: [],
+      standaloneTerminalIds: [],
+    };
+    store.getState().deferOpenTab({
+      workspaceKey,
+      target: { kind: "agent", agentId: "linked" },
+      intent: "reveal",
+      pin: true,
+    });
+
+    store.getState().reconcileTabs(workspaceKey, snapshot);
+    expect(store.getState().layoutByWorkspace[workspaceKey]).toBeUndefined();
+
+    expect(store.getState().consumePendingOpen(workspaceKey)).toBe("agent_linked");
+    store.getState().reconcileTabs(workspaceKey, snapshot);
+    const agentTabIds = store
+      .getState()
+      .getWorkspaceTabs(workspaceKey)
+      .filter((tab) => tab.target.kind === "agent")
+      .map((tab) => tab.tabId);
+    expect(agentTabIds.sort()).toEqual(["agent_linked", "agent_newest"]);
+    const layout = store.getState().layoutByWorkspace[workspaceKey];
+    expect(findPaneById(layout.root, layout.focusedPaneId)?.focusedTabId).toBe("agent_linked");
+  });
 });
 
 describe("source-owned dirty sheets in a conversation layout", () => {

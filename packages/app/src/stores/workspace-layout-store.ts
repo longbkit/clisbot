@@ -1686,6 +1686,11 @@ export function createWorkspaceLayoutStore(
           if (!normalizedWorkspaceKey) {
             return;
           }
+          // Agents can hydrate before the workspace, which the pending open waits for. Reconciling
+          // first would focus some other agent, show it, and keep it mounted behind the opened one.
+          if (get().pendingOpenByWorkspace[normalizedWorkspaceKey]) {
+            return;
+          }
 
           set((state) => {
             const rawLayout = getWorkspaceLayout(state.layoutByWorkspace, normalizedWorkspaceKey);
