@@ -14,7 +14,7 @@ tail cache and Settings → Storage, is [offline cache](offline-cache.md).
 | Backoff                   | full jitter, `uniform(0, min(60 s, 1 s · 2^failures))`     | `packages/app/src/runtime/connection-backoff.ts` |
 | Reset                     | on success, a changed route, an explicit retry, or a sweep | `HostRuntimeController`                          |
 | Reconnect sweep           | Hosts that need a connect slot start 100 ms apart          | `packages/app/src/runtime/reconnect-sweep.ts`    |
-| Connects in flight        | 4 per runtime store                                        | `ConnectLimiter`, shared by every controller     |
+| Connects in flight        | 16 per runtime store                                       | `ConnectLimiter`, shared by every controller     |
 | Directory pages in flight | 3 per runtime store                                        | `DirectorySync` (`pageFetchLimiter`)             |
 | App client auto-reconnect | full jitter, cap 60 s                                      | `createDefaultDeps` (`reconnect.jitter: "full"`) |
 
@@ -37,12 +37,14 @@ tail cache and Settings → Storage, is [offline cache](offline-cache.md).
   share three slots across Hosts, so 14 Hosts coming back do not fetch at once; a page that waited
   past a connection change is dropped instead of opening a stale subscription.
 - Admission sessions and probe sockets take a connect slot. A self-retrying client's
-  `connect()` can stay pending across retries, so it is not gated.
+  `connect()` can stay pending across retries, so it is not gated. A connect mostly waits on round
+  trips, so the limit is sized for a company fleet to connect in one wave (it was 4 until
+  2026-10-30, which made 14 Hosts on a 400 ms VPN connect in four waves).
 - `DaemonClient` keeps its unjittered default; only the app opts in, so CLI and daemon timing
   do not change.
 
-Measured in `host-runtime-fleet.test.ts` with fake timers (100 Hosts, 10 simulated minutes; Node
-simulation, not device evidence):
+Measured in `host-runtime-fleet.test.ts` with fake timers (100 Hosts, 10 simulated minutes, a
+connect limit of 4; Node simulation, not device evidence):
 
 | Scenario                                     | Fixed 2 s tick (before)  | Backoff (O1)         |
 | -------------------------------------------- | ------------------------ | -------------------- |
@@ -67,17 +69,62 @@ connects in flight.
 
 Tickets are single use: the Hub stamps `consumedAt` when the daemon consumes one, and each lives
 60 s (`packages/hub/src/managed-access/tickets.ts`). A cached ticket presented again is rejected,
-so the app does not reuse tickets. The client asks for a ticket only after the transport to the
-sandbox opens, so an unreachable sandbox costs no ticket, and the backoff above bounds how often
-a reachable one asks. Cutting ticket calls further needs the Hub multiplexing gateway (O4).
+so the app does not reuse tickets. A Host with no failure since it last connected requests its
+ticket when the attempt starts, while the transport opens (`prefetchedAccessTicket`); the first
+hello takes it. After a failure the ticket waits for the transport, so an unreachable sandbox
+costs a ticket only on the first attempt after a reset (launch, a sweep, a Retry), and the backoff
+above bounds how often a reachable one asks. Cutting
+ticket calls further needs the Hub multiplexing gateway (O4).
 
 ## Cold start: adopt, never restart
 
 The registry restores Hub-managed Hosts and their controllers start before the Hub list arrives.
 When a Hub binding mounts, registering its ticket resolver re-runs admission if the binding or
-advertised routes changed. The binding then calls `adoptHostConnection`: an online or connecting
-controller is left alone, anything else gets one immediate attempt. A changed offer still
-reaches the controller through the profile upsert.
+advertised routes changed. The binding then waits for the registry to load (a write before it
+would replace the stored profiles), writes the offer and calls `adoptHostConnection`: an online
+or connecting controller is left alone, anything else gets one immediate attempt. A changed offer
+still reaches the controller through the profile upsert.
+
+## Cold-start connect path
+
+Each step below costs whole round trips through the VPN. On 2026-10-30 a Galaxy S23 (14 Hub
+Hosts, ~400 ms) showed 0/14 online 20 s after a force-stop and 14/14 only by 60 s.
+
+| Step                     | Round trips | Runs alongside                                      |
+| ------------------------ | ----------- | --------------------------------------------------- |
+| Registry restore         | local       | the remembered daemon list restore                  |
+| Hub binding              | none        | mounts from the remembered list                     |
+| Hub access-token refresh | ~3          | transport open                                      |
+| Transport open (relay)   | ~4          | the ticket request                                  |
+| Access ticket            | 1           | transport open (first attempt after reset)          |
+| hello → server_info      | 1           |                                                     |
+| Account read, list read  | 1 each      | connects; the live list replaces the binding source |
+| First directory fetch    | 1 per page  | sends the cached cursors, so it is a delta          |
+
+Before 2026-10-30 these ran in series: bindings mounted only after the account and list reads,
+so the first attempts opened a transport and then failed for want of a ticket resolver ("Sign in
+to the Hub managing this Host"); the next ones were cut off when the bindings registered; then 14
+connects ran four at a time, each opening the transport before asking for its ticket.
+`clisbot/hub/hub-cold-start.test.ts` replays the report with fake timers: 12.8 s to 14/14 before,
+2.0 s after (one wave of transport open and hello). Without a remembered list the Hosts connect
+one wave after the live list, 4.0 s. The device took longer than either; the summary below says
+where the rest went.
+
+- **Bind from the remembered list.** `managedHostBindingList` binds the list this account last
+  read until this run's list arrives, with the same binding keys, so the live list replaces it
+  without reconnecting. Its ticket requests use the remembered organization through
+  `api(organizationId)` before the account read answers. A Hub that answers signed out or another
+  account drops the list, and its bindings unmount. Orphan removal and re-adding a removed Host
+  wait for this run's list.
+- **Ticket with the transport**: [Hub access tickets](#hub-access-tickets).
+- **One wave**: the connect limit in [reconnect pacing](#reconnect-pacing).
+
+`runtime/cold-start-connect.ts` records one `cold-start-connect` host diagnostic per app start
+(read it with `await clisbotHostDiagnostics()` on web, or in the device log as
+`[clisbot:host] cold-start-connect`): Hub-managed Hosts restored, how many came online, failed
+attempts, and milliseconds from bundle start to the registry restore, the first Hub binding, the
+account read, the list read, the first Host online and the last (null if the 60 s deadline came
+first).
 
 Only the Hub's answer removes a Hub-managed Host: signed out, another organization, a daemon the
 list no longer offers, or the saved Hub forgotten (`orphanedManagedHosts`). A binding unmounting
@@ -156,9 +203,11 @@ reopen the app before treating it as lost data, and record it here.
 account id, organization id, daemons and `syncedAt`, in AsyncStorage under
 `@clisbot:hub-daemon-lists:v1`.
 
-- **Used** only for visibility, when the live list is missing and the account is the same one,
-  or its state could not be read. The inventory reports `lastSyncedAtByOrigin` for those Hubs.
-- **Never used** for bindings, ticket resolvers or orphan removal; those act on a fresh list.
+- **Used** for visibility, when the live list is missing and the account is the same one, or its
+  state could not be read. The inventory reports `lastSyncedAtByOrigin` for those Hubs.
+- **Used** for bindings and ticket resolvers under the same rule, until this run's list arrives
+  ([cold-start connect path](#cold-start-connect-path)).
+- **Never used** for orphan removal or adding back a removed Host; those act on a fresh list.
 - **Replaced** by every successful list, so a delisted daemon disappears.
 - **Removed** on explicit sign-out, when the reachable Hub reports signed out or a different
   account or organization, and on a 403 from the list. `onAccessRevoked` still removes the Host

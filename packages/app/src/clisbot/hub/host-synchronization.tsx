@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { offerConnections } from "@/device-access/host-profile";
 import type { ConnectionOffer } from "@clisbot/protocol/connection-offer";
 import { getHostRuntimeStore, useHosts } from "@/runtime/host-runtime";
 import { recordHostDiagnostic } from "@/runtime/host-diagnostics";
-import { registerHostAccessTicketResolver } from "@/runtime/host-session-access";
-import type { HubHostManagement } from "@/types/host-connection";
 import { i18n } from "@/i18n/i18next";
 import { HubAccountScope, useHubAccount, useHubAccounts } from "./account-provider";
 import { HubAccessTicketSchema } from "./contracts";
 import { classifyHubFailure } from "./hub-failure";
-import { hubManagedHostRequiresAccessTicket } from "./managed-host-admission";
+import {
+  bindManagedHost,
+  enqueueManagedHostMutation,
+  managedHostBindingList,
+} from "./managed-host-binding";
 import { type HubHostAnswer, orphanedManagedHosts } from "./managed-host-reconciliation";
 import { useHubDaemonsQuery } from "./host-inventory";
 import { cachedListForAccount, useHubDaemonListCache } from "./hub-daemon-list-cache";
@@ -23,14 +24,6 @@ const HOST_READD_BASE_DELAY_MS = 1_000;
 const HOST_READD_MAX_DELAY_MS = 60_000;
 /** A Host registered this long counts as recovered; the next removal backs off from the start. */
 const HOST_READD_STABLE_MS = 120_000;
-
-let managedHostMutationTail: Promise<void> = Promise.resolve();
-
-function enqueueManagedHostMutation(operation: () => Promise<void>): Promise<void> {
-  const next = managedHostMutationTail.then(operation);
-  managedHostMutationTail = next.catch(() => undefined);
-  return next;
-}
 
 /** Removes every Host `hubOrigin` manages, once that saved Hub is forgotten on this device. */
 function removeHubManagedHosts(hubOrigin: string): Promise<void> {
@@ -90,7 +83,6 @@ function useForgottenHubHostRemoval(accounts: readonly { origin: string | null }
 
 function AccountHostSynchronization() {
   const hub = useHubAccount();
-  const signedIn = hub.signedIn;
   const hubOrigin = hub.origin;
   const daemons = useHubDaemonsQuery();
   const hosts = useHosts();
@@ -110,34 +102,34 @@ function AccountHostSynchronization() {
   const readListAgain = useCallback(() => refetchList({ cancelRefetch: false }), [refetchList]);
   useManagedHostReconciliation(hub, daemons, hosts);
 
-  if (
-    !hub.enabled ||
-    signedIn === null ||
-    hubOrigin === null ||
-    daemons.isPlaceholderData ||
-    daemons.data === undefined
-  ) {
-    return null;
-  }
+  const bindingList = managedHostBindingList({
+    account: hub,
+    live: daemons.isPlaceholderData ? undefined : daemons.data,
+    remembered: rememberedList,
+  });
+  if (bindingList === null || hubOrigin === null) return null;
   // The list kept from before a 401 or 403 still mounts the bindings, but the Hub refuses this
-  // account a ticket too: re-adding a Host it removed would be refused again.
+  // account a ticket too: re-adding a Host it removed would be refused again. A remembered list
+  // never re-adds: only this run's list says the Hub still offers the daemon.
   const hubRefusesAccount =
     daemons.error !== null &&
     daemons.error !== undefined &&
     classifyHubFailure(daemons.error) !== "unreachable";
-  return daemons.data.daemons.flatMap((daemon) =>
+  const readdPaused = hubRefusesAccount || bindingList.source === "remembered";
+  return bindingList.daemons.flatMap((daemon) =>
     daemon.connectionOffer === null
       ? []
       : [
           <HubHostBinding
-            key={`${signedIn.account.id}:${signedIn.organization.id}:${daemon.id}`}
+            key={`${bindingList.accountId}:${bindingList.organizationId}:${daemon.id}`}
             daemonId={daemon.id}
             label={daemon.slug}
             offer={daemon.connectionOffer}
             managedAccessMode={daemon.managedAccessMode}
             hubOrigin={hubOrigin}
-            organizationId={signedIn.organization.id}
-            readdPaused={hubRefusesAccount}
+            accountId={bindingList.accountId}
+            organizationId={bindingList.organizationId}
+            readdPaused={readdPaused}
             readListAgain={readListAgain}
           />,
         ],
@@ -220,6 +212,7 @@ function HubHostBinding({
   offer,
   managedAccessMode,
   hubOrigin,
+  accountId,
   organizationId,
   readdPaused,
   readListAgain,
@@ -229,6 +222,8 @@ function HubHostBinding({
   offer: ConnectionOffer;
   managedAccessMode: "off" | "external";
   hubOrigin: string;
+  /** The account the list was read for; stable when the live list replaces a remembered one. */
+  accountId: string;
   organizationId: string;
   /** The Hub answered that this account must sign in again or lost access. */
   readdPaused: boolean;
@@ -241,7 +236,7 @@ function HubHostBinding({
   const synchronizationKey = hubHostSynchronizationKey({
     origin: hubOrigin,
     organizationId,
-    accountId: hub.signedIn?.account.id ?? null,
+    accountId,
     daemonId,
   });
   const hubRef = useRef(hub);
@@ -257,69 +252,38 @@ function HubHostBinding({
   );
   const issueAccessTicket = useCallback(
     (clientId: string) =>
+      // Before the account read answers, the remembered list's organization authorizes the
+      // request; the Hub decides whether this sign-in may have a ticket.
       hubRef.current
-        .api()
+        .api(organizationId)
         .post(
           `daemons/${encodeURIComponent(daemonId)}/access-tickets`,
           { clientId },
           HubAccessTicketSchema,
         )
         .then(({ accessTicket }) => accessTicket),
-    [daemonId],
+    [daemonId, organizationId],
   );
   useEffect(() => {
-    let disposed = false;
     setHubHostSynchronizationFailure(synchronizationKey, null);
-    const store = getHostRuntimeStore();
-    const management: HubHostManagement = {
-      kind: "hub",
-      hubOrigin,
-      organizationId,
-      daemonId,
-    };
-    // Even off-mode Hub Hosts need a current account binding. Off skips ticket
-    // issuance, not ownership of the app's automatically supplied connection.
-    const unregister = registerHostAccessTicketResolver(
-      synchronizedOffer.serverId,
-      hubManagedHostRequiresAccessTicket(managedAccessMode)
-        ? issueAccessTicket
-        : async () => undefined,
-      management,
-      synchronizedOffer.v === 5 ? offerConnections(synchronizedOffer) : undefined,
-    );
-    void enqueueManagedHostMutation(async () => {
-      if (disposed) return;
-      const existing = store
-        .getHosts()
-        .find((host) => host.serverId === synchronizedOffer.serverId);
-      const profile = await store.upsertManagedConnectionFromOffer({
-        offer: synchronizedOffer,
-        label: labelRef.current,
-        management: { ...management, daemonSlug: labelRef.current, managedAccessMode },
-      });
-      if (profile === null) {
-        throw new Error(i18n.t("hub.account.synchronization.conflictWithHint"));
-      }
-      // Adopt, never restart, a Host already running for this daemon (cold start restores it
-      // from the registry). Registering the binding above re-ran its admission if the binding
-      // or offered routes changed; a changed offer reaches it through the upsert. A Host that
-      // gave up (offline, error) gets one immediate attempt.
-      if (!disposed && existing) await store.adoptHostConnection(synchronizedOffer.serverId);
-    }).catch((error: unknown) => {
-      unregister();
-      if (!disposed) {
+    const unbind = bindManagedHost({
+      store: getHostRuntimeStore(),
+      offer: synchronizedOffer,
+      management: { kind: "hub", hubOrigin, organizationId, daemonId },
+      managedAccessMode,
+      label: () => labelRef.current,
+      issueAccessTicket,
+      onFailure: (error) =>
         setHubHostSynchronizationFailure(synchronizationKey, {
           message:
             error instanceof Error
               ? error.message
               : i18n.t("hub.account.synchronization.addFailed"),
           retry,
-        });
-      }
+        }),
     });
     return () => {
-      disposed = true;
-      unregister();
+      unbind();
       setHubHostSynchronizationFailure(synchronizationKey, null);
     };
   }, [

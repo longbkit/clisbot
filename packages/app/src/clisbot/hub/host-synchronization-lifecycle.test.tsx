@@ -77,6 +77,8 @@ vi.mock("@/runtime/host-runtime", () => ({
     upsertManagedConnectionFromOffer: adapters.upsert,
     adoptHostConnection: adapters.adopt,
     removeManagedHost: adapters.remove,
+    whenHostRegistryLoaded: async () => undefined,
+    markColdStartPhase: () => undefined,
   }),
   useHosts: () => adapters.hosts,
 }));

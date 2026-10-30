@@ -78,6 +78,8 @@ vi.mock("@/runtime/host-runtime", () => ({
     upsertManagedConnectionFromOffer: adapters.upsert,
     removeManagedHost: adapters.remove,
     restartHostConnection: adapters.restart,
+    whenHostRegistryLoaded: async () => undefined,
+    markColdStartPhase: () => undefined,
   }),
 }));
 vi.mock("@/hooks/use-open-add-project", () => ({

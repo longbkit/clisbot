@@ -15,6 +15,7 @@ import {
 } from "react";
 import { useFetchQuery } from "@/data/query";
 import { i18n } from "@/i18n/i18next";
+import { getColdStartConnectTimeline } from "@/runtime/cold-start-connect";
 import { HubApiClient } from "./api-client";
 import type { HubConfiguration } from "./config";
 import { type HubAccountScopeConfiguration, useHubAccountScopes } from "./account-scopes";
@@ -97,7 +98,12 @@ export interface HubAccountContextValue {
   changeMemberRole(input: { memberId: string; role: "owner" | "admin" | "member" }): Promise<void>;
   removeMember(memberId: string): Promise<void>;
   refresh(): Promise<void>;
-  api(): HubApiClient;
+  /**
+   * The signed-in organization's API. `organizationId` names the organization a remembered daemon
+   * list was read for; it is accepted before the account read answers (a cold start) and must
+   * match the signed-in organization after.
+   */
+  api(organizationId?: string): HubApiClient;
 }
 
 /** Every account action of a build without Hub support. */
@@ -564,10 +570,20 @@ function EnabledHubAccountController({
   const state = account.data ?? null;
   const signedIn =
     state?.status === "active" || state?.status === "appSetupRequired" ? state : null;
-  const api = useCallback(() => {
-    if (signedIn === null) throw new Error(i18n.t("hub.account.errors.signInFirst"));
-    return new HubApiClient(transport, signedIn.organization.id);
-  }, [signedIn, transport]);
+  const api = useCallback(
+    (organizationId?: string) => {
+      if (signedIn !== null) {
+        const signedInOrganizationId = signedIn.organization.id;
+        const sameOrganization =
+          organizationId === undefined || organizationId === signedInOrganizationId;
+        if (sameOrganization) return new HubApiClient(transport, signedInOrganizationId);
+      } else if (state === null && organizationId !== undefined) {
+        return new HubApiClient(transport, organizationId);
+      }
+      throw new Error(i18n.t("hub.account.errors.signInFirst"));
+    },
+    [signedIn, state, transport],
+  );
   const accountError = accountErrorMessage(account.error, account.isError);
   const value = useMemo<HubAccountContextValue>(
     () => ({
@@ -676,6 +692,7 @@ async function readAccountState(
   invitationId: string | null,
 ): Promise<HubAccountState> {
   const state = await requestAccountState(transport, invitationId);
+  getColdStartConnectTimeline().mark("hubAccount");
   if (state.status !== "signedOut" || !transport.recoverSignIn) return state;
   if (!(await transport.recoverSignIn())) return state;
   return requestAccountState(transport, invitationId);

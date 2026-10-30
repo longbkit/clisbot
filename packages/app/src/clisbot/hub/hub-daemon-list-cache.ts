@@ -8,7 +8,8 @@ import { HubDaemonSchema } from "./contracts";
  * The last daemon list each signed-in Hub account returned, so its Hosts stay visible (and their
  * cached sessions readable) while that Hub or the VPN in front of it is unreachable.
  *
- * Visibility only: bindings, ticket resolvers and orphan removal act on a fresh list alone.
+ * A cold start also binds its Hosts from it, so they connect before the Hub answers
+ * (`managedHostBindingList`); orphan removal and re-adding a removed Host act on a fresh list alone.
  * The entry is replaced by every successful list (a delisted daemon disappears) and removed on
  * sign-out, a different account or organization, or a 403 from the list. "Unreachable" never
  * removes it. See docs/features/offline/connection-resilience.md.

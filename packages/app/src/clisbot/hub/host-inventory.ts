@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { z } from "zod";
 import { useFetchQueries, useFetchQuery } from "@/data/query";
 import { useHosts, useHostRuntimeConnectedServerIds } from "@/runtime/host-runtime";
+import { getColdStartConnectTimeline } from "@/runtime/cold-start-connect";
 import { type HubAccountContextValue, useHubAccount, useHubAccounts } from "./account-provider";
 import { classifyHubFailure } from "./hub-failure";
 import { HubDaemonsSchema } from "./contracts";
@@ -52,6 +53,7 @@ export async function readHubDaemons(
   const cache = getHubDaemonListCache();
   try {
     const list = await hub.api().get("daemons", HubDaemonsSchema);
+    getColdStartConnectTimeline().mark("hubList");
     listFailures.delete(failureKey);
     if (hub.origin !== null && hub.signedIn !== null)
       cache.remember({

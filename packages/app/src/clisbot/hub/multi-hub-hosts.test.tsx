@@ -159,6 +159,8 @@ vi.mock("@/runtime/host-runtime", () => {
       return true;
     },
     adoptHostConnection: async () => undefined,
+    whenHostRegistryLoaded: async () => undefined,
+    markColdStartPhase: () => undefined,
   };
   return {
     getHostRuntimeStore: () => store,
