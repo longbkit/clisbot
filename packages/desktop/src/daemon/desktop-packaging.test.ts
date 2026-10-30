@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import {
   chmodSync,
   copyFileSync,
@@ -14,6 +15,74 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const { MANIFEST_NAME, recordDesktopRenderer, verifyDesktopRenderer } = createRequire(
+  import.meta.url,
+)(join(packageRoot, "scripts", "renderer-build.js")) as {
+  MANIFEST_NAME: string;
+  recordDesktopRenderer: (root: string) => void;
+  verifyDesktopRenderer: (root: string) => void;
+};
+
+describe("desktop renderer packaging gate", () => {
+  function rendererFixture(): string {
+    const root = mkdtempSync(join(tmpdir(), "clisbot-renderer-test-"));
+    writeFileSync(join(root, "index.html"), '<script src="app.js"></script>');
+    writeFileSync(join(root, "app.js"), 'document.createElement("webview")');
+    return root;
+  }
+
+  it("accepts an unchanged Electron export after copying into packaged resources", () => {
+    const root = rendererFixture();
+    const packaged = mkdtempSync(join(tmpdir(), "clisbot-renderer-packaged-test-"));
+    try {
+      recordDesktopRenderer(root);
+      for (const name of ["index.html", "app.js", MANIFEST_NAME]) {
+        copyFileSync(join(root, name), join(packaged, name));
+      }
+      expect(() => verifyDesktopRenderer(packaged)).not.toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(packaged, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a generic web export with no Electron receipt", () => {
+    const root = rendererFixture();
+    try {
+      expect(() => verifyDesktopRenderer(root)).toThrow("npm run build:desktop");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(["index.html", "app.js", "new.js"])(
+    "rejects a later export that changes or adds %s despite a leftover Electron receipt",
+    (name) => {
+      const root = rendererFixture();
+      try {
+        recordDesktopRenderer(root);
+        writeFileSync(join(root, name), "generic web export");
+        expect(() => verifyDesktopRenderer(root)).toThrow("changed after the Electron export");
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("rejects receipts for the wrong platform", () => {
+    const root = rendererFixture();
+    try {
+      recordDesktopRenderer(root);
+      const file = join(root, MANIFEST_NAME);
+      const receipt = JSON.parse(readFileSync(file, "utf8"));
+      receipt.platform = "web";
+      writeFileSync(file, JSON.stringify(receipt));
+      expect(() => verifyDesktopRenderer(root)).toThrow("missing Electron export provenance");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
 
 function writeExecutable(filePath: string, contents: string): void {
   writeFileSync(filePath, contents, "utf8");
