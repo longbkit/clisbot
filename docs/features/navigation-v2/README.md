@@ -233,6 +233,12 @@ caches retain immutable source identities and compute participant identities onc
 profile-only changes do not alter the key. Workspace count caches compare participation even
 when a creator exists.
 
+A chat's participation key is cached on its payload (`clisbot/navigation/chat-ownership.ts`), so
+Home's pin tags and the Chats pane derive it once between them. It is recomputed only when the
+chat's Host replaces its agents map and a participant session actually changed; the session store
+replaces that map on every agent update and never edits it in place. A hidden Chats pane or Home
+holds its keys and re-reads them when shown.
+
 The scope applies first everywhere; pins only reorder inside it. A pin (a resource pin, or a
 workspace pinned on the Host, which every reader sees) never brings another member's session into
 For me.

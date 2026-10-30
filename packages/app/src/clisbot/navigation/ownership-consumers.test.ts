@@ -103,14 +103,15 @@ describe.each<OwnershipHostKind>(["hub", "direct", "unknown"])(
       expect(resolveOwnership({ ...chatOwnershipEvidence(chat, source), ...context })).toBe(
         hostKind === "direct" ? "mine" : "unknown",
       );
-      source.set("child", { ...fixture.participated, createdBy: own });
-      expect(resolveOwnership({ ...chatOwnershipEvidence(chat, source), ...context })).toBe(
+      // The session store replaces an agents map; it never edits one in place.
+      const participated = new Map([["child", { ...fixture.participated, createdBy: own }]]);
+      expect(resolveOwnership({ ...chatOwnershipEvidence(chat, participated), ...context })).toBe(
         hostKind === "unknown" ? "unknown" : "mine",
       );
       const authored = { ...chat, record: { createdBy: other } } as ChatPayload;
-      expect(resolveOwnership({ ...chatOwnershipEvidence(authored, source), ...context })).toBe(
-        hostKind === "unknown" ? "unknown" : "mine",
-      );
+      expect(
+        resolveOwnership({ ...chatOwnershipEvidence(authored, participated), ...context }),
+      ).toBe(hostKind === "unknown" ? "unknown" : "mine");
     });
 
     it("Workspace visibility and counts agree inside a reader-created workspace", () => {
