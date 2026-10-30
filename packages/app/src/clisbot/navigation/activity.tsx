@@ -41,7 +41,6 @@ const MINUTE = 60_000;
 interface NavigationActivity {
   rows: HomeRow[];
   badge: number;
-  now: number;
   ownershipOf: (
     agent: Pick<AggregatedAgent, "serverId" | "createdBy" | "participationKey">,
   ) => Ownership;
@@ -104,7 +103,6 @@ function ObservedNavigationActivity({ children }: { children: ReactNode }) {
     () => ({
       rows,
       badge: homeBadgeCount(rows),
-      now,
       ...ownership,
       markSeen: (agent) =>
         transition((current) => markIssueSeen(current, subjectOf(agent), Date.now())),
@@ -115,7 +113,9 @@ function ObservedNavigationActivity({ children }: { children: ReactNode }) {
       markAllSeen: (list) =>
         transition((current) => markIssuesSeen(current, list.map(subjectOf), Date.now())),
     }),
-    [rows, now, ownership, subjectOf, transition],
+    // The minute clock reaches readers only through `rows`, which keep their identity unless a
+    // seen failure aged out, so the tick re-renders nobody.
+    [rows, ownership, subjectOf, transition],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
