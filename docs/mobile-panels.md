@@ -16,11 +16,16 @@ Navigation V2 phones switch Home, Chats, Work, Schedules and More the way Slack 
 with no remount. `PhoneTabs` (`clisbot/home/phone-tab-navigator.tsx`) is a `TabRouter` with its own
 view, not the bottom-tabs view:
 
-- After the first paint every unvisited tab mounts hidden, one per idle slot
+- Once startup settles, every unvisited tab mounts hidden, one per idle slot
   (`requestIdleCallback`, a short timer on Safari), each in a transition a press can interrupt.
   A first visit is then a visibility flip, not a mount: on 2026-10-30 a first visit to Work (about
   6,100 items, 14 Hosts) took 833–1033 ms with no change on screen. A mounted tab never unmounts.
   Each tab is a `RetainedPanel` in route order, a stable sibling order.
+- Startup settles when the cache restore is done and every restored Hub Host is online, or 10 s
+  after the registry restore (`clisbot/home/after-startup.ts`). The idle callback's 2 s timeout
+  had mounted Work during the restore and the connects
+  ([cold-start JS thread](features/offline/connection-resilience.md#cold-start-js-thread)). A tab
+  pressed before then mounts on the press.
 - The tab bar (`MobileTabBar`) dispatches the switch on the tab navigator. The press's commit
   shows and activates the target and hides the old tab; its held panes render the latest value in
   that commit. No animation, no settlement, no focus-event round trip. Panels are never detached
