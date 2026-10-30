@@ -12,6 +12,7 @@ import { useStoreWithEqualityFn } from "zustand/traditional";
 import { getChatIdFromLabels } from "@clisbot/protocol/bots/labels";
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { useResourcePrincipalScope } from "@/clisbot/bots/data/resource-principal-scope";
+import { HeldContextValue } from "@/components/held-context";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useHosts } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
@@ -61,6 +62,14 @@ const Context = createContext<NavigationActivity | null>(null);
 export function NavigationActivityProvider({ children }: { children: ReactNode }) {
   if (!NAVIGATION_V2_ENABLED) return children;
   return <ObservedNavigationActivity>{children}</ObservedNavigationActivity>;
+}
+
+/**
+ * The activity as it was when the surrounding retained panel was hidden: a hidden Home tab skips
+ * every directory update and renders once with the latest rows when shown.
+ */
+export function HeldNavigationActivity({ children }: { children: ReactNode }) {
+  return <HeldContextValue context={Context}>{children}</HeldContextValue>;
 }
 
 function ObservedNavigationActivity({ children }: { children: ReactNode }) {
