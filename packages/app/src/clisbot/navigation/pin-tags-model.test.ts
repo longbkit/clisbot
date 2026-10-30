@@ -14,14 +14,15 @@ const keys = (list: PinTag[]) => list.map((tag) => tag.key);
 describe("splitPinTags", () => {
   it("shows only my pins by default and folds others into one count", () => {
     const { mine, others } = splitPinTags(tags, "hybrid");
-    expect(keys(mine)).toEqual(["bot:nia", "ws:fix"]);
-    // A pin nobody can place yet is not the reader's own: it folds in with the others.
-    expect(keys(others)).toEqual(["ws:theirs", "chat:theirs", "ws:unplaced"]);
+    // A pin nobody can place is the reader's: only a proven other person folds into the count.
+    expect(keys(mine)).toEqual(["bot:nia", "ws:fix", "ws:unplaced"]);
+    expect(keys(others)).toEqual(["ws:theirs", "chat:theirs"]);
   });
 
   it("follows Home's mode", () => {
     expect(keys(splitPinTags(tags, "chat").mine)).toEqual(["bot:nia"]);
-    expect(keys(splitPinTags(tags, "work").others)).toEqual(["ws:theirs", "ws:unplaced"]);
+    expect(keys(splitPinTags(tags, "work").mine)).toEqual(["ws:fix", "ws:unplaced"]);
+    expect(keys(splitPinTags(tags, "work").others)).toEqual(["ws:theirs"]);
   });
 });
 

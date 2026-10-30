@@ -34,7 +34,10 @@ const scopes: OwnershipScope[] = ["mine", "others", "all"];
 describe.each<OwnershipHostKind>(["hub", "direct", "unknown"])(
   "ownership across consumers on %s",
   (hostKind) => {
-    const expectedMine = { hub: 4, direct: 9, unknown: 0 }[hostKind];
+    // Only a proven other person leaves For me: `other` and the unlinked channel identity on a
+    // known Host. Unproven fixtures (absent, local, automation, system, interaction-only, and
+    // everything on an unknown Host) stay with the reader.
+    const expectedMine = { hub: 9, direct: 9, unknown: 11 }[hostKind];
     const expected = { mine: expectedMine, others: 11 - expectedMine, all: 11 };
     const context = { accounts, hostKind };
     const agents = Object.entries(fixture).map(

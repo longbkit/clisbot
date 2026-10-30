@@ -185,11 +185,23 @@ not proof of daemon ownership (pairing can delegate access). `KEEP_DIRECT_LEGACY
 single switch, tested both ways. A Host missing from the registry is always **unknown**.
 `watched === true` is the explicit Round 2 override on a registered Host; no live caller sets it.
 
-**Unknown** is listed under Others and All, never For me. Its count joins Others, so For me +
-Others = All. It may persist for legacy sessions without identity evidence; a temporarily missing
-reader can resolve later using the remembered account below.
+**Unknown** is listed under For me and All, never Others (Owner, 2026-10-31). Its count joins For
+me, so For me + Others = All; only a proven other person is Others. `isReaderOwned` in
+`ownership.ts` is the single predicate every consumer reads (scopes, counts, Home badge, pin tags,
+search ranking). The resolver still returns `unknown`, so the distinction stays available. The
+scope tabs' help icon about unknown ownership shows on the tabs that list it (For me and All). It may
+persist for legacy sessions without identity evidence; a temporarily missing reader can resolve
+later using the remembered account below.
 
-**Why the provisional rule was removed.** On 2026-10-29, a watchdog-only app probe of 14 real
+**Why unknown moved to For me.** Sessions the desktop app starts on its own Host carry no creator
+and no participant, because the local connection has no Hub account. Under the 2026-10-29 rule
+about 700 of the owner's own Mac sessions were listed under Others. Evidence that cannot place an
+item no longer moves it away from the reader; a verified other creator still does. Consequences:
+on a Host missing from the registry everything is For me until the Host is classified, and a Hub
+session whose creator is absent, an automation or the system is For me unless participation or a
+creator proves another person.
+
+**Why the provisional rule was removed (2026-10-29, superseded above).** A watchdog-only app probe of 14 real
 Hub-bound Hosts found 38 of 3,359 sessions admitted to For me solely because `createdBy` was absent.
 All 38 reported authorship `ready`; none matched the reader through last sender or participants.
 The initial fix, which accepted participation only for creatorless sessions, changed that snapshot

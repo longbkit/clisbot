@@ -46,8 +46,8 @@ export function isInView(view: SearchViewContext | null, placement: ItemPlacemen
 }
 
 /**
- * Keep every match (R1) in four bands: in view and For me, in view and not mine (Others, or
- * nobody can tell), then the same two outside the view. Stable, so the matcher's order holds
+ * Keep every match (R1) in four bands: in view and For me (including work nobody can place), in
+ * view and Others, then the same two outside the view. Stable, so the matcher's order holds
  * within each band and the highlighted row does not jump while results stream in.
  */
 export function rankItemsByView<Row>(

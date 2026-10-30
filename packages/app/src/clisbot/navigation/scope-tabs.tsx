@@ -7,7 +7,7 @@ import type { Theme } from "@/styles/theme";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
-import type { OwnershipScope, ScopeCounts } from "./ownership";
+import { inScope, type OwnershipScope, type ScopeCounts } from "./ownership";
 import { useNavigationStore, type ScopedSection } from "./store";
 
 const SCOPES: readonly OwnershipScope[] = ["mine", "others", "all"];
@@ -44,7 +44,7 @@ export function ScopeTabs({ section, counts }: { section: ScopedSection; counts:
         onValueChange={change}
         testID={`${section}-scope`}
       />
-      {value !== "mine" ? (
+      {inScope(value, "unknown") ? (
         <Tooltip enabledOnMobile>
           <TooltipTrigger
             accessibilityRole="button"

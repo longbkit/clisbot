@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
-import { resolveOwnership, type OwnershipHostKind } from "./ownership";
+import { resolveOwnership, type Ownership, type OwnershipHostKind } from "./ownership";
 import { participationKeyOf } from "./ownership-key";
 import {
   countWork,
@@ -32,15 +32,14 @@ const query = (hostKind: OwnershipHostKind = "hub"): WorkQuery => ({
 describe("incremental ownership evidence", () => {
   it("keeps distinct Host keys and invalidates unchanged workspace counts when bindings change", () => {
     const counter = createWorkCounter();
-    const sessions: WorkSession[] = [{ id: "legacy", statusBucket: "done" }];
+    // A proven other person is Others on a known Host and unproven (so the reader's) on an
+    // unknown one; that difference is what shows a Host binding change was not served stale.
+    const sessions: WorkSession[] = [{ id: "theirs", statusBucket: "done", createdBy: other }];
     const options = query("direct");
     const second = { ...workspace, workspaceKey: "other:workspace", serverId: "other" };
     const mixed = {
       ...options,
-      hostKinds: new Map<string, OwnershipHostKind>([
-        ["host", "direct"],
-        ["other", "hub"],
-      ]),
+      hostKinds: new Map<string, OwnershipHostKind>([["host", "direct"]]),
     };
     expect(counter([workspace, second], () => sessions, mixed).scopes).toEqual({
       mine: 1,
@@ -48,10 +47,11 @@ describe("incremental ownership evidence", () => {
       all: 2,
     });
     for (const [hostKind, mine] of [
-      ["direct", 1],
+      ["direct", 0],
+      ["unknown", 1],
       ["hub", 0],
-      ["unknown", 0],
-      ["direct", 1],
+      ["unknown", 1],
+      ["direct", 0],
     ] as const) {
       const next = {
         ...options,
@@ -69,18 +69,27 @@ describe("incremental ownership evidence", () => {
   });
 
   it("updates absent-author participation while reusing equivalent identity snapshots", () => {
+    // Both "unknown" and "mine" count as For me, so the resolved values show the re-resolution.
+    const resolved: Ownership[] = [];
     let calls = 0;
     const counter = createWorkCounter((input) => {
       calls++;
-      return resolveOwnership(input);
+      const ownership = resolveOwnership(input);
+      resolved.push(ownership);
+      return ownership;
     });
     const options = query();
     let sessions: WorkSession[] = [{ id: "absent", statusBucket: "done" }];
-    expect(counter([workspace], () => sessions, options).scopes.mine).toBe(0);
+    expect(counter([workspace], () => sessions, options).scopes).toEqual({
+      mine: 1,
+      others: 0,
+      all: 1,
+    });
     sessions = [{ ...sessions[0], participationKey: participationKeyOf({ lastMessageBy: own }) }];
     const participated = counter([workspace], () => sessions, options);
     expect(participated.scopes.mine).toBe(1);
     expect(calls).toBe(2);
+    expect(resolved).toEqual(["unknown", "mine"]);
     sessions = [
       {
         ...sessions[0],
@@ -99,15 +108,17 @@ describe("incremental ownership evidence", () => {
         participationKey: participationKeyOf({ lastMessageBy: other }),
       },
     ];
+    // Another person's message does not prove they own a session without a creator.
     expect(counter([workspace], () => sessions, options).scopes).toEqual({
-      mine: 1,
-      others: 1,
+      mine: 2,
+      others: 0,
       all: 2,
     });
+    expect(resolved.at(-1)).toBe("unknown");
     sessions = sessions.map((session) => ({ ...session, participationKey: undefined }));
     expect(counter([workspace], () => sessions, options).scopes).toEqual({
-      mine: 0,
-      others: 2,
+      mine: 2,
+      others: 0,
       all: 2,
     });
     expect(counter([workspace], () => sessions, options)).toEqual(

@@ -97,17 +97,18 @@ describe("Workspace items", () => {
     ];
     const list = () => rows;
     const mine = createWorkFilter(query(), list);
+    // Unproven sessions stay the reader's; a proven other person stays Others even here.
     expect(rows.filter((row) => mine.session(row, sandbox)).map((row) => row.id)).toEqual([
-      "mine",
-      "linked-channel",
-    ]);
-    expect(countWork([sandbox], list, query()).scopes).toEqual({ mine: 2, others: 6, all: 8 });
-    const others = createWorkFilter(query({ scope: "others" }), list);
-    expect(rows.filter((row) => others.session(row, sandbox)).map((row) => row.id)).toEqual([
       "absent",
       "local-owner",
       "workflow",
       "system",
+      "mine",
+      "linked-channel",
+    ]);
+    expect(countWork([sandbox], list, query()).scopes).toEqual({ mine: 6, others: 2, all: 8 });
+    const others = createWorkFilter(query({ scope: "others" }), list);
+    expect(rows.filter((row) => others.session(row, sandbox)).map((row) => row.id)).toEqual([
       "teammate",
       "unlinked-channel",
     ]);
@@ -132,9 +133,13 @@ describe("Workspace items", () => {
   });
 
   it("does not inherit either workspace author when a session records none", () => {
-    const filter = createWorkFilter(query({ scope: "others" }), sessionsOf);
-    expect(filter.session(session("legacy"), teammateWorkspace)).toBe(true);
-    expect(filter.session(session("legacy"), sandbox)).toBe(true);
+    // Unproven, so the reader's in both: a teammate's workspace does not make it the teammate's.
+    const mine = createWorkFilter(query(), sessionsOf);
+    const others = createWorkFilter(query({ scope: "others" }), sessionsOf);
+    for (const parent of [teammateWorkspace, sandbox]) {
+      expect(mine.session(session("legacy"), parent)).toBe(true);
+      expect(others.session(session("legacy"), parent)).toBe(false);
+    }
   });
 
   it("lists Bot sessions by default and hides them, and Bot-only workspaces, with Bots off", () => {
@@ -174,7 +179,7 @@ describe("Workspace items", () => {
     expect(hidden.chips.done).toBe(1);
   });
 
-  it("lists an item whose Hub has no known reader under Others and All", () => {
+  it("lists an item whose Hub has no known reader under For me and All, never Others", () => {
     const stranger: SessionActor = { kind: "user", id: "u-9", hubOrigin: "https://other.example" };
     const unplaced = workspace("unplaced", stranger);
     const rows = [sandbox, unplaced];
@@ -186,10 +191,10 @@ describe("Workspace items", () => {
       hostKinds,
       showBots: true,
     });
-    expect(counts.scopes).toEqual({ mine: 1, others: 1, all: 2 });
+    expect(counts.scopes).toEqual({ mine: 2, others: 0, all: 2 });
     for (const [scope, listed] of [
-      ["mine", false],
-      ["others", true],
+      ["mine", true],
+      ["others", false],
       ["all", true],
     ] as const) {
       expect(createWorkFilter(query({ scope }), none).workspace(unplaced)).toBe(listed);

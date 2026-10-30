@@ -15,7 +15,7 @@ export function pinTagMatchesMode(tag: Pick<PinTag, "area">, mode: HomeMode): bo
 }
 
 /**
- * The reader's own pins by default; every other pin, including one nobody can place yet, folds
+ * The reader's pins by default, including one nobody can place yet; another person's pins fold
  * into one `+N · Show` tag.
  */
 export function splitPinTags<T extends PinTag>(tags: readonly T[], mode: HomeMode) {

@@ -118,7 +118,9 @@ describe.each(seeds)("ownership properties, seed %i", (seed) => {
       expect(counts.mine + counts.others).toBe(counts.all);
       expect(counts.all).toBe(sources.length);
       expect(
-        ownerships.filter((value) => value === "unknown").every((value) => !inScope("mine", value)),
+        ownerships
+          .filter((value) => value === "unknown")
+          .every((value) => inScope("mine", value) && !inScope("others", value)),
       ).toBe(true);
 
       const rows = homeRows({
@@ -258,8 +260,8 @@ describe.each(seeds)("ownership properties, seed %i", (seed) => {
         const counts = countByScope([actual]);
         expect(counts.mine + counts.others).toBe(counts.all);
         if (actual === "unknown") {
-          expect(inScope("mine", actual)).toBe(false);
-          expect(inScope("others", actual)).toBe(true);
+          expect(inScope("mine", actual)).toBe(true);
+          expect(inScope("others", actual)).toBe(false);
         }
         if (input.hostKind === "unknown") expect(actual).toBe("unknown");
       }
@@ -308,8 +310,8 @@ describe.each(seeds)("ownership properties, seed %i", (seed) => {
           }),
         ).toBe(expected);
         if (expected === "unknown") {
-          expect(inScope("mine", expected)).toBe(false);
-          expect(inScope("others", expected)).toBe(true);
+          expect(inScope("mine", expected)).toBe(true);
+          expect(inScope("others", expected)).toBe(false);
           expect(inScope("all", expected)).toBe(true);
         }
       }
