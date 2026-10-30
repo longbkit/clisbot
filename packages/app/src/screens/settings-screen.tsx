@@ -1489,9 +1489,9 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
               <>
                 <GeneralSection settings={settings} handleLanguageChange={handleLanguageChange} />
                 <SendingSection />
+                {OFFLINE_CACHE_ENABLED ? <StorageSection /> : null}
                 <ProductAnalyticsSettings />
                 {isDesktopApp ? <OpenLocationSection /> : null}
-                {OFFLINE_CACHE_ENABLED ? <StorageSection /> : null}
               </>
             );
           case "diagnostics":
