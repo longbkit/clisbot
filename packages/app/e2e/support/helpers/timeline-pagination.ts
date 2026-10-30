@@ -3,12 +3,11 @@ import { buildAgentRoute, seedMockAgentWorkspace, type MockAgentWorkspace } from
 import { readReplicaCache } from "./replica-cache-storage";
 import { loadSessionMessageReaders } from "./new-workspace";
 import {
-  delayAgentBootstrapTailResponse,
+  delayAgentHydrationResponse,
   delayAgentOlderTimelineResponse,
   holdDaemonHydration,
   holdAgentOlderTimelinePages,
   type AgentTimelineResponseGate,
-  type BootstrapTimelineGate,
   type OlderTimelinePagesGate,
 } from "./agent-timeline-gate";
 
@@ -308,13 +307,17 @@ export async function reloadAgentTimelineFromPersistedReplica(
   page: Page,
   agent: LongTimelineAgent,
 ): Promise<void> {
+  // The tail's size is the cache's business: 256 KB of compact items with the offline cache, the
+  // last 50 without it (docs/features/offline/offline-cache.md). The reload needs the newest row.
   await expect
     .poll(async () => {
       const cache = await readReplicaCache(page);
       const timeline = cache?.hosts
         ?.flatMap((host) => host.timelines)
         .find((candidate) => candidate.agentId === agent.agentId);
-      return timeline?.items?.length === 50;
+      return timeline?.items?.some(
+        (item) => item.kind === "user_message" && item.text === agent.newestPrompt,
+      );
     })
     .toBe(true);
 
@@ -504,11 +507,23 @@ export async function expectTimelineAtHistoryStart(page: Page): Promise<void> {
     .toBeLessThanOrEqual(HISTORY_START_THRESHOLD_PX);
 }
 
-export async function holdBootstrapTimelinePage(
+export interface ReplicaHydrationGate extends AgentTimelineResponseGate {
+  /** The painted tail shows Updating until the held answer is applied. */
+  expectPending(): Promise<void>;
+  expectApplied(): Promise<void>;
+}
+
+export async function holdReplicaHydration(
   page: Page,
   agent: LongTimelineAgent,
-): Promise<BootstrapTimelineGate> {
-  return delayAgentBootstrapTailResponse(page, agent.agentId);
+): Promise<ReplicaHydrationGate> {
+  const gate = await delayAgentHydrationResponse(page, agent.agentId);
+  const updating = page.getByTestId("agent-updating-toast");
+  return {
+    ...gate,
+    expectPending: () => expect(updating).toBeVisible(),
+    expectApplied: () => expect(updating).toBeHidden({ timeout: 30_000 }),
+  };
 }
 
 export async function sendLiveTurnBeforeHydration(agent: LongTimelineAgent): Promise<string> {
