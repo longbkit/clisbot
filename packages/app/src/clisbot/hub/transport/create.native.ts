@@ -1,7 +1,11 @@
 import * as Crypto from "expo-crypto";
 import * as Linking from "expo-linking";
 import { readSecret, writeSecret, deleteSecret, lockSecret } from "@/device-access/secret-storage";
-import { oauthCredentialKey, parseOAuthCredential } from "./oauth-credentials";
+import {
+  type OAuthCredential,
+  oauthCredentialKey,
+  parseOAuthCredential,
+} from "./oauth-credentials";
 import * as WebBrowser from "expo-web-browser";
 import { AppState, Platform } from "react-native";
 import type { HubConfiguration } from "../config";
@@ -22,13 +26,26 @@ import {
 } from "./oauth";
 import { i18n } from "@/i18n/i18next";
 import { fetchWithDeadline } from "./request-deadline";
+import { getColdStartConnectTimeline } from "@/runtime/cold-start-connect";
 
 const CREDENTIAL_REREAD_DELAY_MS = 500;
+/** An access token this close to expiry is refreshed before use. */
+const ACCESS_TOKEN_MARGIN_MS = 30_000;
 
 interface AccessCredential {
   accessToken: string;
   expiresAt: number;
   generation: string;
+}
+
+function storedAccess(credential: OAuthCredential): AccessCredential | null {
+  return credential.accessToken === undefined || credential.accessExpiresAt === undefined
+    ? null
+    : {
+        accessToken: credential.accessToken,
+        expiresAt: credential.accessExpiresAt,
+        generation: credential.generation,
+      };
 }
 
 export function createHubTransport(configuration: HubConfiguration): HubTransport {
@@ -38,6 +55,7 @@ export function createHubTransport(configuration: HubConfiguration): HubTranspor
 class NativeHubTransport implements HubTransport {
   readonly signInKind = "system-browser" as const;
   private access: AccessCredential | null = null;
+  private accessTokenRead: Promise<string | null> | null = null;
   private readonly refreshKey: string;
 
   constructor(private readonly origin: string) {
@@ -156,28 +174,58 @@ class NativeHubTransport implements HubTransport {
     });
   }
 
-  private async currentAccessToken(): Promise<string | null> {
-    return lockSecret(this.refreshKey, async () => {
-      const credential = parseOAuthCredential(await readSecret(this.refreshKey), this.origin);
-      if (!credential) {
+  /**
+   * Requests asking at the same time share one keystore read and at most one refresh: a cold start
+   * sends the account read, the daemon list and a ticket per Host together, and reading the
+   * keystore once per request in turn put whole seconds before the last of them
+   * (connection-resilience.md#cold-start-connect-path).
+   */
+  private currentAccessToken(): Promise<string | null> {
+    this.accessTokenRead ??= this.readAccessToken().finally(() => {
+      this.accessTokenRead = null;
+    });
+    return this.accessTokenRead;
+  }
+
+  /** Settles as soon as the token is known; the lock is held until the rotated one is stored. */
+  private readAccessToken(): Promise<string | null> {
+    return new Promise((resolve, reject) => {
+      lockSecret(this.refreshKey, async () => {
+        const credential = parseOAuthCredential(await readSecret(this.refreshKey), this.origin);
+        if (!credential) {
+          this.access = null;
+          return resolve(null);
+        }
+        // In memory, or stored by the last refresh before this process started.
+        const held = [this.access, storedAccess(credential)].find(
+          (access) =>
+            access?.generation === credential.generation &&
+            access.expiresAt - Date.now() > ACCESS_TOKEN_MARGIN_MS,
+        );
+        if (held) {
+          this.access = held;
+          return resolve(held.accessToken);
+        }
         this.access = null;
-        return null;
-      }
-      if (
-        this.access?.generation === credential.generation &&
-        this.access.expiresAt - Date.now() > 30_000
-      )
-        return this.access.accessToken;
-      this.access = null;
-      const token = await this.exchange(
-        tokenRequestBody({ origin: this.origin, refreshToken: credential.refreshToken }),
-        credential.generation,
-      );
-      return token?.access_token ?? null;
+        const token = await this.exchange(
+          tokenRequestBody({ origin: this.origin, refreshToken: credential.refreshToken }),
+          credential.generation,
+          (accessToken) => {
+            getColdStartConnectTimeline().mark("hubToken");
+            resolve(accessToken);
+          },
+        );
+        resolve(token?.access_token ?? null);
+      }).catch(reject);
     });
   }
 
-  private async exchange(body: URLSearchParams, generation: string) {
+  private async exchange(
+    body: URLSearchParams,
+    generation: string,
+    /** Called with the new access token before the rotated refresh token is written. */
+    onIssued?: (accessToken: string) => void,
+  ) {
     return withRequestTimeout(20_000, async (signal) => {
       const response = await fetch(new URL("/api/auth/oauth2/token", this.origin), {
         method: "POST",
@@ -204,15 +252,17 @@ class NativeHubTransport implements HubTransport {
       }
       const token = OAuthTokenResponseSchema.parse(await response.json());
       if (!token.refresh_token) throw new Error(i18n.t("hub.account.signIn.noRefreshToken"));
-      await writeSecret(
-        this.refreshKey,
-        JSON.stringify({ issuer: this.origin, refreshToken: token.refresh_token, generation }),
-      );
-      this.access = {
+      onIssued?.(token.access_token);
+      const expiresAt = Date.now() + token.expires_in * 1_000;
+      const stored: OAuthCredential = {
+        issuer: this.origin,
+        refreshToken: token.refresh_token,
         generation,
         accessToken: token.access_token,
-        expiresAt: Date.now() + token.expires_in * 1_000,
+        accessExpiresAt: expiresAt,
       };
+      await writeSecret(this.refreshKey, JSON.stringify(stored));
+      this.access = { generation, accessToken: token.access_token, expiresAt };
       return token;
     });
   }

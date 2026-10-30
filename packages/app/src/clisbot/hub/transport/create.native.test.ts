@@ -250,6 +250,74 @@ test("native request returns a second 401 instead of looping", async () => {
   expect(apiCalls).toHaveLength(2);
 });
 
+test("cold-start requests share one keystore read and token refresh, and go out before the keystore write", async () => {
+  // A Hub account read, its daemon list and 14 access tickets ask at once after a force-stop.
+  vi.useFakeTimers();
+  save(work);
+  const SecureStore = await import("expo-secure-store");
+  const reads = vi.spyOn(SecureStore, "getItemAsync").mockImplementation(async (key: string) => {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return secrets.get(key) ?? null;
+  });
+  const writes = vi
+    .spyOn(SecureStore, "setItemAsync")
+    .mockImplementation(async (key: string, value: string) => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      secrets.set(key, value);
+    });
+  const sentAt: number[] = [];
+  const startedAt = Date.now();
+  fetch.mockReset().mockImplementation(async (url: URL) => {
+    if (url.pathname.endsWith("/token")) {
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+      return Response.json({
+        access_token: "access",
+        refresh_token: "rotated",
+        expires_in: 300,
+        token_type: "Bearer",
+      });
+    }
+    sentAt.push(Date.now() - startedAt);
+    return Response.json({ ok: true });
+  });
+  const transport = createHubTransport({ origin: work });
+  const requests = Array.from({ length: 16 }, () => transport.request("/api/management/v1/x"));
+  await vi.advanceTimersByTimeAsync(5_000);
+  await Promise.all(requests);
+  expect(fetch.mock.calls.filter(([url]) => (url as URL).pathname.endsWith("/token"))).toHaveLength(
+    1,
+  );
+  expect(reads).toHaveBeenCalledTimes(1);
+  // One keystore read (50 ms) and the refresh (1.2 s); not 16 reads in turn, not the write.
+  expect(sentAt).toHaveLength(16);
+  expect(Math.max(...sentAt)).toBeLessThanOrEqual(1_250);
+  expect(secrets.get(oauthCredentialKey(work))).toContain("rotated");
+  reads.mockRestore();
+  writes.mockRestore();
+});
+
+test("a relaunch uses the access token stored with the sign-in while it lasts, and refreshes after", async () => {
+  vi.useFakeTimers();
+  const transport = () => createHubTransport({ origin: work });
+  await transport().signIn?.();
+  // A new process: nothing in memory, the keystore holds what the last refresh stored.
+  fetch.mockClear();
+  expect(await (await transport().request("/api/auth/clisbot/state")).json()).toEqual({
+    authorization: `Bearer access:${work}`,
+  });
+  expect(fetch.mock.calls.map(([url]) => (url as URL).pathname)).toEqual([
+    "/api/auth/clisbot/state",
+  ]);
+  // Within 30 s of its expiry it is refreshed first.
+  vi.setSystemTime(Date.now() + 271_000);
+  fetch.mockClear();
+  await transport().request("/api/auth/clisbot/state");
+  expect(fetch.mock.calls.map(([url]) => (url as URL).pathname)).toEqual([
+    "/api/auth/oauth2/token",
+    "/api/auth/clisbot/state",
+  ]);
+});
+
 /** Android's keystore can answer empty once on a cold start although the credential is intact. */
 function missNextSecretRead() {
   const stored = new Map(secrets);
