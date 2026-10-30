@@ -107,12 +107,13 @@ export function createValidatedPersistStorage<State>(
   return {
     getItem: async (name) => {
       // Taken before the scheduled write's turn: a change during the read is not written.
-      const written = flushScheduled(name);
+      const written = scheduled.has(name) ? flushScheduled(name) : null;
       accepted.delete(name);
       reading.add(name);
       try {
-        // A failed write already reached its own callers; the read proceeds either way.
-        await written.catch(() => undefined);
+        // A failed write already reached its own callers; the read proceeds either way. Without
+        // a scheduled write the read starts in this task, as hydration expects.
+        if (written) await written.catch(() => undefined);
         return await read(name);
       } finally {
         reading.delete(name);
