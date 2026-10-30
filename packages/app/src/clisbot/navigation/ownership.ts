@@ -2,7 +2,7 @@ import { actorsFromParticipationKey, ownershipKey, type OwnershipKeyInput } from
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { isOwnActor, type HubAccountIdentity } from "@/clisbot/session-storage/actor-presentation";
 
-/** Unproven ownership belongs to Others and All, never For me. */
+/** Unproven ownership belongs to For me and All, never Others (isReaderOwned). */
 export type Ownership = "mine" | "others" | "unknown";
 export type OwnershipScope = "mine" | "others" | "all";
 
@@ -118,12 +118,21 @@ export function resolveBotOwnership(
   return resolveOwnership({ createdBy: bot.owner, directOwner: bot.isOwner, ...context });
 }
 
-export function inScope(scope: OwnershipScope, ownership: Ownership): boolean {
-  if (scope === "all") return true;
-  return scope === "mine" ? ownership === "mine" : ownership !== "mine";
+/**
+ * Whether the reader sees `ownership` as theirs: everything not proven to be someone else's. Work
+ * with no recorded author, such as sessions the desktop app started on its own Host before the
+ * daemon stamped a creator, stays in For me rather than looking like a teammate's.
+ */
+export function isReaderOwned(ownership: Ownership): boolean {
+  return ownership !== "others";
 }
 
-/** `all` is `mine` + `others`; work that cannot be told apart is counted under `others`. */
+export function inScope(scope: OwnershipScope, ownership: Ownership): boolean {
+  if (scope === "all") return true;
+  return scope === "mine" ? isReaderOwned(ownership) : !isReaderOwned(ownership);
+}
+
+/** `all` is `mine` + `others`; work that cannot be told apart is counted under `mine`. */
 export interface ScopeCounts {
   mine: number;
   others: number;
@@ -134,7 +143,7 @@ export const EMPTY_SCOPE_COUNTS: Readonly<ScopeCounts> = { mine: 0, others: 0, a
 
 /** Adds one item to the counts of the scopes it is listed under. */
 export function addToScopeCounts(counts: ScopeCounts, ownership: Ownership): void {
-  counts[ownership === "mine" ? "mine" : "others"] += 1;
+  counts[isReaderOwned(ownership) ? "mine" : "others"] += 1;
   counts.all += 1;
 }
 

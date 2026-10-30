@@ -14,6 +14,7 @@ import {
   EMPTY_SCOPE_COUNTS,
   addToScopeCounts,
   inScope,
+  isReaderOwned,
   type Ownership,
   type OwnershipScope,
   type ScopeCounts,
@@ -297,6 +298,7 @@ export function chipCounts(rows: readonly HomeRow[]): Record<HomeChip, number> {
 /** The Home tab and rail badge: the reader's own unseen issues, in every mode (C9, C15). */
 export function homeBadgeCount(rows: readonly HomeRow[]): number {
   let count = 0;
-  for (const row of rows) if (row.ownership === "mine" && row.issue?.state === "unseen") count += 1;
+  for (const row of rows)
+    if (isReaderOwned(row.ownership) && row.issue?.state === "unseen") count += 1;
   return count;
 }

@@ -1,4 +1,4 @@
-import { inScope, type Ownership } from "@/clisbot/navigation/ownership";
+import { inScope, isReaderOwned, type Ownership } from "@/clisbot/navigation/ownership";
 import type { SearchViewContext } from "./candidates";
 import { inSearchScope, type ResolvedSearchScope } from "./model";
 
@@ -58,7 +58,7 @@ export function rankItemsByView<Row>(
   const bands: Row[][] = [[], [], [], []];
   for (const row of rows) {
     const placement = placementOf(row);
-    const band = (isInView(view, placement) ? 0 : 2) + (placement.ownership === "mine" ? 0 : 1);
+    const band = (isInView(view, placement) ? 0 : 2) + (isReaderOwned(placement.ownership) ? 0 : 1);
     bands[band]!.push(row);
   }
   return bands.flat();

@@ -37,8 +37,9 @@ describe("resolveOwnership", () => {
   ])("does not claim ownership from $scenario", ({ createdBy }) => {
     const ownership = resolveOwnership({ hostKind: "hub", createdBy, accounts });
     expect(ownership).toBe("unknown");
-    expect(inScope("mine", ownership)).toBe(false);
-    expect(countByScope([ownership])).toEqual({ mine: 0, others: 1, all: 1 });
+    // Not proven to be someone else's, so it stays in the reader's For me.
+    expect(inScope("mine", ownership)).toBe(true);
+    expect(countByScope([ownership])).toEqual({ mine: 1, others: 0, all: 1 });
   });
 
   it("retains direct compatibility only for registered direct Hosts", () => {
@@ -154,15 +155,15 @@ describe("resolveOwnership", () => {
 });
 
 describe("scopes", () => {
-  it("lists a session nobody can place under Others and All, never For me", () => {
+  it("lists a session nobody can place under For me and All, never Others", () => {
     expect(inScope("all", "unknown")).toBe(true);
-    expect(inScope("mine", "unknown")).toBe(false);
-    expect(inScope("others", "unknown")).toBe(true);
+    expect(inScope("mine", "unknown")).toBe(true);
+    expect(inScope("others", "unknown")).toBe(false);
   });
 
-  it("counts scopes so All is For me plus Others, which holds the ones nobody can place", () => {
+  it("counts scopes so All is For me plus Others, and For me holds the ones nobody can place", () => {
     const counts = countByScope(["mine", "others", "mine", "unknown"]);
-    expect(counts).toEqual({ mine: 2, others: 2, all: 4 });
+    expect(counts).toEqual({ mine: 3, others: 1, all: 4 });
     expect(inScope("all", "others") && inScope("mine", "mine") && !inScope("mine", "others")).toBe(
       true,
     );

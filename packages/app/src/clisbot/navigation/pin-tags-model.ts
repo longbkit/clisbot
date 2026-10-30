@@ -1,5 +1,5 @@
 import type { HomeMode } from "./home-feed";
-import type { Ownership } from "./ownership";
+import { isReaderOwned, type Ownership } from "./ownership";
 
 /** A pin as Home shows it: a compact tag (brief C8). */
 export interface PinTag {
@@ -21,8 +21,8 @@ export function pinTagMatchesMode(tag: Pick<PinTag, "area">, mode: HomeMode): bo
 export function splitPinTags<T extends PinTag>(tags: readonly T[], mode: HomeMode) {
   const visible = tags.filter((tag) => pinTagMatchesMode(tag, mode) && tag.title);
   return {
-    mine: visible.filter((tag) => tag.ownership === "mine"),
-    others: visible.filter((tag) => tag.ownership !== "mine"),
+    mine: visible.filter((tag) => isReaderOwned(tag.ownership)),
+    others: visible.filter((tag) => !isReaderOwned(tag.ownership)),
   };
 }
 
