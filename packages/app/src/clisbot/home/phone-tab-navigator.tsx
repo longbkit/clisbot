@@ -1,4 +1,4 @@
-import { startTransition, useDeferredValue, useEffect, useState, type ReactNode } from "react";
+import { startTransition, useEffect, useState, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import {
   TabRouter,
@@ -50,9 +50,9 @@ type PhoneTabNavigatorProps = DefaultNavigatorOptions<
 /**
  * The phone's peer tabs (docs/mobile-panels.md#phone-tabs). After the first paint each unvisited
  * tab mounts hidden, one per idle slot, so a first visit is not a mount; a mounted tab never
- * unmounts. A press shows its tab in the press's own commit as the tab last rendered and
- * activates it in a deferred render: hidden panes hold their inputs (`useHeldWhileInactive`), so
- * the press's commit renders no tab body.
+ * unmounts. A press shows and activates its tab in the press's own commit. Activating in a deferred
+ * render instead let a busy JS thread postpone it until the next input, and that input (the first
+ * row tap on the tab) was lost on a Galaxy S23.
  */
 function PhoneTabNavigator({
   id,
@@ -81,7 +81,6 @@ function PhoneTabNavigator({
     screenLayout,
   });
   const focusedKey = state.routes[state.index]!.key;
-  const activeKey = useDeferredValue(focusedKey);
   const mounted = useMountedKeys(focusedKey, state.routes, schedule);
   return (
     <NavigationContent>
@@ -89,11 +88,7 @@ function PhoneTabNavigator({
         <View style={styles.fill}>
           {state.routes.map((route) =>
             mounted.has(route.key) ? (
-              <RetainedPanel
-                key={route.key}
-                shown={route.key === focusedKey}
-                active={route.key === focusedKey && route.key === activeKey}
-              >
+              <RetainedPanel key={route.key} active={route.key === focusedKey}>
                 <RenderProfile id={`Tab:${route.name}`}>
                   {descriptors[route.key]!.render()}
                 </RenderProfile>

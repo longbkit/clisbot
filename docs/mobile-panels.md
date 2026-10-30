@@ -22,13 +22,13 @@ view, not the bottom-tabs view:
   6,100 items, 14 Hosts) took 833–1033 ms with no change on screen. A mounted tab never unmounts.
   Each tab is a `RetainedPanel` in route order, a stable sibling order.
 - The tab bar (`MobileTabBar`) dispatches the switch on the tab navigator. The press's commit
-  shows the target as it last rendered (`RetainedPanel`'s `shown`) and hides the old tab; the
-  target's active signal flips in the deferred render after it (`useDeferredValue`). Its held
-  panes render the latest value there, interruptibly, so the press's commit renders no tab body.
-  No animation, no settlement, no focus-event round trip. Panels are never detached or frozen.
-- A pre-mounted tab holds what it rendered at mount until its first visit. If Hosts were still
-  connecting then, the first visit shows that (the skeleton) for a frame and the list arrives in
-  the deferred render.
+  shows and activates the target and hides the old tab; its held panes render the latest value in
+  that commit. No animation, no settlement, no focus-event round trip. Panels are never detached
+  or frozen. Do not defer activation (`useDeferredValue`): on 2026-10-30 a busy JS thread
+  postponed the deferred render until the next input, and that input, the first row tap on the
+  tab, was lost.
+- A pre-mounted tab holds what it rendered at mount until its first visit, then catches up in the
+  press's commit.
 - Hidden tabs see an inactive `useRetainedPanelActive`. Chats and Work hold their inputs as below;
   Home holds the navigation activity (`HeldNavigationActivity`); each tab's route renders memoized
   content, so a switch re-renders the routes and not their screens.
@@ -231,7 +231,6 @@ a sequence there whenever ownership or ordering changes.
 
 `clisbot/home/phone-tab-navigator.browser.test.tsx` runs the phone tab navigator in a real
 `NavigationContainer`: tabs pre-mount hidden one idle slot at a time, no tab unmounts, the press's
-commit shows the target without rendering its body, the deferred render activates it, and hidden
-tabs render zero times on store updates. `home-tab-navigation.test.ts` runs the root stack
+commit shows and activates the target, and hidden tabs render zero times on store updates. `home-tab-navigation.test.ts` runs the root stack
 reducer for detail Back and cold deep links; `e2e/browser/navigation-v2.spec.ts` checks at 390px
 that switches and Back keep the same tab nodes.

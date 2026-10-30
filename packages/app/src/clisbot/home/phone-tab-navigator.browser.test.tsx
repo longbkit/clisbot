@@ -194,7 +194,7 @@ describe("phone tab navigator", () => {
     expect(unmounts).toEqual({});
   });
 
-  it("shows the target in the press's commit as it last rendered, then activates it", () => {
+  it("shows and activates the target in the press's own commit", () => {
     mountTabs();
     press("chats");
     press("home");
@@ -202,12 +202,11 @@ describe("phone tab navigator", () => {
     log = [];
     pressCommits = [];
     const before = bodyRenders.chats;
-    // No timers, frames or settlement: the press's own commit shows the target.
+    // No timers, frames or settlement: the press's own commit shows the target, active, so a row
+    // tapped right after is never waiting on a deferred render that busy JS can postpone.
     press("chats");
-    // That commit shows the target without rendering its body.
     expect(pressCommits[0]?.shown).toEqual(["chats"]);
-    expect(pressCommits[0]?.bodyRenders.chats).toBe(before);
-    // The deferred render after it activates the target with the latest value.
+    expect(pressCommits[0]?.bodyRenders.chats).toBe(before + 1);
     expect(shown("chats")).toBe(true);
     expect(shown("home")).toBe(false);
     expect(log).toEqual(["home:hidden", "chats:active"]);
@@ -239,7 +238,8 @@ describe("phone tab navigator", () => {
     press("work");
     expect(mounts).toEqual({ home: 1, chats: 1, work: 1 });
     expect(pressCommits[0]?.shown).toEqual(["work"]);
-    expect(pressCommits[0]?.bodyRenders.work).toBe(1);
+    // The pre-mount render, then one catch-up render as it activates; no mount.
+    expect(pressCommits[0]?.bodyRenders.work).toBe(2);
     expect(shown("work")).toBe(true);
     expect(log.at(-1)).toBe("work:active");
   });
