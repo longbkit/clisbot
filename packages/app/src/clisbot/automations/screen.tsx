@@ -10,6 +10,7 @@ import { useBotsFeatureHosts } from "../bots/feature";
 import { AutomationsHome } from "./home";
 import { useTranslation } from "react-i18next";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import { useUsesPhoneTabs } from "@/clisbot/home/mobile-navigation";
 
 type Tab = "home" | "schedules" | "automations";
 const TAB_VALUES = ["home", "schedules", "automations"] as const;
@@ -18,7 +19,12 @@ const TAB_VALUES = ["home", "schedules", "automations"] as const;
 export function AutomationsLandingScreen() {
   const hub = useHubAccount();
   const botHosts = useBotsFeatureHosts();
-  return hub.enabled || botHosts.length > 0 ? <AutomationsLandingContent /> : <SchedulesScreen />;
+  const phoneTabs = useUsesPhoneTabs();
+  if (hub.enabled || botHosts.length > 0) return <AutomationsLandingContent />;
+  // SchedulesScreen mounts its content only while focused. A phone tab stays mounted and the
+  // retained panel hides it, so that gate would unmount every Host's schedules, agents and
+  // directory demand on each hide and rebuild them on each show.
+  return phoneTabs ? <SchedulesScreenContent /> : <SchedulesScreen />;
 }
 function AutomationsLandingContent() {
   // Navigation V2 names the destination Schedules / Lịch (brief C11); Hub Automations keep their tab.

@@ -24,6 +24,10 @@ view, not the bottom-tabs view:
 - Hidden tabs see an inactive `useRetainedPanelActive`. Chats and Work hold their inputs as below;
   Home holds the navigation activity (`HeldNavigationActivity`); each tab's route renders memoized
   content, so a switch re-renders the routes and not their screens.
+- A tab screen never gates its content on `useIsFocused`: the retained panel already hides it, and
+  a focus gate unmounts the content on every hide and rebuilds it on every show. Schedules without
+  a Hub or Bots Host did that through `SchedulesScreen` (every Host's schedules, agents and
+  directory demand); its phone tab renders `SchedulesScreenContent` directly.
 - Chats and Work render their panes directly as the tab screen (`PhoneListTab`). Work owns a
   `SidebarModelProvider` there, because the sidebar chrome's provider does not reach routes.
 

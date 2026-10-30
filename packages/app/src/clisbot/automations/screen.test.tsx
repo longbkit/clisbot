@@ -7,7 +7,8 @@ import { i18n } from "@/i18n/i18next";
 import { AutomationsLandingScreen } from "./screen";
 // The real catalog, so tab labels read as a reader sees them.
 void i18n;
-const state = vi.hoisted(() => ({ enabled: true, bots: false }));
+const state = vi.hoisted(() => ({ enabled: true, bots: false, phoneTabs: false }));
+vi.mock("@/clisbot/home/mobile-navigation", () => ({ useUsesPhoneTabs: () => state.phoneTabs }));
 vi.mock("react-native", () => ({
   View: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
 }));
@@ -36,7 +37,9 @@ vi.mock("../hub/settings/view-tabs", () => ({
 }));
 vi.mock("@/screens/schedules-screen", () => ({
   SchedulesScreen: () => <p>Original schedules</p>,
-  SchedulesScreenContent: () => <p>Embedded schedules</p>,
+  SchedulesScreenContent: ({ embedded }: { embedded?: boolean }) => (
+    <p>{embedded ? "Embedded schedules" : "Schedules content"}</p>
+  ),
 }));
 vi.mock("./home", () => ({
   AutomationsHome: ({
@@ -75,6 +78,7 @@ beforeEach(() => {
   vi.stubGlobal("React", React);
   state.enabled = true;
   state.bots = false;
+  state.phoneTabs = false;
 });
 afterEach(() => {
   cleanup();
@@ -94,6 +98,13 @@ it("opens the existing creation path and retains its draft across tabs", () => {
   expect(screen.getByText("Embedded schedules")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Automations" }));
   expect((screen.getByLabelText("Workflow draft") as HTMLInputElement).value).toBe("Daily brief");
+});
+it("keeps the schedules mounted in a phone tab instead of remounting them on every focus", () => {
+  state.enabled = false;
+  state.phoneTabs = true;
+  render(<AutomationsLandingScreen />);
+  expect(screen.getByText("Schedules content")).toBeTruthy();
+  expect(screen.queryByText("Original schedules")).toBeNull();
 });
 it("makes the landing available on a bots Host without Hub", () => {
   state.enabled = false;
