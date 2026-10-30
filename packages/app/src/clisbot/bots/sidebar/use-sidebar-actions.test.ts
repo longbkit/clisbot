@@ -66,6 +66,21 @@ it("hands the chat route the pressed chat's title before navigating", () => {
   act(() => result.current.navigate("host", "room"));
   expect(previewAtPush).toEqual({ serverId: "host", chatId: "room", title: "Ada, Bo" });
 });
+it("opens a bot's existing direct chat in the press itself, without waiting on the Host", () => {
+  const rows = [
+    {
+      serverId: "host",
+      id: "dm",
+      kind: "direct",
+      title: "Ada",
+      participants: [{ botId: "bot", displayName: "Ada" }],
+    },
+  ] as unknown as Parameters<typeof useBotSidebarActions>[0];
+  const { result } = renderHook(() => useBotSidebarActions(rows));
+  void result.current.openBot("host", "bot");
+  expect(env.push).toHaveBeenCalledWith("/h/host/chat/dm");
+  expect(env.listChats).not.toHaveBeenCalled();
+});
 it("rechecks the authoritative private chat list before creating from a stale empty catalog", async () => {
   env.listChats.mockResolvedValue({
     chats: [{ id: "existing", kind: "direct", participants: [{ botId: "bot" }] }],

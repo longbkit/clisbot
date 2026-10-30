@@ -6,8 +6,48 @@ The device never keeps more than a bounded, compact copy. Budgets and the phase 
 [Connection resilience](connection-resilience.md) is O1.
 
 The slice is behind `OFFLINE_CACHE_ENABLED` (`packages/app/src/runtime/replica-cache/offline-flag.ts`).
-`EXPO_PUBLIC_CLISBOT_OFFLINE_CACHE=0` restores the 50-item timeline with whole-Host eviction and
-hides Settings → Storage.
+`EXPO_PUBLIC_CLISBOT_OFFLINE_CACHE=0` restores the 50-item timeline with whole-Host eviction,
+hides Settings → Storage, and turns off preloading and the hidden-session release below.
+
+## Opening never waits
+
+Tapping a row shows its screen in the next frame. What fills it depends on what the app holds.
+
+| Holds                             | Session                                                          | Chat                                                                                       |
+| --------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Memory (opened in the last 5 min) | the timeline as it was; no fetch unless live events were dropped | the cached transcript query, then a delta                                                  |
+| Device tail                       | the compact tail, then the Host's page                           | the 50-line tail, then the Host's page                                                     |
+| Nothing                           | the directory row (title, status, provider) and a loading row    | the pressed row's title, no transcript, sending off, and a loading row (`open-preview.ts`) |
+
+- The agent screen no longer holds an overlay until authoritative history lands; the empty stream
+  shows `agent-history-loading-row` (`agent-stream/placeholder.ts`, `isStreamHistoryLoading`).
+- A chat preview never authorizes anything. Sending needs the accepted record, and a refusal still
+  replaces the screen.
+- The open fetch is one bounded page: 40 projected items (`TIMELINE_FETCH_PAGE_SIZE`), tool payloads
+  deferred. The daemon counts items, not turns, so "about 20 turns" is not expressible without a
+  protocol change. Older pages load on scroll with `before`.
+- Navigation does not await data, except a bot row whose direct chat is not in the cached rows: it
+  needs the chat id from the Host first. Native Chats still dispatches the push in the next JS task
+  ([mobile panels](../../mobile-panels.md#home-navigation)).
+
+### Preload on intent
+
+`open-preload/` starts the open's own fetch before the tap completes.
+
+- Press-in on a Home, Inbox, Work or Chats row, and the top two Home rows while shown, request a
+  preload. A session hydrates its device tail, then fetches the open tail; a chat fills the route's
+  own transcript query (`chatTranscriptFetchInput`), so the route's first render already holds it.
+- At most two run at once. A finished preload is not repeated for 30 s. Fetches cannot be aborted,
+  so cancelling only drops queued work: a list drag drops the queue, and a row leaving the top
+  drops its own.
+
+### Hidden sessions
+
+A session nobody is viewing keeps its retained pages for 5 minutes (`HIDDEN_TIMELINE_TTL_MS`),
+then releases them (`timeline-page-retention.ts`). Its subscription stays, and it is marked like a
+session whose events were dropped while hidden, so showing it again catches up. A preloaded session
+that is never opened is released the same way. The 8 MB per session and 32 MB total byte budget
+still evicts sooner when needed.
 
 ## What a tail keeps
 
@@ -75,5 +115,9 @@ assistant 0.3 KB, 10% reasoning 0.6 KB); not device evidence.
   values; a function exported from `row-store.ts` is `undefined` at runtime.
 - Rows are keyed by `serverId`, not account (R10 in the proposal); clearing on sign-out is what
   keeps one account's tails from another for now.
-- Not done in this slice: idle prefetch of For me sessions, an older-page cache, per-source and
-  per-session sizes on the Storage screen, encryption at rest.
+- Not done in this slice: idle prefetch of For me sessions beyond the top Home rows, an older-page
+  cache, per-source and per-session sizes on the Storage screen, encryption at rest, a TTL for chat
+  transcripts (the transcript store still keeps every chat for the app's lifetime).
+- The agent stream's list owner (`AgentStreamView`) subscribes to the live head, so it re-renders
+  per flushed chunk; its history rows and the panel header do not (`strategy-web.test.tsx`). The
+  chat route itself no longer re-renders per chunk (`use-chat-live-heads.test.tsx`).
