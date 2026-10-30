@@ -26,6 +26,17 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: `${SHOTS}/${name}.png` });
 }
 
+/** Tags the visible node; a remount replaces it with an untagged one. */
+async function markRetained(page: Page, testId: string) {
+  await page
+    .locator(`[data-testid="${testId}"]:visible`)
+    .evaluate((node) => node.setAttribute("data-retained", "1"));
+}
+
+function retained(page: Page, testId: string) {
+  return page.locator(`[data-testid="${testId}"][data-retained="1"]`);
+}
+
 async function seedNavigationFixtures() {
   const workspace = await seedWorkspace({ repoPrefix: "nav-v2-" });
   const client = await connectDaemonClient<DaemonClient>({ clientIdPrefix: "nav-v2" });
@@ -153,6 +164,17 @@ test.describe("Navigation V2", () => {
       for (const id of ["tasks", "hosts", "settings"])
         await expect(page.getByTestId(`more-${id}`)).toBeVisible();
       await shot(page, "mobile-more");
+
+      // Visited tabs stay mounted: switching back shows the same nodes, not rebuilt ones.
+      await markRetained(page, "more-screen");
+      await page.getByTestId("home-tab-chat").click();
+      await markRetained(page, "chats-pane");
+      await page.getByTestId("home-tab-work").click();
+      await page.getByTestId("home-tab-more").click();
+      await expect(retained(page, "more-screen")).toBeVisible();
+      await page.getByTestId("home-tab-chat").click();
+      await expect(retained(page, "chats-pane")).toBeVisible();
+      await expect(retained(page, "more-screen")).toBeHidden();
     } finally {
       await seeded.cleanup();
     }
@@ -263,13 +285,15 @@ test.describe("Navigation V2", () => {
         `sidebar-workspace-row-${getServerId()}:${seeded.workspace.workspaceId}`,
       );
       await expect(row).toBeVisible({ timeout: 30_000 });
+      await markRetained(page, "work-pane");
       await row.click();
       await expect(page).toHaveURL(/\/workspace\//);
-      await expect(page.getByTestId("home-mobile-tabs")).toHaveCount(0);
+      await expect(page.getByTestId("home-mobile-tabs")).toBeHidden();
       await shot(page, "mobile-session-detail");
       await page.getByTestId("chat-back").click();
       await expect(page).toHaveURL(/\/work$/);
-      await expect(page.getByTestId("work-pane")).toBeVisible();
+      // Back pops the detail off the retained tabs: the same Work list, not a rebuilt one.
+      await expect(retained(page, "work-pane")).toBeVisible();
 
       await page.emulateMedia({ colorScheme: "dark" });
       await page.getByTestId("home-tab-open-project").click();

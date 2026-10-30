@@ -3,6 +3,7 @@ import {
   PHONE_TABS_ROUTE,
   phoneTabPath,
   phoneTabRouteName,
+  phoneTabsRemountAction,
   resolvePhoneTabReturn,
 } from "./phone-tab-routes";
 
@@ -42,6 +43,32 @@ describe("phone tab routes", () => {
       target: "root",
       count: 2,
     });
+  });
+
+  it("finds the app stack under Expo Router's own root navigator", () => {
+    const app = root([tabs(), host]);
+    const expoRoot = { key: "expo", index: 0, routes: [{ name: "__root", key: "r", state: app }] };
+    expect(resolvePhoneTabReturn(expoRoot)).toEqual({ kind: "pop", target: "root", count: 1 });
+    expect(
+      resolvePhoneTabReturn({
+        ...expoRoot,
+        routes: [{ ...expoRoot.routes[0]!, state: root([host]) }],
+      }),
+    ).toEqual({
+      kind: "replace",
+    });
+  });
+
+  it("remounts the focused tabs route on the same tab when the navigator kind changes", () => {
+    const app = root([host, tabs("work")]);
+    const expoRoot = { key: "expo", index: 0, routes: [{ name: "__root", key: "r", state: app }] };
+    expect(phoneTabsRemountAction(expoRoot)).toEqual({
+      type: "REPLACE",
+      target: "root",
+      payload: { name: PHONE_TABS_ROUTE, params: { screen: "work" } },
+    });
+    // Behind a detail it waits: replacing there would drop the detail.
+    expect(phoneTabsRemountAction(root([tabs(), host]))).toBeNull();
   });
 
   it("replaces a cold deep-linked detail that has no tabs underneath", () => {

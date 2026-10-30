@@ -1,7 +1,9 @@
-import type { ReactElement, ReactNode } from "react";
-import { Stack } from "expo-router";
+import { useEffect, useState, type ReactElement, type ReactNode } from "react";
+import { Stack, useNavigationContainerRef } from "expo-router";
+import { useIsFocused } from "expo-router/react-navigation";
 import { AppearanceStyleBoundary } from "@/components/appearance-style-boundary";
 import { useUsesPhoneTabs } from "@/clisbot/home/mobile-navigation";
+import { phoneTabsRemountAction } from "@/clisbot/home/phone-tab-routes";
 import { PhoneTabs, renderPhoneTabBar } from "@/clisbot/home/phone-tabs";
 import { ThemedStack } from "@/navigation/themed-stack";
 
@@ -15,11 +17,25 @@ const STACK_SCREEN_OPTIONS = {
  * `/open-project`, `/chat`, `/work`, `/schedules` and `/more` keep their links. Phones get one
  * retained tab navigator (docs/expo-router.md#phone-tabs); every other layout keeps the stack.
  *
- * The choice follows the breakpoint. Crossing it mounts the other navigator, which starts from
- * the linked tab, not the one shown before.
+ * Each mount keeps the navigator it started with: the root stack holds this route's navigation
+ * state, and the other kind of navigator cannot adopt it. Crossing the breakpoint replaces this
+ * route on the tab it shows, once the tabs are on screen.
  */
 export default function PeerPagesLayout() {
-  return useUsesPhoneTabs() ? <PhoneTabsLayout /> : <PeerPagesStack />;
+  const phoneTabs = useUsesPhoneTabs();
+  const [mountedAsPhoneTabs] = useState(phoneTabs);
+  useRemountAcrossBreakpoint(mountedAsPhoneTabs !== phoneTabs);
+  return mountedAsPhoneTabs ? <PhoneTabsLayout /> : <PeerPagesStack />;
+}
+
+function useRemountAcrossBreakpoint(stale: boolean) {
+  const root = useNavigationContainerRef();
+  const focused = useIsFocused();
+  useEffect(() => {
+    if (!stale || !focused) return;
+    const action = phoneTabsRemountAction(root.getRootState());
+    if (action) root.dispatch(action);
+  }, [focused, root, stale]);
 }
 
 function PhoneTabsLayout() {

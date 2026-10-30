@@ -33,6 +33,16 @@ function createNavigationRef(rootState: unknown, options: { ready?: boolean } = 
   };
 }
 
+const tabsState = {
+  type: "tab",
+  key: "phone-tabs",
+  index: 1,
+  routes: [
+    { key: "home", name: "open-project" },
+    { key: "work", name: "work" },
+  ],
+};
+
 describe("navigateToHostWorkspaceRoute", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -51,6 +61,52 @@ describe("navigateToHostWorkspaceRoute", () => {
     navigateToHostWorkspaceRoute("/h/server-1/workspace/workspace-a", { dismissTo });
 
     expect(dispatch).not.toHaveBeenCalled();
+    expect(dismissTo).toHaveBeenCalledWith("/h/server-1/workspace/workspace-a");
+  });
+
+  it("pushes above focused phone tabs instead of replacing them", () => {
+    const { navigationRef, dispatch } = createNavigationRef({
+      key: "expo-root",
+      index: 0,
+      routes: [
+        {
+          key: "root",
+          name: "__root",
+          state: {
+            key: "root-stack",
+            index: 0,
+            routeNames: ["index", "(tabs)", "h/[serverId]"],
+            routes: [{ key: "tabs", name: "(tabs)", state: tabsState }],
+          },
+        },
+      ],
+    });
+    registerWorkspaceRouteNavigationRef(navigationRef);
+    const dismissTo = vi.fn();
+    const push = vi.fn();
+
+    navigateToHostWorkspaceRoute("/h/server-1/workspace/workspace-a", { dismissTo, push });
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(dismissTo).not.toHaveBeenCalled();
+    expect(push).toHaveBeenCalledWith("/h/server-1/workspace/workspace-a");
+  });
+
+  it("keeps replacing the peer page when the (tabs) group is desktop's stack", () => {
+    const { navigationRef } = createNavigationRef({
+      key: "root-stack",
+      index: 0,
+      routes: [
+        { key: "tabs", name: "(tabs)", state: { ...tabsState, type: "stack", key: "peer-stack" } },
+      ],
+    });
+    registerWorkspaceRouteNavigationRef(navigationRef);
+    const dismissTo = vi.fn();
+    const push = vi.fn();
+
+    navigateToHostWorkspaceRoute("/h/server-1/workspace/workspace-a", { dismissTo, push });
+
+    expect(push).not.toHaveBeenCalled();
     expect(dismissTo).toHaveBeenCalledWith("/h/server-1/workspace/workspace-a");
   });
 

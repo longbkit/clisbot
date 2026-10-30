@@ -4,6 +4,7 @@ import type {
   NavigationContainerRefWithCurrent,
 } from "expo-router/react-navigation";
 import { router, type Href } from "expo-router";
+import { arePhoneTabsFocused } from "@/clisbot/home/phone-tab-routes";
 import {
   encodeWorkspaceIdForPathSegment,
   getHostWorkspaceOpenParamFromPathname,
@@ -15,10 +16,12 @@ const HOST_WORKSPACE_ROUTE_NAME = "workspace/[workspaceId]/index";
 
 interface NavigateToHostWorkspaceRouteDeps {
   dismissTo(route: string): void;
+  push?(route: string): void;
 }
 
 const defaultNavigateToHostWorkspaceRouteDeps: NavigateToHostWorkspaceRouteDeps = {
   dismissTo: (route) => router.dismissTo(route as Href),
+  push: (route) => router.push(route as Href),
 };
 
 let rootNavigationRef: NavigationContainerRefWithCurrent<ReactNavigation.RootParamList> | null =
@@ -157,5 +160,9 @@ function flushPendingIntent(): void {
 
   const { route, deps } = pendingIntent;
   pendingIntent = null;
-  if (!dispatchHostWorkspacePopTo(route, navigation)) deps.dismissTo(route);
+  if (dispatchHostWorkspacePopTo(route, navigation)) return;
+  // Clisbot phone tabs: POP_TO a route that is not in the stack replaces the current one, which
+  // would unmount every retained tab. A workspace pushes above them; Back pops to them.
+  if (deps.push && arePhoneTabsFocused(navigation.getRootState())) deps.push(route);
+  else deps.dismissTo(route);
 }
