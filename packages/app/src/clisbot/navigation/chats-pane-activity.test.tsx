@@ -68,6 +68,13 @@ vi.mock("react-native", () => ({
   View: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({}) } }));
+// Press-in preloading reaches the Host runtime; this suite only counts pane renders.
+vi.mock("@/open-preload/live", () => ({
+  openPreloads: { pressIn: () => undefined, top: () => undefined, cancel: () => undefined },
+}));
+vi.mock("@/clisbot/bots/data/resource-principal-scope", () => ({
+  useResourcePrincipalScope: () => null,
+}));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("lucide-react-native", () => ({
   Bot: () => null,
