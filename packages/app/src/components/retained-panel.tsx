@@ -9,6 +9,11 @@ export function useRetainedPanelActive(): boolean {
 
 interface RetainedPanelProps {
   active: boolean;
+  /**
+   * Whether the panel is on screen; defaults to `active`. Phone tabs show a pressed tab before it
+   * becomes active, so the press's commit does not render the tab's content.
+   */
+  shown?: boolean;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   testID?: string;
@@ -36,12 +41,13 @@ export function RetainedPanelActivity({ active, children }: RetainedPanelActivit
  */
 export const RetainedPanel = memo(function RetainedPanel({
   active,
+  shown = active,
   children,
   style,
   testID,
 }: RetainedPanelProps) {
   const visibleStyle = StyleSheet.compose<ViewStyle, ViewStyle, ViewStyle>(styles.root, style);
-  const panelStyle = active
+  const panelStyle = shown
     ? visibleStyle
     : StyleSheet.compose<ViewStyle, ViewStyle, ViewStyle>(visibleStyle, styles.hidden);
 
@@ -49,7 +55,7 @@ export const RetainedPanel = memo(function RetainedPanel({
     <RetainedPanelActivity active={active}>
       <View
         collapsable={false}
-        pointerEvents={active ? "auto" : "none"}
+        pointerEvents={shown ? "auto" : "none"}
         style={panelStyle}
         testID={testID}
       >

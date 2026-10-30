@@ -290,7 +290,8 @@ test.describe("Navigation V2", () => {
       await expect(page).toHaveURL(/\/workspace\//);
       await expect(page.getByTestId("home-mobile-tabs")).toBeHidden();
       await shot(page, "mobile-session-detail");
-      await page.getByTestId("chat-back").click();
+      // Pre-mounted tabs keep their headers, hidden, under the detail.
+      await page.getByTestId("chat-back").filter({ visible: true }).click();
       await expect(page).toHaveURL(/\/work$/);
       // Back pops the detail off the retained tabs: the same Work list, not a rebuilt one.
       await expect(retained(page, "work-pane")).toBeVisible();

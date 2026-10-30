@@ -7,7 +7,7 @@ The device never keeps more than a bounded, compact copy. Budgets and the phase 
 
 The slice is behind `OFFLINE_CACHE_ENABLED` (`packages/app/src/runtime/replica-cache/offline-flag.ts`).
 `EXPO_PUBLIC_CLISBOT_OFFLINE_CACHE=0` restores the 50-item timeline with whole-Host eviction,
-hides Settings → Storage, and turns off preloading, the session shell and the hidden-session
+hides Settings → Storage, and turns off preloading, the open shell and the hidden-session
 release below.
 
 ## Opening never waits
@@ -31,17 +31,24 @@ Tapping a row shows its screen in the next frame. What fills it depends on what 
   needs the chat id from the Host first. Native Chats still dispatches the push in the next JS task
   ([mobile panels](../../mobile-panels.md#home-navigation)).
 
-### The session shell
+### The open shell
 
 React Navigation renders a pushed screen inside the commit of the press that pushed it, so the
 press's frame waits for the whole screen. On 2026-10-30 (production APK, Galaxy S23) a session row
-took 367–533 ms to first change and a chat 67–167 ms. Both push `h/[serverId]`; the difference is
-the workspace screen's mount, one component of several hundred hooks.
+took 367–533 ms to first change. Both rows push `h/[serverId]`; for a session the cost was the
+workspace screen's mount, one component of several hundred hooks. With the phone tabs, a Chats row
+pushes from the press itself (there is no list panel admission to defer it), and a chat took 833 ms
+to first change.
 
-- On native phones the deck entry paints `WorkspaceOpenShell` in the press's frame: the screen's
-  compact header (Back, workspace title, project row) over the spinner the screen shows before its
-  body. `WorkspaceOpenGate` mounts the workspace screen in the next JS task; Back first cancels it.
-  Web, desktop and tablets mount the screen at once.
+- On native phones (`useOpenShellEnabled`) the pushed screen paints a shell in the press's frame
+  and `OpenGate` (`navigation/open-gate.tsx`) mounts the screen in the next JS task; Back first
+  cancels it. Web, desktop and tablets mount the screen at once.
+- A session's deck entry shows `WorkspaceOpenShell`: the screen's compact header (Back, workspace
+  title, project row) over the spinner the screen shows before its body.
+- A chat shows `ChatOpenGate`'s shell (`clisbot/bots/chat/chat-open-gate.tsx`): the compact
+  header with Back and the title the pressed row showed (`open-preview.ts`) over a spinner. The
+  record, transcript and live heads subscribe when the route mounts, a task later. A reopen pushes
+  a new route, so it shows the shell too, then the cached transcript.
 - The tail is not in the shell. It paints when the screen mounts, from memory within the five
   minutes below, otherwise from the device tail. A second timeline renderer for one frame was not
   worth its drift.
@@ -49,11 +56,12 @@ the workspace screen's mount, one component of several hundred hooks.
   changes in between (`writeAfter` in `validated-persist-storage.ts`). Each save validated and
   serialized every opened workspace's layout, 7.3 ms on Node with 300 workspaces, and opening a
   session saves at least twice.
-- `workspace-open-gate.browser.test.tsx` presses a row in a real navigator: the press's commit
+- `navigation/open-gate.browser.test.tsx` presses a row in a real navigator: the press's commit
   holds the shell and zero renders of the screen; the screen renders in the scheduled task; Back
-  before it means the screen never renders.
-- A device trace shows `clisbot.workspace.shell`, then `clisbot.workspace.mount`. Not yet measured
-  on the S23 after this change.
+  before it means the screen never renders. `chat-open-gate.browser.test.tsx` does the same for a
+  chat row, with the row's title in the shell, and again after Back.
+- A device trace shows `clisbot.workspace.shell`, then `clisbot.workspace.mount`, and
+  `clisbot.chat.shell` for a chat. Not yet measured on the S23 after these changes.
 
 ### Preload on intent
 
