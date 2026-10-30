@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import equal from "fast-deep-equal/es6";
 import { useSyncExternalStore } from "react";
 import { z } from "zod";
 import { readValidatedJson } from "@/storage/validated-storage";
@@ -68,8 +69,17 @@ export class HubDaemonListCache {
     return this.lists.get(origin);
   }
 
+  /**
+   * Every 60 s poll remembers a list, usually the same one. Readers re-render only when what it
+   * lists changed; a newer `syncedAt` alone is stored without notifying them (`get` reads it).
+   */
   remember(list: CachedHubDaemonList): void {
+    const previous = this.lists.get(list.origin);
     this.lists.set(list.origin, list);
+    if (previous !== undefined && equal({ ...previous, syncedAt: list.syncedAt }, list)) {
+      this.write();
+      return;
+    }
     this.persist();
   }
 
@@ -92,6 +102,10 @@ export class HubDaemonListCache {
 
   private persist(): void {
     this.emit();
+    this.write();
+  }
+
+  private write(): void {
     const snapshot = JSON.stringify({ lists: [...this.lists.values()] });
     this.writes = this.writes
       .then(() =>

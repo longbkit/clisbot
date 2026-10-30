@@ -212,7 +212,9 @@ account id, organization id, daemons and `syncedAt`, in AsyncStorage under
 - **Used** for bindings and ticket resolvers under the same rule, until this run's list arrives
   ([cold-start connect path](#cold-start-connect-path)).
 - **Never used** for orphan removal or adding back a removed Host; those act on a fresh list.
-- **Replaced** by every successful list, so a delisted daemon disappears.
+- **Replaced** by every successful list, so a delisted daemon disappears. A poll that returns the
+  same daemons stores its new `syncedAt` without notifying readers, so the 60 s poll does not
+  re-render every Host inventory reader.
 - **Removed** on explicit sign-out, when the reachable Hub reports signed out or a different
   account or organization, and on a 403 from the list. `onAccessRevoked` still removes the Host
   from the registry, which hides it whatever the list says.
