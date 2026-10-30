@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useRouter } from "expo-router";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import { useHubAccounts, type HubAccountContextValue } from "@/clisbot/hub/account-provider";
@@ -25,6 +25,7 @@ import {
   type StripHub,
   type StripHubState,
 } from "./hosts-strip-model";
+import { useStallNow, type WaitingHost } from "./connect-stall-clock";
 
 function hubState(account: HubAccountContextValue): StripHubState {
   if (account.signedIn) return "online";
@@ -39,31 +40,58 @@ function useEffectiveStatuses(
   serverIds: readonly string[],
 ): ReadonlyMap<string, HostRuntimeConnectionStatus> {
   const statuses = useHostRuntimeConnectionStatuses(serverIds);
-  const [now, setNow] = useState(() => Date.now());
-  const waiting = serverIds.filter((id) => {
-    const status = statuses.get(id);
-    return status === "connecting" || status === "idle";
-  });
-  const waitingKey = waiting.join("\n");
-  useEffect(() => {
-    if (!waitingKey) return;
-    const timer = setInterval(() => setNow(Date.now()), 5000);
-    return () => clearInterval(timer);
-  }, [waitingKey]);
-  return useMemo(() => {
-    const store = getHostRuntimeStore();
-    return new Map(
-      serverIds.map((id) => [
-        id,
-        effectiveHostStatus({
-          status: statuses.get(id) ?? "connecting",
-          since: getHostRuntimeConnectionStatusSince(id),
-          lastError: store.getSnapshot(id)?.lastError ?? null,
-          now,
+  const waitingKey = useWaitingKey(serverIds);
+  const waiting = useMemo(() => parseWaitingKey(waitingKey), [waitingKey]);
+  const now = useStallNow([...waiting.values()]);
+  return useMemo(
+    () =>
+      new Map(
+        serverIds.map((id) => {
+          const host = waiting.get(id);
+          const status = effectiveHostStatus({
+            status: statuses.get(id) ?? "connecting",
+            since: host?.since ?? null,
+            lastError: host?.failed ? "failed" : null,
+            now,
+          });
+          return [id, status];
         }),
-      ]),
-    );
-  }, [serverIds, statuses, now]);
+      ),
+    [serverIds, statuses, waiting, now],
+  );
+}
+
+interface WaitingStripHost extends WaitingHost {
+  failed: boolean;
+}
+
+/**
+ * Each connecting or idle Host's status start and whether it has an error, compared by value: a
+ * failed attempt can leave a Host connecting, and the strip calls that "Can't connect".
+ */
+function useWaitingKey(serverIds: readonly string[]): string {
+  const store = getHostRuntimeStore();
+  const read = () =>
+    serverIds
+      .flatMap((id) => {
+        const snapshot = store.getSnapshot(id);
+        const status = snapshot?.connectionStatus ?? "connecting";
+        if (status !== "connecting" && status !== "idle") return [];
+        const since = getHostRuntimeConnectionStatusSince(id) ?? "";
+        return [`${id}\t${since}\t${snapshot?.lastError ? 1 : 0}`];
+      })
+      .join("\n");
+  return useSyncExternalStore((onChange) => store.subscribeAll(onChange), read, read);
+}
+
+function parseWaitingKey(key: string): ReadonlyMap<string, WaitingStripHost> {
+  if (!key) return new Map();
+  return new Map(
+    key.split("\n").map((line) => {
+      const [id = "", since = "", failed] = line.split("\t");
+      return [id, { since: since ? Number(since) : null, failed: failed === "1" }];
+    }),
+  );
 }
 
 /** Every Host and Hub this device knows, reduced to what the Home strip shows. */
