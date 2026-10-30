@@ -20,6 +20,9 @@ tail cache and Settings → Storage, is [offline cache](offline-cache.md).
 
 - Hub-managed Hosts own their retries in the controller (their clients never auto-retry). The
   2 s probe tick only attempts a Host whose backoff is due.
+- An online Host's latency comes from its 10 s heartbeat RTT. A reading within max(20 ms, 25%) of
+  the published one keeps it (`holdLatencyJitter`): publishing every reading rewrote each Host's
+  snapshot every 10 s and re-rendered every Host reader.
 - A reconnect sweep runs when there is reason to think Hosts can connect again: the window
   `online` event (web and Electron, `runtime/network-reachability.web.ts`), the app returning to
   the foreground, and a Host that had failed connecting again. Online Hosts verify their socket
@@ -255,7 +258,9 @@ account id, organization id, daemons and `syncedAt`, in AsyncStorage under
 - **Used** for bindings and ticket resolvers under the same rule, until this run's list arrives
   ([cold-start connect path](#cold-start-connect-path)).
 - **Never used** for orphan removal or adding back a removed Host; those act on a fresh list.
-- **Replaced** by every successful list, so a delisted daemon disappears.
+- **Replaced** by every successful list, so a delisted daemon disappears. A poll that returns the
+  same daemons stores its new `syncedAt` without notifying readers, so the 60 s poll does not
+  re-render every Host inventory reader.
 - **Removed** on explicit sign-out, when the reachable Hub reports signed out or a different
   account or organization, and on a 403 from the list. `onAccessRevoked` still removes the Host
   from the registry, which hides it whatever the list says.

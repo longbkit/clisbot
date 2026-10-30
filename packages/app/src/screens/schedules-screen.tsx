@@ -1,12 +1,5 @@
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-  type ReactElement,
-} from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useIsFocused } from "expo-router/react-navigation";
 import { CalendarClock, Plus } from "lucide-react-native";
@@ -28,7 +21,9 @@ import {
   type AggregatedSchedule,
   type ScheduleHostError,
 } from "@/hooks/use-schedules";
-import { getHostRuntimeStore } from "@/runtime/host-runtime";
+import { useRetainedPanelActive } from "@/components/retained-panel";
+import { useHeldWhileInactive } from "@/hooks/use-held-while-inactive";
+import { useAgentDirectoryReadyHosts } from "@/schedules/agent-directory-ready";
 import {
   resolveSchedule,
   type ScheduleBucket,
@@ -71,31 +66,16 @@ export function SchedulesScreenContent({
 }: { embedded?: boolean } = {}): ReactElement {
   const { loadState, hostErrors, isError, refetch } = useSchedules();
   const schedules = loadState.status === "loaded" ? loadState.data : EMPTY_SCHEDULES;
-  const { agents } = useAggregatedAgents({ includeArchived: true });
+  // A hidden phone tab keeps the agents it last showed, so directory updates do not rebuild
+  // every schedule row behind it (docs/mobile-panels.md).
+  const agents = useHeldWhileInactive(
+    useAggregatedAgents({ includeArchived: true }).agents,
+    useRetainedPanelActive(),
+  );
   const { projects } = useProjects();
   const hosts = useAvailableHosts();
-  const runtime = getHostRuntimeStore();
-  const runtimeVersion = useSyncExternalStore(
-    (onStoreChange) => runtime.subscribeAll(onStoreChange),
-    () => runtime.getVersion(),
-    () => runtime.getVersion(),
-  );
-
-  // Per-host agent-directory readiness from the runtime, not the aggregate agent
-  // flag: the aggregate `isInitialLoad` flips false as soon as *any* host has
-  // agents, so a still-loading host would falsely mark its agent-target
-  // schedules "gone". `hasEverLoadedAgentDirectory` is true only once that
-  // host's directory has loaded at least once.
-  const agentDirReadyHosts = useMemo(() => {
-    void runtimeVersion;
-    const ready = new Set<string>();
-    for (const host of hosts) {
-      if (runtime.getSnapshot(host.serverId)?.hasEverLoadedAgentDirectory) {
-        ready.add(host.serverId);
-      }
-    }
-    return ready;
-  }, [hosts, runtime, runtimeVersion]);
+  const serverIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
+  const agentDirReadyHosts = useAgentDirectoryReadyHosts(serverIds);
 
   const [form, setForm] = useState<FormState>({ mode: "closed" });
   const [selectedHost, setSelectedHost] = useState(ALL_HOSTS_OPTION_ID);

@@ -477,6 +477,8 @@ export interface DaemonClientConfig {
   };
   runtimeMetricsIntervalMs?: number;
   runtimeMetricsWindowMs?: number;
+  /** Diagnostic: one call per inbound JSON message, after its handlers ran. */
+  onInboundMessage?: (type: string, bytes: number, handlerMs: number) => void;
   trace?: DaemonClientTrace;
   capabilities?: Partial<Record<ClientCapability, unknown>>;
   /**
@@ -7506,7 +7508,7 @@ export class DaemonClient {
         messageType: "pong",
       });
       this.resolvePingProbe();
-      this.runtimeMetrics?.recordMessage("pong", bytes, perfNow() - startMs);
+      this.recordInboundMessage("pong", bytes, perfNow() - startMs);
       return;
     }
 
@@ -7538,10 +7540,15 @@ export class DaemonClient {
       this.endTraceSection(dispatchTrace);
     }
     const msgType = parsed.data.message.type;
-    this.runtimeMetrics?.recordMessage(msgType, bytes, perfNow() - startMs);
+    this.recordInboundMessage(msgType, bytes, perfNow() - startMs);
     if (parsed.data.message.type === "agent_stream") {
       this.runtimeMetrics?.recordAgentStream(parsed.data.message.payload);
     }
+  }
+
+  private recordInboundMessage(type: string, bytes: number, handlerMs: number): void {
+    this.runtimeMetrics?.recordMessage(type, bytes, handlerMs);
+    this.config.onInboundMessage?.(type, bytes, handlerMs);
   }
 
   private tryHandleBinaryFrame(rawBytes: Uint8Array): boolean {

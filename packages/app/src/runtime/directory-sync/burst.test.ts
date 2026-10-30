@@ -336,4 +336,62 @@ describe("a burst of live directory updates across many Hosts", () => {
     });
     for (const { directory } of hosts) directory.dispose();
   });
+
+  it("lands an agent's activity bump in the same store commit as its update", async () => {
+    const clock = createManualFrameClock();
+    const serverId = serverIds[0]!;
+    const client = new FakeHost(0);
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, client as unknown as DaemonClient, 1);
+    store.updateSessionServerInfo(serverId, {
+      serverId,
+      hostname: null,
+      version: "test",
+      features: { workspaceMultiplicity: true },
+    });
+    const directory = new DirectorySync(
+      serverId,
+      {
+        onAgentStoppedRunning: () => undefined,
+        markAgentLoading: () => undefined,
+        markAgentReady: () => undefined,
+        markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
+      },
+      undefined,
+      { frameClock: shareFrames(clock) },
+    );
+    directory.connectionChanged({
+      client: client as unknown as DaemonClient,
+      status: "online",
+      source: { clientGeneration: 1, connectionEpoch: 1 },
+    });
+    await directory.refreshAll();
+    useSessionStore.getState().flushAgentLastActivity();
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    const updatedAt = "2026-10-03T00:00:00.000Z";
+    const agent = agentPayload({
+      id: "h0-a1",
+      workspaceId: workspaceIdOf(0, 1),
+      title: "initial",
+      updatedAt,
+    });
+    client.emit({ type: "agent_update", payload: { kind: "upsert", ...agentEntry(agent) } });
+    clock.tick();
+    // Past the activity flush's own frame, which used to commit a second time.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    unsubscribe();
+
+    expect(notifications).toBe(1);
+    expect(useSessionStore.getState().agentLastActivity.get("h0-a1")?.toISOString()).toBe(
+      updatedAt,
+    );
+    directory.dispose();
+  });
 });

@@ -7,6 +7,7 @@ import {
   exportNativeRenderProfile,
   traceInstant,
 } from "@/performance/native-trace";
+import { perfProbe } from "@/performance/perf-probe/probe";
 
 const NATIVE_SAMPLE_LIMIT = 4096;
 let nativeCollecting = isSyntheticReactProfileBuild;
@@ -180,6 +181,14 @@ function createSyntheticSink(): RenderSink {
 // Choose the destination once. Browser QA can still enable capture at runtime.
 function selectRenderSink(): RenderSink {
   if (isSyntheticReactProfileBuild) return createSyntheticSink();
+  const probe = perfProbe;
+  if (probe) {
+    return {
+      isEnabled: () => true,
+      render: (sample) => probe.render(sample.id, sample.actualDuration),
+      reasons: () => {},
+    };
+  }
   if (watchdog) return { isEnabled: () => true, render: watchdog.render, reasons: () => {} };
   return createBrowserSink();
 }

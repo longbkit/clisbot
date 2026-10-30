@@ -12,6 +12,7 @@ import {
   type TabRouterOptions,
 } from "expo-router/react-navigation";
 import { RetainedPanel } from "@/components/retained-panel";
+import { RenderProfile } from "@/utils/render-profiler";
 
 export interface PhoneTabBarProps {
   state: TabNavigationState<ParamListBase>;
@@ -72,7 +73,9 @@ function PhoneTabNavigator({
           {state.routes.map((route) =>
             visited.has(route.key) ? (
               <RetainedPanel key={route.key} active={route.key === focusedKey}>
-                {descriptors[route.key]!.render()}
+                <RenderProfile id={`Tab:${route.name}`}>
+                  {descriptors[route.key]!.render()}
+                </RenderProfile>
               </RetainedPanel>
             ) : null,
           )}

@@ -125,6 +125,7 @@ import {
 } from "@/timeline/viewed-timeline-sync";
 import { projectIconCache } from "@/projects/icon-cache";
 import { createPerformanceTrace } from "@/performance/native-trace";
+import { perfProbe } from "@/performance/perf-probe/probe";
 import { revokePushNotifications } from "@/push-notifications";
 import { createAppWebSocketFactory } from "./websocket-factory";
 import { selectReceiveCodec } from "./encrypted-receive";
@@ -227,6 +228,28 @@ function setSnapshotPatchField<Key extends keyof HostRuntimeSnapshotPatch>(
   value: HostRuntimeSnapshot[Key],
 ): void {
   patch[key] = value;
+}
+
+const LATENCY_JITTER_MIN_MS = 20;
+const LATENCY_JITTER_RATIO = 0.25;
+
+/**
+ * Every heartbeat measures a slightly different RTT. Publishing each one rewrote the snapshot of
+ * every online Host every 10 s and re-rendered every Host consumer, so a reading inside the band
+ * keeps the published one. The band stays under the adaptive switch threshold for fast routes.
+ */
+function holdLatencyJitter(
+  previous: ReadonlyMap<string, ConnectionProbeState>,
+  next: Map<string, ConnectionProbeState>,
+): Map<string, ConnectionProbeState> {
+  const held = new Map(next);
+  for (const [connectionId, probe] of next) {
+    const published = previous.get(connectionId);
+    if (probe.status !== "available" || published?.status !== "available") continue;
+    const band = Math.max(LATENCY_JITTER_MIN_MS, published.latencyMs * LATENCY_JITTER_RATIO);
+    if (Math.abs(probe.latencyMs - published.latencyMs) < band) held.set(connectionId, published);
+  }
+  return held;
 }
 
 export function isHostRuntimeConnected(snapshot: HostRuntimeSnapshot | null): boolean {
@@ -763,6 +786,7 @@ function createDefaultDeps(
         runtimeGeneration,
         capabilities: appCapabilities,
         trace: createPerformanceTrace({ host: host.serverId, connection: connection.id }),
+        onInboundMessage: perfProbe?.message,
         // Admission is resolved per hello, not per client: Hub binding
         // registration races host hydration, so a client born before its
         // binding must still present a ticket once admission is required.
@@ -1649,6 +1673,15 @@ export class HostRuntimeController {
   }
 
   private updateSnapshot(patch: HostRuntimeSnapshotPatch): void {
+    if (patch.probeByConnectionId) {
+      patch = {
+        ...patch,
+        probeByConnectionId: holdLatencyJitter(
+          this.snapshot.probeByConnectionId,
+          patch.probeByConnectionId,
+        ),
+      };
+    }
     const preservedPatch: HostRuntimeSnapshotPatch = { ...patch };
     let hasChanged = this.host.serverId !== this.snapshot.serverId;
     for (const key of Object.keys(patch) as (keyof HostRuntimeSnapshotPatch)[]) {

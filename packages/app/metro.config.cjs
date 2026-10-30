@@ -10,6 +10,9 @@ const projectRoot = __dirname;
 const appNodeModulesRoot = path.resolve(projectRoot, "node_modules");
 const appSrcRoot = path.resolve(projectRoot, "src");
 const isWatchdogBuild = process.env.CLISBOT_WATCHDOG_BUILD === "1";
+// The idle CPU probe (docs/mobile-testing.md#idle-cpu-probe) reads React Profiler commits, which the
+// production renderer never reports.
+const isPerfProbeBuild = process.env.EXPO_PUBLIC_CLISBOT_PERF_PROBE === "1";
 const isFdroidBuild = process.env.CLISBOT_FDROID_BUILD === "1";
 const fdroidModuleOverrides = {
   "expo-camera": path.resolve(appSrcRoot, "fdroid/expo-camera.tsx"),
@@ -22,6 +25,9 @@ const customWebPlatform = (process.env.CLISBOT_WEB_PLATFORM ?? "")
 
 const config = getDefaultConfig(projectRoot);
 config.cacheVersion = isWatchdogBuild ? "watchdog" : "standard";
+if (isPerfProbeBuild) {
+  config.cacheVersion = `${config.cacheVersion}:perf-probe`;
+}
 
 // Cloudflare limits each uncompressed asset to 25 MiB. Preserve Unicode as UTF-8
 // for this web export; native and desktop packaging keep Metro's defaults.
@@ -92,7 +98,7 @@ function resolveWithCustomWebOverlay(context, moduleName, platform) {
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (
-    isWatchdogBuild &&
+    (isWatchdogBuild || isPerfProbeBuild) &&
     platform === "android" &&
     /[/\\]Renderer[/\\]shims[/\\]/.test(context.originModulePath) &&
     /implementations\/(ReactFabric|ReactNativeRenderer)-prod$/.test(moduleName)

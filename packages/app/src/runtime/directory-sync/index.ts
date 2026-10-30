@@ -362,6 +362,9 @@ export class DirectorySync {
             : this.applyLiveWorkspaceDelta(update.source, update.delta);
         applied ||= appliedNow;
       }
+      // An accepted update queues its activity bump; committing it here keeps it out of a
+      // second store notification on the next frame.
+      useSessionStore.getState().flushAgentLastActivity();
     });
     if (applied) this.persistCheckpoint();
   }

@@ -5,6 +5,7 @@ import {
   issueSessionKey,
   resolveIssue,
   type Issue,
+  type IssueRecord,
   type IssueRecords,
   type IssueSubject,
 } from "./issues";
@@ -68,38 +69,76 @@ export function homeRows(input: HomeRowsInput): HomeRow[] {
   return input.agents.map((agent) => buildRow(agent, subjectOf(agent), input));
 }
 
+interface CachedRow {
+  row: HomeRow;
+  record: IssueRecord | undefined;
+}
+
+/** Only a seen failure depends on the clock: it leaves Seen issues after a week. */
+function agesWithClock(row: HomeRow): boolean {
+  return row.issue?.kind === "failure" && row.issue.state === "seen";
+}
+
+function sameIssue(a: Issue | null, b: Issue | null): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    a.key === b.key && a.kind === b.kind && a.occurrence === b.occurrence && a.state === b.state
+  );
+}
+
 /**
  * `homeRows` for a stream of directory updates: a directory entry is replaced only when it
  * changes, so the row of every other session is reused, along with the reader and Hub matching
- * its ownership costs. A session with pending requests is always rebuilt, because its request ids
- * (the issue's occurrence) can change while its entry stays equal. The array itself is reused when
- * no row changed, so memoized readers downstream stay quiet.
+ * its ownership costs. The minute clock and an issue record change re-derive only the issues they
+ * can move (a seen failure, a session whose record changed) and keep each row's ownership. A
+ * session with pending requests is always rebuilt, because its request ids (the issue's
+ * occurrence) can change while its entry stays equal. The array itself is reused when no row
+ * changed, so memoized readers downstream stay quiet.
  */
 export function createHomeRowCache() {
-  let sharedInputs: readonly unknown[] = [];
-  let cached = new Map<AggregatedAgent, HomeRow>();
+  let ownershipOf: HomeRowsInput["ownershipOf"] | null = null;
+  let records: IssueRecords | null = null;
+  let now = Number.NaN;
+  let cached = new Map<AggregatedAgent, CachedRow>();
   let lastRows: HomeRow[] = [];
+
+  function refresh(agent: AggregatedAgent, input: HomeRowsInput, entry: CachedRow | undefined) {
+    const record = entry && input.records === records ? entry.record : recordOf(agent, input);
+    if (entry && record === entry.record && !(input.now !== now && agesWithClock(entry.row))) {
+      return entry;
+    }
+    const issue = resolveIssue(agent, record, input.now);
+    if (entry && sameIssue(issue, entry.row.issue)) return { row: entry.row, record };
+    const ownership = entry ? entry.row.ownership : input.ownershipOf(agent);
+    return { row: { agent, ownership, issue }, record };
+  }
+
   return (input: HomeRowsInput): HomeRow[] => {
-    const inputs = [input.ownershipOf, input.records, input.now];
-    if (inputs.some((value, index) => value !== sharedInputs[index])) {
-      sharedInputs = inputs;
+    if (input.ownershipOf !== ownershipOf) {
+      ownershipOf = input.ownershipOf;
       cached = new Map();
     }
-    const next = new Map<AggregatedAgent, HomeRow>();
+    const next = new Map<AggregatedAgent, CachedRow>();
     const rows = input.agents.map((agent) => {
       if ((agent.pendingPermissionCount ?? 0) > 0) {
         return buildRow(agent, input.subjectOf ? input.subjectOf(agent) : agent, input);
       }
-      const row = cached.get(agent) ?? buildRow(agent, agent, input);
-      next.set(agent, row);
-      return row;
+      const entry = refresh(agent, input, cached.get(agent));
+      next.set(agent, entry);
+      return entry.row;
     });
     cached = next;
+    records = input.records;
+    now = input.now;
     const unchanged =
       rows.length === lastRows.length && rows.every((row, i) => row === lastRows[i]);
     if (!unchanged) lastRows = rows;
     return lastRows;
   };
+}
+
+function recordOf(agent: AggregatedAgent, input: HomeRowsInput): IssueRecord | undefined {
+  return input.records[issueSessionKey(agent)];
 }
 
 /**
