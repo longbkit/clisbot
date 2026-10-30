@@ -30,6 +30,8 @@ vi.mock("react-native-unistyles", async () => {
           : styles,
     },
     withUnistyles: <T,>(component: T): T => component,
+    // layout.ts reads the breakpoint for the compact resume hold.
+    UnistylesRuntime: { breakpoint: window.innerWidth < 500 ? "xs" : "lg" },
     useUnistyles: () => ({
       theme: lightTheme,
       rt: { breakpoint: window.innerWidth < 500 ? "xs" : "lg" },
