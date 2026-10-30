@@ -695,6 +695,20 @@
         "hostInputQueue": {
           "type": "boolean"
         },
+        "agentColdStorage": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "coldAfterDays": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 36500
+            }
+          },
+          "additionalProperties": false
+        },
         "dictation": {
           "type": "object",
           "properties": {

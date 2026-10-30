@@ -263,6 +263,10 @@ snapshot so a mixed edit can apply its live subset and still name the paths that
   pluginsEnabled: boolean,
   plugins: Record<pluginId, { source: "directory", path: string, enabled?: boolean }>,
   features: {
+    // Old records skip the startup authorship probe; stored payloads and `bot.list` are cached.
+    // Defaults true / 3; env CLISBOT_AGENT_COLD_STORAGE, CLISBOT_AGENT_COLD_AFTER_DAYS. Startup-only.
+    // See features/agent-session-storage/cold-storage.md.
+    agentColdStorage: { enabled: boolean, coldAfterDays: number },
     dictation: { enabled, stt: { provider, model, language, confidenceThreshold } },
     voiceMode: { enabled, llm, stt: { provider, model, language }, turnDetection, tts: { provider, model, voice, speakerId, speed } }
   },

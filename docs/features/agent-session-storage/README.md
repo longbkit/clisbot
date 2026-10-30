@@ -86,15 +86,16 @@ log.
 
 ## What works today
 
-| Capability                                                                      | State                                                      |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Durable timeline in `events.jsonl`, survives restart                            | Done                                                       |
-| Fast jump to a message not resident in RAM, via anchors                         | Done                                                       |
-| Index rebuild after loss or corruption                                          | Done                                                       |
-| Tool approval survives a mid-flight restart, no duplicate approval              | Done                                                       |
-| Prompt submissions deduped by `clientMessageId` across retry                    | Done                                                       |
-| Capability-gated reads (`agentSessionStorageRead`); upstream daemons unaffected | Done                                                       |
-| Benchmark gates at 1,000 and 10,000 rows                                        | Green — [report](benchmarks/2026-09-14-iteration-gates.md) |
+| Capability                                                                         | State                                                      |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Durable timeline in `events.jsonl`, survives restart                               | Done                                                       |
+| Fast jump to a message not resident in RAM, via anchors                            | Done                                                       |
+| Index rebuild after loss or corruption                                             | Done                                                       |
+| Tool approval survives a mid-flight restart, no duplicate approval                 | Done                                                       |
+| Prompt submissions deduped by `clientMessageId` across retry                       | Done                                                       |
+| Capability-gated reads (`agentSessionStorageRead`); upstream daemons unaffected    | Done                                                       |
+| Benchmark gates at 1,000 and 10,000 rows                                           | Green — [report](benchmarks/2026-09-14-iteration-gates.md) |
+| Startup and list cost independent of old records ([cold storage](cold-storage.md)) | Done; record parse at startup still scales                 |
 
 Details and evidence: [implementation.md](implementation.md) ·
 [iteration acceptance](iterations/2026-09-13-acceptance-matrix.md).
@@ -186,6 +187,7 @@ Known cleanups, not blocking:
 | Which upstream files were touched and what was decided                                       | [upstream-blast-radius.md](upstream-blast-radius.md)          |
 | Changes outside the storage / session / timeline layers                                      | [out-of-layer-changes.md](out-of-layer-changes.md)            |
 | Benchmark measurements                                                                       | [benchmarks/](benchmarks/)                                    |
+| Why old records stop costing startup and list time, and the `agentColdStorage` flag          | [cold-storage.md](cold-storage.md)                            |
 | The closed 2026-09-12 three-lane campaign (history, not backlog)                             | [campaign-2026-09-12/](campaign-2026-09-12/)                  |
 
 Workspace naming, selection and reuse live in

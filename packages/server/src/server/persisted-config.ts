@@ -367,6 +367,13 @@ export const PersistedConfigSchema = z
         personalServing: z.boolean().optional(),
         agentSessionStorage: z.boolean().optional(),
         hostInputQueue: z.boolean().optional(),
+        agentColdStorage: z
+          .object({
+            enabled: z.boolean().optional(),
+            coldAfterDays: z.number().int().nonnegative().max(36_500).optional(),
+          })
+          .strict()
+          .optional(),
         dictation: FeatureDictationSchema.optional(),
         voiceMode: FeatureVoiceModeSchema.optional(),
         webUi: FeatureWebUiSchema.optional(),

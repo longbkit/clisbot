@@ -397,3 +397,8 @@ Each agent is a single JSON file. Fields relevant to this doc:
 | `lastStatus`                                   | `AgentStatus` | `initializing` / `idle` / `running` / `error` / `closed`                           |
 
 See [`docs/data-model.md`](./data-model.md) for the full agent record.
+
+A stored record with no activity for `features.agentColdStorage.coldAfterDays` (default 3) is
+cold: it stays listed and loads like any other, but its startup authorship probe waits for its
+first history open or the background drain. Cold is not a lifecycle state and adds no field to the
+record. See [cold storage](./features/agent-session-storage/cold-storage.md).
