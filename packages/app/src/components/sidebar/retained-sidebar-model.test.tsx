@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import React, { memo } from "react";
+import React, { memo, type ReactNode } from "react";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
@@ -13,9 +13,18 @@ import { seedRuntimeWorkspaces } from "@/test/seed-session";
 import type { HostProfile } from "@/types/host-connection";
 import { SidebarActiveFilters } from "./display-preferences/active-filters";
 import { RetainedSidebarModel, SidebarModelProvider, useSidebarModel } from "./sidebar-model";
+import { RouteSourceProvider } from "@/navigation/route-source";
+import { createTestRouteSource } from "@/test/route-source";
 
 const scans = vi.hoisted(() => ({ metadata: 0 }));
 // Counts full scans of every Host's workspaces for the user and channel filter options.
+const routeSource = createTestRouteSource("/").source;
+
+/** The provider's route reads need the root layout's route source. */
+function RouteWrapper({ children }: { children: ReactNode }) {
+  return <RouteSourceProvider source={routeSource}>{children}</RouteSourceProvider>;
+}
+
 vi.mock("@/clisbot/session-storage/directory", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/clisbot/session-storage/directory")>();
   return {
@@ -158,7 +167,7 @@ function updateWorkspace(id: string, patch: Partial<WorkspaceDescriptor>) {
 
 describe("SidebarModelProvider held while its pane is hidden", () => {
   it("derives no new model for directory updates and catches up once when shown", () => {
-    const view = render(<PhoneWork active />);
+    const view = render(<PhoneWork active />, { wrapper: RouteWrapper });
     view.rerender(<PhoneWork active={false} />);
     const before = held.model;
     held.renders = 0;
@@ -177,7 +186,7 @@ describe("SidebarModelProvider held while its pane is hidden", () => {
   it("derives once at mount when the pane mounts hidden", () => {
     seed(["ws-1", "ws-2"]);
     held.renders = 0;
-    render(<PhoneWork active={false} />);
+    render(<PhoneWork active={false} />, { wrapper: RouteWrapper });
     expect(held.model?.workspacePlacements).toHaveLength(2);
     const mounted = held.renders;
     updateWorkspace("ws-1", { status: "running" });
@@ -209,7 +218,7 @@ function ChipsUnderWork() {
 describe("session metadata options", () => {
   it("scans the workspaces once per directory change for the model and its filter chips", () => {
     act(markSessionStorageReadable);
-    render(<ChipsUnderWork />);
+    render(<ChipsUnderWork />, { wrapper: RouteWrapper });
     scans.metadata = 0;
     updateWorkspace("ws-1", { status: "running" });
     expect(scans.metadata).toBe(1);
@@ -218,13 +227,13 @@ describe("session metadata options", () => {
 
 describe("RetainedSidebarModel", () => {
   it("passes model updates through while Work is shown", () => {
-    render(<Mounted shown />);
+    render(<Mounted shown />, { wrapper: RouteWrapper });
     seed(["ws-1", "ws-2"]);
     expect(screen.getByTestId("workspaces").textContent).toBe("2");
   });
 
   it("does not re-render a hidden Work body when Host directories change", () => {
-    const view = render(<Mounted shown />);
+    const view = render(<Mounted shown />, { wrapper: RouteWrapper });
     view.rerender(<Mounted shown={false} />);
     renders.work = 0;
     seed(["ws-1", "ws-2"]);
@@ -234,7 +243,7 @@ describe("RetainedSidebarModel", () => {
   });
 
   it("shows the latest model in the first render after Work returns", () => {
-    const view = render(<Mounted shown />);
+    const view = render(<Mounted shown />, { wrapper: RouteWrapper });
     view.rerender(<Mounted shown={false} />);
     seed(["ws-1", "ws-2", "ws-3"]);
     renders.work = 0;
