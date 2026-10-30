@@ -306,6 +306,29 @@ before/after comparison, bounded peer-tab history, retained-state QA and unrun p
 `--count 0` for a 65-second idle capture; it keeps the native recording window and samples memory
 at its end, without assigning latency to an automation wait.
 
+## Idle CPU probe
+
+To see what the JS thread does on a real device with a real fleet, build any APK with
+`EXPO_PUBLIC_CLISBOT_PERF_PROBE=1`. Every 10 s the app logs one line:
+
+```bash
+adb logcat -s ReactNativeJS | grep '\[clisbot:perf\]'
+```
+
+The line is JSON for one window: inbound daemon messages by type (`count`, `bytes`, `ms` from
+parse through every handler), commits of the hot zustand stores by action (`session.setAgents`;
+`set` means a bare `setState`) plus `hostRuntime` emits, React commits per `RenderProfile` id with
+dynamic suffixes folded (`Tab:open-project`, `NavHome`, `HomeRow`), timer callbacks (intervals by
+period, timeouts together) and `longestTaskMs`, the worst lateness of a 50 ms tick.
+
+- The code is `packages/app/src/performance/perf-probe/`. Without the flag the collector is `null`
+  and every hook is one null check.
+- The flag also makes Metro resolve React's profiling renderer on Android, because the production
+  renderer never calls `Profiler.onRender`. Render durations carry its overhead; compare windows of
+  the same build, not against an ordinary APK.
+- Timers registered while modules load, before `startPerfProbe()` in `index.ts`, are not counted.
+- Release bundles mangle function names, so a timer is known by its period, not its caller.
+
 ## Maestro compatibility
 
 Existing Maestro flows live in `packages/app/maestro/`. Agent Device can execute its supported subset with `agent-device test <path> --maestro`, which provides a migration path while `.ad` coverage replaces these flows.

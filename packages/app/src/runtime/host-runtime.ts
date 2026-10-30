@@ -125,6 +125,7 @@ import {
 } from "@/timeline/viewed-timeline-sync";
 import { projectIconCache } from "@/projects/icon-cache";
 import { createPerformanceTrace } from "@/performance/native-trace";
+import { perfProbe } from "@/performance/perf-probe/probe";
 import { revokePushNotifications } from "@/push-notifications";
 import { createAppWebSocketFactory } from "./websocket-factory";
 import { selectReceiveCodec } from "./encrypted-receive";
@@ -763,6 +764,7 @@ function createDefaultDeps(
         runtimeGeneration,
         capabilities: appCapabilities,
         trace: createPerformanceTrace({ host: host.serverId, connection: connection.id }),
+        onInboundMessage: perfProbe?.message,
         // Admission is resolved per hello, not per client: Hub binding
         // registration races host hydration, so a client born before its
         // binding must still present a ticket once admission is required.

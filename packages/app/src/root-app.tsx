@@ -8,6 +8,7 @@ import { I18nProvider } from "@/i18n/provider";
 import { RootErrorBoundary } from "@/components/root-error-boundary";
 import { isSyntheticReactProfileBuild } from "@/constants/build-profile";
 import { RenderProfile, startNativeRenderProfileControl } from "@/utils/render-profiler";
+import { perfProbe } from "@/performance/perf-probe/probe";
 
 // Keep Expo's platform filtering, route root, and lazy import configuration.
 const { ctx: context } = require("expo-router/_ctx") as {
@@ -15,7 +16,7 @@ const { ctx: context } = require("expo-router/_ctx") as {
 };
 
 export function RootApp() {
-  if (isSyntheticReactProfileBuild) return <ProfiledRootApp />;
+  if (isSyntheticReactProfileBuild || perfProbe) return <ProfiledRootApp />;
   return <RootRouter context={context} />;
 }
 

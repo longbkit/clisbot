@@ -11,6 +11,8 @@ import "expo-router/build/fast-refresh";
 import { renderRootComponent } from "expo-router/build/renderRootComponent";
 import { startWatchdog } from "./src/watchdog";
 import { RootApp } from "./src/root-app";
+import { startPerfProbe } from "./src/performance/perf-probe/start";
 
 startWatchdog();
+startPerfProbe();
 renderRootComponent(RootApp);
