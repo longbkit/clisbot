@@ -10,6 +10,8 @@ import { prefetchedAccessTicket, resolveHostAccessTicket } from "@/runtime/host-
 import { HOST_COLORS } from "@/hosts/appearance";
 import type { HostProfile, HubHostManagement } from "@/types/host-connection";
 import { HubDaemonSchema } from "./contracts";
+import { createHubTransport } from "./transport/create.native";
+import { oauthCredentialKey } from "./transport/oauth-credentials";
 import type { CachedHubDaemonList } from "./hub-daemon-list-cache";
 import {
   bindManagedHost,
@@ -21,6 +23,29 @@ import {
 vi.mock("@/desktop/daemon/local-credential", () => ({
   readDesktopManagedLocalCredential: async () => undefined,
 }));
+vi.mock("@/device-access/secret-storage", () =>
+  vi.importActual("@/device-access/secret-storage.ts"),
+);
+/** Android keystore: a read answers in tens of milliseconds, a write in a few hundred. */
+const KEYSTORE_READ_MS = 50;
+const secrets = vi.hoisted(() => new Map<string, string>());
+vi.mock("expo-secure-store", () => ({
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 1,
+  getItemAsync: async (key: string) => {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return secrets.get(key) ?? null;
+  },
+  setItemAsync: async (key: string, value: string) => {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    secrets.set(key, value);
+  },
+  deleteItemAsync: async (key: string) => {
+    secrets.delete(key);
+  },
+}));
+vi.mock("expo-crypto", () => ({}));
+vi.mock("expo-linking", () => ({ createURL: () => "clisbot://hub-auth/callback" }));
+vi.mock("expo-web-browser", () => ({}));
 
 /**
  * The 2026-10-30 Galaxy S23 report: 14 Hub-managed Hosts behind a VPN with a ~400 ms round
@@ -253,14 +278,113 @@ async function rememberedRegistry() {
 const unbinds: Array<() => void> = [];
 let store: HostRuntimeStore | null = null;
 
+/** The Hub as the cold start meets it: its access tickets, and when the live list is bound. */
+interface HubModel {
+  issueAccessTicket: (daemonId: string) => Promise<string>;
+  /** The account read and the live list both answered. */
+  listed: Promise<void>;
+}
+
+/** Every Hub request waits for one shared token refresh, then takes one round trip. */
+function idealHub(): HubModel {
+  const signedIn = sleep(HUB_SIGN_IN_MS);
+  return {
+    issueAccessTicket: async (daemonId) => {
+      await signedIn;
+      await sleep(HUB_REQUEST_MS);
+      return `ticket-${daemonId}`;
+    },
+    listed: signedIn.then(() => sleep(2 * HUB_REQUEST_MS)),
+  };
+}
+
+/** Android fetch runs on OkHttp, whose dispatcher sends at most 5 requests to one host at once. */
+const OKHTTP_REQUESTS_PER_HOST = 5;
+let hubTokenRequests = 0;
+
+/** The Hub over HTTP: the token refresh opens the connection, every other request is one RTT. */
+function hubFetch() {
+  let inFlight = 0;
+  const waiting: Array<() => void> = [];
+  const acquire = () => {
+    if (inFlight < OKHTTP_REQUESTS_PER_HOST) {
+      inFlight += 1;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => waiting.push(resolve));
+  };
+  // A finished request hands its slot to the next one waiting.
+  const release = () => {
+    const next = waiting.shift();
+    if (next) next();
+    else inFlight -= 1;
+  };
+  return async (url: URL) => {
+    await acquire();
+    try {
+      if (url.pathname.endsWith("/token")) {
+        hubTokenRequests += 1;
+        await sleep(HUB_SIGN_IN_MS);
+        return Response.json({
+          access_token: "access",
+          refresh_token: "rotated",
+          expires_in: 300,
+          token_type: "Bearer",
+        });
+      }
+      await sleep(HUB_REQUEST_MS);
+      return Response.json({ accessTicket: "ticket:" + url.pathname });
+    } finally {
+      release();
+    }
+  };
+}
+
+/**
+ * The app's own native Hub transport. The account read and this run's list read start together
+ * (`prefetchRememberedHubDaemons`), and every ticket goes through the same transport.
+ */
+function nativeHub(input: { storedAccessToken: boolean }): () => HubModel {
+  return () => {
+    hubTokenRequests = 0;
+    secrets.clear();
+    secrets.set(
+      oauthCredentialKey(HUB_ORIGIN),
+      JSON.stringify({
+        issuer: HUB_ORIGIN,
+        refreshToken: "refresh",
+        generation: "login-1",
+        ...(input.storedAccessToken
+          ? { accessToken: "stored", accessExpiresAt: Date.now() + 240_000 }
+          : {}),
+      }),
+    );
+    vi.stubGlobal("fetch", hubFetch());
+    const transport = createHubTransport({ origin: HUB_ORIGIN });
+    const read = async (path: string) => (await transport.request(path)).json();
+    return {
+      issueAccessTicket: async (daemonId) =>
+        (await read("/api/management/v1/daemons/" + daemonId + "/access-tickets")).accessTicket,
+      listed: Promise.all([
+        read("/api/auth/clisbot/state"),
+        read("/api/management/v1/daemons"),
+      ]).then(() => undefined),
+    };
+  };
+}
+
 /**
  * Relaunches the app over the remembered registry and runs the Hub account as
  * `AccountHostSynchronization` sees it: no answer until the token is refreshed and the account
  * read, then the live list one request later. React keeps a binding whose key is unchanged, so a
  * key is bound once.
  */
-async function coldStart(input: { remembered: CachedHubDaemonList | undefined }) {
+async function coldStart(input: {
+  remembered: CachedHubDaemonList | undefined;
+  hub?: () => HubModel;
+}) {
   const storage = await rememberedRegistry();
+  const hub = (input.hub ?? idealHub)();
   storage.slowReads();
   const network: Network = {
     attempts: [],
@@ -294,7 +418,6 @@ async function coldStart(input: { remembered: CachedHubDaemonList | undefined })
       return profile;
     },
   };
-  const signedIn = sleep(HUB_SIGN_IN_MS);
   const bound = new Set<string>();
   const bindListed = (list: ManagedHostBindingList | null) => {
     for (const daemon of list?.daemons ?? []) {
@@ -313,11 +436,9 @@ async function coldStart(input: { remembered: CachedHubDaemonList | undefined })
           },
           managedAccessMode: daemon.managedAccessMode,
           label: () => daemon.slug,
-          issueAccessTicket: async () => {
-            await signedIn;
+          issueAccessTicket: () => {
             network.ticketRequests += 1;
-            await sleep(HUB_REQUEST_MS);
-            return `ticket-${daemon.id}`;
+            return hub.issueAccessTicket(daemon.id);
           },
           onFailure: () => undefined,
         }),
@@ -331,26 +452,26 @@ async function coldStart(input: { remembered: CachedHubDaemonList | undefined })
       remembered: input.remembered,
     }),
   );
-  void signedIn
-    .then(() => sleep(2 * HUB_REQUEST_MS))
-    .then(() =>
-      bindListed(
-        managedHostBindingList({
-          account: { enabled: true, origin: HUB_ORIGIN, state: ACCOUNT, signedIn: ACCOUNT },
-          live: { daemons: hubDaemons },
-          remembered: input.remembered,
-        }),
-      ),
-    );
+  void hub.listed.then(() =>
+    bindListed(
+      managedHostBindingList({
+        account: { enabled: true, origin: HUB_ORIGIN, state: ACCOUNT, signedIn: ACCOUNT },
+        live: { daemons: hubDaemons },
+        remembered: input.remembered,
+      }),
+    ),
+  );
 
   const onlineCount = () =>
     Array.from(
       { length: HOSTS },
       (_, index) => running.getSnapshot(`srv_sandbox_${index}`)?.connectionStatus,
     ).filter((status) => status === "online").length;
+  let firstOnlineAfterMs: number | null = null;
   let allOnlineAfterMs: number | null = null;
   while (Date.now() - startedAt < 60_000) {
     await vi.advanceTimersByTimeAsync(100);
+    if (onlineCount() > 0) firstOnlineAfterMs ??= Date.now() - startedAt;
     if (onlineCount() === HOSTS) {
       allOnlineAfterMs = Date.now() - startedAt;
       break;
@@ -361,7 +482,7 @@ async function coldStart(input: { remembered: CachedHubDaemonList | undefined })
       `${network.ticketRequests} tickets, ${network.peakConnectsInFlight} connects in flight at peak`,
   );
   console.info(`[cold-start] attempts ${network.attempts.join(" ")}`);
-  return { allOnlineAfterMs, network, storage, upsertedAt, summaries };
+  return { firstOnlineAfterMs, allOnlineAfterMs, network, storage, upsertedAt, summaries };
 }
 
 describe("cold start of 14 Hub-managed Hosts at a 400 ms round trip", () => {
@@ -376,6 +497,7 @@ describe("cold start of 14 Hub-managed Hosts at a 400 ms round trip", () => {
     store?.syncHosts([]);
     store = null;
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it("connects every Host from the remembered list in one wave", async () => {
@@ -395,6 +517,12 @@ describe("cold start of 14 Hub-managed Hosts at a 400 ms round trip", () => {
         hubBindingMs: 0,
         hubAccountMs: null,
         hubListMs: null,
+        hubTokenMs: null,
+        hubTicketMs: null,
+        hostTransportOpenMs: null,
+        cachedDirectoriesMs: expect.any(Number),
+        jsStallMaxMs: 0,
+        jsStallTotalMs: 0,
         firstHostOnlineMs: expect.any(Number),
         allHostsOnlineMs: expect.any(Number),
       },
@@ -416,5 +544,33 @@ describe("cold start of 14 Hub-managed Hosts at a 400 ms round trip", () => {
     // Each binding writes its offer without waiting for another Host's connect.
     expect(upsertedAt).toHaveLength(HOSTS);
     expect(Math.max(...upsertedAt)).toBeLessThanOrEqual(liveListAt + SLACK_MS);
+  }, 30_000);
+
+  it("refreshes the Hub token once for every request and connects the first Host in one wave", async () => {
+    const { firstOnlineAfterMs, allOnlineAfterMs } = await coldStart({
+      remembered: rememberedList,
+      hub: nativeHub({ storedAccessToken: false }),
+    });
+    expect(hubTokenRequests).toBe(1);
+    // The ticket (keystore read, refresh, one request) is ready as the transport opens.
+    const ticketAt = KEYSTORE_READ_MS + HUB_SIGN_IN_MS + HUB_REQUEST_MS;
+    expect(firstOnlineAfterMs).toBeLessThanOrEqual(
+      Math.max(TRANSPORT_OPEN_MS, ticketAt) + HELLO_MS + SLACK_MS,
+    );
+    // The account, the list and 14 tickets go out 5 at a time once the token is known.
+    const waves = Math.ceil((HOSTS + 2) / OKHTTP_REQUESTS_PER_HOST);
+    expect(allOnlineAfterMs).toBeLessThanOrEqual(
+      KEYSTORE_READ_MS + HUB_SIGN_IN_MS + waves * HUB_REQUEST_MS + HELLO_MS + SLACK_MS,
+    );
+  }, 30_000);
+
+  it("reuses the access token stored by the last run, so no Host waits for a refresh", async () => {
+    const { firstOnlineAfterMs, allOnlineAfterMs } = await coldStart({
+      remembered: rememberedList,
+      hub: nativeHub({ storedAccessToken: true }),
+    });
+    expect(hubTokenRequests).toBe(0);
+    expect(firstOnlineAfterMs).toBeLessThanOrEqual(TRANSPORT_OPEN_MS + HELLO_MS + SLACK_MS);
+    expect(allOnlineAfterMs).toBeLessThanOrEqual(TRANSPORT_OPEN_MS + HELLO_MS + SLACK_MS);
   }, 30_000);
 });

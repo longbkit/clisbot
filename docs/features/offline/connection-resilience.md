@@ -94,11 +94,11 @@ Hosts, ~400 ms) showed 0/14 online 20 s after a force-stop and 14/14 only by 60 
 | ------------------------ | ----------- | --------------------------------------------------- |
 | Registry restore         | local       | the remembered daemon list restore                  |
 | Hub binding              | none        | mounts from the remembered list                     |
-| Hub access-token refresh | ~3          | transport open                                      |
+| Hub access-token refresh | ~3, or none | transport open; none within the stored token's life |
 | Transport open (relay)   | ~4          | the ticket request                                  |
 | Access ticket            | 1           | transport open (first attempt after reset)          |
 | hello → server_info      | 1           |                                                     |
-| Account read, list read  | 1 each      | connects; the live list replaces the binding source |
+| Account read, list read  | 1, together | connects; the live list replaces the binding source |
 | First directory fetch    | 1 per page  | sends the cached cursors, so it is a delta          |
 
 Before 2026-10-30 these ran in series: bindings mounted only after the account and list reads,
@@ -107,8 +107,19 @@ to the Hub managing this Host"); the next ones were cut off when the bindings re
 connects ran four at a time, each opening the transport before asking for its ticket.
 `clisbot/hub/hub-cold-start.test.ts` replays the report with fake timers: 12.8 s to 14/14 before,
 2.0 s after (one wave of transport open and hello). Without a remembered list the Hosts connect
-one wave after the live list, 4.0 s. The device took longer than either; the summary below says
-where the rest went.
+one wave after the live list, 4.0 s.
+
+The device still took 6.7 s to the first Host and 13.2 s to the last, with the account read
+answering at 5.7 s although the bindings were up at 0.1 s. Every Hub request on Android waited in
+`NativeHubTransport`: the access token lives only in memory, so a relaunch always refreshed it
+(about 3 round trips on a fresh TLS connection), and each of the 16 requests a cold start sends
+(account, list, a ticket per Host) took the keystore lock in turn and read the keystore again
+after the refresh and its write. The list read only started once the account answered. The same
+test file now drives the real native transport over a simulated Hub (keystore 50 ms reads and
+200 ms writes, OkHttp's 5 requests per host): 3.3 s to 14/14 with a refresh and 2.1 s with the
+stored token; the old transport needed 3.5 s and refreshed in both cases. Network round trips do
+not explain the rest of the device's 5.7 s; it coincides with the cached lists painting at 5 s,
+so the JS thread is the next suspect. `jsStallMaxMs` and `jsStallTotalMs` below measure it.
 
 - **Bind from the remembered list.** `managedHostBindingList` binds the list this account last
   read until this run's list arrives, with the same binding keys, so the live list replaces it
@@ -116,15 +127,47 @@ where the rest went.
   `api(organizationId)` before the account read answers. A Hub that answers signed out or another
   account drops the list, and its bindings unmount. Orphan removal and re-adding a removed Host
   wait for this run's list.
+- **One token read for all requests.** Requests asking at the same time share one keystore read
+  and at most one refresh, and go out as soon as the token is known, before the rotated refresh
+  token is written (`currentAccessToken` in `transport/create.native.ts`).
+- **Stored access token.** A refresh stores the access token and its expiry in the same keystore
+  entry as the refresh token (one write, as before). A relaunch within its 5 minutes, minus a
+  30 s margin, uses it without a refresh. The Hub refusing it takes the usual single 401 retry.
+- **List with the account.** On a cold start `prefetchRememberedHubDaemons` reads this run's list
+  with the account and organization the remembered list was read for while the account read is
+  in flight. If the account answers as that account, its list query has the same key and joins
+  the read; any other answer leaves the read unused. A list that answers before the account is
+  read once more when the account's query takes over (the list is never stale-cached).
 - **Ticket with the transport**: [Hub access tickets](#hub-access-tickets).
-- **One wave**: the connect limit in [reconnect pacing](#reconnect-pacing).
+- **One wave**: the connect limit in [reconnect pacing](#reconnect-pacing). Hub HTTP requests are
+  not covered by it: Android's `fetch` runs on OkHttp, which sends at most 5 requests to one host
+  at once, so 14 tickets plus the account and list reads go out in four waves of a round trip.
+  Raising that needs a native rebuild (an `OkHttpClientProvider` factory).
+- **Relay handshakes run in parallel.** Each Host's relay socket and Noise handshake are its own;
+  nothing in `@clisbot/relay` or the client serializes them beyond the connect limit.
 
 `runtime/cold-start-connect.ts` records one `cold-start-connect` host diagnostic per app start
 (read it with `await clisbotHostDiagnostics()` on web, or in the device log as
 `[clisbot:host] cold-start-connect`): Hub-managed Hosts restored, how many came online, failed
-attempts, and milliseconds from bundle start to the registry restore, the first Hub binding, the
-account read, the list read, the first Host online and the last (null if the 60 s deadline came
-first).
+attempts, and milliseconds from bundle start to:
+
+| Field                 | Marked when                                                           |
+| --------------------- | --------------------------------------------------------------------- |
+| `registryRestoredMs`  | the registry is loaded and the controllers start                      |
+| `cachedDirectoriesMs` | every restored Host's cached directory is read back                   |
+| `hubBindingMs`        | the first Hub binding registers its ticket resolver                   |
+| `hubTokenMs`          | the first Hub access token is refreshed (null if the stored one held) |
+| `hubAccountMs`        | the account read answers                                              |
+| `hubListMs`           | this run's daemon list answers                                        |
+| `hubTicketMs`         | the first Host access ticket answers                                  |
+| `hostTransportOpenMs` | the first hello asks for its ticket (transport and relay open)        |
+| `firstHostOnlineMs`   | the first Host is online                                              |
+| `allHostsOnlineMs`    | the last is (null if the 60 s deadline came first)                    |
+
+`jsStallMaxMs` and `jsStallTotalMs` sample the event loop every 100 ms from the registry restore
+to the summary and add up every tick that fired 50 ms or more late: a network answer waits that
+long for the JS thread. A large total with `hubTokenMs` early and `hubAccountMs` late says the
+time went to JS work, not to the Hub.
 
 Only the Hub's answer removes a Hub-managed Host: signed out, another organization, a daemon the
 list no longer offers, or the saved Hub forgotten (`orphanedManagedHosts`). A binding unmounting
