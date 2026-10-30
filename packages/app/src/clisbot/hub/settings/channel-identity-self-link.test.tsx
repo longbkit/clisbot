@@ -17,6 +17,10 @@ const fixture = vi.hoisted(() => ({
   post: vi.fn(),
   copy: vi.fn(),
 }));
+// The signed-out view's browser sign-in reports failures through a toast; this suite does not.
+vi.mock("@/contexts/toast-api-context", () => ({
+  useToast: () => ({ show: vi.fn(), error: vi.fn(), success: vi.fn(), dismiss: vi.fn() }),
+}));
 vi.mock("expo-router", () => ({
   useRouter: () => ({ setParams: fixture.setParams }),
   useLocalSearchParams: () => ({ channelConnectionId: fixture.connectionId }),
