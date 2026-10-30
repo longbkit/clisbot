@@ -108,7 +108,11 @@ vi.mock("../data/use-chat-transcript", () => ({
   }),
 }));
 vi.mock("./use-chat-visibility", () => ({ useChatVisibility: () => {} }));
-vi.mock("./use-chat-live-heads", () => ({ useChatLiveHeads: () => new Map() }));
+vi.mock("./use-chat-live-heads", () => ({
+  useChatLiveHeads: () => new Map(),
+  useChatTurnActive: () => false,
+  useChatHeaderToolActivities: () => [],
+}));
 vi.mock("./use-chat-send", () => ({ useChatSend: () => ({ sending: false, send: () => {} }) }));
 vi.mock("@/clisbot/connectors/chat-tools", async () => ({
   ChatToolsContext: React.createContext(null),

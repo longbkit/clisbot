@@ -418,6 +418,70 @@ describe("createWebStreamStrategy", () => {
     expect(renderCountById.get(other.id)).toBe(1);
   });
 
+  it("redraws only the streaming row on a text chunk, never the history rows", () => {
+    const strategy = createWebStreamStrategy({ isMobileBreakpoint: false });
+    const viewportRef = React.createRef<StreamViewportHandle>();
+    const renders = new Map<string, number>();
+    const count = (id: string) => renders.set(id, (renders.get(id) ?? 0) + 1);
+    const HistoryRow = React.memo(function HistoryRow({ item }: { item: StreamItem }) {
+      count(item.id);
+      return <div>{item.id}</div>;
+    });
+    const LiveRow = React.memo(function LiveRow({ item }: { item: StreamItem }) {
+      count("live");
+      return <div>{item.kind === "assistant_message" ? item.text : item.id}</div>;
+    });
+    const chunk = (text: string): StreamItem => ({
+      kind: "assistant_message",
+      id: "streaming",
+      text,
+      timestamp: new Date(10),
+    });
+    const input = (liveText: string): StreamRenderInput => ({
+      agentId: "agent",
+      segments: {
+        historyVirtualized: [],
+        historyMounted: history,
+        liveHead: [chunk(liveText)],
+      },
+      boundary: { hasVirtualizedHistory: false, hasMountedHistory: true, hasLiveHead: true },
+      renderers: {
+        ...createRenderers(vi.fn()),
+        renderHistoryMountedRow: (item) => <HistoryRow item={item} />,
+        renderLiveHeadRow: (item) => <LiveRow item={item} />,
+      },
+      listEmptyComponent: null,
+      viewportRef,
+      routeBottomAnchorRequest: null,
+      isAuthoritativeHistoryReady: true,
+      onNearBottomChange: vi.fn(),
+      onNearHistoryStart: vi.fn().mockReturnValue(true),
+      isLoadingOlderHistory: false,
+      hasOlderHistory: false,
+      olderHistoryProgressKey: null,
+      scrollEnabled: true,
+      listStyle: null,
+      baseListContentContainerStyle: null,
+      forwardListContentContainerStyle: null,
+      contentMaxWidth: DEFAULT_CONTENT_MAX_WIDTH,
+    });
+    const history = [userMessage(1), userMessage(2)];
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(strategy.render(input("Hel"))));
+    act(() => root?.render(strategy.render(input("Hello"))));
+    act(() => root?.render(strategy.render(input("Hello there"))));
+
+    expect(container.textContent).toContain("Hello there");
+    expect(Object.fromEntries(renders)).toEqual({
+      [history[0]!.id]: 1,
+      [history[1]!.id]: 1,
+      live: 3,
+    });
+  });
+
   it("keeps a row mounted when it moves from the live head into mounted history", () => {
     const strategy = createWebStreamStrategy({ isMobileBreakpoint: false });
     const viewportRef = React.createRef<StreamViewportHandle>();

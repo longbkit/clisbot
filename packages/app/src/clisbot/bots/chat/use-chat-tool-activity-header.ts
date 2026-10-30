@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import type { ChatBotIdentity } from "./chat-rows";
-import type { ChatLiveHead } from "./render-model";
-import { headerToolActivities } from "./tool-activity";
+import type { BotToolActivity } from "./tool-activity";
 import type { ChatToolActivityHeader } from "./tool-activity-context";
 
 /** The header's tool activity under the `header` display; `null` in the other displays. */
@@ -9,13 +8,14 @@ export function useChatToolActivityHeaderValue({
   enabled,
   serverId,
   group,
-  heads,
+  activities,
   identities,
 }: {
   enabled: boolean;
   serverId: string;
   group: boolean;
-  heads: ReadonlyMap<string, ChatLiveHead>;
+  /** From `useChatHeaderToolActivities`, which keeps it by value across text chunks. */
+  activities: BotToolActivity[];
   identities: readonly ChatBotIdentity[];
 }): ChatToolActivityHeader | null {
   const bots = useMemo(
@@ -23,7 +23,7 @@ export function useChatToolActivityHeaderValue({
     [identities],
   );
   return useMemo(
-    () => (enabled ? { serverId, group, bots, activities: headerToolActivities(heads) } : null),
-    [enabled, serverId, group, bots, heads],
+    () => (enabled ? { serverId, group, bots, activities } : null),
+    [enabled, serverId, group, bots, activities],
   );
 }
