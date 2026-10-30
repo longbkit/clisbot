@@ -20,6 +20,9 @@ tail cache and Settings → Storage, is [offline cache](offline-cache.md).
 
 - Hub-managed Hosts own their retries in the controller (their clients never auto-retry). The
   2 s probe tick only attempts a Host whose backoff is due.
+- An online Host's latency comes from its 10 s heartbeat RTT. A reading within max(20 ms, 25%) of
+  the published one keeps it (`holdLatencyJitter`): publishing every reading rewrote each Host's
+  snapshot every 10 s and re-rendered every Host reader.
 - A reconnect sweep runs when there is reason to think Hosts can connect again: the window
   `online` event (web and Electron, `runtime/network-reachability.web.ts`), the app returning to
   the foreground, and a Host that had failed connecting again. Online Hosts verify their socket
