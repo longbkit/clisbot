@@ -1295,6 +1295,11 @@ export class HostRuntimeController {
       return;
     }
 
+    const admitted = this.host.management || hostRequiresSessionAdmission(this.host.serverId);
+    // An offline Hub-managed Host waits out its backoff before anything else: the credential read
+    // below is a keychain read, and Android serializes those behind one keystore lock.
+    if (admitted && this.snapshot.connectionStatus !== "online" && !this.reconnectBackoff.isDue())
+      return;
     let localConnectionId: string | null = null;
     if (this.snapshot.connectionStatus !== "online") {
       const access = await deviceCredentialAccess(this.host);
@@ -1310,7 +1315,7 @@ export class HostRuntimeController {
       this.updateSnapshot({ localCredentialConnectionId: localConnectionId });
     }
 
-    if (this.host.management || hostRequiresSessionAdmission(this.host.serverId)) {
+    if (admitted) {
       await this.runSessionAdmissionConnectionCycle(requestVersion, localConnectionId);
       return;
     }
