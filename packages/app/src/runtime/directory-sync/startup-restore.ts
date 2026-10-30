@@ -22,10 +22,14 @@ export interface StartupRestoreDeps {
   commit: (apply: () => void) => void;
   afterNextFrame: (run: () => void) => void;
   onFirstCachedFrame: () => void;
+  now: () => number;
 }
 
-/** Hosts committed before the others, so the first screen paints from the cache early. */
-const FIRST_GROUP_HOSTS = 1;
+/**
+ * The longest a read Host waits for its commit. Committing only the first Host and then all the
+ * others at the end left a Galaxy S23's Home empty until the whole 4.5 s restore finished.
+ */
+const COMMIT_INTERVAL_MS = 400;
 
 interface RestoredHost {
   directory: StartupRestoreDirectory;
@@ -37,7 +41,7 @@ interface RestoredHost {
  * Restores every Host's cached directory after the startup connects went out: one Host at a time,
  * its rows parsed in the slicer's chunks, a macrotask between chunks and Hosts. Each commit of a
  * Host's directory re-runs every derivation over all Hosts, so the first Host commits alone (the
- * first cached frame) and the rest commit together
+ * first cached frame) and the rest commit together at most every `COMMIT_INTERVAL_MS`
  * (docs/features/offline/connection-resilience.md#cold-start-js-thread).
  */
 export async function restoreCachedDirectories(
@@ -51,18 +55,22 @@ export async function restoreCachedDirectories(
   });
   try {
     await deps.yieldToEventLoop();
-    const groups = [targets.slice(0, FIRST_GROUP_HOSTS), targets.slice(FIRST_GROUP_HOSTS)];
-    for (const [index, group] of groups.entries()) {
-      if (group.length === 0) continue;
-      const restored = await readGroup(group, deps);
-      deps.slicer.begin();
-      deps.commit(() => {
-        for (const host of restored)
-          host.directory.applyCachedDirectory(host.cached, host.readRevision);
-      });
-      deps.slicer.end();
-      for (const target of group) settles[targets.indexOf(target)]!();
-      if (index === 0) deps.afterNextFrame(deps.onFirstCachedFrame);
+    let pending: number[] = [];
+    let restored: RestoredHost[] = [];
+    let lastCommit: number | undefined;
+    for (const [index, { serverId, directory }] of targets.entries()) {
+      const readRevision = directory.cacheReadRevision();
+      restored.push({ directory, cached: await deps.read(serverId, deps.slicer), readRevision });
+      pending.push(index);
+      await deps.slicer.pause();
+      const due = lastCommit === undefined || deps.now() - lastCommit >= COMMIT_INTERVAL_MS;
+      if (!due && index < targets.length - 1) continue;
+      commitRestored(restored, deps);
+      for (const done of pending) settles[done]!();
+      if (lastCommit === undefined) deps.afterNextFrame(deps.onFirstCachedFrame);
+      lastCommit = deps.now();
+      pending = [];
+      restored = [];
       await deps.yieldToEventLoop();
     }
   } finally {
@@ -70,16 +78,11 @@ export async function restoreCachedDirectories(
   }
 }
 
-async function readGroup(
-  group: readonly StartupRestoreTarget[],
-  deps: StartupRestoreDeps,
-): Promise<RestoredHost[]> {
-  const restored: RestoredHost[] = [];
-  for (const { serverId, directory } of group) {
-    const readRevision = directory.cacheReadRevision();
-    const cached = await deps.read(serverId, deps.slicer);
-    restored.push({ directory, cached, readRevision });
-    await deps.slicer.pause();
-  }
-  return restored;
+function commitRestored(restored: readonly RestoredHost[], deps: StartupRestoreDeps): void {
+  deps.slicer.begin();
+  deps.commit(() => {
+    for (const host of restored)
+      host.directory.applyCachedDirectory(host.cached, host.readRevision);
+  });
+  deps.slicer.end();
 }

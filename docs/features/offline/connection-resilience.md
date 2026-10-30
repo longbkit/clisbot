@@ -206,22 +206,23 @@ What the app does now:
 | ------------------------ | ----------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | Network first            | the restore starts one macrotask after `syncHosts` started every controller's connect           | `directory-sync/startup-restore.ts`      |
 | One Host at a time       | rows parsed 100 per synchronous chunk, a macrotask between chunks and between Hosts             | `replica-cache/restore-slicer.ts`        |
-| Two commits              | the first Host alone (the first cached frame), then every other Host in one batch               | same                                     |
+| Interval commits         | the first Host alone (the first cached frame), then what was read, at most every 400 ms         | same                                     |
 | No second read           | a refresh that loads a Host's cache waits for the restore instead of reading again              | `DirectorySync.adoptCacheRestore`        |
 | Hidden tabs after settle | pre-mount waits until the restore is done and every restored Hub Host is online, or 10 s passed | `clisbot/home/after-startup.ts`          |
 | Empty live answer        | keeps the restored map; members without a placement still take the full path                    | `AgentDirectoryReplica.commitChanges`    |
 | Baseline save            | writes only rows whose payload changed; restored agents keep their payload                      | `ReplicaCache.materializePendingChanges` |
 | First save index         | row bytes measured in 256 KB chunks with a yield between them                                   | `ReplicaCache.measureRows`               |
 
-- A restored Host's commit still re-runs the root derivations once. With 14 Hosts that is two
-  passes instead of about 56; making those derivations incremental per Host is the next step if
-  a single pass exceeds a frame.
+- A restored Host's commit still re-runs the root derivations once. With 14 Hosts that is up to
+  about 12 passes instead of about 56. Two commits (the first Host, then the rest at the end) left
+  Home empty for the whole 4.5 s restore on a Galaxy S23 on 2026-10-30, so the rest commit every
+  400 ms; the agent projection and Home feed are incremental, which keeps each pass short.
 - The first group is the first Host in registry order, not the Hosts Home shows first: Home's
   order is only known after every Host is parsed.
 - `clisbot/hub/hub-cold-start.test.ts` restores the 14-Host fleet fixture
   (`replica-cache/cached-fleet-fixture.ts`, 486 rows per Host) with fake timers: all 14 connects
   are in flight before the first chunk, the restore runs in 72 chunks, and the Hosts still come
-  online in one wave. `startup-restore.test.ts` pins the yields and the two commits. In Node a
+  online in one wave. `startup-restore.test.ts` pins the yields and the 400 ms commits. In Node a
   Host's 486 rows parse in about 4 ms; not yet measured on the S23.
 
 Only the Hub's answer removes a Hub-managed Host: signed out, another organization, a daemon the

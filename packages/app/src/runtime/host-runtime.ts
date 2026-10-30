@@ -2371,6 +2371,7 @@ export class HostRuntimeStore {
       commit: batchSessionStoreUpdates,
       afterNextFrame: scheduler.afterNextFrame,
       onFirstCachedFrame: () => timeline.mark("firstCachedFrame"),
+      now: scheduler.now,
     }).catch((error) => console.error("[HostRuntime] Failed to restore cached directories", error));
     timeline.mark("cachedDirectories");
   }

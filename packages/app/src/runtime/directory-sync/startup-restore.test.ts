@@ -16,7 +16,7 @@ import {
 import { restoreCachedDirectories, type StartupRestoreTarget } from "./startup-restore";
 
 /** Records, in order, what the restore did and what else got the JS thread in between. */
-function harness(cache: ReplicaCache, events: string[] = []) {
+function harness(cache: ReplicaCache, events: string[] = [], now: () => number = Date.now) {
   const chunks: RestoreChunk[] = [];
   const loads: Array<Promise<void>> = [];
   const applied = new Map<string, number>();
@@ -55,6 +55,7 @@ function harness(cache: ReplicaCache, events: string[] = []) {
     },
     afterNextFrame: (paint) => setTimeout(paint, 16),
     onFirstCachedFrame: () => events.push("first-cached-frame"),
+    now,
   });
   return { events, chunks, loads, applied, run };
 }
@@ -125,6 +126,35 @@ describe("restoring the cached directories of 14 Hosts at startup", () => {
     );
     // The frame after the first commit is the first cached frame.
     expect(events.indexOf("first-cached-frame")).toBeGreaterThan(commits[0]!);
+  });
+
+  it("commits what it has read every 400 ms, so the list fills while the restore runs", async () => {
+    // Each Host read takes 250 ms on this clock: commits land after Hosts 1, 3, 5, … and the last.
+    let clock = 0;
+    const { events, applied, run } = harness(cache, [], () => clock);
+    const reads = new Set<string>();
+    const unhook = events.push.bind(events);
+    events.push = (...items: string[]) => {
+      for (const item of items)
+        if (item.startsWith("read:") && !reads.has(item)) {
+          reads.add(item);
+          clock += 250;
+        }
+      return unhook(...items);
+    };
+
+    await vi.runAllTimersAsync();
+    await run;
+
+    const commits = events.flatMap((event, index) => (event === "commit" ? [index] : []));
+    expect(commits.length).toBeGreaterThanOrEqual(7);
+    // No Host waits for the whole restore: every commit applies at most two Hosts.
+    for (const [index, at] of commits.entries()) {
+      const next = commits[index + 1] ?? events.length;
+      const appliedHere = events.slice(at, next).filter((event) => event.startsWith("apply:"));
+      expect(appliedHere.length).toBeLessThanOrEqual(2);
+    }
+    expect(applied.size).toBe(FLEET_HOSTS);
   });
 
   it("holds every other load of a Host's cache until its restore is committed", async () => {
