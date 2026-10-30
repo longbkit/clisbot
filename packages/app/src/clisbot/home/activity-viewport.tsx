@@ -4,6 +4,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { isWeb } from "@/constants/platform";
 import { useHomeInteraction } from "./use-home-interaction";
 import { useActivityAnchor } from "./use-activity-anchor";
+import { openPreloads } from "@/open-preload/live";
 
 type ActivityViewport = ReturnType<typeof useActivityAnchor> &
   Pick<ReturnType<typeof useHomeInteraction>, "automatic" | "onScroll" | "offset">;
@@ -33,6 +34,11 @@ export function ActivityViewportProvider({ children }: { children: ReactNode }) 
 export function ActivityScrollView(props: ScrollViewProps) {
   const { scroll, viewport, onScroll, onUserScroll } = useActivityViewport();
   const webHandlers = isWeb ? { onWheel: onUserScroll, onKeyDown: onUserScroll } : {};
+  // A drag means the touch that pressed a row in was a scroll, not a tap.
+  const beginDrag = useCallback(() => {
+    onUserScroll();
+    openPreloads.cancelQueued();
+  }, [onUserScroll]);
   return (
     <View ref={viewport} collapsable={false} style={styles.fill}>
       <ScrollView
@@ -43,7 +49,7 @@ export function ActivityScrollView(props: ScrollViewProps) {
         onScroll={onScroll}
         onTouchStart={onUserScroll}
         onPointerDown={onUserScroll}
-        onScrollBeginDrag={onUserScroll}
+        onScrollBeginDrag={beginDrag}
         scrollEventThrottle={32}
       />
     </View>

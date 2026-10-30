@@ -4,7 +4,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFetchQuery } from "@/data/query";
 import { useHostRuntimeSnapshot } from "@/runtime/host-runtime";
 import { toErrorMessage } from "@/utils/error-messages";
-import type { BotsRuntime } from "./client";
+import type { BotsRuntime, BotsRuntimeSnapshot } from "./client";
 import { fetchTranscriptPage, refreshChatTranscript } from "./transcript-refresh";
 import { chatTranscriptQueryKey } from "./query-keys";
 import { selectTranscript, useTranscriptStore, type ChatTranscript } from "./transcript-store";
@@ -27,6 +27,32 @@ export interface UseChatTranscriptResult {
   isLoadingOlder: boolean;
   /** A request may be active while accepted content remains loaded. */
   isFetching: boolean;
+}
+
+interface ChatTranscriptFetchTarget {
+  serverId: string;
+  chatId: string;
+  runtime: BotsRuntime;
+  presentationScope?: string;
+  snapshot: BotsRuntimeSnapshot | null | undefined;
+}
+
+/** The transcript query, shared by the chat route and the open preload so both hit one entry. */
+export function chatTranscriptFetchInput(target: ChatTranscriptFetchTarget) {
+  const { serverId, chatId, runtime, presentationScope, snapshot } = target;
+  const key = scopedTranscriptKey(serverId, chatId, snapshot);
+  return {
+    queryKey: [
+      ...chatTranscriptQueryKey(serverId, chatId),
+      presentationScope,
+      snapshot?.connectionStatus ?? "connecting",
+      botsSessionScope(snapshot),
+    ],
+    queryFn: () =>
+      refreshChatTranscript(runtime, { serverId, chatId, key, principalScope: presentationScope }),
+    dataShape: "value" as const,
+    staleTimeMs: 0,
+  };
 }
 
 /**
@@ -56,21 +82,13 @@ export function useChatTranscriptQuery(input: {
   );
   const samePrincipal = readPrincipal === input.presentationScope;
   const query = useFetchQuery({
-    queryKey: [
-      ...chatTranscriptQueryKey(serverId, chatId),
-      input.presentationScope,
-      connectionStatus,
-      botsSessionScope(snapshot),
-    ],
-    queryFn: () =>
-      refreshChatTranscript(runtime, {
-        serverId,
-        chatId,
-        key,
-        principalScope: input.presentationScope,
-      }),
-    dataShape: "value",
-    staleTimeMs: 0,
+    ...chatTranscriptFetchInput({
+      serverId,
+      chatId,
+      runtime,
+      presentationScope: input.presentationScope,
+      snapshot,
+    }),
     enabled: online,
   });
   const owner = JSON.stringify([

@@ -34,6 +34,9 @@ import type { HomeChip, HomeRow } from "./home-feed";
 import { IssueActions } from "./issue-actions";
 import { HOME_PATH } from "./sections";
 import { useNavigationStore } from "./store";
+import { openPreloads } from "@/open-preload/live";
+import type { AgentOpenTarget } from "@/open-preload/targets";
+import { usePreloadTopAgents } from "@/open-preload/use-top-rows";
 
 const SECTION_CHIPS: Record<string, HomeChip> = { needs: "needs", active: "running" };
 
@@ -79,6 +82,7 @@ export function NavigationHomeFeed({
   const total = (list: ActivityLayoutSection[]) => list.reduce((n, s) => n + s.keys.length, 0);
   const hasMore = total(sections) < total(accepted);
   const live = useMemo(() => new Map(agents.map((agent) => [activityKey(agent), agent])), [agents]);
+  usePreloadTopAgents(topAgentTargets(sections, live), openPreloads);
   const unseen = useMemo(
     () => agents.filter((agent) => rows.get(activityKey(agent))?.issue?.state === "unseen"),
     [agents, rows],
@@ -147,6 +151,20 @@ export function NavigationHomeFeed({
       ) : null}
     </View>
   );
+}
+
+const TOP_PRELOAD_ROWS = 2;
+
+/** The first sessions the feed shows, skipping collapsed Seen issues. */
+function topAgentTargets(
+  sections: readonly ActivityLayoutSection[],
+  live: ReadonlyMap<string, AggregatedAgent>,
+): AgentOpenTarget[] {
+  const keys = sections.filter((section) => section.key !== "seen").flatMap((s) => s.keys);
+  const agents = keys.slice(0, TOP_PRELOAD_ROWS).map((key) => live.get(key));
+  return agents
+    .filter((agent): agent is AggregatedAgent => agent !== undefined)
+    .map((agent) => ({ serverId: agent.serverId, agentId: agent.id }));
 }
 
 /**

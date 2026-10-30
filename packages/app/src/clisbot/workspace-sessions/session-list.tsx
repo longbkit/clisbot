@@ -36,6 +36,7 @@ import { ProjectAboveLine } from "./project-above";
 import { SessionLineTrailing, type SessionLineActionsInput } from "./session-line-trailing";
 import { SessionTitleTooltip } from "./session-title-tooltip";
 import { shownAgentIds } from "./shown-agents";
+import { openPreloads } from "@/open-preload/live";
 
 /**
  * - `selected`: the agent in the workspace's focused pane — the session you are in. It takes the
@@ -208,6 +209,10 @@ export const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
     onPress?.(buildHostWorkspaceRoute(serverId, workspaceId));
     navigateToAgent({ serverId, workspaceId, agentId: agent.id });
   }, [onPress, serverId, workspaceId, agent.id]);
+  const handlePressIn = useCallback(
+    () => openPreloads.preloadAgent({ serverId, agentId: agent.id }),
+    [serverId, agent.id],
+  );
   const accessibilityState = useMemo(() => ({ selected }), [selected]);
   const rowStyle = useSessionRowStyle({ placement, selected, rowHovered });
 
@@ -220,6 +225,7 @@ export const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
           accessibilityState={accessibilityState}
           aria-selected={selected}
           onPress={handlePress}
+          onPressIn={handlePressIn}
           style={rowStyle}
           testID={`sidebar-workspace-session-${agent.id}`}
         >

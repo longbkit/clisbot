@@ -9,6 +9,9 @@ import {
 import equal from "fast-deep-equal";
 import { Text, View } from "react-native";
 import { FlatList } from "@/components/ui/scroll-view";
+import { openPreloads } from "@/open-preload/live";
+import { rememberChatOpenPreview } from "@/clisbot/bots/chat/open-preview";
+import { useResourcePrincipalScope } from "@/clisbot/bots/data/resource-principal-scope";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { Bot, Hash, SquarePen } from "lucide-react-native";
@@ -118,6 +121,11 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
   const fresh = useMemo(() => orderChatList(query), [query]);
   const freshKeys = useMemo(() => fresh.map((entry) => entry.key), [fresh]);
   const { held, handlers } = useHeldOrder(freshKeys);
+  // A drag means the touch that pressed a row in was a scroll, not a tap.
+  const beginDrag = useCallback(() => {
+    handlers.onScrollBeginDrag();
+    openPreloads.cancelQueued();
+  }, [handlers]);
   const items = useMemo(
     () => chatListItems(held ? orderChatList({ ...query, held }) : fresh, split),
     [held, fresh, query, split],
@@ -168,6 +176,7 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
         <OutsideFilterNotice list="chats" />
         <FlatList
           {...handlers}
+          onScrollBeginDrag={beginDrag}
           data={items}
           keyExtractor={itemKey}
           renderItem={actions.renderItem}
@@ -238,6 +247,7 @@ interface ChatsListEntryProps {
   selected: boolean;
   onPressBot: (bot: BotsSidebarBot) => void;
   onPressChat: (chat: ChatsSidebarChat) => void;
+  onPressInChat: (chat: ChatsSidebarChat) => void;
   onBotMenu: ComponentProps<typeof BotRow>["onOpenMenu"];
   onChatMenu: ComponentProps<typeof ChatRow>["onOpenMenu"];
 }
@@ -252,6 +262,7 @@ const ChatsListEntry = memo(function ChatsListEntry({
   selected,
   onPressBot,
   onPressChat,
+  onPressInChat,
   onBotMenu,
   onChatMenu,
 }: ChatsListEntryProps) {
@@ -272,6 +283,7 @@ const ChatsListEntry = memo(function ChatsListEntry({
           pinned={entry.pinned}
           selected={selected}
           onPress={onPressChat}
+          onPressIn={onPressInChat}
           onOpenMenu={onChatMenu}
         />
       ) : null}
@@ -284,6 +296,7 @@ function sameRowProps(previous: ChatsListEntryProps, next: ChatsListEntryProps):
     previous.selected === next.selected &&
     previous.onPressBot === next.onPressBot &&
     previous.onPressChat === next.onPressChat &&
+    previous.onPressInChat === next.onPressInChat &&
     previous.onBotMenu === next.onBotMenu &&
     previous.onChatMenu === next.onChatMenu &&
     equal(previous.entry, next.entry)
@@ -307,6 +320,11 @@ function useChatRowActions(
   const pressChat = useStableEvent((chat: ChatsSidebarChat) =>
     navigate(chat.serverId, chat.chatId),
   );
+  const presentationScope = useResourcePrincipalScope();
+  const pressInChat = useStableEvent(({ serverId, chatId, title }: ChatsSidebarChat) => {
+    rememberChatOpenPreview({ serverId, chatId, title });
+    openPreloads.preloadChat({ serverId, chatId, presentationScope });
+  });
   const botMenu = useStableEvent(menu.onBotMenu);
   const chatMenu = useStableEvent(menu.onChatMenu);
   const selection = `${selectedBot ?? ""}|${current?.serverId ?? ""}:${current?.chatId ?? ""}`;
@@ -328,12 +346,13 @@ function useChatRowActions(
           selected={selected}
           onPressBot={pressBot}
           onPressChat={pressChat}
+          onPressInChat={pressInChat}
           onBotMenu={botMenu}
           onChatMenu={chatMenu}
         />
       );
     },
-    [botMenu, chatMenu, current, pressBot, pressChat, selectedBot, t],
+    [botMenu, chatMenu, current, pressBot, pressChat, pressInChat, selectedBot, t],
   );
   const menuProps = {
     anchor: menu.menu?.anchor,
