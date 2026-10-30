@@ -160,6 +160,7 @@ attempts, and milliseconds from bundle start to:
 | --------------------- | --------------------------------------------------------------------- |
 | `registryRestoredMs`  | the registry is loaded and the controllers start                      |
 | `cachedDirectoriesMs` | every restored Host's cached directory is read back                   |
+| `firstCachedFrameMs`  | the frame after the first Host's cached directory reached the store   |
 | `hubBindingMs`        | the first Hub binding registers its ticket resolver                   |
 | `hubTokenMs`          | the first Hub access token is refreshed (null if the stored one held) |
 | `hubAccountMs`        | the account read answers                                              |
@@ -172,7 +173,51 @@ attempts, and milliseconds from bundle start to:
 `jsStallMaxMs` and `jsStallTotalMs` sample the event loop every 100 ms from the registry restore
 to the summary and add up every tick that fired 50 ms or more late: a network answer waits that
 long for the JS thread. A large total with `hubTokenMs` early and `hubAccountMs` late says the
-time went to JS work, not to the Hub.
+time went to JS work, not to the Hub. `cacheRestoreChunks` and `cacheRestoreLongestChunkMs`
+count the restore's synchronous chunks ([below](#cold-start-js-thread)); a stall much longer
+than the longest chunk came from something else.
+
+## Cold-start JS thread
+
+The 2026-10-30 summary above (Galaxy S23, production APK, 14 Hub Hosts, ~3,600 Home and ~6,100
+Work items) had `jsStallTotalMs` 7,308 of the first 9,520 ms, the longest stall 1,584 ms, and
+every network step answering at about 4.2 s. The requests had gone out by 0.2 s
+(`hubBindingMs` 127); their answers waited for JS. What ran:
+
+- **Cache restore.** All 14 Hosts read their cache at once. Each Host committed its directory in
+  about four store notifications (agents, workspaces, projects, flags), and every notification
+  re-ran the root derivations over all Hosts: the aggregated-agent sort, issue observation, Home
+  rows, the workspace structure with deep equality and the sidebar entries. None of them is
+  incremental per Host, so the cost is the number of commits times everything.
+- **Hidden tabs.** `requestIdleCallback` with a 2 s timeout mounted Work, Chats and Schedules
+  during the restore.
+- **Live answers.** Each Host's first answer, usually an empty delta, re-normalized and
+  deep-compared every agent and re-saved the whole directory. The first save also measured the
+  UTF-8 bytes of every stored row, timeline tails included, in one block.
+
+What the app does now:
+
+| Step                     | Rule                                                                                            | Where                                    |
+| ------------------------ | ----------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Network first            | the restore starts one macrotask after `syncHosts` started every controller's connect           | `directory-sync/startup-restore.ts`      |
+| One Host at a time       | rows parsed 100 per synchronous chunk, a macrotask between chunks and between Hosts             | `replica-cache/restore-slicer.ts`        |
+| Two commits              | the first Host alone (the first cached frame), then every other Host in one batch               | same                                     |
+| No second read           | a refresh that loads a Host's cache waits for the restore instead of reading again              | `DirectorySync.adoptCacheRestore`        |
+| Hidden tabs after settle | pre-mount waits until the restore is done and every restored Hub Host is online, or 10 s passed | `clisbot/home/after-startup.ts`          |
+| Empty live answer        | keeps the restored map; members without a placement still take the full path                    | `AgentDirectoryReplica.commitChanges`    |
+| Baseline save            | writes only rows whose payload changed; restored agents keep their payload                      | `ReplicaCache.materializePendingChanges` |
+| First save index         | row bytes measured in 256 KB chunks with a yield between them                                   | `ReplicaCache.measureRows`               |
+
+- A restored Host's commit still re-runs the root derivations once. With 14 Hosts that is two
+  passes instead of about 56; making those derivations incremental per Host is the next step if
+  a single pass exceeds a frame.
+- The first group is the first Host in registry order, not the Hosts Home shows first: Home's
+  order is only known after every Host is parsed.
+- `clisbot/hub/hub-cold-start.test.ts` restores the 14-Host fleet fixture
+  (`replica-cache/cached-fleet-fixture.ts`, 486 rows per Host) with fake timers: all 14 connects
+  are in flight before the first chunk, the restore runs in 72 chunks, and the Hosts still come
+  online in one wave. `startup-restore.test.ts` pins the yields and the two commits. In Node a
+  Host's 486 rows parse in about 4 ms; not yet measured on the S23.
 
 Only the Hub's answer removes a Hub-managed Host: signed out, another organization, a daemon the
 list no longer offers, or the saved Hub forgotten (`orphanedManagedHosts`). A binding unmounting

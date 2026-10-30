@@ -12,7 +12,9 @@ import {
   type TabRouterOptions,
 } from "expo-router/react-navigation";
 import { RetainedPanel } from "@/components/retained-panel";
+import { getColdStartConnectTimeline } from "@/runtime/cold-start-connect";
 import { RenderProfile } from "@/utils/render-profiler";
+import { scheduleIdleAfterStartup } from "./after-startup";
 
 export interface PhoneTabBarProps {
   state: TabNavigationState<ParamListBase>;
@@ -23,7 +25,7 @@ export interface PhoneTabBarProps {
 export type ScheduleIdle = (run: () => void) => () => void;
 
 // Safari has no requestIdleCallback; a short timer still lets the first paint go out first.
-const scheduleIdle: ScheduleIdle = (run) => {
+const scheduleIdleSlot: ScheduleIdle = (run) => {
   if (typeof requestIdleCallback !== "function") {
     const timer = setTimeout(run, 200);
     return () => clearTimeout(timer);
@@ -31,6 +33,8 @@ const scheduleIdle: ScheduleIdle = (run) => {
   const id = requestIdleCallback(run, { timeout: 2000 });
   return () => cancelIdleCallback(id);
 };
+
+const scheduleIdle = scheduleIdleAfterStartup(getColdStartConnectTimeline(), scheduleIdleSlot);
 
 type PhoneTabEventMap = Record<string, { data?: unknown }>;
 
@@ -48,7 +52,7 @@ type PhoneTabNavigatorProps = DefaultNavigatorOptions<
   };
 
 /**
- * The phone's peer tabs (docs/mobile-panels.md#phone-tabs). After the first paint each unvisited
+ * The phone's peer tabs (docs/mobile-panels.md#phone-tabs). Once startup settles each unvisited
  * tab mounts hidden, one per idle slot, so a first visit is not a mount; a mounted tab never
  * unmounts. A press shows and activates its tab in the press's own commit. Activating in a deferred
  * render instead let a busy JS thread postpone it until the next input, and that input (the first

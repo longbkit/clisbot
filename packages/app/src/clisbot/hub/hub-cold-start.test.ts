@@ -6,6 +6,14 @@ import {
   type ColdStartConnectSummary,
 } from "@/runtime/cold-start-connect";
 import { HostRuntimeStore, type HostRuntimeControllerDeps } from "@/runtime/host-runtime";
+import {
+  FLEET_AGENTS_PER_HOST,
+  FLEET_ROWS_PER_HOST,
+  cachedFleetStorage,
+} from "@/runtime/replica-cache/cached-fleet-fixture";
+import { RESTORE_ROWS_PER_CHUNK } from "@/runtime/replica-cache/restore-slicer";
+import type { ReplicaRowStore } from "@/runtime/replica-cache/row-store";
+import { useSessionStore } from "@/stores/session-store";
 import { prefetchedAccessTicket, resolveHostAccessTicket } from "@/runtime/host-session-access";
 import { HOST_COLORS } from "@/hosts/appearance";
 import type { HostProfile, HubHostManagement } from "@/types/host-connection";
@@ -382,6 +390,8 @@ function nativeHub(input: { storedAccessToken: boolean }): () => HubModel {
 async function coldStart(input: {
   remembered: CachedHubDaemonList | undefined;
   hub?: () => HubModel;
+  /** What the last run cached for each Host's directory. */
+  replicaRowStore?: ReplicaRowStore;
 }) {
   const storage = await rememberedRegistry();
   const hub = (input.hub ?? idealHub)();
@@ -394,7 +404,14 @@ async function coldStart(input: {
   };
   const startedAt = Date.now();
   const summaries: ColdStartConnectSummary[] = [];
-  const coldStartTimeline = new ColdStartConnectTimeline({
+  /** Connects in flight when each cache restore chunk ended. */
+  const connectsAtRestoreChunks: number[] = [];
+  const coldStartTimeline = new (class extends ColdStartConnectTimeline {
+    override restoreChunk(durationMs: number): void {
+      connectsAtRestoreChunks.push(network.connectsInFlight);
+      super.restoreChunk(durationMs);
+    }
+  })({
     now: Date.now,
     report: (summary) => summaries.push(summary),
     schedule: (callback, delayMs) => {
@@ -402,7 +419,12 @@ async function coldStart(input: {
       return () => clearTimeout(timer);
     },
   });
-  store = new HostRuntimeStore({ storage, deps: sessionDeps(network), coldStartTimeline });
+  store = new HostRuntimeStore({
+    storage,
+    deps: sessionDeps(network),
+    coldStartTimeline,
+    ...(input.replicaRowStore ? { replicaRowStore: input.replicaRowStore } : {}),
+  });
   void store.boot();
   const running = store;
 
@@ -482,7 +504,15 @@ async function coldStart(input: {
       `${network.ticketRequests} tickets, ${network.peakConnectsInFlight} connects in flight at peak`,
   );
   console.info(`[cold-start] attempts ${network.attempts.join(" ")}`);
-  return { firstOnlineAfterMs, allOnlineAfterMs, network, storage, upsertedAt, summaries };
+  return {
+    firstOnlineAfterMs,
+    allOnlineAfterMs,
+    network,
+    storage,
+    upsertedAt,
+    summaries,
+    connectsAtRestoreChunks,
+  };
 }
 
 describe("cold start of 14 Hub-managed Hosts at a 400 ms round trip", () => {
@@ -521,6 +551,10 @@ describe("cold start of 14 Hub-managed Hosts at a 400 ms round trip", () => {
         hubTicketMs: null,
         hostTransportOpenMs: null,
         cachedDirectoriesMs: expect.any(Number),
+        firstCachedFrameMs: expect.any(Number),
+        // Nothing cached: each of the two commits is a chunk of its own.
+        cacheRestoreChunks: 2,
+        cacheRestoreLongestChunkMs: 0,
         jsStallMaxMs: 0,
         jsStallTotalMs: 0,
         firstHostOnlineMs: expect.any(Number),
@@ -533,6 +567,25 @@ describe("cold start of 14 Hub-managed Hosts at a 400 ms round trip", () => {
     expect(store!.getHosts()).toHaveLength(HOSTS);
     expect(JSON.parse(storage.items.get("@clisbot:daemon-registry")!)).toHaveLength(HOSTS);
     expect(store!.getHosts()[0]?.appearance.color).toBe(HOST_COLORS[1]);
+  }, 30_000);
+
+  it("restores 14 cached directories in short chunks after every connect went out", async () => {
+    const { allOnlineAfterMs, summaries, connectsAtRestoreChunks } = await coldStart({
+      remembered: rememberedList,
+      replicaRowStore: await cachedFleetStorage(),
+    });
+
+    // The cache does not hold the connects back.
+    expect(allOnlineAfterMs).toBeLessThanOrEqual(TRANSPORT_OPEN_MS + HELLO_MS + SLACK_MS);
+    // Every Host was connecting before the first cached row was parsed.
+    expect(connectsAtRestoreChunks[0]).toBe(HOSTS);
+    const chunksPerHost = Math.ceil(FLEET_ROWS_PER_HOST / RESTORE_ROWS_PER_CHUNK);
+    const summary = summaries[0]!;
+    expect(summary.cacheRestoreChunks).toBe(HOSTS * chunksPerHost + 2);
+    expect(summary.firstCachedFrameMs).toBeLessThan(summary.cachedDirectoriesMs!);
+    expect(summary.cachedDirectoriesMs).toBeLessThan(summary.firstHostOnlineMs!);
+    const session = useSessionStore.getState().sessions.srv_sandbox_13;
+    expect(session?.agents.size).toBe(FLEET_AGENTS_PER_HOST);
   }, 30_000);
 
   it("connects every Host one wave after the live list when nothing was remembered", async () => {

@@ -32,11 +32,13 @@ import {
   type CachedChatTail,
 } from "./chat-tail";
 import { OFFLINE_CACHE_ENABLED } from "./offline-flag";
+import { type RestoreSlicer, yieldToEventLoop } from "./restore-slicer";
 import { isReplicaTailKind } from "./row-store-schema";
 import { TAIL_MAX_AGE_MS, TAIL_SAVE_WINDOW_MS, selectTailEvictions } from "./tail-retention";
 import { TAIL_MAX_BYTES, compactTailItem, keepNewestWithinBytes } from "./timeline-tail";
 import {
   REPLICA_SINGLETON_ROW_ID,
+  type ReplicaHostRows,
   type ReplicaRow,
   type ReplicaRowChanges,
   type ReplicaRowKey,
@@ -84,6 +86,11 @@ export interface CachedTimeline {
 }
 
 const PERSIST_DELAY_MS = 1_000;
+/**
+ * Payload measured between yields while the first save after launch indexes the stored rows.
+ * The cache can hold 32 MB, and counting UTF-8 bytes runs character by character.
+ */
+export const STORED_INDEX_BYTES_PER_CHUNK = 256 * 1024;
 const MAX_TIMELINE_ITEMS = 50;
 const MAX_CACHE_BYTES = 32 * 1024 * 1024;
 const IsoDateSchema = z.iso.datetime();
@@ -395,6 +402,8 @@ interface ReplicaCacheOptions {
   /** Defaults to `OFFLINE_CACHE_ENABLED`. */
   offlineTails?: boolean;
   now?: () => number;
+  /** Lets other work run between chunks of the stored-row index. */
+  yieldToEventLoop?: () => Promise<void>;
 }
 
 type StructuredReplicaUpsert =
@@ -925,6 +934,10 @@ interface PendingReplicaChanges {
   baselines: Set<string>;
 }
 
+// The payload each agent object was read from or saved as. Agents are replaced, never mutated, so
+// an agent the live directory left unchanged is not serialized again to find it unchanged.
+const agentPayloads = new WeakMap<Agent, string>();
+
 function applyDirectoryRow(
   serverId: string,
   row: ReplicaRow,
@@ -934,7 +947,9 @@ function applyDirectoryRow(
     case "agent": {
       const stored = parseStoredPayload(StoredAgentSchema, row.payload);
       if (stored.snapshot.id !== row.id) throw new Error("Replica agent row id mismatch");
-      result.agents.set(row.id, deserializeAgent(serverId, stored));
+      const agent = deserializeAgent(serverId, stored);
+      agentPayloads.set(agent, row.payload);
+      result.agents.set(row.id, agent);
       return;
     }
     case "workspace": {
@@ -1007,10 +1022,12 @@ export class ReplicaCache {
     this.clearLegacyCache = options.clearLegacyCache ?? clearLegacyReplicaCache;
     this.offlineTails = options.offlineTails ?? OFFLINE_CACHE_ENABLED;
     this.now = options.now ?? Date.now;
+    this.yieldToEventLoop = options.yieldToEventLoop ?? yieldToEventLoop;
   }
 
   private readonly offlineTails: boolean;
   private readonly now: () => number;
+  private readonly yieldToEventLoop: () => Promise<void>;
   /** When each tail was last opened in this app run; the stored row carries older opens. */
   private readonly tailOpens = new Map<string, number>();
 
@@ -1076,7 +1093,8 @@ export class ReplicaCache {
     return { workspace, ...(project ? { project } : {}) };
   }
 
-  async readDirectory(serverId: string): Promise<CachedDirectory> {
+  /** With a `slicer`, rows are parsed in its chunks with a macrotask between them. */
+  async readDirectory(serverId: string, slicer?: RestoreSlicer): Promise<CachedDirectory> {
     const rows = await this.readRows(serverId, ["agent", "workspace", "project", "checkpoint"]);
     const result: DirectoryReadAccumulator = {
       agents: new Map(),
@@ -1093,6 +1111,7 @@ export class ReplicaCache {
         if (invalidEntity) invalidEntities.add(invalidEntity);
         invalidRows.push(row);
       }
+      if (slicer?.countRow()) await slicer.pause();
     }
     if (result.checkpoint && invalidEntities.size > 0) {
       result.checkpoint = { ...result.checkpoint };
@@ -1577,15 +1596,22 @@ export class ReplicaCache {
         }
       }
     }
-    return { upserts, deletes: [...deletes.values()] };
+    // A live answer re-saves the whole directory as its baseline; most rows are what is stored.
+    const changed = upserts.filter(
+      (row) => this.storedRows.get(row.serverId)?.get(rowKey(row))?.payload !== row.payload,
+    );
+    return { upserts: changed, deletes: [...deletes.values()] };
   }
 
   private materializeUpsert(upsert: StructuredReplicaUpsert): ReplicaRow | null {
     let value: unknown;
     switch (upsert.kind) {
-      case "agent":
-        value = serializeAgent(upsert.value);
-        break;
+      case "agent": {
+        const payload =
+          agentPayloads.get(upsert.value) ?? JSON.stringify(serializeAgent(upsert.value));
+        agentPayloads.set(upsert.value, payload);
+        return { serverId: upsert.serverId, kind: "agent", id: upsert.id, payload };
+      }
       case "workspace":
         value = serializeWorkspace(upsert.value);
         break;
@@ -1810,6 +1836,7 @@ export class ReplicaCache {
 
   private ensureStoredIndex(): Promise<void> {
     this.storedIndexPromise ??= this.rowStore.readAll().then(async (hosts) => {
+      await this.measureRows(hosts);
       this.storedRows.clear();
       this.hostBytes.clear();
       this.hostWriteOrder.clear();
@@ -1829,6 +1856,21 @@ export class ReplicaCache {
       return undefined;
     });
     return this.storedIndexPromise;
+  }
+
+  /** Counts every row's bytes (cached per row) in chunks, so indexing them after is cheap. */
+  private async measureRows(hosts: readonly ReplicaHostRows[]): Promise<void> {
+    let measured = 0;
+    let nextYieldAt = STORED_INDEX_BYTES_PER_CHUNK;
+    for (const host of hosts) {
+      if (!this.activeServerIds.has(host.serverId)) continue;
+      for (const row of host.rows) {
+        measured += rowBytes(row);
+        if (measured < nextYieldAt) continue;
+        nextYieldAt += STORED_INDEX_BYTES_PER_CHUNK;
+        await this.yieldToEventLoop();
+      }
+    }
   }
 
   private queueOperation(operation: () => Promise<void>): Promise<void> {

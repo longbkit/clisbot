@@ -174,6 +174,10 @@ export class AgentDirectoryReplica {
     deltas: readonly AgentDirectoryDelta[],
   ): Map<string, Agent> {
     const previous = this.storeProjection.snapshot();
+    if (entries.length === 0 && removals.length === 0 && deltas.length === 0) {
+      const unchanged = this.keepUnchanged(previous);
+      if (unchanged) return unchanged;
+    }
     const merged = new Map<string, FetchAgentsEntry>();
     for (const agent of previous.values()) {
       merged.set(agent.id, projectAgentDirectoryEntry(agent));
@@ -200,6 +204,21 @@ export class AgentDirectoryReplica {
       }),
     );
     return agents;
+  }
+
+  /**
+   * A live answer with no changes after a cache restore: rebuilding the merged directory would
+   * re-normalize and deep-compare every agent to publish the same values. Members without a
+   * placement still take the full path, which derives one.
+   */
+  private keepUnchanged(previous: Map<string, Agent>): Map<string, Agent> | null {
+    for (const agent of previous.values()) if (!agent.projectPlacement) return null;
+    for (const agentId of this.pendingCacheReads) {
+      if (!previous.has(agentId)) this.advance(agentId);
+    }
+    this.pendingCacheReads.clear();
+    this.storeProjection.markHydrated();
+    return previous;
   }
 
   archive(agentId: string, archivedAt: string): void {

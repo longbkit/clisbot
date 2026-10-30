@@ -4,15 +4,15 @@ import { ColdStartConnectTimeline, type ColdStartConnectSummary } from "./cold-s
 function timeline() {
   let now = 1_000;
   const reports: ColdStartConnectSummary[] = [];
-  const scheduled: Array<() => void> = [];
+  const scheduled = new Map<number, () => void>();
   let stall: ((lagMs: number) => void) | null = null;
   let watching = false;
   const subject = new ColdStartConnectTimeline({
     now: () => now,
     report: (summary) => reports.push(summary),
-    schedule: (callback) => {
-      scheduled.push(callback);
-      return () => undefined;
+    schedule: (callback, delayMs) => {
+      scheduled.set(delayMs, callback);
+      return () => scheduled.delete(delayMs);
     },
     watchEventLoop: (onStall) => {
       stall = onStall;
@@ -30,9 +30,16 @@ function timeline() {
     advanceTo: (ms: number) => {
       now = 1_000 + ms;
     },
-    fireDeadline: () => scheduled.shift()?.(),
+    fireDeadline: () => scheduled.get(60_000)?.(),
+    fireSettleDeadline: () => scheduled.get(10_000)?.(),
   };
 }
+
+const NO_RESTORE = {
+  firstCachedFrameMs: null,
+  cacheRestoreChunks: 0,
+  cacheRestoreLongestChunkMs: 0,
+};
 
 describe("the cold-start connect summary", () => {
   it("reports each phase once, when every restored Hub Host is online", () => {
@@ -43,6 +50,11 @@ describe("the cold-start connect summary", () => {
     subject.mark("hubBinding");
     stall(300);
     stall(1_200);
+    advanceTo(400);
+    subject.restoreChunk(12);
+    subject.mark("firstCachedFrame");
+    subject.restoreChunk(31);
+    subject.restoreChunk(8);
     advanceTo(700);
     subject.mark("cachedDirectories");
     advanceTo(1_300);
@@ -74,6 +86,9 @@ describe("the cold-start connect summary", () => {
         hubTicketMs: 1_500,
         hostTransportOpenMs: 1_300,
         cachedDirectoriesMs: 700,
+        firstCachedFrameMs: 400,
+        cacheRestoreChunks: 3,
+        cacheRestoreLongestChunkMs: 31,
         jsStallMaxMs: 1_200,
         jsStallTotalMs: 1_500,
         firstHostOnlineMs: 2_000,
@@ -106,12 +121,54 @@ describe("the cold-start connect summary", () => {
         hubTicketMs: null,
         hostTransportOpenMs: null,
         cachedDirectoriesMs: null,
+        ...NO_RESTORE,
         jsStallMaxMs: 0,
         jsStallTotalMs: 0,
         firstHostOnlineMs: 3_000,
         allHostsOnlineMs: null,
       },
     ]);
+  });
+
+  it("settles once the cache restore is done and every restored Hub Host is online", () => {
+    const { subject } = timeline();
+    const settled: string[] = [];
+    subject.whenSettled(() => settled.push("early listener"));
+    subject.registryRestored(["a", "b"]);
+    subject.hostOnline("a");
+    subject.hostOnline("b");
+    expect(subject.isSettled()).toBe(false);
+    subject.mark("cachedDirectories");
+    expect(subject.isSettled()).toBe(true);
+    subject.whenSettled(() => settled.push("late listener"));
+    expect(settled).toEqual(["early listener", "late listener"]);
+  });
+
+  it("settles 10 s after the registry restore when a Host stays offline", () => {
+    const { subject, fireSettleDeadline } = timeline();
+    subject.registryRestored(["a", "b"]);
+    subject.hostOnline("a");
+    subject.mark("cachedDirectories");
+    expect(subject.isSettled()).toBe(false);
+    fireSettleDeadline();
+    expect(subject.isSettled()).toBe(true);
+  });
+
+  it("waits for the cache restore even after the settle deadline", () => {
+    const { subject, fireSettleDeadline } = timeline();
+    subject.registryRestored(["a"]);
+    fireSettleDeadline();
+    expect(subject.isSettled()).toBe(false);
+    subject.mark("cachedDirectories");
+    expect(subject.isSettled()).toBe(true);
+  });
+
+  it("settles on the cache restore alone without Hub-managed Hosts", () => {
+    const { subject } = timeline();
+    subject.registryRestored([]);
+    expect(subject.isSettled()).toBe(false);
+    subject.mark("cachedDirectories");
+    expect(subject.isSettled()).toBe(true);
   });
 
   it("reports nothing when no Hub-managed Host was restored", () => {
