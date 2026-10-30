@@ -7,7 +7,8 @@ The device never keeps more than a bounded, compact copy. Budgets and the phase 
 
 The slice is behind `OFFLINE_CACHE_ENABLED` (`packages/app/src/runtime/replica-cache/offline-flag.ts`).
 `EXPO_PUBLIC_CLISBOT_OFFLINE_CACHE=0` restores the 50-item timeline with whole-Host eviction,
-hides Settings → Storage, and turns off preloading and the hidden-session release below.
+hides Settings → Storage, and turns off preloading, the session shell and the hidden-session
+release below.
 
 ## Opening never waits
 
@@ -29,6 +30,30 @@ Tapping a row shows its screen in the next frame. What fills it depends on what 
 - Navigation does not await data, except a bot row whose direct chat is not in the cached rows: it
   needs the chat id from the Host first. Native Chats still dispatches the push in the next JS task
   ([mobile panels](../../mobile-panels.md#home-navigation)).
+
+### The session shell
+
+React Navigation renders a pushed screen inside the commit of the press that pushed it, so the
+press's frame waits for the whole screen. On 2026-10-30 (production APK, Galaxy S23) a session row
+took 367–533 ms to first change and a chat 67–167 ms. Both push `h/[serverId]`; the difference is
+the workspace screen's mount, one component of several hundred hooks.
+
+- On native phones the deck entry paints `WorkspaceOpenShell` in the press's frame: the screen's
+  compact header (Back, workspace title, project row) over the spinner the screen shows before its
+  body. `WorkspaceOpenGate` mounts the workspace screen in the next JS task; Back first cancels it.
+  Web, desktop and tablets mount the screen at once.
+- The tail is not in the shell. It paints when the screen mounts, from memory within the five
+  minutes below, otherwise from the device tail. A second timeline renderer for one frame was not
+  worth its drift.
+- A layout change no longer saves in the press: native writes it 500 ms later, once for the
+  changes in between (`writeAfter` in `validated-persist-storage.ts`). Each save validated and
+  serialized every opened workspace's layout, 7.3 ms on Node with 300 workspaces, and opening a
+  session saves at least twice.
+- `workspace-open-gate.browser.test.tsx` presses a row in a real navigator: the press's commit
+  holds the shell and zero renders of the screen; the screen renders in the scheduled task; Back
+  before it means the screen never renders.
+- A device trace shows `clisbot.workspace.shell`, then `clisbot.workspace.mount`. Not yet measured
+  on the S23 after this change.
 
 ### Preload on intent
 

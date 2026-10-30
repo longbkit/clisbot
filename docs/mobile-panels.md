@@ -70,6 +70,9 @@ reversal need not emit another appearance end. A first/unpresented screen still 
 actual appearance; parent, stale phase, canceled intent and changed panel generation cannot
 complete the destination.
 
+Before any of this, a native phone's deck entry shows the session shell for one JS task, so the
+press's frame does not wait for the workspace screen's mount
+([offline cache](features/offline/offline-cache.md#the-session-shell)).
 Native compact workspace entry keeps its existing header/Back surface separate from first pane
 materialization. The body waits for the existing outgoing Chat presentation boundary, then React
 prepares it at deferred render priority. Losing focus before that first body commits abandons the
