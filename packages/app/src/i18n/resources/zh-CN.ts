@@ -5,6 +5,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3027,5 +3028,6 @@ export const zhCN: TranslationResources = {
   bots: bots["zh-CN"],
   heartbeats: heartbeats["zh-CN"],
   navigation: navigation["zh-CN"],
+  productAnalytics: productAnalytics["zh-CN"],
   home: home["zh-CN"],
 };

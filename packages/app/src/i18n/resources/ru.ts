@@ -5,6 +5,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3117,5 +3118,6 @@ export const ru: TranslationResources = {
   bots: bots.ru,
   heartbeats: heartbeats.ru,
   navigation: navigation.ru,
+  productAnalytics: productAnalytics.ru,
   home: home.ru,
 };

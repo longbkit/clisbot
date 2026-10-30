@@ -3,6 +3,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3200,6 +3201,7 @@ export const en = {
   bots: bots.en,
   heartbeats: heartbeats.en,
   navigation: navigation.en,
+  productAnalytics: productAnalytics.en,
   home: home.en,
 } as const;
 

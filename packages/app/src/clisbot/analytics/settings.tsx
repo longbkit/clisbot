@@ -28,7 +28,7 @@ export function ProductAnalyticsSettings() {
     t(`productAnalytics.${key}`, { defaultValue });
   let hint = text(
     "description",
-    "Help improve Clisbot by sharing app opens, screen names, usage duration, version and device/platform details with Google Analytics. Uses a random identifier; never sends prompts, chats, code, paths or project/host names. No advertising IDs or ad personalization. You can turn it off anytime.",
+    "Only app opens, screens and version with a random ID; never your chats, code, files or Host names.",
   );
   if (state.pending) hint = text("saving", "Saving…");
   else if (!analyticsUsable) hint = text("unavailable", "Analytics is unavailable in this build.");
@@ -48,7 +48,7 @@ export function ProductAnalyticsSettings() {
       <SettingsCard>
         <SettingsRow
           testID="product-analytics-consent"
-          label={text("label", "Share usage analytics")}
+          label={text("label", "Anonymous stats, never your content")}
           hint={hint}
           error={error}
           hintBelow
@@ -57,7 +57,7 @@ export function ProductAnalyticsSettings() {
             value={state.enabled}
             disabled={!analyticsUsable || !state.ready || state.pending}
             onValueChange={setAnalyticsEnabled}
-            accessibilityLabel={text("label", "Share usage analytics")}
+            accessibilityLabel={text("label", "Anonymous stats, never your content")}
           />
         </SettingsRow>
         <SettingsAction

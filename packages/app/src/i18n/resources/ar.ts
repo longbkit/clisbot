@@ -5,6 +5,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3097,5 +3098,6 @@ export const ar: TranslationResources = {
   bots: bots.ar,
   heartbeats: heartbeats.ar,
   navigation: navigation.ar,
+  productAnalytics: productAnalytics.ar,
   home: home.ar,
 };

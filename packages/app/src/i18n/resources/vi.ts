@@ -4,6 +4,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 import { pluginSettings } from "./plugin-settings";
@@ -3091,6 +3092,7 @@ export const vi: TranslationResources = {
   bots: bots.vi,
   heartbeats: heartbeats.vi,
   navigation: navigation.vi,
+  productAnalytics: productAnalytics.vi,
   home: home.vi,
 
   providerUsage: {

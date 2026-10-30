@@ -5,6 +5,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3123,5 +3124,6 @@ export const es: TranslationResources = {
   bots: bots.es,
   heartbeats: heartbeats.es,
   navigation: navigation.es,
+  productAnalytics: productAnalytics.es,
   home: home.es,
 };

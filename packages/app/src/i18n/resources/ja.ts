@@ -5,6 +5,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -3090,5 +3091,6 @@ export const ja: TranslationResources = {
   bots: bots.ja,
   heartbeats: heartbeats.ja,
   navigation: navigation.ja,
+  productAnalytics: productAnalytics.ja,
   home: home.ja,
 } as const;
