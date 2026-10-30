@@ -17,7 +17,8 @@ export function useActivityLayout(
     () => activityLayout(agents, new Date(day), accepted, bucketOf),
     [agents, day, accepted, bucketOf],
   );
-  const pending = activityLayoutChanges(accepted, next);
+  // Once per layout, not on every render of the provider.
+  const pending = useMemo(() => activityLayoutChanges(accepted, next), [accepted, next]);
   const latest = useRef(next);
   useEffect(() => {
     latest.current = next;

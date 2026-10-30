@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { activityKey } from "@/clisbot/home/activity-layout";
 import { HomeActivityProvider } from "@/clisbot/home/activity-state";
 import { ActivityPlaceholder } from "@/clisbot/home/activity-placeholder";
-import type { ActivityBucketOf } from "@/clisbot/home/activity";
 import { RenderProfile } from "@/utils/render-profiler";
 import { HoldReadingPosition } from "./hold-reading-position";
 import { ActivityScrollView, ActivityViewportProvider } from "@/clisbot/home/activity-viewport";
@@ -14,7 +12,7 @@ import { InboxHistory } from "@/screens/sessions-screen";
 import { useNavigationActivity } from "./activity";
 import { HomeConnectionNotice } from "./connection-notice";
 import { HomeFeedControls } from "./home-controls";
-import { buildHomeFeed, type HomeRow } from "./home-feed";
+import { createHomeFeedCache } from "./home-feed";
 import { NavigationHomeFeed } from "./home-feed-view";
 import { useNavigationStore } from "./store";
 import { useHostFilter } from "./host-filter";
@@ -42,40 +40,31 @@ export function NavigationHomeLayout(props: HomeLayoutProps) {
   const chip = useNavigationStore((state) => state.homeChip);
   const { serverIds } = useHostFilter();
   const searchOpen = useNavigationStore((state) => state.homeSearchOpen);
+  // One pass over the rows; parts that did not change keep their objects, so an update to a
+  // session the feed does not show re-renders nothing below.
+  const feedOf = useMemo(createHomeFeedCache, []);
   const feed = useMemo(
-    () => buildHomeFeed(rows, { scope, mode, chip, serverIds }),
-    [rows, scope, mode, chip, serverIds],
+    () => feedOf(rows, { scope, mode, chip, serverIds }),
+    [feedOf, rows, scope, mode, chip, serverIds],
   );
-  const { agents, bucketOf, byKey } = useMemo(() => {
-    const buckets = new Map(
-      feed.visible.map(({ row, bucket }) => [activityKey(row.agent), bucket]),
-    );
-    const of: ActivityBucketOf = (agent) => buckets.get(activityKey(agent)) ?? "recent";
-    return {
-      agents: feed.visible.map(({ row }) => row.agent),
-      bucketOf: of,
-      byKey: new Map<string, HomeRow>(feed.visible.map(({ row }) => [activityKey(row.agent), row])),
-    };
-  }, [feed.visible]);
   if (searchOpen) return <InboxHistory />;
   return (
     <RenderProfile id="NavHome">
       <ActivityViewportProvider>
-        <HomeActivityProvider agents={agents} bucketOf={bucketOf}>
+        <HomeActivityProvider agents={feed.agents} bucketOf={feed.bucketOf}>
           <ActivityScrollView
             testID="home-scroll"
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.scroll}
           >
             <View style={styles.column}>
-              <HoldReadingPosition>
-                <HomeConnectionNotice />
-              </HoldReadingPosition>
+              {connectionNotice}
               <StartBlock {...props} />
               <HomeFeedControls scopeCounts={feed.scopeCounts} chipCounts={feed.chipCounts} />
               {feedReady ? (
                 <NavigationHomeFeed
-                  rows={byKey}
+                  rows={feed.byKey}
+                  unseen={feed.unseen}
                   filterKey={`${scope}|${mode}|${chip}|${serverIds.join(",")}`}
                 />
               ) : (
@@ -89,8 +78,17 @@ export function NavigationHomeLayout(props: HomeLayoutProps) {
   );
 }
 
-/** The composer near the top, its pickers opening downward, then Status and quick starts. */
-function StartBlock({
+const connectionNotice = (
+  <HoldReadingPosition>
+    <HomeConnectionNotice />
+  </HoldReadingPosition>
+);
+
+/**
+ * The composer near the top, its pickers opening downward, then Status and quick starts.
+ * Memoized: its props come from Home's parent, so a directory update does not re-render it.
+ */
+const StartBlock = memo(function StartBlock({
   compact,
   choices,
   form,
@@ -112,7 +110,7 @@ function StartBlock({
       {quickStarts}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create((theme) => ({
   flex: { flex: 1 },

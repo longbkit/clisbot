@@ -8,7 +8,7 @@ import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
 import { useActivityViewport } from "./activity-viewport";
 import { useActivityLayout } from "./use-activity-layout";
 import { useLocalDay } from "./use-local-day";
-import { activityBucket, type ActivityBucketOf } from "./activity";
+import type { ActivityBucketOf } from "./activity";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { visibleActivityLayout } from "./activity-layout";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
@@ -27,7 +27,6 @@ function useHomeActivityState(source: HomeActivitySource) {
   const directory = useAggregatedAgents();
   const { isInitialLoad, directoryHealth } = directory;
   const agents = source.agents ?? directory.agents;
-  const bucketOf = source.bucketOf ?? activityBucket;
   const { automatic, apply } = useActivityViewport();
   const day = useLocalDay();
   const { accepted, next, pending, accept } = useActivityLayout(
@@ -48,7 +47,8 @@ function useHomeActivityState(source: HomeActivitySource) {
     const visible = visibleActivityLayout(next, limit);
     void apply(accept, new Set(visible.flatMap((section) => section.keys)));
   }, [apply, accept, next, limit]);
-  const needs = agents.filter((agent) => bucketOf(agent) === "needs").length;
+  // The layout holds every Needs row; counting it is not another pass over the sessions.
+  const needs = next.find((section) => section.key === "needs")?.keys.length ?? 0;
   return useMemo(
     () => ({
       agents,
