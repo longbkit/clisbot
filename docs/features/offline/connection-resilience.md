@@ -138,6 +138,11 @@ so the JS thread is the next suspect. `jsStallMaxMs` and `jsStallTotalMs` below 
 - **Stored access token.** A refresh stores the access token and its expiry in the same keystore
   entry as the refresh token (one write, as before). A relaunch within its 5 minutes, minus a
   30 s margin, uses it without a refresh. The Hub refusing it takes the usual single 401 retry.
+- **Wider per-host limit on Android.** `fetch` runs on React Native's shared OkHttp client, which
+  sends at most 5 calls to one host and queues the rest, so the 16 startup requests to the Hub
+  went out in four waves. `plugins/with-android-http-per-host.js` installs a client factory with
+  32 per host; the Hub speaks HTTP/2, so they share one connection. The relay WebSockets are not
+  affected: React Native gives each its own client.
 - **List with the account.** On a cold start `prefetchRememberedHubDaemons` reads this run's list
   with the account and organization the remembered list was read for while the account read is
   in flight. If the account answers as that account, its list query has the same key and joins
