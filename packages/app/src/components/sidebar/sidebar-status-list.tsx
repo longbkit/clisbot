@@ -1016,17 +1016,17 @@ function StatusWorkspaceRowInnerContent({
   const serviceSummary = isDesktop ? selectWorkspaceServiceSummary(workspace.scripts) : null;
 
   const accessibilityState = useMemo(() => ({ selected }), [selected]);
-  const didLongPressRef = dragInteraction?.didLongPressRef;
+  const consumeLongPress = dragInteraction?.consumeLongPress;
   const startDragPress = dragInteraction?.handlePressIn;
   const moveDragPress = dragInteraction?.handleTouchMove;
   const endDragPress = dragInteraction?.handlePressOut;
-  const handlePress = useCallback(() => {
-    if (didLongPressRef?.current) {
-      didLongPressRef.current = false;
-      return;
-    }
-    onPress();
-  }, [didLongPressRef, onPress]);
+  const handlePress = useCallback(
+    (event: GestureResponderEvent) => {
+      if (consumeLongPress?.(event)) return;
+      onPress();
+    },
+    [consumeLongPress, onPress],
+  );
   const handlePressIn = useCallback(
     (event: GestureResponderEvent) => {
       setIsPressed(true);

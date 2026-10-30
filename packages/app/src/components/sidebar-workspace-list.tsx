@@ -997,13 +997,14 @@ function ProjectHeaderRow({
     ...dragAttributes
   } = dragHandleProps?.attributes ?? {};
 
-  const handlePress = useCallback(() => {
-    if (interaction.didLongPressRef.current) {
-      interaction.didLongPressRef.current = false;
-      return;
-    }
-    onPress();
-  }, [interaction.didLongPressRef, onPress]);
+  const { consumeLongPress } = interaction;
+  const handlePress = useCallback(
+    (event: GestureResponderEvent) => {
+      if (consumeLongPress(event)) return;
+      onPress();
+    },
+    [consumeLongPress, onPress],
+  );
 
   const handlePointerEnter = useCallback(() => {
     if (!contextMenuOpen) setIsHovered(true);
@@ -1200,10 +1201,7 @@ function WorkspaceRowInner({
         guard: String(interaction.didLongPressRef.current),
         key: workspace.workspaceKey,
       });
-      if (interaction.didLongPressRef.current) {
-        interaction.didLongPressRef.current = false;
-        return;
-      }
+      if (interaction.consumeLongPress(event)) return;
       traceInstant("clisbot.workspace.press", {
         eventMs: String(event.nativeEvent.timestamp),
         workspaceKey: workspace.workspaceKey,
@@ -1211,7 +1209,7 @@ function WorkspaceRowInner({
       startArmedHermesSampling(workspace.workspaceKey);
       onPress();
     },
-    [interaction.didLongPressRef, onPress, workspace.workspaceKey],
+    [interaction, onPress, workspace.workspaceKey],
   );
   const handleWorkspacePressIn = useCallback(
     (event: GestureResponderEvent) => {
