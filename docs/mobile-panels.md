@@ -219,6 +219,10 @@ definition, no longer eligible to begin.
   the body skips every update until the panel is active, then renders once with the latest value.
   Hold the derived model, not each row. For a context read deep in the pane, wrap the pane in
   `HeldContextValue` (`components/held-context.tsx`) with a stable child element.
+- A retained pane's large components do not read the route (`usePathname`,
+  `useActiveWorkspaceSelection`): the route changes on every navigation, hidden tabs included.
+  Read the narrow fact from a small provider that already subscribes, as the Work list reads
+  `useIsSidebarOnWorkspaceRoute` from `WorkspaceSessionsAutoCollapseProvider`.
 - Catalog-backed surfaces narrow external-store snapshots and preserve unchanged directory row
   identity through the shared aggregation owner ([architecture](architecture.md)). Reducing hidden
   derivation work does not change the native workspace/tab retention limits or visibility ownership.
