@@ -33,7 +33,9 @@ export function ProductAnalyticsSettings() {
   if (state.pending) hint = text("saving", "Saving…");
   else if (!analyticsUsable) hint = text("unavailable", "Analytics is unavailable in this build.");
   let error: string | undefined;
-  if (state.error === "storage")
+  // A build that cannot collect explains itself in the hint; an earlier failed attempt is noise.
+  if (!analyticsUsable) error = undefined;
+  else if (state.error === "storage")
     error = text(
       "storageError",
       "Collection is paused. Your preference could not be saved; retry before restarting the app.",
