@@ -62,15 +62,6 @@ function hasOptimisticCreateContinuity(input: AgentScreenMachineInput): boolean 
   return input.continuity.kind === "optimistic-create";
 }
 
-function shouldBlockInitialAuthoritativeReadyState(input: AgentScreenMachineInput): boolean {
-  return (
-    !input.isArchived &&
-    !hasOptimisticCreateContinuity(input) &&
-    !input.hasHydratedHistoryBefore &&
-    (input.needsAuthoritativeSync || input.isHistorySyncing)
-  );
-}
-
 export interface AgentScreenMachineMemory {
   hasRenderedReady: boolean;
   lastReadyAgent: AgentScreenAgent | null;
@@ -82,7 +73,9 @@ export type AgentScreenReadySyncState =
   | { status: "reconnecting" }
   | {
       status: "catching_up";
-      ui: "overlay" | "status" | "silent";
+      // `inline`: no history to show yet, so the stream shows a loading row under the
+      // directory facts. The screen never waits on history to render.
+      ui: "inline" | "status" | "silent";
     }
   | { status: "sync_error"; isRetrying: boolean };
 
@@ -162,12 +155,12 @@ function resolveCatchingUpUi(args: {
   isVisibilityCatchUpPending: boolean;
   hasHydratedHistoryBefore: boolean;
   hadInitialSyncFailure: boolean;
-}): "overlay" | "status" | "silent" {
+}): "inline" | "status" | "silent" {
   if (args.hasOptimisticCreateContinuity) return "silent";
   if (args.hasHydratedHistoryBefore) return "status";
-  if (args.isVisibilityCatchUpPending) return "overlay";
+  if (args.isVisibilityCatchUpPending) return "inline";
   if (args.hadInitialSyncFailure) return "silent";
-  return "overlay";
+  return "inline";
 }
 
 function resolveAgentScreenSync(args: {
@@ -222,7 +215,6 @@ export function deriveAgentScreenViewState({
 
   const useOptimisticCreateFlowAgent = shouldUseOptimisticCreateFlowAgent(input);
   const candidateAgent = resolveCandidateAgent({ input, useOptimisticCreateFlowAgent });
-  const shouldBlockReadyState = shouldBlockInitialAuthoritativeReadyState(input);
 
   if (input.missingAgentState.kind === "not_found") {
     return {
@@ -254,17 +246,6 @@ export function deriveAgentScreenViewState({
       state: {
         tag: "error",
         message: input.visibilityCatchUpError,
-      },
-      memory: nextMemory,
-    };
-  }
-
-  if (candidateAgent && shouldBlockReadyState) {
-    return {
-      state: {
-        tag: "boot",
-        reason: "loading",
-        source: "none",
       },
       memory: nextMemory,
     };

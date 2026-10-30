@@ -249,6 +249,7 @@ export const ar: TranslationResources = {
   agentStream: {
     agent: "Agent",
     empty: "ابدأ الدردشة مع هذا الوكيل...",
+    loadingHistory: "جارٍ تحميل الرسائل…",
     scrollToBottom: "قم بالتمرير إلى الأسفل",
     historyLoadFailed: "تعذر تحميل سجل الوكيل",
     messageCapped: "تم اقتطاع هذه الرسالة ({{bytes}} بايت).",

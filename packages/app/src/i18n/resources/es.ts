@@ -252,6 +252,7 @@ export const es: TranslationResources = {
   agentStream: {
     agent: "Agente",
     empty: "Comience a chatear con este agente...",
+    loadingHistory: "Cargando mensajes…",
     scrollToBottom: "Desplazarse hacia abajo",
     historyLoadFailed: "No se pudo cargar el historial del agente",
     messageCapped: "Este mensaje fue truncado ({{bytes}} bytes).",

@@ -253,6 +253,7 @@ export const fr: TranslationResources = {
   agentStream: {
     agent: "Agent",
     empty: "Commencez à discuter avec cet agent…",
+    loadingHistory: "Chargement des messages…",
     scrollToBottom: "Faire défiler vers le bas",
     historyLoadFailed: "Impossible de charger l’historique de l’agent",
     messageCapped: "Ce message a été tronqué ({{bytes}} octets).",

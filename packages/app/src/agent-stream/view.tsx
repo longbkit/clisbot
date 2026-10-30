@@ -125,6 +125,7 @@ import type { Theme } from "@/styles/theme";
 import { recordRenderProfileReasons } from "@/utils/render-profiler";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useStreamHistoryWindow } from "./use-stream-history-window";
+import { resolveStreamPlaceholder } from "./placeholder";
 import { PluginTimelineItemView, useInstalledTimelineTransform } from "@/plugins/timeline";
 import { ConnectorPermissionCard, readConnectorCard } from "@/clisbot/connectors/connector-card";
 
@@ -260,19 +261,29 @@ function renderStreamItemWithTurnFooter(input: {
 
 function renderListEmptyComponent(input: {
   renderModel: AgentStreamRenderModel;
+  isHistoryLoading: boolean;
   emptyStateStyle: StyleProp<ViewStyle>;
   emptyText: string;
+  loadingText: string;
 }): ReactNode {
-  if (
-    input.renderModel.boundary.hasVirtualizedHistory ||
-    input.renderModel.boundary.hasMountedHistory ||
-    input.renderModel.boundary.hasLiveHead ||
-    input.renderModel.auxiliary.pendingPermissions ||
-    input.renderModel.auxiliary.turnFooter
-  ) {
-    return null;
+  const placeholder = resolveStreamPlaceholder({
+    hasVirtualizedHistory: input.renderModel.boundary.hasVirtualizedHistory,
+    hasMountedHistory: input.renderModel.boundary.hasMountedHistory,
+    hasLiveHead: input.renderModel.boundary.hasLiveHead,
+    hasAuxiliaryRows: Boolean(
+      input.renderModel.auxiliary.pendingPermissions || input.renderModel.auxiliary.turnFooter,
+    ),
+    isHistoryLoading: input.isHistoryLoading,
+  });
+  if (placeholder === "none") return null;
+  if (placeholder === "loading") {
+    return (
+      <View style={stylesheet.syncingIndicator} testID="agent-history-loading-row">
+        <ThemedLoadingSpinner size="small" uniProps={mutedColorMapping} />
+        <Text style={stylesheet.syncingIndicatorText}>{input.loadingText}</Text>
+      </View>
+    );
   }
-
   return (
     <View style={input.emptyStateStyle}>
       <Text style={stylesheet.emptyStateText}>{input.emptyText}</Text>
@@ -331,6 +342,8 @@ export interface AgentStreamViewProps {
   turnPresentation: TurnPresentation;
   routeBottomAnchorRequest?: BottomAnchorRouteRequest | null;
   isAuthoritativeHistoryReady?: boolean;
+  /** No history has reached the screen yet; an empty stream shows a loading row. */
+  isHistoryLoading?: boolean;
   /** Tail space required by a transparent overlay rendered at the bottom edge. */
   bottomOverlayTailClearance?: number;
   /** Bottom offset required for controls floating above that overlay. */
@@ -442,6 +455,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       turnPresentation,
       routeBottomAnchorRequest = null,
       isAuthoritativeHistoryReady = true,
+      isHistoryLoading,
       bottomOverlayTailClearance = 0,
       bottomOverlayControlClearance,
       toast,
@@ -1221,10 +1235,12 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       () =>
         renderListEmptyComponent({
           renderModel,
+          isHistoryLoading: isHistoryLoading === true,
           emptyStateStyle,
           emptyText: t("agentStream.empty"),
+          loadingText: t("agentStream.loadingHistory"),
         }),
-      [renderModel, emptyStateStyle, t],
+      [renderModel, isHistoryLoading, emptyStateStyle, t],
     );
 
     const { boundary, auxiliary } = renderModel;
@@ -1509,6 +1525,7 @@ function agentStreamViewPropsEqual(
   if (left.isAuthoritativeHistoryReady !== right.isAuthoritativeHistoryReady) {
     reasons.push("isAuthoritativeHistoryReady");
   }
+  if (left.isHistoryLoading !== right.isHistoryLoading) reasons.push("isHistoryLoading");
   if (left.bottomOverlayTailClearance !== right.bottomOverlayTailClearance) {
     reasons.push("bottomOverlayTailClearance");
   }

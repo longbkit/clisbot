@@ -249,6 +249,7 @@ export const zhCN: TranslationResources = {
   agentStream: {
     agent: "Agent",
     empty: "开始和这个 Agent 对话...",
+    loadingHistory: "正在加载消息…",
     scrollToBottom: "滚动到底部",
     historyLoadFailed: "无法加载智能体历史记录",
     messageCapped: "此消息已被截断（{{bytes}} 字节）。",

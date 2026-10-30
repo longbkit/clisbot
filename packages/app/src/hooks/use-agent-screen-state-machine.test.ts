@@ -158,7 +158,7 @@ describe("deriveAgentScreenViewState", () => {
     expect(ready.sync.status).toBe("reconnecting");
   });
 
-  it("shows overlay catching-up state for first open while loading history", () => {
+  it("shows an inline loading row for first open while loading history", () => {
     const memory = createBaseMemory({
       hasRenderedReady: true,
       lastReadyAgent: createAgent("agent-1"),
@@ -172,7 +172,7 @@ describe("deriveAgentScreenViewState", () => {
     const ready = expectReadyState(result.state);
     const sync = expectCatchingUpSync(ready);
 
-    expect(sync.ui).toBe("overlay");
+    expect(sync.ui).toBe("inline");
   });
 
   it("shows updating status for already-hydrated agents", () => {
@@ -401,25 +401,28 @@ describe("deriveAgentScreenViewState", () => {
     expect(ready.sync.status).toBe("idle");
   });
 
-  it("keeps first route entry blocked until authoritative history is applied", () => {
-    const memory = createBaseMemory();
-    const input: AgentScreenMachineInput = {
-      ...createBaseInput(),
-      agent: createAgent("agent-1"),
-      needsAuthoritativeSync: true,
-      isHistorySyncing: true,
-      hasHydratedHistoryBefore: false,
-    };
-
-    const result = deriveAgentScreenViewState({ input, memory });
+  it("renders a cold open from the directory row in its first frame, without an overlay", () => {
+    const agent = createAgent("agent-1");
+    const result = deriveAgentScreenViewState({
+      input: {
+        ...createBaseInput(),
+        agent,
+        needsAuthoritativeSync: true,
+        isHistorySyncing: true,
+        visibilityCatchUpStatus: "pending",
+        hasHydratedHistoryBefore: false,
+      },
+      memory: createBaseMemory(),
+    });
 
     expect(result.state).toEqual({
-      tag: "boot",
-      reason: "loading",
-      source: "none",
+      tag: "ready",
+      agent,
+      source: "authoritative",
+      sync: { status: "catching_up", ui: "inline" },
+      isArchiving: false,
     });
-    expect(result.memory.hasRenderedReady).toBe(false);
-    expect(result.memory.lastReadyAgent).toBeNull();
+    expect(result.memory.hasRenderedReady).toBe(true);
   });
 
   it("renders an archived agent before provider history is initialized", () => {

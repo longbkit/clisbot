@@ -250,6 +250,7 @@ export const vi: TranslationResources = {
   agentStream: {
     agent: "Agent",
     empty: "Bắt đầu trò chuyện với agent này...",
+    loadingHistory: "Đang tải tin nhắn…",
     scrollToBottom: "Cuộn xuống cuối",
     historyLoadFailed: "Không thể tải lịch sử agent",
     messageCapped: "Tin nhắn này đã bị cắt bớt ({{bytes}} byte).",
