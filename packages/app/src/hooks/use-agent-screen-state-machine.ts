@@ -198,6 +198,14 @@ function resolveAgentScreenSync(args: {
   return { status: "idle" };
 }
 
+/**
+ * The stream shows its loading row (when it has no rows) while history is on its way: on a first
+ * open, and when a session whose hidden pages were released catches up again.
+ */
+export function isStreamHistoryLoading(state: AgentScreenViewState): boolean {
+  return state.tag === "ready" && state.sync.status === "catching_up" && state.sync.ui !== "silent";
+}
+
 export function deriveAgentScreenViewState({
   input,
   memory,

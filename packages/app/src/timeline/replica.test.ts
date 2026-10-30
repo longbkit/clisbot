@@ -1280,6 +1280,68 @@ describe("viewed timeline persistence", () => {
     owner.dispose();
   });
 
+  it("reopens a left session instantly within five minutes and refetches it after release", async () => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null);
+    let releaseHidden: (() => void) | null = null;
+    const budget = new TimelinePageRetention(
+      { sessionBytes: 1_000_000, totalBytes: 2_000_000, pageMetadataBytes: 0 },
+      {
+        ttlMs: 5 * 60 * 1000,
+        schedule: (release) => {
+          releaseHidden = release;
+          return () => {
+            if (releaseHidden === release) releaseHidden = null;
+          };
+        },
+      },
+    );
+    const requests: string[] = [];
+    const owner = createOwner(
+      { readTimeline: async () => undefined, commitTimeline: () => undefined },
+      budget,
+      {
+        initialDeliveryMode: "selective",
+        readCursor: (agentId) => {
+          const range = useSessionStore
+            .getState()
+            .sessions[SERVER_ID]?.agentTimelineCursor.get(agentId);
+          return range ? { epoch: range.epoch, endSeq: range.endSeq } : undefined;
+        },
+        fetchPage: async (agentId, request) => {
+          requests.push(`${agentId}:${request.direction}`);
+          return { hasNewer: false, endCursor: null };
+        },
+      },
+    );
+    const rowIds = () => {
+      const timeline = selectAgentTimelineState(
+        useSessionStore.getState().sessions[SERVER_ID],
+        AGENT_ID,
+      );
+      return timeline.status === "cold" ? [] : timeline.items.map((row) => row.id);
+    };
+    owner.setConnected(true);
+    owner.replaceVisibleAgentIds("workspace", [AGENT_ID]);
+    await expect.poll(() => requests).toEqual([`${AGENT_ID}:tail`]);
+    owner.applyTimelineResponse(retentionPage(1, 3, false));
+
+    owner.replaceVisibleAgentIds("workspace", []);
+    owner.replaceVisibleAgentIds("workspace", [AGENT_ID]);
+    await Promise.resolve();
+    expect(requests).toEqual([`${AGENT_ID}:tail`]);
+    expect(rowIds()).toHaveLength(3);
+
+    owner.replaceVisibleAgentIds("workspace", []);
+    expect(releaseHidden).not.toBeNull();
+    releaseHidden!();
+    expect(rowIds()).toEqual([]);
+    expect(budget.retainedBytes).toBeLessThan(1_000);
+
+    owner.replaceVisibleAgentIds("workspace", [AGENT_ID]);
+    await expect.poll(() => requests).toEqual([`${AGENT_ID}:tail`, `${AGENT_ID}:tail`]);
+    owner.dispose();
+  });
+
   it("does not retain hidden legacy broadcasts or certify their cursors", () => {
     useSessionStore.getState().initializeSession(SERVER_ID, null);
     applySynced(AGENT_ID, 8);

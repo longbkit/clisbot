@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Agent } from "@/contexts/session-context";
 import {
   deriveAgentScreenViewState,
+  isStreamHistoryLoading,
   type AgentScreenMachineInput,
   type AgentScreenMachineMemory,
   type AgentScreenViewState,
@@ -612,5 +613,25 @@ describe("deriveAgentScreenViewState", () => {
 
     expect(sync.ui).toBe("status");
     expect(result.memory.hadInitialSyncFailure).toBe(false);
+  });
+});
+
+describe("isStreamHistoryLoading", () => {
+  const agent = createAgent("agent-1");
+  function ready(sync: ReadyState["sync"]): AgentScreenViewState {
+    return { tag: "ready", agent, source: "authoritative", sync, isArchiving: false };
+  }
+
+  it("shows the loading row while a first open catches up", () => {
+    expect(isStreamHistoryLoading(ready({ status: "catching_up", ui: "inline" }))).toBe(true);
+  });
+
+  it("shows the loading row when a released session catches up with no rows left", () => {
+    expect(isStreamHistoryLoading(ready({ status: "catching_up", ui: "status" }))).toBe(true);
+  });
+
+  it("stays quiet for an optimistic create and once the session is current", () => {
+    expect(isStreamHistoryLoading(ready({ status: "catching_up", ui: "silent" }))).toBe(false);
+    expect(isStreamHistoryLoading(ready({ status: "idle" }))).toBe(false);
   });
 });

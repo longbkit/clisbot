@@ -53,6 +53,7 @@ import {
   type AgentScreenContinuity,
   type AgentScreenMissingState,
   type AgentScreenViewState,
+  isStreamHistoryLoading,
   useAgentScreenStateMachine,
   type AgentScreenReadySyncState,
 } from "@/hooks/use-agent-screen-state-machine";
@@ -999,10 +1000,7 @@ function ChatAgentContent({
   invariant(effectiveAgent, "effectiveAgent is defined when the non-ready view is absent");
   const agentCwd = agentState.cwd;
   invariant(agentCwd, "agent cwd is defined when agent content is ready");
-  const isHistoryLoading =
-    viewState.tag === "ready" &&
-    viewState.sync.status === "catching_up" &&
-    viewState.sync.ui === "inline";
+  const isHistoryLoading = isStreamHistoryLoading(viewState);
   const showHistorySyncError = viewState.tag === "ready" && viewState.sync.status === "sync_error";
   const isRetryingHistorySync =
     viewState.tag === "ready" &&
