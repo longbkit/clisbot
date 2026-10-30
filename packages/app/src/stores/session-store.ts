@@ -220,6 +220,7 @@ function preserveWorkspaceDescriptorIdentity(
   return incoming;
 }
 
+// May return `incoming` itself: the caller hands the map over and never mutates it again.
 function preserveMapIdentity<Key, Value>(
   existing: Map<Key, Value>,
   incoming: Map<Key, Value>,
