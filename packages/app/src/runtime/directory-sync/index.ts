@@ -528,19 +528,33 @@ export class DirectorySync {
     this.cacheLoad ??= (async () => {
       const revision = this.revision;
       const cached = await checkpoints.readDirectory(this.serverId);
-      if (this.cacheAccepted) return;
-      if (!useSessionStore.getState().sessions[this.serverId]) return;
-      this.liveUpdates.flush();
-      this.agents.commitCached(cached.agents);
-      this.workspaces.commitCached(cached);
-      if (this.revision === revision) this.cursors = cached.checkpoint ?? {};
-      this.cacheAccepted = true;
+      batchSessionStoreUpdates(() => this.applyCachedDirectory(cached, revision));
     })();
     return this.cacheLoad;
   }
 
   restoreCachedDirectory(): Promise<void> {
     return this.loadCachedDirectory();
+  }
+
+  /** The startup restore reads this Host's cache; loads meanwhile wait for it instead. */
+  adoptCacheRestore(restored: Promise<void>): void {
+    this.cacheLoad ??= restored;
+  }
+
+  cacheReadRevision(): number {
+    return this.revision;
+  }
+
+  /** Applies a cached directory read when `readRevision` was current, unless one was applied. */
+  applyCachedDirectory(cached: CachedDirectory, readRevision: number): void {
+    if (this.cacheAccepted) return;
+    if (!useSessionStore.getState().sessions[this.serverId]) return;
+    this.liveUpdates.flush();
+    this.agents.commitCached(cached.agents);
+    this.workspaces.commitCached(cached);
+    if (this.revision === readRevision) this.cursors = cached.checkpoint ?? {};
+    this.cacheAccepted = true;
   }
 
   applyAgentTurnLiveness(

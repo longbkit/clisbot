@@ -81,6 +81,7 @@ import { readDesktopManagedLocalCredential } from "@/desktop/daemon/local-creden
 import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
 import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@clisbot/protocol/browser-automation/rpc-schemas";
 import {
+  batchSessionStoreUpdates,
   useSessionStore,
   toDaemonServerInfo,
   type Agent,
@@ -145,6 +146,24 @@ import {
 } from "./cold-start-connect";
 import { type NetworkReachability, subscribeNetworkReachability } from "./network-reachability";
 import { ReconnectSweep, type ReconnectSweepReason } from "./reconnect-sweep";
+import { restoreCachedDirectories } from "./directory-sync/startup-restore";
+import { RestoreSlicer, yieldToEventLoop } from "./replica-cache/restore-slicer";
+
+/** How the startup cache restore measures time and gives the JS thread back. */
+export interface StartupScheduler {
+  now: () => number;
+  yieldToEventLoop: () => Promise<void>;
+  afterNextFrame: (run: () => void) => void;
+}
+
+const defaultStartupScheduler: StartupScheduler = {
+  now: Date.now,
+  yieldToEventLoop,
+  afterNextFrame: (run) => {
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => run());
+    else setTimeout(run, 16);
+  },
+};
 
 export type HostRuntimeConnectionStatus = "idle" | "connecting" | "online" | "offline" | "error";
 export type PairingNavigationTarget = "openProject" | "hostRoot" | "hostSettings";
@@ -2157,6 +2176,7 @@ export class HostRuntimeStore {
   private readonly directoryFrameClock: FrameClock | null;
   private readonly directoryPageLimiter = new ConnectLimiter(MAX_CONCURRENT_DIRECTORY_PAGES);
   private readonly coldStartTimeline: ColdStartConnectTimeline;
+  private readonly startupScheduler: StartupScheduler;
 
   constructor(input?: {
     deps?: HostRuntimeControllerDeps;
@@ -2166,6 +2186,7 @@ export class HostRuntimeStore {
     /** Clisbot: paces each Host's live directory updates to one commit per frame. */
     directoryFrameClock?: FrameClock | null;
     coldStartTimeline?: ColdStartConnectTimeline;
+    startupScheduler?: StartupScheduler;
   }) {
     const deps =
       input?.deps ??
@@ -2185,6 +2206,7 @@ export class HostRuntimeStore {
     this.revokePushNotifications = input?.revokePushNotifications ?? revokePushNotifications;
     this.directoryFrameClock = input?.directoryFrameClock ?? null;
     this.coldStartTimeline = input?.coldStartTimeline ?? getColdStartConnectTimeline();
+    this.startupScheduler = input?.startupScheduler ?? defaultStartupScheduler;
   }
 
   // --- Host registry ---
@@ -2308,14 +2330,7 @@ export class HostRuntimeStore {
       projectIconCache.setHosts(profiles.map((profile) => profile.serverId));
       await projectIconCache.restore();
       this.syncHosts(profiles);
-      void Promise.all(
-        profiles.map((profile) =>
-          this.directorySyncByServer
-            .get(profile.serverId)
-            ?.restoreCachedDirectory()
-            .catch(() => undefined),
-        ),
-      ).then(() => this.coldStartTimeline.mark("cachedDirectories"));
+      void this.restoreCachedDirectories(profiles.map((profile) => profile.serverId));
     } catch (error) {
       console.error("[HostRuntime] Failed to load host registry from storage", error);
     } finally {
@@ -2330,6 +2345,29 @@ export class HostRuntimeStore {
         );
       }
     }
+  }
+
+  /** Runs after `syncHosts` started every controller's connect, so the network goes first. */
+  private async restoreCachedDirectories(serverIds: readonly string[]): Promise<void> {
+    const timeline = this.coldStartTimeline;
+    const scheduler = this.startupScheduler;
+    const targets = serverIds.flatMap((serverId) => {
+      const directory = this.directorySyncByServer.get(serverId);
+      return directory ? [{ serverId, directory }] : [];
+    });
+    await restoreCachedDirectories(targets, {
+      read: (serverId, slicer) => this.replicaCache.readDirectory(serverId, slicer),
+      slicer: new RestoreSlicer({
+        now: scheduler.now,
+        yieldToEventLoop: scheduler.yieldToEventLoop,
+        onChunk: (chunk) => timeline.restoreChunk(chunk.durationMs),
+      }),
+      yieldToEventLoop: scheduler.yieldToEventLoop,
+      commit: batchSessionStoreUpdates,
+      afterNextFrame: scheduler.afterNextFrame,
+      onFirstCachedFrame: () => timeline.mark("firstCachedFrame"),
+    }).catch((error) => console.error("[HostRuntime] Failed to restore cached directories", error));
+    timeline.mark("cachedDirectories");
   }
 
   private markHostRegistryLoaded(): void {

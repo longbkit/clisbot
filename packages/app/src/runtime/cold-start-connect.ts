@@ -26,6 +26,11 @@ export interface ColdStartConnectSummary {
   hostTransportOpenMs: number | null;
   /** Every restored Host's cached directory was read back. */
   cachedDirectoriesMs: number | null;
+  /** The frame after the first Host's cached directory reached the store. */
+  firstCachedFrameMs: number | null;
+  /** Synchronous chunks the cache restore ran in, and the longest of them. */
+  cacheRestoreChunks: number;
+  cacheRestoreLongestChunkMs: number;
   /** The longest the JS thread was busy past a timer, from the registry restore to the summary. */
   jsStallMaxMs: number;
   /** All such delays added up; network answers wait this long for the JS thread. */
@@ -42,9 +47,12 @@ export type ColdStartPhase =
   | "hubToken"
   | "hubTicket"
   | "hostTransportOpen"
-  | "cachedDirectories";
+  | "cachedDirectories"
+  | "firstCachedFrame";
 
 const COLD_START_DEADLINE_MS = 60_000;
+/** Startup settles this long after the registry restore even if a Host stays offline. */
+const STARTUP_SETTLE_DEADLINE_MS = 10_000;
 /** Event-loop sampling step, and the lag below which the JS thread counts as free. */
 const EVENT_LOOP_SAMPLE_MS = 100;
 const EVENT_LOOP_STALL_MS = 50;
@@ -67,7 +75,13 @@ export class ColdStartConnectTimeline {
   private firstHostOnlineMs: number | null = null;
   private jsStallMaxMs = 0;
   private jsStallTotalMs = 0;
+  private cacheRestoreChunks = 0;
+  private cacheRestoreLongestChunkMs = 0;
   private finished = false;
+  private restoreDone = false;
+  private settleDeadlinePassed = false;
+  private settled = false;
+  private readonly settleListeners = new Set<() => void>();
   private cancelDeadline: () => void = () => undefined;
   private stopWatchingEventLoop: () => void = () => undefined;
 
@@ -81,11 +95,16 @@ export class ColdStartConnectTimeline {
     this.registryRestoredMs = this.elapsed();
     if (serverIds.length === 0) {
       this.finished = true;
+      this.settleIfReady();
       return;
     }
     this.pending = new Set(serverIds);
     this.hosts = serverIds.length;
     this.cancelDeadline = this.deps.schedule(() => this.finish(), COLD_START_DEADLINE_MS);
+    this.deps.schedule(() => {
+      this.settleDeadlinePassed = true;
+      this.settleIfReady();
+    }, STARTUP_SETTLE_DEADLINE_MS);
     // From the registry restore on: before it nothing connects, and the deadline ends the watch.
     this.stopWatchingEventLoop =
       this.deps.watchEventLoop?.((lagMs) => {
@@ -95,8 +114,46 @@ export class ColdStartConnectTimeline {
   }
 
   mark(phase: ColdStartPhase): void {
+    if (phase === "cachedDirectories" && !this.restoreDone) {
+      this.restoreDone = true;
+      this.settleIfReady();
+    }
     if (this.finished || this.phases.has(phase)) return;
     this.phases.set(phase, this.elapsed());
+  }
+
+  /** One synchronous chunk of the cache restore ran for `durationMs`. */
+  restoreChunk(durationMs: number): void {
+    if (this.finished) return;
+    this.cacheRestoreChunks += 1;
+    this.cacheRestoreLongestChunkMs = Math.max(this.cacheRestoreLongestChunkMs, durationMs);
+  }
+
+  /**
+   * Startup has settled: the cache restore is done and every restored Hub Host is online (or
+   * 10 s passed since the registry restore). Deferred startup work, such as mounting the hidden
+   * phone tabs, waits for this so it does not compete with the first screen and the connects.
+   */
+  isSettled(): boolean {
+    return this.settled;
+  }
+
+  /** Calls `listener` once startup has settled, at once if it already has; returns a cancel. */
+  whenSettled(listener: () => void): () => void {
+    if (this.settled) {
+      listener();
+      return () => undefined;
+    }
+    this.settleListeners.add(listener);
+    return () => this.settleListeners.delete(listener);
+  }
+
+  private settleIfReady(): void {
+    const connected = this.finished || this.settleDeadlinePassed;
+    if (this.settled || !this.restoreDone || !connected) return;
+    this.settled = true;
+    for (const listener of this.settleListeners) listener();
+    this.settleListeners.clear();
   }
 
   attemptFailed(serverId: string): void {
@@ -127,11 +184,15 @@ export class ColdStartConnectTimeline {
       hubTicketMs: this.phase("hubTicket"),
       hostTransportOpenMs: this.phase("hostTransportOpen"),
       cachedDirectoriesMs: this.phase("cachedDirectories"),
+      firstCachedFrameMs: this.phase("firstCachedFrame"),
+      cacheRestoreChunks: this.cacheRestoreChunks,
+      cacheRestoreLongestChunkMs: this.cacheRestoreLongestChunkMs,
       jsStallMaxMs: this.jsStallMaxMs,
       jsStallTotalMs: this.jsStallTotalMs,
       firstHostOnlineMs: this.firstHostOnlineMs,
       allHostsOnlineMs: allOnline ? this.elapsed() : null,
     });
+    this.settleIfReady();
   }
 
   private phase(phase: ColdStartPhase): number | null {

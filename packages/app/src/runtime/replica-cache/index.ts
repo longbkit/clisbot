@@ -32,6 +32,7 @@ import {
   type CachedChatTail,
 } from "./chat-tail";
 import { OFFLINE_CACHE_ENABLED } from "./offline-flag";
+import type { RestoreSlicer } from "./restore-slicer";
 import { isReplicaTailKind } from "./row-store-schema";
 import { TAIL_MAX_AGE_MS, TAIL_SAVE_WINDOW_MS, selectTailEvictions } from "./tail-retention";
 import { TAIL_MAX_BYTES, compactTailItem, keepNewestWithinBytes } from "./timeline-tail";
@@ -1076,7 +1077,8 @@ export class ReplicaCache {
     return { workspace, ...(project ? { project } : {}) };
   }
 
-  async readDirectory(serverId: string): Promise<CachedDirectory> {
+  /** With a `slicer`, rows are parsed in its chunks with a macrotask between them. */
+  async readDirectory(serverId: string, slicer?: RestoreSlicer): Promise<CachedDirectory> {
     const rows = await this.readRows(serverId, ["agent", "workspace", "project", "checkpoint"]);
     const result: DirectoryReadAccumulator = {
       agents: new Map(),
@@ -1093,6 +1095,7 @@ export class ReplicaCache {
         if (invalidEntity) invalidEntities.add(invalidEntity);
         invalidRows.push(row);
       }
+      if (slicer?.countRow()) await slicer.pause();
     }
     if (result.checkpoint && invalidEntities.size > 0) {
       result.checkpoint = { ...result.checkpoint };
