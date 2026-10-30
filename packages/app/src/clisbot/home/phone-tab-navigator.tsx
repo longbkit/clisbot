@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState, type ReactNode } from "react";
+import { memo, startTransition, useEffect, useState, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import {
   TabRouter,
@@ -100,11 +100,22 @@ function PhoneTabNavigator({
             ) : null,
           )}
         </View>
-        {tabBar({ state, navigation })}
+        <TabBarSlot tabBar={tabBar} state={state} navigation={navigation} />
       </View>
     </NavigationContent>
   );
 }
+
+/**
+ * The navigator re-renders when its layout does, and a push above the tabs blurs the layout's
+ * route. The bar re-renders only when the tab state changes.
+ */
+const TabBarSlot = memo(function TabBarSlot({
+  tabBar,
+  ...props
+}: PhoneTabBarProps & { tabBar: PhoneTabNavigatorProps["tabBar"] }) {
+  return tabBar(props);
+});
 
 /**
  * Route keys whose tab is mounted: the focused one at once, then the others in route order, one

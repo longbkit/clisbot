@@ -24,18 +24,27 @@ const STACK_SCREEN_OPTIONS = {
 export default function PeerPagesLayout() {
   const phoneTabs = useUsesPhoneTabs();
   const [mountedAsPhoneTabs] = useState(phoneTabs);
-  useRemountAcrossBreakpoint(mountedAsPhoneTabs !== phoneTabs);
-  return mountedAsPhoneTabs ? <PhoneTabsLayout /> : <PeerPagesStack />;
+  return (
+    <>
+      {mountedAsPhoneTabs ? <PhoneTabsLayout /> : <PeerPagesStack />}
+      {mountedAsPhoneTabs !== phoneTabs ? <RemountAcrossBreakpoint /> : null}
+    </>
+  );
 }
 
-function useRemountAcrossBreakpoint(stale: boolean) {
+/**
+ * Its own component: focus changes on every push and pop above the tabs, and reading it in the
+ * layout re-rendered the navigator each time (docs/expo-router.md#route-reads).
+ */
+function RemountAcrossBreakpoint() {
   const root = useNavigationContainerRef();
   const focused = useIsFocused();
   useEffect(() => {
-    if (!stale || !focused) return;
+    if (!focused) return;
     const action = phoneTabsRemountAction(root.getRootState());
     if (action) root.dispatch(action);
-  }, [focused, root, stale]);
+  }, [focused, root]);
+  return null;
 }
 
 function PhoneTabsLayout() {
