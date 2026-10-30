@@ -1,5 +1,5 @@
 import type { WorkspaceSort } from "@/projects/workspace-structure";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import {
@@ -19,6 +19,7 @@ import {
   selectWorkspaceStatusesForBadges,
   workspaceEqualityFns,
   type WorkspaceStructure,
+  type WorkspaceStructureProject,
 } from "./selectors";
 import { useSessionStore, type WorkspaceDescriptor } from "../session-store";
 import type { DesktopBadgeWorkspaceStatus } from "@/utils/desktop-badge-state";
@@ -99,19 +100,35 @@ export function useWorkspaceDirectory(
   );
 }
 
+interface HeldStructure {
+  select: ReturnType<typeof createWorkspaceStructureProjectsSelector>;
+  projects: WorkspaceStructureProject[];
+}
+
+/**
+ * `live: false` holds the structure last read (a hidden retained pane): rebuilding it is
+ * O(workspaces) whenever a Host replaces its workspaces map, which a status change does.
+ */
 export function useWorkspaceStructure(
   serverIds: string[],
   workspaceSort?: WorkspaceSort,
+  live = true,
 ): WorkspaceStructure {
   const selectProjects = useMemo(
     () => createWorkspaceStructureProjectsSelector(serverIds, workspaceSort),
     [serverIds, workspaceSort],
   );
+  const lastProjects = useRef<HeldStructure | null>(null);
   const projects = useStoreWithEqualityFn(
     useSessionStore,
-    selectProjects,
+    (state) => {
+      const last = lastProjects.current;
+      if (!live && last?.select === selectProjects) return last.projects;
+      return selectProjects(state);
+    },
     workspaceEqualityFns.deep,
   );
+  lastProjects.current = { select: selectProjects, projects };
   const projectOrder = useStoreWithEqualityFn(
     useSidebarOrderStore,
     (state) => selectProjectOrder(state),

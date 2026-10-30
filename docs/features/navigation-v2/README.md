@@ -72,7 +72,8 @@ The primary navigation says where you are; each section owns its header, filters
 - **Retention**: a visited section stays mounted, so a switch only flips visibility and keeps
   scroll position. On desktop Chats and Work are retained panels in the list pane (`ListContent` in
   `list-panel.tsx`); on phones every tab is ([phone tabs][phone-tabs]). A hidden list holds its
-  inputs (`useHeldWhileInactive`): Work reads the sidebar model through `RetainedSidebarModel`,
+  inputs (`useHeldWhileInactive`): desktop Work reads the sidebar model through
+  `RetainedSidebarModel`, a phone's Work tab holds its own provider's inputs (`holdWhileInactive`),
   Chats holds its catalog and unread agents in `ChatsPane`, and a phone's hidden Home holds the
   navigation activity. Host updates skip a hidden section; its first render back uses the latest
   data. Until 2026-10-30 a phone tab switch replaced the route (and Android also unmounted hidden

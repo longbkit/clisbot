@@ -613,6 +613,8 @@ function SidebarChrome({
     ) : (
       <LeftSidebar active={active} presented={visible} />
     );
+  // Phone tabs have no list chrome: the Work tab owns the only sidebar model (`PhoneListTab`).
+  if (usesPhoneTabs(isCompactLayout)) return chrome;
   return (
     <SidebarModelProvider active={active}>
       {chrome}

@@ -7,6 +7,7 @@ import {
 } from "@/clisbot/workspace-sessions/select-sessions";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { useSessionStore, type Agent } from "@/stores/session-store";
+import { useHeldWhileInactive } from "@/hooks/use-held-while-inactive";
 import { workspaceRootAgentsOf } from "@/stores/workspace-root-agents";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useResourcePins } from "@/clisbot/bots/sidebar/pins";
@@ -110,17 +111,25 @@ function useLoadedSessionHosts(serverIds: readonly string[]): ReadonlySet<string
 }
 
 /** Every Host's root sessions by workspace, rebuilt once per agents or submissions change. */
-export function useWorkSessionsOf(): WorkSessionsOf {
-  const { listable, cached } = useSourceLiveness();
+/** `live: false` holds the index (a hidden retained pane); building it is O(agents). */
+export function useWorkSessionsOf(live = true): WorkSessionsOf {
+  const liveness = useHeldWhileInactive(useSourceLiveness(), live);
+  const { listable, cached } = liveness;
   // Outside Navigation V2 nothing reads the index; it subscribes to no Host.
   const serverIds = useMemo(() => (NAVIGATION_V2_ENABLED ? [...listable] : []), [listable]);
-  const agentMaps = useSessionStore(
-    useShallow((state) => serverIds.map((id) => state.sessions[id]?.agents ?? null)),
+  const agentMaps = useHeldWhileInactive(
+    useSessionStore(
+      useShallow((state) => serverIds.map((id) => state.sessions[id]?.agents ?? null)),
+    ),
+    live,
   );
-  const submissionMaps = useSessionStore(
-    useShallow((state) => serverIds.map((id) => state.sessions[id]?.messageSubmissions ?? null)),
+  const submissionMaps = useHeldWhileInactive(
+    useSessionStore(
+      useShallow((state) => serverIds.map((id) => state.sessions[id]?.messageSubmissions ?? null)),
+    ),
+    live,
   );
-  const loaded = useLoadedSessionHosts(serverIds);
+  const loaded = useHeldWhileInactive(useLoadedSessionHosts(serverIds), live);
   // The last index, so an agent update that changes no session hands the Work tree the same one.
   const previous = useRef<ReadonlyMap<string, WorkSession[]> | undefined>(undefined);
   const index = useMemo(() => {
@@ -172,14 +181,14 @@ export function useWorkQuery() {
  * The Workspace list's one filter for the shared sidebar model: which workspaces it lists and
  * which sessions under them. Null outside Navigation V2, where the Home V2 sidebar lists all.
  */
-export function useWorkListFilter(): {
+export function useWorkListFilter(live = true): {
   filter: WorkFilter;
   sessionsOf: WorkSessionsOf;
   /** `serverId:agentId` of pinned sessions: they float above the list instead of sitting in it. */
   pinnedSessions: ReadonlySet<string>;
 } | null {
-  const query = useWorkQuery();
-  const sessionsOf = useWorkSessionsOf();
+  const query = useHeldWhileInactive(useWorkQuery(), live);
+  const sessionsOf = useWorkSessionsOf(live);
   const { pins } = useResourcePins();
   const pinnedSessions = useMemo(
     () =>
