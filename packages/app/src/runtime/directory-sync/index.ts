@@ -525,21 +525,29 @@ export class DirectorySync {
   private loadCachedDirectory(): Promise<void> {
     const checkpoints = this.checkpoints;
     if (!checkpoints) return Promise.resolve();
-    this.cacheLoad ??= (async () => {
-      const revision = this.revision;
-      const cached = await checkpoints.readDirectory(this.serverId);
-      batchSessionStoreUpdates(() => this.applyCachedDirectory(cached, revision));
-    })();
+    this.cacheLoad ??= this.readCachedDirectory(checkpoints);
     return this.cacheLoad;
+  }
+
+  private async readCachedDirectory(checkpoints: DirectoryCheckpointStorage): Promise<void> {
+    const revision = this.revision;
+    const cached = await checkpoints.readDirectory(this.serverId);
+    batchSessionStoreUpdates(() => this.applyCachedDirectory(cached, revision));
   }
 
   restoreCachedDirectory(): Promise<void> {
     return this.loadCachedDirectory();
   }
 
-  /** The startup restore reads this Host's cache; loads meanwhile wait for it instead. */
-  adoptCacheRestore(restored: Promise<void>): void {
-    this.cacheLoad ??= restored;
+  /**
+   * The startup restore reads this Host's cache; loads meanwhile wait for it instead. If it did
+   * not apply the cache (its read failed), the Host reads the cache itself.
+   */
+  adoptCacheRestore(restored: Promise<boolean>): void {
+    const checkpoints = this.checkpoints;
+    this.cacheLoad ??= restored.then((applied) =>
+      applied || !checkpoints ? undefined : this.readCachedDirectory(checkpoints),
+    );
   }
 
   cacheReadRevision(): number {

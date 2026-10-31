@@ -361,6 +361,46 @@ describe("DirectorySync session readiness", () => {
     directory.dispose();
   });
 
+  it("reads its own cache when the startup restore could not apply it", async () => {
+    const serverId = "restore-skipped-host";
+    serverIds.add(serverId);
+    const cachedAgent = createAgent(serverId, "agent-1");
+    let reads = 0;
+    const directory = new DirectorySync(
+      serverId,
+      {
+        onAgentStoppedRunning: () => undefined,
+        markAgentLoading: () => undefined,
+        markAgentReady: () => undefined,
+        markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
+      },
+      {
+        readAgent: async () => undefined,
+        readWorkspace: async () => undefined,
+        readDirectory: async () => {
+          reads += 1;
+          return {
+            agents: new Map([[cachedAgent.id, cachedAgent]]),
+            workspaces: new Map(),
+            projects: new Map(),
+          };
+        },
+        commitDirectoryMutations: () => undefined,
+      },
+    );
+    useSessionStore.getState().initializeSession(serverId, null);
+
+    directory.adoptCacheRestore(Promise.resolve(false));
+    await directory.restoreCachedDirectory();
+
+    expect(reads).toBe(1);
+    expect(useSessionStore.getState().sessions[serverId]?.agents.has(cachedAgent.id)).toBe(true);
+    directory.dispose();
+  });
+
   it("prepares a cached agent workspace route without sidebar demand", async () => {
     const serverId = "cached-agent-route";
     serverIds.add(serverId);

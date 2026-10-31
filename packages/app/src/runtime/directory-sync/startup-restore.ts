@@ -3,8 +3,11 @@ import type { RestoreSlicer } from "@/runtime/replica-cache/restore-slicer";
 
 /** What the startup restore needs from a Host's directory sync. */
 export interface StartupRestoreDirectory {
-  /** Loads of this Host's cache wait for `restored` instead of reading the cache again. */
-  adoptCacheRestore(restored: Promise<void>): void;
+  /**
+   * Loads of this Host's cache wait for `restored` instead of reading the cache again. It
+   * resolves false when the restore did not apply this Host's cache, so the Host reads it itself.
+   */
+  adoptCacheRestore(restored: Promise<boolean>): void;
   cacheReadRevision(): number;
   applyCachedDirectory(cached: CachedDirectory, readRevision: number): void;
 }
@@ -49,8 +52,8 @@ export async function restoreCachedDirectories(
   deps: StartupRestoreDeps,
 ): Promise<void> {
   const settles = targets.map(({ directory }) => {
-    let settle = () => undefined as void;
-    directory.adoptCacheRestore(new Promise<void>((resolve) => (settle = resolve)));
+    let settle: (applied: boolean) => void = () => undefined;
+    directory.adoptCacheRestore(new Promise<boolean>((resolve) => (settle = resolve)));
     return settle;
   });
   try {
@@ -58,15 +61,18 @@ export async function restoreCachedDirectories(
     let pending: number[] = [];
     let restored: RestoredHost[] = [];
     let lastCommit: number | undefined;
-    for (const [index, { serverId, directory }] of targets.entries()) {
-      const readRevision = directory.cacheReadRevision();
-      restored.push({ directory, cached: await deps.read(serverId, deps.slicer), readRevision });
-      pending.push(index);
+    for (const [index, target] of targets.entries()) {
+      const host = await readHost(target, deps);
+      if (host) {
+        restored.push(host);
+        pending.push(index);
+      } else settles[index]!(false);
       await deps.slicer.pause();
       const due = lastCommit === undefined || deps.now() - lastCommit >= COMMIT_INTERVAL_MS;
       if (!due && index < targets.length - 1) continue;
+      if (!restored.length) continue;
       commitRestored(restored, deps);
-      for (const done of pending) settles[done]!();
+      for (const done of pending) settles[done]!(true);
       if (lastCommit === undefined) deps.afterNextFrame(deps.onFirstCachedFrame);
       lastCommit = deps.now();
       pending = [];
@@ -74,7 +80,25 @@ export async function restoreCachedDirectories(
       await deps.yieldToEventLoop();
     }
   } finally {
-    for (const settle of settles) settle();
+    for (const settle of settles) settle(false);
+  }
+}
+
+/**
+ * One Host's cached directory, or null when its rows cannot be read. A storage error is that
+ * Host's alone: it ended the whole restore before, and every Host after it showed no cached
+ * sessions until it connected.
+ */
+async function readHost(
+  { serverId, directory }: StartupRestoreTarget,
+  deps: StartupRestoreDeps,
+): Promise<RestoredHost | null> {
+  const readRevision = directory.cacheReadRevision();
+  try {
+    return { directory, cached: await deps.read(serverId, deps.slicer), readRevision };
+  } catch (error) {
+    console.warn(`[HostRuntime] Failed to restore the cached directory of ${serverId}`, error);
+    return null;
   }
 }
 

@@ -334,11 +334,12 @@ the mode switch and search (the tab bar already says Home).
   loading is the skeleton, and the directory line appears only when a connected Host's list fails —
   a Host that drops is the connection notice's to say. The feed renders one frame after the
   header, composer and filters, so switching to Home paints the top of the page first.
-- **States**. Home, Chats and Workspace share `ListState`: the skeleton while a Host connects, one
-  offline line once no Host can be reached (`useHostsReachability`; Chats and Workspace add View
+- **States**. Home, Chats and Workspace share `ListState`: the skeleton while a Host connects and
+  nothing is held for it, one offline line once no Host can be reached (`useHostsReachability`; Chats and Workspace add View
   details, which opens the connection sheet), empty, and filtered-empty.
 - **Rows never blank.** Once a list has rows it does not go back to a skeleton, an empty state or
-  nothing for a refresh, a Bot change or a Host reconnecting. Bot and chat queries key on each
+  nothing for a refresh, a Bot change or a Host reconnecting. Rows restored from the device count:
+  a cold start lists them, cached, while their Hosts connect (`home-cached-sessions.spec.ts`). Bot and chat queries key on each
   Host's admission, so a managed Host's reconnect starts a new query; `useAggregatedQuery` holds each
   Host's last rows for display until that Host answers again (`holdAggregateRows`), while
   `acceptedServerIds` still proves only the current admission. Each Host's Bot/chat event feed restarts only on

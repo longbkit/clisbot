@@ -208,6 +208,7 @@ What the app does now:
 | One Host at a time       | rows parsed 100 per synchronous chunk, a macrotask between chunks and between Hosts             | `replica-cache/restore-slicer.ts`        |
 | Interval commits         | the first Host alone (the first cached frame), then what was read, at most every 400 ms         | same                                     |
 | No second read           | a refresh that loads a Host's cache waits for the restore instead of reading again              | `DirectorySync.adoptCacheRestore`        |
+| One Host's read fails    | the restore skips that Host and goes on; the skipped Host reads its own cache                   | `startup-restore.ts` (`readHost`)        |
 | Hidden tabs after settle | pre-mount waits until the restore is done and every restored Hub Host is online, or 10 s passed | `clisbot/home/after-startup.ts`          |
 | Empty live answer        | keeps the restored map; members without a placement still take the full path                    | `AgentDirectoryReplica.commitChanges`    |
 | Baseline save            | writes only rows whose payload changed; restored agents keep their payload                      | `ReplicaCache.materializePendingChanges` |
@@ -219,6 +220,9 @@ What the app does now:
   400 ms; the agent projection and Home feed are incremental, which keeps each pass short.
 - The first group is the first Host in registry order, not the Hosts Home shows first: Home's
   order is only known after every Host is parsed.
+- Before 2026-10-31 a read that threw (a storage error) ended the whole restore. Every Host after
+  it had already handed its cache load to the restore, so none read its cache again, and Home
+  listed none of their sessions until they connected.
 - `clisbot/hub/hub-cold-start.test.ts` restores the 14-Host fleet fixture
   (`replica-cache/cached-fleet-fixture.ts`, 486 rows per Host) with fake timers: all 14 connects
   are in flight before the first chunk, the restore runs in 72 chunks, and the Hosts still come
