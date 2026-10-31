@@ -76,6 +76,7 @@ export function buildConfigOverrides(record: StoredAgentRecord): Partial<AgentSe
     featureValues: record.config?.featureValues ?? undefined,
     providerOptions: record.config?.providerOptions ?? undefined,
     toolPolicy: record.config?.toolPolicy ?? undefined,
+    ...(record.config?.fullAutoAccept ? { fullAutoAccept: true } : {}),
     systemPrompt: record.config?.systemPrompt ?? undefined,
     mcpServers: record.config?.mcpServers ?? undefined,
   });
@@ -98,6 +99,7 @@ export function buildSessionConfig(
     featureValues: overrides.featureValues,
     providerOptions: overrides.providerOptions,
     toolPolicy: overrides.toolPolicy,
+    ...(overrides.fullAutoAccept ? { fullAutoAccept: true } : {}),
     systemPrompt: overrides.systemPrompt,
     mcpServers: overrides.mcpServers,
   });

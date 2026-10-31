@@ -3907,3 +3907,71 @@ test("model overrides preserve negotiated plugin capabilities and connection shu
     manager.destroy();
   }
 });
+
+describe("ProviderSnapshotManager Full auto-accept", () => {
+  const modes: AgentMode[] = [
+    { id: "auto", label: "Default Permissions" },
+    { id: "full-access", label: "Full Access", isUnattended: true },
+  ];
+
+  function createManager(): ProviderSnapshotManager {
+    return new ProviderSnapshotManager({
+      logger: createTestLogger(),
+      providerOverrides: {
+        claude: { enabled: false },
+        copilot: { enabled: false },
+        opencode: { enabled: false },
+        pi: { enabled: false },
+      },
+      extraClients: {
+        codex: createExtraClient("codex", {
+          async isAvailable() {
+            return true;
+          },
+          async fetchCatalog() {
+            return { models: [] as AgentModelDefinition[], modes };
+          },
+        }),
+      },
+    });
+  }
+
+  test("creates the agent in the provider's no-prompt mode with Full auto-accept on", async () => {
+    const manager = createManager();
+    try {
+      const resolved = await manager.resolveCreateConfig({
+        cwd: "/tmp/project",
+        provider: "codex",
+        requestedMode: "full-auto-accept",
+        featureValues: undefined,
+        parent: null,
+        unattended: false,
+      });
+      expect(resolved).toEqual({
+        modeId: "full-access",
+        featureValues: undefined,
+        fullAutoAccept: true,
+      });
+    } finally {
+      manager.destroy();
+    }
+  });
+
+  test("counts Full auto-accept as unattended for access checks", async () => {
+    const manager = createManager();
+    try {
+      const base = { provider: "codex", cwd: "/tmp/project" };
+      await expect(manager.isUnattendedConfiguration({ ...base, modeId: "auto" })).resolves.toBe(
+        false,
+      );
+      await expect(
+        manager.isUnattendedConfiguration({ ...base, modeId: "full-auto-accept" }),
+      ).resolves.toBe(true);
+      await expect(
+        manager.isUnattendedConfiguration({ ...base, modeId: "auto", fullAutoAccept: true }),
+      ).resolves.toBe(true);
+    } finally {
+      manager.destroy();
+    }
+  });
+});

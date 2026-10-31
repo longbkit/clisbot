@@ -136,6 +136,7 @@ export function toAgentPayload(
     updatedAt: agent.updatedAt.toISOString(),
     lastUserMessageAt: agent.lastUserMessageAt ? agent.lastUserMessageAt.toISOString() : null,
     status: agent.lifecycle,
+    ...fullAutoAcceptPayload(agent.config),
     activeTurn: agent.activeTurnId
       ? {
           turnId: agent.activeTurnId,
@@ -208,6 +209,13 @@ function buildStoredPersistenceHandle(
   return toAgentPersistenceHandle(validProviders, record.persistence);
 }
 
+/** The wire flag is written only when on, so older snapshots and clients stay unchanged. */
+function fullAutoAcceptPayload(config: { fullAutoAccept?: boolean } | null | undefined): {
+  fullAutoAccept?: true;
+} {
+  return config?.fullAutoAccept ? { fullAutoAccept: true } : {};
+}
+
 export function buildStoredAgentPayload(
   record: StoredAgentRecord,
   validProviders: Iterable<AgentProvider>,
@@ -251,6 +259,7 @@ export function buildStoredAgentPayload(
     updatedAt: updatedAt.toISOString(),
     lastUserMessageAt: lastUserMessageAt ? lastUserMessageAt.toISOString() : null,
     status: record.lastStatus,
+    ...fullAutoAcceptPayload(record.config),
     capabilities: defaultCapabilities,
     currentModeId: record.lastModeId ?? null,
     availableModes: [],
@@ -390,6 +399,9 @@ function buildSerializableConfig(config: AgentSessionConfig): SerializableAgentC
     if (providerOptions && isJsonObject(providerOptions)) {
       serializable.providerOptions = providerOptions;
     }
+  }
+  if (config.fullAutoAccept) {
+    serializable.fullAutoAccept = true;
   }
   if (config.toolPolicy) {
     serializable.toolPolicy = {

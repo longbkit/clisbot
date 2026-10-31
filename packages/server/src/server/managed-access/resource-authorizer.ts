@@ -1558,6 +1558,7 @@ function storedAgentConfig(record: StoredAgentRecord): AgentSessionConfig {
     ...(config?.featureValues ? { featureValues: config.featureValues } : {}),
     ...(config?.providerOptions ? { providerOptions: config.providerOptions } : {}),
     ...(config?.toolPolicy ? { toolPolicy: config.toolPolicy } : {}),
+    ...(config?.fullAutoAccept ? { fullAutoAccept: true } : {}),
     ...(config?.systemPrompt ? { systemPrompt: config.systemPrompt } : {}),
     ...(config?.mcpServers ? { mcpServers: config.mcpServers } : {}),
   };

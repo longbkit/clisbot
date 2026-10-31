@@ -632,6 +632,11 @@ export interface AgentSessionConfig {
   toolPolicy?: ToolPolicy;
   mcpServers?: Record<string, McpServerConfig>;
   /**
+   * Clisbot's Full auto-accept mode: the daemon approves tool permission requests while
+   * `modeId` stays the provider mode it runs on (see `full-auto-accept.ts`).
+   */
+  fullAutoAccept?: boolean;
+  /**
    * Internal agents are hidden from listings and don't trigger notifications.
    * They are used for ephemeral system tasks like commit/PR generation.
    */

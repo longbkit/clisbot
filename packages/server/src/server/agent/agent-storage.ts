@@ -37,6 +37,7 @@ const SERIALIZABLE_CONFIG_SCHEMA = z
     thinkingOptionId: z.string().nullable().optional(),
     featureValues: z.record(z.string(), z.unknown()).nullable().optional(),
     providerOptions: z.record(z.string(), z.unknown()).nullable().optional(),
+    fullAutoAccept: z.boolean().optional(),
     toolPolicy: z
       .object({
         preapproved: z.array(
@@ -112,6 +113,7 @@ export type SerializableAgentConfig = Pick<
   | "thinkingOptionId"
   | "featureValues"
   | "providerOptions"
+  | "fullAutoAccept"
   | "toolPolicy"
   | "systemPrompt"
   | "mcpServers"

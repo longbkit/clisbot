@@ -3,6 +3,12 @@ import {
   PendingEventBudgetError,
 } from "./session-storage/pending-event-budget.js";
 import { readConnectorsOff, skillsInOffList } from "@clisbot/protocol/connectors/types";
+import {
+  FULL_AUTO_ACCEPT_RESPONSE,
+  isFullAutoAcceptMode,
+  resolveFullAutoAcceptProviderMode,
+  shouldDaemonAutoAccept,
+} from "./full-auto-accept.js";
 import { CommittedEventOutbox } from "./session-storage/committed-event-outbox.js";
 import { currentSessionOperationIdentity } from "./session-operation-context.js";
 import { isDeepStrictEqual } from "node:util";
@@ -299,6 +305,7 @@ function buildStoredAgentConfig(record: StoredAgentRecord): AgentSessionConfig {
     config.providerOptions = record.config.providerOptions;
   }
   if (record.config.toolPolicy != null) config.toolPolicy = record.config.toolPolicy;
+  if (record.config.fullAutoAccept) config.fullAutoAccept = true;
   if (record.config.systemPrompt != null) {
     config.systemPrompt = record.config.systemPrompt;
   }
@@ -2648,15 +2655,24 @@ export class AgentManager {
 
   async setAgentMode(agentId: string, modeId: string): Promise<AgentProviderNotice | null> {
     const agent = this.requireSessionAgent(agentId);
-    const notice = (await agent.session.setMode(modeId)) ?? null;
+    const fullAutoAccept = isFullAutoAcceptMode(modeId);
+    const providerModeId = fullAutoAccept
+      ? resolveFullAutoAcceptProviderMode(agent.availableModes, agent.currentModeId)
+      : modeId;
+    const keepsProviderMode =
+      providerModeId === null || (fullAutoAccept && providerModeId === agent.currentModeId);
+    const notice = keepsProviderMode
+      ? null
+      : ((await agent.session.setMode(providerModeId)) ?? null);
     await this.drainSessionEvents(agentId);
-    const currentMode = (await agent.session.getCurrentMode()) ?? modeId;
+    const currentMode = (await agent.session.getCurrentMode()) ?? providerModeId;
     agent.config.modeId = currentMode ?? undefined;
     agent.currentModeId = currentMode;
     // Update runtimeInfo to reflect the new mode
     if (agent.runtimeInfo) {
       agent.runtimeInfo = { ...agent.runtimeInfo, modeId: currentMode };
     }
+    this.applyFullAutoAccept(agent, fullAutoAccept);
     this.refreshSessionPersistence(agent);
     this.touchUpdatedAt(agent);
     this.emitState(agent);
@@ -5720,6 +5736,8 @@ export class AgentManager {
         this.emitState(agent);
         return undefined;
       case "mode_changed":
+        // A provider leaving the mode Full auto-accept runs on ends Full auto-accept too.
+        if (event.currentModeId !== agent.currentModeId) this.applyFullAutoAccept(agent, false);
         this.applyObservedMode(agent, event.currentModeId);
         agent.availableModes = event.availableModes;
         if (agent.runtimeInfo) {
@@ -6063,10 +6081,36 @@ export class AgentManager {
     }
     agent.pendingPermissions.set(event.request.id, event.request);
     this.refreshSessionPersistence(agent);
-    if (!hadPendingPermissions && !agent.internal) {
+    const autoAccepted = shouldDaemonAutoAccept(agent.config, event.request);
+    if (!hadPendingPermissions && !agent.internal && !autoAccepted) {
       this.broadcastAgentAttention(agent, "permission");
     }
     this.emitState(agent);
+    if (autoAccepted) this.autoAcceptPermission(agent, event.request);
+  }
+
+  private applyFullAutoAccept(agent: ActiveManagedAgent, enabled: boolean): void {
+    if (!enabled) {
+      delete agent.config.fullAutoAccept;
+      return;
+    }
+    agent.config.fullAutoAccept = true;
+    for (const request of agent.pendingPermissions.values()) {
+      if (shouldDaemonAutoAccept(agent.config, request)) this.autoAcceptPermission(agent, request);
+    }
+  }
+
+  /** Answers for the user, through the same admission path as their own answer. */
+  private autoAcceptPermission(agent: ActiveManagedAgent, request: AgentPermissionRequest): void {
+    void this.respondToPermission(agent.id, request.id, FULL_AUTO_ACCEPT_RESPONSE, {
+      actor: this.getSystemActor("full-auto-accept", "Full auto-accept"),
+      receivedAt: new Date().toISOString(),
+    }).catch((error: unknown) => {
+      this.logger.warn(
+        { err: error, agentId: agent.id, requestId: request.id },
+        "Full auto-accept could not approve a permission request",
+      );
+    });
   }
 
   private onStreamPermissionResolved(params: {

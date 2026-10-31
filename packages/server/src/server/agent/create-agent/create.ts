@@ -15,7 +15,10 @@ import type { AgentManager, CreateAgentOptions, ManagedAgent } from "../agent-ma
 import type { AgentPromptInput, AgentRunOptions, AgentSessionConfig } from "../agent-sdk-types.js";
 import type { AgentStorage } from "../agent-storage.js";
 import type { AgentOwner } from "../agent-owner.js";
-import type { ProviderSnapshotManager } from "../provider-snapshot-manager.js";
+import type {
+  ProviderSnapshotManager,
+  ResolvedProviderCreateConfig,
+} from "../provider-snapshot-manager.js";
 import { startCreatedAgentInitialPrompt } from "../agent-prompt.js";
 import { resolveCreateAgentTitles } from "../create-agent-title.js";
 import { buildAgentPrompt } from "../prompt-attachments.js";
@@ -263,6 +266,7 @@ async function resolveSessionCreateAgent(
     ...builtSessionConfig,
     modeId: resolvedCreateConfig.modeId,
     featureValues: resolvedCreateConfig.featureValues,
+    ...(resolvedCreateConfig.fullAutoAccept ? { fullAutoAccept: true } : {}),
   };
   const prompt = buildAgentPrompt(trimmedPrompt ?? "", input.images, input.attachments);
   const hasPromptContent = Array.isArray(prompt) ? prompt.length > 0 : prompt.length > 0;
@@ -357,6 +361,7 @@ async function resolveMcpCreateAgent(
       trimmedPrompt,
       resolvedMode: resolvedCreateConfig.modeId,
       resolvedFeatures: resolvedCreateConfig.featureValues,
+      fullAutoAccept: resolvedCreateConfig.fullAutoAccept,
     }),
     createOptions: {
       ...(Object.keys(intent.labels).length > 0 ? { labels: intent.labels } : {}),
@@ -395,7 +400,7 @@ async function resolveMcpProviderCreateConfig(params: {
   provider: string;
   resolvedCwd: string;
   parentAgent: ManagedAgent | null;
-}): Promise<{ modeId?: string; featureValues?: Record<string, unknown> }> {
+}): Promise<ResolvedProviderCreateConfig> {
   const passthroughConfig = params.input.config;
   return params.dependencies.providerSnapshotManager.resolveCreateConfig({
     cwd: params.resolvedCwd,
@@ -415,6 +420,7 @@ function buildMcpSessionConfig(params: {
   trimmedPrompt: string;
   resolvedMode?: string;
   resolvedFeatures?: Record<string, unknown>;
+  fullAutoAccept?: true;
 }): AgentSessionConfig {
   const passthroughConfig = params.input.config;
   const { provisionalTitle } = resolveCreateAgentTitles({
@@ -430,6 +436,7 @@ function buildMcpSessionConfig(params: {
     model: params.resolvedProviderModel.model ?? passthroughConfig?.model,
     thinkingOptionId: params.input.thinking ?? passthroughConfig?.thinkingOptionId,
     internal: params.input.internal ?? passthroughConfig?.internal,
+    ...(params.fullAutoAccept ? { fullAutoAccept: true } : {}),
   };
   if (provisionalTitle) {
     config.title = provisionalTitle;

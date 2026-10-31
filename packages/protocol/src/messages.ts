@@ -988,6 +988,8 @@ export const AgentSnapshotPayloadSchema = z.object({
   providerUnavailable: z.boolean().optional(),
   // Private helper marker, retained for exact-ID snapshots and older wire messages.
   internal: z.boolean().optional(),
+  // Full auto-accept is on; currentModeId stays the provider mode it runs on.
+  fullAutoAccept: z.boolean().optional(),
 });
 
 export type AgentSnapshotPayload = z.infer<typeof AgentSnapshotPayloadSchema>;
@@ -3836,6 +3838,9 @@ export const ServerInfoStatusPayloadSchema = z
         // COMPAT(agentRequestReceipts): added in v0.8.0; remove gate after 2027-03-05.
         agentRequestReceipts: z.boolean().optional(),
         hostInputQueue: z.boolean().optional(),
+        // COMPAT(fullAutoAccept): added in v2.2.2; the app offers the Full auto-accept mode
+        // only when present. Remove the gate after 2027-05-01.
+        fullAutoAccept: z.boolean().optional(),
         // COMPAT(workspaceRequestReceipts): added in v0.8.0; remove gate after 2027-03-07.
         workspaceRequestReceipts: z.boolean().optional(),
         creationLifecycle: z.boolean().optional(),

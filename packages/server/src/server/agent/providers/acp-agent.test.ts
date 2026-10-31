@@ -1392,6 +1392,8 @@ describe("ACPAgentSession Zed parity", () => {
           { id: "q0_opt_1", label: "Protocol fix", behavior: "allow" },
           { id: "q0_skip", label: "Skip", behavior: "deny" },
         ],
+        // A choice waits for a person even under Full auto-accept.
+        metadata: { clisbotChoice: true },
       },
     });
     if (requested?.type !== "permission_requested") {
