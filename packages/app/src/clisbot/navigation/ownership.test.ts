@@ -214,7 +214,6 @@ describe("ownership evidence and cache", () => {
     for (const source of [
       {},
       { lastInteractionBy: own },
-      { participantActors: [teammate] },
       { lastMessageBy: { kind: "user" as const, id: "owner" } },
     ]) {
       expect(
@@ -224,6 +223,18 @@ describe("ownership evidence and cache", () => {
           participationKey: participationKeyOf(source),
         }),
       ).toBe("unknown");
+    }
+  });
+
+  it("gives a creatorless session to the verified teammates who took part, not the reader", () => {
+    // A subagent a teammate drives on a shared sandbox records no creator, only their messages.
+    const context = { accounts, hostKind: "hub" as const };
+    for (const source of [{ participantActors: [teammate] }, { lastMessageBy: teammate }]) {
+      const participationKey = participationKeyOf(source);
+      expect(resolveOwnership({ ...context, createdBy: undefined, participationKey })).toBe(
+        "others",
+      );
+      expect(inScope("mine", "others")).toBe(false);
     }
   });
 
@@ -281,9 +292,10 @@ describe("ownership evidence and cache", () => {
     expect(resolve(hub)).toBe("unknown");
     const participated = { ...hub, participationKey: participationKeyOf({ lastMessageBy: own }) };
     expect(resolve(participated)).toBe("mine");
+    // Another reader sees a creatorless session someone else took part in as theirs, not unknown.
     expect(
       resolve({ ...participated, accounts: [{ ...accounts[0], id: "u-2", memberId: "m-2" }] }),
-    ).toBe("unknown");
+    ).toBe("others");
     expect(resolve({ ...participated, hostKind: "unknown" })).toBe("unknown");
   });
 

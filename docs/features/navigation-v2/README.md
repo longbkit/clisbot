@@ -175,9 +175,11 @@ company Hub. On these Hosts:
 - Channel actors need a verified Member link; a provider id alone cannot match a Hub account.
   An unresolved reader or an actor from another Hub does not prove a relationship.
 - Without matching creator or participation evidence, a verified other user creator is **others**.
-  Missing creators, automation, system and unscoped user creators (including `LOCAL_OWNER`) are
-  **unknown** when participation also cannot prove a relationship. Neither titles nor a parent
-  workspace/chat author supply that evidence.
+- With no verified creator (missing, automation, system or an unscoped user, including
+  `LOCAL_OWNER`), a verified participant who is not the reader makes the item **others**: a subagent
+  a teammate drives on a shared sandbox records no creator, only that teammate's messages (Owner,
+  2026-10-31). Only when no verified person appears at all is it **unknown**. Neither titles nor a
+  parent workspace/chat author supply that evidence.
 
 A registered Host without a management binding keeps the previous direct-Host behavior for now:
 missing creators, automation, system and unscoped users are mine. This is a compatibility exception,

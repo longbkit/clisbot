@@ -41,12 +41,15 @@ function classify(input: OwnershipInput, keepDirectLegacy: boolean): Ownership {
   }
   const creatorOwnership = actor ? actorOwnership(actor, input.accounts) : "unknown";
   if (creatorOwnership === "mine") return "mine";
-  const participated =
-    input.participationKey &&
-    actorsFromParticipationKey(input.participationKey).some(
-      (participant) => actorOwnership(participant, input.accounts) === "mine",
-    );
-  return participated ? "mine" : creatorOwnership;
+  const participants = input.participationKey
+    ? actorsFromParticipationKey(input.participationKey).map((participant) =>
+        actorOwnership(participant, input.accounts),
+      )
+    : [];
+  if (participants.includes("mine")) return "mine";
+  if (creatorOwnership !== "unknown") return creatorOwnership;
+  // No creator, but verified people other than the reader did the work: it is theirs.
+  return participants.includes("others") ? "others" : "unknown";
 }
 
 /** One bounded resolver for every surface; reader arrays are immutable identity snapshots. */

@@ -108,13 +108,13 @@ describe("incremental ownership evidence", () => {
         participationKey: participationKeyOf({ lastMessageBy: other }),
       },
     ];
-    // Another person's message does not prove they own a session without a creator.
+    // With no creator, another verified person's message makes the session theirs.
     expect(counter([workspace], () => sessions, options).scopes).toEqual({
-      mine: 2,
-      others: 0,
+      mine: 1,
+      others: 1,
       all: 2,
     });
-    expect(resolved.at(-1)).toBe("unknown");
+    expect(resolved.at(-1)).toBe("others");
     sessions = sessions.map((session) => ({ ...session, participationKey: undefined }));
     expect(counter([workspace], () => sessions, options).scopes).toEqual({
       mine: 2,
