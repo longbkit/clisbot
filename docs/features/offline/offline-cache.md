@@ -121,6 +121,9 @@ still evicts sooner when needed.
 | Save window   | a tail is written only if opened in the last 7 days              | `ReplicaCache.tailSaveOpenedAt`      |
 | Age sweep     | tails not opened for 30 days, when the store is first used       | `ReplicaRowStore.deleteOpenedBefore` |
 
+A cold start restores the rows that are never evicted before any Host answers, so Home and Work
+list them while the Hosts connect ([cold-start JS thread](connection-resilience.md#cold-start-js-thread)).
+
 Reading a tail is opening it: `readTimeline` and `readChatTail` record the open, and the row
 stores it as `opened_at`. The schema moved to version 2 for that column and the `transcript`
 kind, so an upgrade rebuilds the cache once.

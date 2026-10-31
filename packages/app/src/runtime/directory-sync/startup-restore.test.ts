@@ -16,7 +16,12 @@ import {
 import { restoreCachedDirectories, type StartupRestoreTarget } from "./startup-restore";
 
 /** Records, in order, what the restore did and what else got the JS thread in between. */
-function harness(cache: ReplicaCache, events: string[] = [], now: () => number = Date.now) {
+function harness(
+  cache: ReplicaCache,
+  events: string[] = [],
+  now: () => number = Date.now,
+  failingRead?: string,
+) {
   const chunks: RestoreChunk[] = [];
   const loads: Array<Promise<void>> = [];
   const applied = new Map<string, number>();
@@ -45,6 +50,7 @@ function harness(cache: ReplicaCache, events: string[] = [], now: () => number =
   const run = restoreCachedDirectories(targets, {
     read: (serverId, chunked) => {
       events.push(`read:${serverId}`);
+      if (serverId === failingRead) return Promise.reject(new Error("database is locked"));
       return cache.readDirectory(serverId, chunked);
     },
     slicer,
@@ -155,6 +161,18 @@ describe("restoring the cached directories of 14 Hosts at startup", () => {
       expect(appliedHere.length).toBeLessThanOrEqual(2);
     }
     expect(applied.size).toBe(FLEET_HOSTS);
+  });
+
+  it("restores every other Host when one Host's cache cannot be read", async () => {
+    const failing = fleetServerIds()[2]!;
+    const { applied, run } = harness(cache, [], Date.now, failing);
+
+    await vi.runAllTimersAsync();
+    await run;
+
+    const others = fleetServerIds().filter((serverId) => serverId !== failing);
+    expect([...applied.keys()]).toEqual(others);
+    expect([...applied.values()]).toEqual(others.map(() => FLEET_AGENTS_PER_HOST));
   });
 
   it("holds every other load of a Host's cache until its restore is committed", async () => {
