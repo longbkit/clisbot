@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import pino from "pino";
@@ -112,6 +112,19 @@ describe("BotStore list cache", () => {
     await store.list();
     const added = { ...created, id: "bot_00000000000000aa", slug: "qa", name: "qa" };
     await writeFile(path.join(dir, `${added.id}.json`), JSON.stringify(added));
+    expect((await store.list()).map((bot) => bot.slug).sort()).toEqual(["ops", "qa"]);
+  });
+
+  it("rereads when a file is added and the directory's mtime does not move", async () => {
+    // NTFS can update a directory's mtime late, so the new name alone must invalidate the cache.
+    const { dir, store } = await createStore({ listCache: true });
+    const created = await store.create(record("ops"));
+    const fixed = new Date("2026-01-01T00:00:00.000Z");
+    await utimes(dir, fixed, fixed);
+    await store.list();
+    const added = { ...created, id: "bot_00000000000000ab", slug: "qa", name: "qa" };
+    await writeFile(path.join(dir, `${added.id}.json`), JSON.stringify(added));
+    await utimes(dir, fixed, fixed);
     expect((await store.list()).map((bot) => bot.slug).sort()).toEqual(["ops", "qa"]);
   });
 

@@ -38,7 +38,7 @@ export class BotStore {
   private reportedInvalidFiles = new Set<string>();
   /** Bumped by every write here, so a list read before the write is never served after it. */
   private generation = 0;
-  private listed: { generation: number; directoryMtimeNs: bigint; bots: StoredBot[] } | null = null;
+  private listed: { generation: number; directoryKey: string; bots: StoredBot[] } | null = null;
 
   constructor(
     private readonly dir: string,
@@ -60,29 +60,38 @@ export class BotStore {
 
   /**
    * Every record on disk, oldest first; a file that is not a bot is reported once and skipped.
-   * With the list cache on, a read is reused until a write here or a change of the directory's
-   * mtime (an added, removed or renamed-in file) (docs/features/agent-session-storage/cold-storage.md).
+   * With the list cache on, a read is reused until a write here or a change of the directory: its
+   * mtime or the names in it (an added, removed or renamed-in file). The names cover file systems
+   * that update a directory's mtime late, such as NTFS; reading them is cheap next to parsing
+   * every file (docs/features/agent-session-storage/cold-storage.md).
    */
   async list(): Promise<StoredBot[]> {
     if (!this.options.listCache) return this.readAll();
     const generation = this.generation;
-    const directoryMtimeNs = await this.directoryMtimeNs();
+    const directoryKey = await this.directoryKey();
     const cached = this.listed;
-    if (cached?.generation === generation && cached.directoryMtimeNs === directoryMtimeNs)
+    if (cached?.generation === generation && cached.directoryKey === directoryKey)
       return [...cached.bots];
     const bots = await this.readAll();
-    this.listed = { generation, directoryMtimeNs, bots };
+    this.listed = { generation, directoryKey, bots };
     return [...bots];
   }
 
-  private async directoryMtimeNs(): Promise<bigint> {
-    return stat(this.dir, { bigint: true }).then(
-      (stats) => stats.mtimeNs,
-      (error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return -1n;
+  private async directoryKey(): Promise<string> {
+    const [mtimeNs, names] = await Promise.all([
+      stat(this.dir, { bigint: true }).then(
+        (stats) => stats.mtimeNs,
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return -1n;
+          throw error;
+        },
+      ),
+      readdir(this.dir).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return [];
         throw error;
-      },
-    );
+      }),
+    ]);
+    return `${mtimeNs}\n${names.sort().join("\n")}`;
   }
 
   private async readAll(): Promise<StoredBot[]> {

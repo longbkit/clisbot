@@ -35,8 +35,10 @@ A record is **cold** when cold storage is on, the record is not internal, and it
   provider ids, because a stored payload depends on provider availability. Callers receive a
   shallow copy.
 - **Bot list cache.** `BotStore.list` reuses its last read until a write through the store or a
-  change of the `bots/` directory mtime (a file added, removed or renamed in). Writes through the
-  daemon go through the store, and `writeJsonFileAtomic` renames into the directory.
+  change of the `bots/` directory: its mtime or the file names in it (a file added, removed or
+  renamed in). The names matter on NTFS, which can update a directory's mtime late; Windows CI
+  missed an added file on the mtime alone. Writes through the daemon go through the store, and
+  `writeJsonFileAtomic` renames into the directory.
 
 Why a cold record may skip the startup probe: the probe repairs a record whose authorship lags its
 log after a crash between the two writes. A record goes cold only after `coldAfterDays` without a
