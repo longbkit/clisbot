@@ -1,4 +1,9 @@
-import { actorsFromParticipationKey, ownershipKey, type OwnershipKeyInput } from "./ownership-key";
+import {
+  actorsFromParticipationKey,
+  hasVerifiedEvidence,
+  ownershipKey,
+  type OwnershipKeyInput,
+} from "./ownership-key";
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { isOwnActor, type HubAccountIdentity } from "@/clisbot/session-storage/actor-presentation";
 
@@ -34,6 +39,14 @@ function actorOwnership(actor: SessionActor, accounts: readonly ReaderAccount[])
 function classify(input: OwnershipInput, keepDirectLegacy: boolean): Ownership {
   if (input.hostKind === "unknown") return "unknown";
   if (input.watched) return "mine";
+  // A session no verified person appears in, such as a subagent, is its parent's.
+  if (input.inheritedOwnership && !hasVerifiedEvidence(input)) {
+    const { createdBy, participationKey } = input.inheritedOwnership;
+    return classify(
+      { ...input, createdBy, participationKey, inheritedOwnership: undefined },
+      keepDirectLegacy,
+    );
+  }
   const actor = input.createdBy;
   if (keepDirectLegacy && input.hostKind === "direct") {
     if (input.directOwner !== undefined) return input.directOwner ? "mine" : "others";

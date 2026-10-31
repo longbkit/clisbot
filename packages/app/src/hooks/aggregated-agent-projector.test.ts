@@ -168,3 +168,24 @@ it("projects all participant identities once per immutable source without compar
   const changed = agent({ ...renamed, participantActors: [own] });
   expect(project(input(changed, authored))).not.toBe(first);
 });
+
+it("re-projects a creatorless subagent when only its parent's evidence changes", () => {
+  const project = createAggregatedAgentProjector();
+  const hub = "https://hub.example";
+  const me = { kind: "user" as const, id: "me", hubOrigin: hub, memberId: "m-me" };
+  const teammate = { kind: "user" as const, id: "u-2", hubOrigin: hub, memberId: "m-2" };
+  const parent = agent({ id: "parent", createdBy: me });
+  const child = agent({ id: "child", parentAgentId: "parent" });
+  const unrelated = agent({ id: "unrelated" });
+  const first = project(input(parent, child, unrelated));
+  const firstChild = first.find((row) => row.id === "child")!;
+  expect(firstChild.inheritedOwnership?.createdBy).toBe(me);
+  expect(first.find((row) => row.id === "parent")!.inheritedOwnership).toBeUndefined();
+  // The child's own source is the same object; only its parent changed hands.
+  const next = project(input({ ...parent, createdBy: teammate }, child, unrelated));
+  const nextChild = next.find((row) => row.id === "child")!;
+  expect(nextChild).not.toBe(firstChild);
+  expect(nextChild.inheritedOwnership?.createdBy).toBe(teammate);
+  const unrelatedRow = (rows: typeof first) => rows.find((row) => row.id === "unrelated");
+  expect(unrelatedRow(next)).toBe(unrelatedRow(first));
+});

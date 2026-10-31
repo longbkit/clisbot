@@ -10,7 +10,7 @@ import {
   type ReaderAccount,
 } from "./ownership";
 import type { WorkChip } from "./store";
-import { ownershipKey } from "./ownership-key";
+import { ownershipEvidenceKey, ownershipKey, type OwnershipEvidence } from "./ownership-key";
 
 /**
  * A session is Chat iff it carries a Bot label; everything else is Work. Home's mode, the
@@ -27,6 +27,7 @@ export interface WorkSession {
   labels?: Record<string, unknown> | null;
   createdBy?: SessionActor;
   participationKey?: string;
+  inheritedOwnership?: OwnershipEvidence;
   statusBucket: string;
   /** Its live state was dropped (the source is out of reach): unknown, so not Running or Done. */
   unverified?: boolean;
@@ -68,6 +69,7 @@ export interface WorkItem {
   key: string;
   createdBy?: SessionActor;
   participationKey?: string;
+  inheritedOwnership?: OwnershipEvidence;
   statusBucket: string;
   unverified?: boolean;
 }
@@ -106,6 +108,7 @@ export function workItemsOf(
             key: `${workspace.workspaceKey}:${session.id}`,
             createdBy: session.createdBy,
             participationKey: session.participationKey,
+            inheritedOwnership: session.inheritedOwnership,
             statusBucket: session.statusBucket,
             ...(session.unverified ? { unverified: true } : {}),
           },
@@ -135,6 +138,7 @@ export function workItemPasses(item: WorkItem, query: WorkQuery, serverId: strin
   const ownership = resolveOwnership({
     createdBy: item.createdBy,
     participationKey: item.participationKey,
+    inheritedOwnership: item.inheritedOwnership,
     accounts: query.accounts,
     hostKind: query.hostKinds.get(serverId) ?? "unknown",
   });
@@ -167,6 +171,7 @@ export function createWorkFilter(query: WorkQuery, sessionsOf: WorkSessionsOf): 
           key: session.id,
           createdBy: session.createdBy,
           participationKey: session.participationKey,
+          inheritedOwnership: session.inheritedOwnership,
           statusBucket: session.statusBucket,
           unverified: session.unverified,
         },
@@ -204,6 +209,7 @@ function countWorkWithOwnership(
       const ownership = ownershipOf({
         createdBy: item.createdBy,
         participationKey: item.participationKey,
+        inheritedOwnership: item.inheritedOwnership,
         accounts,
         hostKind: query.hostKinds.get(workspace.serverId) ?? "unknown",
       });
@@ -253,6 +259,8 @@ export function createWorkCounter(resolve: OwnershipResolver = resolveOwnership)
         item.unverified === other.unverified &&
         sameActor(item.createdBy, other.createdBy) &&
         item.participationKey === other.participationKey &&
+        ownershipEvidenceKey(item.inheritedOwnership) ===
+          ownershipEvidenceKey(other.inheritedOwnership) &&
         (showBots || isChatSession(item) === isChatSession(other))
       );
     });

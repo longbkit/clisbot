@@ -38,12 +38,15 @@ import { useNavigationAgents } from "./use-navigation-agents";
 
 const MINUTE = 60_000;
 
+type OwnedAgent = Pick<
+  AggregatedAgent,
+  "serverId" | "createdBy" | "participationKey" | "inheritedOwnership"
+>;
+
 interface NavigationActivity {
   rows: HomeRow[];
   badge: number;
-  ownershipOf: (
-    agent: Pick<AggregatedAgent, "serverId" | "createdBy" | "participationKey">,
-  ) => Ownership;
+  ownershipOf: (agent: OwnedAgent) => Ownership;
   /** Author lookup for a workspace, the source of ownership for Work rows and pins. */
   workspaceAuthor: (serverId: string, workspaceId: string) => SessionActor | undefined;
   markSeen: (agent: AggregatedAgent) => void;
@@ -225,10 +228,11 @@ function useOwnership() {
     [serverIds, workspaceMaps],
   );
   const ownershipOf = useCallback(
-    (agent: Pick<AggregatedAgent, "serverId" | "createdBy" | "participationKey">): Ownership =>
+    (agent: OwnedAgent): Ownership =>
       resolveOwnership({
         createdBy: agent.createdBy,
         participationKey: agent.participationKey,
+        inheritedOwnership: agent.inheritedOwnership,
         accounts,
         hostKind: hostKinds.get(agent.serverId) ?? "unknown",
       }),

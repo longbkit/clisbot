@@ -1,9 +1,17 @@
 import type { SessionActor, SessionAuthorship } from "@clisbot/protocol/session-authorship";
 import type { ReaderAccount } from "./ownership";
 
+/** Who a session's ownership is judged by: its creator and its already loaded senders. */
+export interface OwnershipEvidence {
+  createdBy?: SessionActor | null;
+  participationKey?: string;
+}
+
 export interface OwnershipKeyInput {
   createdBy: SessionActor | null | undefined;
   participationKey?: string;
+  /** The nearest ancestor's evidence; decides only when this session names no verified person. */
+  inheritedOwnership?: OwnershipEvidence;
   accounts: readonly ReaderAccount[];
   hostKind: "direct" | "hub" | "unknown";
   watched?: boolean;
@@ -21,6 +29,19 @@ function actorIdentity(actor: SessionActor) {
     actor.hubIdentity,
     actor.connectionId,
   ];
+}
+
+/** A Hub-stamped person: the only actor whose presence can place a session. */
+export function isVerifiedPerson(actor: SessionActor | null | undefined): boolean {
+  return actor?.kind === "user" && Boolean(actor.hubOrigin || actor.hubIdentity);
+}
+
+/** Whether `evidence` names a verified person, whoever is reading. */
+export function hasVerifiedEvidence(evidence: OwnershipEvidence): boolean {
+  if (isVerifiedPerson(evidence.createdBy)) return true;
+  return evidence.participationKey
+    ? actorsFromParticipationKey(evidence.participationKey).some(isVerifiedPerson)
+    : false;
 }
 
 const participationKeys = new WeakMap<SessionAuthorship, string | undefined>();
@@ -71,5 +92,15 @@ export function ownershipKey(input: OwnershipKeyInput): string {
     input.hostKind,
     input.watched === true,
     input.directOwner,
+    ownershipEvidenceKey(input.inheritedOwnership),
+  ]);
+}
+
+/** Identity of `evidence`, so equal evidence from replaced sources compares equal. */
+export function ownershipEvidenceKey(evidence: OwnershipEvidence | undefined): string | undefined {
+  if (!evidence) return undefined;
+  return JSON.stringify([
+    evidence.createdBy ? actorIdentity(evidence.createdBy) : null,
+    evidence.participationKey,
   ]);
 }

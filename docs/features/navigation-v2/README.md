@@ -160,7 +160,7 @@ lines are dimmed and the percent gets a `~` prefix.
 
 ## For me / Others / All
 
-`resolveOwnership({ createdBy, participationKey, accounts, hostKind, watched })` is the shared
+`resolveOwnership({ createdBy, participationKey, inheritedOwnership, accounts, hostKind, watched })` is the shared
 predicate for Home (including its badge), Chats, Workspace, pin tags, search and tab counts.
 It returns `mine`, `others` or `unknown`.
 
@@ -178,8 +178,15 @@ company Hub. On these Hosts:
 - With no verified creator (missing, automation, system or an unscoped user, including
   `LOCAL_OWNER`), a verified participant who is not the reader makes the item **others**: a subagent
   a teammate drives on a shared sandbox records no creator, only that teammate's messages (Owner,
-  2026-10-31). Only when no verified person appears at all is it **unknown**. Neither titles nor a
-  parent workspace/chat author supply that evidence.
+  2026-10-31). Neither titles nor a parent workspace/chat author supply that evidence.
+- A session that names no verified person at all (no verified creator, no verified participant)
+  takes the ownership of its **parent agent** on the same Host (`Agent.parentAgentId`, from the
+  `clisbot.parent-agent-id` label): the nearest ancestor within 8 levels that names a verified
+  person decides, by the rules above (Owner, 2026-10-31). A subagent records no creator and its
+  messages come from the parent agent, so without this it sat under the reader's For me while a
+  teammate drove its parent. A session's own verified evidence always wins over its parent's. A
+  parent that is not loaded, a chain with no evidence, a cycle or a deeper chain leaves it
+  **unknown**. Inheritance comes before the direct-Host exception below.
 
 A registered Host without a management binding keeps the previous direct-Host behavior for now:
 missing creators, automation, system and unscoped users are mine. This is a compatibility exception,
@@ -247,6 +254,16 @@ accounts identity and Host kind); changing a binding or reader invalidates the r
 caches retain immutable source identities and compute participant identities once per source;
 profile-only changes do not alter the key. Workspace count caches compare participation even
 when a creator exists.
+
+Every surface builds a session's evidence with `agentOwnershipEvidence(agent, hostAgents)`
+(`clisbot/navigation/ownership-inheritance.ts`), which adds the parent's evidence as
+`inheritedOwnership`; the resolver uses it only when the session's own evidence names nobody, and
+`ownershipKey` includes it. The projector stores it on the row and re-projects a creatorless
+subagent whose parent's evidence moved even when the subagent's own source did not; only sessions
+with a `parentAgentId` are walked. The Work index rebuilds a root-agent list holding a subagent when
+the Host's map changes, because the store keeps that list's identity when only the parent changed.
+Surfaces that hold one session without its Host's map (sidebar session lines, pinned rows, pin
+tags) read the map from the session store when they evaluate (`stored-ownership-evidence.ts`).
 
 A chat's participation key is cached on its payload (`clisbot/navigation/chat-ownership.ts`), so
 Home's pin tags and the Chats pane derive it once between them. It is recomputed only when the
