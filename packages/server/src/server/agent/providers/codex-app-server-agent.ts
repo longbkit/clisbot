@@ -366,7 +366,7 @@ function restoreCodexModes(input: {
   }
   // A record written by a daemon that shows Plan as a mode always carries permissionModeId,
   // so its modeId is authoritative and a leftover plan_mode flag is ignored.
-  // COMPAT(codex-plan-mode-feature): added after v2.2.1, remove after 2027-05-01 once sessions saved with featureValues.plan_mode have been resumed.
+  // COMPAT(codex-plan-mode-feature): added in v2.2.2, remove after 2027-05-01 once sessions saved with featureValues.plan_mode have been resumed.
   const legacyPlan =
     !(input.metadata && "permissionModeId" in input.metadata) &&
     input.featureValues?.plan_mode === true;
@@ -3977,7 +3977,7 @@ export class CodexAppServerAgentSession implements AgentSession {
   }
 
   private applyPlanMode(enabled: boolean): void {
-    // COMPAT(codex-plan-mode-feature): added after v2.2.1, remove after 2027-05-01 with restoreCodexModes' legacy flag.
+    // COMPAT(codex-plan-mode-feature): added in v2.2.2, remove after 2027-05-01 with restoreCodexModes' legacy flag.
     if (this.config.featureValues && "plan_mode" in this.config.featureValues) {
       const { plan_mode: _legacyPlan, ...featureValues } = this.config.featureValues;
       this.config.featureValues = featureValues;
@@ -4816,7 +4816,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       this.cachedRuntimeInfo = null;
       return;
     }
-    // COMPAT(codex-plan-mode-feature): added after v2.2.1, remove after 2027-05-01 once apps select the Plan mode.
+    // COMPAT(codex-plan-mode-feature): added in v2.2.2, remove after 2027-05-01 once apps select the Plan mode.
     if (featureId === "plan_mode") {
       if (value && !this.hasPlanCollaborationMode()) {
         throw new Error("This Codex version does not offer a plan collaboration mode");

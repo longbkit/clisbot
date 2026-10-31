@@ -20,6 +20,15 @@ import {
 } from "./codex/test-utils/fake-app-server.js";
 
 const logger = createTestLogger();
+// Plan is a Codex mode only when the app server offers a plan collaboration mode.
+const PLAN_COLLABORATION = {
+  "collaborationMode/list": () => ({
+    data: [
+      { name: "Default", mode: "default" },
+      { name: "Plan", mode: "plan" },
+    ],
+  }),
+};
 
 interface PendingPlanLifecycle {
   close(): Promise<void>;
@@ -31,7 +40,7 @@ async function withPendingPlan(
   runScenario: (plan: PendingPlanLifecycle) => Promise<void>,
 ): Promise<void> {
   const workdir = mkdtempSync(join(tmpdir(), "codex-plan-cancel-"));
-  const appServer = createFakeCodexAppServer();
+  const appServer = createFakeCodexAppServer(PLAN_COLLABORATION);
   const client = new ProcessExitCodexClient([appServer]);
   const session = await client.createSession({
     provider: "codex",
@@ -509,8 +518,8 @@ test("provider permissions do not survive an unexpected exit and reconnect", asy
 
 test("idle provider exit preserves a synthetic plan approval across reconnect", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "codex-process-plan-exit-"));
-  const exitedAppServer = createFakeCodexAppServer();
-  const replacementAppServer = createFakeCodexAppServer();
+  const exitedAppServer = createFakeCodexAppServer(PLAN_COLLABORATION);
+  const replacementAppServer = createFakeCodexAppServer(PLAN_COLLABORATION);
   const manager = new AgentManager({
     clients: {
       codex: new ProcessExitCodexClient([exitedAppServer, replacementAppServer]),
