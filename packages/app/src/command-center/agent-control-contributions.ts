@@ -9,7 +9,6 @@ import { formatAgentModeLabel, formatThinkingOptionLabel } from "@/agent-control
 import {
   FAST_MODE_FEATURE_ID,
   isPlanningAgentMode,
-  PLAN_MODE_FEATURE_ID,
   resolveNonPlanningModeId,
 } from "@/agent-controls/policy";
 import type { CommandCenterContribution, CommandCenterIcon } from "./contributions";
@@ -242,20 +241,8 @@ function toggleChoices(input: {
 }
 
 function buildPlanModeGroup(source: AgentControlContributionSource): CommandCenterChoiceGroup {
-  const planFeature = source.features.list.find(
-    (feature) => feature.id === PLAN_MODE_FEATURE_ID && feature.type === "toggle",
-  );
   let choices: CommandCenterChoice[] = [];
-  if (planFeature?.type === "toggle") {
-    choices = toggleChoices({
-      source,
-      key: "plan",
-      icon: source.icons.feature(planFeature),
-      isOn: planFeature.value,
-      turnOn: () => source.features.set(PLAN_MODE_FEATURE_ID, true),
-      turnOff: () => source.features.set(PLAN_MODE_FEATURE_ID, false),
-    });
-  } else if (source.modes) {
+  if (source.modes) {
     const modes = source.modes;
     const planMode = modes.options.find(isPlanningAgentMode);
     const offModeId = resolveNonPlanningModeId(modes.options, modes.defaultModeId);

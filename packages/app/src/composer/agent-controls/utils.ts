@@ -4,13 +4,12 @@ import { formatThinkingOptionLabel } from "@/agent-controls/labels";
 import {
   AUTO_ACCEPT_FEATURE_ID,
   FAST_MODE_FEATURE_ID,
-  PLAN_MODE_FEATURE_ID,
   SPEED_FEATURE_ID,
 } from "@/agent-controls/policy";
 import { hexColorWithAlpha } from "@/utils/color";
 
 export type ExplainedAgentControl = "mode" | "model" | "thinking";
-export type FeatureHighlightColor = "blue" | "default" | "green" | "yellow";
+export type FeatureHighlightColor = "default" | "green" | "yellow";
 export type AgentControlHintKey =
   | "agentControls.hints.thinking"
   | "agentControls.hints.model"
@@ -61,8 +60,6 @@ export function getFeatureHighlightColor(featureId: string): FeatureHighlightCol
       return "yellow";
     case AUTO_ACCEPT_FEATURE_ID:
       return "green";
-    case PLAN_MODE_FEATURE_ID:
-      return "blue";
     default:
       return "default";
   }
@@ -74,13 +71,6 @@ export interface FeatureTogglePalette {
   statusDotSuccess: string;
   statusDotWarning: string;
   foregroundMuted: string;
-  palette: {
-    blue: {
-      400: string;
-      500: string;
-      600: string;
-    };
-  };
 }
 
 export interface FeatureToggleAppearance {
@@ -94,7 +84,6 @@ export function getFeatureToggleAppearance(
   featureId: string,
   enabled: boolean,
   colors: FeatureTogglePalette,
-  colorScheme: "light" | "dark" = "light",
 ): FeatureToggleAppearance {
   if (!enabled) {
     return { iconColor: colors.foregroundMuted };
@@ -111,16 +100,6 @@ export function getFeatureToggleAppearance(
         iconColor: colors.statusWarning,
         backgroundColor: hexColorWithAlpha(colors.statusDotWarning, SELECTED_CHIP_ALPHA),
       };
-    case "blue": {
-      const iconColor =
-        colorScheme === "dark" ? colors.palette.blue[400] : colors.palette.blue[600];
-      const fillColor =
-        colorScheme === "dark" ? colors.palette.blue[400] : colors.palette.blue[500];
-      return {
-        iconColor,
-        backgroundColor: hexColorWithAlpha(fillColor, SELECTED_CHIP_ALPHA),
-      };
-    }
     default:
       return { iconColor: colors.foregroundMuted };
   }

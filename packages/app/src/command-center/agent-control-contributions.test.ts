@@ -128,6 +128,12 @@ const CLAUDE_MODES: AgentMode[] = [
   { id: "acceptEdits", label: "Accept File Edits" },
 ];
 
+const CODEX_MODES: AgentMode[] = [
+  { id: "plan", label: "Plan", colorTier: "planning" },
+  { id: "auto", label: "Default Permissions" },
+  { id: "full-access", label: "Full Access" },
+];
+
 describe("Command Center agent-control contributions", () => {
   it("omits mode-derived choices when no mode control is available", () => {
     const contributions = buildAgentControlContributions({
@@ -140,7 +146,7 @@ describe("Command Center agent-control contributions", () => {
 
     const groups = contributions.map((contribution) => contribution.group);
     expect(groups).toContain("models");
-    expect(groups).toContain("plan-mode");
+    expect(groups).not.toContain("plan-mode");
     expect(groups).not.toContain("modes");
   });
 
@@ -314,27 +320,32 @@ describe("Command Center agent-control contributions", () => {
     expect(selections).toEqual(["default"]);
   });
 
-  it("prefers the plan_mode feature and reads its canonical value", () => {
-    const calls: [string, unknown][] = [];
+  it("reads Plan from the Mode list and ignores a plan_mode feature", () => {
+    const featureCalls: [string, unknown][] = [];
+    const selections: string[] = [];
     const contributions = buildAgentControlContributions(
       makeSource({
         modes: {
-          options: CLAUDE_MODES,
-          selectedId: "default",
-          defaultModeId: "default",
+          options: CODEX_MODES,
+          selectedId: "full-access",
+          defaultModeId: "auto",
+          select: (id) => {
+            selections.push(id);
+          },
         },
         features: {
           list: [toggleFeature("plan_mode", true, "list-todo")],
           set: (id, value) => {
-            calls.push([id, value]);
+            featureCalls.push([id, value]);
           },
         },
       }),
     ).filter((contribution) => contribution.group === "plan-mode");
 
-    expect(contributions.map(selected)).toEqual([true, false]);
-    contributions[1].run();
-    expect(calls).toEqual([["plan_mode", false]]);
+    expect(contributions.map(selected)).toEqual([false, true]);
+    contributions[0].run();
+    expect(selections).toEqual(["plan"]);
+    expect(featureCalls).toEqual([]);
   });
 
   it("publishes Fast only for an available toggle and ignores unrelated features", () => {

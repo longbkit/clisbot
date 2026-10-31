@@ -74,7 +74,15 @@ const CLAUDE_MODES: AgentProviderModeDefinition[] = [
   },
 ];
 
+// The daemon lists Plan only when the running Codex offers a plan collaboration mode.
 const CODEX_MODES: AgentProviderModeDefinition[] = [
+  {
+    id: "plan",
+    label: "Plan",
+    description: "Plan the work with Codex's plan collaboration mode before changing anything.",
+    icon: "ShieldEllipsis",
+    colorTier: "planning",
+  },
   {
     id: "auto",
     label: "Default Permissions",

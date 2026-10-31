@@ -2657,6 +2657,7 @@ export class AgentManager {
     if (agent.runtimeInfo) {
       agent.runtimeInfo = { ...agent.runtimeInfo, modeId: currentMode };
     }
+    this.refreshSessionPersistence(agent);
     this.touchUpdatedAt(agent);
     this.emitState(agent);
     return notice;
@@ -5724,6 +5725,7 @@ export class AgentManager {
         if (agent.runtimeInfo) {
           agent.runtimeInfo = { ...agent.runtimeInfo, modeId: event.currentModeId };
         }
+        this.refreshSessionPersistence(agent);
         flags.shouldDispatchEvent = false;
         this.emitState(agent);
         return undefined;

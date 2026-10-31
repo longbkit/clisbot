@@ -52,7 +52,8 @@ describe("feature metadata helpers", () => {
     expect(getFeatureHighlightColor("fast_mode")).toBe("yellow");
     expect(getFeatureHighlightColor("auto_accept")).toBe("green");
     expect(getFeatureHighlightColor("service_tier")).toBe("yellow");
-    expect(getFeatureHighlightColor("plan_mode")).toBe("blue");
+    // Plan is a mode on every provider; an old daemon's plan_mode toggle gets no plan styling.
+    expect(getFeatureHighlightColor("plan_mode")).toBe("default");
     expect(getFeatureHighlightColor("other")).toBe("default");
   });
 
@@ -63,9 +64,6 @@ describe("feature metadata helpers", () => {
       statusDotSuccess: "#299f51",
       statusDotWarning: "#b37824",
       foregroundMuted: "#71717a",
-      palette: {
-        blue: { 400: "#60a5fa", 500: "#3b82f6", 600: "#2563eb" },
-      },
     };
 
     expect(getFeatureToggleAppearance("auto_accept", false, colors)).toEqual({

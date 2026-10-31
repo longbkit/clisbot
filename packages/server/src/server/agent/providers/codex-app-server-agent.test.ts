@@ -6690,10 +6690,11 @@ describe("Codex app-server provider", () => {
 
     expect(asInternals(session).serviceTier).toBe("fast");
     expect(asInternals(session).planModeEnabled).toBe(false);
-    expect(asInternals(session).config.featureValues).toEqual({
-      plan_mode: false,
-      fast_mode: true,
-    });
+    expect(asInternals(session).config.featureValues).toEqual({ fast_mode: true });
+    await expect(session.getCurrentMode()).resolves.toBe("auto");
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "mode_changed", provider: "codex", currentModeId: "auto" }),
+    );
     // The session returns the follow-up prompt instead of calling startTurn directly.
     // The caller (session/agent-manager) is responsible for sending it through streamAgent.
     expect(result).toBeDefined();
@@ -6744,10 +6745,7 @@ describe("Codex app-server provider", () => {
 
     expect(asInternals(session).serviceTier).toBeNull();
     expect(asInternals(session).planModeEnabled).toBe(false);
-    expect(asInternals(session).config.featureValues).toEqual({
-      plan_mode: false,
-      fast_mode: false,
-    });
+    expect(asInternals(session).config.featureValues).toEqual({ fast_mode: false });
     expect(result?.followUpPrompt).toEqual(
       expect.stringContaining("The user approved the plan. Implement it now."),
     );

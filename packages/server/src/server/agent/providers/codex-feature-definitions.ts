@@ -1,4 +1,4 @@
-import type { AgentFeature, AgentFeatureToggle } from "../agent-sdk-types.js";
+import type { AgentFeature } from "../agent-sdk-types.js";
 
 import { z } from "zod";
 
@@ -29,26 +29,12 @@ function buildCodexSpeedFeature(tiers: CodexServiceTier[], value: string): Agent
   ];
 }
 
-export const CODEX_PLAN_MODE_FEATURE: Omit<AgentFeatureToggle, "value"> = {
-  type: "toggle",
-  id: "plan_mode",
-  label: "Plan",
-  description: "Switch Codex into planning-only collaboration mode",
-  tooltip: "Toggle plan mode",
-  icon: "list-todo",
-};
-
+// Plan is a Codex mode, not a feature; see CODEX_PLAN_MODE in codex-app-server-agent.ts.
 export function buildCodexFeatures(input: {
   serviceTiers: CodexServiceTier[];
   serviceTier: string;
-  planModeEnabled: boolean;
-  planModeAvailable?: boolean;
 }): AgentFeature[] {
-  const features = buildCodexSpeedFeature(input.serviceTiers, input.serviceTier);
-  if (input.planModeAvailable !== false) {
-    features.push({ ...CODEX_PLAN_MODE_FEATURE, value: input.planModeEnabled });
-  }
-  return features;
+  return buildCodexSpeedFeature(input.serviceTiers, input.serviceTier);
 }
 
 export function readCodexServiceTier(values: Record<string, unknown> | undefined): string | null {

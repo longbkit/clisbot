@@ -30,7 +30,12 @@ function respond(method, params) {
     case "config/read":
       return { config: { model: models[0].id, model_reasoning_effort: "medium" } };
     case "collaborationMode/list":
-      return { data: [] };
+      return {
+        data: [
+          { name: "Default", mode: "default" },
+          { name: "Plan", mode: "plan" },
+        ],
+      };
     case "skills/list":
       return { data: [] };
     case "thread/list":

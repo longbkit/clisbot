@@ -221,14 +221,9 @@ function getModeProviderDefinitions(modeControl: AgentModeControlValue | null) {
 function getToggleAppearance(
   featureId: string,
   enabled: boolean,
-  theme: { colorScheme?: string; colors: FeatureTogglePalette },
+  theme: { colors: FeatureTogglePalette },
 ) {
-  return getFeatureToggleAppearance(
-    featureId,
-    enabled,
-    theme.colors,
-    theme.colorScheme === "dark" ? "dark" : "light",
-  );
+  return getFeatureToggleAppearance(featureId, enabled, theme.colors);
 }
 
 type ActiveSheet = "thinking" | "features" | null;
