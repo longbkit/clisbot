@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import type { GestureResponderEvent } from "react-native";
 import { Plus, Server, Settings } from "lucide-react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -18,11 +19,7 @@ import {
 import { ManagedAccessIcon } from "@/hosts/managed-access-icon";
 import { orderHostsLocalFirst } from "@/types/host-connection";
 import { formatConnectionStatus } from "@/utils/daemons";
-import {
-  ADD_HOST_OPTION_ID,
-  ALL_HOSTS_OPTION_ID,
-  ENABLE_BUILT_IN_DAEMON_OPTION_ID,
-} from "./host-picker-constants";
+import { ALL_HOSTS_OPTION_ID, ENABLE_BUILT_IN_DAEMON_OPTION_ID } from "./host-picker-constants";
 
 export {
   ADD_HOST_OPTION_ID,
@@ -194,8 +191,7 @@ export function HostPickerOption({
   );
 }
 
-const SYSTEM_HOST_PICKER_OPTION_LABELS: Record<"add" | "all" | "enableBuiltInDaemon", string> = {
-  add: "Add host",
+const SYSTEM_HOST_PICKER_OPTION_LABELS: Record<"all" | "enableBuiltInDaemon", string> = {
   all: "All hosts",
   enableBuiltInDaemon: "Enable built-in daemon",
 };
@@ -216,8 +212,9 @@ function SystemHostPickerOption({
   testID?: string;
 }): ReactElement {
   const { theme } = useUnistyles();
+  const { t } = useTranslation();
   const Icon = kind === "add" ? Plus : Server;
-  const label = SYSTEM_HOST_PICKER_OPTION_LABELS[kind];
+  const label = kind === "add" ? t("settings.addHost") : SYSTEM_HOST_PICKER_OPTION_LABELS[kind];
   const leadingSlot = useMemo(
     () => <Icon size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />,
     [Icon, theme.colors.foregroundMuted, theme.iconSize.sm],
@@ -308,27 +305,43 @@ export function HostPicker({
   const options = useMemo(() => {
     const hostOptions = orderedHosts.map((host) => ({ id: host.serverId, label: host.label }));
     if (includeAllHost) hostOptions.unshift({ id: ALL_HOSTS_OPTION_ID, label: "All hosts" });
-    if (includeAddHost) hostOptions.push({ id: ADD_HOST_OPTION_ID, label: "Add host" });
     if (includeEnableBuiltInDaemon)
       hostOptions.push({
         id: ENABLE_BUILT_IN_DAEMON_OPTION_ID,
         label: "Enable built-in daemon",
       });
     return hostOptions;
-  }, [orderedHosts, includeAllHost, includeAddHost, includeEnableBuiltInDaemon]);
+  }, [orderedHosts, includeAllHost, includeEnableBuiltInDaemon]);
 
   const handleSelect = useCallback(
     (id: string) => {
-      if (id === ADD_HOST_OPTION_ID) {
-        onAddHost?.();
-      } else if (id === ENABLE_BUILT_IN_DAEMON_OPTION_ID) {
+      if (id === ENABLE_BUILT_IN_DAEMON_OPTION_ID) {
         onEnableBuiltInDaemon?.();
       } else {
         onSelect(id);
       }
       onOpenChange(false);
     },
-    [onAddHost, onEnableBuiltInDaemon, onOpenChange, onSelect],
+    [onEnableBuiltInDaemon, onOpenChange, onSelect],
+  );
+  const handleAddHost = useCallback(() => {
+    onAddHost?.();
+    onOpenChange(false);
+  }, [onAddHost, onOpenChange]);
+  // Add host is pinned below the list so it stays in reach however many Hosts scroll above it.
+  const footer = useMemo(
+    () =>
+      includeAddHost ? (
+        <View style={styles.footer}>
+          <SystemHostPickerOption
+            kind="add"
+            active={false}
+            onPress={handleAddHost}
+            testID={addHostTestID}
+          />
+        </View>
+      ) : undefined,
+    [addHostTestID, handleAddHost, includeAddHost],
   );
 
   const handleOpenHostSettings = useCallback(
@@ -345,16 +358,6 @@ export function HostPicker({
 
   const renderOption = useCallback<RenderHostOption>(
     ({ option, selected, active, onPress }) => {
-      if (option.id === ADD_HOST_OPTION_ID) {
-        return (
-          <SystemHostPickerOption
-            kind="add"
-            active={active}
-            onPress={onPress}
-            testID={addHostTestID}
-          />
-        );
-      }
       if (option.id === ALL_HOSTS_OPTION_ID) {
         return (
           <SystemHostPickerOption
@@ -386,7 +389,6 @@ export function HostPicker({
       );
     },
     [
-      addHostTestID,
       hostOptionTestID,
       onOpenHostSettings,
       onOpenAllHostsSettings,
@@ -412,6 +414,7 @@ export function HostPicker({
         anchorRef={anchorRef}
         desktopPlacement={desktopPlacement}
         desktopMinWidth={desktopMinWidth}
+        footer={footer}
       />
     </>
   );
@@ -431,6 +434,9 @@ function hostOptionDescription(
 }
 
 const styles = StyleSheet.create((theme) => ({
+  footer: {
+    paddingVertical: theme.spacing[1],
+  },
   trailing: {
     flexDirection: "row",
     alignItems: "center",

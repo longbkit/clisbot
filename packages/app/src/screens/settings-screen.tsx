@@ -819,8 +819,8 @@ interface HostPickerProps {
  * Scopes the host sections to a host. Reuses the canonical sidebar host
  * switcher pattern (left-sidebar.tsx): a quiet row-styled trigger opening a
  * <Combobox>. The local host is listed first, each row shows the connection it
- * is using right now; an "Add host" row is always reachable from the list —
- * even with a single host.
+ * is using right now; an "Add host" row is pinned below the list, so it stays
+ * in reach however many hosts there are.
  */
 function HostPicker({
   activeServerId,
