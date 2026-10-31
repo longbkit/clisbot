@@ -1,4 +1,7 @@
 import { MenuHeader } from "@/components/headers/menu-header";
+import { HomeHeaderNavigation } from "@/clisbot/home/header-navigation";
+import { useOpenShellEnabled } from "@/navigation/open-gate";
+import { ChatOpenGate } from "./chat-open-gate";
 import { profileNativeRegion } from "@/utils/render-profiler";
 import { traceConversationPhase } from "@/performance/conversation-trace";
 import { ChatToolsContext, useChatToolsValue } from "@/clisbot/connectors/chat-tools";
@@ -8,16 +11,22 @@ import { ConversationWorkspace } from "./conversation-workspace";
 import { useChatVisibility } from "./use-chat-visibility";
 import { acceptedChatRecord, useChatRecord } from "./use-chat-record";
 import { useChatSend } from "./use-chat-send";
+import { useOfflineChatTail, useSaveChatTail } from "./use-chat-offline-tail";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { scopedTranscriptKey } from "../data/session-scope";
 import { useIsFocused } from "expo-router/react-navigation";
-import { useChatLiveHeads } from "./use-chat-live-heads";
+import {
+  useChatHeaderToolActivities,
+  useChatLiveHeads,
+  useChatTurnActive,
+} from "./use-chat-live-heads";
 import { ChatOptions } from "./chat-options";
 import { ChatHeartbeatsButton } from "@/clisbot/heartbeats/chat-heartbeats-button";
 import { isGroupChat } from "./chat-kind";
 import { ParticipantActions } from "./participant-actions";
 import { StopAllAction } from "./stop-all-action";
-import { useCallback, useLayoutEffect, useMemo, type ReactNode } from "react";
+import { memo, useCallback, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { readChatOpenPreview } from "./open-preview";
 import { useLocalSearchParams } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View, Text } from "react-native";
@@ -35,7 +44,7 @@ import {
 import { useHostBotsFeature } from "../feature";
 import { botsRuntime, useBotCatalog } from "../data/runtime";
 import { useChatTranscriptQuery, type UseChatTranscriptResult } from "../data/use-chat-transcript";
-import { ChatScreen } from "./chat-screen";
+import { ChatScreen, type ChatScreenProps } from "./chat-screen";
 import { conversationToolDisplay } from "./tool-activity";
 import { useChatToolActivityHeaderValue } from "./use-chat-tool-activity-header";
 import { ChatToolActivityHeaderContext } from "./tool-activity-context";
@@ -48,12 +57,26 @@ const UPDATING = { status: "catching_up", ui: "status" } as const;
 const RECONNECTING = { status: "reconnecting" } as const;
 const EMPTY_PARTICIPANTS: ChatPayload["participants"] = [];
 
+const HEADER_NAVIGATION = <HomeHeaderNavigation />;
+
 export default function ChatRoute() {
+  const { serverId = "", chatId = "" } = useLocalSearchParams<{
+    serverId: string;
+    chatId: string;
+  }>();
+  const openShellEnabled = useOpenShellEnabled();
   return profileNativeRegion(
     "BotChatRoute",
-    <HostRouteBootstrapBoundary>
-      <Gate />
-    </HostRouteBootstrapBoundary>,
+    <ChatOpenGate
+      serverId={serverId}
+      chatId={chatId}
+      enabled={openShellEnabled}
+      navigation={HEADER_NAVIGATION}
+    >
+      <HostRouteBootstrapBoundary>
+        <Gate />
+      </HostRouteBootstrapBoundary>
+    </ChatOpenGate>,
   );
 }
 function Gate() {
@@ -96,12 +119,14 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   const client = useHostRuntimeClient(serverId);
   const online = useHostRuntimeConnectionStatus(serverId) === "online";
   const catalog = useBotCatalog();
+  const offlineChat = useOfflineChatTail(serverId, chatId, key);
   const { chat, setChat, error, setError, authorized, transportInterrupted } = useChatRecord(
     client,
     online,
     chatId,
     key,
     acceptedChatRecord(catalog.chats, serverId, chatId),
+    offlineChat,
   );
   const transcript = useChatTranscriptQuery({
     serverId,
@@ -110,8 +135,10 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
     presentationScope: principalScope,
     presentationAllowed: chat !== null,
   });
+  useSaveChatTail({ serverId, chatId, chat, authorized, transcript });
   useChatVisibility(serverId, chatId, chat, focused);
-  const heads = useChatLiveHeads(serverId, chat?.participants ?? EMPTY_PARTICIPANTS);
+  const participants = chat?.participants ?? EMPTY_PARTICIPANTS;
+  const anyTurnActive = useChatTurnActive(serverId, participants);
   const { botRows, identities, workspaceByBotId } = useChatIdentities(
     serverId,
     chat?.participants,
@@ -135,7 +162,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
     void loadOlder().catch((e) => setError(String(e)));
   }, [loadOlder, setError]);
   const group = chat ? isGroupChat(chat) : false;
-  const working = group && [...heads.values()].some((head) => head.turnActive);
+  const working = group && anyTurnActive;
   // Clisbot Connectors: the Chat's own tools off list, for the composer's Tools chip.
   const chatTools = useChatToolsValue({
     serverId,
@@ -153,11 +180,16 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   // Clisbot: a direct chat shows tool calls as its Bot says, a group as the group says.
   const directBot = !group ? botRows.find((b) => b.id === chat?.participants[0]?.botId) : undefined;
   const toolDisplay = conversationToolDisplay(chat, group, directBot);
+  const headerActivities = useChatHeaderToolActivities(
+    serverId,
+    participants,
+    toolDisplay === "header",
+  );
   const toolActivityHeader = useChatToolActivityHeaderValue({
     enabled: toolDisplay === "header",
     serverId,
     group,
-    heads,
+    activities: headerActivities,
     identities,
   });
   const options = useChatHeaderOptions({
@@ -179,9 +211,10 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
       error: String(Boolean(error) || loadStatus === "error"),
     });
   }, [key, chat, messageCount, loadStatus, focused, error]);
+  const [preview] = useState(() => readChatOpenPreview(serverId, chatId));
   const title = chat
     ? (chat.title ?? identities.map((b) => b.name).join(", "))
-    : t("bots.chat.route.loading");
+    : (preview?.title ?? t("bots.chat.route.loading"));
   return (
     <View style={styles.root}>
       <ChatToolsContext.Provider value={chatTools}>
@@ -200,6 +233,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
             >
               <ChatRouteBody
                 chat={chat}
+                hasPreview={preview !== null}
                 online={online}
                 error={error}
                 transcript={transcript}
@@ -207,17 +241,16 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
               >
                 {profileNativeRegion(
                   "BotChatScreen",
-                  <ChatScreen
-                    hideHeader
+                  <ChatLiveScreen
                     serverId={serverId}
                     chatId={chatId}
                     title={title}
                     bots={identities}
                     group={group}
                     transcript={transcript.transcript.messages}
-                    liveHeads={heads}
+                    participants={participants}
                     discussionActive={chat?.discussionActive === true}
-                    canSend={online && authorized && !sending}
+                    canSend={chat !== null && online && authorized && !sending}
                     onSubmitMessage={send}
                     onReachTop={reachTop}
                     toolDisplay={toolDisplay}
@@ -232,9 +265,26 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   );
 }
 
+type ChatLiveScreenProps = Omit<ChatScreenProps, "liveHeads" | "hideHeader"> & {
+  participants: ChatPayload["participants"];
+};
+
+/**
+ * The only part of the route that follows streaming text: a chunk redraws this screen and its
+ * live row, never the route, its header or the conversation workspace.
+ */
+const ChatLiveScreen = memo(function ChatLiveScreen({
+  participants,
+  ...screen
+}: ChatLiveScreenProps) {
+  const liveHeads = useChatLiveHeads(screen.serverId, participants);
+  return <ChatScreen hideHeader liveHeads={liveHeads} {...screen} />;
+});
+
 /** Keep navigation and the accepted body mounted independently of refresh status. */
 function ChatRouteBody({
   chat,
+  hasPreview,
   online,
   error,
   transcript,
@@ -242,6 +292,7 @@ function ChatRouteBody({
   children,
 }: {
   chat: ChatPayload | null;
+  hasPreview: boolean;
   online: boolean;
   error: string | null;
   transcript: UseChatTranscriptResult;
@@ -250,7 +301,9 @@ function ChatRouteBody({
 }) {
   const failure = transcript.loadState.status === "error" ? transcript.loadState : null;
   const blocked = failure && !failure.retainAccepted ? failure.message : null;
-  if (!chat || blocked) return <ChatEmptyBody error={blocked ?? error} online={online} />;
+  const kind = chatBodyKind({ hasChat: chat !== null, hasPreview, online, error, blocked });
+  if (kind === "preview") return <ChatPreviewBody>{children}</ChatPreviewBody>;
+  if (kind === "empty") return <ChatEmptyBody error={blocked ?? error} online={online} />;
   const visibleError = transportInterrupted ? null : error;
   const visibleFailure = failure?.retainAccepted ? null : failure;
   const initialLoading =
@@ -273,6 +326,36 @@ function ChatRouteBody({
         }
         online={online}
       />
+    </View>
+  );
+}
+
+function chatBodyKind(input: {
+  hasChat: boolean;
+  hasPreview: boolean;
+  online: boolean;
+  error: string | null;
+  blocked: string | null;
+}): "accepted" | "preview" | "empty" {
+  if (input.blocked) return "empty";
+  if (input.hasChat) return "accepted";
+  const canPreview = input.hasPreview && input.online && !input.error;
+  return canPreview ? "preview" : "empty";
+}
+
+/**
+ * The pressed row's chat before its record is accepted: the screen with no transcript, sending
+ * off (the record is null), and a loading row that never intercepts touches.
+ */
+function ChatPreviewBody({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.body}>
+      <View testID="chat-preview-loading" style={styles.previewLoading} pointerEvents="none">
+        <ThemedLoadingSpinner size="small" uniProps={loadingColor} />
+        <Text style={styles.loadingText}>{t("bots.chat.route.loading")}</Text>
+      </View>
+      {children}
     </View>
   );
 }
@@ -444,6 +527,13 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
   },
   loadingText: { color: theme.colors.foregroundMuted },
+  previewLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing[2],
+    paddingVertical: theme.spacing[2],
+  },
   syncStatus: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0 },
   actions: {
     flexDirection: "row",

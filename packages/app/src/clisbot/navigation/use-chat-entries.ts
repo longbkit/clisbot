@@ -7,10 +7,10 @@ import { pinKey, useResourcePins } from "@/clisbot/bots/sidebar/pins";
 import type { BotsSidebarBot } from "@/clisbot/bots/sidebar/bots-section";
 import type { ChatsSidebarChat } from "@/clisbot/bots/sidebar/chats-section";
 import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
+import { useHeldWhileInactive } from "@/hooks/use-held-while-inactive";
 import { useHosts } from "@/runtime/host-runtime";
 import type { ChatListEntry } from "./chat-list";
-import { resolveDirectChatOwnership, resolveOwnership } from "./ownership";
-import { useReaderAccounts } from "./reader";
+import { useChatOwnership } from "./use-chat-ownership";
 import { listedAgents } from "./source-liveness";
 import { useSourceLiveness } from "./use-source-liveness";
 
@@ -34,8 +34,9 @@ function useCompanyHosts(): ReadonlySet<string> {
   }, [accounts, hosts]);
 }
 
-function useUnreadAgents(): ReadonlySet<string> {
-  const { agents } = useAggregatedAgents({ demand: false });
+/** Every agent update changes `agents`; a hidden Chats list keeps its set until it is shown. */
+function useUnreadAgents(active: boolean): ReadonlySet<string> {
+  const { agents } = useHeldWhileInactive(useAggregatedAgents({ demand: false }), active);
   const { listable } = useSourceLiveness();
   return useMemo(
     () =>
@@ -50,15 +51,16 @@ function useUnreadAgents(): ReadonlySet<string> {
 
 /**
  * Every Chats row (brief C3): each Bot's direct chat and each group chat, with the facts the
- * list orders and filters by. Chats' own Display menu holds the Host filter.
+ * list orders and filters by. Chats' own Display menu holds the Host filter. While `active` is
+ * false the catalog and unread agents are held, so a hidden list skips rebuilding its entries.
  */
-export function useChatEntries() {
-  const catalog = useSidebarCatalog();
+export function useChatEntries(active: boolean) {
+  const catalog = useHeldWhileInactive(useSidebarCatalog(), active);
   const { hosts, botRows, chatRows } = catalog;
   const { isPinned, pins } = useResourcePins(chatRows);
-  const accounts = useReaderAccounts();
+  const { chatOwnership, botOwnership } = useChatOwnership(chatRows, active);
   const company = useCompanyHosts();
-  const unread = useUnreadAgents();
+  const unread = useUnreadAgents(active);
   const entries = useMemo(() => {
     const multiple = hosts.length > 1;
     const order = new Map(pins.map((pin, index) => [pinKey(pin), index]));
@@ -79,10 +81,7 @@ export function useChatEntries() {
         updatedAt: bot.updatedAt,
         pinned: isPinned({ kind: "bot", serverId: bot.serverId, id: bot.botId }),
         pinIndex: pinIndex("bot", bot.serverId, bot.botId),
-        ownership: resolveDirectChatOwnership(
-          { directChatCreatedBy: direct?.record?.createdBy, bot: payload ?? {} },
-          accounts,
-        ),
+        ownership: botOwnership(payload ?? { serverId: bot.serverId }, direct),
         unread: Boolean(bot.agentId && unread.has(`${bot.serverId}:${bot.agentId}`)),
         company: company.has(bot.serverId),
         bot,
@@ -97,16 +96,13 @@ export function useChatEntries() {
         updatedAt: chat.updatedAt,
         pinned: isPinned({ kind: "chat", serverId: chat.serverId, id: chat.chatId }),
         pinIndex: pinIndex("chat", chat.serverId, chat.chatId),
-        ownership: resolveOwnership({
-          createdBy: chatById.get(chat.key)?.record?.createdBy,
-          accounts,
-        }),
+        ownership: chatById.has(chat.key) ? chatOwnership(chatById.get(chat.key)!) : "unknown",
         unread: (chat.agentIds ?? []).some((id) => unread.has(`${chat.serverId}:${id}`)),
         company: company.has(chat.serverId),
         group: chat,
       }),
     );
     return [...botEntries, ...groupEntries];
-  }, [accounts, botRows, chatRows, company, hosts, isPinned, pins, unread]);
+  }, [chatOwnership, botOwnership, botRows, chatRows, company, hosts, isPinned, pins, unread]);
   return { entries, catalog };
 }

@@ -1,5 +1,5 @@
 import { RefreshControl } from "react-native";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import DraggableFlatList, {
   NestableDraggableFlatList,
   type RenderItemParams,
@@ -33,10 +33,12 @@ export function DraggableList<T>({
   gestureHostPresented,
   waitFor,
   onDragBegin: onDragBeginProp,
+  onDragSettled,
   nestable = false,
 }: DraggableListProps<T>) {
   const { theme } = useUnistyles();
   const [isDragging, setIsDragging] = useState(false);
+  const dragInProgress = useRef(false);
 
   // Pass the ref directly to DraggableFlatList - it handles gesture
   // coordination internally for nestable lists.
@@ -67,15 +69,31 @@ export function DraggableList<T>({
   const handleDragEnd = useCallback(
     ({ data: newData }: { data: T[] }) => {
       setIsDragging(false);
-      onDragEnd(newData);
+      try {
+        onDragEnd(newData);
+      } finally {
+        if (dragInProgress.current) {
+          dragInProgress.current = false;
+          onDragSettled?.();
+        }
+      }
     },
-    [onDragEnd],
+    [onDragEnd, onDragSettled],
   );
 
   const handleDragBegin = useCallback(() => {
+    dragInProgress.current = true;
     setIsDragging(true);
     onDragBeginProp?.();
   }, [onDragBeginProp]);
+
+  const handleDragTerminate = useCallback(() => {
+    setIsDragging(false);
+    if (dragInProgress.current) {
+      dragInProgress.current = false;
+      onDragSettled?.();
+    }
+  }, [onDragSettled]);
 
   const handleRelease = useCallback(() => {
     setIsDragging(false);
@@ -124,6 +142,7 @@ export function DraggableList<T>({
       // lists are inside a scroll container.
       activationDistance={20}
       onDragBegin={handleDragBegin}
+      onDragTerminate={handleDragTerminate}
       onRelease={handleRelease}
       // @ts-ignore - waitFor is supported by RNGH FlatList but missing from DraggableFlatList types
       waitFor={waitFor}

@@ -1,3 +1,4 @@
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import type { AllowedOutput } from "../execution-capabilities/outputs.js";
 import type { TriggerAgentConfig } from "../triggers/index.js";
 import type { WorktreeTarget } from "../config/index.js";
@@ -16,6 +17,8 @@ export interface DaemonEnvironmentTarget {
 
 export interface LaunchMachineIntent {
   kind: "launch_machine";
+  /** Trusted revision author snapshot, persisted before dispatch; absent for legacy intents. */
+  ownerActor?: SessionActor;
   organizationId: string;
   workflowId: string;
   triggerRunId: string;

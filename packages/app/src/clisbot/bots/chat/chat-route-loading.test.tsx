@@ -62,6 +62,11 @@ vi.mock("@/components/headers/menu-header", () => ({
   MenuHeader: () => <button type="button">Back</button>,
 }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
+vi.mock("@/clisbot/home/header-navigation", () => ({ HomeHeaderNavigation: () => null }));
+vi.mock("@/navigation/open-gate", () => ({ useOpenShellEnabled: () => false }));
+vi.mock("./chat-open-gate", () => ({
+  ChatOpenGate: ({ children }: React.PropsWithChildren) => children,
+}));
 vi.mock("@/stores/session-store", () => ({ useSessionStore: () => false }));
 vi.mock("@/components/host-route-bootstrap-boundary", () => ({
   HostRouteBootstrapBoundary: ({ children }: { children: React.ReactNode }) => children,
@@ -84,6 +89,10 @@ vi.mock("../data/runtime", () => ({
   botsRuntime: {},
   useBotCatalog: () => ({ bots: { loadState: { status: "loading" } }, chats: {} }),
 }));
+vi.mock("./use-chat-offline-tail", () => ({
+  useOfflineChatTail: () => null,
+  useSaveChatTail: () => undefined,
+}));
 vi.mock("./use-chat-record", () => ({
   acceptedChatRecord: () => null,
   useChatRecord: () => ({
@@ -104,7 +113,11 @@ vi.mock("../data/use-chat-transcript", () => ({
   }),
 }));
 vi.mock("./use-chat-visibility", () => ({ useChatVisibility: () => {} }));
-vi.mock("./use-chat-live-heads", () => ({ useChatLiveHeads: () => new Map() }));
+vi.mock("./use-chat-live-heads", () => ({
+  useChatLiveHeads: () => new Map(),
+  useChatTurnActive: () => false,
+  useChatHeaderToolActivities: () => [],
+}));
 vi.mock("./use-chat-send", () => ({ useChatSend: () => ({ sending: false, send: () => {} }) }));
 vi.mock("@/clisbot/connectors/chat-tools", async () => ({
   ChatToolsContext: React.createContext(null),
@@ -132,13 +145,26 @@ vi.mock("./conversation-workspace", () => ({
   },
 }));
 vi.mock("./chat-screen", () => ({
-  ChatScreen: ({ transcript }: { transcript: { id: string }[] }) => (
-    <article>{transcript[0]?.id}</article>
+  ChatScreen: ({
+    transcript,
+    title,
+    canSend,
+  }: {
+    transcript: { id: string }[];
+    title: string;
+    canSend: boolean;
+  }) => (
+    <article data-testid="chat-screen" data-can-send={String(canSend)}>
+      <h1>{title}</h1>
+      {transcript[0]?.id}
+    </article>
   ),
 }));
 import ChatRoute from "./chat-route";
+import { forgetChatOpenPreviews, rememberChatOpenPreview } from "./open-preview";
 afterEach(() => {
   cleanup();
+  forgetChatOpenPreviews();
   state.chat = null;
   state.error = null;
   state.transcriptError = null;
@@ -167,6 +193,19 @@ it("keeps the same conversation chrome through metadata loading, accepted conten
   expect(screen.queryByText("accepted-message")).toBeNull();
   expect(screen.getByRole("button", { name: "Back" })).toBe(back);
   expect(state.workspaceMounts).toBe(1);
+});
+it("renders the chat screen from the pressed row before the chat record arrives", () => {
+  state.empty = true;
+  state.fetching = true;
+  rememberChatOpenPreview({ serverId: "host", chatId: "chat", title: "Release room" });
+  render(<ChatRoute />);
+  const chatScreen = screen.getByTestId("chat-screen");
+  expect(chatScreen.querySelector("h1")?.textContent).toBe("Release room");
+  expect(chatScreen.getAttribute("data-can-send")).toBe("false");
+  expect(screen.getByTestId("chat-preview-loading").getAttribute("data-pointer-events")).toBe(
+    "none",
+  );
+  expect(screen.queryByText("accepted-message")).toBeNull();
 });
 it("keeps navigation for unavailable/offline content without remounting on a same-client epoch", () => {
   state.error = "Unavailable";

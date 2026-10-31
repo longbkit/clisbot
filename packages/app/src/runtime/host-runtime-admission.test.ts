@@ -284,12 +284,12 @@ it("ignores late admission denial from a replaced route", async () => {
 it("keeps foreground reconnection inside the admitted serial cycle", async () => {
   const { controller, attempts, direct, alternate } = await admittedRuntime(true);
   await controller.start({ autoProbe: false });
-  controller.ensureConnected();
+  controller.retryAfterNetworkChange();
   const oldClient = controller.getClient()!;
   direct.disconnect();
   await vi.waitFor(() => expect(oldClient.getConnectionState().status).toBe("disconnected"));
-  controller.ensureConnected();
-  controller.ensureConnected({ verify: true });
+  controller.retryAfterNetworkChange();
+  controller.retryAfterNetworkChange();
   await controller.runProbeCycleNow();
   expect(controller.getSnapshot().activeConnectionId).toBe("alternate");
   expect(attempts).toEqual(["direct", "alternate"]);

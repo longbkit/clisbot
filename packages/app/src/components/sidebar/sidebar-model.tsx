@@ -1,9 +1,14 @@
+import { participationKeyOf } from "@/clisbot/navigation/ownership-key";
 import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
 import { useTranslation } from "react-i18next";
 import {
   matchesSessionMetadata,
+  sessionMetadataOptions,
   sessionMetadataRecoveryNotice,
 } from "@/clisbot/session-storage/directory";
+import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
+import { useSessionStore } from "@/stores/session-store";
+import { useShallow } from "zustand/react/shallow";
 import { useGroupedSidebarView, useSidebarGroupMode } from "@/clisbot/workspace-sessions/model";
 import type { StatusDisplayGroup } from "@/clisbot/workspace-sessions/status-sessions";
 import React, { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
@@ -26,8 +31,11 @@ import { buildSidebarProjection } from "./sidebar-projection";
 import { useWorkListFilter, type WorkFilter } from "@/clisbot/navigation/work-filter";
 import {
   WorkspaceSessionFilterProvider,
+  useWorkspaceSessionFilter,
   type WorkspaceSessionFilter,
 } from "@/clisbot/workspace-sessions/session-filter";
+import { useRetainedPanelActive } from "@/components/retained-panel";
+import { useActiveAfterShow, useHeldWhileInactive } from "@/hooks/use-held-while-inactive";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
 import { filterWorkspacesByLabels } from "./sidebar-labels";
 import {
@@ -52,6 +60,8 @@ interface SidebarModel extends SidebarWorkspacesListResult {
    */
   allProjects: SidebarProjectEntry[];
   metadataRecoveryNotice: string | null;
+  /** The user and channel filters' options, for the display menu and the active-filter chips. */
+  sessionMetadata: SessionMetadata;
   /** The project filter as it is actually being applied — see `resolveActiveProjectFilters`. */
   resolvedProjectFilters: readonly string[];
   hasProjectsBeforeFilter: boolean;
@@ -73,25 +83,37 @@ const SidebarModelContext = createContext<SidebarModel | null>(null);
 
 export function SidebarModelProvider({
   active,
+  holdWhileInactive = false,
   children,
 }: {
   active?: boolean;
+  /**
+   * For a provider read only by one retained pane (the phone's Work tab): while inactive it
+   * derives nothing and hands out the model it had when hidden. A show commits that held model and
+   * catches up in a low-priority render after it (`useActiveAfterShow`): over thousands of
+   * workspaces the catch-up took 167–367 ms inside the tab press. Without it an inactive provider
+   * stays live for the keyboard shortcuts.
+   */
+  holdWhileInactive?: boolean;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const list = useSidebarWorkspacesList({ enabled: active });
+  const caughtUp = useActiveAfterShow(holdWhileInactive && active !== false);
+  const shown = holdWhileInactive ? caughtUp : active;
+  const live = caughtUp || !holdWhileInactive;
+  const list = useSidebarWorkspacesList({ enabled: shown, held: !live });
   const showBackground = useSidebarViewStore((state) => state.showBackground);
   const groupMode = useSidebarGroupMode();
   const userFilters = useSidebarViewStore((state) => state.userFilters);
   const channelFilters = useSidebarViewStore((state) => state.channelFilters);
   // Clisbot Navigation V2: Work's scope and quick-filter chips narrow workspaces like metadata does.
-  const workFilter = useWorkListFilter();
+  const workFilter = useWorkListFilter(live);
   const hasMetadataFilter = userFilters.length > 0 || channelFilters.length > 0;
   const hasEntryFilter = hasMetadataFilter || workFilter !== null;
   const labelFilter = useSidebarViewStore((state) => state.labelFilter);
   const projectFilters = useSidebarViewStore((state) => state.projectFilters);
   const reconcileLabelFilter = useSidebarViewStore((state) => state.reconcileLabelFilter);
-  const { hosts: labelHosts } = useWorkspaceLabelProjection();
+  const labelHosts = useHeldWhileInactive(useWorkspaceLabelProjection().hosts, live);
   const collapsedProjectKeys = useSidebarCollapsedSectionsStore(
     (state) => state.collapsedProjectKeys,
   );
@@ -128,10 +150,11 @@ export function SidebarModelProvider({
   // live session-store subscription over every workspace on every visible host, so widening this
   // for a filter that does not need it costs a retained-but-inactive sidebar real work.
   const needsWorkspaceEntries = groupMode !== "project" || hasActiveLabelFilter || hasEntryFilter;
-  const entriesEnabled = active !== false || needsWorkspaceEntries;
+  const entriesEnabled = shown !== false || needsWorkspaceEntries;
   const workspaceEntriesByKey = useSidebarWorkspaceEntries(
     list.workspacePlacements,
     entriesEnabled,
+    live,
   );
   const filteredWorkspaceEntriesByKey = useMemo(() => {
     const byProject = filterWorkspacesByProjects({
@@ -238,17 +261,20 @@ export function SidebarModelProvider({
     pinnedCollapsed,
     collapsedWorkspaceGroupKeys,
     sessionFilter,
+    live,
   });
   const metadataRecoveryNotice = useMemo(
     () => sessionMetadataRecoveryNotice(workspaceEntriesByKey.values(), hasMetadataFilter),
     [workspaceEntriesByKey, hasMetadataFilter],
   );
+  const sessionMetadata = useSessionMetadata(live);
   const value = useMemo(
     () => ({
       ...list,
       isLoading: list.isLoading || awaitingEntryProjection,
       isInitialLoad: awaitingEntryProjection,
       metadataRecoveryNotice,
+      sessionMetadata,
       projects: filteredProjects,
       allProjects: list.projects,
       resolvedProjectFilters,
@@ -268,6 +294,7 @@ export function SidebarModelProvider({
       workFilter,
       awaitingEntryProjection,
       metadataRecoveryNotice,
+      sessionMetadata,
       resolvedProjectFilters,
       collapsedProjectKeys,
       groupMode,
@@ -291,6 +318,56 @@ export function SidebarModelProvider({
   );
 }
 
+/**
+ * The model as a retained list pane sees it: held while that pane's retained panel is inactive.
+ * The provider stays live for the keyboard shortcuts and the visible chrome; a hidden Work pane
+ * keeps its last model and catches up in its first render back.
+ */
+export function RetainedSidebarModel({ children }: { children: ReactNode }) {
+  const active = useRetainedPanelActive();
+  const model = useHeldWhileInactive(useContext(SidebarModelContext), active);
+  const sessionFilter = useHeldWhileInactive(useWorkspaceSessionFilter(), active);
+  return (
+    <SidebarModelContext.Provider value={model}>
+      <WorkspaceSessionFilterProvider value={sessionFilter}>
+        {children}
+      </WorkspaceSessionFilterProvider>
+    </SidebarModelContext.Provider>
+  );
+}
+
+interface SessionMetadata {
+  options: ReturnType<typeof sessionMetadataOptions>;
+  /** Some Host stores session metadata, so the user and channel filters apply. */
+  available: boolean;
+}
+
+/**
+ * Every Host's session users and channels, read once per change for the display menu and the
+ * active-filter chips; each used to rescan all workspaces itself, hidden or not.
+ */
+function useSessionMetadata(live: boolean): SessionMetadata {
+  const metadataHosts = useHeldWhileInactive(
+    useSessionStore(
+      useShallow((state) =>
+        Object.values(state.sessions)
+          .filter((session) => sessionStorageReadable(session.serverInfo))
+          .map((session) => session.workspaces),
+      ),
+    ),
+    live,
+  );
+  return useMemo(
+    () => ({
+      options: sessionMetadataOptions(
+        metadataHosts.flatMap((workspaces) => [...workspaces.values()]),
+      ),
+      available: metadataHosts.length > 0,
+    }),
+    [metadataHosts],
+  );
+}
+
 /** For surfaces that may render outside the list (Home pin tags); null when no list is mounted. */
 export function useOptionalSidebarModel(): SidebarModel | null {
   return useContext(SidebarModelContext);
@@ -306,16 +383,17 @@ function toSessionLineFilter(
   filter: WorkFilter,
   pinned: ReadonlySet<string>,
 ): WorkspaceSessionFilter {
-  return (session, workspace) =>
+  return (session) =>
     !pinned.has(`${session.agent.serverId}:${session.agent.id}`) &&
     filter.session(
       {
         id: session.agent.id,
         labels: session.agent.labels,
         createdBy: session.agent.createdBy,
+        participationKey: participationKeyOf(session.agent),
         statusBucket: session.statusBucket,
         unverified: session.unverified,
       },
-      workspace,
+      { serverId: session.agent.serverId },
     );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useRetainedPanelActive } from "@/components/retained-panel";
 import { subscribeToRelativeTimeTick, type TickResolution } from "@/utils/relative-time-ticker";
 import { describeCompactTimeAgo, describeTimeAgo, type RelativeTimeLabel } from "@/utils/time";
 
@@ -27,32 +28,39 @@ export function useCompactTimeAgo(date: Date | null): string {
   return useRelativeTimeLabel(date, describeCompactTimeAgo);
 }
 
+/**
+ * A hidden retained panel (a phone tab, a retained workspace) holds no subscription, so its labels
+ * neither tick nor re-render. The label is derived in render, so the commit that shows the panel
+ * already paints it current.
+ */
 function useRelativeTimeLabel(
   date: Date | null,
   describe: (date: Date) => RelativeTimeLabel,
 ): string {
-  const [label, setLabel] = useState(() => (date ? describe(date).label : ""));
+  // The label reads the wall clock in render, which no dependency shows: compiled, it would be
+  // memoized on the instant alone and never age on a tick or a reshow.
+  "use no memo";
+  const active = useRetainedPanelActive();
+  // A tick that changes the label only asks for a render; the render reads the wall clock.
+  const [, setTick] = useState(0);
 
   // Keyed on the instant, not the Date object: the store parses a fresh Date on every payload, so
   // depending on identity would tear down and rebuild the subscription for an unchanged time.
   const time = date === null ? null : date.getTime();
+  const label = time === null ? "" : describe(new Date(time)).label;
 
   useEffect(() => {
-    if (time === null) {
-      setLabel("");
-      return undefined;
-    }
+    if (time === null || !active) return undefined;
 
     const source = new Date(time);
     let current = describe(source);
-    setLabel(current.label);
 
     let unsubscribe: (() => void) | null = null;
 
     const handleTick = () => {
       const next = describe(source);
       if (next.label !== current.label) {
-        setLabel(next.label);
+        setTick((value) => value + 1);
       }
       if (next.resolution !== current.resolution) {
         // Aged into a slower tier — or out of them entirely.
@@ -74,7 +82,7 @@ function useRelativeTimeLabel(
     return () => {
       unsubscribe?.();
     };
-  }, [time, describe]);
+  }, [time, describe, active]);
 
   return label;
 }

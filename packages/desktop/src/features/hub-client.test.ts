@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createServer } from "node:http";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -38,6 +39,38 @@ function decrypt(value: Buffer): string {
 }
 
 describe("DesktopHubClient", () => {
+  it("reaches a local Hub with the access query intact", async () => {
+    const seen: string[] = [];
+    const server = createServer((req, res) => {
+      seen.push(req.url ?? "");
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ assignments: [] }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string") throw new Error("Missing test port");
+      const client = new DesktopHubClient({
+        userDataPath: await temporaryRoot(),
+        encryptionAvailable: () => true,
+        encrypt,
+        decrypt,
+        openExternal: async () => undefined,
+        fetch,
+      });
+      const resourcePath = "/api/management/v1/organizations/org/access-assignments?include=team";
+      const response = await client.request({
+        origin: `http://127.0.0.1:${address.port}`,
+        path: resourcePath,
+      });
+      expect(response.status).toBe(200);
+      expect(JSON.parse(response.body)).toEqual({ assignments: [] });
+      expect(seen).toEqual([resourcePath]);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
   it("uses a loopback PKCE callback and keeps refresh credentials out of API responses", async () => {
     const userDataPath = await temporaryRoot();
     let authorization: URL | undefined;
@@ -199,6 +232,37 @@ describe("DesktopHubClient", () => {
     );
     expect(persisted).not.toContain("refresh-one");
     expect(persisted).not.toContain("refresh-two");
+  });
+
+  it("forwards management query parameters without relaxing the account path boundary", async () => {
+    const userDataPath = await temporaryRoot();
+    const fetchMock = vi.fn(async (_input: string | URL) => Response.json({ assignments: [] }));
+    const client = new DesktopHubClient({
+      userDataPath,
+      encryptionAvailable: () => true,
+      encrypt,
+      decrypt,
+      openExternal: async () => undefined,
+      fetch: fetchMock,
+    });
+    const resourcePath = "/api/management/v1/organizations/org/access-assignments?include=team";
+    await expect(
+      client.request({ origin: "https://hub.example.com", path: resourcePath }),
+    ).resolves.toMatchObject({ status: 200 });
+    expect(String(fetchMock.mock.calls[0]![0])).toBe(`https://hub.example.com${resourcePath}`);
+    await expect(
+      client.request({
+        origin: "https://hub.example.com",
+        path: "/api/auth/clisbot/state?include=team",
+      }),
+    ).rejects.toThrow(/query is unavailable/u);
+    await expect(
+      client.request({
+        origin: "https://hub.example.com",
+        path: "/api/management/v1/organizations/org/access-assignments?include=team#fragment",
+      }),
+    ).rejects.toThrow(/path is invalid/u);
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it("fails closed for unavailable encryption, mismatched state, and non-allowlisted requests", async () => {

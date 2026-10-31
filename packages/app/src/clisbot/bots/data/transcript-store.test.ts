@@ -78,3 +78,52 @@ it("preserves a live push arriving before a stale page response", () => {
     1, 2, 3,
   ]);
 });
+
+describe("clearing offline data", () => {
+  it("forgets one source's chats, or every chat", () => {
+    useTranscriptStore.setState({ transcripts: {}, reads: {} });
+    const store = useTranscriptStore.getState();
+    const mine = transcriptKey("host-a@1:1", "chat-1");
+    const other = transcriptKey("host-b@1:1", "chat-1");
+    store.replacePage(mine, { messages: [line(1)], hasOlder: false });
+    store.replacePage(other, { messages: [line(1)], hasOlder: false });
+
+    useTranscriptStore.getState().clearSource("host-a");
+    expect(Object.keys(useTranscriptStore.getState().transcripts)).toEqual([other]);
+    expect(Object.keys(useTranscriptStore.getState().reads)).toEqual([other]);
+
+    useTranscriptStore.getState().clearAll();
+    expect(useTranscriptStore.getState().transcripts).toEqual({});
+    expect(useTranscriptStore.getState().reads).toEqual({});
+  });
+});
+
+describe("cached transcript hydration", () => {
+  it("shows a cached tail until the first accepted page replaces it", () => {
+    const store = useTranscriptStore.getState();
+    store.hydrateCached(KEY, { messages: [line(1), line(2)], hasOlder: true });
+
+    expect(selectTranscript(useTranscriptStore.getState(), KEY)).toEqual({
+      messages: [line(1), line(2)],
+      hasOlder: true,
+      cached: true,
+    });
+
+    const read = useTranscriptStore.getState().beginRead(KEY);
+    useTranscriptStore
+      .getState()
+      .acceptRead(KEY, read, { messages: [line(2), line(3)], hasOlder: false }, false);
+    expect(selectTranscript(useTranscriptStore.getState(), KEY)).toEqual({
+      messages: [line(2), line(3)],
+      hasOlder: false,
+    });
+  });
+
+  it("never replaces lines the Host already delivered", () => {
+    const store = useTranscriptStore.getState();
+    store.append(KEY, line(5));
+    store.hydrateCached(KEY, { messages: [line(1)], hasOlder: false });
+
+    expect(selectTranscript(useTranscriptStore.getState(), KEY).messages).toEqual([line(5)]);
+  });
+});

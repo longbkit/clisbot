@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useReducer, type ReactNode } from "react";
+import { useIsOnWorkspaceRoute } from "@/navigation/route-facts";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useIsChatListDeparting } from "@/clisbot/home/use-chat-list-departure";
 import {
@@ -18,6 +19,15 @@ interface AutoCollapseContextValue {
 }
 
 const SidebarWorkspaceSelectionContext = createContext<ActiveWorkspaceSelection | null>(null);
+const SidebarWorkspaceRouteContext = createContext(false);
+
+/**
+ * Whether a workspace route is open, from the provider's own route subscription. A list that read
+ * the pathname itself re-rendered on every navigation, hidden phone tabs included.
+ */
+export function useIsSidebarOnWorkspaceRoute(): boolean {
+  return useContext(SidebarWorkspaceRouteContext);
+}
 
 export function useSidebarWorkspaceSelection(): ActiveWorkspaceSelection | null {
   return useContext(SidebarWorkspaceSelectionContext);
@@ -39,6 +49,8 @@ function reduceAutoCollapse(
 /** Shared by the row's press target, selected fill and session list, including pinned rows. */
 export function WorkspaceSessionsAutoCollapseProvider({ children }: { children: ReactNode }) {
   const actualSelection = useActiveWorkspaceSelection();
+  // Selected facts: neither re-renders the Work list on a push that keeps them.
+  const onWorkspaceRoute = useIsOnWorkspaceRoute();
   const pending = useIsChatListDeparting();
   const departing = useIsCompactFormFactor() && pending;
   const serverId = departing ? null : actualSelection?.serverId;
@@ -56,7 +68,9 @@ export function WorkspaceSessionsAutoCollapseProvider({ children }: { children: 
   const value = useMemo(() => ({ collapsedWorkspaceKey, toggle }), [collapsedWorkspaceKey, toggle]);
   return (
     <SidebarWorkspaceSelectionContext value={selection}>
-      <AutoCollapseContext value={value}>{children}</AutoCollapseContext>
+      <SidebarWorkspaceRouteContext value={onWorkspaceRoute}>
+        <AutoCollapseContext value={value}>{children}</AutoCollapseContext>
+      </SidebarWorkspaceRouteContext>
     </SidebarWorkspaceSelectionContext>
   );
 }

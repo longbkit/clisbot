@@ -1,3 +1,4 @@
+import type { SessionOperationIdentity } from "../agent/session-authorship.js";
 import { buildAgentPrompt } from "../agent/prompt-attachments.js";
 import type { AgentAttachment } from "@clisbot/protocol/messages";
 import type { AgentPromptInput } from "../agent/agent-sdk-types.js";
@@ -121,6 +122,7 @@ export interface ScheduledLineInput {
   text: string;
   messageId: string;
   actor: SessionActor;
+  sessionIdentity?: SessionOperationIdentity;
   scheduleRun: import("@clisbot/protocol/schedule/heartbeat-notice").HeartbeatRun;
 }
 
@@ -324,6 +326,9 @@ export class ChatEngine implements TurnTrackerHost {
         hop: 0,
         deliveryBotIds: targets,
         scheduleRun: input.scheduleRun,
+        ...(input.sessionIdentity
+          ? { sessionIdentity: structuredClone(input.sessionIdentity) }
+          : {}),
       });
       // A group takes the floor as an addressed user line does; a direct chat has one Bot.
       if (group) this.track(this.discussions.start(chat.id, "addressed", targets), chat.id);
@@ -565,6 +570,7 @@ export class ChatEngine implements TurnTrackerHost {
       bot,
       title,
       room ? renderRoomContract(room) : undefined,
+      lines.findLast((line) => line.sender.kind === "user")?.sessionIdentity,
     );
     if (session.replaced) await this.appendSystem(chatId, replacementNotice(bot, session.replaced));
     const deliveredSeq = Math.max(...lines.map((entry) => entry.seq));

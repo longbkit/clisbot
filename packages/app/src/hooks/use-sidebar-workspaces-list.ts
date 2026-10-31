@@ -12,6 +12,7 @@ import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { useTranslation } from "react-i18next";
 import { useHostFeatureMap } from "@/runtime/host-features";
 import { useCallback, useEffect, useMemo } from "react";
+import { useHeldWhileInactive } from "./use-held-while-inactive";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
 import { useSessionStore } from "@/stores/session-store";
@@ -108,10 +109,13 @@ export interface SidebarWorkspacesListResult {
 export function useSidebarWorkspacesList(options?: {
   hostFilters?: readonly string[];
   enabled?: boolean;
+  /** Hold every derived value, for a hidden retained pane (`SidebarModelProvider`). */
+  held?: boolean;
 }): SidebarWorkspacesListResult {
   const runtime = getHostRuntimeStore();
 
   const isActive = options?.enabled !== false;
+  const live = options?.held !== true;
 
   const serverIds = useSidebarHostIds(options?.hostFilters);
   const health = useDirectoryHealth(serverIds, "workspaces");
@@ -138,12 +142,12 @@ export function useSidebarWorkspacesList(options?: {
     groupMode === "project" && (workspaceSort === "manual" || workspaceSortSupported)
       ? workspaceSort
       : undefined;
-  const { projects: hostProjects } = useWorkspaceStructure(directoryServerIds, sort);
+  const { projects: hostProjects } = useWorkspaceStructure(directoryServerIds, sort, live);
 
   const selectPlacements = useMemo(createSidebarWorkspacePlacementSelector, []);
   const botProjectKeys = useSidebarBotProjectKeys();
   const showBotProjects = useShowBotProjects().visible;
-  const quickChatRoots = useQuickChatRoots(directoryServerIds);
+  const quickChatRoots = useHeldWhileInactive(useQuickChatRoots(directoryServerIds), live);
   const quickChatName = useTranslation().t("home.start.quickChat");
   const sidebarModel = useMemo(() => {
     const quickKeys = quickChatProjectKeys(hostProjects, quickChatRoots);
@@ -206,18 +210,32 @@ export function useSidebarWorkspacesList(options?: {
   // Read pending state independently of demand activation: the first visible retained frame
   // can precede activation, and must not claim a ready empty directory.
   const isLoading = health.status === "loading" || health.status === "refreshing";
-  const loadingState = {
-    isLoading,
-    isInitialLoad: isLoading && !health.hasAcceptedResult,
-    isRevalidating: isLoading && (health.hasAcceptedResult || projects.length > 0),
-  };
+  const isInitialLoad = isLoading && !health.hasAcceptedResult;
+  const isRevalidating = isLoading && (health.hasAcceptedResult || projects.length > 0);
 
-  return {
-    workspaceSortSupported,
-    workspacePlacements,
-    projects,
-    projectNamesByViewKey,
-    ...loadingState,
-    refreshAll,
-  };
+  // Clisbot: SidebarModelProvider spreads this into its context value; a fresh object every render
+  // re-rendered the whole Work tree.
+  const result = useMemo(
+    () => ({
+      workspaceSortSupported,
+      workspacePlacements,
+      projects,
+      projectNamesByViewKey,
+      isLoading,
+      isInitialLoad,
+      isRevalidating,
+      refreshAll,
+    }),
+    [
+      workspaceSortSupported,
+      workspacePlacements,
+      projects,
+      projectNamesByViewKey,
+      isLoading,
+      isInitialLoad,
+      isRevalidating,
+      refreshAll,
+    ],
+  );
+  return useHeldWhileInactive(result, live);
 }

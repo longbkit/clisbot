@@ -6,8 +6,8 @@ export interface StripHost {
   label: string;
   local: boolean;
   status: HostRuntimeConnectionStatus;
-  /** Latest agent activity on this Host, ms since epoch; the closest thing to "last used". */
-  lastActivity: number | null;
+  /** The Host has at least one unarchived session: the closest thing to "used". */
+  hasSessions: boolean;
   hubOrigin: string | null;
   /**
    * Shown by name: this computer, a Host added directly, or one from a Hub small enough to list.
@@ -83,7 +83,7 @@ export function connectionIssues(
   hubs: readonly StripHub[],
 ): StripIssue[] {
   const issues: StripIssue[] = hosts
-    .filter((host) => isDown(host.status) && (host.named || host.lastActivity !== null))
+    .filter((host) => isDown(host.status) && (host.named || host.hasSessions))
     .map((host) => ({
       kind: "host",
       serverId: host.serverId,
@@ -95,6 +95,44 @@ export function connectionIssues(
     if (hub.state === "setup" || hub.state === "signIn" || hub.state === "unreachable")
       issues.push({ kind: hub.state, origin: hub.origin, name: hub.name });
   return issues;
+}
+
+interface SessionAgentSource {
+  agents: ReadonlyMap<string, { archivedAt?: Date | null }>;
+}
+
+const liveAgentsByMap = new WeakMap<object, boolean>();
+
+function hasLiveAgent(agents: SessionAgentSource["agents"]): boolean {
+  const cached = liveAgentsByMap.get(agents);
+  if (cached !== undefined) return cached;
+  let live = false;
+  for (const agent of agents.values()) {
+    if (agent.archivedAt) continue;
+    live = true;
+    break;
+  }
+  liveAgentsByMap.set(agents, live);
+  return live;
+}
+
+/**
+ * Which Hosts have an unarchived session, as one string for a session-store selector: a session
+ * update that does not change the set keeps the key, so subscribers do not re-render. Each agent map
+ * is scanned once; the store replaces the map when an agent changes.
+ */
+export function hostsWithSessionsKey(
+  sessions: Readonly<Record<string, SessionAgentSource | undefined>>,
+): string {
+  const serverIds: string[] = [];
+  for (const [serverId, session] of Object.entries(sessions)) {
+    if (session && hasLiveAgent(session.agents)) serverIds.push(serverId);
+  }
+  return serverIds.sort().join("\n");
+}
+
+export function parseHostsWithSessionsKey(key: string): ReadonlySet<string> {
+  return new Set(key ? key.split("\n") : []);
 }
 
 export function onlineSummary(hosts: readonly StripHost[]): { online: number; total: number } {

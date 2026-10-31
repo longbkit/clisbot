@@ -19,7 +19,7 @@ vi.mock("@/runtime/host-runtime", () => ({
 import type { ChatRenderRow } from "@/clisbot/bots/chat/render-model";
 import { useHostHeartbeats } from "./use-heartbeats";
 import { useChatTurnHeartbeats } from "./use-chat-turn-heartbeats";
-import { schedulesQueryKey } from "@/hooks/use-schedules";
+import { schedulesConnectionKey, schedulesQueryKey } from "@/hooks/use-schedules";
 const row = (key: string, seq = 1): ChatRenderRow => ({
   kind: "bot",
   key,
@@ -34,7 +34,10 @@ const row = (key: string, seq = 1): ChatRenderRow => ({
     agentId: "agent",
   },
 });
-const key = [...schedulesQueryKey(["host"]), "online"];
+const key = [
+  ...schedulesQueryKey(["host"]),
+  schedulesConnectionKey(["host"], new Map([["host", "online"]])),
+];
 let client: QueryClient;
 beforeEach(() => {
   client = new QueryClient({

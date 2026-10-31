@@ -1,3 +1,5 @@
+import type { ChatPayload } from "@/clisbot/bots/data/contracts";
+import type { HostTagged } from "@/clisbot/bots/data/aggregate";
 import { useCallback, useMemo, useState } from "react";
 import { View, type LayoutChangeEvent } from "react-native";
 import { useRouter, type Href } from "expo-router";
@@ -7,15 +9,22 @@ import { ChipButton } from "@/components/ui/filter-chips";
 import { CONTROL_HEIGHTS } from "@/components/ui/control-geometry";
 import { SPACING } from "@/styles/theme";
 import { PinMark } from "@/components/ui/pin-mark";
+import { useRetainedPanelActive } from "@/components/retained-panel";
 import { usePinnedRows, type PinRow } from "@/clisbot/bots/sidebar/use-pinned-rows";
 import { rememberChatReturn } from "@/clisbot/home/mobile-navigation";
 import { useBotCatalog } from "@/clisbot/bots/data/runtime";
 import { useNavigationActivity } from "./activity";
-import { resolveBotOwnership, resolveOwnership, type Ownership } from "./ownership";
+import { directChatForBot } from "@/clisbot/bots/sidebar/sidebar-model";
+import { participationKeyOf } from "./ownership-key";
+import { useChatOwnership } from "./use-chat-ownership";
+import { useOwnershipHosts } from "./use-ownership-hosts";
+import { resolveOwnership, type Ownership } from "./ownership";
 import { fitPinTags, splitPinTags, type PinTag } from "./pin-tags-model";
 import { useReaderAccounts } from "./reader";
 import { HOME_PATH } from "./sections";
 import { useNavigationStore } from "./store";
+
+const NO_CHATS: readonly HostTagged<ChatPayload>[] = [];
 
 interface RowTag extends PinTag {
   row: PinRow;
@@ -23,8 +32,13 @@ interface RowTag extends PinTag {
 
 function useRowOwnership() {
   const accounts = useReaderAccounts();
+  const hostKinds = useOwnershipHosts();
   const { workspaceAuthor } = useNavigationActivity();
   const { bots, chats } = useBotCatalog();
+  const { chatOwnership, botOwnership } = useChatOwnership(
+    chats.loadState.status === "loaded" ? chats.loadState.data : NO_CHATS,
+    useRetainedPanelActive(),
+  );
   return useCallback(
     (row: PinRow): Ownership => {
       if (row.kind === "bot") {
@@ -34,7 +48,11 @@ function useRowOwnership() {
                 (entry) => entry.serverId === row.bot.serverId && entry.id === row.bot.botId,
               )
             : undefined;
-        return resolveBotOwnership(bot ?? {}, accounts);
+        const direct =
+          chats.loadState.status === "loaded"
+            ? directChatForBot(chats.loadState.data, row.bot.serverId, row.bot.botId)
+            : undefined;
+        return botOwnership(bot ?? { serverId: row.bot.serverId }, direct ?? undefined);
       }
       if (row.kind === "chat") {
         const chat =
@@ -43,18 +61,30 @@ function useRowOwnership() {
                 (entry) => entry.serverId === row.chat.serverId && entry.id === row.chat.chatId,
               )
             : undefined;
-        return resolveOwnership({ createdBy: chat?.record?.createdBy, accounts });
+        return chat ? chatOwnership(chat) : "unknown";
       }
       if (row.kind === "workspace" || row.kind === "session")
         return resolveOwnership({
           createdBy:
-            (row.kind === "session" ? row.session.agent.createdBy : undefined) ??
-            workspaceAuthor(row.workspace.serverId, row.workspace.workspaceId),
+            row.kind === "session"
+              ? row.session.agent.createdBy
+              : workspaceAuthor(row.workspace.serverId, row.workspace.workspaceId),
+          participationKey:
+            row.kind === "session" ? participationKeyOf(row.session.agent) : undefined,
           accounts,
+          hostKind: hostKinds.get(row.workspace.serverId) ?? "unknown",
         });
-      return "mine";
+      return "unknown";
     },
-    [accounts, bots.loadState, chats.loadState, workspaceAuthor],
+    [
+      accounts,
+      hostKinds,
+      chatOwnership,
+      botOwnership,
+      bots.loadState,
+      chats.loadState,
+      workspaceAuthor,
+    ],
   );
 }
 

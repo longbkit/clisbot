@@ -9,6 +9,11 @@ import type { HostRuntimeConnectionStatus } from "@/runtime/host-runtime";
 export interface NewWorkspaceInitialServerInput {
   allServerIds: readonly string[];
   routeServerId: string | null | undefined;
+  /**
+   * Clisbot Home: the Host of the composer's remembered start. While it is in `allServerIds` it
+   * wins whatever its connection status, so Hosts connecting at a cold start cannot replace it.
+   */
+  rememberedServerId?: string | null;
   lastActiveProject: HostProjectListItem | null;
   projects: readonly HostProjectListItem[];
   hostConnectionStatusByServerId: ReadonlyMap<string, HostRuntimeConnectionStatus>;
@@ -120,6 +125,10 @@ export function resolveNewWorkspaceInitialServerId(input: NewWorkspaceInitialSer
   if (routeServerId) {
     return routeServerId;
   }
+  const rememberedServerId = knownServerId(serverIds, input.rememberedServerId);
+  if (rememberedServerId) {
+    return rememberedServerId;
+  }
 
   const onlineServerIds = input.allServerIds.filter((serverId) =>
     isOnline(input.hostConnectionStatusByServerId, serverId),
@@ -190,6 +199,10 @@ export function resolveNewWorkspaceAutomaticServerId(
   const serverIds = new Set(input.allServerIds);
   const currentServerId = knownServerId(serverIds, input.currentServerId);
   const nextServerId = knownServerId(serverIds, input.nextServerId) ?? input.allServerIds[0] ?? "";
+  const rememberedServerId = knownServerId(serverIds, input.rememberedServerId);
+  if (rememberedServerId && !knownServerId(serverIds, input.routeServerId)) {
+    return rememberedServerId;
+  }
   if (!currentServerId || currentServerId === nextServerId) {
     return nextServerId;
   }

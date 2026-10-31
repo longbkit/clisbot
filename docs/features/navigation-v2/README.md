@@ -24,10 +24,12 @@ set to `"0"` turns it off (`"1"` or absent leaves the build's choice). Native bu
 env. New code lives in `clisbot/navigation/`. Old and new navigation are separate components; shared
 files branch on the flag at their entry point only (see [Flag removal](#flag-removal)).
 
-**Names.** The section the code calls `work` reads **Workspace** in every locale; its route
-(`/work`), ids and test ids keep `work`. Home's mode switch reads Chat · Workspace · All (vi: Chat ·
-Workspace · Tất cả). Tasks is Tasks / Công việc, and in Vietnamese "Công việc" names Tasks only.
-Other locales use their word for workspace and a different word for tasks
+**Names.** The section the code calls `work` reads **Work** in the rail, the phone tab and Home's
+mode switch (Chat · Work · All; vi: Chat · Work · Tất cả); its route (`/work`), ids and test ids keep
+`work`. It was Workspace until 2026-10-29. Tasks is Tasks / Công việc, and in Vietnamese "Công việc"
+names Tasks only. Korean and Vietnamese keep the English word because their natural word for work is
+the word they use for Tasks.
+Other locales use their word for work and a different word for tasks
 (`i18n/resources/navigation.ts`; `navigation-naming.test.ts` checks that every locale has every key
 and that the two never collide). The mode switch's All and the scope tabs' All share one word; each
 sits in its own labelled control.
@@ -46,10 +48,10 @@ The primary navigation says where you are; each section owns its header, filters
   window's top-left corner. Chats and Workspace open the existing resizable list pane
   (`components/desktop-sidebar-frame.tsx`, shared with the Home V2 sidebar); clicking the active
   one, or ⌘B, hides or shows it. Home, Schedules, Tasks, Connectors and More have no list pane.
-- **Phone** (`clisbot/home/mobile-navigation.tsx`, `mobile-tabs.tsx`): tabs Home · Chats ·
-  Workspace · Lịch · More. Chats and Workspace are both list tabs: the same retained `agent-list`
-  panel shows the Chats or Workspace list, so native presentation, the pending-detail shell and the Back return path
-  stay one implementation (`isListTabPath`, `currentListTabPath`). More is the `/more` page.
+- **Phone** (`clisbot/home/mobile-navigation.tsx`, `mobile-tabs.tsx`, `app/(tabs)`): tabs Home ·
+  Chats · Work · Lịch · More in one retained tab navigator ([phone tabs][phone-tabs]). Chats and
+  Work render their lists as the tab screen (`PhoneListTab`); details push above the tabs and Back
+  pops to them ([route topology][phone-tab-routes]). More is the `/more` tab.
 - **One component per job** across Home, Chats and Workspace: `SectionHeader`, `SectionControls` (For
   me / Others / All, chips, then the Display row, on one inset), `DisplayMenuTrigger`
   ("Display ▾", with a dot while a filter is in force), `HostsDisplayItems`, `ChipRow` /
@@ -67,9 +69,19 @@ The primary navigation says where you are; each section owns its header, filters
   component. A `FlatList`'s `contentContainerStyle` gets no Unistyles class on web
   ([unistyles](../../unistyles.md#main-gotcha-contentcontainerstyle)), so Chats and the flat
   Workspace list use theme-free `SPACING` insets.
-- **Chats and Workspace stay mounted** once opened (`ListContent` in `list-panel.tsx`) and swap
-  visibility, so switching between them never rebuilds a 500-row list. Their rows are memoized and
-  compare entries by value: a rename or a new message re-renders that row only.
+- **Retention**: a visited section stays mounted, so a switch only flips visibility and keeps
+  scroll position. On desktop Chats and Work are retained panels in the list pane (`ListContent` in
+  `list-panel.tsx`); on phones every tab is ([phone tabs][phone-tabs]). A hidden list holds its
+  inputs (`useHeldWhileInactive`): desktop Work reads the sidebar model through
+  `RetainedSidebarModel`, a phone's Work tab holds its own provider's inputs (`holdWhileInactive`),
+  Chats holds its catalog and unread agents in `ChatsPane`, and a phone's hidden Home holds the
+  navigation activity. Host updates skip a hidden section; its first render back uses the latest
+  data. Until 2026-10-30 a phone tab switch replaced the route (and Android also unmounted hidden
+  lists), so every switch rebuilt the screen: 2 s or more on a production build, about 2 s for
+  Work on a Galaxy S23 with 14 Hosts.
+
+[phone-tabs]: ../../mobile-panels.md#phone-tabs
+[phone-tab-routes]: ../../expo-router.md#phone-tabs
 
 ## Change map
 
@@ -148,22 +160,58 @@ lines are dimmed and the percent gets a `~` prefix.
 
 ## For me / Others / All
 
-`resolveOwnership({ createdBy, accounts, watched })` returns `mine`, `others` or `unknown`:
+`resolveOwnership({ createdBy, participationKey, accounts, hostKind, watched })` is the shared
+predicate for Home (including its badge), Chats, Workspace, pin tags, search and tab counts.
+It returns `mine`, `others` or `unknown`.
 
-- No author, a non-user author (automation, system), or a user author with no Hub scope (a direct
-  connection): **mine** (provisional, brief 1.3). A Host older than session authorship sends no
-  `createdBy`, so all of its work lands here.
-- A user author from a Hub with a known reader on this device: **mine** when that account made
-  it (`isOwnActor`: member id, else user id), else **others**.
-- A user author from a Hub with no known reader (not signed in, never signed in, or the account
-  not resolved yet): **unknown**, "cannot tell". Never **mine**: that listed other members' work
-  under For me.
-- `watched === true` (Round 2) makes anything **mine**; the predicate already takes the input.
+A Host is **Hub-bound** when its registered `HostProfile.management` binding exists, including
+managed-access mode `off` and a direct TCP transport. A personal Hub follows the same rule as a
+company Hub. On these Hosts:
 
-**Unknown** is listed under Others and All, never For me: it is not the reader's own work, and
-For me stays a claim the app can back. Its count joins Others, so For me + Others = All. It is a
-transient state: it ends when the Hub's account resolves, and the reader is remembered across it
-(below).
+- A verified relationship through the creator **or any participant** makes the item **mine**:
+  its `createdBy`, `lastMessageBy` or any `participantActors` entry matches the reader on that Hub
+  (`isOwnActor`: member id, else user id). Participation counts even when another person or an
+  automation created the session. `lastInteractionBy` is not participation evidence.
+- Channel actors need a verified Member link; a provider id alone cannot match a Hub account.
+  An unresolved reader or an actor from another Hub does not prove a relationship.
+- Without matching creator or participation evidence, a verified other user creator is **others**.
+- With no verified creator (missing, automation, system or an unscoped user, including
+  `LOCAL_OWNER`), a verified participant who is not the reader makes the item **others**: a subagent
+  a teammate drives on a shared sandbox records no creator, only that teammate's messages (Owner,
+  2026-10-31). Only when no verified person appears at all is it **unknown**. Neither titles nor a
+  parent workspace/chat author supply that evidence.
+
+A registered Host without a management binding keeps the previous direct-Host behavior for now:
+missing creators, automation, system and unscoped users are mine. This is a compatibility exception,
+not proof of daemon ownership (pairing can delegate access). `KEEP_DIRECT_LEGACY_OWNERSHIP` is its
+single switch, tested both ways. A Host missing from the registry is always **unknown**.
+`watched === true` is the explicit Round 2 override on a registered Host; no live caller sets it.
+
+**Unknown** is listed under For me and All, never Others (Owner, 2026-10-31). Its count joins For
+me, so For me + Others = All; only a proven other person is Others. `isReaderOwned` in
+`ownership.ts` is the single predicate every consumer reads (scopes, counts, Home badge, pin tags,
+search ranking). The resolver still returns `unknown`, so the distinction stays available. The
+scope tabs' help icon about unknown ownership shows on the tabs that list it (For me and All). It may
+persist for legacy sessions without identity evidence; a temporarily missing reader can resolve
+later using the remembered account below.
+
+**Why unknown moved to For me.** Sessions the desktop app starts on its own Host carry no creator
+and no participant, because the local connection has no Hub account. Under the 2026-10-29 rule
+about 700 of the owner's own Mac sessions were listed under Others. Evidence that cannot place an
+item no longer moves it away from the reader; a verified other creator still does. Consequences:
+on a Host missing from the registry everything is For me until the Host is classified, and a Hub
+session whose creator is absent, an automation or the system is For me unless participation or a
+creator proves another person.
+
+**Why the provisional rule was removed (2026-10-29, superseded above).** A watchdog-only app probe of 14 real
+Hub-bound Hosts found 38 of 3,359 sessions admitted to For me solely because `createdBy` was absent.
+All 38 reported authorship `ready`; none matched the reader through last sender or participants.
+The initial fix, which accepted participation only for creatorless sessions, changed that snapshot
+from 181/3,178/3,359 to 143/3,216/3,359 (mine/others/all). That probe did not collect participation
+for authored sessions, so these historical totals do not predict the broader creator-or-participant
+rule above.
+No direct Host was present in that sample. The probe reads aggregate metadata already in the app;
+no timeline fetch or diagnostic probe ships with the ownership fix.
 
 **The reader on a Hub** (`reader.ts`, `reader-accounts.ts`, `hub/reader-memory.ts`) is the live
 signed-in account, else the last one this device verified for that Hub (persisted per Hub origin,
@@ -186,12 +234,25 @@ author matches the reader's Hub by `hubIdentity` against that `hubId` when both 
 canonical origin (scheme, host and port, no trailing slash) against the account's origin or its
 connection route. Two Hubs at one address with different identities are two Hubs.
 
-Authors: a session's own `createdBy` (the agent snapshot and `AgentDirectoryEntry` carry it), else
-its workspace's; a Bot DM its Chat's (`ChatPayload.record.createdBy`); a Bot row without a chat the
-Host's `isOwner` projection, else the Bot's `owner`. Home, the Workspace list, pin tags and global
-search all read the session's author, so a teammate's session in a workspace the reader created is
-Others. A channel-started session is the reader's only when its snapshot carries the reader's
-verified `memberId`. In pin tags and in search an unknown item is one of the others, hidden by For me.
+A session never inherits its workspace's or chat's author. Empty workspaces use their own
+`createdBy`. A Bot DM uses its Chat's `record.createdBy` and already loaded participant
+sessions can supply sender evidence, but not their creators. A Bot without a chat uses its owner
+snapshot. The Host's `isOwner` flag alone does not establish ownership on a Hub-bound Host.
+
+`AgentDirectoryEntry` projects a scalar `participationKey` for every session with sender evidence.
+It contains deduplicated sender identity fields, not names, avatars or whole actor arrays. The
+resolver compares these with current readers, so a reader change does not require reprojection.
+A bounded 2,048-entry cache uses the shared `ownershipKey` (creator, participation, immutable reader
+accounts identity and Host kind); changing a binding or reader invalidates the result. Projector
+caches retain immutable source identities and compute participant identities once per source;
+profile-only changes do not alter the key. Workspace count caches compare participation even
+when a creator exists.
+
+A chat's participation key is cached on its payload (`clisbot/navigation/chat-ownership.ts`), so
+Home's pin tags and the Chats pane derive it once between them. It is recomputed only when the
+chat's Host replaces its agents map and a participant session actually changed; the session store
+replaces that map on every agent update and never edits it in place. A hidden Chats pane or Home
+holds its keys and re-reads them when shown.
 
 The scope applies first everywhere; pins only reorder inside it. A pin (a resource pin, or a
 workspace pinned on the Host, which every reader sees) never brings another member's session into
@@ -266,16 +327,21 @@ the mode switch and search (the tab bar already says Home).
   bucket — approvals and failures — limited to unseen issues; Failed lists failures with seen ones
   below, dimmed. Counts are the reader's scope; Needs me and Failed count unseen only.
 - **Feed**. Home's activity layout (`useActivityLayout`) takes the filtered rows and a bucket per
-  row, adding a `seen` group. Background changes still wait behind Show updates; a change the
+  row, adding a `seen` group. `buildHomeFeed` derives the shown rows, their buckets, Mark all as
+  seen and every count in one pass, and its cache keeps whatever did not change, so an update to a
+  session the feed does not show re-renders nothing on Home. The layout does not sort: the
+  aggregated list is already newest first apart from open turns and ties, so it merges those runs
+  (ties by `serverId:id`). Background changes still wait behind Show updates; a change the
   reader makes (a filter, Mark as seen, Dismiss, Archive) applies at once. The feed has no caption:
   loading is the skeleton, and the directory line appears only when a connected Host's list fails —
   a Host that drops is the connection notice's to say. The feed renders one frame after the
   header, composer and filters, so switching to Home paints the top of the page first.
-- **States**. Home, Chats and Workspace share `ListState`: the skeleton while a Host connects, one
-  offline line once no Host can be reached (`useHostsReachability`; Chats and Workspace add View
+- **States**. Home, Chats and Workspace share `ListState`: the skeleton while a Host connects and
+  nothing is held for it, one offline line once no Host can be reached (`useHostsReachability`; Chats and Workspace add View
   details, which opens the connection sheet), empty, and filtered-empty.
 - **Rows never blank.** Once a list has rows it does not go back to a skeleton, an empty state or
-  nothing for a refresh, a Bot change or a Host reconnecting. Bot and chat queries key on each
+  nothing for a refresh, a Bot change or a Host reconnecting. Rows restored from the device count:
+  a cold start lists them, cached, while their Hosts connect (`home-cached-sessions.spec.ts`). Bot and chat queries key on each
   Host's admission, so a managed Host's reconnect starts a new query; `useAggregatedQuery` holds each
   Host's last rows for display until that Host answers again (`holdAggregateRows`), while
   `acceptedServerIds` still proves only the current admission. Each Host's Bot/chat event feed restarts only on
@@ -382,7 +448,7 @@ Delete or collapse to the V2 branch:
 | `screens/sessions-screen.tsx`                                                               | keep only `InboxHistory` (embedded); drop the standalone screen and its `MenuHeader`                                                                                                                                                                                                                                                                                                |
 | `screens/new-workspace-screen.tsx`                                                          | `StartLayout` always uses `NavigationHomeLayout` for Home                                                                                                                                                                                                                                                                                                                           |
 | `clisbot/home/home-header.tsx`                                                              | always `NavigationHomeHeader`; delete `MobileToolbar` (`clisbot/home/mobile-toolbar.tsx`)                                                                                                                                                                                                                                                                                           |
-| `clisbot/home/mobile-navigation.tsx`                                                        | drop `HOME_V2_TABS` and the `/sessions` badge/label branch; `LIST_TAB_PATHS` = Chats, Workspace                                                                                                                                                                                                                                                                                     |
+| `clisbot/home/mobile-navigation.tsx`                                                        | drop `HOME_V2_TABS`, the `/sessions` badge/label branch, `MobileChatPanelTabs` and the panel branch of `Tab`; `usesPhoneTabs` = compact                                                                                                                                                                                                                                             |
 | `clisbot/home/list-tab-page.tsx`                                                            | drop the non-V2 branches                                                                                                                                                                                                                                                                                                                                                            |
 | `clisbot/home/activity-state.tsx`                                                           | Needs link always sets the chip; label "Needs me"                                                                                                                                                                                                                                                                                                                                   |
 | `clisbot/home/activity-preview.tsx`                                                         | delete `HomeActivity` (replaced by `home-feed-view.tsx`)                                                                                                                                                                                                                                                                                                                            |
@@ -477,15 +543,13 @@ Native iOS/Android were not run.
 ## Native
 
 Everything is shared React Native code with Unistyles tokens and the existing primitives; there is
-no DOM path. Phones keep the Home V2 native model: peer tabs replace their route, Chats and Workspace
-are the retained list panel with its pending-detail shell, Android Back follows the tab rules, and
-iOS swipe-back is the native stack's. Chats is a virtualized `FlatList`; Workspace is the existing
+no DOM path. Phones (native and compact web) use the retained [phone tabs][phone-tabs]: a detail
+pushes on the root stack, Android Back pops it to the tab it came from (a tab other than Home goes
+Home; Home leaves the app), and iOS swipe-back is the native stack's. Chats is a virtualized
+`FlatList`; Work is the existing
 workspace list in Project grouping and a virtualized `FlatList` in Session and Workspace grouping;
 the Home feed keeps Home's existing scroller. Chips and pin
-tags stay visually compact and reach 44pt through `hitSlop`. On web only, a tab that opens the
-list panel changes the route one frame after presenting the panel, because the panel presents a
-frame after the store changes and the outgoing page would otherwise leave one blank frame; native
-keeps its own presentation. `HoldReadingPosition` compensates from `onLayout`, which on native can
+tags stay visually compact and reach 44pt through `hitSlop`. `HoldReadingPosition` compensates from `onLayout`, which on native can
 land a frame after the change, so a native recording should confirm S1; the scope and mode switches use the
 44pt segmented size on phones. The issue store persists only when a record changes (a new occurrence or a reader mark), as one small JSON write through AsyncStorage; observing an unchanged directory writes nothing. Native iOS/Android builds were not run for
 Round 1.

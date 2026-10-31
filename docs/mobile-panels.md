@@ -7,9 +7,63 @@ Compact layouts have three mutually exclusive destinations:
 - `file-explorer` on the right
 
 They are one interaction, not two independent drawers. The implementation lives in
-`packages/app/src/mobile-panels/`.
+`packages/app/src/mobile-panels/`. Navigation V2 phones never open `agent-list`: Chats and Work are
+[phone tabs](#phone-tabs).
+
+## Phone tabs
+
+Navigation V2 phones switch Home, Chats, Work, Schedules and More the way Slack does: instantly,
+with no remount. `PhoneTabs` (`clisbot/home/phone-tab-navigator.tsx`) is a `TabRouter` with its own
+view, not the bottom-tabs view:
+
+- Once startup settles, every unvisited tab mounts hidden, one per idle slot
+  (`requestIdleCallback`, a short timer on Safari), each in a transition a press can interrupt.
+  A first visit is then a visibility flip, not a mount: on 2026-10-30 a first visit to Work (about
+  6,100 items, 14 Hosts) took 833–1033 ms with no change on screen. A mounted tab never unmounts.
+  Each tab is a `RetainedPanel` in route order, a stable sibling order.
+- Startup settles when the cache restore is done and every restored Hub Host is online, or 10 s
+  after the registry restore (`clisbot/home/after-startup.ts`). The idle callback's 2 s timeout
+  had mounted Work during the restore and the connects
+  ([cold-start JS thread](features/offline/connection-resilience.md#cold-start-js-thread)). A tab
+  pressed before then mounts on the press.
+- The tab bar (`MobileTabBar`) dispatches the switch on the tab navigator. The press's commit
+  shows and activates the target and hides the old tab; its held panes render the latest value in
+  that commit, except Work's model (below). No animation, no settlement, no focus-event round
+  trip. Panels are never detached or frozen. Do not defer activation (`useDeferredValue`): on 2026-10-30 a busy JS thread
+  postponed the deferred render until the next input, and that input, the first row tap on the
+  tab, was lost.
+- A pre-mounted tab holds what it rendered at mount until its first visit, then catches up in the
+  press's commit. Work is the exception below.
+- Hidden tabs see an inactive `useRetainedPanelActive`. Chats and Work hold their inputs as below;
+  Home holds the navigation activity (`HeldNavigationActivity`); each tab's route renders memoized
+  content, so a switch re-renders the routes and not their screens.
+- A tab screen never gates its content on `useIsFocused`: the retained panel already hides it, and
+  a focus gate unmounts the content on every hide and rebuilds it on every show. Schedules without
+  a Hub or Bots Host did that through `SchedulesScreen` (every Host's schedules, agents and
+  directory demand); its phone tab renders `SchedulesScreenContent` directly.
+- Chats and Work render their panes directly as the tab screen (`PhoneListTab`). Work owns the
+  phone's only `SidebarModelProvider` there, because the sidebar chrome's provider does not reach
+  routes; the chrome mounts none on phone tabs, and Work also feeds the workspace shortcut targets.
+  The provider takes `holdWhileInactive`: hidden, it derives nothing (O(workspaces) per Host update
+  otherwise). Shortcut targets stay as Work last showed them until it catches up.
+- Work's catch-up does not run in the press's commit. On 2026-10-30, re-deriving the model over
+  about 6,100 workspaces and re-rendering the list held every switch to Work for 167–367 ms with
+  nothing on screen. The press shows Work with the held model and rows; `useActiveAfterShow`
+  (`hooks/use-held-while-inactive.ts`) moves the provider's catch-up and the list's drag-host
+  flag to a low-priority render after it, which input interrupts. Only the content waits. The
+  panel's activation stays in the press, so the first row tap is not lost. A tap on a held row
+  opens that row's workspace: rows are keyed by Host and workspace id, and the catch-up keeps the
+  keys. A row for a workspace removed while Work was hidden can open until the catch-up lands.
+- Keep the provider's inputs referentially stable. Each provider render that changes one reruns
+  the placement build, which compares every workspace. `useAggregatedQuery` used to return a new
+  `loadState` on every render. The Bot project keys derive from it, so every Work render, the
+  press included, rebuilt all placements.
+
+Route topology, Back and deep links are in [Expo Router](expo-router.md#phone-tabs).
 
 ## Home navigation
+
+This section is the Home V2 layout, which `EXPO_PUBLIC_CLISBOT_NAVIGATION_V2=0` restores.
 
 The Home extension (`HOME_V2_ENABLED`) adds Home / Chat / Inbox / Automations tabs above the
 existing panel model. Chat is a page, not a drawer: `/chat` selects `agent-list`, the switch has no
@@ -48,6 +102,9 @@ reversal need not emit another appearance end. A first/unpresented screen still 
 actual appearance; parent, stale phase, canceled intent and changed panel generation cannot
 complete the destination.
 
+Before any of this, a native phone's deck entry shows the session shell for one JS task, so the
+press's frame does not wait for the workspace screen's mount
+([offline cache](features/offline/offline-cache.md#the-open-shell)). A chat route does the same.
 Native compact workspace entry keeps its existing header/Back surface separate from first pane
 materialization. The body waits for the existing outgoing Chat presentation boundary, then React
 prepares it at deferred render priority. Losing focus before that first body commits abandons the
@@ -176,7 +233,23 @@ definition, no longer eligible to begin.
   ownership and can detach descendants. Keep the tree mounted, stabilize its subscriptions/selectors,
   and use the retained-panel active signal to stop timers, polling, and other genuine background work.
   Hidden chat content is suspended on web only, through `retained-chat-content.web.tsx`, where DOM
-  nodes carry no Fabric ownership; the native file keeps the chat live.
+  nodes carry no Fabric ownership; the native file keeps the chat live. A hidden chat's stream
+  tail holds the rows it last showed (`agent-stream/use-agent-stream-tail.ts`), never an empty
+  list: the web freeze lands one commit after the hide, and a list emptied in that commit loses
+  its scroll range, so the reading position was gone on return.
+- To stop hidden re-renders, hold the pane's inputs at its owner with `useHeldWhileInactive`
+  (`hooks/use-held-while-inactive.ts`) and pass them to a memoized body. The owner still subscribes;
+  the body skips every update until the panel is active, then renders once with the latest value.
+  Hold the derived model, not each row. When the owner itself derives the model, hold its inputs
+  instead, so a hidden pane runs no derivation at all (`SidebarModelProvider` with
+  `holdWhileInactive`). A model several pane components need (the display menu and the filter
+  chips both list session users and channels) is derived once in the model, not in each reader.
+  For a context read deep in the pane, wrap the pane in
+  `HeldContextValue` (`components/held-context.tsx`) with a stable child element.
+- A retained pane's components do not read the whole route: it changes on every navigation,
+  hidden tabs included. Select the fact they render ([route reads](expo-router.md#route-reads)),
+  or read it from a small provider that already selects it, as the Work list reads
+  `useIsSidebarOnWorkspaceRoute` from `WorkspaceSessionsAutoCollapseProvider`.
 - Catalog-backed surfaces narrow external-store snapshots and preserve unchanged directory row
   identity through the shared aggregation owner ([architecture](architecture.md)). Reducing hidden
   derivation work does not change the native workspace/tab retention limits or visibility ownership.
@@ -186,3 +259,9 @@ definition, no longer eligible to begin.
 `packages/app/src/mobile-panels/model.test.ts` exercises command, drag, cancellation, interruption,
 rapid-command, position-settlement, and width-projection sequences through the transition model. Add
 a sequence there whenever ownership or ordering changes.
+
+`clisbot/home/phone-tab-navigator.browser.test.tsx` runs the phone tab navigator in a real
+`NavigationContainer`: tabs pre-mount hidden one idle slot at a time, no tab unmounts, the press's
+commit shows and activates the target, and hidden tabs render zero times on store updates. `home-tab-navigation.test.ts` runs the root stack
+reducer for detail Back and cold deep links; `e2e/browser/navigation-v2.spec.ts` checks at 390px
+that switches and Back keep the same tab nodes.

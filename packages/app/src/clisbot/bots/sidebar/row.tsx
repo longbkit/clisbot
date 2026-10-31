@@ -34,6 +34,8 @@ interface BotsSidebarRowProps {
   selected: boolean;
   testID: string;
   onPress?: () => void;
+  /** The finger is down on the row: start loading what it opens. */
+  onPressIn?: () => void;
   /** Menu replaces the trailing metadata on hover/focus; touch keeps it visible. */
   onOpenMenu?: (anchor: Rect) => void;
   menuLabel?: string;
@@ -54,6 +56,7 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
   selected,
   testID,
   onPress,
+  onPressIn,
   onOpenMenu,
   menuLabel,
   pinned = false,
@@ -92,6 +95,7 @@ export const BotsSidebarRow = memo(function BotsSidebarRow({
         accessibilityState={accessibilityState}
         aria-selected={selected}
         onPress={onPress}
+        onPressIn={onPressIn}
         disabled={disabled}
         style={rowStyle}
         testID={`${testID}-press`}

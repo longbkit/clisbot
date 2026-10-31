@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HubAccountProvider, useHubAccount } from "./account-provider";
 import { HubAccountRequestError } from "@/device-access/hub-account-error";
 import { hubClientAuthorizationContinuation } from "./account-entry-route";
+import { HubSignInReplacedError, HubSignInStartError } from "./transport/auth-session";
 import { useReaderMemory } from "./reader-memory";
 import { useReaderAccounts, useRememberVerifiedReaders } from "@/clisbot/navigation/reader";
 
@@ -14,14 +15,19 @@ const INVITATION_URL =
 const testState = vi.hoisted(() => ({
   url: "",
   request: vi.fn(),
+  recoverSignIn: vi.fn(),
   signIn: vi.fn(),
   signOut: vi.fn(),
+  clearOffline: vi.fn(async (_origin: string) => undefined),
   sessionChanged: undefined as (() => void) | undefined,
   setParams: vi.fn(),
   configured: true,
   google: undefined as (() => Promise<void>) | undefined,
 }));
 vi.mock("expo-linking", () => ({ useURL: () => testState.url }));
+vi.mock("@/clisbot/offline-storage/hub", () => ({
+  clearHubOfflineData: (origin: string) => testState.clearOffline(origin),
+}));
 vi.mock("expo-router", () => ({
   useRouter: () => ({ setParams: testState.setParams }),
 }));
@@ -32,6 +38,7 @@ vi.mock("./transport/create", () => ({
   createHubTransport: () => ({
     signInKind: "password",
     request: testState.request,
+    recoverSignIn: () => testState.recoverSignIn(),
     signIn: (...input: unknown[]) => testState.signIn(...input),
     signOut: () => testState.signOut(),
     subscribeSessionChange: (listener: () => void) => {
@@ -335,6 +342,12 @@ describe("the reader across an explicit sign-out", () => {
     return view;
   }
 
+  it("clears what this Hub's Hosts left on the device when signing out", async () => {
+    testState.clearOffline.mockClear();
+    await signedOutWhileRefreshFails();
+    expect(testState.clearOffline).toHaveBeenCalledWith(ORIGIN);
+  });
+
   it("keeps the sign-out when the refresh after it fails and the query still holds the account", async () => {
     const view = await signedOutWhileRefreshFails();
     expect(view.result.current.hub.signedIn?.account.id).toBe("a");
@@ -427,5 +440,83 @@ describe("the reader across an explicit sign-out", () => {
     );
     await waitFor(() => expect(memory().signedOut[ORIGIN]).toBeUndefined());
     await waitFor(() => expect(readerIds(view)).toEqual(["a"]));
+  });
+});
+
+/** The provider reports the failure through `error`; the rejected promise is not the subject. */
+function ignoreFailure(): void {}
+
+describe("browser sign-in outcomes", () => {
+  beforeEach(() => {
+    testState.url = "";
+    testState.recoverSignIn.mockResolvedValue(false);
+    testState.request.mockImplementation(async () =>
+      Response.json({ status: "signedOut", registration: "invite_only" }),
+    );
+  });
+
+  it("shows the error when the browser cannot open", async () => {
+    testState.signIn.mockRejectedValueOnce(new HubSignInStartError(new Error("no browser")));
+    const { result } = setup();
+    await act(() => result.current.signIn().catch(ignoreFailure));
+    expect(result.current.error).toBe("Couldn't open the browser to sign in to Hub.");
+  });
+
+  it("does not report a sign-in a newer press replaced", async () => {
+    testState.signIn.mockRejectedValueOnce(new HubSignInReplacedError());
+    const { result } = setup();
+    await act(() => result.current.signIn().catch(ignoreFailure));
+    expect(result.current.error).toBeNull();
+  });
+});
+
+describe("a cold start with a stored sign-in", () => {
+  const signedOut = { status: "signedOut", registration: "invite_only" };
+
+  function renderColdStart() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>
+        <HubAccountProvider>{children}</HubAccountProvider>
+      </QueryClientProvider>
+    );
+    const seen: Array<string | undefined> = [];
+    const rendered = renderHook(
+      () => {
+        const value = useHubAccount();
+        seen.push(value.state?.status);
+        return value;
+      },
+      { wrapper },
+    );
+    return { ...rendered, seen };
+  }
+
+  beforeEach(() => {
+    testState.url = "";
+  });
+
+  it("reads the sign-in again before showing signed out, and never shows it meanwhile", async () => {
+    let recovered = false;
+    testState.recoverSignIn.mockImplementation(async () => {
+      recovered = true;
+      return true;
+    });
+    testState.request.mockImplementation(async () =>
+      Response.json(recovered ? active("org") : signedOut),
+    );
+    const { result, seen } = renderColdStart();
+    await waitFor(() => expect(result.current.state?.status).toBe("active"));
+    expect(testState.recoverSignIn).toHaveBeenCalledTimes(1);
+    expect(seen).not.toContain("signedOut");
+  });
+
+  it("shows signed out when no sign-in is stored", async () => {
+    testState.recoverSignIn.mockResolvedValue(false);
+    testState.request.mockImplementation(async () => Response.json(signedOut));
+    const { result } = renderColdStart();
+    await waitFor(() => expect(result.current.state?.status).toBe("signedOut"));
+    expect(testState.recoverSignIn).toHaveBeenCalledTimes(1);
+    expect(testState.request).toHaveBeenCalledTimes(1);
   });
 });

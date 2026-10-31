@@ -1,5 +1,7 @@
-import { useUnistyles } from "react-native-unistyles";
+import { useSyncExternalStore } from "react";
+import { UnistylesRuntime, useUnistyles } from "react-native-unistyles";
 import { isWeb } from "@/constants/platform";
+import { createAppCompactResumeHold } from "@/navigation/compact-resume-hold";
 
 export const FOOTER_HEIGHT = 75;
 
@@ -44,8 +46,14 @@ export function isCompactBreakpoint(breakpoint: string | undefined): boolean {
  */
 export function useIsCompactFormFactor(): boolean {
   const { rt } = useUnistyles();
-  return isCompactBreakpoint(rt.breakpoint);
+  const held = useSyncExternalStore(compactResumeHold.subscribe, compactResumeHold.get);
+  return held ?? isCompactBreakpoint(rt.breakpoint);
 }
+
+// A resuming Android activity can report a passing window size; the hold keeps the breakpoint.
+const compactResumeHold = createAppCompactResumeHold(() =>
+  isCompactBreakpoint(UnistylesRuntime.breakpoint),
+);
 
 // SplitContainer relies on dnd-kit and DOM-backed accessibility helpers.
 // Keep that capability distinct from desktop-width layout so touch tablets

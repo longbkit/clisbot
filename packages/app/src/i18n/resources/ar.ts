@@ -5,6 +5,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -248,10 +249,13 @@ export const ar: TranslationResources = {
   agentStream: {
     agent: "Agent",
     empty: "ابدأ الدردشة مع هذا الوكيل...",
+    loadingHistory: "جارٍ تحميل الرسائل…",
     scrollToBottom: "قم بالتمرير إلى الأسفل",
     historyLoadFailed: "تعذر تحميل سجل الوكيل",
     messageCapped: "تم اقتطاع هذه الرسالة ({{bytes}} بايت).",
     permission: {
+      reason: "سبب الحاجة إلى الموافقة",
+      blockedPath: "المسار المحظور",
       rejectedPlan: "خطة مرفوضة",
       approvedPlan: "خطة معتمدة",
       canceledPlan: "خطة ملغاة",
@@ -3097,5 +3101,6 @@ export const ar: TranslationResources = {
   bots: bots.ar,
   heartbeats: heartbeats.ar,
   navigation: navigation.ar,
+  productAnalytics: productAnalytics.ar,
   home: home.ar,
 };

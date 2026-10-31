@@ -23,6 +23,9 @@ import { useCreationRequest } from "@/clisbot/bots/sidebar/creation-request";
 import { rememberChatReturn } from "@/clisbot/home/mobile-navigation";
 import { buildHostChatRoute } from "@/clisbot/bots/routes";
 import { useStartDestination } from "@/clisbot/home/use-start-destination";
+import { useHomeStartHosts, useHomeStartProject } from "@/clisbot/home/use-home-start";
+import { rememberStart } from "@/clisbot/home/use-remembered-start";
+import { rememberedProjectOf } from "@/clisbot/home/remembered-start";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import type {
   CreateAgentRequestOptions,
@@ -680,6 +683,7 @@ function submitWorkspaceDraft(input: SubmitDraftInput): SubmitOutcome {
 function useNewWorkspaceHostSelector(input: {
   initialServerId: string;
   allServerIds: string[];
+  rememberedServerId: string | null;
   projects: HostProjectListItem[];
   lastActiveProject: HostProjectListItem | null;
   hostConnectionStatusByServerId: ReadonlyMap<string, HostRuntimeConnectionStatus>;
@@ -691,6 +695,7 @@ function useNewWorkspaceHostSelector(input: {
       resolveNewWorkspaceInitialServerId({
         allServerIds: input.allServerIds,
         routeServerId: input.initialServerId,
+        rememberedServerId: input.rememberedServerId,
         lastActiveProject: input.lastActiveProject,
         projects: input.projects,
         hostConnectionStatusByServerId: input.hostConnectionStatusByServerId,
@@ -702,6 +707,7 @@ function useNewWorkspaceHostSelector(input: {
       input.initialServerId,
       input.lastActiveProject,
       input.projects,
+      input.rememberedServerId,
       input.workspaceMultiplicityByServerId,
     ],
   );
@@ -722,6 +728,7 @@ function useNewWorkspaceHostSelector(input: {
           ? resolveNewWorkspaceAutomaticServerId({
               allServerIds: input.allServerIds,
               routeServerId: input.initialServerId,
+              rememberedServerId: input.rememberedServerId,
               lastActiveProject: input.lastActiveProject,
               projects: input.projects,
               hostConnectionStatusByServerId: input.hostConnectionStatusByServerId,
@@ -744,6 +751,7 @@ function useNewWorkspaceHostSelector(input: {
     input.initialServerId,
     input.lastActiveProject,
     input.projects,
+    input.rememberedServerId,
     input.workspaceMultiplicityByServerId,
     routeServerId,
   ]);
@@ -798,12 +806,21 @@ interface NewWorkspaceInitialContextState {
 }
 
 function useNewWorkspaceInitialContext({
+  home = false,
   serverId,
   sourceDirectory: sourceDirectoryProp,
   projectId,
   displayName: displayNameProp,
 }: NewWorkspaceScreenProps): NewWorkspaceInitialContextState {
-  const allHosts = useAvailableHosts();
+  const inventoryHosts = useAvailableHosts();
+  const lastWorkspaceSelection = useLastWorkspaceSelection();
+  const rememberStarts = remembersStarts(home);
+  const homeStart = useHomeStartHosts({
+    enabled: rememberStarts,
+    inventoryHosts,
+    lastWorkspace: lastWorkspaceSelection,
+  });
+  const allHosts = homeStart.hosts;
   const allServerIds = useMemo(() => allHosts.map((h) => h.serverId), [allHosts]);
   const projects = useHostProjects(allServerIds);
   const routeDisplayName = displayNameProp?.trim() ?? "";
@@ -827,7 +844,6 @@ function useNewWorkspaceInitialContext({
       }) ?? routePlacement
     );
   }, [projects, routePlacement, serverId]);
-  const lastWorkspaceSelection = useLastWorkspaceSelection();
   const lastWorkspaceServerId = useMemo(
     () =>
       lastWorkspaceSelection && allServerIds.includes(lastWorkspaceSelection.serverId)
@@ -837,13 +853,15 @@ function useNewWorkspaceInitialContext({
   );
   const lastWorkspaceId = lastWorkspaceServerId ? lastWorkspaceSelection!.workspaceId : null;
   const lastWorkspace = useWorkspace(lastWorkspaceServerId, lastWorkspaceId);
-  const lastActiveProject = useMemo(
+  const lastWorkspaceProject = useMemo(
     () =>
       lastWorkspaceServerId
         ? hostProjectFromWorkspace({ serverId: lastWorkspaceServerId, workspace: lastWorkspace })
         : null,
     [lastWorkspace, lastWorkspaceServerId],
   );
+  const rememberedProject = useHomeStartProject(homeStart.start, projects);
+  const lastActiveProject = rememberStarts ? rememberedProject : lastWorkspaceProject;
   const hostConnectionStatusByServerId = useHostRuntimeConnectionStatuses(allServerIds);
   const workspaceMultiplicityByServerId = useHostFeatureMap(allServerIds, "workspaceMultiplicity");
   const {
@@ -855,6 +873,7 @@ function useNewWorkspaceInitialContext({
   } = useNewWorkspaceHostSelector({
     initialServerId: serverId,
     allServerIds,
+    rememberedServerId: homeStart.start?.serverId ?? null,
     projects,
     lastActiveProject,
     hostConnectionStatusByServerId,
@@ -884,6 +903,7 @@ export function NewWorkspaceScreen({
   draftId,
 }: NewWorkspaceScreenProps) {
   const focused = useIsFocused();
+  const rememberStarts = remembersStarts(home);
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
@@ -1216,9 +1236,18 @@ export function NewWorkspaceScreen({
       selectProjectOption(id);
       setProjectPickerOpen(false);
       clearPickerSelectionForTargetChange(selectedProjectOptionId, id);
+      const project = projectByOptionId.get(id);
+      if (rememberStarts && project) {
+        rememberStart({
+          serverId: selectedServerId,
+          project: rememberedProjectOf(project, selectedServerId, null),
+        });
+      }
     },
     [
       clearPickerSelectionForTargetChange,
+      projectByOptionId,
+      rememberStarts,
       selectProjectOption,
       setStartTarget,
       selectedProjectOptionId,
@@ -1233,8 +1262,9 @@ export function NewWorkspaceScreen({
       setTemplateApplied(false);
       handleSelectHost(id);
       clearPickerSelectionForTargetChange(selectedServerId, id);
+      if (rememberStarts) rememberStart({ serverId: id, project: null });
     },
-    [clearPickerSelectionForTargetChange, handleSelectHost, selectedServerId],
+    [clearPickerSelectionForTargetChange, handleSelectHost, rememberStarts, selectedServerId],
   );
 
   const handleAddProject = useCallback(() => {
@@ -1636,8 +1666,11 @@ export function NewWorkspaceScreen({
       if (
         currentStartDestination.current.host === host &&
         currentStartDestination.current.kind === "quickChat"
-      )
+      ) {
         setQuickProject({ host, cwd: result.cwd, projectId: result.projectId });
+        const project = { projectId: result.projectId, sourceDirectory: result.cwd, name: "" };
+        if (rememberStarts) rememberStart({ serverId: host, project });
+      }
     } catch (error) {
       if (
         currentStartDestination.current.host === host &&
@@ -1645,7 +1678,14 @@ export function NewWorkspaceScreen({
       )
         setErrorMessage(error instanceof Error ? error.message : String(error));
     }
-  }, [selectedServerId, setStartTarget, setQuickProject, quickStartsFeature, acceptCurrent]);
+  }, [
+    selectedServerId,
+    setStartTarget,
+    setQuickProject,
+    quickStartsFeature,
+    acceptCurrent,
+    rememberStarts,
+  ]);
   // With several Hosts every picker row names its Host, the selected one included.
   const currentHostLabel = hostLabelWhenSeveral(allHosts, selectedServerId);
   const destinations = useMemo(
@@ -1687,6 +1727,10 @@ export function NewWorkspaceScreen({
         const bot = botQuery.data?.find((entry) => `bot:${entry.id}` === id);
         if (!bot) return;
         setStartTarget({ host: selectedServerId, kind: "bot", botId: bot.id });
+        if (rememberStarts) {
+          const project = { projectId: bot.projectId, sourceDirectory: bot.cwd, name: bot.name };
+          rememberStart({ serverId: selectedServerId, project });
+        }
         setPendingQuickStart({
           serverId: selectedServerId,
           template: {
@@ -1710,6 +1754,7 @@ export function NewWorkspaceScreen({
       setStartTarget,
       chatDraft.textSource,
       handleSelectProjectOption,
+      rememberStarts,
     ],
   );
   const crossHost = useCrossHostPicker({
@@ -2177,6 +2222,11 @@ function StartLayout({
 
 /** Home names itself in the header; New workspace keeps its title in the page. */
 /** With several Hosts, the name every picker row carries; none when there is only one. */
+/** Clisbot Home opens on the remembered start; the legacy screen keeps its online-first policy. */
+function remembersStarts(home: boolean): boolean {
+  return HOME_V2_ENABLED && home;
+}
+
 function hostLabelWhenSeveral(hosts: HostProfile[], serverId: string): string | undefined {
   if (hosts.length < 2) return undefined;
   return hosts.find((host) => host.serverId === serverId)?.label;

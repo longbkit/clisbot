@@ -4,9 +4,11 @@
 // Host is set in People & access › Access.
 
 import { useRouter } from "expo-router";
+import { Plus } from "lucide-react-native";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
@@ -37,13 +39,30 @@ export function HostsSettings() {
     ? buildHubConnectCommand(connectionOrigin, DEV_CLI_COMMAND)
     : null;
   const connectionCount = useMemo(() => <HostsConnectionCount />, []);
-  const refreshAction = useMemo(
+  const router = useRouter();
+  // The Settings screen owns the add-host flow and opens it for each new intent, as it does for
+  // the Host picker's Add host; the page stays on Hosts underneath.
+  const addHost = useCallback(() => router.setParams({ addHost: String(Date.now()) }), [router]);
+  const headerActions = useMemo(
     () => (
-      <Button size="sm" variant="ghost" loading={daemons.isFetching} onPress={retry}>
-        {t("hub.settings.hosts.refresh")}
-      </Button>
+      <View style={styles.headerActions}>
+        {signedIn ? (
+          <Button size="sm" variant="ghost" loading={daemons.isFetching} onPress={retry}>
+            {t("hub.settings.hosts.refresh")}
+          </Button>
+        ) : null}
+        <Button
+          size="sm"
+          variant="outline"
+          leftIcon={Plus}
+          onPress={addHost}
+          testID="settings-hosts-add-host"
+        >
+          {t("settings.addHost")}
+        </Button>
+      </View>
     ),
-    [daemons.isFetching, retry, t],
+    [addHost, daemons.isFetching, retry, signedIn, t],
   );
 
   return (
@@ -52,7 +71,7 @@ export function HostsSettings() {
         title={t("hub.settings.hosts.title")}
         titleAccessory={connectionCount}
         info={signedIn ? t("hub.settings.hosts.info") : t("hub.settings.hosts.infoSignedOut")}
-        trailing={signedIn ? refreshAction : undefined}
+        trailing={headerActions}
         testID="settings-hosts-list"
       >
         {/* The selected Hub failing is news even while saved Hosts stay usable: its own Hosts
@@ -213,3 +232,7 @@ function HostEnrollmentCommand({ command }: { command: string }) {
     </>
   );
 }
+
+const styles = StyleSheet.create((theme) => ({
+  headerActions: { flexDirection: "row", alignItems: "center", gap: theme.spacing[1] },
+}));

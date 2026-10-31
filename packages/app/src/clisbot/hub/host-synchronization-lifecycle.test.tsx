@@ -24,6 +24,13 @@ const adapters = vi.hoisted(() => ({
     },
   ],
 }));
+// The cold-start list read (`prefetchRememberedHubDaemons`) needs a client; the account here has
+// already answered, so it never reads.
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-query")>();
+  const client = new actual.QueryClient();
+  return { ...actual, useQueryClient: () => client };
+});
 vi.mock("@/data/query", () => ({
   useFetchQuery: () => ({
     data: {
@@ -45,18 +52,29 @@ vi.mock("@/data/query", () => ({
     refetch: adapters.refetch,
   }),
 }));
-vi.mock("./account-provider", () => {
-  const account = {
-    enabled: true,
-    origin: "https://hub.example.test",
-    signedIn: { account: { id: "owner" }, organization: { id: "org" } },
-  };
-  return {
-    useHubAccount: () => account,
-    useHubAccounts: () => [account],
-    HubAccountScope: ({ children }: { children: unknown }) => children,
-  };
-});
+const SIGNED_IN = {
+  status: "active",
+  account: { id: "owner" },
+  organization: { id: "org" },
+};
+const account = vi.hoisted(() => ({
+  enabled: true,
+  loading: false,
+  origin: "https://hub.example.test",
+  state: null as { status: string } | null,
+  signedIn: null as { account: { id: string }; organization: { id: string } } | null,
+}));
+const savedAccounts = vi.hoisted(() => ({ list: null as unknown[] | null }));
+vi.mock("./account-provider", () => ({
+  useHubAccount: () => account,
+  useHubAccounts: () => savedAccounts.list ?? [account],
+  HubAccountScope: ({ children }: { children: unknown }) => children,
+}));
+function signIn(organizationId = "org") {
+  account.state = SIGNED_IN;
+  account.signedIn = { ...SIGNED_IN, organization: { id: organizationId } };
+}
+signIn();
 vi.mock("@/runtime/host-session-access", () => ({
   registerHostAccessTicketResolver: adapters.register,
 }));
@@ -66,12 +84,18 @@ vi.mock("@/runtime/host-runtime", () => ({
     upsertManagedConnectionFromOffer: adapters.upsert,
     adoptHostConnection: adapters.adopt,
     removeManagedHost: adapters.remove,
+    whenHostRegistryLoaded: async () => undefined,
+    markColdStartPhase: () => undefined,
   }),
   useHosts: () => adapters.hosts,
 }));
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  signIn();
+  account.loading = false;
+  savedAccounts.list = null;
+  adapters.remove.mockClear();
   adapters.slug = "sandbox";
   adapters.listError = null;
   adapters.refetch.mockReset();
@@ -232,4 +256,107 @@ it("waits for the list read a removal started before adding the Host back", asyn
     timeout: 3_000,
   });
   expect(adapters.refetch).toHaveBeenCalledTimes(1);
+});
+
+it("keeps every managed Host when the bindings unmount and mount again", async () => {
+  vi.stubGlobal("React", React);
+  const first = render(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
+
+  // The tree under the Hub scope remounts: a layout rebuilt itself, or Android recreated the
+  // activity's React surface. Nothing about the Hub's answer changed.
+  first.unmount();
+  render(<HubHostSynchronization />);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  expect(adapters.remove).not.toHaveBeenCalled();
+});
+
+it("keeps every managed Host while the account is read again", async () => {
+  vi.stubGlobal("React", React);
+  const view = render(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
+
+  // A read with no answer yet: no signed-in account and no state.
+  account.signedIn = null;
+  account.state = null;
+  account.loading = true;
+  view.rerender(<HubHostSynchronization />);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  expect(adapters.remove).not.toHaveBeenCalled();
+});
+
+it("removes this Hub's Hosts once the Hub answers that the account is signed out", async () => {
+  vi.stubGlobal("React", React);
+  const view = render(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
+
+  account.signedIn = null;
+  account.state = { status: "signedOut" };
+  view.rerender(<HubHostSynchronization />);
+
+  await waitFor(() =>
+    expect(adapters.remove).toHaveBeenCalledWith(
+      expect.objectContaining({ daemonId: "daemon" }),
+      expect.any(String),
+    ),
+  );
+});
+
+it("removes only the forgotten Hub's Hosts when a saved Hub is forgotten", async () => {
+  vi.stubGlobal("React", React);
+  adapters.hosts = [
+    ...adapters.hosts,
+    {
+      serverId: "other-hub-server",
+      management: {
+        kind: "hub",
+        hubOrigin: "https://other-hub.example.test",
+        organizationId: "org",
+        daemonId: "daemon",
+      },
+    },
+  ];
+  const otherHub = { ...account, origin: "https://other-hub.example.test" };
+  savedAccounts.list = [account, otherHub];
+  const view = render(<HubHostSynchronization />);
+  await waitFor(() => expect(adapters.upsert).toHaveBeenCalled());
+  expect(adapters.remove).not.toHaveBeenCalled();
+
+  savedAccounts.list = [account];
+  view.rerender(<HubHostSynchronization />);
+
+  await waitFor(() => expect(adapters.remove).toHaveBeenCalledTimes(1));
+  expect(adapters.remove).toHaveBeenCalledWith(
+    expect.objectContaining({ hubOrigin: "https://other-hub.example.test" }),
+    expect.any(String),
+  );
+});
+
+it("removes a Host this Hub manages under an organization the account left", async () => {
+  vi.stubGlobal("React", React);
+  adapters.hosts = [
+    ...adapters.hosts,
+    {
+      serverId: "other-org-server",
+      management: {
+        kind: "hub",
+        hubOrigin: "https://hub.example.test",
+        organizationId: "previous-org",
+        daemonId: "daemon",
+      },
+    },
+  ];
+  render(<HubHostSynchronization />);
+  await waitFor(() =>
+    expect(adapters.remove).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: "previous-org" }),
+      expect.any(String),
+    ),
+  );
+  expect(adapters.remove).not.toHaveBeenCalledWith(
+    expect.objectContaining({ organizationId: "org" }),
+    expect.any(String),
+  );
 });

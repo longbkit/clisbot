@@ -1,3 +1,5 @@
+import { scheduleSessionIdentity } from "./session-identity.js";
+import type { SessionOperationIdentity } from "../agent/session-authorship.js";
 import { BOT_ID_LABEL, CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import type { ScheduleTarget, StoredSchedule } from "@clisbot/protocol/schedule/types";
 import { formatHeartbeatRunNotice } from "@clisbot/protocol/schedule/heartbeat-notice";
@@ -18,6 +20,8 @@ export interface ScheduleChatPost {
   /** One per run, so a retried post is a duplicate and not a second line. */
   messageId: string;
   actor: SessionActor;
+  /** Trusted, durable creation identity for a replacement Bot session. */
+  sessionIdentity?: SessionOperationIdentity;
   scheduleRun: import("@clisbot/protocol/schedule/heartbeat-notice").HeartbeatRun;
 }
 
@@ -56,7 +60,19 @@ export function chatHeartbeatPost(input: {
   /** This run's number, counted from 1. */
   run: number;
   title: string;
+  sessionStorageEnabled?: boolean;
 }): ScheduleChatPost {
+  const identity = input.sessionStorageEnabled
+    ? scheduleSessionIdentity(input.schedule)
+    : undefined;
+  const actor: SessionActor = {
+    ...(identity?.actor ?? { kind: "automation", id: input.schedule.id }),
+    displayName: formatHeartbeatRunNotice({
+      title: input.title,
+      run: input.run,
+      maxRuns: input.schedule.maxRuns,
+    }),
+  };
   return {
     chatId: input.target.chatId,
     botId: input.botId,
@@ -69,16 +85,8 @@ export function chatHeartbeatPost(input: {
       maxRuns: input.schedule.maxRuns,
       name: input.schedule.name ?? null,
     },
-    // The sender name is the run marker the app draws in place of a user bubble, and the line
-    // the Bot reads before the text.
-    actor: {
-      kind: "automation",
-      id: input.schedule.id,
-      displayName: formatHeartbeatRunNotice({
-        title: input.title,
-        run: input.run,
-        maxRuns: input.schedule.maxRuns,
-      }),
-    },
+    // Keep the displayed run marker and the actual automation identity together.
+    actor,
+    ...(identity ? { sessionIdentity: { ...identity, actor } } : {}),
   };
 }

@@ -6,7 +6,7 @@ import { NavigationChrome } from "@/clisbot/navigation/list-panel";
 import { resolveNavigationChrome } from "@/clisbot/navigation/chrome-layout";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 import { profileNativeRegion } from "@/utils/render-profiler";
-import { MobileHomeTabs } from "@/clisbot/home/mobile-navigation";
+import { MobileHomeTabs, usesPhoneTabs } from "@/clisbot/home/mobile-navigation";
 import { OfferLinkListener } from "@/device-access/offer-link-listener";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
@@ -132,10 +132,10 @@ import {
   WindowChromeRegion,
   WindowChromeSafeArea,
 } from "@/utils/desktop-window";
-import {
-  parseHostWorkspaceRouteFromPathname,
-  parseServerIdFromPathname,
-} from "@/utils/host-routes";
+import { parseServerIdFromPathname } from "@/utils/host-routes";
+import { expoRouteSource } from "@/navigation/expo-route-source";
+import { useIsOnWorkspaceRoute } from "@/navigation/route-facts";
+import { RouteSourceProvider, useRoutePath } from "@/navigation/route-source";
 import { PluginCatalogSync } from "@/plugins";
 import { HubAccountProvider } from "@/clisbot/hub/account-provider";
 import { HubAccountEntryNavigation } from "@/clisbot/hub/account-entry-navigation";
@@ -356,6 +356,8 @@ interface AppContainerProps {
 
 const WINDOW_SIDEBAR_TOGGLE_HORIZONTAL_PADDING = 12;
 
+function ignoreAgentListToggle() {}
+
 function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppContainerProps) {
   const keyboardActionDispatcher = useKeyboardActionDispatcher();
   const daemons = useHosts();
@@ -376,12 +378,15 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
 
   const isCompactLayout = useIsCompactFormFactor();
   useCompactWebViewportZoomLock(isCompactLayout);
-  const pathname = usePathname();
-  const isWorkspaceRoute = parseHostWorkspaceRouteFromPathname(pathname) !== null;
+  const isWorkspaceRoute = useIsOnWorkspaceRoute();
+  const isSettingsPage = useRoutePath(isSettingsPagePath);
+  const isSettingsRoute = useRoutePath(isSettingsRoutePath);
   const isWorkspaceFocusModeEnabled = isWorkspaceRoute && isFocusModeEnabled;
   const chromeEnabled = chromeEnabledOverride ?? daemons.length > 0;
   const hasMountedSidebar = useLatchedBoolean(chromeEnabled);
-  const toggleAgentList = isCompactLayout ? toggleMobileAgentList : toggleDesktopAgentList;
+  // Phone tabs have no list panel to slide in: Chats and Work are tabs.
+  let toggleAgentList = isCompactLayout ? toggleMobileAgentList : toggleDesktopAgentList;
+  if (usesPhoneTabs(isCompactLayout)) toggleAgentList = ignoreAgentListToggle;
   const toggleDesktopSidebars = useCallback(() => {
     // The focused workspace owns its layout key, its checkout, and therefore the
     // only correct answer to "is the explorer open". Let it decide when there is
@@ -397,7 +402,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   // conflate workspace/project-specific chrome (sidebar, mobile gesture) with
   // global concerns like keyboard shortcuts. Split those out so settings (and
   // other non-workspace routes) don't need a special-case to keep shortcuts alive.
-  const keyboardShortcutsEnabled = chromeEnabled || pathname.startsWith("/settings");
+  const keyboardShortcutsEnabled = chromeEnabled || isSettingsPage;
 
   useKeyboardShortcuts({
     enabled: keyboardShortcutsEnabled,
@@ -421,7 +426,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
   });
   const appContentMinimumWidth = resolveDesktopAppContentMinimum({
     explorerVisible: isWorkspaceRoute && explorerVisible,
-    isSettingsRoute: pathname.includes("/settings"),
+    isSettingsRoute,
   });
   const desktopSidebarMounted = hasMountedSidebar && !isWorkspaceFocusModeEnabled;
   const desktopSidebarVisible = resolveDesktopSidebarVisibility({
@@ -605,10 +610,12 @@ function SidebarChrome({
   let chrome: ReactNode = null;
   if (mounted)
     chrome = NAVIGATION_V2_ENABLED ? (
-      <NavigationChrome active={active} presented={visible} railVisible={railVisible} />
+      <NavigationChrome active={active} railVisible={railVisible} />
     ) : (
       <LeftSidebar active={active} presented={visible} />
     );
+  // Phone tabs have no list chrome: the Work tab owns the only sidebar model (`PhoneListTab`).
+  if (usesPhoneTabs(isCompactLayout)) return chrome;
   return (
     <SidebarModelProvider active={active}>
       {chrome}
@@ -798,29 +805,42 @@ function OpenProjectListener() {
 }
 
 function AppWithSidebar({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
   const hosts = useHosts();
   const storeReady = useStoreReady();
-  const routeServerId = useMemo(() => parseServerIdFromPathname(pathname), [pathname]);
-  const routeHasKnownHost =
-    routeServerId !== null && hosts.some((host) => host.serverId === routeServerId);
-  const shouldShowAppChrome =
-    storeReady &&
-    (pathname === "/open-project" ||
-      pathname === "/new" ||
-      (HOME_V2_ENABLED && pathname === "/chat") ||
-      (NAVIGATION_V2_ENABLED &&
-        (pathname === "/work" ||
-          pathname === "/more" ||
-          pathname === "/tasks" ||
-          pathname === "/design")) ||
-      pathname === "/sessions" ||
-      pathname === "/schedules" ||
-      pathname === "/automations" ||
-      pathname === "/connectors" ||
-      routeHasKnownHost);
+  // A selected boolean: a push or pop that keeps the chrome re-renders nothing here.
+  const routeShowsChrome = useRoutePath((pathname) => showsAppChrome(pathname, hosts));
+  return <AppContainer chromeEnabled={storeReady && routeShowsChrome}>{children}</AppContainer>;
+}
 
-  return <AppContainer chromeEnabled={shouldShowAppChrome}>{children}</AppContainer>;
+function showsAppChrome(pathname: string, hosts: readonly { serverId: string }[]): boolean {
+  if (isAppPagePath(pathname)) return true;
+  const routeServerId = parseServerIdFromPathname(pathname);
+  return routeServerId !== null && hosts.some((host) => host.serverId === routeServerId);
+}
+
+function isAppPagePath(pathname: string): boolean {
+  return (
+    pathname === "/open-project" ||
+    pathname === "/new" ||
+    (HOME_V2_ENABLED && pathname === "/chat") ||
+    (NAVIGATION_V2_ENABLED &&
+      (pathname === "/work" ||
+        pathname === "/more" ||
+        pathname === "/tasks" ||
+        pathname === "/design")) ||
+    pathname === "/sessions" ||
+    pathname === "/schedules" ||
+    pathname === "/automations" ||
+    pathname === "/connectors"
+  );
+}
+
+function isSettingsPagePath(pathname: string): boolean {
+  return pathname.startsWith("/settings");
+}
+
+function isSettingsRoutePath(pathname: string): boolean {
+  return pathname.includes("/settings");
 }
 
 function FaviconStatusSync() {
@@ -832,7 +852,7 @@ const ROOT_STACK_SCREEN_OPTIONS = {
   headerShown: false,
   animation: "none" as const,
 };
-const ROOT_STACK_NESTED_NAVIGATOR_SCREENS = ["h/[serverId]"] as const;
+const ROOT_STACK_NESTED_NAVIGATOR_SCREENS = ["h/[serverId]", "(tabs)"] as const;
 
 function RootStack() {
   const storeReady = useStoreReady();
@@ -851,13 +871,9 @@ function RootStack() {
         <Stack.Screen name="settings/[section]" />
         <Stack.Screen name="settings/hub/[hubSection]" />
         <Stack.Screen name="new" />
-        <Stack.Screen name="open-project" />
-        <Stack.Screen name="chat" />
-        <Stack.Screen name="work" />
-        <Stack.Screen name="more" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen name="tasks" />
         <Stack.Screen name="sessions" />
-        <Stack.Screen name="schedules" />
         <Stack.Screen name="automations" />
         <Stack.Screen name="connectors" />
         <Stack.Screen name="pair-scan" />
@@ -1001,7 +1017,11 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, []);
 
-  return <RootAppTree />;
+  return (
+    <RouteSourceProvider source={expoRouteSource}>
+      <RootAppTree />
+    </RouteSourceProvider>
+  );
 }
 
 const layoutStyles = StyleSheet.create((theme) => ({

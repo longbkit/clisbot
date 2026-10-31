@@ -1862,6 +1862,66 @@ describe("durable multi-step workflow engine", () => {
   });
 });
 
+describe("workflow ownership snapshot", () => {
+  it.each([true, false])(
+    "preserves an owner snapshot (present=%s) across restart and a changed resolver",
+    async (hasOwner) => {
+      let now = new Date("2026-08-06T12:00:00.000Z");
+      const fixture = await workflowFixture({ rawConfiguration: deadlineConfiguration() });
+      const ownerA = {
+        kind: "user" as const,
+        id: "author-a",
+        memberId: "member-a",
+        hubOrigin: "https://hub.example",
+        organizationId: "org-1",
+      };
+      const originalOwner = hasOwner ? ownerA : undefined;
+      let owner: typeof ownerA | undefined = originalOwner;
+      const resolveOwner = vi.fn(async () => structuredClone(owner));
+      let crash = true;
+      const dispatches: LaunchMachineIntent[] = [];
+      const options = {
+        database: fixture.database,
+        entitlements: fixture.entitlements,
+        providers: [providerMatch(fixture.configuration, fixture.revisionId)],
+        now: () => now,
+        leaseMs: 1000,
+        resolveWorkflowOwner: resolveOwner,
+        dispatchLaunchMachineIntent: async (intent: LaunchMachineIntent) => {
+          dispatches.push(intent);
+          if (crash) {
+            crash = false;
+            throw new Error("fixture pre-handoff interruption");
+          }
+          const execution = await fixture.database.findAgentExecutionByWorkflowStepRunId(
+            intent.workflowStepRunId!,
+          );
+          assert.ok(execution);
+          return { execution };
+        },
+      };
+      const { handler, engine } = createDurableWorkflowHandler(options);
+      await handler(fixture.trigger("run"));
+      await engine.processAvailable();
+      assert.deepEqual(dispatches[0]?.ownerActor, originalOwner);
+      owner = { ...ownerA, id: "author-b", memberId: "member-b" };
+      now = new Date("2026-08-06T12:00:02.000Z");
+      const restarted = createDurableWorkflowHandler(options);
+      await restarted.engine.processAvailable();
+      assert.equal(dispatches.length, 2);
+      assert.deepEqual(dispatches[1]?.ownerActor, originalOwner);
+      assert.equal(resolveOwner.mock.calls.length, 1);
+      const execution = await fixture.database.findAgentExecutionByWorkflowStepRunId(
+        dispatches[0]!.workflowStepRunId!,
+      );
+      assert.deepEqual(
+        JSON.parse(JSON.stringify(execution?.launchIntent)).ownerActor,
+        originalOwner,
+      );
+    },
+  );
+});
+
 describe("author access re-check", () => {
   it("rejects the run with author_access_lost when the authorizer refuses, and dispatches nothing", async () => {
     const fixture = await workflowFixture();

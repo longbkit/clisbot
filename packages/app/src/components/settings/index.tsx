@@ -31,6 +31,8 @@ export { SettingsCollapsibleRow } from "./collapsible-row";
 interface AppSettingsRowProps extends Omit<SettingsRowProps, "hint"> {
   hint?: ReactNode;
   labelAccessory?: ReactNode;
+  /** The title and control share the first line; the hint and error run the full width below. */
+  hintBelow?: boolean;
 }
 
 export function SettingsCard({ children, testID }: { children: ReactNode; testID?: string }) {
@@ -55,9 +57,25 @@ export function SettingsRow({
   error,
   children,
   testID,
+  hintBelow = false,
 }: AppSettingsRowProps) {
   const compact = useIsCompactFormFactor();
   const rowStyle = useMemo(() => [settingsStyles.row, compact && styles.compactRow], [compact]);
+  if (hintBelow)
+    return (
+      <View style={styles.stackedRow} testID={testID}>
+        <View style={styles.stackedHeader}>
+          <Text style={[settingsStyles.rowTitle, styles.accessoryLabel]}>{label}</Text>
+          {children ? <View style={styles.stackedControl}>{children}</View> : null}
+        </View>
+        {typeof hint === "string" ? <Text style={settingsStyles.rowHint}>{hint}</Text> : hint}
+        {error ? (
+          <Text accessibilityRole="alert" style={settingsStyles.rowError}>
+            {error}
+          </Text>
+        ) : null}
+      </View>
+    );
   return (
     <View style={rowStyle} testID={testID}>
       <View style={styles.label}>
@@ -203,5 +221,18 @@ const styles = StyleSheet.create((theme) => ({
   },
   accessoryLabel: { flexShrink: 1, minWidth: 0 },
   control: { flexShrink: 1, maxWidth: "100%" },
+  // Same padding as `settingsStyles.row`, so the stacked row sits on the card's rails.
+  stackedRow: {
+    paddingVertical: theme.spacing[4],
+    paddingHorizontal: theme.spacing[4],
+    gap: theme.spacing[1],
+  },
+  stackedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing[3],
+  },
+  stackedControl: { flexShrink: 0 },
   input: { minWidth: 180 },
 }));

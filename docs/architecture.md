@@ -126,6 +126,8 @@ Cross-platform React Native app that connects to one or more daemons.
 - `HostRuntimeController` manages saved host connections, reconnection, and per-host runtime state. Direct TCP and relay connections use the ordinary client transport; desktop socket, pipe, and SSH connections cross one Electron-owned transport boundary. SSH only tunnels to an already-running daemon.
 - `runtime/replica-cache` is typed storage behind the directory and timeline owners. It never observes or mutates `SessionStore`.
 - `runtime/directory-sync` owns directory cache selection and network reconciliation. On demand it paints accepted rows for one host, then passes the persisted per-entity cursor through `project.list`, `fetch_workspaces`, and `fetch_agents`; the daemon returns each entity's latest projection when its sequence is newer, plus tombstones.
+- A busy host sends tens of `agent_update` / `workspace_update` messages a second. The app's directory owner holds them per host and applies each frame's burst, in arrival order per host, as one `SessionStore` commit (`batchSessionStoreUpdates`) shared by every host (`shareFrames`); on Android a 250 ms timer caps the wait for a frame. Anything else that writes the directory (a fetch beginning, completing or failing, a cache read, a timeline page, a local accept or removal, a reconnect) applies the held updates first, and the app applies them when it goes to the background, where frames stop. A `DirectorySync` built without a frame clock, as in tests, applies each update on arrival. Flag: `DIRECTORY_FRAME_BATCHING_ENABLED` in `runtime/directory-sync/live-batch.ts`.
+- `stores/workspace-root-agents.ts` indexes each agents map by workspace once: the unarchived root agents a workspace's tab bar would open. `setAgents` derives the next index from the previous one, so only workspaces an agent entered, left or changed in get a new list, and `workspaceAgentActivity` is recomputed for those alone. Sidebar rows and the Work filter read these lists; never scan a host's agents per row.
 - `workspace-labels` owns one sequenced catalog replica per connected host, the deterministic cross-host projection that surfaces spanning hosts use (the filter page, the manager), and the per-host resolution a workspace row's chips use. Two hosts may give one name different colors, so a row resolves against its own host's catalog and a merged answer would be wrong there. Catalogs never synchronize between hosts; assignment creates a missing definition only on the target host. On the daemon, catalog and assignment rewrites share a journaled commit boundary. Startup recovery completes that commit before workspace or catalog publication.
 - `SessionContext` wraps the daemon client for the active session
 - Composer UI and submit/draft behavior live in `packages/app/src/composer/`; screens and panels should integrate it from there instead of dropping composer internals into `components/`, `hooks/`, or `screens/workspace/`
@@ -151,10 +153,19 @@ resume behavior.
 
 Cross-Host activity surfaces use `useAggregatedAgents`. Its runtime snapshot contains only directory readiness, connection state and actionable errors,
 not the Host runtime's version counter; workspace, transport and timeline
-notifications must not invalidate an unchanged agent catalog. Each consumer keeps a bounded
-projection cache keyed by Host and agent, using the directory owner's immutable entries. Unchanged
-directory fields preserve row and sorted-array identity; Host labels, permissions, attention, turns,
-archive state and activity order still update. Dropped sources leave the cache. See
+notifications must not invalidate an unchanged agent catalog. Every consumer of a view shares one
+projector (`hooks/aggregated-agent-projector.ts`), a bounded cache keyed by Host and agent over the
+directory owner's immutable entries. It is incremental: a Host whose Map and label are unchanged is
+skipped, a changed Host's Map is compared by reference to find the changed sessions, and only
+their rows move in the sorted list, by binary search (one merge pass past 32 changes). Equal
+timestamps keep the order a full sort of the store gave them, the store's Host order and then each
+Host's Map order; when either order moves, the projector renumbers and keeps every unchanged row.
+On a 14-Host, 3,600-session fleet one update went from about 66,000 timestamp reads (1.8 ms in
+Node) to 44 (0.03 ms); `aggregated-agent-projector.fleet.test.ts` keeps the old full sort as its
+oracle. The store still copies the changed Host's Map, so an update stays linear in that Host's
+sessions, not the fleet's. Unchanged directory fields preserve row and sorted-array identity; Host
+labels, permissions, attention, turns, archive state and activity order still update. Dropped
+sources leave the cache. See
 [native profiling](mobile-testing.md#native-switching-performance) before widening this subscription. Accepted workspace directory rows remain in the sidebar during transient
 transport loss; registry removal and directory tombstones still remove their rows. Managed revocation retains the existing runtime policy, including manual-profile restoration for adopted Hosts. Display sorting reuses numeric collators
 so a loading burst does not construct one for every comparison.

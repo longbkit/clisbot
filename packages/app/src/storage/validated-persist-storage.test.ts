@@ -112,6 +112,62 @@ it("retries an unchanged state after a failed save", async () => {
   expect(backing.getItem("layout")).toBe(JSON.stringify(value));
 });
 
+function createScheduledWrites() {
+  const flushes: Array<() => void> = [];
+  return {
+    writeAfter: (flush: () => void) => {
+      flushes.push(flush);
+    },
+    runAll: () => {
+      for (const flush of flushes.splice(0)) flush();
+    },
+    get pending() {
+      return flushes.length;
+    },
+  };
+}
+
+it("validates and writes nothing in the caller's task when writes are scheduled", async () => {
+  let validations = 0;
+  const schema = z.strictObject({
+    count: z.number().refine(() => {
+      validations += 1;
+      return true;
+    }),
+  });
+  const backing = new MemoryStorage();
+  const scheduled = createScheduledWrites();
+  const storage = createValidatedPersistStorage(backing, schema, {
+    skipUnchanged: true,
+    writeAfter: scheduled.writeAfter,
+  });
+
+  const first = storage.setItem("layout", { state: { count: 1 }, version: 1 });
+  const second = storage.setItem("layout", { state: { count: 2 }, version: 1 });
+  expect(validations).toBe(0);
+  expect(backing.values.has("layout")).toBe(false);
+  expect(scheduled.pending).toBe(1);
+
+  scheduled.runAll();
+  await Promise.all([first, second]);
+  expect(validations).toBe(1);
+  expect(backing.getItem("layout")).toBe(JSON.stringify({ state: { count: 2 }, version: 1 }));
+});
+
+it("writes a scheduled state before reading the stored one", async () => {
+  const backing = new MemoryStorage();
+  const scheduled = createScheduledWrites();
+  const storage = createValidatedPersistStorage(backing, StateSchema, {
+    writeAfter: scheduled.writeAfter,
+  });
+  void storage.setItem("layout", { state: { enabled: true }, version: 1 });
+
+  await expect(storage.getItem("layout")).resolves.toEqual({
+    state: { enabled: true },
+    version: 1,
+  });
+});
+
 it("saves the same state again after removal or rehydration clears invalid storage", async () => {
   const backing = new MemoryStorage();
   const storage = createValidatedPersistStorage(backing, StateSchema, { skipUnchanged: true });

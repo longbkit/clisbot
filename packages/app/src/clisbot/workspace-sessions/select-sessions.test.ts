@@ -7,6 +7,7 @@ import { DEFAULT_SIDEBAR_WORKSPACE_SESSIONS, SidebarWorkspaceSessionsSchema } fr
 import { hasWorkspaceSessionLine, selectWorkspaceSessions } from "./select-sessions";
 import {
   buildStatusSessionShortcutModel,
+  createSessionDisplayGroupsMemo,
   sessionDisplayGroups,
   type StatusDisplayGroup,
   type StatusGroupItem,
@@ -345,6 +346,52 @@ describe("sessionDisplayGroups by status", () => {
     ]);
     expect(model.shortcutIndexByWorkspaceKey.get(`srv:${WORKSPACE_ID}:older-idle`)).toBe(4);
     expect(model.shortcutIndexByWorkspaceKey.has(`srv:${WORKSPACE_ID}:working`)).toBe(false);
+  });
+
+  describe("across agent updates", () => {
+    const input = (agents: Map<string, Agent>, activeOnly = false) => ({
+      t: i18n.t,
+      groups,
+      sources: new Map([["srv", { agents, messageSubmissions: source.messageSubmissions }]]),
+      activeOnly,
+      byStatus: true,
+    });
+    const sessionItem = (display: StatusDisplayGroup[], agentId: string) =>
+      display
+        .flatMap((group) => group.items)
+        .find((item) => item.kind === "session" && item.session.agent.id === agentId);
+
+    it("returns the previous groups when no listed workspace's sessions changed", () => {
+      const groupsOf = createSessionDisplayGroupsMemo();
+      const first = groupsOf(input(source.agents));
+      const unrelated = makeAgent({ id: "elsewhere", workspaceId: "not-listed" });
+      const next = new Map(source.agents).set(unrelated.id, unrelated);
+
+      expect(groupsOf(input(next))).toBe(first);
+    });
+
+    it("rebuilds only the workspace whose sessions changed", () => {
+      const groupsOf = createSessionDisplayGroupsMemo();
+      const first = groupsOf(input(source.agents));
+      const next = new Map(source.agents);
+      next.set("other-workspace", { ...next.get("other-workspace")!, title: "Renamed" });
+
+      const second = groupsOf(input(next));
+
+      expect(second).not.toBe(first);
+      expect(second).toEqual(sessionDisplayGroups(input(next)));
+      expect(sessionItem(second, "older-idle")).toBe(sessionItem(first, "older-idle"));
+      expect(sessionItem(second, "other-workspace")).not.toBe(
+        sessionItem(first, "other-workspace"),
+      );
+    });
+
+    it("recomputes everything when the query changes", () => {
+      const groupsOf = createSessionDisplayGroupsMemo();
+      groupsOf(input(source.agents));
+
+      expect(describeGroups(groupsOf(input(source.agents, true)))).toEqual(summarizeGroups(true));
+    });
   });
 });
 

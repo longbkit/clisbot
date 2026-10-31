@@ -34,6 +34,9 @@ import type { HomeChip, HomeRow } from "./home-feed";
 import { IssueActions } from "./issue-actions";
 import { HOME_PATH } from "./sections";
 import { useNavigationStore } from "./store";
+import { openPreloads } from "@/open-preload/live";
+import type { AgentOpenTarget } from "@/open-preload/targets";
+import { usePreloadTopAgents } from "@/open-preload/use-top-rows";
 
 const SECTION_CHIPS: Record<string, HomeChip> = { needs: "needs", active: "running" };
 
@@ -43,24 +46,19 @@ const SECTION_CHIPS: Record<string, HomeChip> = { needs: "needs", active: "runni
  */
 export function NavigationHomeFeed({
   rows,
+  unseen,
   filterKey,
 }: {
+  /** The shown rows by `activityKey`. */
   rows: ReadonlyMap<string, HomeRow>;
+  /** The shown sessions with an unseen issue. */
+  unseen: readonly AggregatedAgent[];
   /** Changes when the reader changes a filter; the feed follows at once. */
   filterKey: string;
 }) {
   const { t } = useTranslation();
-  const {
-    agents,
-    isInitialLoad,
-    directoryHealth,
-    accepted,
-    needs,
-    limit,
-    showMore,
-    pending,
-    update,
-  } = useHomeActivity();
+  const { isInitialLoad, directoryHealth, accepted, needs, limit, showMore, pending, update } =
+    useHomeActivity();
   const activity = useNavigationActivity();
   const requestApply = useApplyReaderChanges(filterKey);
   const showHost = useHosts().length > 1;
@@ -78,11 +76,7 @@ export function NavigationHomeFeed({
   const sections = visibleActivityLayout(accepted, limit);
   const total = (list: ActivityLayoutSection[]) => list.reduce((n, s) => n + s.keys.length, 0);
   const hasMore = total(sections) < total(accepted);
-  const live = useMemo(() => new Map(agents.map((agent) => [activityKey(agent), agent])), [agents]);
-  const unseen = useMemo(
-    () => agents.filter((agent) => rows.get(activityKey(agent))?.issue?.state === "unseen"),
-    [agents, rows],
-  );
+  usePreloadTopAgents(topAgentTargets(sections, rows), openPreloads);
   const markAll = useCallback(() => {
     activity.markAllSeen(unseen);
     requestApply();
@@ -132,7 +126,6 @@ export function NavigationHomeFeed({
         <FeedSection
           key={section.key}
           section={section}
-          live={live}
           rows={rows}
           needs={needs}
           showHost={showHost}
@@ -147,6 +140,20 @@ export function NavigationHomeFeed({
       ) : null}
     </View>
   );
+}
+
+const TOP_PRELOAD_ROWS = 2;
+
+/** The first sessions the feed shows, skipping collapsed Seen issues. */
+function topAgentTargets(
+  sections: readonly ActivityLayoutSection[],
+  rows: ReadonlyMap<string, HomeRow>,
+): AgentOpenTarget[] {
+  const keys = sections.filter((section) => section.key !== "seen").flatMap((s) => s.keys);
+  const agents = keys.slice(0, TOP_PRELOAD_ROWS).map((key) => rows.get(key)?.agent);
+  return agents
+    .filter((agent): agent is AggregatedAgent => agent !== undefined)
+    .map((agent) => ({ serverId: agent.serverId, agentId: agent.id }));
 }
 
 /**
@@ -180,7 +187,6 @@ function useApplyReaderChanges(filterKey: string) {
 
 function FeedSection({
   section,
-  live,
   rows,
   needs,
   showHost,
@@ -188,7 +194,6 @@ function FeedSection({
   onAction,
 }: {
   section: ActivityLayoutSection;
-  live: Map<string, AggregatedAgent>;
   rows: ReadonlyMap<string, HomeRow>;
   needs: number;
   showHost: boolean;
@@ -225,7 +230,7 @@ function FeedSection({
             <FeedRow
               key={key}
               identity={key}
-              agent={live.get(key)}
+              agent={rows.get(key)?.agent}
               row={rows.get(key)}
               dimmed={seen}
               showHost={showHost}

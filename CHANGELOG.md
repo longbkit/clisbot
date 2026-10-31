@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.2.1 - 2026-10-29
+
+### Changed
+
+- Home, Chats and Workspace all open on For me and remember your last choice
+- For me now lists every session you created or took part in, including ones someone else started
+
+### Added
+
+- Added the creator to sessions started by schedules, heartbeats and workflows, so they can be attributed to the person who set them up; this takes effect once the Host and the Hub are updated
+
+### Improved
+
+- Improved Home speed with many Hosts connected: the session list is computed once per update and only the sessions that changed are rebuilt
+- Improved Workspace speed with many Hosts connected: the counts are reused when an update does not change them
+
+### Fixed
+
+- Fixed the desktop app asking you to sign in to a Hub again after a brief network error or a Hub restart
+- Fixed Hosts disappearing from the phone app when the Hub answered a ticket with 401 or 400; the app now asks for a new ticket once and keeps your Hosts
+- Fixed work with no known author or participant appearing under For me; it now appears under Others and All
+- Fixed cached sessions from a Host that cannot be reached being shown as live
+- Fixed Home and Workspace listing Hosts that were not selected in the Host picker
+- Fixed signing out of a Hub leaving its sessions classified by the previous account
+- Fixed the Hosts icon in the rail not showing how many Hosts are online
+
 ## 2.2.0 - 2026-10-27
 
 ### Added

@@ -4,6 +4,7 @@ import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { WorkspaceDescriptorPayload } from "@clisbot/protocol/messages";
 
 import {
+  batchSessionStoreUpdates,
   normalizeWorkspaceDescriptor,
   toDaemonServerInfo,
   selectAgentTurnPresentation,
@@ -133,6 +134,83 @@ function permutations<T>(values: readonly T[]): T[][] {
 function taskTexts(tasks: ReadonlyArray<{ text: string }>): string[] {
   return tasks.map((task) => task.text);
 }
+
+describe("batched session store updates", () => {
+  it("publishes every write inside a batch as one notification, readable as it goes", () => {
+    initializeTestSession();
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+    let seenInside: number | undefined;
+
+    batchSessionStoreUpdates(() => {
+      useSessionStore.getState().setAgents("test-server", new Map([["a", createTestAgent("a")]]));
+      useSessionStore.getState().setHasHydratedAgents("test-server", true);
+      seenInside = useSessionStore.getState().sessions["test-server"]?.agents.size;
+    });
+
+    unsubscribe();
+    expect({ notifications, seenInside }).toEqual({ notifications: 1, seenInside: 1 });
+    expect(useSessionStore.getState().sessions["test-server"]?.hasHydratedAgents).toBe(true);
+  });
+
+  it("publishes nothing when the writes in a batch change nothing", () => {
+    initializeTestSession();
+    const before = useSessionStore.getState();
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    batchSessionStoreUpdates(() => {
+      useSessionStore.getState().setHasHydratedAgents("test-server", false);
+    });
+
+    unsubscribe();
+    expect(notifications).toBe(0);
+    expect(useSessionStore.getState()).toBe(before);
+  });
+});
+
+describe("setAgents identity", () => {
+  it("keeps the stored agent and the session when an incoming agent is equal", () => {
+    initializeTestSession();
+    const store = useSessionStore.getState();
+    store.setAgents("test-server", new Map([["a", createTestAgent("a")]]));
+    const before = useSessionStore.getState().sessions["test-server"];
+
+    store.setAgents("test-server", new Map([["a", createTestAgent("a")]]));
+
+    expect(useSessionStore.getState().sessions["test-server"]).toBe(before);
+  });
+
+  it("keeps unchanged agents by reference when one agent changes", () => {
+    initializeTestSession();
+    const store = useSessionStore.getState();
+    store.setAgents(
+      "test-server",
+      new Map([
+        ["a", createTestAgent("a")],
+        ["b", createTestAgent("b")],
+      ]),
+    );
+    const before = useSessionStore.getState().sessions["test-server"]!.agents;
+
+    store.setAgents(
+      "test-server",
+      new Map([
+        ["a", createTestAgent("a")],
+        ["b", { ...createTestAgent("b"), title: "renamed" }],
+      ]),
+    );
+
+    const after = useSessionStore.getState().sessions["test-server"]!.agents;
+    expect(after).not.toBe(before);
+    expect(after.get("a")).toBe(before.get("a"));
+    expect(after.get("b")?.title).toBe("renamed");
+  });
+});
 
 describe("agent task state", () => {
   it("notifies the task subscriber only when its task snapshot changes", () => {

@@ -1,9 +1,10 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import type { WorkspaceSessionFilter } from "./session-filter";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useAppSettings, type AppSettings } from "@/hooks/use-settings";
+import { useHeldWhileInactive } from "@/hooks/use-held-while-inactive";
 import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
@@ -15,9 +16,9 @@ import type {
   SidebarWorkspaceSessions,
 } from "./preferences";
 import {
+  describeWorkspaceSessions,
   hasWorkspaceSessionLine,
   listWorkspaceRootAgents,
-  selectWorkspaceSessions,
   type WorkspaceSessionItem,
   type WorkspaceSessionSource,
 } from "./select-sessions";
@@ -30,7 +31,7 @@ import {
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import {
   buildStatusSessionShortcutModel,
-  sessionDisplayGroups,
+  createSessionDisplayGroupsMemo,
   workspaceStatusDisplayGroups,
   type StatusDisplayGroup,
 } from "./status-sessions";
@@ -41,7 +42,7 @@ import { useCachedServerIds, useIsSourceCached } from "@/clisbot/navigation/use-
 import { listsSessions, resolveSidebarGroupMode } from "./grouping";
 import type { SidebarShortcutModel } from "@/utils/sidebar-shortcuts";
 
-const EMPTY_SOURCE: WorkspaceSessionSource = { agents: new Map(), messageSubmissions: new Map() };
+const EMPTY_SUBMISSIONS: WorkspaceSessionSource["messageSubmissions"] = new Map();
 
 interface WorkspaceRef {
   serverId: string;
@@ -174,9 +175,9 @@ export function useWorkspaceSessionsManualToggle(workspaceKey: string): {
 }
 
 /**
- * The session lines for an open workspace. Subscribes to the two maps a line reads rather than
- * the whole store; both are replaced only when an agent or a submission changes, so other store
- * updates, such as timeline items, never re-run the list.
+ * The session lines for an open workspace. Subscribes to this workspace's root-agent list, which
+ * the store replaces only when one of its agents changes, and to the Host's submissions; agent
+ * updates elsewhere on the Host, or timeline items, never re-run the list.
  */
 export function useWorkspaceSessions(input: {
   serverId: string;
@@ -186,25 +187,22 @@ export function useWorkspaceSessions(input: {
   include?: (session: WorkspaceSessionItem) => boolean;
 }): WorkspaceSessionItem[] {
   const cached = useIsSourceCached(input.serverId);
-  const stored = useSessionStore(
-    useShallow((state) => {
-      const session = state.sessions[input.serverId];
-      return session
-        ? { agents: session.agents, messageSubmissions: session.messageSubmissions }
-        : EMPTY_SOURCE;
-    }),
+  const agents = useSessionStore((state) =>
+    listWorkspaceRootAgents(state.sessions[input.serverId]?.agents, input.workspaceId),
   );
-  const source = useMemo(() => (cached ? { ...stored, cached } : stored), [stored, cached]);
+  const messageSubmissions = useSessionStore(
+    (state) => state.sessions[input.serverId]?.messageSubmissions ?? EMPTY_SUBMISSIONS,
+  );
   return useMemo(
     () =>
-      selectWorkspaceSessions({
-        source,
-        workspaceId: input.workspaceId,
+      describeWorkspaceSessions({
+        agents,
+        source: { messageSubmissions, cached },
         activeOnly: input.activeOnly,
         keepAgentIds: input.keepAgentIds,
         include: input.include,
       }),
-    [source, input.workspaceId, input.activeOnly, input.keepAgentIds, input.include],
+    [agents, messageSubmissions, cached, input.activeOnly, input.keepAgentIds, input.include],
   );
 }
 
@@ -213,10 +211,9 @@ export function useWorkspaceSessions(input: {
  * chevron must not appear and vanish as sessions go idle and busy.
  */
 export function useWorkspaceHasSessions(input: { serverId: string; workspaceId: string }): boolean {
-  const agents = useSessionStore((state) => state.sessions[input.serverId]?.agents);
-  return useMemo(
-    () => listWorkspaceRootAgents(agents, input.workspaceId).length > 0,
-    [agents, input.workspaceId],
+  return useSessionStore(
+    (state) =>
+      listWorkspaceRootAgents(state.sessions[input.serverId]?.agents, input.workspaceId).length > 0,
   );
 }
 
@@ -296,6 +293,8 @@ export function useGroupedSidebarView(input: {
   pinnedCollapsed: boolean;
   collapsedWorkspaceGroupKeys: ReadonlySet<string>;
   sessionFilter?: WorkspaceSessionFilter | null;
+  /** False holds the session lines (a hidden retained pane). */
+  live?: boolean;
 }): { workspaceGroups: StatusDisplayGroup[]; shortcutModel: SidebarShortcutModel } {
   const { visible, activeOnly } = useSidebarWorkspaceSessions();
   const sessionsShown = visible && listsSessions(input.groupMode);
@@ -306,6 +305,7 @@ export function useGroupedSidebarView(input: {
     byStatus: input.groupMode === "status",
     activeOnly,
     sessionFilter: input.sessionFilter ?? null,
+    live: input.live !== false,
   });
   const shortcutModel = useMemo(
     () =>
@@ -332,21 +332,34 @@ function useDisplayGroups(input: {
   byStatus: boolean;
   activeOnly: boolean;
   sessionFilter: WorkspaceSessionFilter | null;
+  live: boolean;
 }): StatusDisplayGroup[] {
-  const { groups, sessionsShown, byStatus, activeOnly, sessionFilter } = input;
+  const { groups, sessionsShown, byStatus, activeOnly, sessionFilter, live } = input;
   const { t } = useTranslation();
-  const keepAgentIds = useOpenWorkspaceShownAgentIds(sessionsShown && activeOnly);
+  const keepAgentIds = useHeldWhileInactive(
+    useOpenWorkspaceShownAgentIds(sessionsShown && activeOnly),
+    live,
+  );
   const serverIds = useMemo(
     () => (sessionsShown ? [...new Set(groups.flatMap((g) => g.rows.map((r) => r.serverId)))] : []),
     [sessionsShown, groups],
   );
-  const agentMaps = useSessionStore(
-    useShallow((state) => serverIds.map((id) => state.sessions[id]?.agents ?? null)),
+  // Held with `serverIds`: the groups they come from are held upstream with the projection.
+  const agentMaps = useHeldWhileInactive(
+    useSessionStore(
+      useShallow((state) => serverIds.map((id) => state.sessions[id]?.agents ?? null)),
+    ),
+    live,
   );
-  const submissionMaps = useSessionStore(
-    useShallow((state) => serverIds.map((id) => state.sessions[id]?.messageSubmissions ?? null)),
+  const submissionMaps = useHeldWhileInactive(
+    useSessionStore(
+      useShallow((state) => serverIds.map((id) => state.sessions[id]?.messageSubmissions ?? null)),
+    ),
+    live,
   );
-  const cached = useCachedServerIds();
+  const cached = useHeldWhileInactive(useCachedServerIds(), live);
+  // Rebuilds only the workspaces whose root agents or submissions moved; the rest keep their lines.
+  const [displayGroupsOf] = useState(createSessionDisplayGroupsMemo);
   return useMemo(() => {
     if (!sessionsShown) return workspaceStatusDisplayGroups(groups);
     const sources = new Map<string, WorkspaceSessionSource>();
@@ -356,7 +369,7 @@ function useDisplayGroups(input: {
       if (agents && messageSubmissions)
         sources.set(serverId, { agents, messageSubmissions, cached: cached.has(serverId) });
     });
-    return sessionDisplayGroups({
+    return displayGroupsOf({
       groups,
       sources,
       activeOnly,
@@ -377,6 +390,7 @@ function useDisplayGroups(input: {
     submissionMaps,
     cached,
     t,
+    displayGroupsOf,
   ]);
 }
 

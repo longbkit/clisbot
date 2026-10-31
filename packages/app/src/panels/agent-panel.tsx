@@ -20,6 +20,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
 import { shallow, useShallow } from "zustand/shallow";
 import { useStoreWithEqualityFn } from "zustand/traditional";
+import { useAgentStreamTail } from "@/agent-stream/use-agent-stream-tail";
 import { AgentStreamView, type AgentStreamViewHandle } from "@/agent-stream/view";
 import { ArchivedAgentCallout } from "@/components/archived-agent-callout";
 import { ComposerDock } from "@/composer/dock";
@@ -52,6 +53,7 @@ import {
   type AgentScreenContinuity,
   type AgentScreenMissingState,
   type AgentScreenViewState,
+  isStreamHistoryLoading,
   useAgentScreenStateMachine,
   type AgentScreenReadySyncState,
 } from "@/hooks/use-agent-screen-state-machine";
@@ -998,10 +1000,7 @@ function ChatAgentContent({
   invariant(effectiveAgent, "effectiveAgent is defined when the non-ready view is absent");
   const agentCwd = agentState.cwd;
   invariant(agentCwd, "agent cwd is defined when agent content is ready");
-  const showHistorySyncOverlay =
-    viewState.tag === "ready" &&
-    viewState.sync.status === "catching_up" &&
-    viewState.sync.ui === "overlay";
+  const isHistoryLoading = isStreamHistoryLoading(viewState);
   const showHistorySyncError = viewState.tag === "ready" && viewState.sync.status === "sync_error";
   const isRetryingHistorySync =
     viewState.tag === "ready" &&
@@ -1027,7 +1026,7 @@ function ChatAgentContent({
       handleMessageSent={handleMessageSent}
       handleRewindComplete={handleRewindComplete}
       timelineSync={isPaneVisible && viewState.tag === "ready" ? viewState.sync : null}
-      showHistorySyncOverlay={showHistorySyncOverlay}
+      isHistoryLoading={isHistoryLoading}
       showHistorySyncError={showHistorySyncError}
       isRetryingHistorySync={isRetryingHistorySync}
       cwd={agentCwd}
@@ -1057,7 +1056,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
   handleMessageSent,
   handleRewindComplete,
   timelineSync,
-  showHistorySyncOverlay,
+  isHistoryLoading,
   showHistorySyncError,
   isRetryingHistorySync,
   retryTimelineSync,
@@ -1083,7 +1082,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
   handleMessageSent: () => void;
   handleRewindComplete: () => void;
   timelineSync: AgentScreenReadySyncState | null;
-  showHistorySyncOverlay: boolean;
+  isHistoryLoading: boolean;
   showHistorySyncError: boolean;
   isRetryingHistorySync: boolean;
   retryTimelineSync: () => void;
@@ -1192,6 +1191,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
           agent={effectiveAgent}
           routeBottomAnchorRequest={routeBottomAnchorRequest}
           hasAppliedAuthoritativeHistory={hasAppliedAuthoritativeHistory}
+          isHistoryLoading={isHistoryLoading}
           hasActiveComposer={hasActiveComposer}
           hasVisibleAgentTracks={hasVisibleAgentTracks}
           toast={toastApi}
@@ -1223,17 +1223,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
     </View>
   );
 
-  const dockOverlay = (
-    <>
-      {showHistorySyncOverlay ? (
-        <View style={styles.historySyncOverlay} testID="agent-history-overlay">
-          <ThemedLoadingSpinner size="large" uniProps={foregroundMutedColorMapping} />
-        </View>
-      ) : null}
-
-      <TimelineSyncStatus sync={timelineSync} toast={toast} onDismiss={dismiss} />
-    </>
-  );
+  const dockOverlay = <TimelineSyncStatus sync={timelineSync} toast={toast} onDismiss={dismiss} />;
 
   const dock = (
     <ChatSurface disabled={isArchivingCurrentAgent} fullscreen={isComposerFullscreen}>
@@ -1327,6 +1317,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
   agent,
   routeBottomAnchorRequest,
   hasAppliedAuthoritativeHistory,
+  isHistoryLoading,
   hasActiveComposer,
   hasVisibleAgentTracks,
   toast,
@@ -1339,6 +1330,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
   agent: AgentScreenAgent;
   routeBottomAnchorRequest: RouteBottomAnchorRequest;
   hasAppliedAuthoritativeHistory: boolean;
+  isHistoryLoading: boolean;
   hasActiveComposer: boolean;
   hasVisibleAgentTracks: boolean;
   toast: ReturnType<typeof useToastHost>["api"];
@@ -1354,9 +1346,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
   const bottomOverlayControlClearance = hasVisibleComposerTracks
     ? resolveComposerTrackControlClearance(isCompactFormFactor)
     : 0;
-  const streamItemsRaw = useSessionStore((state) =>
-    agentId ? state.sessions[serverId]?.agentStreamTail?.get(agentId) : undefined,
-  );
+  const streamItemsRaw = useAgentStreamTail(serverId, agentId);
   const pendingMessageSubmissions = useSessionStore(
     useShallow((state) =>
       agentId
@@ -1409,6 +1399,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
       pendingPermissions={pendingPermissions}
       routeBottomAnchorRequest={routeBottomAnchorRequest}
       isAuthoritativeHistoryReady={hasAppliedAuthoritativeHistory}
+      isHistoryLoading={isHistoryLoading}
       bottomOverlayTailClearance={bottomOverlayTailClearance}
       bottomOverlayControlClearance={bottomOverlayControlClearance}
       toast={toast}
@@ -1727,17 +1718,6 @@ const styles = StyleSheet.create((theme) => ({
   timelineSyncCalloutText: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
-  },
-  historySyncOverlay: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    backgroundColor: theme.colors.surface0,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 40,
   },
   archivingOverlay: {
     position: "absolute",

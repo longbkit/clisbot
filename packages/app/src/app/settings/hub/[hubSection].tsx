@@ -8,7 +8,8 @@ import {
 import SettingsScreen from "@/screens/settings-screen";
 
 export default function HubSettingsSectionRoute() {
-  const params = useLocalSearchParams<{ hubSection?: string }>();
+  const params = useLocalSearchParams<{ hubSection?: string; addHost?: string }>();
+  const openAddHostIntent = typeof params.addHost === "string" ? params.addHost : null;
   const raw = typeof params.hubSection === "string" ? params.hubSection : "";
   const section: HubSectionSlug = isHubSectionSlug(raw) ? raw : "account";
   const view = useMemo(() => ({ kind: "hub" as const, section }), [section]);
@@ -25,5 +26,5 @@ export default function HubSettingsSectionRoute() {
     [moved, params],
   );
   if (movedHref !== null) return <Redirect href={movedHref} />;
-  return <SettingsScreen view={view} />;
+  return <SettingsScreen view={view} openAddHostIntent={openAddHostIntent} />;
 }

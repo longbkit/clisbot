@@ -26,6 +26,7 @@ import {
 import { AgentFeatureSchema, AgentStatusSchema } from "../messages.js";
 import { toStoredAgentRecord } from "./agent-projections.js";
 import type { ManagedAgent } from "./agent-manager.js";
+import type { AgentColdStorageConfig } from "./agent-cold-storage.js";
 import type { AgentSessionConfig } from "./agent-sdk-types.js";
 import { AgentOwnerSchema, daemonExecutionKey, type DaemonAgentOwner } from "./agent-owner.js";
 
@@ -140,10 +141,15 @@ export class AgentStorage {
     private readonly options: {
       sessionLayout?: boolean;
       removeSessionData?: (agentId: string, directory: string) => Promise<void>;
+      coldStorage?: AgentColdStorageConfig;
     } = {},
   ) {
     this.baseDir = baseDir;
     this.logger = logger.child({ module: "agent", component: "agent-storage" });
+  }
+
+  get coldStorage(): AgentColdStorageConfig | undefined {
+    return this.options.coldStorage?.enabled ? this.options.coldStorage : undefined;
   }
 
   async initialize(): Promise<void> {
@@ -330,6 +336,7 @@ export class AgentStorage {
     const materialize = (record: StoredAgentRecord) => ({
       ...copySessionAuthorship(value.summary),
       createdBy: record.createdBy,
+      ownerActor: record.ownerActor,
       participantActors:
         record.createdBy &&
         !value.summary.participantActors?.some((actor) =>

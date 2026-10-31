@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import equal from "fast-deep-equal/es6";
 import { useSyncExternalStore } from "react";
 import { z } from "zod";
 import { readValidatedJson } from "@/storage/validated-storage";
@@ -8,7 +9,8 @@ import { HubDaemonSchema } from "./contracts";
  * The last daemon list each signed-in Hub account returned, so its Hosts stay visible (and their
  * cached sessions readable) while that Hub or the VPN in front of it is unreachable.
  *
- * Visibility only: bindings, ticket resolvers and orphan removal act on a fresh list alone.
+ * A cold start also binds its Hosts from it, so they connect before the Hub answers
+ * (`managedHostBindingList`); orphan removal and re-adding a removed Host act on a fresh list alone.
  * The entry is replaced by every successful list (a delisted daemon disappears) and removed on
  * sign-out, a different account or organization, or a 403 from the list. "Unreachable" never
  * removes it. See docs/features/offline/connection-resilience.md.
@@ -67,8 +69,17 @@ export class HubDaemonListCache {
     return this.lists.get(origin);
   }
 
+  /**
+   * Every 60 s poll remembers a list, usually the same one. Readers re-render only when what it
+   * lists changed; a newer `syncedAt` alone is stored without notifying them (`get` reads it).
+   */
   remember(list: CachedHubDaemonList): void {
+    const previous = this.lists.get(list.origin);
     this.lists.set(list.origin, list);
+    if (previous !== undefined && equal({ ...previous, syncedAt: list.syncedAt }, list)) {
+      this.write();
+      return;
+    }
     this.persist();
   }
 
@@ -91,6 +102,10 @@ export class HubDaemonListCache {
 
   private persist(): void {
     this.emit();
+    this.write();
+  }
+
+  private write(): void {
     const snapshot = JSON.stringify({ lists: [...this.lists.values()] });
     this.writes = this.writes
       .then(() =>

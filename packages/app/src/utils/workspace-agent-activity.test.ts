@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Agent } from "@/stores/session-store";
-import { buildWorkspaceAgentActivityIndex } from "./workspace-agent-activity";
+import {
+  advanceWorkspaceAgentActivityIndex,
+  buildWorkspaceAgentActivityIndex,
+} from "./workspace-agent-activity";
 
 function agent(input: {
   id: string;
@@ -318,5 +321,70 @@ describe("workspace agent activity index", () => {
       status: "needs_input",
       enteredAt: new Date("2026-06-01T10:05:00.000Z"),
     });
+  });
+});
+
+describe("advancing the workspace agent activity index", () => {
+  function advanceFrom(agents: Map<string, Agent>) {
+    const activity = advanceWorkspaceAgentActivityIndex(new Map(), agents, new Map());
+    return {
+      activity,
+      to: (next: Map<string, Agent>) => advanceWorkspaceAgentActivityIndex(agents, next, activity),
+    };
+  }
+
+  it("recomputes only the workspaces whose agents changed and matches a full rebuild", () => {
+    const agents = new Map([
+      ["a", agent({ id: "a", workspaceId: "w1", updatedAt: "2026-01-01T00:00:00.000Z" })],
+      ["b", agent({ id: "b", workspaceId: "w2", updatedAt: "2026-01-01T00:00:00.000Z" })],
+    ]);
+    const start = advanceFrom(agents);
+    const next = new Map(agents);
+    next.set(
+      "a",
+      agent({
+        id: "a",
+        workspaceId: "w1",
+        status: "running",
+        updatedAt: "2026-01-02T00:00:00.000Z",
+      }),
+    );
+    next.set("c", agent({ id: "c", workspaceId: "w3", updatedAt: "2026-01-02T00:00:00.000Z" }));
+
+    const advanced = start.to(next);
+
+    expect(advanced).toEqual(buildWorkspaceAgentActivityIndex(next));
+    expect(advanced.get("w2")).toBe(start.activity.get("w2"));
+    expect(advanced.get("w1")?.status).toBe("running");
+  });
+
+  it("returns the previous index when the change moves no workspace's activity", () => {
+    const agents = new Map([
+      ["a", agent({ id: "a", workspaceId: "w1", updatedAt: "2026-01-01T00:00:00.000Z" })],
+    ]);
+    const start = advanceFrom(agents);
+    const next = new Map([["a", { ...agents.get("a")!, title: "renamed" }]]);
+
+    expect(start.to(next)).toBe(start.activity);
+  });
+
+  it("drops a workspace whose last root agent is archived", () => {
+    const agents = new Map([
+      ["a", agent({ id: "a", workspaceId: "w1", updatedAt: "2026-01-01T00:00:00.000Z" })],
+    ]);
+    const start = advanceFrom(agents);
+    const next = new Map([
+      [
+        "a",
+        agent({
+          id: "a",
+          workspaceId: "w1",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          archivedAt: "2026-01-02T00:00:00.000Z",
+        }),
+      ],
+    ]);
+
+    expect(start.to(next).has("w1")).toBe(false);
   });
 });

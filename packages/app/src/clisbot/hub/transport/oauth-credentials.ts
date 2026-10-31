@@ -5,6 +5,12 @@ const Credential = z.object({
   issuer: z.string(),
   refreshToken: z.string(),
   generation: z.string(),
+  /**
+   * The access token issued with `refreshToken` and when it expires (epoch ms). Stored in the
+   * same write so a relaunch within its few minutes skips a refresh (native only).
+   */
+  accessToken: z.string().optional(),
+  accessExpiresAt: z.number().optional(),
 });
 export type OAuthCredential = z.infer<typeof Credential>;
 

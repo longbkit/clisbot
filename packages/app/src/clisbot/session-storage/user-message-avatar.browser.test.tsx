@@ -44,6 +44,8 @@ vi.mock("react-native-unistyles", async () => {
           ? (styles as (theme: typeof lightTheme) => T)(lightTheme)
           : styles,
     },
+    // layout.ts reads the breakpoint for the compact resume hold.
+    UnistylesRuntime: { breakpoint: window.innerWidth < 500 ? "xs" : "lg" },
     // Keep the real renderer's theme-prop bridge: an identity wrapper silently drops
     // MarkdownRenderer's uniProps and renders the library defaults instead of Clisbot spacing.
     withUnistyles: <T,>(

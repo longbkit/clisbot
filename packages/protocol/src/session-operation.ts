@@ -3,6 +3,7 @@ import { SessionActorSchema, SessionChannelReferenceSchema } from "./session-aut
 
 export const SessionOperationIdentitySchema = z.object({
   actor: SessionActorSchema,
+  ownerActor: SessionActorSchema.optional(),
   channel: SessionChannelReferenceSchema.optional(),
 });
 export type VerifiedSessionOperationIdentity = z.infer<typeof SessionOperationIdentitySchema>;

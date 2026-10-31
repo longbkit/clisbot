@@ -8,6 +8,7 @@ import type {
   SidebarShortcutWorkspaceTarget,
 } from "@/utils/sidebar-shortcuts";
 import type { TFunction } from "i18next";
+import type { Agent } from "@/stores/session-store";
 import {
   getStatusBucketLabel,
   STATUS_BUCKET_ORDER,
@@ -61,7 +62,11 @@ export function workspaceStatusDisplayGroups(
  * Inside a group the most recently messaged session comes first. That time only moves when
  * someone sends a message, so a line does not jump while its turn streams.
  */
-export function sessionDisplayGroups(input: {
+export function sessionDisplayGroups(input: SessionDisplayGroupsInput): StatusDisplayGroup[] {
+  return groupLines(input, (workspace) => workspaceLines({ ...input, workspace }));
+}
+
+export interface SessionDisplayGroupsInput {
   groups: readonly SidebarWorkspaceGroup[];
   sources: ReadonlyMap<string, WorkspaceSessionSource>;
   activeOnly: boolean;
@@ -71,10 +76,98 @@ export function sessionDisplayGroups(input: {
   sessionFilter?: WorkspaceSessionFilter | null;
   byStatus: boolean;
   t: TFunction;
-}): StatusDisplayGroup[] {
+}
+
+interface CachedLines {
+  workspace: SidebarWorkspaceEntry;
+  roots: readonly Agent[] | null;
+  source: Omit<WorkspaceSessionSource, "agents"> | null;
+  lines: WorkspaceLine[];
+}
+
+/**
+ * `sessionDisplayGroups` for a hook that runs on every agent change of every Host it lists. A
+ * workspace's lines are rebuilt only when its row, its root-agent list or its Host's submissions
+ * changed; when none was, and the groups and query are the same, the previous result comes back.
+ */
+export function createSessionDisplayGroupsMemo(): (
+  input: SessionDisplayGroupsInput,
+) => StatusDisplayGroup[] {
+  let last: SessionDisplayGroupsInput | null = null;
+  let cache = new Map<string, CachedLines>();
+  let result: StatusDisplayGroup[] = [];
+  return (input) => {
+    const sameQuery = last !== null && isSameQuery(last, input);
+    const previous = sameQuery ? cache : new Map<string, CachedLines>();
+    cache = new Map();
+    let reused = sameQuery && last?.groups === input.groups;
+    for (const workspace of input.groups.flatMap((group) => group.rows)) {
+      const entry = cachedLinesOf(input, workspace, previous.get(workspace.workspaceKey));
+      if (entry !== previous.get(workspace.workspaceKey)) reused = false;
+      cache.set(workspace.workspaceKey, entry);
+    }
+    last = input;
+    if (reused) return result;
+    result = groupLines(input, (workspace) => cache.get(workspace.workspaceKey)?.lines ?? []);
+    return result;
+  };
+}
+
+function isSameQuery(left: SessionDisplayGroupsInput, right: SessionDisplayGroupsInput): boolean {
+  return (
+    left.activeOnly === right.activeOnly &&
+    left.keepAgentIds === right.keepAgentIds &&
+    left.sessionFilter === right.sessionFilter &&
+    left.byStatus === right.byStatus &&
+    left.t === right.t
+  );
+}
+
+function cachedLinesOf(
+  input: SessionDisplayGroupsInput,
+  workspace: SidebarWorkspaceEntry,
+  previous: CachedLines | undefined,
+): CachedLines {
+  const found = input.sources.get(workspace.serverId);
+  const roots = found ? listWorkspaceRootAgents(found.agents, workspace.workspaceId) : null;
+  const source = found
+    ? { messageSubmissions: found.messageSubmissions, cached: found.cached }
+    : null;
+  if (
+    previous?.workspace === workspace &&
+    sameAgents(previous.roots, roots) &&
+    previous.source?.messageSubmissions === source?.messageSubmissions &&
+    previous.source?.cached === source?.cached
+  ) {
+    return previous;
+  }
+  return { workspace, roots, source, lines: workspaceLines({ ...input, workspace }) };
+}
+
+// The store keeps an unchanged workspace's list by reference; a list rebuilt elsewhere still
+// matches while it holds the same agents.
+function sameAgents(left: readonly Agent[] | null, right: readonly Agent[] | null): boolean {
+  if (left === right) return true;
+  if (!left || !right || left.length !== right.length) return false;
+  return left.every((agent, index) => agent === right[index]);
+}
+
+function groupLines(
+  input: SessionDisplayGroupsInput,
+  linesOf: (workspace: SidebarWorkspaceEntry) => WorkspaceLine[],
+): StatusDisplayGroup[] {
   let order = 0;
   const rank = (group: SidebarWorkspaceGroup): RankedItem[] =>
-    group.rows.flatMap((workspace) => rankWorkspace({ ...input, workspace, order: () => order++ }));
+    group.rows.flatMap((workspace) =>
+      linesOf(workspace).map(
+        (line): RankedItem => ({
+          item: line.item,
+          bucket: line.bucket,
+          time: line.time,
+          order: order++,
+        }),
+      ),
+    );
   if (!input.byStatus) {
     return input.groups.flatMap((group) => {
       const ranked = rank(group);
@@ -99,20 +192,19 @@ export function sessionDisplayGroups(input: {
 }
 
 /** One workspace's lines: its sessions, or its own row while it has none to list. */
-function rankWorkspace(input: {
+function workspaceLines(input: {
   workspace: SidebarWorkspaceEntry;
   sources: ReadonlyMap<string, WorkspaceSessionSource>;
   activeOnly: boolean;
   keepAgentIds?: ReadonlySet<string>;
   sessionFilter?: WorkspaceSessionFilter | null;
-  order: () => number;
-}): RankedItem[] {
+}): WorkspaceLine[] {
   const { workspace } = input;
   const source = input.sources.get(workspace.serverId);
   if (!source || listWorkspaceRootAgents(source.agents, workspace.workspaceId).length === 0) {
     const time = workspace.statusEnteredAt?.getTime() ?? null;
     const item = workspaceItem(workspace);
-    return [{ item, bucket: workspace.statusBucket, time, order: input.order() }];
+    return [{ item, bucket: workspace.statusBucket, time }];
   }
   const sessions = selectWorkspaceSessions({
     source,
@@ -132,7 +224,6 @@ function rankWorkspace(input: {
     },
     bucket: session.statusBucket,
     time: (session.agent.lastUserMessageAt ?? session.agent.createdAt).getTime(),
-    order: input.order(),
   }));
 }
 
@@ -146,10 +237,13 @@ function displayGroup(
   return { ...group, rows, items };
 }
 
-interface RankedItem {
+interface WorkspaceLine {
   item: StatusGroupItem;
   bucket: StatusBucket;
   time: number | null;
+}
+
+interface RankedItem extends WorkspaceLine {
   /** Position in the incoming workspace order — the tie-break, so equal times never swap. */
   order: number;
 }

@@ -1587,6 +1587,10 @@ function WorkspaceScreenContent({
     if (!hasHydratedWorkspaceLayoutStore) {
       return;
     }
+    // The store skips reconciling while an open is pending; run again once it is consumed.
+    if (pendingOpenTarget) {
+      return;
+    }
 
     const hasActivePendingDraftCreateInWorkspace = uiTabs.some((tab) => {
       if (tab.target.kind !== "draft") {
@@ -1618,6 +1622,7 @@ function WorkspaceScreenContent({
     normalizedServerId,
     normalizedWorkspaceId,
     pendingByDraftId,
+    pendingOpenTarget,
     persistenceKey,
     reconcileWorkspaceTabs,
     knownTerminalIds,

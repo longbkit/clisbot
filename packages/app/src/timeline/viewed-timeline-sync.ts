@@ -458,12 +458,15 @@ export function createViewedTimelineOwner(input: {
   ports: ViewedTimelineOwnerPorts;
 }): ViewedTimelineOwner {
   const forcedTailReplacements = new Set<string>();
-  const retention = new TimelineRetentionOwner(input.serverId, input.retentionBudget);
+  // Agents whose live events were dropped, or whose retained pages were released, while
+  // hidden. Selective delivery keeps a hidden agent hot and skips catch-up on return, so
+  // these must catch up when shown again.
+  const droppedWhileHidden = new Set<string>();
+  const retention = new TimelineRetentionOwner(input.serverId, input.retentionBudget, (agentId) =>
+    droppedWhileHidden.add(agentId),
+  );
   const visibleSources = new Map<string, readonly string[]>();
   const deferredLatest = new Map<string, { epoch: string; seq: number }>();
-  // Agents whose live events were dropped while hidden. Selective delivery keeps a hidden
-  // agent hot and skips catch-up on return, so these must catch up when shown again.
-  const droppedWhileHidden = new Set<string>();
   let active = true;
   const visible = (agentId: string) => {
     if (!active) return false;

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
@@ -8,29 +8,42 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { usePanelStore } from "@/stores/panel-store";
 import { useIsMobilePanelActive } from "@/mobile-panels/provider";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
+import { PhoneListTab } from "@/clisbot/navigation/list-panel";
 import { rememberListSection } from "@/clisbot/navigation/mobile-tabs";
-import { HOME_TAB_PATH, rememberChatReturn, useNavigateHomeTab } from "./mobile-navigation";
+import { WORK_PATH } from "@/clisbot/navigation/sections";
+import {
+  HOME_TAB_PATH,
+  rememberChatReturn,
+  useNavigateHomeTab,
+  usesPhoneTabs,
+} from "./mobile-navigation";
 
 /**
- * A list tab's page (Chat, or Navigation V2's Chats and Work). On a phone it is the conversation
- * list panel, with no page of its own; on desktop the list is the pane beside it and this page
- * waits for a pick.
+ * A list tab's page (Chat, or Navigation V2's Chats and Work). A Navigation V2 phone shows the
+ * list as the tab screen itself. On desktop the list is the pane beside this page, which waits for
+ * a pick. The Home V2 phone's page is empty under the conversation list panel.
  */
-export function ListTabPage({ path }: { path: string }) {
+export const ListTabPage = memo(function ListTabPage({ path }: { path: string }) {
   const focused = useIsFocused();
   const compact = useIsCompactFormFactor();
+  const phoneTabs = usesPhoneTabs(compact);
   useEffect(() => {
     if (!focused) return;
     if (NAVIGATION_V2_ENABLED) rememberListSection(path);
-    if (NAVIGATION_V2_ENABLED && !compact) {
+    if (phoneTabs) {
+      rememberChatReturn(path);
+      return;
+    }
+    if (NAVIGATION_V2_ENABLED) {
       usePanelStore.getState().openDesktopAgentList();
       return;
     }
     rememberChatReturn(path);
     usePanelStore.getState().showMobileAgentList();
-  }, [compact, focused, path]);
-  useLeaveWhenSidebarCloses(focused && (compact || !NAVIGATION_V2_ENABLED));
-  if (NAVIGATION_V2_ENABLED && !compact) return <PickPrompt />;
+  }, [focused, path, phoneTabs]);
+  useLeaveWhenSidebarCloses(focused && !NAVIGATION_V2_ENABLED);
+  if (phoneTabs) return <PhoneListTab section={path === WORK_PATH ? "work" : "chats"} />;
+  if (NAVIGATION_V2_ENABLED) return <PickPrompt />;
   return (
     <View style={styles.fill}>
       <Button variant="ghost" onPress={openList}>
@@ -38,7 +51,7 @@ export function ListTabPage({ path }: { path: string }) {
       </Button>
     </View>
   );
-}
+});
 
 function PickPrompt() {
   const { t } = useTranslation();
@@ -50,7 +63,7 @@ function PickPrompt() {
 }
 
 /**
- * The phone's list has no page of its own: if the list closes while this route is focused
+ * The Home V2 phone's list has no page of its own: if the list closes while this route is focused
  * (anything that still closes the panel), go Home rather than leave this empty page. It waits for
  * the settled panel, not the close request: picking a conversation also closes the panel, and by
  * the time that settles this route has lost focus.

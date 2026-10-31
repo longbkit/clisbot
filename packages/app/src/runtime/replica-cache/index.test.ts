@@ -9,7 +9,8 @@ import type { StreamItem } from "@/types/stream";
 import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
 import { ReplicaCache } from ".";
 import type { DirectoryCheckpoint } from "@/runtime/replica-cache";
-import type { ReplicaHostRows, ReplicaRow, ReplicaRowChanges, ReplicaRowStore } from "./row-store";
+import type { ReplicaRow } from "./row-store";
+import { MemoryStorage } from "./testing";
 
 const SERVER_ID = "cached-host";
 
@@ -21,103 +22,13 @@ function deferred(): { promise: Promise<void>; resolve(): void } {
   return { promise, resolve };
 }
 
-class MemoryStorage implements ReplicaRowStore {
-  readonly rows = new Map<string, ReplicaRow>();
-  readonly changes: ReplicaRowChanges[] = [];
-  readonly reads: Array<{
-    serverId: string;
-    kinds: readonly ReplicaRow["kind"][];
-    ids?: readonly string[];
-  }> = [];
-  writes = 0;
-  cleanups = 0;
-  nextWriteFailure: Error | null = null;
-  persistentWriteFailure: Error | null = null;
-  writeGate: Promise<void> | null = null;
-  onWrite: (() => void) | null = null;
-  readGate: Promise<void> | null = null;
-  onRead: (() => void) | null = null;
-  /** Throws once a read goes past this count, so a non-terminating read loop fails the test. */
-  readLimit: number | null = null;
-
-  private key(row: Pick<ReplicaRow, "serverId" | "kind" | "id">): string {
-    return `${row.serverId}:${row.kind}:${row.id}`;
-  }
-
-  async open(): Promise<void> {}
-
-  async read(
-    serverId: string,
-    kinds: readonly ReplicaRow["kind"][],
-    ids?: readonly string[],
-  ): Promise<ReplicaRow[]> {
-    this.reads.push({ serverId, kinds, ...(ids ? { ids } : {}) });
-    if (this.readLimit !== null && this.reads.length > this.readLimit) {
-      throw new Error(
-        `replica cache read ${this.reads.length} passed the limit of ${this.readLimit}`,
-      );
-    }
-    this.onRead?.();
-    await this.readGate;
-    const acceptedKinds = new Set(kinds);
-    const acceptedIds = ids ? new Set(ids) : null;
-    return [...this.rows.values()].filter(
-      (row) =>
-        row.serverId === serverId &&
-        acceptedKinds.has(row.kind) &&
-        (!acceptedIds || acceptedIds.has(row.id)),
-    );
-  }
-
-  async readAll(): Promise<ReplicaHostRows[]> {
-    const hosts = new Map<string, ReplicaRow[]>();
-    for (const row of this.rows.values()) {
-      const rows = hosts.get(row.serverId) ?? [];
-      rows.push(row);
-      hosts.set(row.serverId, rows);
-    }
-    return [...hosts].map(([serverId, rows]) => ({ serverId, rows }));
-  }
-
-  async apply(changes: ReplicaRowChanges): Promise<void> {
-    this.writes += 1;
-    this.onWrite?.();
-    await this.writeGate;
-    if (this.persistentWriteFailure) throw this.persistentWriteFailure;
-    if (this.nextWriteFailure) {
-      const error = this.nextWriteFailure;
-      this.nextWriteFailure = null;
-      throw error;
-    }
-    this.changes.push(changes);
-    for (const key of changes.deletes) this.rows.delete(this.key(key));
-    for (const row of changes.upserts) this.rows.set(this.key(row), row);
-  }
-
-  async deleteHost(serverId: string): Promise<void> {
-    for (const [key, row] of this.rows) if (row.serverId === serverId) this.rows.delete(key);
-  }
-
-  async renameHost(oldServerId: string, newServerId: string): Promise<void> {
-    for (const [key, row] of this.rows) {
-      if (row.serverId !== oldServerId) continue;
-      this.rows.delete(key);
-      const renamed = { ...row, serverId: newServerId };
-      this.rows.set(this.key(renamed), renamed);
-    }
-  }
-
-  async clear(): Promise<void> {
-    this.rows.clear();
-  }
-}
-
 const noLegacyCleanup = { clearLegacyCache: async () => undefined };
 
+/** A `maxBytes` budget pins the whole-Host eviction these tests were written for. */
 function createCache(storage: MemoryStorage, maxBytes?: number): ReplicaCache {
   const cache = new ReplicaCache(storage, {
     ...noLegacyCleanup,
-    ...(maxBytes ? { maxBytes } : {}),
+    ...(maxBytes ? { maxBytes, offlineTails: false } : {}),
   });
   cache.setHosts([SERVER_ID]);
   return cache;
@@ -1062,9 +973,13 @@ describe("ReplicaCache", () => {
     ]);
   });
 
-  it("rebuilds every directory row before restoring its checkpoint after eviction", async () => {
+  it("rebuilds every directory row before restoring its checkpoint after whole-Host eviction", async () => {
     const storage = new MemoryStorage();
-    const cache = new ReplicaCache(storage, { ...noLegacyCleanup, maxBytes: 2_500 });
+    const cache = new ReplicaCache(storage, {
+      ...noLegacyCleanup,
+      maxBytes: 2_500,
+      offlineTails: false,
+    });
     cache.setHosts([SERVER_ID, "other-host"]);
     const cachedDirectory = directory();
     commitDirectory(cache, SERVER_ID, cachedDirectory);
@@ -1195,9 +1110,14 @@ describe("ReplicaCache", () => {
   });
 });
 
-it("retains semantic agent messages across disk-cache reconstruction", async () => {
+it("retains semantic agent messages across disk-cache reconstruction with offline tails off", async () => {
   const storage = new MemoryStorage();
-  const writer = createCache(storage);
+  const fullFidelity = () => {
+    const cache = new ReplicaCache(storage, { ...noLegacyCleanup, offlineTails: false });
+    cache.setHosts([SERVER_ID]);
+    return cache;
+  };
+  const writer = fullFidelity();
   const value = timeline();
   value.items = [
     {
@@ -1225,7 +1145,7 @@ it("retains semantic agent messages across disk-cache reconstruction", async () 
   ];
   writer.commitTimeline(SERVER_ID, "agent-1", value);
   await writer.flush();
-  expect(await createCache(storage).readTimeline(SERVER_ID, "agent-1")).toEqual(value);
+  expect(await fullFidelity().readTimeline(SERVER_ID, "agent-1")).toEqual(value);
 });
 
 describe("selected reads during drained in-flight persistence", () => {

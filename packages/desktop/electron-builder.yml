@@ -6,6 +6,7 @@ protocols:
   - name: Clisbot agent link
     schemes:
       - clisbot
+beforePack: ./scripts/before-pack.js
 afterPack: ./scripts/after-pack.js
 afterSign: ./scripts/after-sign.js
 directories:

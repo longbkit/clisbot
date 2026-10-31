@@ -1,4 +1,4 @@
-import type { Ownership } from "@/clisbot/navigation/ownership";
+import { inScope, isReaderOwned, type Ownership } from "@/clisbot/navigation/ownership";
 import type { SearchViewContext } from "./candidates";
 import { inSearchScope, type ResolvedSearchScope } from "./model";
 
@@ -35,7 +35,7 @@ export function hiddenBy(
   if (view.projectKeys && (!placement.projectKey || !view.projectKeys.has(placement.projectKey))) {
     return "project";
   }
-  if (view.ownership && view.ownership !== "all" && placement.ownership !== view.ownership) {
+  if (view.ownership && !inScope(view.ownership, placement.ownership)) {
     return "others";
   }
   return null;
@@ -46,8 +46,8 @@ export function isInView(view: SearchViewContext | null, placement: ItemPlacemen
 }
 
 /**
- * Keep every match (R1) in four bands: in view and For me, in view and not mine (Others, or
- * nobody can tell), then the same two outside the view. Stable, so the matcher's order holds
+ * Keep every match (R1) in four bands: in view and For me (including work nobody can place), in
+ * view and Others, then the same two outside the view. Stable, so the matcher's order holds
  * within each band and the highlighted row does not jump while results stream in.
  */
 export function rankItemsByView<Row>(
@@ -58,7 +58,7 @@ export function rankItemsByView<Row>(
   const bands: Row[][] = [[], [], [], []];
   for (const row of rows) {
     const placement = placementOf(row);
-    const band = (isInView(view, placement) ? 0 : 2) + (placement.ownership === "mine" ? 0 : 1);
+    const band = (isInView(view, placement) ? 0 : 2) + (isReaderOwned(placement.ownership) ? 0 : 1);
     bands[band]!.push(row);
   }
   return bands.flat();

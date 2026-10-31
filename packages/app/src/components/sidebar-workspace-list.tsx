@@ -3,7 +3,10 @@ import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import type { PinRow } from "@/clisbot/bots/sidebar/use-pinned-rows";
 import { StatusSessionRow } from "@/components/sidebar/sidebar-status-list";
 import { resolveSidebarProjectIconTargets } from "@/utils/sidebar-project-row-model";
-import { useSidebarWorkspaceSelection } from "@/clisbot/workspace-sessions/auto-collapse";
+import {
+  useIsSidebarOnWorkspaceRoute,
+  useSidebarWorkspaceSelection,
+} from "@/clisbot/workspace-sessions/auto-collapse";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
 import { useSidebarHostIds } from "@/hooks/use-sidebar-host-ids";
 import { startArmedHermesSampling, traceInstant } from "@/performance/native-trace";
@@ -22,6 +25,7 @@ import {
   View,
   Text,
   Pressable,
+  Platform,
   ScrollView,
   type GestureResponderEvent,
   type PressableStateCallbackType,
@@ -42,7 +46,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { router, usePathname, type Href } from "expo-router";
+import { router, type Href } from "expo-router";
 import {
   navigateToWorkspace,
   type ActiveWorkspaceSelection,
@@ -81,11 +85,7 @@ import { useSidebarCollapsedSectionsStore } from "@/stores/sidebar-collapsed-sec
 import { useHostFeatureMap } from "@/runtime/host-features";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useProjectIcons } from "@/projects/icons";
-import {
-  buildNewWorkspaceRoute,
-  buildProjectSettingsRoute,
-  parseHostWorkspaceRouteFromPathname,
-} from "@/utils/host-routes";
+import { buildNewWorkspaceRoute, buildProjectSettingsRoute } from "@/utils/host-routes";
 import {
   shouldShowSidebarHostLabels,
   useSidebarProjectStatusBucket,
@@ -126,6 +126,7 @@ import { SidebarSectionHeader } from "@/components/sidebar/sidebar-section-heade
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
 import { PinMark, usePinnedRow } from "@/components/ui/pin-mark";
 import { SidebarStatusFlatList } from "@/components/sidebar/sidebar-status-flat-list";
+import { useBatchedProjectContent } from "@/components/sidebar/use-batched-project-content";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { createSidebarWorkspaceVisibilityPolicy } from "@/components/sidebar/sidebar-group-visibility";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
@@ -995,13 +996,14 @@ function ProjectHeaderRow({
     ...dragAttributes
   } = dragHandleProps?.attributes ?? {};
 
-  const handlePress = useCallback(() => {
-    if (interaction.didLongPressRef.current) {
-      interaction.didLongPressRef.current = false;
-      return;
-    }
-    onPress();
-  }, [interaction.didLongPressRef, onPress]);
+  const { consumeLongPress } = interaction;
+  const handlePress = useCallback(
+    (event: GestureResponderEvent) => {
+      if (consumeLongPress(event)) return;
+      onPress();
+    },
+    [consumeLongPress, onPress],
+  );
 
   const handlePointerEnter = useCallback(() => {
     if (!contextMenuOpen) setIsHovered(true);
@@ -1198,10 +1200,7 @@ function WorkspaceRowInner({
         guard: String(interaction.didLongPressRef.current),
         key: workspace.workspaceKey,
       });
-      if (interaction.didLongPressRef.current) {
-        interaction.didLongPressRef.current = false;
-        return;
-      }
+      if (interaction.consumeLongPress(event)) return;
       traceInstant("clisbot.workspace.press", {
         eventMs: String(event.nativeEvent.timestamp),
         workspaceKey: workspace.workspaceKey,
@@ -1209,7 +1208,7 @@ function WorkspaceRowInner({
       startArmedHermesSampling(workspace.workspaceKey);
       onPress();
     },
-    [interaction.didLongPressRef, onPress, workspace.workspaceKey],
+    [interaction, onPress, workspace.workspaceKey],
   );
   const handleWorkspacePressIn = useCallback(
     (event: GestureResponderEvent) => {
@@ -1726,6 +1725,9 @@ function ProjectBlock({
   supportsMultiplicityByServerId,
   supportsPinningByServerId,
   onToggleWorkspacePin,
+  childrenReady = true,
+  onBatchDragBegin,
+  onBatchDragSettled,
 }: {
   project: SidebarProjectEntry;
   workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
@@ -1753,6 +1755,9 @@ function ProjectBlock({
   supportsMultiplicityByServerId: ReadonlyMap<string, boolean>;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
+  childrenReady?: boolean;
+  onBatchDragBegin?: () => void;
+  onBatchDragSettled?: () => void;
 }) {
   const fusion = useBotsFeatureHosts().length > 0;
   const visibilityPolicy = useMemo(
@@ -1765,6 +1770,10 @@ function ProjectBlock({
     canToggle: canToggleWorkspaces,
     toggleExpanded: toggleWorkspacesExpanded,
   } = useLimitedSidebarGroup(project.workspaces, visibilityPolicy);
+  const pendingChildrenStyle = useMemo(
+    () => ({ height: (visibleWorkspaces.length + Number(canToggleWorkspaces)) * 64 }),
+    [visibleWorkspaces.length, canToggleWorkspaces],
+  );
   const activeServerId = activeWorkspaceSelection?.serverId ?? null;
   const activeHostStatus = useHostRuntimeConnectionStatus(activeServerId ?? "");
   const preferredServerId = activeHostStatus === "online" ? activeServerId : null;
@@ -1923,7 +1932,18 @@ function ProjectBlock({
 
   let projectChildren = null;
   if (!collapsed) {
-    if (project.workspaces.length > 0) {
+    if (project.workspaces.length > 0 && !childrenReady) {
+      // Retain approximate scroll geometry until this project's rows mount. All project headers
+      // and draggable data remain present; the first projects mount immediately.
+      projectChildren = (
+        <View
+          accessible
+          accessibilityLabel={t("common.loading")}
+          testID="sidebar-project-children-pending"
+          style={pendingChildrenStyle}
+        />
+      );
+    } else if (project.workspaces.length > 0) {
       projectChildren = (
         <>
           {manualSort ? (
@@ -1933,6 +1953,8 @@ function ProjectBlock({
               keyExtractor={workspaceKeyExtractor}
               renderItem={renderWorkspace}
               onDragEnd={handleWorkspaceDragEnd}
+              onDragBegin={onBatchDragBegin}
+              onDragSettled={onBatchDragSettled}
               extraData={activeWorkspaceSelectionKey(activeWorkspaceSelection)}
               scrollEnabled={false}
               useDragHandle
@@ -2025,6 +2047,9 @@ function areProjectBlockPropsEqual(previous: ProjectBlockProps, next: ProjectBlo
     previous.supportsMultiplicityByServerId === next.supportsMultiplicityByServerId &&
     previous.supportsPinningByServerId === next.supportsPinningByServerId &&
     previous.onToggleWorkspacePin === next.onToggleWorkspacePin &&
+    previous.childrenReady === next.childrenReady &&
+    previous.onBatchDragBegin === next.onBatchDragBegin &&
+    previous.onBatchDragSettled === next.onBatchDragSettled &&
     previous.onToggleCollapsed === next.onToggleCollapsed &&
     previous.onPinnedPress === next.onPinnedPress &&
     previous.onWorkspacePress === next.onWorkspacePress &&
@@ -2214,7 +2239,6 @@ export function SidebarWorkspaceList({
   dragGestureHostActive,
   pinPresentation = "section",
 }: SidebarWorkspaceListProps) {
-  const pathname = usePathname();
   const hosts = useHosts();
   const rowItems = useSidebarRowItems();
   const selectedHostIds = useSidebarHostIds();
@@ -2345,7 +2369,6 @@ export function SidebarWorkspaceList({
         hasActiveProjectFilter={hasActiveProjectFilter}
         parentGestureRef={parentGestureRef}
         dragGestureHostActive={dragGestureHostActive}
-        pathname={pathname}
         hostBadgeByServerId={hostBadgeByServerId}
         supportsMultiplicityByServerId={supportsMultiplicityByServerId}
         supportsPinningByServerId={supportsPinningByServerId}
@@ -2445,6 +2468,10 @@ function SidebarGroupedModeList({
   );
 }
 
+function shouldBatchProjectContent(compact: boolean, pinPresentation?: "section" | "float") {
+  return Platform.OS === "android" && compact && pinPresentation === "float";
+}
+
 function ProjectModeList({
   projects,
   pinnedGroups,
@@ -2463,7 +2490,6 @@ function ProjectModeList({
   hasActiveProjectFilter,
   parentGestureRef,
   dragGestureHostActive,
-  pathname,
   hostBadgeByServerId,
   supportsMultiplicityByServerId,
   supportsPinningByServerId,
@@ -2482,7 +2508,6 @@ function ProjectModeList({
   /** Swaps the list body for the label filter's empty state. Never the header above it. */
   sidebarFilterEmpty: boolean;
   projectIconByProjectViewKey: ReadonlyMap<string, string | null>;
-  pathname: string;
   hostBadgeByServerId: ReadonlyMap<string, HostBadgeModel>;
   supportsMultiplicityByServerId: ReadonlyMap<string, boolean>;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
@@ -2507,13 +2532,36 @@ function ProjectModeList({
   const getProjectOrder = useSidebarOrderStore((state) => state.getProjectOrder);
   const setProjectOrder = useSidebarOrderStore((state) => state.setProjectOrder);
 
-  const isWorkspaceRoute = useMemo(
-    () => Boolean(pathname && parseHostWorkspaceRouteFromPathname(pathname)),
-    [pathname],
-  );
-  const selectionEnabled = isWorkspaceRoute;
+  const selectionEnabled = useIsSidebarOnWorkspaceRoute();
   const activeWorkspaceSelection = useSidebarWorkspaceSelection();
   const { pinnedChats, unpinnedProjects } = pinnedGroups;
+  const compact = useIsCompactFormFactor();
+  const batchProjectChildren = shouldBatchProjectContent(compact, pinPresentation);
+  const projectKeys = useMemo(
+    () => unpinnedProjects.map((project) => project.viewKey),
+    [unpinnedProjects],
+  );
+  const [activeBatchDrags, setActiveBatchDrags] = useState(0);
+  const activeBatchDragCount = useRef(0);
+  const batchDragActive = useRef(false);
+  const readyProjectChildren = useBatchedProjectContent(
+    projectKeys,
+    batchProjectChildren,
+    activeBatchDrags > 0,
+    batchDragActive,
+  );
+  const onBatchDragBegin = useCallback(() => {
+    activeBatchDragCount.current += 1;
+    batchDragActive.current = true;
+    setActiveBatchDrags(activeBatchDragCount.current);
+  }, []);
+  const onBatchDragSettled = useCallback(() => {
+    activeBatchDragCount.current = Math.max(0, activeBatchDragCount.current - 1);
+    batchDragActive.current = activeBatchDragCount.current > 0;
+    setActiveBatchDrags(activeBatchDragCount.current);
+  }, []);
+  // Track every drag, including one that started before a Host introduces new projects.
+  const needsBatchDragTracking = batchProjectChildren;
   const hasBotsFeature = useBotsFeatureHosts().length > 0;
   const [storedProjectsCollapsed] = useSectionCollapsed("projects");
   const projectsCollapsed = pinPresentation !== "float" && storedProjectsCollapsed;
@@ -2693,6 +2741,9 @@ function ProjectModeList({
           supportsMultiplicityByServerId={supportsMultiplicityByServerId}
           supportsPinningByServerId={supportsPinningByServerId}
           onToggleWorkspacePin={onToggleWorkspacePin}
+          childrenReady={readyProjectChildren.has(item.viewKey)}
+          onBatchDragBegin={needsBatchDragTracking ? onBatchDragBegin : undefined}
+          onBatchDragSettled={needsBatchDragTracking ? onBatchDragSettled : undefined}
         />
       );
     },
@@ -2708,6 +2759,10 @@ function ProjectModeList({
       supportsMultiplicityByServerId,
       supportsPinningByServerId,
       onToggleWorkspacePin,
+      readyProjectChildren,
+      needsBatchDragTracking,
+      onBatchDragBegin,
+      onBatchDragSettled,
       onWorkspacePress,
       onToggleProjectCollapsed,
       projectIconByProjectViewKey,
@@ -2778,6 +2833,8 @@ function ProjectModeList({
       keyExtractor={projectViewKeyExtractor}
       renderItem={renderProject}
       onDragEnd={handleProjectDragEnd}
+      onDragBegin={needsBatchDragTracking ? onBatchDragBegin : undefined}
+      onDragSettled={needsBatchDragTracking ? onBatchDragSettled : undefined}
       extraData={activeWorkspaceSelectionKey(activeWorkspaceSelection)}
       scrollEnabled={false}
       useDragHandle
@@ -2813,6 +2870,8 @@ function ProjectModeList({
                 keyExtractor={workspaceKeyExtractor}
                 renderItem={renderPinnedChat}
                 onDragEnd={onPinnedWorkspaceReorder}
+                onDragBegin={needsBatchDragTracking ? onBatchDragBegin : undefined}
+                onDragSettled={needsBatchDragTracking ? onBatchDragSettled : undefined}
                 extraData={activeWorkspaceSelectionKey(activeWorkspaceSelection)}
                 scrollEnabled={false}
                 useDragHandle

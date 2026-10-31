@@ -9,6 +9,8 @@ import type { ChatMessage } from "./contracts";
 export interface ChatTranscript {
   messages: ChatMessage[];
   hasOlder: boolean;
+  /** Painted from the device's offline cache; the first accepted page replaces it. */
+  cached?: true;
 }
 
 /** Object identity is the read admission: clear/recreate and a newer read invalidate it. */
@@ -30,7 +32,24 @@ interface TranscriptStoreState {
   prependOlder: (key: string, messages: readonly ChatMessage[], hasOlder: boolean) => void;
   /** A pushed line; a repeat of an id already held is ignored. */
   append: (key: string, message: ChatMessage) => void;
+  /** Paints the offline tail while nothing has arrived from the Host for this key. */
+  hydrateCached: (key: string, page: ChatTranscript) => void;
   clear: (key: string) => void;
+  /** Forgets every chat of one source (sign-out, Hub profile removal). */
+  clearSource: (serverId: string) => void;
+  /** Forgets every chat (Settings → Storage → Clear offline cache). */
+  clearAll: () => void;
+}
+
+function keepOtherSources<Value>(
+  entries: Record<string, Value>,
+  serverId: string,
+): Record<string, Value> {
+  // Admission-scoped keys are `serverId@scope:chatId`; plain `transcriptKey` ones `serverId:chatId`.
+  const prefixes = [`${serverId}@`, `${serverId}:`];
+  return Object.fromEntries(
+    Object.entries(entries).filter(([key]) => !prefixes.some((prefix) => key.startsWith(prefix))),
+  );
 }
 
 export function transcriptKey(serverId: string, chatId: string): string {
@@ -130,12 +149,24 @@ export const useTranscriptStore = create<TranscriptStoreState>()((set, get) => (
       if (messages === current.messages) return state;
       return { transcripts: { ...state.transcripts, [key]: { ...current, messages } } };
     }),
+  hydrateCached: (key, page) =>
+    set((state) => {
+      if (state.transcripts[key]) return state;
+      const transcript: ChatTranscript = { ...page, cached: true };
+      return { transcripts: { ...state.transcripts, [key]: transcript } };
+    }),
   clear: (key) =>
     set((state) => {
       const { [key]: _removed, ...transcripts } = state.transcripts;
       const { [key]: _read, ...reads } = state.reads;
       return { transcripts, reads };
     }),
+  clearSource: (serverId) =>
+    set((state) => ({
+      transcripts: keepOtherSources(state.transcripts, serverId),
+      reads: keepOtherSources(state.reads, serverId),
+    })),
+  clearAll: () => set({ transcripts: {}, reads: {} }),
 }));
 
 export function selectTranscript(state: TranscriptStoreState, key: string): ChatTranscript {

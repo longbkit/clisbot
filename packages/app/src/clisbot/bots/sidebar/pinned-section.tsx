@@ -1,3 +1,4 @@
+import { participationKeyOf } from "@/clisbot/navigation/ownership-key";
 import { UnavailablePinRow } from "./unavailable-pin-row";
 import type { ResourcePin } from "./pins";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
@@ -8,7 +9,8 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { PinnedRowProvider } from "@/components/ui/pin-mark";
 import { FLAT_ROW_FILL_INSET } from "@/components/sidebar/row-geometry";
 
-import { usePathname, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import { useRoutePath } from "@/navigation/route-source";
 import { StyleSheet } from "react-native-unistyles";
 import { PinOptionsMenu } from "./pin-options";
 import { BotsSectionHeader, useSectionCollapsed, sectionRowIndent } from "./section-header";
@@ -46,7 +48,8 @@ export function FusionPinnedSection({
   const menu = useSidebarPinMenu(onBeforeNavigate, chats);
   const { t } = useTranslation();
   const router = useRouter();
-  const pathname = usePathname();
+  // The open pin's route, or null: a push that opens no pin re-renders nothing here.
+  const pathname = useRoutePath((path) => (rows.some((row) => row.route === path) ? path : null));
   const limited = useLimitedSidebarGroup(rows);
   // Floated pins are part of one list; they are never folded behind Show more.
   const visibleItems = float ? rows : limited.visibleItems;
@@ -133,6 +136,7 @@ function admitsPin(
         id: row.session.agent.id,
         labels: row.session.agent.labels,
         createdBy: row.session.agent.createdBy,
+        participationKey: participationKeyOf(row.session.agent),
         statusBucket: row.session.statusBucket,
       },
       row.workspace,
@@ -160,7 +164,7 @@ function FloatedPin({ children }: { children: ReactNode }) {
 
 function renderPin(
   row: PinRow,
-  pathname: string,
+  pathname: string | null,
   openBot: (bot: { serverId: string; botId: string }) => void,
   openChat: (chat: { serverId: string; chatId: string }) => void,
   menu: ReturnType<typeof useSidebarPinMenu>,

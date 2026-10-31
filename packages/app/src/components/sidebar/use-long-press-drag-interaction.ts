@@ -6,6 +6,8 @@ import { decideLongPressMove } from "@/utils/sidebar-gesture-arbitration";
 import type { useContextMenu } from "@/components/ui/context-menu";
 import { traceInstant } from "@/performance/native-trace";
 
+const DRAG_ARM_DELAY_MS = 180;
+
 export function useLongPressDragInteraction(input: {
   drag?: () => void;
   menuController: ReturnType<typeof useContextMenu> | null;
@@ -29,6 +31,7 @@ export function useLongPressDragInteraction(input: {
   const dragActivatedRef = useRef(false);
   const didStartDragRef = useRef(false);
   const scrollIntentRef = useRef(false);
+  const swipeIntentRef = useRef(false);
   const menuOpenedRef = useRef(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const touchCurrentRef = useRef<{ x: number; y: number } | null>(null);
@@ -78,7 +81,6 @@ export function useLongPressDragInteraction(input: {
       return;
     }
 
-    const DRAG_ARM_DELAY_MS = 180;
     const DRAG_ARM_STATIONARY_SLOP_PX = 4;
     const CONTEXT_MENU_DELAY_MS = 450;
     const CONTEXT_MENU_STATIONARY_SLOP_PX = 6;
@@ -157,6 +159,7 @@ export function useLongPressDragInteraction(input: {
   const handleSwipeIntent = useCallback(
     (_details: { dx: number; dy: number; distance: number }) => {
       didLongPressRef.current = true;
+      swipeIntentRef.current = true;
       trace("swipe-intent");
       clearTimers();
     },
@@ -172,6 +175,7 @@ export function useLongPressDragInteraction(input: {
       dragActivatedRef.current = false;
       didStartDragRef.current = false;
       scrollIntentRef.current = false;
+      swipeIntentRef.current = false;
       menuOpenedRef.current = false;
       touchStartRef.current = {
         x: event.nativeEvent.pageX,
@@ -238,8 +242,24 @@ export function useLongPressDragInteraction(input: {
     touchCurrentRef.current = null;
   }, [clearTimers, trace]);
 
+  /**
+   * Whether the press `event` ends belongs to a long press, drag, scroll or swipe, and must not
+   * act as a tap. Consumes that mark. The drag timer is wall-clock: on a busy JS thread it can run
+   * before the release that came first, so a release earlier than the arm delay stays a tap.
+   */
+  const consumeLongPress = useCallback((event: GestureResponderEvent) => {
+    if (!didLongPressRef.current) return false;
+    didLongPressRef.current = false;
+    const pressedAt = pressEventTimeRef.current;
+    const releasedBeforeArm =
+      pressedAt !== null && event.nativeEvent.timestamp - pressedAt < DRAG_ARM_DELAY_MS;
+    const moved = scrollIntentRef.current || swipeIntentRef.current || didStartDragRef.current;
+    return moved || menuOpenedRef.current || !releasedBeforeArm;
+  }, []);
+
   return {
     didLongPressRef,
+    consumeLongPress,
     handleLongPress,
     handlePressIn,
     handleTouchMove,

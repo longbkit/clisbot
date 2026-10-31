@@ -32,6 +32,8 @@ export function useChatRecord(
   chatId: string,
   key: string,
   initialChat: ChatPayload | null = null,
+  /** The record saved for offline use; shown until the Host answers for this chat. */
+  offlineChat: ChatPayload | null = null,
 ) {
   // Presentation survives reconnect on the same client/principal. The key still identifies
   // each transport admission; stale responses cannot authorize the new admission.
@@ -106,8 +108,11 @@ export function useChatRecord(
       void feed?.release().catch(() => undefined);
     };
   }, [chatId, client, online, key]);
+  // Every refusal or removal sets an error; a transport failure does not answer for the chat.
+  const hostAnswered = error !== null && !transportInterrupted;
+  const showOffline = !hostAnswered && offlineChat?.id === chatId;
   return {
-    chat,
+    chat: chat ?? (showOffline ? offlineChat : null),
     setChat,
     error,
     setError,

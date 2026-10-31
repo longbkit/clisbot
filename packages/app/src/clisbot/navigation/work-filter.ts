@@ -1,15 +1,19 @@
-import { useMemo, useSyncExternalStore } from "react";
+import equal from "fast-deep-equal";
+import { useMemo, useRef, useSyncExternalStore } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
   deriveSessionStatus,
   type WorkspaceSessionSource,
 } from "@/clisbot/workspace-sessions/select-sessions";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
-import { useSessionStore } from "@/stores/session-store";
-import { isWorkspaceRootAgent } from "@/subagents/workspace-root-policy";
+import { useSessionStore, type Agent } from "@/stores/session-store";
+import { useHeldWhileInactive } from "@/hooks/use-held-while-inactive";
+import { workspaceRootAgentsOf } from "@/stores/workspace-root-agents";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useResourcePins } from "@/clisbot/bots/sidebar/pins";
 import { NAVIGATION_V2_ENABLED } from "./feature";
+import { participationKeyOf } from "./ownership-key";
+import { useOwnershipHosts } from "./use-ownership-hosts";
 import { useReaderAccounts } from "./reader";
 import { useSourceLiveness } from "./use-source-liveness";
 import { useNavigationStore } from "./store";
@@ -32,31 +36,67 @@ type Source = WorkspaceSessionSource;
 
 const NONE: readonly WorkSession[] = [];
 
-/** `serverId:workspaceId` → its unarchived root sessions, with the status each dot shows. */
+/**
+ * `serverId:workspaceId` → its unarchived root sessions, with the status each dot shows. Reads the
+ * store's per-workspace root-agent lists, and keeps `previous`'s list for a workspace whose
+ * sessions say the same, and `previous` itself when every list does.
+ */
 export function indexWorkSessions(
   sources: ReadonlyMap<string, Source>,
+  previous?: ReadonlyMap<string, WorkSession[]>,
 ): ReadonlyMap<string, WorkSession[]> {
   const index = new Map<string, WorkSession[]>();
+  let changed = false;
   for (const [serverId, source] of sources) {
-    for (const agent of source.agents.values()) {
-      const workspaceId = normalizeWorkspaceOpaqueId(agent.workspaceId);
-      if (agent.archivedAt || !workspaceId) continue;
-      const parent = agent.parentAgentId ? source.agents.get(agent.parentAgentId) : undefined;
-      if (!isWorkspaceRootAgent(agent, parent)) continue;
+    for (const [workspaceId, agents] of workspaceRootAgentsOf(source.agents)) {
       const key = `${serverId}:${workspaceId}`;
-      const list = index.get(key) ?? [];
-      const status = deriveSessionStatus(agent, source);
-      list.push({
-        id: agent.id,
-        labels: agent.labels,
-        createdBy: agent.createdBy,
-        statusBucket: status.bucket,
-        ...(status.unverified ? { unverified: true } : {}),
-      });
-      index.set(key, list);
+      const before = previous?.get(key);
+      const sessions = workSessionsOf(agents, source, before);
+      if (sessions !== before) changed = true;
+      index.set(key, sessions);
     }
   }
-  return index;
+  if (!previous || changed || previous.size !== index.size) return index;
+  return previous;
+}
+
+interface WorkSessionsMemo {
+  source: Source;
+  sessions: WorkSession[];
+}
+
+// One entry per root-agent list: its sessions only change with the list or the Host's submissions.
+const workSessionsMemo = new WeakMap<readonly Agent[], WorkSessionsMemo>();
+
+function workSessionsOf(
+  agents: readonly Agent[],
+  source: Source,
+  previous: WorkSession[] | undefined,
+): WorkSession[] {
+  const memo = workSessionsMemo.get(agents);
+  if (
+    memo &&
+    memo.source.messageSubmissions === source.messageSubmissions &&
+    memo.source.cached === source.cached
+  ) {
+    return memo.sessions;
+  }
+  const built = agents.map((agent) => workSessionOf(agent, source));
+  const sessions = previous && equal(previous, built) ? previous : built;
+  workSessionsMemo.set(agents, { source, sessions });
+  return sessions;
+}
+
+function workSessionOf(agent: Agent, source: Source): WorkSession {
+  const status = deriveSessionStatus(agent, source);
+  return {
+    id: agent.id,
+    labels: agent.labels,
+    createdBy: agent.createdBy,
+    participationKey: participationKeyOf(agent),
+    statusBucket: status.bucket,
+    ...(status.unverified ? { unverified: true } : {}),
+  };
 }
 
 /** Hosts whose session directory has arrived at least once; their workspaces can be judged. */
@@ -71,17 +111,27 @@ function useLoadedSessionHosts(serverIds: readonly string[]): ReadonlySet<string
 }
 
 /** Every Host's root sessions by workspace, rebuilt once per agents or submissions change. */
-export function useWorkSessionsOf(): WorkSessionsOf {
-  const { listable, cached } = useSourceLiveness();
+/** `live: false` holds the index (a hidden retained pane); building it is O(agents). */
+export function useWorkSessionsOf(live = true): WorkSessionsOf {
+  const liveness = useHeldWhileInactive(useSourceLiveness(), live);
+  const { listable, cached } = liveness;
   // Outside Navigation V2 nothing reads the index; it subscribes to no Host.
   const serverIds = useMemo(() => (NAVIGATION_V2_ENABLED ? [...listable] : []), [listable]);
-  const agentMaps = useSessionStore(
-    useShallow((state) => serverIds.map((id) => state.sessions[id]?.agents ?? null)),
+  const agentMaps = useHeldWhileInactive(
+    useSessionStore(
+      useShallow((state) => serverIds.map((id) => state.sessions[id]?.agents ?? null)),
+    ),
+    live,
   );
-  const submissionMaps = useSessionStore(
-    useShallow((state) => serverIds.map((id) => state.sessions[id]?.messageSubmissions ?? null)),
+  const submissionMaps = useHeldWhileInactive(
+    useSessionStore(
+      useShallow((state) => serverIds.map((id) => state.sessions[id]?.messageSubmissions ?? null)),
+    ),
+    live,
   );
-  const loaded = useLoadedSessionHosts(serverIds);
+  const loaded = useHeldWhileInactive(useLoadedSessionHosts(serverIds), live);
+  // The last index, so an agent update that changes no session hands the Work tree the same one.
+  const previous = useRef<ReadonlyMap<string, WorkSession[]> | undefined>(undefined);
   const index = useMemo(() => {
     const sources = new Map<string, Source>();
     serverIds.forEach((serverId, i) => {
@@ -90,7 +140,8 @@ export function useWorkSessionsOf(): WorkSessionsOf {
       if (agents && messageSubmissions)
         sources.set(serverId, { agents, messageSubmissions, cached: cached.has(serverId) });
     });
-    return indexWorkSessions(sources);
+    previous.current = indexWorkSessions(sources, previous.current);
+    return previous.current;
   }, [agentMaps, cached, serverIds, submissionMaps]);
   return useMemo<WorkSessionsOf>(
     () => (workspace) => {
@@ -110,17 +161,19 @@ export function useWorkQuery() {
   const chip = useNavigationStore((state) => state.workChip);
   const showBots = useNavigationStore((state) => state.workShowBots);
   const accounts = useReaderAccounts();
+  const hostKinds = useOwnershipHosts();
   const { listable, cached } = useSourceLiveness();
   return useMemo(
     () => ({
       scope,
       chip,
       accounts,
+      hostKinds,
       showBots,
       cachedServerIds: cached,
       listableServerIds: listable,
     }),
-    [scope, chip, accounts, showBots, cached, listable],
+    [scope, chip, accounts, hostKinds, showBots, cached, listable],
   );
 }
 
@@ -128,14 +181,14 @@ export function useWorkQuery() {
  * The Workspace list's one filter for the shared sidebar model: which workspaces it lists and
  * which sessions under them. Null outside Navigation V2, where the Home V2 sidebar lists all.
  */
-export function useWorkListFilter(): {
+export function useWorkListFilter(live = true): {
   filter: WorkFilter;
   sessionsOf: WorkSessionsOf;
   /** `serverId:agentId` of pinned sessions: they float above the list instead of sitting in it. */
   pinnedSessions: ReadonlySet<string>;
 } | null {
-  const query = useWorkQuery();
-  const sessionsOf = useWorkSessionsOf();
+  const query = useHeldWhileInactive(useWorkQuery(), live);
+  const sessionsOf = useWorkSessionsOf(live);
   const { pins } = useResourcePins();
   const pinnedSessions = useMemo(
     () =>

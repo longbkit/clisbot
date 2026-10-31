@@ -59,6 +59,43 @@ it("skips unchanged reconciliations and immediately saves real layout changes", 
   );
 });
 
+it("saves an opened tab after the press that opened it, once for several changes", async () => {
+  const values = new Map<string, string>();
+  let writes = 0;
+  const storage: StateStorage = {
+    getItem: (name) => values.get(name) ?? null,
+    setItem: (name, value) => {
+      writes += 1;
+      values.set(name, value);
+    },
+    removeItem: (name) => {
+      values.delete(name);
+    },
+  };
+  const flushes: Array<() => void> = [];
+  const store = createWorkspaceLayoutStore(undefined, storage, {
+    writeAfter: (flush) => flushes.push(flush),
+  });
+  await store.persist.rehydrate();
+  const workspaceKey = "server:workspace";
+  const tabId = store.getState().openTab({
+    workspaceKey,
+    target: { kind: "agent", agentId: "agent-1" },
+    intent: "reveal",
+  });
+  store.getState().focusTab(workspaceKey, tabId!);
+  expect(writes).toBe(0);
+
+  for (const flush of flushes.splice(0)) flush();
+  await Promise.resolve();
+  expect(writes).toBe(1);
+  const restored = createWorkspaceLayoutStore(undefined, storage);
+  await restored.persist.rehydrate();
+  expect(restored.getState().layoutByWorkspace[workspaceKey]).toEqual(
+    store.getState().layoutByWorkspace[workspaceKey],
+  );
+});
+
 it("keeps the saved layout when the shell publishes its layout mode before hydration", async () => {
   const values = new Map<string, string>();
   const storage: StateStorage = {

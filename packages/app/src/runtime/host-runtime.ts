@@ -81,6 +81,7 @@ import { readDesktopManagedLocalCredential } from "@/desktop/daemon/local-creden
 import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
 import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@clisbot/protocol/browser-automation/rpc-schemas";
 import {
+  batchSessionStoreUpdates,
   useSessionStore,
   toDaemonServerInfo,
   type Agent,
@@ -97,6 +98,7 @@ import {
   hostAdvertisedConnections,
   matchesAdvertisedHostConnection,
   subscribeHostSessionAccess,
+  prefetchedAccessTicket,
   resolveHostAccessTicket,
 } from "@/runtime/host-session-access";
 import {
@@ -110,6 +112,7 @@ import { createMessageSubmissionWriter } from "@/composer/submission/writer";
 import { resolveComposerAttachmentSubmitFormat } from "@/composer/attachments/submit";
 import { encodeImages } from "@/utils/encode-images";
 import { DirectorySync, type RefreshAgentDirectoryResult } from "@/runtime/directory-sync";
+import { createDirectoryFrameClock, type FrameClock } from "@/runtime/directory-sync/live-batch";
 import { diagnosticStack, recordHostDiagnostic } from "@/runtime/host-diagnostics";
 import { ReplicaCache } from "@/runtime/replica-cache";
 import type { ReplicaRowStore } from "@/runtime/replica-cache/row-store";
@@ -123,6 +126,7 @@ import {
 } from "@/timeline/viewed-timeline-sync";
 import { projectIconCache } from "@/projects/icon-cache";
 import { createPerformanceTrace } from "@/performance/native-trace";
+import { perfProbe } from "@/performance/perf-probe/probe";
 import { revokePushNotifications } from "@/push-notifications";
 import { createAppWebSocketFactory } from "./websocket-factory";
 import { selectReceiveCodec } from "./encrypted-receive";
@@ -130,11 +134,36 @@ import {
   type BackoffPolicy,
   ConnectLimiter,
   DEFAULT_BACKOFF_POLICY,
+  MAX_CONCURRENT_DIRECTORY_PAGES,
   MAX_CONCURRENT_HOST_CONNECTS,
   RECONNECT_MAX_DELAY_MS,
   ReconnectBackoff,
 } from "./connection-backoff";
+import {
+  type ColdStartConnectTimeline,
+  type ColdStartPhase,
+  getColdStartConnectTimeline,
+} from "./cold-start-connect";
 import { type NetworkReachability, subscribeNetworkReachability } from "./network-reachability";
+import { ReconnectSweep, type ReconnectSweepReason } from "./reconnect-sweep";
+import { restoreCachedDirectories } from "./directory-sync/startup-restore";
+import { RestoreSlicer, yieldToEventLoop } from "./replica-cache/restore-slicer";
+
+/** How the startup cache restore measures time and gives the JS thread back. */
+export interface StartupScheduler {
+  now: () => number;
+  yieldToEventLoop: () => Promise<void>;
+  afterNextFrame: (run: () => void) => void;
+}
+
+const defaultStartupScheduler: StartupScheduler = {
+  now: () => Date.now(),
+  yieldToEventLoop,
+  afterNextFrame: (run) => {
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => run());
+    else setTimeout(run, 16);
+  },
+};
 
 export type HostRuntimeConnectionStatus = "idle" | "connecting" | "online" | "offline" | "error";
 export type PairingNavigationTarget = "openProject" | "hostRoot" | "hostSettings";
@@ -218,6 +247,28 @@ function setSnapshotPatchField<Key extends keyof HostRuntimeSnapshotPatch>(
   value: HostRuntimeSnapshot[Key],
 ): void {
   patch[key] = value;
+}
+
+const LATENCY_JITTER_MIN_MS = 20;
+const LATENCY_JITTER_RATIO = 0.25;
+
+/**
+ * Every heartbeat measures a slightly different RTT. Publishing each one rewrote the snapshot of
+ * every online Host every 10 s and re-rendered every Host consumer, so a reading inside the band
+ * keeps the published one. The band stays under the adaptive switch threshold for fast routes.
+ */
+function holdLatencyJitter(
+  previous: ReadonlyMap<string, ConnectionProbeState>,
+  next: Map<string, ConnectionProbeState>,
+): Map<string, ConnectionProbeState> {
+  const held = new Map(next);
+  for (const [connectionId, probe] of next) {
+    const published = previous.get(connectionId);
+    if (probe.status !== "available" || published?.status !== "available") continue;
+    const band = Math.max(LATENCY_JITTER_MIN_MS, published.latencyMs * LATENCY_JITTER_RATIO);
+    if (Math.abs(probe.latencyMs - published.latencyMs) < band) held.set(connectionId, published);
+  }
+  return held;
 }
 
 export function isHostRuntimeConnected(snapshot: HostRuntimeSnapshot | null): boolean {
@@ -308,6 +359,8 @@ export interface HostRuntimeControllerDeps {
     clientId: string;
     runtimeGeneration: number;
     onAdmissionFailure?: (revoked: boolean) => boolean;
+    /** Request the Hub ticket while the transport opens (`prefetchedAccessTicket`). */
+    prefetchAccessTicket?: boolean;
   }) => DaemonClient;
   connectToDaemon: (input: {
     host: HostProfile;
@@ -701,7 +754,28 @@ function createDefaultDeps(
   };
 
   return {
-    createClient: ({ host, connection, clientId, runtimeGeneration, onAdmissionFailure }) => {
+    createClient: ({
+      host,
+      connection,
+      clientId,
+      runtimeGeneration,
+      onAdmissionFailure,
+      prefetchAccessTicket,
+    }) => {
+      const requestAccessTicket = async () => {
+        // Electron validates the live local target; this authority does not depend on Hub.
+        if (await readDesktopManagedLocalCredential(connection).catch(() => undefined))
+          return undefined;
+        return resolveHostAccessTicket(
+          host.serverId,
+          clientId,
+          host.management,
+          usesDeviceCredential(host),
+        );
+      };
+      const takeAccessTicket = prefetchAccessTicket
+        ? prefetchedAccessTicket(requestAccessTicket)
+        : requestAccessTicket;
       const desktopTransportFactory = createDesktopDaemonTransportFactory();
       const webSocketConfig = { webSocketFactory: createAppWebSocketFactory() };
       const base = {
@@ -731,20 +805,14 @@ function createDefaultDeps(
         runtimeGeneration,
         capabilities: appCapabilities,
         trace: createPerformanceTrace({ host: host.serverId, connection: connection.id }),
+        onInboundMessage: perfProbe?.message,
         // Admission is resolved per hello, not per client: Hub binding
         // registration races host hydration, so a client born before its
         // binding must still present a ticket once admission is required.
         resolveAccessTicket: async () => {
-          // Electron validates the live local target; this authority does not depend on Hub.
-          if (await readDesktopManagedLocalCredential(connection).catch(() => undefined))
-            return undefined;
+          if (host.management) getColdStartConnectTimeline().mark("hostTransportOpen");
           try {
-            return await resolveHostAccessTicket(
-              host.serverId,
-              clientId,
-              host.management,
-              usesDeviceCredential(host),
-            );
+            return await takeAccessTicket();
           } catch (error) {
             onAdmissionFailure?.(false);
             throw error;
@@ -1107,19 +1175,24 @@ export class HostRuntimeController {
   }
 
   /**
-   * The device's network came back: an online Host verifies its socket, any other Host drops
-   * its remaining backoff and tries now. Admission and probe connects still take a shared slot.
+   * The network or the app came back (`runtime/reconnect-sweep.ts`): an online Host verifies its
+   * socket, any other Host drops its remaining backoff and tries now. Admission and probe
+   * connects still take a shared slot.
    */
   retryAfterNetworkChange(): void {
-    if (this.snapshot.connectionStatus === "online") {
-      this.activeClient?.verifyConnection();
-      return;
-    }
     if (this.usesSessionAdmission() || !this.activeClient) {
-      void this.runProbeCycleNow();
+      if (this.snapshot.connectionStatus === "online") this.activeClient?.verifyConnection();
+      else void this.runProbeCycleNow();
       return;
     }
-    this.activeClient.ensureConnected();
+    // A self-retrying client verifies a live socket and reconnects a dropped one at once.
+    this.activeClient.ensureConnected({ verify: true });
+  }
+
+  /** Whether `retryAfterNetworkChange` would start a connect that waits for a shared slot. */
+  retryTakesConnectSlot(): boolean {
+    const routedHere = this.usesSessionAdmission() || !this.activeClient;
+    return routedHere && this.snapshot.connectionStatus !== "online";
   }
 
   /** The device lost its network: probe live sockets now so they report offline promptly. */
@@ -1130,20 +1203,6 @@ export class HostRuntimeController {
   /** A changed route is new information, not another failure of the old one. */
   private resetBackoffForChangedRoutes(next: HostProfile): void {
     if (!equal(this.host.connections, next.connections)) this.reconnectBackoff.reset();
-  }
-
-  ensureConnected(options?: { verify?: boolean }): void {
-    if (this.host.management || hostRequiresSessionAdmission(this.host.serverId)) {
-      if (this.snapshot.connectionStatus === "online") {
-        if (options?.verify) this.activeClient?.verifyConnection();
-      } else {
-        // Foreground/network nudges verify live sockets fast; an offline source keeps its
-        // backoff, or a hundred unreachable sandboxes would all reconnect at once.
-        void this.runScheduledProbeCycle();
-      }
-      return;
-    }
-    this.activeClient?.ensureConnected(options);
   }
 
   markAgentDirectorySyncLoading(): void {
@@ -1255,6 +1314,11 @@ export class HostRuntimeController {
       return;
     }
 
+    const admitted = this.host.management || hostRequiresSessionAdmission(this.host.serverId);
+    // An offline Hub-managed Host waits out its backoff before anything else: the credential read
+    // below is a keychain read, and Android serializes those behind one keystore lock.
+    if (admitted && this.snapshot.connectionStatus !== "online" && !this.reconnectBackoff.isDue())
+      return;
     let localConnectionId: string | null = null;
     if (this.snapshot.connectionStatus !== "online") {
       const access = await deviceCredentialAccess(this.host);
@@ -1270,7 +1334,7 @@ export class HostRuntimeController {
       this.updateSnapshot({ localCredentialConnectionId: localConnectionId });
     }
 
-    if (this.host.management || hostRequiresSessionAdmission(this.host.serverId)) {
+    if (admitted) {
       await this.runSessionAdmissionConnectionCycle(requestVersion, localConnectionId);
       return;
     }
@@ -1633,6 +1697,15 @@ export class HostRuntimeController {
   }
 
   private updateSnapshot(patch: HostRuntimeSnapshotPatch): void {
+    if (patch.probeByConnectionId) {
+      patch = {
+        ...patch,
+        probeByConnectionId: holdLatencyJitter(
+          this.snapshot.probeByConnectionId,
+          patch.probeByConnectionId,
+        ),
+      };
+    }
     const preservedPatch: HostRuntimeSnapshotPatch = { ...patch };
     let hasChanged = this.host.serverId !== this.snapshot.serverId;
     for (const key of Object.keys(patch) as (keyof HostRuntimeSnapshotPatch)[]) {
@@ -1817,6 +1890,10 @@ export class HostRuntimeController {
     }
 
     const nextGeneration = this.snapshot.clientGeneration + 1;
+    // A Host that has been failing may be unreachable: its ticket waits for the transport, so
+    // an unreachable sandbox costs the Hub no ticket per retry.
+    const prefetchAccessTicket =
+      this.usesSessionAdmission() && this.reconnectBackoff.failureCount === 0;
     const client =
       existingClient ??
       this.deps.createClient({
@@ -1824,6 +1901,7 @@ export class HostRuntimeController {
         connection,
         clientId,
         runtimeGeneration: nextGeneration,
+        prefetchAccessTicket,
         onAdmissionFailure: (revoked) => {
           if (!this.isCurrentSwitchRequest(requestVersion)) return false;
           this.admissionAttemptFailed = true;
@@ -2087,6 +2165,8 @@ export class HostRuntimeStore {
   private deps: HostRuntimeControllerDeps;
   private lastConnectionStatusByServer = new Map<string, HostRuntimeConnectionStatus>();
   private connectionStatusStartedAtByServer = new Map<string, number>();
+  private readonly reconnectSweep = new ReconnectSweep();
+  private readonly failedSinceOnline = new Set<string>();
   private queuedAgentDrainInFlight = new Set<string>();
   private directorySyncByServer = new Map<string, DirectorySync>();
   private nextCancellationRequestId = 0;
@@ -2098,12 +2178,20 @@ export class HostRuntimeStore {
   private storage: HostRuntimeStorage;
   private replicaCache: ReplicaCache;
   private readonly revokePushNotifications: typeof revokePushNotifications;
+  private readonly directoryFrameClock: FrameClock | null;
+  private readonly directoryPageLimiter = new ConnectLimiter(MAX_CONCURRENT_DIRECTORY_PAGES);
+  private readonly coldStartTimeline: ColdStartConnectTimeline;
+  private readonly startupScheduler: StartupScheduler;
 
   constructor(input?: {
     deps?: HostRuntimeControllerDeps;
     storage?: HostRuntimeStorage;
     replicaRowStore?: ReplicaRowStore;
     revokePushNotifications?: typeof revokePushNotifications;
+    /** Clisbot: paces each Host's live directory updates to one commit per frame. */
+    directoryFrameClock?: FrameClock | null;
+    coldStartTimeline?: ColdStartConnectTimeline;
+    startupScheduler?: StartupScheduler;
   }) {
     const deps =
       input?.deps ??
@@ -2121,6 +2209,9 @@ export class HostRuntimeStore {
     this.storage = input?.storage ?? AsyncStorage;
     this.replicaCache = new ReplicaCache(input?.replicaRowStore ?? createReplicaRowStore());
     this.revokePushNotifications = input?.revokePushNotifications ?? revokePushNotifications;
+    this.directoryFrameClock = input?.directoryFrameClock ?? null;
+    this.coldStartTimeline = input?.coldStartTimeline ?? getColdStartConnectTimeline();
+    this.startupScheduler = input?.startupScheduler ?? defaultStartupScheduler;
   }
 
   // --- Host registry ---
@@ -2146,6 +2237,15 @@ export class HostRuntimeStore {
 
   isHostRegistryLoaded(): boolean {
     return this.hostRegistryLoaded;
+  }
+
+  markColdStartPhase(phase: ColdStartPhase): void {
+    this.coldStartTimeline.mark(phase);
+  }
+
+  /** Resolves once the stored registry is loaded; a write before that would replace it. */
+  whenHostRegistryLoaded(): Promise<void> {
+    return this.loadRegistry();
   }
 
   boot(): Promise<void> {
@@ -2235,16 +2335,14 @@ export class HostRuntimeStore {
       projectIconCache.setHosts(profiles.map((profile) => profile.serverId));
       await projectIconCache.restore();
       this.syncHosts(profiles);
-      for (const profile of profiles) {
-        void this.directorySyncByServer
-          .get(profile.serverId)
-          ?.restoreCachedDirectory()
-          .catch(() => undefined);
-      }
+      void this.restoreCachedDirectories(profiles.map((profile) => profile.serverId));
     } catch (error) {
       console.error("[HostRuntime] Failed to load host registry from storage", error);
     } finally {
       this.hostRegistryStatus = "ready";
+      this.coldStartTimeline.registryRestored(
+        this.hosts.filter((host) => host.management).map((host) => host.serverId),
+      );
       this.emitHostList();
       if (shouldPersistHosts) {
         void this.persistHosts().catch((error) =>
@@ -2252,6 +2350,30 @@ export class HostRuntimeStore {
         );
       }
     }
+  }
+
+  /** Runs after `syncHosts` started every controller's connect, so the network goes first. */
+  private async restoreCachedDirectories(serverIds: readonly string[]): Promise<void> {
+    const timeline = this.coldStartTimeline;
+    const scheduler = this.startupScheduler;
+    const targets = serverIds.flatMap((serverId) => {
+      const directory = this.directorySyncByServer.get(serverId);
+      return directory ? [{ serverId, directory }] : [];
+    });
+    await restoreCachedDirectories(targets, {
+      read: (serverId, slicer) => this.replicaCache.readDirectory(serverId, slicer),
+      slicer: new RestoreSlicer({
+        now: scheduler.now,
+        yieldToEventLoop: scheduler.yieldToEventLoop,
+        onChunk: (chunk) => timeline.restoreChunk(chunk.durationMs),
+      }),
+      yieldToEventLoop: scheduler.yieldToEventLoop,
+      commit: batchSessionStoreUpdates,
+      afterNextFrame: scheduler.afterNextFrame,
+      onFirstCachedFrame: () => timeline.mark("firstCachedFrame"),
+      now: scheduler.now,
+    }).catch((error) => console.error("[HostRuntime] Failed to restore cached directories", error));
+    timeline.mark("cachedDirectories");
   }
 
   private markHostRegistryLoaded(): void {
@@ -2373,6 +2495,7 @@ export class HostRuntimeStore {
     rekeyMap(this.controllers, oldServerId, newServerId);
     rekeyMap(this.lastConnectionStatusByServer, oldServerId, newServerId);
     rekeyMap(this.connectionStatusStartedAtByServer, oldServerId, newServerId);
+    if (this.failedSinceOnline.delete(oldServerId)) this.failedSinceOnline.add(newServerId);
     this.replicaCache.reconcileServerId(oldServerId, newServerId);
     projectIconCache.reconcileServerId(oldServerId, newServerId);
     this.directorySyncByServer.get(oldServerId)?.dispose();
@@ -2390,6 +2513,7 @@ export class HostRuntimeStore {
         markWorkspaceError: (error) => controller.markWorkspaceDirectorySyncError(error),
       },
       this.replicaCache,
+      { frameClock: this.directoryFrameClock, pageFetchLimiter: this.directoryPageLimiter },
     );
     this.directorySyncByServer.set(newServerId, directory);
     this.timelineReplicaByServer.set(
@@ -3091,6 +3215,7 @@ export class HostRuntimeStore {
       this.controllers.delete(serverId);
       this.lastConnectionStatusByServer.delete(serverId);
       this.connectionStatusStartedAtByServer.delete(serverId);
+      this.failedSinceOnline.delete(serverId);
       this.directorySyncByServer.get(serverId)?.dispose();
       this.directorySyncByServer.delete(serverId);
       this.timelineReplicaByServer.delete(serverId);
@@ -3131,6 +3256,7 @@ export class HostRuntimeStore {
           markWorkspaceError: (error) => controller.markWorkspaceDirectorySyncError(error),
         },
         this.replicaCache,
+        { frameClock: this.directoryFrameClock, pageFetchLimiter: this.directoryPageLimiter },
       );
       this.directorySyncByServer.set(host.serverId, directory);
       this.timelineReplicaByServer.set(
@@ -3265,9 +3391,15 @@ export class HostRuntimeStore {
       this.connectionStatusStartedAtByServer.set(serverId, Date.now());
     }
     this.lastConnectionStatusByServer.set(serverId, snapshot.connectionStatus);
+    if (snapshot.connectionStatus === "offline" || snapshot.connectionStatus === "error") {
+      this.failedSinceOnline.add(serverId);
+      if (statusChanged) this.coldStartTimeline.attemptFailed(serverId);
+    }
     const didTransitionOnline =
       snapshot.connectionStatus === "online" && previousStatus !== "online";
     if (didTransitionOnline) {
+      this.coldStartTimeline.hostOnline(serverId);
+      this.noteHostRecovered(serverId);
       useSessionStore.getState().bumpHistorySyncGeneration(serverId);
       // Availability no longer changes history membership/query identity. Recovery uses the
       // same invalidation roots as archive/restore actions to revalidate accepted history.
@@ -3441,12 +3573,6 @@ export class HostRuntimeStore {
     return earliestServerId;
   }
 
-  ensureConnectedAll(options?: { verify?: boolean }): void {
-    for (const controller of this.controllers.values()) {
-      controller.ensureConnected(options);
-    }
-  }
-
   async restartHostConnection(serverId: string): Promise<void> {
     const controller = this.controllers.get(serverId);
     if (controller === undefined) return;
@@ -3467,24 +3593,54 @@ export class HostRuntimeStore {
     await controller.runProbeCycleNow();
   }
 
-  /** OS network changes (web and Electron; native relies on foreground for now). */
+  /** OS network changes (web and Electron; native relies on foreground and recovered Hosts). */
   handleNetworkChange(state: NetworkReachability): void {
     recordHostDiagnostic("network-change", { state });
-    for (const controller of this.controllers.values()) {
-      if (state === "online") controller.retryAfterNetworkChange();
-      else controller.verifyIfOnline();
+    if (state === "online") {
+      this.sweepReconnect("network");
+      return;
     }
+    this.reconnectSweep.cancel();
+    for (const controller of this.controllers.values()) controller.verifyIfOnline();
   }
 
   setAppVisible(visible: boolean): void {
     // Keep normal reconnect backoff running while hidden, for as long as the OS
-    // lets us execute. Foregrounding bypasses that backoff without closing healthy sockets.
+    // lets us execute. Foregrounding drops that backoff without closing healthy sockets.
     if (!visible) {
+      // Frames stop in the background; held live directory updates land now, then persist.
+      for (const directory of this.directorySyncByServer.values()) directory.flushLiveUpdates();
       void this.replicaCache.flush();
       return;
     }
 
-    this.ensureConnectedAll({ verify: true });
+    this.sweepReconnect("foreground");
+  }
+
+  /** Clisbot: every offline Host tries now, staggered and within the shared connect limit. */
+  private sweepReconnect(reason: ReconnectSweepReason): void {
+    const controllers = Array.from(this.controllers);
+    recordHostDiagnostic("host-reconnect-sweep", { reason, hosts: controllers.length });
+    this.reconnectSweep.run(
+      controllers.map(([serverId, controller]) => ({
+        takesConnectSlot: () => controller.retryTakesConnectSlot(),
+        retryNow: () => {
+          // A Host removed while its staggered turn was pending is stopped; leave it alone.
+          if (this.controllers.get(serverId) === controller) controller.retryAfterNetworkChange();
+        },
+      })),
+    );
+  }
+
+  /** A Host that had failed connected: the network is likely back for its siblings too. */
+  private noteHostRecovered(serverId: string): void {
+    if (!this.failedSinceOnline.delete(serverId)) return;
+    if (!this.reconnectSweep.shouldSweepAfterRecovery()) return;
+    const othersOffline = Array.from(this.controllers).some(
+      ([id, controller]) =>
+        id !== serverId && controller.getSnapshot().connectionStatus !== "online",
+    );
+    if (othersOffline) this.sweepReconnect("host-recovered");
   }
 
   runProbeCycleNow(serverId?: string): Promise<void> {
@@ -3542,6 +3698,11 @@ export class HostRuntimeStore {
     const directory = this.directorySyncByServer.get(serverId);
     if (!directory) throw new Error(`Unknown host runtime for serverId ${serverId}`);
     await directory.prepareWorkspaceRoute(workspaceId);
+  }
+
+  /** The device's offline cache: chat tails and Settings → Storage read and clear it here. */
+  getReplicaCache(): ReplicaCache {
+    return this.replicaCache;
   }
 
   async prepareAgentTimeline(serverId: string, agentId: string): Promise<void> {
@@ -3615,7 +3776,7 @@ export function getHostRuntimeStore(): HostRuntimeStore {
     return existing;
   }
 
-  const store = new HostRuntimeStore();
+  const store = new HostRuntimeStore({ directoryFrameClock: createDirectoryFrameClock() });
   singletonHostRuntimeStore = store;
   Reflect.set(globalThis, HOST_RUNTIME_STORE_GLOBAL_KEY, store);
   // The app store lives for the process; it follows OS network changes where the platform has them.

@@ -71,10 +71,10 @@ test.describe("Workspace agent title handoff", () => {
         timeout: 15_000,
       });
       await expect(page.getByText(prompt, { exact: true }).first()).toBeVisible();
-      await expect(page.getByTestId("agent-history-overlay")).toHaveCount(0);
+      await expect(page.getByTestId("agent-history-loading-row")).toHaveCount(0);
 
       const overlayAppeared = page
-        .getByTestId("agent-history-overlay")
+        .getByTestId("agent-history-loading-row")
         .waitFor({ state: "attached", timeout: 2_000 })
         .then(
           () => true,

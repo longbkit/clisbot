@@ -106,7 +106,6 @@ function pinnedSession(pin: ResourcePin, input: PinnedRowInput): PinRow | null {
       agent,
       title: agent.title,
       statusBucket: deriveSessionStatusBucket(agent, {
-        agents: source.agents,
         messageSubmissions: source.messageSubmissions,
       }),
     },

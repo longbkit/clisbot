@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/channels-markdown-core",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "OpenClaw markdown-core ported for the in-repo channel verticals; mirrors upstream packages/markdown-core/src under src (docs/audits/2026-09-07-openclaw-channel-port-goal.md). Manifest: upstream-sync.json",
   "files": [
     "dist",

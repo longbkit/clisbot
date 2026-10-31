@@ -5,6 +5,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -251,10 +252,13 @@ export const ru: TranslationResources = {
   agentStream: {
     agent: "Агент",
     empty: "Начните общаться с этим агентом...",
+    loadingHistory: "Загрузка сообщений…",
     scrollToBottom: "Прокрутить вниз",
     historyLoadFailed: "Не удалось загрузить историю агента",
     messageCapped: "Это сообщение было обрезано ({{bytes}} байт).",
     permission: {
+      reason: "Почему требуется разрешение",
+      blockedPath: "Заблокированный путь",
       rejectedPlan: "Отклонённый план",
       approvedPlan: "Одобренный план",
       canceledPlan: "Отменённый план",
@@ -3117,5 +3121,6 @@ export const ru: TranslationResources = {
   bots: bots.ru,
   heartbeats: heartbeats.ru,
   navigation: navigation.ru,
+  productAnalytics: productAnalytics.ru,
   home: home.ru,
 };

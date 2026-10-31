@@ -49,6 +49,8 @@ export class TimelineRetentionOwner {
   constructor(
     private readonly serverId: string,
     private readonly budget: TimelinePageRetention = timelinePageRetention,
+    /** Every retained page of a hidden session went; it must catch up when shown again. */
+    private readonly onReleased: (agentId: string) => void = () => {},
   ) {}
 
   private ensure(agentId: string): string {
@@ -110,7 +112,9 @@ export class TimelineRetentionOwner {
       synchronized: false,
       acknowledgedClientMessageIds: [],
     });
-    if (!change.range) store.setAgentAuthoritativeHistoryApplied(this.serverId, agentId, false);
+    if (change.range) return;
+    store.setAgentAuthoritativeHistoryApplied(this.serverId, agentId, false);
+    this.onReleased(agentId);
   }
   setVisible(agentIds: readonly string[]): void {
     const previous = new Set(this.visible);

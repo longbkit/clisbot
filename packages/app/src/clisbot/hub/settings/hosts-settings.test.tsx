@@ -26,6 +26,7 @@ const adapters = vi.hoisted(() => ({
   refresh: vi.fn(),
   copy: vi.fn(),
   openAddProject: vi.fn(),
+  setParams: vi.fn(),
   upsert: vi.fn(),
   remove: vi.fn(),
   restart: vi.fn(),
@@ -78,6 +79,8 @@ vi.mock("@/runtime/host-runtime", () => ({
     upsertManagedConnectionFromOffer: adapters.upsert,
     removeManagedHost: adapters.remove,
     restartHostConnection: adapters.restart,
+    whenHostRegistryLoaded: async () => undefined,
+    markColdStartPhase: () => undefined,
   }),
 }));
 vi.mock("@/hooks/use-open-add-project", () => ({
@@ -85,7 +88,9 @@ vi.mock("@/hooks/use-open-add-project", () => ({
 }));
 vi.mock("@/utils/copy-to-clipboard", () => ({ copyToClipboard: adapters.copy }));
 vi.mock("@/utils/confirm-dialog", () => ({ confirmDialog: adapters.confirm }));
-vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("expo-router", () => ({
+  useRouter: () => ({ push: vi.fn(), setParams: adapters.setParams }),
+}));
 // The row's … menu renders its items inline, so a test presses Disconnect directly.
 vi.mock("./team/row-actions-menu", () => ({
   RowActionsMenu: (props: {
@@ -169,6 +174,7 @@ beforeEach(async () => {
   adapters.statuses = new Map();
   adapters.statusListeners.clear();
   adapters.copy.mockReset();
+  adapters.setParams.mockReset();
   adapters.upsert.mockReset();
   adapters.remove.mockReset().mockResolvedValue(undefined);
   adapters.restart.mockReset().mockResolvedValue(undefined);
@@ -708,6 +714,25 @@ describe("Host administration", () => {
     expect(screen.queryByRole("button", { name: "Disconnect" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Rename" })).toBeNull();
     expect(screen.queryByText("Add a Host")).toBeNull();
+  });
+
+  it("opens Add host from the page header, beside Refresh Hosts", async () => {
+    adapters.get.mockResolvedValue({ daemons: [registeredDaemon] });
+    renderSection();
+    await screen.findByText("Workstation");
+    const addHost = screen.getByRole("button", { name: "Add host" });
+    const refresh = screen.getByRole("button", { name: "Refresh Hosts" });
+    expect(addHost.parentElement).toBe(refresh.parentElement);
+    fireEvent.click(addHost);
+    expect(adapters.setParams).toHaveBeenCalledExactlyOnceWith({ addHost: expect.any(String) });
+  });
+
+  it("offers Add host in the page header without a Hub account", async () => {
+    adapters.signedIn = false;
+    adapters.hubEnabled = false;
+    renderSection();
+    fireEvent.click(await screen.findByRole("button", { name: "Add host" }));
+    expect(adapters.setParams).toHaveBeenCalledExactlyOnceWith({ addHost: expect.any(String) });
   });
 
   it("always shows an Organization Admin how to add a Host", async () => {

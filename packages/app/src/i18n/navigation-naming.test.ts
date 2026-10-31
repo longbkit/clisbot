@@ -10,21 +10,21 @@ function strings(value: unknown, prefix = ""): [string, string][] {
   );
 }
 
-// Owner naming decision (2026-10-26): Workspace (formerly Work), Chat · Workspace · All on Home,
+// Owner naming decision (2026-10-29, supersedes 2026-10-26): the section is Work, Chat · Work · All on Home,
 // Tasks = "Công việc" in Vietnamese and nothing else.
 describe("Navigation V2 naming", () => {
-  it("never lets the Workspace section share the Tasks word", () => {
+  it("never lets the Work section share the Tasks word", () => {
     for (const [locale, resource] of Object.entries(navigation)) {
       expect(resource.sections.work, locale).not.toBe(resource.sections.tasks);
       expect(resource.mode.work, locale).toBe(resource.sections.work);
     }
   });
 
-  it("reads Chat · Workspace · All in English and Chat · Workspace · Tất cả in Vietnamese", () => {
-    expect(navigation.en.mode).toMatchObject({ chat: "Chat", work: "Workspace", hybrid: "All" });
-    expect(navigation.vi.mode).toMatchObject({ chat: "Chat", work: "Workspace", hybrid: "Tất cả" });
-    expect(navigation.en.sections).toMatchObject({ work: "Workspace", tasks: "Tasks" });
-    expect(navigation.vi.sections).toMatchObject({ work: "Workspace", tasks: "Công việc" });
+  it("reads Chat · Work · All in English and Chat · Work · Tất cả in Vietnamese", () => {
+    expect(navigation.en.mode).toMatchObject({ chat: "Chat", work: "Work", hybrid: "All" });
+    expect(navigation.vi.mode).toMatchObject({ chat: "Chat", work: "Work", hybrid: "Tất cả" });
+    expect(navigation.en.sections).toMatchObject({ work: "Work", tasks: "Tasks" });
+    expect(navigation.vi.sections).toMatchObject({ work: "Work", tasks: "Công việc" });
     expect(navigation.vi.actions.newWorkspace).toBe("Workspace mới");
   });
 

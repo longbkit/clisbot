@@ -409,7 +409,16 @@ test("enrolled Hub execution persists creator and message initiator with stamped
     displayName: "Scheduled automation",
     hubOrigin: "https://forged.invalid",
   };
-  hub.beginOwnedCreate("authorship-create", "authorship-execution", { sessionIdentity: { actor } });
+  const ownerActor = {
+    kind: "user" as const,
+    id: "revision-author",
+    memberId: "revision-author-member",
+    organizationId: "org",
+    hubOrigin: "https://forged.invalid",
+  };
+  hub.beginOwnedCreate("authorship-create", "authorship-execution", {
+    sessionIdentity: { actor, ownerActor },
+  });
   const created = await hub.ownedCreateResult("authorship-create");
   if (created.type !== "hub.execution.agent.create.response" || !created.payload.agentId)
     throw new Error("Expected Hub-created Agent");
@@ -421,6 +430,7 @@ test("enrolled Hub execution persists creator and message initiator with stamped
       id: "workflow",
       hubOrigin: "https://hub.test",
     });
+    expect(record?.ownerActor).toEqual({ ...ownerActor, hubOrigin: "https://hub.test" });
     expect(rows.filter((row) => row.item.type === "user_message")).toEqual([
       expect.objectContaining({
         item: expect.objectContaining({

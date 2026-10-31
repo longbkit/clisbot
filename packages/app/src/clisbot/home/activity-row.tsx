@@ -13,6 +13,7 @@ import { activityBucket, isUnreadReply } from "./activity";
 import { traceInstant } from "@/performance/native-trace";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { isCachedAgent } from "@/clisbot/navigation/source-liveness";
+import { openPreloads } from "@/open-preload/live";
 import {
   FLAT_ROW_FILL_INSET,
   SIDEBAR_TWO_LINE_ROW_HEIGHT,
@@ -83,10 +84,15 @@ export function ActivityRow({
   const titleRanges = useMemo(() => findHighlightRanges(search ?? "", title), [search, title]);
   const press = useCallback(() => onPress(agent), [onPress, agent]);
   const longPress = useCallback(() => onLongPress?.(agent), [onLongPress, agent]);
+  const pressIn = useCallback(
+    () => openPreloads.preloadAgent({ serverId: agent.serverId, agentId: agent.id }),
+    [agent.serverId, agent.id],
+  );
   return (
     <Pressable
       style={rowStyle}
       onPress={press}
+      onPressIn={pressIn}
       onLongPress={longPress}
       accessibilityRole="button"
       testID={`agent-row-${agent.serverId}-${agent.id}`}

@@ -7,6 +7,7 @@ import { buildHostChatRoute } from "../routes";
 import type { HostTagged } from "../data/aggregate";
 import type { ChatPayload } from "../data/contracts";
 import { directChatForBot } from "./sidebar-model";
+import { rememberChatOpenPreview } from "../chat/open-preview";
 import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 export function useBotSidebarActions(
   chatRows: readonly HostTagged<ChatPayload>[],
@@ -19,11 +20,13 @@ export function useBotSidebarActions(
   const opening = useRef(false);
   const navigate = useCallback(
     (serverId: string, chatId: string) => {
+      const row = chatRows.find((chat) => chat.serverId === serverId && chat.id === chatId);
+      if (row) rememberChatOpenPreview({ serverId, chatId, title: chatRowTitle(row) });
       const destination = buildHostChatRoute(serverId, chatId);
       const go = () => router.push(destination);
       if (!onBeforeNavigate?.(destination, go)) go();
     },
-    [onBeforeNavigate, router],
+    [chatRows, onBeforeNavigate, router],
   );
   const openBot = useCallback(
     async (serverId: string, botId: string) => {
@@ -67,4 +70,8 @@ export function useBotSidebarActions(
     [chatRows, navigate, chatsLoaded, t],
   );
   return { openBot, navigate, error };
+}
+
+function chatRowTitle(chat: ChatPayload): string {
+  return chat.title ?? chat.participants.map((p) => p.displayName).join(", ");
 }

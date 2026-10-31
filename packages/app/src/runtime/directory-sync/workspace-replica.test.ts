@@ -378,3 +378,27 @@ it("restores a missing workspace after an archive failure without replacing a li
     store.clearSession(serverId);
   }
 });
+
+it("publishes a live rename after the snapshot it follows", () => {
+  const serverId = "workspace-rename-replica";
+  const store = useSessionStore.getState();
+  store.initializeSession(serverId, null as unknown as DaemonClient);
+  const replica = new WorkspaceDirectoryReplica(serverId);
+  replica.commitSnapshot(
+    {
+      workspaces: new Map([["main", normalizeWorkspaceDescriptor(workspace("main"))]]),
+      projects: new Map(),
+    },
+    [],
+  );
+  const titles: string[] = [];
+  const unsubscribe = useSessionStore.subscribe((state) => {
+    titles.push(state.sessions[serverId]?.workspaces.get("main")?.title ?? "");
+  });
+
+  replica.applyDelta({ kind: "upsert", workspace: { ...workspace("main"), title: "renamed" } });
+
+  unsubscribe();
+  expect(titles).toEqual(["renamed"]);
+  store.clearSession(serverId);
+});

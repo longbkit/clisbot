@@ -1,12 +1,12 @@
 import { useTranslation } from "react-i18next";
 import { Linking } from "react-native";
-import {
-  SettingsAction,
-  SettingsCard,
-  SettingsSection,
-  SettingsSwitch,
-} from "@/components/settings";
-import { analyticsAvailable } from "./config";
+import { SettingsAction, SettingsCard, SettingsRow, SettingsSection } from "@/components/settings";
+import { Switch } from "@/components/ui/switch";
+import { isNative } from "@/constants/platform";
+import { analyticsAvailable, analyticsNativeConfigured } from "./config";
+
+/** A native build without the Firebase files cannot collect; say so instead of failing on toggle. */
+export const analyticsUsable = analyticsAvailable && (!isNative || analyticsNativeConfigured);
 import { productAnalytics, useProductAnalytics } from "./runtime";
 
 function setAnalyticsEnabled(value: boolean) {
@@ -28,13 +28,14 @@ export function ProductAnalyticsSettings() {
     t(`productAnalytics.${key}`, { defaultValue });
   let hint = text(
     "description",
-    "Help improve Clisbot by sharing app opens, screen names, usage duration, version and device/platform details with Google Analytics. Uses a random identifier; never sends prompts, chats, code, paths or project/host names. No advertising IDs or ad personalization. You can turn it off anytime.",
+    "Only app opens, screens and version with a random ID; never your chats, code, files or Host names.",
   );
   if (state.pending) hint = text("saving", "Saving…");
-  else if (!analyticsAvailable)
-    hint = text("unavailable", "Analytics is unavailable in this build.");
+  else if (!analyticsUsable) hint = text("unavailable", "Analytics is unavailable in this build.");
   let error: string | undefined;
-  if (state.error === "storage")
+  // A build that cannot collect explains itself in the hint; an earlier failed attempt is noise.
+  if (!analyticsUsable) error = undefined;
+  else if (state.error === "storage")
     error = text(
       "storageError",
       "Collection is paused. Your preference could not be saved; retry before restarting the app.",
@@ -47,15 +48,20 @@ export function ProductAnalyticsSettings() {
   return (
     <SettingsSection title={text("title", "Privacy")}>
       <SettingsCard>
-        <SettingsSwitch
+        <SettingsRow
           testID="product-analytics-consent"
-          label={text("label", "Share usage analytics")}
+          label={text("label", "Anonymous stats, never your content")}
           hint={hint}
           error={error}
-          value={state.enabled}
-          disabled={!analyticsAvailable || !state.ready || state.pending}
-          onValueChange={setAnalyticsEnabled}
-        />
+          hintBelow
+        >
+          <Switch
+            value={state.enabled}
+            disabled={!analyticsUsable || !state.ready || state.pending}
+            onValueChange={setAnalyticsEnabled}
+            accessibilityLabel={text("label", "Anonymous stats, never your content")}
+          />
+        </SettingsRow>
         <SettingsAction
           label={text("detailsLabel", "How analytics works")}
           actionLabel={text("privacyPolicy", "Privacy policy")}

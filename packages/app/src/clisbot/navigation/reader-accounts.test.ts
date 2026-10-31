@@ -64,22 +64,22 @@ describe("last verified reader", () => {
     const remembered = rememberReader({}, verified);
     // Offline, loading or signed out: no live account.
     const accounts = mergeReaderAccounts([], Object.values(remembered));
-    expect(resolveOwnership({ createdBy: mine, accounts })).toBe("mine");
-    expect(resolveOwnership({ createdBy: theirs, accounts })).toBe("others");
+    expect(resolveOwnership({ hostKind: "hub", createdBy: mine, accounts })).toBe("mine");
+    expect(resolveOwnership({ hostKind: "hub", createdBy: theirs, accounts })).toBe("others");
   });
 
   it("classifies a retained author the same way after an offline round trip", () => {
     // What the replica cache restores is the stored snapshot, scoped fields included.
     const restored = JSON.parse(JSON.stringify(theirs)) as SessionActor;
     const accounts = mergeReaderAccounts([], [verified]);
-    expect(resolveOwnership({ createdBy: restored, accounts })).toBe("others");
+    expect(resolveOwnership({ hostKind: "hub", createdBy: restored, accounts })).toBe("others");
   });
 
   it("prefers the live account and replaces the remembered one when another signs in", () => {
     const live = { origin: "https://hub.example", aliases: [], id: "u-other", memberId: null };
     const accounts = mergeReaderAccounts([live], [verified]);
     expect(accounts).toEqual([live]);
-    expect(resolveOwnership({ createdBy: mine, accounts })).toBe("others");
+    expect(resolveOwnership({ hostKind: "hub", createdBy: mine, accounts })).toBe("others");
   });
 
   it("keeps the remembered reader of a Hub the live list does not have", () => {

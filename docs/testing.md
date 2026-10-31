@@ -232,6 +232,7 @@ Codex MultiAgentV2 real tests use local Codex authentication rather than the Ope
 
 - Server: `packages/server/src/test-utils/vitest-setup.ts` loads `.env.test`, sets `CLISBOT_SUPERVISED=0`, and disables Git/SSH prompts. Add new global env shims here, not in individual tests.
 - App: `packages/app/vitest.setup.ts` provides `expo`/`__DEV__` shims and stubs a few native-only modules (`react-native-unistyles`, `react-native-svg`, `expo-linking`, `@xterm/addon-ligatures`). Stubbing here is for modules that have no meaningful Node behavior — not a license to mock app code.
+- App tests do not run the React Compiler, except the relative-time modules that `packages/app/vitest.config.ts` lists. The app does. A value derived in render from something the dependencies don't show (the wall clock) is memoized there and goes stale, while an uncompiled test stays green. If you change such a hook, add it to that list.
 
 ## Running tests locally
 

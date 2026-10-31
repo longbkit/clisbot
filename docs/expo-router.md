@@ -11,7 +11,9 @@ workspace restore, or active workspace selection.
 
 Each layout owns only the routes directly inside its directory.
 
-- The root layout registers `h/[serverId]`.
+- The root layout registers `h/[serverId]` and the `(tabs)` group.
+- `packages/app/src/app/(tabs)/_layout.tsx` owns the peer pages: `open-project`, `chat`,
+  `work`, `schedules` and `more` ([Phone tabs](#phone-tabs)).
 - The root layout does not register host leaf routes such as
   `h/[serverId]/workspace/[workspaceId]`, `h/[serverId]/open-project`, or
   `h/[serverId]/index`.
@@ -151,7 +153,7 @@ Settings root Back follows its existing navigation entry before consulting remem
 selection. A saved session is a cold-link fallback, not the origin of Settings opened from Home
 or Chat. On web, screen Back uses browser history when present: Back/Forward may reconstruct a
 different navigator stack while the browser still holds the actual entry. Native keeps stack Back. Settings detail
-Back still resolves its explicit parent; do not change native peer-tab replacement or workspace
+Back still resolves its explicit parent; do not change peer-tab navigation or workspace
 retention to repair a Settings return.
 
 Expo Router 57.0.28 also keeps a private web-history index that can lag an external browser
@@ -174,17 +176,83 @@ store-ready protected group so a cold host deep link can survive daemon startup.
 Do not collapse this topology with a catch-all, `getId`, or
 `dangerouslySingular` workaround.
 
-## Agent Targets
+## Phone tabs
 
-Home's compact native Home/Chat/Inbox/Automations surfaces are peer tabs in the existing root
-stack. Their shared `home-tab-navigation` policy replaces the current peer page. Detail Back
-keeps ordinary navigation to its entry surface: the host route underneath owns retained workspace
-and tab state. Dismissing to an absent entry would replace that host and discard its deck. Ordinary
-`navigate` with the installed native stack retains a
-new page on each cycle; it does not unwind previously visited peers. Do not restore it for tab-bar,
-Home activity or Chat-close entry points. Browser and desktop entry points keep ordinary history.
-Workspace deck retention, route topology and connection ownership stay with their existing owners.
-See [the native measurement harness](mobile-testing.md#native-switching-performance).
+On Navigation V2 phones, Home, Chats, Work, Schedules and More are one tab navigator: the
+`(tabs)` group's layout renders `PhoneTabs` (`clisbot/home/phone-tab-navigator.tsx`), a
+`TabRouter` whose view keeps every visited tab mounted and switches by visibility
+([mobile panels](mobile-panels.md#phone-tabs)). The group adds no URL segment, so `/chat` and the
+other tab links, notification taps and startup restore resolve as before. Desktop, tablets and the
+Home V2 rollback get a plain stack from the same layout.
+
+They replaced peer routes swapped with `router.replace`. Every switch unmounted one screen and
+mounted the next, and Chats and Work also slid the animated `agent-list` panel; a switch took 2 s
+or more on a production Android build.
+
+- **Details push above the tabs.** A workspace, chat or settings page goes on the root stack over
+  `(tabs)`. Back, the header Back and Android Back pop the root stack to `(tabs)`
+  (`returnToPhoneTabs`), which still shows the tab the detail came from, at its scroll position.
+  Never `navigate` back to a tab from a detail: the root stack pushes a second `(tabs)` and remounts
+  every tab. Never `dismissTo` a route that is not in the stack either: POP_TO then replaces the
+  current route, which is `(tabs)`. `navigateToHostWorkspaceRoute` pushes while the phone tabs are
+  focused, before trying POP_TO: a host route left below the tabs would otherwise be popped to.
+- **Expo Router nests the app's root stack** under its own `__root` route. `getRootState()` is the
+  container's state, so `phone-tab-routes.ts` finds the stack holding `(tabs)` along the focused
+  routes.
+- **Tab entry points** go through `useNavigateHomeTab`: a switch inside the tabs, `dismissTo` from a
+  detail above them, `replace` from a cold deep-linked detail with no tabs underneath
+  (`resolvePhoneTabReturn`). The tab bar dispatches its switch directly on the tab navigator, so the
+  target shows in the press's own commit.
+- **A `(tabs)` mount keeps its navigator kind.** The root stack holds the group's navigation state,
+  and swapping the layout's navigator in place hands a tab state to a stack, which crashed the root
+  error boundary on a window resize. When the breakpoint changes, the layout waits until the tabs
+  are focused, then replaces the `(tabs)` route on the tab it shows (`phoneTabsRemountAction`), so
+  the other kind mounts fresh. Visited tabs remount once at that point.
+
+- **The `(tabs)` layout reads no focus.** A push above the tabs blurs the `(tabs)` route and a pop
+  focuses it. A focus read in the layout re-rendered the tab navigator and the whole tab bar on
+  both, so the breakpoint remount reads it in its own null-rendering child, and the navigator draws
+  the bar through a memoized slot that re-renders only when the tab state changes.
+
+The stack layouts keep the earlier policy: a native Home V2 peer page replaces the current one,
+browser and desktop entry points keep ordinary history, and detail Back navigates to its entry
+surface so the host route underneath keeps its retained workspace deck. See
+[the native measurement harness](mobile-testing.md#native-switching-performance).
+
+## Route reads
+
+`usePathname`, `useSegments` and `useGlobalSearchParams` subscribe to Expo Router's route store,
+which notifies on every push, pop and tab switch. The notification comes from the navigation
+container's state-change effect, so on native it lands in the same JS task as the push, and React
+Native mounts all of a task's commits together. On 2026-10-30 (production APK, Galaxy S23, 14
+Hosts) a chat row showed nothing for 1,000 ms and then the whole chat: the root chrome
+(`AppContainer` and about ten hosts below it), the Chats pane, Work's providers and Home's start
+screen all re-rendered with the push, and the chat's open shell waited for them.
+
+In a tree that stays mounted (the root layout and its chrome, a phone tab, the tab bar), read a
+selected fact through `navigation/route-source.tsx`:
+
+| Need                                   | Use                                                                        |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| A value that renders (boolean, id)     | `useRoutePath(select)`, or `useRouteSelector(select)` for params           |
+| The path inside a handler or async end | `useReadRoutePath()`                                                       |
+| An effect on navigation                | `useRoutePathEffect(onChange)`                                             |
+| Common facts                           | `navigation/route-facts.ts` (`useIsOnWorkspaceRoute`, `useFocusedChatKey`) |
+
+The caller re-renders only when the selected value changes; an object needs an `isEqual`
+(`isSameWorkspaceSelection`, `isSameChatRoute`). `useActiveWorkspaceSelection` returns the same
+object until the workspace changes. Leaf screens may keep reading the whole route.
+
+The source is Expo Router's own store, read through internal modules (`expo-route-source.ts`),
+because Expo Router 57 exports no selector; check it when upgrading. `RouteSourceProvider` wraps
+the root layout, and a read outside it throws. `navigation/route-reads.test.ts` lists every
+remaining whole-route read with its reason and fails on a new one;
+`navigation/route-source.browser.test.tsx` pushes and pops a chat and a session above real phone
+tabs and counts zero renders of Home rows, hidden tab bodies and the tab bar.
+
+`useRootNavigationState` does not subscribe: it reads the state when its caller renders.
+
+## Agent Targets
 
 Notifications and agent URLs name a host and agent. Both use
 `navigateToAgent()`, which reads the agent's current workspace from the store
@@ -199,6 +267,11 @@ pending open in the layout model under that host and workspace key. The owning
 workspace screen consumes it once after hydration. Archived-workspace recovery
 reads the same pending target, so startup redirects cannot discard it and a
 retained screen cannot consume another workspace's request.
+
+Tab reconciliation waits while a workspace has a pending open. Agents and
+workspaces hydrate separately, so agents can arrive first; reconciling then
+focused another agent, showed it for a moment, and kept it mounted behind the
+opened one.
 
 Legacy `?open=` links seed this model state at the matched route boundary and
 then lose the query parameter. Internal navigation does not use the query as a
@@ -283,6 +356,7 @@ Before landing route changes:
 - [ ] Did a route return to a workspace? Use `navigateToWorkspace()` and pass a
       `target` when the action names a specific tab.
 - [ ] Did you add a route? Register it in the layout that directly owns it.
+- [ ] Did a phone detail return to a tab? Pop to `(tabs)`; do not `navigate` there.
 - [ ] Did `useLocalSearchParams()` lose a required param? Fix the route tree.
 - [ ] Did native show a blank screen without a crash? Suspect route ownership
       before stores, themes, or rendering.

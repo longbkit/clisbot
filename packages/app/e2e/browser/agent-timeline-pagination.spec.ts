@@ -11,7 +11,7 @@ import {
   expectTimelinePromptNotMounted,
   expectTimelinePromptPositionPreserved,
   expectTimelinePromptVisible,
-  holdBootstrapTimelinePage,
+  holdReplicaHydration,
   holdDaemonHydration,
   holdOlderHistoryPages,
   makeLoadedTimelineFitViewport,
@@ -237,16 +237,16 @@ test.describe("Agent timeline pagination", () => {
       await openAgentTimeline(page, agent);
       await scrollTimelineUntilOlderHistoryIsReachable(page, agent.oldestPrompt);
 
-      const hydration = await holdBootstrapTimelinePage(page, agent);
+      const hydration = await holdReplicaHydration(page, agent);
       await reloadAgentTimelineFromPersistedReplica(page, agent);
       await hydration.waitForDelayedResponse();
+      await hydration.expectPending();
       const livePrompt = await sendLiveTurnBeforeHydration(agent);
       await expectTimelinePromptVisible(page, livePrompt);
 
       hydration.release();
-      await hydration.waitForDelayedCatchUp();
+      await hydration.expectApplied();
       await expectTimelinePromptVisible(page, livePrompt);
-      hydration.releaseCatchUp();
       await scrollTimelineUntilOlderHistoryIsReachable(page, agent.oldestPrompt);
       await expectTimelinePromptVisible(page, agent.oldestPrompt);
       await scrollTimelineToNewestLoadedEdge(page);

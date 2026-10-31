@@ -22,7 +22,7 @@ import type { CreationSnapshot } from "@clisbot/protocol/messages";
 import type { z } from "zod";
 import { CLIENT_CAPS, type ClientCapability } from "@clisbot/protocol/client-capabilities";
 import {
-  isDefinitiveAdmissionDenial,
+  isAccessRevocation,
   MANAGED_ACCESS_REBIND_CLOSE_CODE,
   MANAGED_SESSION_SUPERSEDED_CLOSE_CODE,
 } from "@clisbot/protocol/managed-access";
@@ -477,6 +477,8 @@ export interface DaemonClientConfig {
   };
   runtimeMetricsIntervalMs?: number;
   runtimeMetricsWindowMs?: number;
+  /** Diagnostic: one call per inbound JSON message, after its handlers ran. */
+  onInboundMessage?: (type: string, bytes: number, handlerMs: number) => void;
   trace?: DaemonClientTrace;
   capabilities?: Partial<Record<ClientCapability, unknown>>;
   /**
@@ -7327,9 +7329,10 @@ export class DaemonClient {
           ? await this.config.resolveAccessTicket()
           : undefined;
       } catch (error) {
-        // Only a definitive Hub answer (401/403/404…) revokes. A network error, timeout or 5xx
-        // while the Hub restarts falls through to an ordinary reconnect with a fresh ticket.
-        if (isDefinitiveAdmissionDenial(error)) {
+        // Only a Hub answer that ends this account's access (403/404/410…) revokes. A 401 (our
+        // token was refused), a 400, a network error, a timeout or a 5xx while the Hub restarts
+        // fall through to an ordinary reconnect with a fresh ticket.
+        if (isAccessRevocation(error)) {
           this.config.onAccessRevoked?.();
           this.setReconnectEnabled(false);
         }
@@ -7505,7 +7508,7 @@ export class DaemonClient {
         messageType: "pong",
       });
       this.resolvePingProbe();
-      this.runtimeMetrics?.recordMessage("pong", bytes, perfNow() - startMs);
+      this.recordInboundMessage("pong", bytes, perfNow() - startMs);
       return;
     }
 
@@ -7537,10 +7540,15 @@ export class DaemonClient {
       this.endTraceSection(dispatchTrace);
     }
     const msgType = parsed.data.message.type;
-    this.runtimeMetrics?.recordMessage(msgType, bytes, perfNow() - startMs);
+    this.recordInboundMessage(msgType, bytes, perfNow() - startMs);
     if (parsed.data.message.type === "agent_stream") {
       this.runtimeMetrics?.recordAgentStream(parsed.data.message.payload);
     }
+  }
+
+  private recordInboundMessage(type: string, bytes: number, handlerMs: number): void {
+    this.runtimeMetrics?.recordMessage(type, bytes, handlerMs);
+    this.config.onInboundMessage?.(type, bytes, handlerMs);
   }
 
   private tryHandleBinaryFrame(rawBytes: Uint8Array): boolean {

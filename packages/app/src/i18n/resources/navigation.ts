@@ -3,7 +3,7 @@ const en = {
   sections: {
     home: "Home",
     chats: "Chats",
-    work: "Workspace",
+    work: "Work",
     design: "Design",
     schedules: "Schedules",
     tasks: "Tasks",
@@ -28,10 +28,13 @@ const en = {
     others: "Others",
     all: "All",
     label: "Show",
+    unknownLabel: "About unknown ownership",
+    unknownHint:
+      "There isn't enough information to tell whether you created or participated in this item.",
   },
   mode: {
     chat: "Chat",
-    work: "Workspace",
+    work: "Work",
     hybrid: "All",
     label: "Home shows",
   },
@@ -128,7 +131,7 @@ const vi: typeof en = {
   sections: {
     home: "Trang chủ",
     chats: "Trò chuyện",
-    work: "Workspace",
+    work: "Work",
     design: "Thiết kế",
     schedules: "Lịch",
     tasks: "Công việc",
@@ -148,8 +151,15 @@ const vi: typeof en = {
     title: "Thiết kế đang được phát triển",
     body: "Bản thiết kế và prototype làm cùng agent sẽ nằm ở đây. Hiện chưa lưu dữ liệu nào.",
   },
-  scope: { mine: "Của tôi", others: "Người khác", all: "Tất cả", label: "Hiển thị" },
-  mode: { chat: "Chat", work: "Workspace", hybrid: "Tất cả", label: "Trang chủ hiển thị" },
+  scope: {
+    mine: "Của tôi",
+    others: "Người khác",
+    all: "Tất cả",
+    label: "Hiển thị",
+    unknownLabel: "Về mục chưa xác định",
+    unknownHint: "Chưa đủ dữ liệu để xác định bạn đã tạo hoặc tham gia mục này.",
+  },
+  mode: { chat: "Chat", work: "Work", hybrid: "Tất cả", label: "Trang chủ hiển thị" },
   chips: {
     all: "Tất cả",
     needs: "Cần tôi",
@@ -244,7 +254,7 @@ interface Overrides {
 
 /**
  * The words a reader meets first — sections, the Home mode switch, the scope tabs — in each
- * locale; the rest falls back to English. Workspace and Tasks never share a word, and in no
+ * locale; the rest falls back to English. Work and Tasks never share a word, and in no
  * locale is "Công việc"-style ambiguity possible (Owner naming decision, 2026-10-26).
  */
 function localized(overrides: Overrides): typeof en {
@@ -261,7 +271,7 @@ const zhCN = localized({
   sections: {
     home: "首页",
     chats: "聊天",
-    work: "工作区",
+    work: "工作",
     design: "设计",
     schedules: "日程",
     tasks: "任务",
@@ -272,7 +282,7 @@ const zhCN = localized({
     settings: "设置",
     more: "更多",
   },
-  mode: { chat: "聊天", work: "工作区", hybrid: "全部" },
+  mode: { chat: "聊天", work: "工作", hybrid: "全部" },
   scope: { mine: "我的", others: "他人", all: "全部" },
   work: { bots: "机器人" },
 });
@@ -281,7 +291,7 @@ const ja = localized({
   sections: {
     home: "ホーム",
     chats: "チャット",
-    work: "ワークスペース",
+    work: "作業",
     design: "デザイン",
     schedules: "スケジュール",
     tasks: "タスク",
@@ -292,7 +302,7 @@ const ja = localized({
     settings: "設定",
     more: "その他",
   },
-  mode: { chat: "チャット", work: "ワークスペース", hybrid: "すべて" },
+  mode: { chat: "チャット", work: "作業", hybrid: "すべて" },
   scope: { mine: "自分", others: "他の人", all: "すべて" },
   work: { bots: "ボット" },
 });
@@ -301,7 +311,7 @@ const ko = localized({
   sections: {
     home: "홈",
     chats: "채팅",
-    work: "워크스페이스",
+    work: "Work",
     design: "디자인",
     schedules: "일정",
     tasks: "작업",
@@ -312,7 +322,7 @@ const ko = localized({
     settings: "설정",
     more: "더 보기",
   },
-  mode: { chat: "채팅", work: "워크스페이스", hybrid: "전체" },
+  mode: { chat: "채팅", work: "Work", hybrid: "전체" },
   scope: { mine: "내 항목", others: "다른 사람", all: "전체" },
   work: { bots: "봇" },
 });
@@ -320,7 +330,7 @@ const ko = localized({
 const es = localized({
   sections: {
     home: "Inicio",
-    work: "Workspace",
+    work: "Trabajo",
     design: "Diseño",
     schedules: "Programaciones",
     tasks: "Tareas",
@@ -330,7 +340,7 @@ const es = localized({
     settings: "Ajustes",
     more: "Más",
   },
-  mode: { work: "Workspace", hybrid: "Todo" },
+  mode: { work: "Trabajo", hybrid: "Todo" },
   scope: { mine: "Míos", others: "Otros", all: "Todo" },
   work: {},
 });
@@ -338,7 +348,7 @@ const es = localized({
 const ptBR = localized({
   sections: {
     home: "Início",
-    work: "Workspace",
+    work: "Trabalho",
     design: "Design",
     schedules: "Agendamentos",
     tasks: "Tarefas",
@@ -348,7 +358,7 @@ const ptBR = localized({
     settings: "Configurações",
     more: "Mais",
   },
-  mode: { work: "Workspace", hybrid: "Tudo" },
+  mode: { work: "Trabalho", hybrid: "Tudo" },
   scope: { mine: "Meus", others: "Outros", all: "Tudo" },
   work: {},
 });
@@ -356,7 +366,7 @@ const ptBR = localized({
 const fr = localized({
   sections: {
     home: "Accueil",
-    work: "Workspace",
+    work: "Travail",
     design: "Design",
     schedules: "Planifications",
     tasks: "Tâches",
@@ -367,7 +377,7 @@ const fr = localized({
     settings: "Réglages",
     more: "Plus",
   },
-  mode: { work: "Workspace", hybrid: "Tout" },
+  mode: { work: "Travail", hybrid: "Tout" },
   scope: { mine: "Moi", others: "Autres", all: "Tout" },
   work: {},
 });
@@ -376,7 +386,7 @@ const ru = localized({
   sections: {
     home: "Главная",
     chats: "Чаты",
-    work: "Пространство",
+    work: "Работа",
     design: "Дизайн",
     schedules: "Расписания",
     tasks: "Задачи",
@@ -387,7 +397,7 @@ const ru = localized({
     settings: "Настройки",
     more: "Ещё",
   },
-  mode: { chat: "Чат", work: "Пространство", hybrid: "Все" },
+  mode: { chat: "Чат", work: "Работа", hybrid: "Все" },
   scope: { mine: "Мои", others: "Чужие", all: "Все" },
   work: { bots: "Боты" },
 });
@@ -396,7 +406,7 @@ const ar = localized({
   sections: {
     home: "الرئيسية",
     chats: "المحادثات",
-    work: "مساحة العمل",
+    work: "العمل",
     design: "التصميم",
     schedules: "الجداول",
     tasks: "المهام",
@@ -407,7 +417,7 @@ const ar = localized({
     settings: "الإعدادات",
     more: "المزيد",
   },
-  mode: { chat: "محادثة", work: "مساحة العمل", hybrid: "الكل" },
+  mode: { chat: "محادثة", work: "العمل", hybrid: "الكل" },
   scope: { mine: "لي", others: "للآخرين", all: "الكل" },
   work: { bots: "البوتات" },
 });

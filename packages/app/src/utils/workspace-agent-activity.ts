@@ -1,6 +1,8 @@
 import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
 import { isWorkspaceRootAgent } from "@/subagents/policies";
 import { deriveSidebarStateBucket } from "./sidebar-agent-state";
+import { advanceWorkspaceRootAgents, workspaceRootAgentsOf } from "@/stores/workspace-root-agents";
+import { normalizeWorkspaceOpaqueId } from "./workspace-identity";
 
 export interface WorkspaceAgentActivity {
   agentId: string;
@@ -60,6 +62,53 @@ export function buildWorkspaceAgentActivityIndex(
     return previous instanceof Map ? previous : new Map(previous);
   }
   return activityByWorkspaceId;
+}
+
+/**
+ * Clisbot: the index for `next`, recomputing only the workspaces whose agents changed since
+ * `previousAgents` (same rule as the full build). Returns `previous` when no activity moved.
+ */
+export function advanceWorkspaceAgentActivityIndex(
+  previousAgents: ReadonlyMap<string, Agent>,
+  next: ReadonlyMap<string, Agent>,
+  previous: Map<string, WorkspaceAgentActivity>,
+): Map<string, WorkspaceAgentActivity> {
+  const touched = advanceWorkspaceRootAgents(previousAgents, next);
+  if (!touched) return buildWorkspaceAgentActivityIndex(next, previous);
+  const roots = workspaceRootAgentsOf(next);
+  let advanced: Map<string, WorkspaceAgentActivity> | null = null;
+  for (const workspaceId of touched) {
+    const current = previous.get(workspaceId);
+    const key = normalizeWorkspaceOpaqueId(workspaceId);
+    const activity = key ? latestRootActivity(roots.get(key), workspaceId, current) : undefined;
+    if (activity === current) continue;
+    advanced ??= new Map(previous);
+    if (activity) advanced.set(workspaceId, activity);
+    else advanced.delete(workspaceId);
+  }
+  return advanced ?? previous;
+}
+
+function latestRootActivity(
+  roots: readonly Agent[] | undefined,
+  workspaceId: string,
+  previous: WorkspaceAgentActivity | undefined,
+): WorkspaceAgentActivity | undefined {
+  let latest: Agent | undefined;
+  for (const agent of roots ?? []) {
+    if (agent.workspaceId !== workspaceId) continue;
+    const enteredAt = agent.attentionTimestamp ?? agent.updatedAt;
+    if (!latest || enteredAt > (latest.attentionTimestamp ?? latest.updatedAt)) latest = agent;
+  }
+  if (!latest) return undefined;
+  const status = deriveSidebarStateBucket({
+    status: workspaceAgentStatus(latest),
+    pendingPermissionCount: latest.pendingPermissions.length,
+    requiresAttention: latest.requiresAttention,
+    attentionReason: latest.attentionReason,
+  });
+  if (previous?.agentId === latest.id && previous.status === status) return previous;
+  return { agentId: latest.id, status, enteredAt: latest.attentionTimestamp ?? latest.updatedAt };
 }
 
 function areWorkspaceAgentActivityIndexesIdentical(

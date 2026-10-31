@@ -1,6 +1,15 @@
 export { REPLICA_ROW_STORE_SCHEMA_VERSION, REPLICA_SINGLETON_ROW_ID } from "./row-store-schema";
 
-export type ReplicaRowKind = "agent" | "workspace" | "project" | "timeline" | "checkpoint";
+export type ReplicaRowKind =
+  | "agent"
+  | "workspace"
+  | "project"
+  | "timeline"
+  | "transcript"
+  | "checkpoint";
+
+/** Session and chat tails: evicted per row, least recently opened first. */
+export type ReplicaTailKind = Extract<ReplicaRowKind, "timeline" | "transcript">;
 
 export interface ReplicaRowKey {
   serverId: string;
@@ -10,6 +19,8 @@ export interface ReplicaRowKey {
 
 export interface ReplicaRow extends ReplicaRowKey {
   payload: string;
+  /** When the user last opened this tail (epoch ms). Metadata rows have none. */
+  openedAt?: number;
 }
 
 export interface ReplicaRowChanges {
@@ -33,5 +44,7 @@ export interface ReplicaRowStore {
   apply(changes: ReplicaRowChanges): Promise<void>;
   deleteHost(serverId: string): Promise<void>;
   renameHost(oldServerId: string, newServerId: string): Promise<void>;
+  /** Drops every row whose `openedAt` is older than `cutoff`; metadata rows are never touched. */
+  deleteOpenedBefore(cutoff: number): Promise<void>;
   clear(): Promise<void>;
 }

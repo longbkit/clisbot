@@ -42,6 +42,59 @@ A persisted draft with no provider handle and no committed timeline starts its f
 session under the same Clisbot ID. Creation clears only retained memory for that draft; it must
 not permanently delete its canonical store before the first prompt writes to it.
 
+## Scheduled session ownership
+
+With `agentSessionStorage` enabled, schedules and heartbeats record optional `createdBy` from the
+trusted session operation context when first created. Request/MCP arguments cannot supply
+that snapshot. Updating or idempotently replacing the schedule does not transfer its owner; old
+records without a creator remain unowned. Updating the schedule does not change the creator of an
+existing target session.
+
+Each new-agent run records `createdBy` as an `automation` actor whose id is the schedule id. Its
+optional `ownerActor` is a copy of the schedule creator when that creator is a Hub-scoped user
+(a channel sender also needs a verified Member link). The automation does not receive the user's
+Member id. A manual run by another operator cannot change this creation attribution. Both fields
+survive session persistence and authorship recovery; later participants cannot replace them.
+
+`ownerActor` is descriptive metadata, never an access grant. It is optional on session authorship
+and operation identities; schedule `createdBy` is optional too. Older parsers ignore the new fields,
+and new parsers accept old records without inventing owners. The existing session-storage toggle
+owns writing this metadata; disabling it preserves previous behavior. No additional RPC or timeline
+fetch is needed. Consumers that do not read `ownerActor` retain their existing scope rules.
+
+A heartbeat targeting an existing agent resumes that session and preserves its creator. A heartbeat
+posted through a Chat may create a Bot session after `/new`, archive or failed resume. Its trusted
+automation/owner identity is persisted as optional internal transcript delivery metadata and passed
+only to new-session creation. In a group, each Bot uses the latest triggering user/heartbeat line,
+so a later Bot reply does not erase the initiating heartbeat's ownership. Duplicate posts cannot
+replace the stored identity. Ordinary Chat creation retains its existing behavior; client message
+arguments cannot supply heartbeat creation metadata. With session storage disabled, none of this
+metadata is stamped and the prior Chat behavior remains.
+
+These producer changes require a daemon update: 2.1.8 does not stamp a timer-created new-agent
+session this way. Existing records are not backfilled from titles, labels, project owners or the
+current reader. Rolling back to a daemon that rewrites records without these optional fields can
+lose the added attribution, but must leave the schedule runnable.
+
+## Workflow session ownership
+
+A Hub workflow's owner is the verified Member who authored its **pinned configuration revision**,
+not whoever last edited the active workflow or manually started the run. Before a new execution
+is persisted, the Hub resolves that revision's `createdByUserId` against membership in the same
+organization and stores optional `ownerActor` inside the durable `launchIntent`. Recovery reuses
+that snapshot, including an absent owner on legacy intents; it never looks up the current revision
+again for an existing execution. Imported revisions without authors and unverified membership
+remain unknown. Existing author-access checks and pause/deny behavior are unchanged.
+
+Daemon creation receives that snapshot beside the actual manual/channel initiator, or beside an
+`automation(workflowId)` actor for other triggers. An owner supplied in trigger data is ignored.
+This is attribution only; it neither delegates access nor overrides an existing reused session's
+creator. The Hub writes it when its database runtime and public Hub origin are available; other
+compositions omit the resolver and retain prior behavior. The field extends existing JSON data,
+so no database migration or required wire field is added. Both the Hub producer and the daemon
+session-storage support must be updated for the metadata to survive end to end. Older daemons
+may ignore it, and older persisted executions are not backfilled.
+
 ## File schema
 
 **`events.jsonl`** — one JSON object per line, appended, never rewritten in place. An update to an
@@ -86,15 +139,16 @@ log.
 
 ## What works today
 
-| Capability                                                                      | State                                                      |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Durable timeline in `events.jsonl`, survives restart                            | Done                                                       |
-| Fast jump to a message not resident in RAM, via anchors                         | Done                                                       |
-| Index rebuild after loss or corruption                                          | Done                                                       |
-| Tool approval survives a mid-flight restart, no duplicate approval              | Done                                                       |
-| Prompt submissions deduped by `clientMessageId` across retry                    | Done                                                       |
-| Capability-gated reads (`agentSessionStorageRead`); upstream daemons unaffected | Done                                                       |
-| Benchmark gates at 1,000 and 10,000 rows                                        | Green — [report](benchmarks/2026-09-14-iteration-gates.md) |
+| Capability                                                                         | State                                                      |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Durable timeline in `events.jsonl`, survives restart                               | Done                                                       |
+| Fast jump to a message not resident in RAM, via anchors                            | Done                                                       |
+| Index rebuild after loss or corruption                                             | Done                                                       |
+| Tool approval survives a mid-flight restart, no duplicate approval                 | Done                                                       |
+| Prompt submissions deduped by `clientMessageId` across retry                       | Done                                                       |
+| Capability-gated reads (`agentSessionStorageRead`); upstream daemons unaffected    | Done                                                       |
+| Benchmark gates at 1,000 and 10,000 rows                                           | Green — [report](benchmarks/2026-09-14-iteration-gates.md) |
+| Startup and list cost independent of old records ([cold storage](cold-storage.md)) | Done; record parse at startup still scales                 |
 
 Details and evidence: [implementation.md](implementation.md) ·
 [iteration acceptance](iterations/2026-09-13-acceptance-matrix.md).
@@ -109,9 +163,15 @@ Paging checks must measure source bytes for both legacy and `source_ranges` requ
 only the number of returned entries. Keep a history larger than the projection budget in
 regression coverage, including text continuations without message IDs, forward/backward
 cursors, and a tool updated long after it started. A page must not claim an unread gap as
-loaded. The source-range path reads a cursor window and its merge dependencies; plugin
-identities without an occurrence index still require the full-projection fallback and remain
-subject to the read budget. Tool indexes retain every occurrence: a long-running subagent
+loaded. The source-range path reads a cursor window and its merge dependencies. A page that
+cannot be bounded that way (plugin identities without an occurrence index, a merge or tool
+index past 8,192 rows, or rows too large for the budget) projects the whole history only
+while the session has at most 8,192 rows and the read fits the budget. Otherwise it reads a
+fallback range of at most 8,192 rows or 8 MiB outwards from the cursor and reports
+`hasOlder`/`hasNewer` beyond it, so opening a large session returns its newest page and
+older rows load as you scroll. The range certifies only what it read, and its far edge
+never splits a merged message; a tool or plugin entry crossing that edge shows its
+in-range state. Tool indexes retain every occurrence: a long-running subagent
 can emit hundreds of updates, and truncating those pointers makes small pages fall back to
 reading the entire session. Version 3 upgrades a valid v2 checkpoint in place: preserve pointers, anchors, IDs,
 summary, epoch and revision; scan only when an old tool list reached the 256-entry cap,
@@ -121,8 +181,7 @@ Source-range reads fold tool snapshots incrementally and retain their source ran
 32 MiB budget limits retained data, not cumulative bytes read across successive pages.
 A tail containing only repeated subagent updates must still reach earlier main-session
 messages. Child journals remain scoped to their own directories, even when call IDs match
-ones in the parent. Legacy contiguous-envelope reads retain their existing behavior and may still fall back
-on a full read. Source-range paging seeks the next unread interval rather than widening a
+ones in the parent. Legacy contiguous-envelope reads use the same bounded fallback. Source-range paging seeks the next unread interval rather than widening a
 window past 8192 rows. Completed tool entries are reused within a request; dense updates
 across selected tools are read together, without reading unrelated gaps.
 
@@ -186,6 +245,7 @@ Known cleanups, not blocking:
 | Which upstream files were touched and what was decided                                       | [upstream-blast-radius.md](upstream-blast-radius.md)          |
 | Changes outside the storage / session / timeline layers                                      | [out-of-layer-changes.md](out-of-layer-changes.md)            |
 | Benchmark measurements                                                                       | [benchmarks/](benchmarks/)                                    |
+| Why old records stop costing startup and list time, and the `agentColdStorage` flag          | [cold-storage.md](cold-storage.md)                            |
 | The closed 2026-09-12 three-lane campaign (history, not backlog)                             | [campaign-2026-09-12/](campaign-2026-09-12/)                  |
 
 Workspace naming, selection and reuse live in

@@ -176,6 +176,33 @@ it("revalidates metadata on reconnect and ignores an old admission response", as
   expect(hook.result.current.authorized).toBe(true);
   hook.unmount();
 });
+it("shows the offline chat record without authorizing sends, until the Host answers", async () => {
+  const saved = { id: "chat-a", participants: [{ botId: "bot-a", agentId: "a" }] } as ChatPayload;
+  let resolve!: (value: { chats: ChatPayload[] }) => void;
+  const client = {
+    listChats: () =>
+      new Promise<{ chats: ChatPayload[] }>((yes) => {
+        resolve = yes;
+      }),
+    observeEvents: () => ({ subscribe: () => {}, release: async () => {} }),
+  } as unknown as DaemonClient;
+  const hook = renderHook(
+    ({ online, offline }: { online: boolean; offline: ChatPayload | null }) =>
+      useChatRecord(client, online, "chat-a", "epoch:1", null, offline),
+    { initialProps: { online: false, offline: null as ChatPayload | null } },
+  );
+  expect(hook.result.current.chat).toBeNull();
+
+  hook.rerender({ online: false, offline: saved });
+  expect(hook.result.current.chat).toBe(saved);
+  expect(hook.result.current.authorized).toBe(false);
+
+  hook.rerender({ online: true, offline: saved });
+  await act(async () => resolve({ chats: [] }));
+  expect(hook.result.current.chat).toBeNull();
+  expect(hook.result.current.error).not.toBeNull();
+  hook.unmount();
+});
 it("does not retain metadata when connection loss carries an explicit client authentication rejection", async () => {
   const { DaemonConnectionError } = await import("@clisbot/client/internal/daemon-client");
   const accepted = { id: "chat-a", participants: [] } as unknown as ChatPayload;

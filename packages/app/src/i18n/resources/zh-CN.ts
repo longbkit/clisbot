@@ -5,6 +5,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -248,10 +249,13 @@ export const zhCN: TranslationResources = {
   agentStream: {
     agent: "Agent",
     empty: "开始和这个 Agent 对话...",
+    loadingHistory: "正在加载消息…",
     scrollToBottom: "滚动到底部",
     historyLoadFailed: "无法加载智能体历史记录",
     messageCapped: "此消息已被截断（{{bytes}} 字节）。",
     permission: {
+      reason: "需要批准的原因",
+      blockedPath: "被阻止的路径",
       rejectedPlan: "已拒绝的计划",
       approvedPlan: "已批准的计划",
       canceledPlan: "已取消的计划",
@@ -3027,5 +3031,6 @@ export const zhCN: TranslationResources = {
   bots: bots["zh-CN"],
   heartbeats: heartbeats["zh-CN"],
   navigation: navigation["zh-CN"],
+  productAnalytics: productAnalytics["zh-CN"],
   home: home["zh-CN"],
 };

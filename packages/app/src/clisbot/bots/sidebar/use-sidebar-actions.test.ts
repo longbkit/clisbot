@@ -2,6 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useBotSidebarActions } from "./use-sidebar-actions";
+import { readChatOpenPreview } from "../chat/open-preview";
 const env = vi.hoisted(() => ({
   push: vi.fn(),
   createChat: vi.fn(),
@@ -43,6 +44,42 @@ it("coalesces rapid clicks before a render and does not create until own chats l
     await Promise.all([first, second]);
   });
   expect(env.push).toHaveBeenCalledTimes(1);
+});
+it("hands the chat route the pressed chat's title before navigating", () => {
+  const rows = [
+    {
+      serverId: "host",
+      id: "room",
+      kind: "group",
+      title: null,
+      participants: [
+        { botId: "a", displayName: "Ada" },
+        { botId: "b", displayName: "Bo" },
+      ],
+    },
+  ] as unknown as Parameters<typeof useBotSidebarActions>[0];
+  let previewAtPush: unknown = "unset";
+  env.push.mockImplementation(() => {
+    previewAtPush = readChatOpenPreview("host", "room");
+  });
+  const { result } = renderHook(() => useBotSidebarActions(rows));
+  act(() => result.current.navigate("host", "room"));
+  expect(previewAtPush).toEqual({ serverId: "host", chatId: "room", title: "Ada, Bo" });
+});
+it("opens a bot's existing direct chat in the press itself, without waiting on the Host", () => {
+  const rows = [
+    {
+      serverId: "host",
+      id: "dm",
+      kind: "direct",
+      title: "Ada",
+      participants: [{ botId: "bot", displayName: "Ada" }],
+    },
+  ] as unknown as Parameters<typeof useBotSidebarActions>[0];
+  const { result } = renderHook(() => useBotSidebarActions(rows));
+  void result.current.openBot("host", "bot");
+  expect(env.push).toHaveBeenCalledWith("/h/host/chat/dm");
+  expect(env.listChats).not.toHaveBeenCalled();
 });
 it("rechecks the authoritative private chat list before creating from a stale empty catalog", async () => {
   env.listChats.mockResolvedValue({

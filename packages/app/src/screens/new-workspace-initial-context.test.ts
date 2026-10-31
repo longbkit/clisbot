@@ -184,6 +184,38 @@ describe("resolveNewWorkspaceInitialServerId", () => {
       }),
     ).toBe("connected");
   });
+
+  it("keeps the remembered Host while it connects, though other Hosts are online", () => {
+    expect(
+      resolveNewWorkspaceInitialServerId({
+        allServerIds: ["online-a", "remembered", "online-b"],
+        routeServerId: null,
+        rememberedServerId: "remembered",
+        lastActiveProject: null,
+        projects: [projectFor("online-a"), projectFor("online-b")],
+        hostConnectionStatusByServerId: statuses({
+          "online-a": "online",
+          remembered: "connecting",
+          "online-b": "online",
+        }),
+        workspaceMultiplicityByServerId: multiplicity(),
+      }),
+    ).toBe("remembered");
+  });
+
+  it("falls back when the remembered Host is no longer registered", () => {
+    expect(
+      resolveNewWorkspaceInitialServerId({
+        allServerIds: ["offline", "online"],
+        routeServerId: null,
+        rememberedServerId: "removed",
+        lastActiveProject: null,
+        projects: [projectFor("online")],
+        hostConnectionStatusByServerId: statuses({ offline: "offline", online: "online" }),
+        workspaceMultiplicityByServerId: multiplicity(),
+      }),
+    ).toBe("online");
+  });
 });
 
 describe("resolveNewWorkspaceAutomaticServerId", () => {
@@ -287,5 +319,48 @@ describe("resolveNewWorkspaceAutomaticServerId", () => {
         nextServerId: "offline-project",
       }),
     ).toBe("online-empty");
+  });
+
+  it("never leaves the remembered Host while Hosts connect one by one", () => {
+    const base = {
+      allServerIds: ["head", "hr", "remembered", "ai-team"],
+      routeServerId: null,
+      rememberedServerId: "remembered",
+      lastActiveProject: null,
+      projects: [projectFor("head", "head-clisbot"), projectFor("hr", "default")],
+      workspaceMultiplicityByServerId: multiplicity(),
+    };
+    const waves = [
+      statuses({ head: "online", hr: "connecting", remembered: "connecting" }),
+      statuses({ head: "online", hr: "online", remembered: "offline" }),
+      statuses({ head: "online", hr: "online", remembered: "error", "ai-team": "online" }),
+    ];
+    for (const hostConnectionStatusByServerId of waves) {
+      const next = resolveNewWorkspaceInitialServerId({ ...base, hostConnectionStatusByServerId });
+      expect(
+        resolveNewWorkspaceAutomaticServerId({
+          ...base,
+          hostConnectionStatusByServerId,
+          currentServerId: "remembered",
+          nextServerId: next,
+        }),
+      ).toBe("remembered");
+    }
+  });
+
+  it("moves to the remembered Host once the remembered selection hydrates", () => {
+    expect(
+      resolveNewWorkspaceAutomaticServerId({
+        allServerIds: ["head", "remembered"],
+        routeServerId: null,
+        rememberedServerId: "remembered",
+        lastActiveProject: null,
+        projects: [projectFor("head")],
+        hostConnectionStatusByServerId: statuses({ head: "online", remembered: "connecting" }),
+        workspaceMultiplicityByServerId: multiplicity(),
+        currentServerId: "head",
+        nextServerId: "remembered",
+      }),
+    ).toBe("remembered");
   });
 });

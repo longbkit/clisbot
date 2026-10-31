@@ -109,7 +109,9 @@ export class WorkspaceDirectoryReplica {
     this.projects = new Map(snapshot.projects);
     this.rebuildProjectIndex();
     const store = useSessionStore.getState();
-    store.setWorkspaces(this.serverId, this.workspaces);
+    // The store may keep the map it is given; the replica mutates its own in place, which would
+    // make every later upsert compare equal to the store and never notify.
+    store.setWorkspaces(this.serverId, new Map(this.workspaces));
     store.setProjects(this.serverId, this.projects.values());
   }
 

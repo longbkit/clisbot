@@ -6,7 +6,8 @@ import type {
   PluginSidebarItemProps,
 } from "@clisbot/plugin/client";
 import type { PluginTheme } from "@clisbot/plugin";
-import { router, useGlobalSearchParams, usePathname } from "expo-router";
+import { router } from "expo-router";
+import { useRoutePath, useRouteSelector } from "@/navigation/route-source";
 import { useCallback, useMemo, useState, type ComponentType, type RefObject } from "react";
 import { type View } from "react-native";
 import { withUnistyles } from "react-native-unistyles";
@@ -32,7 +33,11 @@ import {
   type PluginSidebarGroup,
   type PluginSidebarTarget,
 } from "../sidebar-groups";
-import { currentPluginScreen, parsePluginOpenScreenInput } from "../surface-contribution";
+import {
+  currentPluginScreen,
+  isSamePluginScreen,
+  parsePluginOpenScreenInput,
+} from "../surface-contribution";
 import { SurfaceErrorBoundary } from "../surface-error-boundary";
 import { toPluginTheme } from "../theme";
 import type { PluginSidebarSection } from "../types";
@@ -83,9 +88,13 @@ function PluginSidebarItemHost({
   onBeforeNavigate,
   theme,
 }: PluginSidebarItemHostProps & { theme: PluginTheme }) {
-  const pathname = usePathname();
-  const routeParams = useGlobalSearchParams();
-  const { plugin, item } = selectPluginSidebarTarget(group, hostIdFromPathname(pathname));
+  // The More tab keeps this mounted: select the route's Host and this plugin's screen, which a
+  // push to anything else leaves unchanged.
+  const { plugin, item } = selectPluginSidebarTarget(group, useRoutePath(hostIdFromPathname));
+  const currentScreen = useRouteSelector(
+    (route) => currentPluginScreen(plugin, route.pathname, route.params),
+    isSamePluginScreen,
+  );
   const client = useHostRuntimeClient(plugin.serverId);
   const toast = useToast();
   // The content outlives `open` so the surface can play its exit and native sheet teardown.
@@ -124,7 +133,7 @@ function PluginSidebarItemHost({
             item={item}
             section={section}
             theme={theme}
-            currentScreen={currentPluginScreen(plugin, pathname, routeParams)}
+            currentScreen={currentScreen}
             environment={environment}
             popover={popover}
             showPopover={showPopover}

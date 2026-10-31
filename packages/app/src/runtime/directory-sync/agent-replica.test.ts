@@ -57,6 +57,48 @@ function entry(agent: AgentSnapshotPayload): FetchAgentsEntry {
 }
 
 describe("AgentDirectoryReplica", () => {
+  it("leaves the store and the cache alone when a live answer carries no changes", () => {
+    const serverId = "agent-replica-empty-changes";
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, null);
+    const persisted: DirectoryReplicaMutation[][] = [];
+    const replica = new AgentDirectoryReplica(
+      serverId,
+      () => undefined,
+      (mutations) => persisted.push([...mutations]),
+    );
+    const cached = new Map(
+      Array.from({ length: 50 }, (_, index) => {
+        const agent = {
+          ...normalizeAgentSnapshot(
+            { ...payload(`cached ${index}`), id: `agent-${index}` },
+            serverId,
+          ),
+          projectPlacement: entry(payload("placement")).project,
+        };
+        return [agent.id, agent] as const;
+      }),
+    );
+    replica.commitCached(cached);
+    const before = useSessionStore.getState().sessions[serverId]!;
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    const agents = replica.commitChanges([], [], []);
+    unsubscribe();
+
+    const after = useSessionStore.getState().sessions[serverId]!;
+    expect(agents).toBe(before.agents);
+    expect(after.agents).toBe(before.agents);
+    expect(after.pendingPermissions).toBe(before.pendingPermissions);
+    expect(after.hasHydratedAgents).toBe(true);
+    // Only the hydration flag changed, in one notification; nothing was written to the cache.
+    expect(notifications).toBe(1);
+    expect(persisted).toEqual([]);
+  });
+
   it.each(["delta", "snapshot"] as const)(
     "does not erase freshly fetched history when the active directory removes it by %s",
     (removal) => {
@@ -476,6 +518,60 @@ describe("AgentDirectoryReplica", () => {
     replica.commitChanges([], [], []);
 
     expect(useSessionStore.getState().sessions[serverId]?.agents.has("agent")).toBe(true);
+    store.clearSession(serverId);
+  });
+
+  it("commits a fetched snapshot that removes and changes agents as one store update", () => {
+    const serverId = "agent-replica-one-snapshot-commit";
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, null);
+    const replica = new AgentDirectoryReplica(
+      serverId,
+      () => undefined,
+      () => undefined,
+    );
+    const agentWithId = (id: string, title: string) => entry({ ...payload(title), id });
+    replica.commitSnapshot([agentWithId("kept", "old"), agentWithId("gone-1", "x")], []);
+    replica.commitSnapshot([agentWithId("kept", "old"), agentWithId("gone-2", "x")], []);
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    replica.commitSnapshot([agentWithId("kept", "new")], []);
+
+    unsubscribe();
+    const agents = useSessionStore.getState().sessions[serverId]?.agents;
+    expect({ notifications, ids: [...(agents?.keys() ?? [])] }).toEqual({
+      notifications: 1,
+      ids: ["kept"],
+    });
+    expect(agents?.get("kept")?.title).toBe("new");
+    store.clearSession(serverId);
+  });
+
+  it("commits nothing when a live update repeats the agent it already holds", () => {
+    const serverId = "agent-replica-repeated-update";
+    const store = useSessionStore.getState();
+    store.initializeSession(serverId, null);
+    const replica = new AgentDirectoryReplica(
+      serverId,
+      () => undefined,
+      () => undefined,
+    );
+    const update = entry(payload("same"));
+    replica.applyDelta({ kind: "upsert", ...update });
+    const before = useSessionStore.getState().sessions[serverId];
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    replica.applyDelta({ kind: "upsert", ...update });
+
+    unsubscribe();
+    expect(notifications).toBe(0);
+    expect(useSessionStore.getState().sessions[serverId]).toBe(before);
     store.clearSession(serverId);
   });
 });

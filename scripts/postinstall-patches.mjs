@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join, relative } from "node:path";
 
@@ -34,6 +34,12 @@ const patchedPackages = [
     nodeModulesPath: "node_modules/react-native-draggable-flatlist",
     patchPrefix: "react-native-draggable-flatlist+",
   },
+  // COMPAT(reanimated-stale-tag): added in 2.2.1; remove when upstream safely skips removed Fabric tags.
+  {
+    nodeModulesPath: "node_modules/react-native-reanimated",
+    patchPrefix: "react-native-reanimated+",
+    expectedVersion: "4.5.1",
+  },
   {
     nodeModulesPath: "node_modules/react-native-gesture-handler",
     patchPrefix: "react-native-gesture-handler+",
@@ -66,7 +72,18 @@ const installedPackages = patchedPackages.filter(({ nodeModulesPath }) =>
   existsSync(nodeModulesPath),
 );
 
-if (!existsSync("patches") || installedPackages.length === 0) {
+if (installedPackages.length === 0) {
+  process.exit(0);
+}
+
+if (!existsSync("patches")) {
+  const required = installedPackages.find(({ expectedVersion }) => expectedVersion);
+  if (required) {
+    console.error(
+      `postinstall-patches: missing required ${required.patchPrefix}${required.expectedVersion}.patch`,
+    );
+    process.exit(1);
+  }
   process.exit(0);
 }
 
@@ -76,8 +93,38 @@ const isWindows = process.platform === "win32";
 const cmd = isWindows ? "patch-package.cmd" : "patch-package";
 
 let failed = false;
-for (const [index, { nodeModulesPath, patchPrefix, cwd = "." }] of installedPackages.entries()) {
+for (const [
+  index,
+  { nodeModulesPath, patchPrefix, cwd = ".", expectedVersion },
+] of installedPackages.entries()) {
   const files = patchFiles.filter((file) => file.startsWith(patchPrefix));
+  if (expectedVersion) {
+    let installedVersion;
+    try {
+      installedVersion = JSON.parse(
+        readFileSync(join(nodeModulesPath, "package.json"), "utf8"),
+      ).version;
+    } catch {
+      console.error(
+        `postinstall-patches: cannot read version of ${nodeModulesPath}; expected ${expectedVersion}`,
+      );
+      failed = true;
+      continue;
+    }
+    if (installedVersion !== expectedVersion) {
+      console.error(
+        `postinstall-patches: ${nodeModulesPath} version ${installedVersion} does not match required ${expectedVersion}`,
+      );
+      failed = true;
+      continue;
+    }
+    const expectedPatch = `${patchPrefix}${expectedVersion}.patch`;
+    if (files.length !== 1 || files[0] !== expectedPatch) {
+      console.error(`postinstall-patches: missing or ambiguous required ${expectedPatch}`);
+      failed = true;
+      continue;
+    }
+  }
   if (files.length === 0) {
     continue;
   }

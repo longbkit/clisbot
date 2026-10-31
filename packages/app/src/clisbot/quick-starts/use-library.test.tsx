@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { useQuickStartLibrary } from "./use-library";
 import type { QuickStartInput } from "@clisbot/protocol/quick-starts/types";
 vi.mock("expo-crypto", () => ({ randomUUID: () => "12345678-1234-1234-1234-123456789012" }));
-vi.mock("@/constants/platform", () => ({ isWeb: false }));
+vi.mock("@/constants/platform", () => ({ isWeb: false, isNative: false }));
 vi.mock("@/utils/confirm-dialog", () => ({ confirmDialog: vi.fn(async () => true) }));
 afterEach(cleanup);
 const input: QuickStartInput = {

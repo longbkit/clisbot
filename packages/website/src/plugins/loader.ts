@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { getWebsiteCacheContext } from "~/cloudflare-cache";
+import { selectAuthorRegistry } from "./registry";
 import {
   loadInstallCounts,
   loadRegistryIndex,
@@ -12,7 +13,7 @@ function registryBase(): string {
   return (env as RegistryEnvironment).PLUGINS_REGISTRY_URL ?? "https://getpaseo.github.io/plugins";
 }
 /** Listed plugins in index order, featured plugin IDs, install counts per window, and the server's clock. */
-export const getRegistry = createServerFn({ method: "GET" }).handler(async () => {
+async function getAllRegistry() {
   const context = getWebsiteCacheContext();
   const [index, installs] = await Promise.all([
     loadRegistryIndex(registryBase(), context),
@@ -28,7 +29,25 @@ export const getRegistry = createServerFn({ method: "GET" }).handler(async () =>
     installs,
     now: new Date().toISOString(),
   };
-});
+}
+export const getRegistry = createServerFn({ method: "GET" }).handler(getAllRegistry);
+export const getAuthorRegistry = createServerFn({ method: "GET" })
+  .validator((owner: string) => owner)
+  .handler(async ({ data: owner }) => {
+    const registry = await getAllRegistry();
+    return selectAuthorRegistry(registry.plugins, registry.installs, owner);
+  });
+export const getPluginInstallCount = createServerFn({ method: "GET" })
+  .validator((id: string) => id)
+  .handler(async ({ data: id }) => {
+    const context = getWebsiteCacheContext();
+    const counts = await loadInstallCounts(
+      registryBase(),
+      context,
+      (env as RegistryEnvironment).PLUGIN_INSTALLS ?? null,
+    );
+    return counts[id]?.all ?? 0;
+  });
 export const getRegistryPlugin = createServerFn({ method: "GET" })
   .validator((id: string) => id)
   .handler(({ data }) => loadRegistryPlugin(registryBase(), data, getWebsiteCacheContext()));

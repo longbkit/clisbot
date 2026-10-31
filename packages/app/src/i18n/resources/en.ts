@@ -3,6 +3,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -245,10 +246,13 @@ export const en = {
   agentStream: {
     agent: "Agent",
     empty: "Start chatting with this agent...",
+    loadingHistory: "Loading messages…",
     scrollToBottom: "Scroll to bottom",
     historyLoadFailed: "Couldn't load agent history",
     messageCapped: "This message was capped ({{bytes}} bytes).",
     permission: {
+      reason: "Why approval is needed",
+      blockedPath: "Blocked path",
       rejectedPlan: "Rejected plan",
       approvedPlan: "Approved plan",
       canceledPlan: "Canceled plan",
@@ -3200,6 +3204,7 @@ export const en = {
   bots: bots.en,
   heartbeats: heartbeats.en,
   navigation: navigation.en,
+  productAnalytics: productAnalytics.en,
   home: home.en,
 } as const;
 

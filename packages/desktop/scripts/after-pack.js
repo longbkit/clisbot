@@ -4,6 +4,7 @@ const path = require("path");
 const { smokePackagedDesktopApp } = require("../e2e/packaged-app-smoke.js");
 
 const { installLinuxLauncher } = require("./linux-sandbox");
+const { verifyDesktopRenderer } = require("./renderer-build");
 const { verifyPersonalBackends } = require("./verify-personal-backends");
 
 const EXECUTABLE_NAME = "Clisbot";
@@ -116,11 +117,12 @@ exports.default = async function afterPack(context) {
   const platform = context.electronPlatformName;
   const arch = ARCH_MAP[context.arch] || process.arch;
 
-  verifyPersonalBackends(
+  const resourcesDir =
     platform === "darwin"
       ? path.join(context.appOutDir, `${EXECUTABLE_NAME}.app`, "Contents", "Resources")
-      : path.join(context.appOutDir, "resources"),
-  );
+      : path.join(context.appOutDir, "resources");
+  verifyDesktopRenderer(path.join(resourcesDir, "app-dist"));
+  verifyPersonalBackends(resourcesDir);
 
   pruneNativeModules(context.appOutDir, platform, arch);
 

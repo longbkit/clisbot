@@ -5,6 +5,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -249,10 +250,13 @@ export const ptBR: TranslationResources = {
   agentStream: {
     agent: "Agente",
     empty: "Comece a conversar com este agente...",
+    loadingHistory: "Carregando mensagens…",
     scrollToBottom: "Rolar para o fim",
     historyLoadFailed: "Não foi possível carregar o histórico do agente",
     messageCapped: "Esta mensagem foi truncada ({{bytes}} bytes).",
     permission: {
+      reason: "Por que a aprovação é necessária",
+      blockedPath: "Caminho bloqueado",
       rejectedPlan: "Plano rejeitado",
       approvedPlan: "Plano aprovado",
       canceledPlan: "Plano cancelado",
@@ -3104,5 +3108,6 @@ export const ptBR: TranslationResources = {
   bots: bots["pt-BR"],
   heartbeats: heartbeats["pt-BR"],
   navigation: navigation["pt-BR"],
+  productAnalytics: productAnalytics["pt-BR"],
   home: home["pt-BR"],
 };

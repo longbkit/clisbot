@@ -33,6 +33,7 @@ import { InfoRow } from "./resource-rows";
 import { TeamSettings } from "./team/team-settings";
 import { BackLink } from "./back-link";
 import { FirstHostSetup } from "./first-host-setup";
+import { useBrowserSignIn } from "./browser-sign-in";
 import {
   HubConnectionSettings,
   HubOverviewSettings,
@@ -595,7 +596,7 @@ function BrowserHubAuthentication({
   run: HubRun;
 }) {
   const { t } = useTranslation();
-  const signIn = useCallback(() => void run(() => hub.signIn()), [hub, run]);
+  const signIn = useBrowserSignIn(hub, run);
   return (
     <SettingsSection title={t("hub.settings.account.hubAccount")}>
       <Alert

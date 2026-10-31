@@ -37,7 +37,7 @@ function mount() {
       view.rerender();
     });
   const ownerOf = (id: string) =>
-    resolveOwnership({ createdBy: authoredBy(id), accounts: view.result.current });
+    resolveOwnership({ hostKind: "hub", createdBy: authoredBy(id), accounts: view.result.current });
   return { ...view, set, ownerOf };
 }
 

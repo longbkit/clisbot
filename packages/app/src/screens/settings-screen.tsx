@@ -58,6 +58,8 @@ import { TerminalSection } from "@/screens/settings/terminal/terminal-section";
 import { ChatSection } from "@/screens/settings/chat/chat-section";
 import { SidebarNavSection } from "@/screens/settings/sidebar/sidebar-nav-section";
 import { SendingSection } from "@/screens/settings/general/sending-section";
+import { StorageSection } from "@/clisbot/offline-storage/storage-section";
+import { OFFLINE_CACHE_ENABLED } from "@/runtime/replica-cache/offline-flag";
 import { HubPicker } from "@/device-access/hub-picker";
 import { SettingsPageTitleContext } from "@/components/settings/headings/settings-section";
 import { useHubSwitchLocked } from "@/device-access/hub-edit-lock";
@@ -817,8 +819,8 @@ interface HostPickerProps {
  * Scopes the host sections to a host. Reuses the canonical sidebar host
  * switcher pattern (left-sidebar.tsx): a quiet row-styled trigger opening a
  * <Combobox>. The local host is listed first, each row shows the connection it
- * is using right now; an "Add host" row is always reachable from the list —
- * even with a single host.
+ * is using right now; an "Add host" row is pinned below the list, so it stays
+ * in reach however many hosts there are.
  */
 function HostPicker({
   activeServerId,
@@ -1487,6 +1489,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
               <>
                 <GeneralSection settings={settings} handleLanguageChange={handleLanguageChange} />
                 <SendingSection />
+                {OFFLINE_CACHE_ENABLED ? <StorageSection /> : null}
                 <ProductAnalyticsSettings />
                 {isDesktopApp ? <OpenLocationSection /> : null}
               </>

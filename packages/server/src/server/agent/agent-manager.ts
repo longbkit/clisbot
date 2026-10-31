@@ -3890,7 +3890,14 @@ export class AgentManager {
       const record = await this.registry.get(agent.id);
       if (record) Object.assign(agent, copySessionAuthorship(record));
     } else
-      Object.assign(agent, copySessionAuthorship({ ...value.summary, createdBy: agent.createdBy }));
+      Object.assign(
+        agent,
+        copySessionAuthorship({
+          ...value.summary,
+          createdBy: agent.createdBy,
+          ownerActor: agent.ownerActor,
+        }),
+      );
     return true;
   }
 
@@ -4508,6 +4515,7 @@ export class AgentManager {
       if (!storedAuthorship && this.sessionStorageEnabled && !config.internal) {
         const identity = currentSessionOperationIdentity();
         managed.createdBy = identity?.actor;
+        managed.ownerActor = identity?.ownerActor;
         managed.participantActors = identity?.actor ? [identity.actor] : undefined;
         managed.channels = identity?.channel ? [identity.channel] : undefined;
       }
@@ -6193,7 +6201,11 @@ export class AgentManager {
     const identity = options?.sessionIdentity ?? context ?? {};
     return {
       ...options,
-      sessionIdentity: structuredClone({ actor: identity.actor, channel: identity.channel }),
+      sessionIdentity: structuredClone({
+        actor: identity.actor,
+        ownerActor: identity.ownerActor,
+        channel: identity.channel,
+      }),
       sessionReceivedAt: options?.sessionReceivedAt ?? context?.receivedAt,
     } as T;
   }

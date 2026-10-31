@@ -5,6 +5,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -250,10 +251,13 @@ export const ja: TranslationResources = {
   agentStream: {
     agent: "エージェント",
     empty: "このエージェントとチャットを始めましょう...",
+    loadingHistory: "メッセージを読み込み中…",
     scrollToBottom: "下にスクロール",
     historyLoadFailed: "エージェントの履歴を読み込めませんでした",
     messageCapped: "このメッセージは上限で切り詰められました（{{bytes}}バイト）。",
     permission: {
+      reason: "承認が必要な理由",
+      blockedPath: "ブロックされたパス",
       rejectedPlan: "却下されたプラン",
       approvedPlan: "承認されたプラン",
       canceledPlan: "キャンセルされたプラン",
@@ -3090,5 +3094,6 @@ export const ja: TranslationResources = {
   bots: bots.ja,
   heartbeats: heartbeats.ja,
   navigation: navigation.ja,
+  productAnalytics: productAnalytics.ja,
   home: home.ja,
 } as const;

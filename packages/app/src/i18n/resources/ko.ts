@@ -5,6 +5,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -248,10 +249,13 @@ export const ko: TranslationResources = {
   agentStream: {
     agent: "에이전트",
     empty: "이 에이전트와 대화를 시작하세요...",
+    loadingHistory: "메시지를 불러오는 중…",
     scrollToBottom: "맨 아래로 스크롤",
     historyLoadFailed: "에이전트 기록을 로드할 수 없습니다.",
     messageCapped: "이 메시지는 길이 제한으로 잘렸습니다({{bytes}}바이트).",
     permission: {
+      reason: "승인이 필요한 이유",
+      blockedPath: "차단된 경로",
       rejectedPlan: "거부된 계획",
       approvedPlan: "승인된 계획",
       canceledPlan: "취소된 계획",
@@ -3076,5 +3080,6 @@ export const ko: TranslationResources = {
   bots: bots.ko,
   heartbeats: heartbeats.ko,
   navigation: navigation.ko,
+  productAnalytics: productAnalytics.ko,
   home: home.ko,
 };

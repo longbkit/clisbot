@@ -16,6 +16,7 @@ import {
 } from "lucide-react-native";
 import { withUnistyles } from "react-native-unistyles";
 import { getIsElectronRuntime, useIsCompactFormFactor } from "@/constants/layout";
+import { usesPhoneTabs } from "@/clisbot/home/mobile-navigation";
 import { useKeyboardShortcutOverrides } from "@/hooks/use-keyboard-shortcut-overrides";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { useImportSession } from "@/hooks/use-import-session";
@@ -62,6 +63,8 @@ const ThemedCircleDashed = withUnistyles(CircleDashed, (theme) => ({
 const ThemedPanelLeft = withUnistyles(PanelLeft, (theme) => ({
   color: theme.colors.foregroundMuted,
 }));
+
+function ignoreAgentListToggle() {}
 
 function PlusIcon({ size }: CommandCenterIconProps) {
   return <ThemedPlus size={size} strokeWidth={2.4} />;
@@ -126,7 +129,9 @@ export function CommandCenterRootActions() {
   const isCompact = useIsCompactFormFactor();
   const toggleMobileAgentList = usePanelStore((state) => state.toggleMobileAgentList);
   const toggleDesktopAgentList = usePanelStore((state) => state.toggleDesktopAgentList);
-  const toggleAgentList = isCompact ? toggleMobileAgentList : toggleDesktopAgentList;
+  // Phone tabs have no list panel to slide in: Chats and Work are tabs.
+  let toggleAgentList = isCompact ? toggleMobileAgentList : toggleDesktopAgentList;
+  if (usesPhoneTabs(isCompact)) toggleAgentList = ignoreAgentListToggle;
   const shortcutPlatform = useMemo(
     () => ({ isMac: getShortcutOs() === "mac", isDesktop: getIsElectronRuntime() }),
     [],

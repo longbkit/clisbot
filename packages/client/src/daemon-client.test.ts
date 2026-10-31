@@ -210,6 +210,33 @@ test("closing an in-flight admission settles connect without waiting for a timeo
   await expect(outcome).resolves.toBe("Daemon client closed");
 });
 
+test("reports each inbound message's type, size and handling time to onInboundMessage", async () => {
+  const mock = createMockTransport();
+  const inbound: { type: string; bytes: number }[] = [];
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "inbound_observer_test",
+    transportFactory: () => mock.transport,
+    reconnect: { enabled: false },
+    onInboundMessage: (type, bytes, handlerMs) => {
+      expect(handlerMs).toBeGreaterThanOrEqual(0);
+      inbound.push({ type, bytes });
+    },
+  });
+  clients.push(client);
+
+  const connectPromise = client.connect();
+  mock.triggerOpen();
+  await connectPromise;
+  const pong = JSON.stringify({ type: "pong" });
+  mock.triggerMessage(pong);
+
+  expect(inbound).toEqual([
+    { type: "status", bytes: expect.any(Number) },
+    { type: "pong", bytes: pong.length },
+  ]);
+});
+
 test("traces WebSocket frames, message types, and JSON parse duration", async () => {
   const mock = createMockTransport();
   const recorder = createTraceRecorder();
@@ -570,8 +597,23 @@ test.each([
     revoked: false,
   },
   {
+    name: "a Hub 401 (our token was refused)",
+    failure: Object.assign(new Error("Unauthorized"), { status: 401 }),
+    revoked: false,
+  },
+  {
+    name: "a Hub 400 (our request was wrong)",
+    failure: Object.assign(new Error("Bad request"), { status: 400 }),
+    revoked: false,
+  },
+  {
     name: "a Hub 403",
     failure: Object.assign(new Error("Forbidden"), { status: 403 }),
+    revoked: true,
+  },
+  {
+    name: "a Hub 404",
+    failure: Object.assign(new Error("Not found"), { status: 404 }),
     revoked: true,
   },
 ])(

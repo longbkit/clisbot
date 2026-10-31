@@ -4,6 +4,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 import { pluginSettings } from "./plugin-settings";
@@ -249,10 +250,13 @@ export const vi: TranslationResources = {
   agentStream: {
     agent: "Agent",
     empty: "Bắt đầu trò chuyện với agent này...",
+    loadingHistory: "Đang tải tin nhắn…",
     scrollToBottom: "Cuộn xuống cuối",
     historyLoadFailed: "Không thể tải lịch sử agent",
     messageCapped: "Tin nhắn này đã bị cắt bớt ({{bytes}} byte).",
     permission: {
+      reason: "Lý do cần phê duyệt",
+      blockedPath: "Đường dẫn bị chặn",
       rejectedPlan: "Đã từ chối kế hoạch",
       approvedPlan: "Đã phê duyệt kế hoạch",
       canceledPlan: "Đã hủy kế hoạch",
@@ -3091,6 +3095,7 @@ export const vi: TranslationResources = {
   bots: bots.vi,
   heartbeats: heartbeats.vi,
   navigation: navigation.vi,
+  productAnalytics: productAnalytics.vi,
   home: home.vi,
 
   providerUsage: {

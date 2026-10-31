@@ -39,6 +39,7 @@ vi.mock("@/device-access/credentials", async (importOriginal) => ({
 import { registerHostAccessTicketResolver } from "./host-session-access";
 
 import { subscriptionFixture } from "./subscription-fixture";
+import { createManualFrameClock } from "./directory-sync/frame-clock-fixture";
 import { readDesktopManagedLocalCredential } from "@/desktop/daemon/local-credential";
 import type { HostConfirmationRequest } from "./host-confirmation";
 
@@ -690,6 +691,10 @@ function createMemoryReplicaRowStore(): ReplicaRowStore {
         rows.set(keyOf(renamed), renamed);
       }
     },
+    deleteOpenedBefore: async (cutoff) => {
+      for (const [key, row] of rows)
+        if (row.openedAt !== undefined && row.openedAt < cutoff) rows.delete(key);
+    },
     clear: async () => rows.clear(),
   };
 }
@@ -1299,6 +1304,41 @@ describe("HostRuntimeController", () => {
     expect(activeClient.latencyMeasurements()).toEqual([]);
   });
 
+  it("publishes a heartbeat RTT only when it moves past the jitter band", async () => {
+    useHostRuntimeClock();
+    const clients: FakeDaemonClient[] = [];
+    const controller = new HostRuntimeController({
+      host: makeHost({ preferredConnectionId: "direct:lan:6868" }),
+      // The relay stays slower than the live route, so no cycle switches routes.
+      deps: makeDeps({ "direct:lan:6868": 12, "relay:relay.clisbot.com:443": 2_000 }, clients),
+    });
+    await controller.start({ autoProbe: false });
+    const activeClient = controller.getSnapshot().client as unknown as FakeDaemonClient;
+    const latency = () =>
+      controller.getSnapshot().probeByConnectionId.get("direct:lan:6868")?.latencyMs;
+    async function heartbeat(rttMs: number) {
+      activeClient.heartbeatReportsRtt(rttMs);
+      await vi.advanceTimersByTimeAsync(10_000);
+      await controller.runProbeCycleNow();
+    }
+    await heartbeat(400);
+    expect(latency()).toBe(400);
+    let notifications = 0;
+    controller.subscribe(() => {
+      notifications += 1;
+    });
+
+    await heartbeat(412);
+    await heartbeat(381);
+    expect(notifications).toBe(0);
+    expect(latency()).toBe(400);
+
+    await heartbeat(900);
+    expect(notifications).toBe(1);
+    expect(latency()).toBe(900);
+    await controller.stop();
+  });
+
   it.each([12, null])(
     "falls back to relay when the direct client disconnects with heartbeat RTT %s",
     async (heartbeatRtt) => {
@@ -1516,9 +1556,10 @@ describe("HostRuntimeController", () => {
       .getSnapshot()
       .probeByConnectionId.get("relay:relay.clisbot.com:443");
 
-    latencies["direct:lan:6868"] = 12;
+    // Past the jitter band, so the heartbeat reading is published.
+    latencies["direct:lan:6868"] = 42;
     latencies["relay:relay.clisbot.com:443"] = 25;
-    activeClient.heartbeatReportsRtt(12);
+    activeClient.heartbeatReportsRtt(42);
     await vi.advanceTimersByTimeAsync(60_000);
 
     await controller.runProbeCycleNow();
@@ -1527,7 +1568,7 @@ describe("HostRuntimeController", () => {
     expect(clients.length).toBe(initialClientCount);
     expect(snapshot.probeByConnectionId.get("direct:lan:6868")).toEqual({
       status: "available",
-      latencyMs: 12,
+      latencyMs: 42,
     });
     expect(snapshot.probeByConnectionId.get("relay:relay.clisbot.com:443")).toEqual(
       initialRelayProbe,
@@ -3599,6 +3640,62 @@ describe("HostRuntimeStore", () => {
       useSessionStore.getState().sessions[host.serverId]?.agents.get("agent-pre-session")?.title,
     ).toBe("before-session");
 
+    store.syncHosts([]);
+    useSessionStore.getState().clearSession(host.serverId);
+  });
+
+  it("applies live directory updates held for the next frame when the app goes to the background", async () => {
+    const host = makeHost({
+      serverId: "srv_background_flush",
+      connections: [{ id: "direct:lan:6868", type: "directTcp", endpoint: "lan:6868" }],
+    });
+    const fakeClient = new FakeDaemonClient();
+    fakeClient.setConnectionState({ status: "connected" });
+    const entry = makeFetchAgentsEntry({
+      id: "agent-held",
+      cwd: "/repo",
+      updatedAt: "2026-07-12T10:00:00.000Z",
+      title: "snapshot",
+    });
+    fakeClient.fetchAgentsResponses.push(makeFetchAgentsPayload({ entries: [entry] }));
+    // A frame that never comes: only the background flush can apply what is held.
+    const frames = createManualFrameClock();
+    const store = new HostRuntimeStore({
+      deps: {
+        createClient: () => fakeClient as unknown as DaemonClient,
+        connectToDaemon: async () => ({
+          client: fakeClient as unknown as DaemonClient,
+          serverId: host.serverId,
+          hostname: null,
+        }),
+        getClientId: async () => "cid_background_flush",
+      },
+      directoryFrameClock: frames,
+    });
+    store.syncHosts([host]);
+    await waitForHostOnline(store, host.serverId);
+    useSessionStore.getState().updateSessionServerInfo(host.serverId, {
+      serverId: host.serverId,
+      hostname: null,
+      version: "test",
+    });
+    await store.refreshAgentDirectory({
+      serverId: host.serverId,
+      subscribe: {},
+      page: { limit: 200 },
+    });
+    const titleOf = () =>
+      useSessionStore.getState().sessions[host.serverId]?.agents.get("agent-held")?.title;
+    fakeClient.agentUpdate({
+      kind: "upsert",
+      agent: { ...entry.agent, title: "held", updatedAt: "2026-07-12T11:00:00.000Z" },
+      project: entry.project,
+    });
+    expect(titleOf()).toBe("snapshot");
+
+    store.setAppVisible(false);
+
+    expect(titleOf()).toBe("held");
     store.syncHosts([]);
     useSessionStore.getState().clearSession(host.serverId);
   });

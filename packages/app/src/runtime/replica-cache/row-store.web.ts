@@ -201,13 +201,23 @@ export function createIndexedDbReplicaRowStore(
     });
   }
 
+  async function deleteOpenedBefore(cutoff: number): Promise<void> {
+    await runTransaction(getDatabase(), ROWS_STORE, async (transaction) => {
+      const rows = transaction.objectStore(ROWS_STORE);
+      for (const row of await requestResult<ReplicaRow[]>(rows.getAll())) {
+        if (row.openedAt !== undefined && row.openedAt < cutoff)
+          await requestResult(rows.delete([row.serverId, row.kind, row.id]));
+      }
+    });
+  }
+
   async function clear(): Promise<void> {
     await runTransaction(getDatabase(), ROWS_STORE, async (transaction) => {
       await requestResult(transaction.objectStore(ROWS_STORE).clear());
     });
   }
 
-  return { open, read, readAll, apply, deleteHost, renameHost, clear };
+  return { open, read, readAll, apply, deleteHost, renameHost, deleteOpenedBefore, clear };
 }
 
 export function createReplicaRowStore(): ReplicaRowStore {

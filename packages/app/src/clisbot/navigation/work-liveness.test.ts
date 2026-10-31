@@ -111,6 +111,7 @@ describe("Workspace counts over registered Hosts", () => {
     scope: "all",
     chip,
     accounts: [reader],
+    hostKinds: new Map([["srv", "direct"]]),
     showBots: true,
     cachedServerIds: new Set(["offline"]),
   });
@@ -130,5 +131,34 @@ describe("Workspace counts over registered Hosts", () => {
     expect(matchesWorkChip(items[0]!, "needs")).toBe(false);
     const liveItems = workItemsOf({ ...live, statusBucket: "needs_input" }, null, true, false);
     expect(matchesWorkChip(liveItems[0]!, "needs")).toBe(true);
+  });
+});
+
+describe("Workspace session index across agent updates", () => {
+  const sourcesWith = (next: Map<string, Agent>) =>
+    new Map([["srv", { agents: next, messageSubmissions: source.messageSubmissions }]]);
+
+  it("keeps the previous index when an update changes no session's facts", () => {
+    const previous = indexWorkSessions(sourcesWith(agents));
+    const next = new Map(agents);
+    next.set("idle", { ...agents.get("idle")!, lastActivityAt: new Date("2026-10-28T00:00:00Z") });
+
+    expect(indexWorkSessions(sourcesWith(next), previous)).toBe(previous);
+  });
+
+  it("replaces only the workspace whose session changed", () => {
+    const other = agent("elsewhere", { workspaceId: "ws-2" });
+    const withOther = new Map(agents).set(other.id, other);
+    const previous = indexWorkSessions(sourcesWith(withOther));
+    const next = new Map(withOther);
+    next.set("idle", { ...agents.get("idle")!, status: "error" });
+
+    const index = indexWorkSessions(sourcesWith(next), previous);
+
+    expect(index).not.toBe(previous);
+    expect(index.get("srv:ws-2")).toBe(previous.get("srv:ws-2"));
+    expect(index.get("srv:ws")?.find((session) => session.id === "idle")?.statusBucket).toBe(
+      "failed",
+    );
   });
 });

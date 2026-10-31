@@ -11,7 +11,7 @@ const ALL: readonly string[] = [];
  * it survives restarts and drops a Host only once the Host list has settled.
  */
 export function useHostFilter() {
-  const serverIds = useSidebarViewStore((state) => state.hostFilters) ?? ALL;
+  const serverIds = useHostFilterIds();
   const clear = useSidebarViewStore((state) => state.clearHostFilters);
   const toggle = useSidebarViewStore((state) => state.toggleHostFilter);
   const hosts = useAvailableHosts();
@@ -30,4 +30,9 @@ export function useHostFilter() {
     online: summary.online,
     total: summary.total,
   };
+}
+
+/** Only the filtered Host ids, for lists that apply the filter without showing Host status. */
+export function useHostFilterIds(): readonly string[] {
+  return useSidebarViewStore((state) => state.hostFilters) ?? ALL;
 }

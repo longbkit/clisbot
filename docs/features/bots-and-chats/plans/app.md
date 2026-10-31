@@ -351,7 +351,9 @@ two lists that are small and cheap to refetch. Use the schedules pattern instead
   `runtime/host-runtime.ts:2751`); the screen shows the same unavailable state the cowork pane
   shows (`AgentSessionUnavailableState`, `panels/agent-panel.tsx:1640` — local there; copy its 30
   lines into `clisbot/bots/chat/host-offline-state.tsx`).
-- Persisting transcripts into the replica cache is deferred (Open question O4).
+- The accepted record and last 50 lines are saved as a `transcript` replica row and painted before
+  the fetch answers; see [offline cache](../../offline/offline-cache.md) (closes O4). Lists still use
+  plain fetch queries.
 
 ## 7. Compact form factor, native, hover
 
@@ -403,7 +405,7 @@ policy tests there stay green untouched.
 | O1  | Should the host index restore the last chat like it restores the last workspace?                                                                                | Not in phase 1. Restoring a workspace is a developer habit; a chat deep link already works. Decide after use                                                                                                                                                 |
 | O2  | Naming pass (README Open) may rename Bot/Chat and their routes                                                                                                  | Every path stays in `routes.ts`. User-visible strings moved from `clisbot/bots/copy.ts` (removed 2026-10-07) to i18n: `i18n/resources/bots/{chat,workspace}.ts` (`bots.*` keys, all app locales), so a rename edits the English values there                 |
 | O3  | Bot Projects stay visible in the New workspace picker and Settings › Projects                                                                                   | Keep for phase 1 (sharing lives there). Revisit if users open bot directories by accident                                                                                                                                                                    |
-| O4  | Transcript persistence in the replica cache for instant cold-start reads                                                                                        | Defer; measure first fetch on a long transcript                                                                                                                                                                                                              |
+| O4  | Transcript persistence in the replica cache for instant cold-start reads                                                                                        | Resolved 2026-10-30: the last 50 lines are a `transcript` replica row ([offline cache](../../offline/offline-cache.md))                                                                                                                                      |
 | O5  | i18n: Clisbot sidebar labels were English literals (`AutomationSidebarItem`)                                                                                    | Resolved 2026-10-07: Bots & Chats, Hub and Connectors screens use `t()`; copy lives in `i18n/resources/{bots,hub,connectors}/`                                                                                                                               |
 
 ## 10. Ordered tasks (each under ~2 hours)

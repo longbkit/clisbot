@@ -30,14 +30,58 @@ const MERGE_STEP_ROWS = 64;
 /** Above this a bounded window is no longer cheaper than projecting the whole history. */
 const MAX_WINDOW_ROWS = 8192;
 const GLOBAL_BYTES = 32 * 1024 * 1024;
+/** A page that cannot be bounded exactly reads at most this much, leaving room for other reads. */
+const FALLBACK_BYTES = 8 * 1024 * 1024;
 let activeBytes = 0;
+
+/**
+ * Narrows a fallback range so its far edge does not cut a merged message in two; the next
+ * page re-reads that message whole. Tools and plugins keep their in-range state. A merge
+ * filling the whole range stays, or paging could never move past it.
+ */
+function trimFallbackEdge(
+  entries: readonly TimelineProjectionEntry[],
+  range: TimelineSeqRange,
+  state: SessionEventState,
+  direction: "tail" | "before" | "after",
+): TimelineSeqRange {
+  const forward = direction === "after";
+  if (forward ? range.endSeq >= state.maxSeq : range.startSeq <= state.minSeq) return range;
+  const edge = entries.find(
+    (entry) =>
+      entry.item.type !== "tool_call" &&
+      entry.item.type !== "plugin" &&
+      (forward ? entry.seqEnd === range.endSeq : entry.seqStart === range.startSeq),
+  );
+  if (!edge || (edge.seqStart <= range.startSeq && edge.seqEnd >= range.endSeq)) return range;
+  return forward
+    ? { startSeq: range.startSeq, endSeq: edge.seqStart - 1 }
+    : { startSeq: edge.seqEnd + 1, endSeq: range.endSeq };
+}
+
+function withinRange(seq: number, range: TimelineSeqRange): boolean {
+  return range.startSeq <= seq && seq <= range.endSeq;
+}
+
+/** Rows for one legacy page; `fallback` is the only range read when bounding failed. */
+interface PageRows {
+  rows: AgentTimelineRow[];
+  fallback?: TimelineSeqRange;
+}
+
+/** Thrown when a read would push concurrent projections past GLOBAL_BYTES. */
+class ProjectionBudgetExceededError extends Error {
+  constructor() {
+    super("Projected history exceeds its read memory budget");
+    this.name = "ProjectionBudgetExceededError";
+  }
+}
 
 /** Projected history is derived per read and never retained per open agent. */
 class ProjectionBudget {
   private bytes = 0;
   reserve(bytes: number): void {
-    if (activeBytes + bytes > GLOBAL_BYTES)
-      throw new Error("Projected history exceeds its read memory budget");
+    if (activeBytes + bytes > GLOBAL_BYTES) throw new ProjectionBudgetExceededError();
     this.bytes += bytes;
     activeBytes += bytes;
   }
@@ -252,6 +296,40 @@ export class ProjectedTimeline {
     return this.readRange(state.minSeq, state.maxSeq, budget);
   }
 
+  /**
+   * The fallback when a page cannot be bounded exactly (plugin identities, or a merge or tool
+   * index that outgrows the window): read outwards from the cursor until MAX_WINDOW_ROWS or
+   * FALLBACK_BYTES, never the whole history. A merge or lifecycle crossing the far edge is
+   * projected from its in-range rows; `trimFallbackEdge` keeps a split message off the page.
+   */
+  private async fallbackRows(
+    state: SessionEventState,
+    direction: "tail" | "before" | "after",
+    cursorSeq: number | undefined,
+    budget: ProjectionBudget,
+  ): Promise<{ rows: AgentTimelineRow[]; range: TimelineSeqRange }> {
+    const { start, end } = this.windowBounds(state, MAX_WINDOW_ROWS, direction, cursorSeq);
+    if (end < start) return { rows: [], range: { startSeq: start, endSeq: end } };
+    const forward = direction === "after";
+    const rows: AgentTimelineRow[] = [];
+    let bytes = 0;
+    let low = forward ? start : end + 1;
+    let high = forward ? start - 1 : end;
+    // Small first steps keep a few oversized rows from reserving the whole budget at once.
+    for (let span = 16; bytes < FALLBACK_BYTES && (forward ? high < end : low > start); ) {
+      const from = forward ? high + 1 : Math.max(start, low - span);
+      const to = forward ? Math.min(end, high + span) : low - 1;
+      const step = await this.readRange(from, to, budget);
+      bytes += projectionRowBytes(step);
+      rows.push(...step);
+      if (forward) high = to;
+      else low = from;
+      span = Math.min(READ_PAGE_ROWS, span * 2);
+    }
+    rows.sort((left, right) => left.seq - right.seq);
+    return { rows, range: { startSeq: low, endSeq: high } };
+  }
+
   /** The seq range a page of `span` rows starts from, before any merge can widen it. */
   private windowBounds(
     state: SessionEventState,
@@ -420,19 +498,32 @@ export class ProjectedTimeline {
     return rows;
   }
 
-  /** Widens until the page cannot be truncated by its own window, then gives up on bounding. */
+  /** Rows too large for the read budget leave a window as unbounded as a plugin row does. */
+  private async tryWindowRows(
+    ...args: Parameters<ProjectedTimeline["windowRows"]>
+  ): Promise<AgentTimelineRow[] | null> {
+    try {
+      return await this.windowRows(...args);
+    } catch (error) {
+      if (error instanceof ProjectionBudgetExceededError) return null;
+      throw error;
+    }
+  }
+
+  /** Widens until the page cannot be truncated by its own window, then reads the whole
+   * history if it fits the budget, else a bounded fallback range. */
   private async pageRows(
     state: SessionEventState,
     direction: "tail" | "before" | "after",
     cursorSeq: number | undefined,
     limit: number,
     budget: ProjectionBudget,
-  ): Promise<AgentTimelineRow[]> {
-    if (state.maxSeq === 0) return [];
-    if (limit >= MAX_WINDOW_ROWS) return this.readRows(state, budget);
+  ): Promise<PageRows> {
+    if (state.maxSeq === 0) return { rows: [] };
+    if (limit >= MAX_WINDOW_ROWS) return { rows: await this.readRows(state, budget) };
     for (let span = Math.max(MERGE_STEP_ROWS, limit * 8); span <= MAX_WINDOW_ROWS; span *= 4) {
       budget.release();
-      let rows = await this.windowRows(state, span, direction, cursorSeq, budget);
+      let rows = await this.tryWindowRows(state, span, direction, cursorSeq, budget);
       if (!rows) break;
       // Legacy pages certify the whole min/max envelope, including a distant tool's gap.
       let filledSpan = 0;
@@ -445,7 +536,7 @@ export class ProjectedTimeline {
         }
         filledSpan = envelopeSpan;
         budget.release();
-        rows = await this.windowRows(state, envelopeSpan, "after", firstSeq - 1, budget);
+        rows = await this.tryWindowRows(state, envelopeSpan, "after", firstSeq - 1, budget);
         if (!rows) break;
       }
       if (!rows) break;
@@ -453,10 +544,36 @@ export class ProjectedTimeline {
         rows.length === 0 || (rows[0]!.seq <= state.minSeq && rows.at(-1)!.seq >= state.maxSeq);
       // One spare entry at each edge proves the returned page is not the truncated one.
       if (covers || projectTimelineRows({ rows, mode: "projected" }).length > limit + 1)
-        return rows;
+        return { rows };
     }
     budget.release();
-    return this.readRows(state, budget);
+    return this.wholeOrFallbackRows(state, direction, cursorSeq, budget);
+  }
+
+  /** The whole history while it fits the read budget, as before; otherwise only a bounded
+   * fallback range, so a page never fails because the agent's history grew too large. */
+  private async wholeOrFallbackRows(
+    state: SessionEventState,
+    direction: "tail" | "before" | "after",
+    cursorSeq: number | undefined,
+    budget: ProjectionBudget,
+  ): Promise<PageRows> {
+    if (state.maxSeq - state.minSeq < MAX_WINDOW_ROWS) {
+      try {
+        return { rows: await this.readRows(state, budget) };
+      } catch (error) {
+        if (!(error instanceof ProjectionBudgetExceededError)) throw error;
+        budget.release();
+      }
+    }
+    const fallback = await this.fallbackRows(state, direction, cursorSeq, budget);
+    const range = trimFallbackEdge(
+      projectTimelineRows({ rows: fallback.rows, mode: "projected" }),
+      fallback.range,
+      state,
+      direction,
+    );
+    return { rows: fallback.rows.filter((row) => withinRange(row.seq, range)), fallback: range };
   }
 
   /** Select only after every source range traversed by the page is present. Distant
@@ -473,32 +590,25 @@ export class ProjectedTimeline {
     const readRanges: { startSeq: number; endSeq: number }[] = [];
     let nextDirection = direction;
     let nextCursor = cursorSeq;
+    const span = Math.max(MERGE_STEP_ROWS, limit * 2);
     while (true) {
-      let rows = await this.windowRows(
-        state,
-        Math.max(MERGE_STEP_ROWS, limit * 2),
-        nextDirection,
-        nextCursor,
-        budget,
-        true,
-        [...entries.values()],
-      );
-      const bounds = this.windowBounds(
-        state,
-        Math.max(MERGE_STEP_ROWS, limit * 2),
-        nextDirection,
-        nextCursor,
-      );
-      readRanges.push({ startSeq: bounds.start, endSeq: bounds.end });
-      // Plugin identities still need the whole-history projection until they have an index.
-      if (!rows) {
-        entries.clear();
+      const rows = await this.tryWindowRows(state, span, nextDirection, nextCursor, budget, true, [
+        ...entries.values(),
+      ]);
+      let projected: TimelineProjectionEntry[];
+      if (rows) {
+        const bounds = this.windowBounds(state, span, nextDirection, nextCursor);
+        readRanges.push({ startSeq: bounds.start, endSeq: bounds.end });
+        projected = projectTimelineRows({ rows, mode: "projected" });
+      } else {
+        // Plugin identities have no occurrence index; a fallback certifies only what it read.
         budget.release();
-        rows = await this.readRows(state, budget);
-        readRanges.push({ startSeq: state.minSeq, endSeq: state.maxSeq });
+        const read = await this.wholeOrFallbackRows(state, nextDirection, nextCursor, budget);
+        if (!read.fallback) entries.clear();
+        readRanges.push(read.fallback ?? { startSeq: state.minSeq, endSeq: state.maxSeq });
+        projected = projectTimelineRows({ rows: read.rows, mode: "projected" });
       }
-      for (const entry of projectTimelineRows({ rows, mode: "projected" }))
-        entries.set(entry.seqStart, entry);
+      for (const entry of projected) entries.set(entry.seqStart, entry);
       const retained = [...entries.values()];
       budget.release();
       budget.reserve(JSON.stringify(retained).length * 2);
@@ -548,7 +658,7 @@ export class ProjectedTimeline {
           budget,
         );
       } else {
-        const rows = await this.pageRows(
+        const { rows, fallback } = await this.pageRows(
           state,
           control.selectedDirection,
           options.cursor?.seq,
@@ -562,6 +672,13 @@ export class ProjectedTimeline {
           cursorSeq: options.cursor?.seq,
           limit: control.limit,
         });
+        // Rows outside a fallback range were never read, so they still exist beyond the page.
+        if (fallback)
+          page = {
+            ...page,
+            hasOlder: page.hasOlder || fallback.startSeq > state.minSeq,
+            hasNewer: page.hasNewer || fallback.endSeq < state.maxSeq,
+          };
       }
       const deferrable = options.allowDeferredPayloads === true;
       return {

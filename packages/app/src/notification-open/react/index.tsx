@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { router, usePathname, useRootNavigationState, type Href } from "expo-router";
+import { router, useRootNavigationState, type Href } from "expo-router";
+import { useRoutePath } from "@/navigation/route-source";
 import { useHostRegistryStatus } from "@/runtime/host-runtime";
 import {
   navigateToWorkspace,
@@ -31,11 +32,10 @@ const notificationRouter = createNotificationOpenRouter({
 
 export function NotificationOpenRouter({ startupBlocked }: { startupBlocked: boolean }) {
   const root = useRootNavigationState();
-  const pathname = usePathname();
   const registryStatus = useHostRegistryStatus();
   const selectionHydrated = useIsLastWorkspaceSelectionHydrated();
   // Index routes redirect during startup. Let their final leaf commit before dispatching a tap.
-  const atStartupIndex = pathname === "/" || /^\/h\/[^/]+\/?$/.test(pathname);
+  const atStartupIndex = useRoutePath(isStartupIndexPath);
   const canNavigate = Boolean(
     root?.key &&
     registryStatus === "ready" &&
@@ -55,4 +55,8 @@ export function NotificationOpenRouter({ startupBlocked }: { startupBlocked: boo
   }, [canNavigate]);
   useEffect(() => notificationRouter.start(), []);
   return null;
+}
+
+function isStartupIndexPath(pathname: string): boolean {
+  return pathname === "/" || /^\/h\/[^/]+\/?$/.test(pathname);
 }

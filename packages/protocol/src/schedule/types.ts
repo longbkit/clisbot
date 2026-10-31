@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SessionActorSchema } from "../session-authorship.js";
 import { AgentProviderSchema } from "../provider-manifest.js";
 
 export const ScheduleStatusSchema = z.enum(["active", "paused", "completed"]);
@@ -72,6 +73,8 @@ export const StoredScheduleSchema = z.object({
   target: ScheduleTargetSchema,
   status: ScheduleStatusSchema,
   createdAt: z.string(),
+  /** Captured by the daemon at creation; edits do not transfer the schedule's owner. */
+  createdBy: SessionActorSchema.optional(),
   updatedAt: z.string(),
   nextRunAt: z.string().nullable(),
   lastRunAt: z.string().nullable(),

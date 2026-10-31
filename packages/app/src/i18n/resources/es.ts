@@ -5,6 +5,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { navigation } from "./navigation";
+import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
 import { hub } from "./hub";
 
@@ -251,10 +252,13 @@ export const es: TranslationResources = {
   agentStream: {
     agent: "Agente",
     empty: "Comience a chatear con este agente...",
+    loadingHistory: "Cargando mensajes…",
     scrollToBottom: "Desplazarse hacia abajo",
     historyLoadFailed: "No se pudo cargar el historial del agente",
     messageCapped: "Este mensaje fue truncado ({{bytes}} bytes).",
     permission: {
+      reason: "Por qué se necesita aprobación",
+      blockedPath: "Ruta bloqueada",
       rejectedPlan: "Plan rechazado",
       approvedPlan: "Plan aprobado",
       canceledPlan: "Plan cancelado",
@@ -3123,5 +3127,6 @@ export const es: TranslationResources = {
   bots: bots.es,
   heartbeats: heartbeats.es,
   navigation: navigation.es,
+  productAnalytics: productAnalytics.es,
   home: home.es,
 };

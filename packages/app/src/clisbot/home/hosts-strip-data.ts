@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useRouter } from "expo-router";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import { useHubAccounts, type HubAccountContextValue } from "@/clisbot/hub/account-provider";
 import { buildHubSettingsRoute } from "@/clisbot/hub/navigation";
 import { selectHubProfile, useHubProfiles } from "@/device-access/hub-profiles";
 import { isHubUnreachable } from "@/device-access/unavailable-hub";
-import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
+import { useSessionStore } from "@/stores/session-store";
 import {
   getHostRuntimeConnectionStatusSince,
   getHostRuntimeStore,
@@ -17,12 +17,15 @@ import {
   SMALL_HUB_HOSTS,
   connectionIssues,
   effectiveHostStatus,
+  hostsWithSessionsKey,
   onlineSummary,
+  parseHostsWithSessionsKey,
   pickStripHosts,
   type StripHost,
   type StripHub,
   type StripHubState,
 } from "./hosts-strip-model";
+import { useStallNow, type WaitingHost } from "./connect-stall-clock";
 
 function hubState(account: HubAccountContextValue): StripHubState {
   if (account.signedIn) return "online";
@@ -37,31 +40,58 @@ function useEffectiveStatuses(
   serverIds: readonly string[],
 ): ReadonlyMap<string, HostRuntimeConnectionStatus> {
   const statuses = useHostRuntimeConnectionStatuses(serverIds);
-  const [now, setNow] = useState(() => Date.now());
-  const waiting = serverIds.filter((id) => {
-    const status = statuses.get(id);
-    return status === "connecting" || status === "idle";
-  });
-  const waitingKey = waiting.join("\n");
-  useEffect(() => {
-    if (!waitingKey) return;
-    const timer = setInterval(() => setNow(Date.now()), 5000);
-    return () => clearInterval(timer);
-  }, [waitingKey]);
-  return useMemo(() => {
-    const store = getHostRuntimeStore();
-    return new Map(
-      serverIds.map((id) => [
-        id,
-        effectiveHostStatus({
-          status: statuses.get(id) ?? "connecting",
-          since: getHostRuntimeConnectionStatusSince(id),
-          lastError: store.getSnapshot(id)?.lastError ?? null,
-          now,
+  const waitingKey = useWaitingKey(serverIds);
+  const waiting = useMemo(() => parseWaitingKey(waitingKey), [waitingKey]);
+  const now = useStallNow([...waiting.values()]);
+  return useMemo(
+    () =>
+      new Map(
+        serverIds.map((id) => {
+          const host = waiting.get(id);
+          const status = effectiveHostStatus({
+            status: statuses.get(id) ?? "connecting",
+            since: host?.since ?? null,
+            lastError: host?.failed ? "failed" : null,
+            now,
+          });
+          return [id, status];
         }),
-      ]),
-    );
-  }, [serverIds, statuses, now]);
+      ),
+    [serverIds, statuses, waiting, now],
+  );
+}
+
+interface WaitingStripHost extends WaitingHost {
+  failed: boolean;
+}
+
+/**
+ * Each connecting or idle Host's status start and whether it has an error, compared by value: a
+ * failed attempt can leave a Host connecting, and the strip calls that "Can't connect".
+ */
+function useWaitingKey(serverIds: readonly string[]): string {
+  const store = getHostRuntimeStore();
+  const read = () =>
+    serverIds
+      .flatMap((id) => {
+        const snapshot = store.getSnapshot(id);
+        const status = snapshot?.connectionStatus ?? "connecting";
+        if (status !== "connecting" && status !== "idle") return [];
+        const since = getHostRuntimeConnectionStatusSince(id) ?? "";
+        return [`${id}\t${since}\t${snapshot?.lastError ? 1 : 0}`];
+      })
+      .join("\n");
+  return useSyncExternalStore((onChange) => store.subscribeAll(onChange), read, read);
+}
+
+function parseWaitingKey(key: string): ReadonlyMap<string, WaitingStripHost> {
+  if (!key) return new Map();
+  return new Map(
+    key.split("\n").map((line) => {
+      const [id = "", since = "", failed] = line.split("\t");
+      return [id, { since: since ? Number(since) : null, failed: failed === "1" }];
+    }),
+  );
 }
 
 /** Every Host and Hub this device knows, reduced to what the Home strip shows. */
@@ -70,8 +100,9 @@ export function useHostsStrip() {
   const localServerId = useLocalDaemonServerId();
   const serverIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
   const statuses = useEffectiveStatuses(serverIds);
-  // Home already loads the directory; the strip only reads it.
-  const { agents } = useAggregatedAgents({ demand: false });
+  // Home already loads the directory; the strip only asks which Hosts have sessions, so an agent
+  // update re-renders it only when that set changes.
+  const withSessionsKey = useSessionStore((state) => hostsWithSessionsKey(state.sessions));
   const accounts = useHubAccounts();
   const { profiles } = useHubProfiles();
   return useMemo(() => {
@@ -80,11 +111,7 @@ export function useHostsStrip() {
         .filter((account) => account.connection?.accountAuthentication === "personal")
         .map((account) => account.origin),
     );
-    const latest = new Map<string, number>();
-    for (const agent of agents) {
-      const at = agent.lastActivityAt.getTime();
-      if (at > (latest.get(agent.serverId) ?? 0)) latest.set(agent.serverId, at);
-    }
+    const withSessions = parseHostsWithSessionsKey(withSessionsKey);
     const hubSize = new Map<string, number>();
     for (const host of hosts) {
       const origin = host.management?.hubOrigin;
@@ -99,7 +126,7 @@ export function useHostsStrip() {
         label: host.label,
         local,
         status: statuses.get(host.serverId) ?? "connecting",
-        lastActivity: latest.get(host.serverId) ?? null,
+        hasSessions: withSessions.has(host.serverId),
         hubOrigin,
         named: local || !hubOrigin || (hubSize.get(hubOrigin) ?? 0) <= SMALL_HUB_HOSTS,
       };
@@ -126,7 +153,7 @@ export function useHostsStrip() {
       issues: connectionIssues(stripHosts, hubs),
       summary: onlineSummary(stripHosts),
     };
-  }, [hosts, localServerId, statuses, agents, accounts, profiles]);
+  }, [hosts, localServerId, statuses, withSessionsKey, accounts, profiles]);
 }
 
 /** Opens a Hub's settings, selecting that Hub first so the page shows the right one. */

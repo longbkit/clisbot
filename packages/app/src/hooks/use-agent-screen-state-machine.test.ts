@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Agent } from "@/contexts/session-context";
 import {
   deriveAgentScreenViewState,
+  isStreamHistoryLoading,
   type AgentScreenMachineInput,
   type AgentScreenMachineMemory,
   type AgentScreenViewState,
@@ -158,7 +159,7 @@ describe("deriveAgentScreenViewState", () => {
     expect(ready.sync.status).toBe("reconnecting");
   });
 
-  it("shows overlay catching-up state for first open while loading history", () => {
+  it("shows an inline loading row for first open while loading history", () => {
     const memory = createBaseMemory({
       hasRenderedReady: true,
       lastReadyAgent: createAgent("agent-1"),
@@ -172,7 +173,7 @@ describe("deriveAgentScreenViewState", () => {
     const ready = expectReadyState(result.state);
     const sync = expectCatchingUpSync(ready);
 
-    expect(sync.ui).toBe("overlay");
+    expect(sync.ui).toBe("inline");
   });
 
   it("shows updating status for already-hydrated agents", () => {
@@ -265,6 +266,49 @@ describe("deriveAgentScreenViewState", () => {
       message: "already has an active writer",
     });
     expect(result.memory.hadInitialSyncFailure).toBe(true);
+  });
+
+  it("shows the owner error when a cold open's first load fails after the ready frame", () => {
+    const agent = createAgent("agent-1");
+    const opened = deriveAgentScreenViewState({
+      input: {
+        ...createBaseInput(),
+        agent,
+        needsAuthoritativeSync: true,
+        visibilityCatchUpStatus: "pending",
+      },
+      memory: createBaseMemory(),
+    });
+    expectReadyState(opened.state);
+
+    const failed = deriveAgentScreenViewState({
+      input: {
+        ...createBaseInput(),
+        agent,
+        needsAuthoritativeSync: true,
+        visibilityCatchUpStatus: "error",
+        visibilityCatchUpError: "already has an active writer",
+      },
+      memory: opened.memory,
+    });
+
+    expect(failed.state).toEqual({ tag: "error", message: "already has an active writer" });
+  });
+
+  it("keeps a painted tail on screen when its first refresh fails", () => {
+    const agent = createAgent("agent-1");
+    const result = deriveAgentScreenViewState({
+      input: {
+        ...createBaseInput(),
+        agent,
+        hasHydratedHistoryBefore: true,
+        visibilityCatchUpStatus: "error",
+        visibilityCatchUpError: "already has an active writer",
+      },
+      memory: createBaseMemory({ hasRenderedReady: true, lastReadyAgent: agent }),
+    });
+
+    expectSyncErrorSync(expectReadyState(result.state));
   });
 
   it("keeps sync errors non-blocking once the screen was ready", () => {
@@ -401,25 +445,28 @@ describe("deriveAgentScreenViewState", () => {
     expect(ready.sync.status).toBe("idle");
   });
 
-  it("keeps first route entry blocked until authoritative history is applied", () => {
-    const memory = createBaseMemory();
-    const input: AgentScreenMachineInput = {
-      ...createBaseInput(),
-      agent: createAgent("agent-1"),
-      needsAuthoritativeSync: true,
-      isHistorySyncing: true,
-      hasHydratedHistoryBefore: false,
-    };
-
-    const result = deriveAgentScreenViewState({ input, memory });
+  it("renders a cold open from the directory row in its first frame, without an overlay", () => {
+    const agent = createAgent("agent-1");
+    const result = deriveAgentScreenViewState({
+      input: {
+        ...createBaseInput(),
+        agent,
+        needsAuthoritativeSync: true,
+        isHistorySyncing: true,
+        visibilityCatchUpStatus: "pending",
+        hasHydratedHistoryBefore: false,
+      },
+      memory: createBaseMemory(),
+    });
 
     expect(result.state).toEqual({
-      tag: "boot",
-      reason: "loading",
-      source: "none",
+      tag: "ready",
+      agent,
+      source: "authoritative",
+      sync: { status: "catching_up", ui: "inline" },
+      isArchiving: false,
     });
-    expect(result.memory.hasRenderedReady).toBe(false);
-    expect(result.memory.lastReadyAgent).toBeNull();
+    expect(result.memory.hasRenderedReady).toBe(true);
   });
 
   it("renders an archived agent before provider history is initialized", () => {
@@ -609,5 +656,25 @@ describe("deriveAgentScreenViewState", () => {
 
     expect(sync.ui).toBe("status");
     expect(result.memory.hadInitialSyncFailure).toBe(false);
+  });
+});
+
+describe("isStreamHistoryLoading", () => {
+  const agent = createAgent("agent-1");
+  function ready(sync: ReadyState["sync"]): AgentScreenViewState {
+    return { tag: "ready", agent, source: "authoritative", sync, isArchiving: false };
+  }
+
+  it("shows the loading row while a first open catches up", () => {
+    expect(isStreamHistoryLoading(ready({ status: "catching_up", ui: "inline" }))).toBe(true);
+  });
+
+  it("shows the loading row when a released session catches up with no rows left", () => {
+    expect(isStreamHistoryLoading(ready({ status: "catching_up", ui: "status" }))).toBe(true);
+  });
+
+  it("stays quiet for an optimistic create and once the session is current", () => {
+    expect(isStreamHistoryLoading(ready({ status: "catching_up", ui: "silent" }))).toBe(false);
+    expect(isStreamHistoryLoading(ready({ status: "idle" }))).toBe(false);
   });
 });

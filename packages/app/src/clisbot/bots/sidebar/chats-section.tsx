@@ -2,6 +2,7 @@ import { selectChatStatusBucket } from "./row-status";
 import type { Rect } from "@/components/ui/anchor";
 import { ChatAvatar } from "../chat/chat-avatar";
 import type { GroupMarkMember } from "../chat/group-mark";
+import { rememberChatOpenPreview } from "../chat/open-preview";
 import { useSessionStore } from "@/stores/session-store";
 import { memo, useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter } from "expo-router";
@@ -74,6 +75,7 @@ export const ChatsSection = memo(function ChatsSection({
   const openChat = useCallback(
     (chat: ChatsSidebarChat) => {
       setDirectory(false);
+      rememberChatOpenPreview({ serverId: chat.serverId, chatId: chat.chatId, title: chat.title });
       const destination = buildHostChatRoute(chat.serverId, chat.chatId);
       const go = () => router.push(destination);
       if (!onBeforeNavigate?.(destination, go)) go();
@@ -176,6 +178,7 @@ export const ChatRow = memo(function ChatRow({
   chat,
   selected,
   onPress,
+  onPressIn,
   onOpenMenu,
   pinned = false,
 }: {
@@ -183,6 +186,8 @@ export const ChatRow = memo(function ChatRow({
   chat: ChatsSidebarChat;
   selected: boolean;
   onPress: (chat: ChatsSidebarChat) => void;
+  /** The finger is down on the row: the list owner starts loading the chat. */
+  onPressIn?: (chat: ChatsSidebarChat) => void;
   onOpenMenu?: (chat: ChatsSidebarChat, anchor: Rect) => void;
 }) {
   const statusBucket = useSessionStore((state) =>
@@ -202,6 +207,7 @@ export const ChatRow = memo(function ChatRow({
     [chat.chatId, chat.members, markSize],
   );
   const handlePress = useCallback(() => onPress(chat), [chat, onPress]);
+  const handlePressIn = useCallback(() => onPressIn?.(chat), [chat, onPressIn]);
   const handleOpenMenu = useCallback(
     (anchor: Rect) => onOpenMenu?.(chat, anchor),
     [chat, onOpenMenu],
@@ -216,6 +222,7 @@ export const ChatRow = memo(function ChatRow({
       selected={selected}
       testID={`sidebar-chat-${chat.chatId}`}
       onPress={handlePress}
+      onPressIn={onPressIn ? handlePressIn : undefined}
       onOpenMenu={onOpenMenu ? handleOpenMenu : undefined}
       menuLabel={t("bots.workspace.shared.chatOptions")}
       pinned={pinned}

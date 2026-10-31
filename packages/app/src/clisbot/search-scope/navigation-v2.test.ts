@@ -64,6 +64,20 @@ const filter = (input: Partial<SearchViewContext>): SearchViewContext => ({
 });
 
 describe("For me / Others in search", () => {
+  it("keeps unproven ownership inside For me and All, outside Others", () => {
+    expect(hiddenBy(filter({ ownership: "mine" }), place("a", "unknown"))).toBeNull();
+    expect(hiddenBy(filter({ ownership: "all" }), place("a", "unknown"))).toBeNull();
+    expect(hiddenBy(filter({ ownership: "others" }), place("a", "unknown"))).toBe("others");
+    const rows = [
+      { id: "others", ...place("a", "others") },
+      { id: "unknown", ...place("a", "unknown") },
+    ];
+    expect(rankItemsByView(rows, null, (row) => row).map((row) => row.id)).toEqual([
+      "unknown",
+      "others",
+    ]);
+  });
+
   it("ranks For me before Others inside the view, then the same outside it", () => {
     const rows = [
       { id: "b-others", ...place("b", "others") },

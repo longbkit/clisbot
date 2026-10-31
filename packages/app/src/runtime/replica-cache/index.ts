@@ -26,12 +26,25 @@ import {
 import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
 import { clearLegacyReplicaCache } from "./legacy-cleanup";
 import {
+  StoredChatTailSchema,
+  deserializeChatTail,
+  serializeChatTail,
+  type CachedChatTail,
+} from "./chat-tail";
+import { OFFLINE_CACHE_ENABLED } from "./offline-flag";
+import { type RestoreSlicer, yieldToEventLoop } from "./restore-slicer";
+import { isReplicaTailKind } from "./row-store-schema";
+import { TAIL_MAX_AGE_MS, TAIL_SAVE_WINDOW_MS, selectTailEvictions } from "./tail-retention";
+import { TAIL_MAX_BYTES, compactTailItem, keepNewestWithinBytes } from "./timeline-tail";
+import {
   REPLICA_SINGLETON_ROW_ID,
+  type ReplicaHostRows,
   type ReplicaRow,
   type ReplicaRowChanges,
   type ReplicaRowKey,
   type ReplicaRowKind,
   type ReplicaRowStore,
+  type ReplicaTailKind,
 } from "./row-store";
 
 export type DirectoryReplicaMutation =
@@ -73,6 +86,11 @@ export interface CachedTimeline {
 }
 
 const PERSIST_DELAY_MS = 1_000;
+/**
+ * Payload measured between yields while the first save after launch indexes the stored rows.
+ * The cache can hold 32 MB, and counting UTF-8 bytes runs character by character.
+ */
+export const STORED_INDEX_BYTES_PER_CHUNK = 256 * 1024;
 const MAX_TIMELINE_ITEMS = 50;
 const MAX_CACHE_BYTES = 32 * 1024 * 1024;
 const IsoDateSchema = z.iso.datetime();
@@ -381,13 +399,19 @@ type StoredProject = z.infer<typeof StoredProjectSchema>;
 interface ReplicaCacheOptions {
   maxBytes?: number;
   clearLegacyCache?: () => Promise<void>;
+  /** Defaults to `OFFLINE_CACHE_ENABLED`. */
+  offlineTails?: boolean;
+  now?: () => number;
+  /** Lets other work run between chunks of the stored-row index. */
+  yieldToEventLoop?: () => Promise<void>;
 }
 
 type StructuredReplicaUpsert =
   | { serverId: string; kind: "agent"; id: string; value: Agent }
   | { serverId: string; kind: "workspace"; id: string; value: WorkspaceDescriptor }
   | { serverId: string; kind: "project"; id: string; value: ProjectDescriptor }
-  | { serverId: string; kind: "timeline"; id: string; value: CachedTimeline }
+  | { serverId: string; kind: "timeline"; id: string; value: CachedTimeline; openedAt?: number }
+  | { serverId: string; kind: "transcript"; id: string; value: CachedChatTail; openedAt: number }
   | { serverId: string; kind: "checkpoint"; id: string; value: DirectoryCheckpoint };
 
 const DirectoryCursorSchema = z.strictObject({
@@ -784,33 +808,71 @@ function isTimelineItemStoredLosslessly(item: StreamItem): boolean {
   }
 }
 
-function serializeTimeline(timeline: CachedTimeline): StoredTimeline | null {
-  const canonicalItems = timeline.items.filter(
+function canonicalTimelineItems(timeline: CachedTimeline): StreamItem[] {
+  return timeline.items.filter(
     (item) => item.kind !== "user_message" || !isUnreconciledLocalUserMessage(item),
   );
-  const items = canonicalItems.map(serializeTimelineItem).filter((item) => item !== null);
-  const range = timeline.range;
-  const canPersistCoverage =
-    range !== null &&
-    range.retainedRanges === undefined &&
-    canonicalItems.length <= MAX_TIMELINE_ITEMS &&
-    items.length === canonicalItems.length &&
-    canonicalItems.every(
+}
+
+/** The range the stored items prove, or null when the tail must be refetched on open. */
+function coveredRange(
+  range: AgentTimelineCursorState | null,
+  items: readonly StreamItem[],
+): StoredTimeline["range"] {
+  if (range === null || range.retainedRanges !== undefined) return null;
+  const covered =
+    items.every(
       (item) =>
-        isTimelineItemStoredLosslessly(item) &&
         item.timelineCursor?.epoch === range.epoch &&
         item.timelineCursor.seq >= range.startSeq &&
         item.timelineCursor.seq <= range.endSeq,
-    ) &&
-    canonicalItems.some((item) => item.timelineCursor?.seq === range.endSeq);
+    ) && items.some((item) => item.timelineCursor?.seq === range.endSeq);
+  return covered ? { epoch: range.epoch, startSeq: range.startSeq, endSeq: range.endSeq } : null;
+}
+
+function storedTimeline(
+  timeline: CachedTimeline,
+  items: StoredTimelineItem[],
+  range: StoredTimeline["range"],
+): StoredTimeline {
   return {
     agentId: timeline.agentId,
-    items: items.slice(-MAX_TIMELINE_ITEMS),
-    range: canPersistCoverage
-      ? { epoch: range.epoch, startSeq: range.startSeq, endSeq: range.endSeq }
-      : null,
-    hasOlder: canPersistCoverage ? timeline.hasOlder : false,
+    items,
+    range,
+    hasOlder: range ? timeline.hasOlder : false,
   };
+}
+
+function serializeTimeline(timeline: CachedTimeline): StoredTimeline | null {
+  const canonicalItems = canonicalTimelineItems(timeline);
+  const items = canonicalItems.map(serializeTimelineItem).filter((item) => item !== null);
+  const lossless =
+    canonicalItems.length <= MAX_TIMELINE_ITEMS &&
+    items.length === canonicalItems.length &&
+    canonicalItems.every(isTimelineItemStoredLosslessly);
+  const range = lossless ? coveredRange(timeline.range, canonicalItems) : null;
+  return storedTimeline(timeline, items.slice(-MAX_TIMELINE_ITEMS), range);
+}
+
+// Room for the row's envelope (agent id, range, flags) inside the per-tail cap.
+const TAIL_ENVELOPE_BYTES = 1024;
+
+/** The offline tail: compacted items, newest first within 256 KB; lossy tails claim no range. */
+function serializeOfflineTail(timeline: CachedTimeline): StoredTimeline {
+  const canonicalItems = canonicalTimelineItems(timeline);
+  const compacted = canonicalItems.map(compactTailItem);
+  const items = compacted.map(serializeTimelineItem).filter((item) => item !== null);
+  const kept = keepNewestWithinBytes(
+    items,
+    // One extra byte for the separating comma.
+    (item) => utf8ByteLength(JSON.stringify(item)) + 1,
+    TAIL_MAX_BYTES - TAIL_ENVELOPE_BYTES,
+  );
+  const lossless =
+    kept.length === canonicalItems.length &&
+    compacted.every((item, index) => item === canonicalItems[index]);
+  const range = lossless ? coveredRange(timeline.range, canonicalItems) : null;
+  return storedTimeline(timeline, kept, range);
 }
 
 function rowKey(key: Pick<ReplicaRowKey, "kind" | "id">): string {
@@ -872,6 +934,10 @@ interface PendingReplicaChanges {
   baselines: Set<string>;
 }
 
+// The payload each agent object was read from or saved as. Agents are replaced, never mutated, so
+// an agent the live directory left unchanged is not serialized again to find it unchanged.
+const agentPayloads = new WeakMap<Agent, string>();
+
 function applyDirectoryRow(
   serverId: string,
   row: ReplicaRow,
@@ -881,7 +947,9 @@ function applyDirectoryRow(
     case "agent": {
       const stored = parseStoredPayload(StoredAgentSchema, row.payload);
       if (stored.snapshot.id !== row.id) throw new Error("Replica agent row id mismatch");
-      result.agents.set(row.id, deserializeAgent(serverId, stored));
+      const agent = deserializeAgent(serverId, stored);
+      agentPayloads.set(agent, row.payload);
+      result.agents.set(row.id, agent);
       return;
     }
     case "workspace": {
@@ -952,6 +1020,33 @@ export class ReplicaCache {
   ) {
     this.maxBytes = Math.max(options.maxBytes ?? MAX_CACHE_BYTES, 0);
     this.clearLegacyCache = options.clearLegacyCache ?? clearLegacyReplicaCache;
+    this.offlineTails = options.offlineTails ?? OFFLINE_CACHE_ENABLED;
+    this.now = options.now ?? Date.now;
+    this.yieldToEventLoop = options.yieldToEventLoop ?? yieldToEventLoop;
+  }
+
+  private readonly offlineTails: boolean;
+  private readonly now: () => number;
+  private readonly yieldToEventLoop: () => Promise<void>;
+  /** When each tail was last opened in this app run; the stored row carries older opens. */
+  private readonly tailOpens = new Map<string, number>();
+
+  private markTailOpened(serverId: string, kind: ReplicaTailKind, id: string): void {
+    this.tailOpens.set(pendingRowKey({ serverId, kind, id }), this.now());
+  }
+
+  /** The tail's last open, or undefined when it was not opened within the save window. */
+  private tailSaveOpenedAt(
+    serverId: string,
+    kind: ReplicaTailKind,
+    id: string,
+  ): number | undefined {
+    const key = { serverId, kind, id };
+    const openedAt =
+      this.tailOpens.get(pendingRowKey(key)) ??
+      this.storedRows.get(serverId)?.get(rowKey(key))?.openedAt ??
+      this.now();
+    return this.now() - openedAt > TAIL_SAVE_WINDOW_MS ? undefined : openedAt;
   }
 
   private readonly clearLegacyCache: () => Promise<void>;
@@ -998,7 +1093,8 @@ export class ReplicaCache {
     return { workspace, ...(project ? { project } : {}) };
   }
 
-  async readDirectory(serverId: string): Promise<CachedDirectory> {
+  /** With a `slicer`, rows are parsed in its chunks with a macrotask between them. */
+  async readDirectory(serverId: string, slicer?: RestoreSlicer): Promise<CachedDirectory> {
     const rows = await this.readRows(serverId, ["agent", "workspace", "project", "checkpoint"]);
     const result: DirectoryReadAccumulator = {
       agents: new Map(),
@@ -1015,6 +1111,7 @@ export class ReplicaCache {
         if (invalidEntity) invalidEntities.add(invalidEntity);
         invalidRows.push(row);
       }
+      if (slicer?.countRow()) await slicer.pause();
     }
     if (result.checkpoint && invalidEntities.size > 0) {
       result.checkpoint = { ...result.checkpoint };
@@ -1026,7 +1123,9 @@ export class ReplicaCache {
     return result;
   }
 
+  /** Reading a timeline is opening its session: it renews the tail's save window. */
   async readTimeline(serverId: string, agentId: string): Promise<CachedTimeline | undefined> {
+    this.markTailOpened(serverId, "timeline", agentId);
     const rows = await this.readRows(serverId, ["timeline"], [agentId]);
     const row = rows[0];
     if (!row) return undefined;
@@ -1190,12 +1289,14 @@ export class ReplicaCache {
   replaceDirectoryBaseline(serverId: string, directory: CachedDirectory): void {
     if (!this.activeServerIds.has(serverId)) return;
     this.invalidateHostReads(serverId, ["agent", "workspace", "project", "checkpoint"]);
-    // Replacing the directory must not discard independently accepted timeline changes.
+    // Replacing the directory must not discard independently accepted tail changes.
     for (const [key, row] of this.pendingUpserts) {
-      if (row.serverId === serverId && row.kind !== "timeline") this.pendingUpserts.delete(key);
+      if (row.serverId === serverId && !isReplicaTailKind(row.kind))
+        this.pendingUpserts.delete(key);
     }
     for (const [key, row] of this.pendingDeletes) {
-      if (row.serverId === serverId && row.kind !== "timeline") this.pendingDeletes.delete(key);
+      if (row.serverId === serverId && !isReplicaTailKind(row.kind))
+        this.pendingDeletes.delete(key);
     }
     this.pendingBaselines.add(serverId);
     for (const [id, value] of directory.agents) {
@@ -1221,7 +1322,39 @@ export class ReplicaCache {
   commitTimeline(serverId: string, agentId: string, timeline: CachedTimeline): void {
     if (!this.activeServerIds.has(serverId)) return;
     if (timeline.agentId !== agentId) throw new Error("Timeline cache key does not match payload");
-    this.queueUpsert({ serverId, kind: "timeline", id: agentId, value: timeline });
+    if (!this.offlineTails) {
+      this.queueUpsert({ serverId, kind: "timeline", id: agentId, value: timeline });
+      this.schedulePersist();
+      return;
+    }
+    const openedAt = this.tailSaveOpenedAt(serverId, "timeline", agentId);
+    if (openedAt === undefined) return;
+    this.queueUpsert({ serverId, kind: "timeline", id: agentId, value: timeline, openedAt });
+    this.schedulePersist();
+  }
+
+  /** Reading a chat tail is opening the chat: it renews the tail's save window. */
+  async readChatTail(serverId: string, chatId: string): Promise<CachedChatTail | undefined> {
+    this.markTailOpened(serverId, "transcript", chatId);
+    const row = (await this.readRows(serverId, ["transcript"], [chatId]))[0];
+    if (!row) return undefined;
+    try {
+      const stored = parseStoredPayload(StoredChatTailSchema, row.payload);
+      if (stored.chat.id !== chatId) throw new Error("Replica chat row id mismatch");
+      return deserializeChatTail(stored);
+    } catch {
+      await this.deleteInvalidRow(row);
+      return undefined;
+    }
+  }
+
+  /** Saves an accepted chat record and transcript; a no-op with offline tails off. */
+  commitChatTail(serverId: string, chatId: string, tail: CachedChatTail): void {
+    if (!this.offlineTails || !this.activeServerIds.has(serverId)) return;
+    if (tail.chat.id !== chatId) throw new Error("Chat cache key does not match payload");
+    const openedAt = this.tailSaveOpenedAt(serverId, "transcript", chatId);
+    if (openedAt === undefined) return;
+    this.queueUpsert({ serverId, kind: "transcript", id: chatId, value: tail, openedAt });
     this.schedulePersist();
   }
 
@@ -1265,6 +1398,53 @@ export class ReplicaCache {
 
   async flush(): Promise<void> {
     await this.syncPending();
+  }
+
+  /** UTF-8 bytes of every saved row, after pending writes land. */
+  async usedBytes(): Promise<number> {
+    await this.syncPending();
+    await this.prepareStore();
+    await this.ensureStoredIndex();
+    return this.totalBytes;
+  }
+
+  /** Forgets every saved row on this device (Settings → Storage). Rejects if the store fails. */
+  clearAll(): Promise<void> {
+    return this.clearRows([...this.storedRows.keys(), ...this.activeServerIds], () =>
+      this.rowStore.clear(),
+    );
+  }
+
+  /** Forgets one source's rows, on sign-out or when its Hub profile is removed. */
+  clearSource(serverId: string): Promise<void> {
+    return this.clearRows([serverId], () => this.rowStore.deleteHost(serverId));
+  }
+
+  private clearRows(serverIds: string[], drop: () => Promise<void>): Promise<void> {
+    for (const serverId of serverIds) {
+      this.invalidateHostReads(serverId);
+      this.dropPendingHostChanges(serverId);
+      // A connected Host keeps committing directory deltas; until its next full baseline those
+      // would checkpoint a partial directory, so it is invalidated exactly like an eviction.
+      if (this.activeServerIds.has(serverId)) this.invalidatedHosts.add(serverId);
+    }
+    const prefixes = serverIds.map((serverId) => `${serverId}\u0000`);
+    for (const key of this.tailOpens.keys())
+      if (prefixes.some((prefix) => key.startsWith(prefix))) this.tailOpens.delete(key);
+    const operation = this.writeQueue
+      .catch(() => undefined)
+      .then(async () => {
+        await this.prepareStore();
+        await this.ensureStoredIndex();
+        await drop();
+        for (const serverId of serverIds) this.removeStoredHost(serverId);
+        return undefined;
+      });
+    this.writeQueue = operation.then(
+      () => undefined,
+      () => undefined,
+    );
+    return operation;
   }
 
   /** Resolves to whether every pending change reached the store. */
@@ -1346,7 +1526,7 @@ export class ReplicaCache {
   private hasPendingReadChanges(read: ReplicaRead): boolean {
     if (
       this.pendingBaselines.has(read.serverId) &&
-      read.kinds.some((kind) => kind !== "timeline")
+      read.kinds.some((kind) => !isReplicaTailKind(kind))
     ) {
       return true;
     }
@@ -1406,23 +1586,32 @@ export class ReplicaCache {
     }
     for (const serverId of pending.baselines) {
       const replacementKeys = new Set(
-        upserts.filter((row) => row.serverId === serverId && row.kind !== "timeline").map(rowKey),
+        upserts
+          .filter((row) => row.serverId === serverId && !isReplicaTailKind(row.kind))
+          .map(rowKey),
       );
       for (const row of this.storedRows.get(serverId)?.values() ?? []) {
-        if (row.kind !== "timeline" && !replacementKeys.has(rowKey(row))) {
+        if (!isReplicaTailKind(row.kind) && !replacementKeys.has(rowKey(row))) {
           deletes.set(pendingRowKey(row), row);
         }
       }
     }
-    return { upserts, deletes: [...deletes.values()] };
+    // A live answer re-saves the whole directory as its baseline; most rows are what is stored.
+    const changed = upserts.filter(
+      (row) => this.storedRows.get(row.serverId)?.get(rowKey(row))?.payload !== row.payload,
+    );
+    return { upserts: changed, deletes: [...deletes.values()] };
   }
 
   private materializeUpsert(upsert: StructuredReplicaUpsert): ReplicaRow | null {
     let value: unknown;
     switch (upsert.kind) {
-      case "agent":
-        value = serializeAgent(upsert.value);
-        break;
+      case "agent": {
+        const payload =
+          agentPayloads.get(upsert.value) ?? JSON.stringify(serializeAgent(upsert.value));
+        agentPayloads.set(upsert.value, payload);
+        return { serverId: upsert.serverId, kind: "agent", id: upsert.id, payload };
+      }
       case "workspace":
         value = serializeWorkspace(upsert.value);
         break;
@@ -1430,18 +1619,26 @@ export class ReplicaCache {
         value = serializeProject(upsert.value);
         break;
       case "timeline":
-        value = serializeTimeline(upsert.value);
+        value = this.offlineTails
+          ? serializeOfflineTail(upsert.value)
+          : serializeTimeline(upsert.value);
         if (!value) return null;
+        break;
+      case "transcript":
+        value = serializeChatTail(upsert.value);
         break;
       case "checkpoint":
         value = serializeDirectoryCheckpoint(upsert.value);
         break;
     }
+    const openedAt =
+      upsert.kind === "timeline" || upsert.kind === "transcript" ? upsert.openedAt : undefined;
     return {
       serverId: upsert.serverId,
       kind: upsert.kind,
       id: upsert.id,
       payload: JSON.stringify(value),
+      ...(openedAt === undefined ? {} : { openedAt }),
     };
   }
 
@@ -1513,6 +1710,7 @@ export class ReplicaCache {
   private async fitChangesToBudget(
     changes: ReplicaRowChanges,
   ): Promise<{ changes: ReplicaRowChanges; evicted: Set<string> }> {
+    if (this.offlineTails) return { changes: this.fitTailsToBudget(changes), evicted: new Set() };
     const touchedServerIds = new Set<string>();
     for (const key of changes.deletes) touchedServerIds.add(key.serverId);
     for (const row of changes.upserts) touchedServerIds.add(row.serverId);
@@ -1562,6 +1760,37 @@ export class ReplicaCache {
     };
   }
 
+  private storedRow(key: ReplicaRowKey): ReplicaRow | undefined {
+    return this.storedRows.get(key.serverId)?.get(rowKey(key));
+  }
+
+  /** Drops tails, least recently opened first, so metadata always keeps its place. */
+  private fitTailsToBudget(changes: ReplicaRowChanges): ReplicaRowChanges {
+    let total = this.totalBytes;
+    const replaced = new Set<string>();
+    for (const key of changes.deletes) {
+      const previous = this.storedRow(key);
+      if (previous) total -= rowBytes(previous);
+      replaced.add(pendingRowKey(key));
+    }
+    for (const row of changes.upserts) {
+      const previous = this.storedRow(row);
+      total += rowBytes(row) - (previous ? rowBytes(previous) : 0);
+      replaced.add(pendingRowKey(row));
+    }
+    if (total <= this.maxBytes) return changes;
+    const candidates = [...changes.upserts];
+    for (const rows of this.storedRows.values()) {
+      for (const row of rows.values()) if (!replaced.has(pendingRowKey(row))) candidates.push(row);
+    }
+    const evicted = selectTailEvictions(candidates, total, this.maxBytes, rowBytes);
+    const evictedKeys = new Set(evicted.map(pendingRowKey));
+    return {
+      upserts: changes.upserts.filter((row) => !evictedKeys.has(pendingRowKey(row))),
+      deletes: [...changes.deletes, ...evicted.filter((row) => this.storedRow(row))],
+    };
+  }
+
   private removeStoredHost(serverId: string): void {
     this.totalBytes -= this.hostBytes.get(serverId) ?? 0;
     this.storedRows.delete(serverId);
@@ -1598,12 +1827,16 @@ export class ReplicaCache {
       await this.rowStore.open();
       // COMPAT(replica-blob-cache): remove after 2026-11
       await this.clearLegacyCache().catch(() => undefined);
+      // A failed sweep leaves old tails for the next start; it never blocks reading the cache.
+      if (this.offlineTails)
+        await this.rowStore.deleteOpenedBefore(this.now() - TAIL_MAX_AGE_MS).catch(() => undefined);
     })();
     return this.preparePromise;
   }
 
   private ensureStoredIndex(): Promise<void> {
     this.storedIndexPromise ??= this.rowStore.readAll().then(async (hosts) => {
+      await this.measureRows(hosts);
       this.storedRows.clear();
       this.hostBytes.clear();
       this.hostWriteOrder.clear();
@@ -1623,6 +1856,21 @@ export class ReplicaCache {
       return undefined;
     });
     return this.storedIndexPromise;
+  }
+
+  /** Counts every row's bytes (cached per row) in chunks, so indexing them after is cheap. */
+  private async measureRows(hosts: readonly ReplicaHostRows[]): Promise<void> {
+    let measured = 0;
+    let nextYieldAt = STORED_INDEX_BYTES_PER_CHUNK;
+    for (const host of hosts) {
+      if (!this.activeServerIds.has(host.serverId)) continue;
+      for (const row of host.rows) {
+        measured += rowBytes(row);
+        if (measured < nextYieldAt) continue;
+        nextYieldAt += STORED_INDEX_BYTES_PER_CHUNK;
+        await this.yieldToEventLoop();
+      }
+    }
   }
 
   private queueOperation(operation: () => Promise<void>): Promise<void> {

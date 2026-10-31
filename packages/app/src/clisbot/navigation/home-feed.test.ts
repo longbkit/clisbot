@@ -107,23 +107,20 @@ describe("Home feed", () => {
     expect(counts).toMatchObject({ needs: 2, failed: 1, running: 1, updated: 1, all: 5 });
   });
 
-  it("lists a session nobody can place under Others and All, never For me", () => {
+  it("lists a session nobody can place under For me and All, never Others", () => {
     const owners: Record<string, "others" | "unknown"> = {
       "their-fail": "others",
       "my-fail": "unknown",
     };
     const placed = (row: AggregatedAgent) => owners[row.id] ?? "mine";
     const unplaced = homeRows({ agents, ownershipOf: placed, records, now: NOW });
-    expect(ids(buildHomeFeed(unplaced, filters()))).not.toContain("my-fail");
-    expect(ids(buildHomeFeed(unplaced, filters({ scope: "others" }))).sort()).toEqual([
-      "my-fail",
-      "their-fail",
-    ]);
+    expect(ids(buildHomeFeed(unplaced, filters()))).toContain("my-fail");
+    expect(ids(buildHomeFeed(unplaced, filters({ scope: "others" })))).toEqual(["their-fail"]);
     const all = buildHomeFeed(unplaced, filters({ scope: "all" }));
     expect(ids(all)).toContain("my-fail");
-    expect(all.scopeCounts).toEqual({ mine: 4, others: 2, all: 6 });
-    // Its unseen failure is no one's badge until it can be placed.
-    expect(homeBadgeCount(unplaced)).toBe(1);
+    expect(all.scopeCounts).toEqual({ mine: 5, others: 1, all: 6 });
+    // Its unseen failure counts on the reader's badge, beside the approval.
+    expect(homeBadgeCount(unplaced)).toBe(2);
   });
 
   it("filters by Host", () => {
@@ -160,15 +157,57 @@ describe("Home row cache", () => {
     expect(second[8]).toBe(first[8]);
   });
 
-  it("hands back the same array when nothing changed, and rebuilds when an input does", () => {
+  it("hands back the same array when nothing changed, and rebuilds when ownership does", () => {
     const list = [entry("a"), entry("b")];
     const ownerOf = vi.fn(() => "mine" as const);
     const rowsOf = createHomeRowCache();
     const first = rowsOf({ agents: list, ownershipOf: ownerOf, records: NONE, now: 1 });
     expect(rowsOf({ agents: [...list], ownershipOf: ownerOf, records: NONE, now: 1 })).toBe(first);
+    const otherOwner = vi.fn(() => "others" as const);
+    const rebuilt = rowsOf({ agents: list, ownershipOf: otherOwner, records: NONE, now: 1 });
+    expect(otherOwner).toHaveBeenCalledTimes(2);
+    expect(rebuilt.map((row) => row.ownership)).toEqual(["others", "others"]);
+  });
+
+  it("on a clock tick re-derives only seen failures, which age out of Seen issues", () => {
+    const failed = failure("f", { serverId: "h", lastActivityAt: new Date(NOW) });
+    const list = [...Array.from({ length: 200 }, (_, i) => entry(`a${i}`)), failed];
+    const seen = markIssueSeen(observeIssues({}, list, NOW), failed, NOW);
+    const ownerOf = vi.fn(() => "mine" as const);
+    const rowsOf = createHomeRowCache();
+    const first = rowsOf({ agents: list, ownershipOf: ownerOf, records: seen, now: NOW });
     ownerOf.mockClear();
-    rowsOf({ agents: list, ownershipOf: ownerOf, records: NONE, now: 2 });
-    expect(ownerOf).toHaveBeenCalledTimes(2);
+
+    const minuteLater = rowsOf({
+      agents: list,
+      ownershipOf: ownerOf,
+      records: seen,
+      now: NOW + 60_000,
+    });
+    expect(minuteLater).toBe(first);
+    const weekLater = NOW + 8 * 24 * 60 * 60 * 1000;
+    const aged = rowsOf({ agents: list, ownershipOf: ownerOf, records: seen, now: weekLater });
+
+    expect(ownerOf).not.toHaveBeenCalled();
+    expect(first.at(-1)!.issue?.state).toBe("seen");
+    expect(aged.at(-1)!.issue).toBeNull();
+    expect(aged[0]).toBe(first[0]);
+  });
+
+  it("on a records change re-derives only the sessions whose record changed", () => {
+    const list = [failure("f1", { serverId: "h" }), failure("f2", { serverId: "h" })];
+    const observed = observeIssues({}, list, NOW);
+    const ownerOf = vi.fn(() => "mine" as const);
+    const rowsOf = createHomeRowCache();
+    const first = rowsOf({ agents: list, ownershipOf: ownerOf, records: observed, now: NOW });
+    ownerOf.mockClear();
+
+    const seen = markIssueSeen(observed, list[0]!, NOW);
+    const second = rowsOf({ agents: list, ownershipOf: ownerOf, records: seen, now: NOW });
+
+    expect(ownerOf).not.toHaveBeenCalled();
+    expect(second[0]!.issue?.state).toBe("seen");
+    expect(second[1]).toBe(first[1]);
   });
 
   it("always rebuilds a session with pending requests, whose request ids can change unseen", () => {

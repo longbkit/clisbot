@@ -4,8 +4,7 @@ import type { BotPayload, ChatPayload } from "@/clisbot/bots/data/contracts";
 import { directChatForBot } from "@/clisbot/bots/sidebar/sidebar-model";
 import { setOutsideFilterReveal } from "@/clisbot/search-scope/work-navigation";
 import { chatReveal } from "./outside-filter";
-import { resolveDirectChatOwnership, resolveOwnership } from "./ownership";
-import { useReaderAccounts } from "./reader";
+import { useChatOwnership } from "./use-chat-ownership";
 import { useNavigationStore } from "./store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 
@@ -22,14 +21,11 @@ function chatsFilter() {
  * the reader is looking at.
  */
 export function useRevealChatOpen(chats: readonly HostTagged<ChatPayload>[]) {
-  const accounts = useReaderAccounts();
+  const { chatOwnership, botOwnership } = useChatOwnership(chats);
   const revealBot = useCallback(
     (bot: HostTagged<BotPayload>) => {
       const direct = directChatForBot(chats, bot.serverId, bot.id);
-      const ownership = resolveDirectChatOwnership(
-        { directChatCreatedBy: direct?.record?.createdBy, bot },
-        accounts,
-      );
+      const ownership = botOwnership(bot, direct ?? undefined);
       const botTarget = { kind: "bot", serverId: bot.serverId, id: bot.id } as const;
       const chatTarget = direct
         ? ({ kind: "chat", serverId: bot.serverId, id: direct.id } as const)
@@ -47,7 +43,7 @@ export function useRevealChatOpen(chats: readonly HostTagged<ChatPayload>[]) {
         ),
       );
     },
-    [accounts, chats],
+    [botOwnership, chats],
   );
   const revealGroup = useCallback(
     (chat: HostTagged<ChatPayload>) => {
@@ -56,14 +52,14 @@ export function useRevealChatOpen(chats: readonly HostTagged<ChatPayload>[]) {
           {
             serverId: chat.serverId,
             hostLabel: chat.serverName,
-            ownership: resolveOwnership({ createdBy: chat.record?.createdBy, accounts }),
+            ownership: chatOwnership(chat),
             target: { kind: "chat", serverId: chat.serverId, id: chat.id },
           },
           chatsFilter(),
         ),
       );
     },
-    [accounts],
+    [chatOwnership],
   );
   return { revealBot, revealGroup };
 }

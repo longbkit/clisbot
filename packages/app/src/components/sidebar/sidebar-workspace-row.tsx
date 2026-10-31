@@ -247,13 +247,14 @@ function WorkspaceRowBody({
     ...dragAttributes
   } = dragHandleProps?.attributes ?? {};
 
-  const handlePress = useCallback(() => {
-    if (interaction.didLongPressRef.current) {
-      interaction.didLongPressRef.current = false;
-      return;
-    }
-    onPress();
-  }, [interaction.didLongPressRef, onPress]);
+  const { consumeLongPress } = interaction;
+  const handlePress = useCallback(
+    (event: GestureResponderEvent) => {
+      if (consumeLongPress(event)) return;
+      onPress();
+    },
+    [consumeLongPress, onPress],
+  );
   const handleWorkspacePressIn = useCallback(
     (event: GestureResponderEvent) => {
       setIsPressed(true);

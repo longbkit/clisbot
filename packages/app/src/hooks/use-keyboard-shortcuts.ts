@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { usePathname, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import { useReadRoutePath } from "@/navigation/route-source";
 import { getIsElectronRuntime } from "@/constants/layout";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { setCommandCenterFocusRestoreElement } from "@/utils/command-center-focus-restore";
@@ -62,7 +63,7 @@ export function useKeyboardShortcuts({
   cycleTheme?: () => void;
 }) {
   const keyboardActionDispatcher = useKeyboardActionDispatcher();
-  const pathname = usePathname();
+  const readPathname = useReadRoutePath();
   const router = useRouter();
   const resetModifiers = useKeyboardShortcutsStore((s) => s.resetModifiers);
   const { overrides } = useKeyboardShortcutOverrides();
@@ -235,7 +236,7 @@ export function useKeyboardShortcuts({
     const shortcutAction = routeKeyboardShortcut(
       { action: input.action, payload: input.payload },
       {
-        pathname,
+        pathname: readPathname(),
         isMobile,
         sidebarShortcutTargets: store.sidebarShortcutWorkspaceTargets,
         navigationActiveWorkspace: withFocusedAgent(
@@ -351,7 +352,7 @@ export function useKeyboardShortcuts({
     const key = event.key ?? "";
     if (
       key === "Escape" &&
-      pathname.startsWith("/settings") &&
+      readPathname().startsWith("/settings") &&
       !isMobile &&
       hasActiveWebOverlay()
     ) {

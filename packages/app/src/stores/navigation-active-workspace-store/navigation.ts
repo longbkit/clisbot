@@ -86,6 +86,14 @@ export function parseActiveWorkspaceSelection(
   return parseWorkspaceSelectionFromRouteParams(input.params);
 }
 
+export function isSameWorkspaceSelection(
+  left: ActiveWorkspaceSelection | null,
+  right: ActiveWorkspaceSelection | null,
+): boolean {
+  if (left === null || right === null) return left === right;
+  return left.serverId === right.serverId && left.workspaceId === right.workspaceId;
+}
+
 export function navigateToWorkspace(
   input: NavigateToWorkspaceInput,
   deps: NavigateToWorkspaceDeps,

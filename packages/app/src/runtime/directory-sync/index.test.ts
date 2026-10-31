@@ -16,7 +16,9 @@ import {
   normalizeWorkspaceDescriptor,
   useSessionStore,
 } from "@/stores/session-store";
-import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
+import { normalizeAgentSnapshot, projectAgentSnapshot } from "@/utils/agent-snapshots";
+import { createManualFrameClock } from "./frame-clock-fixture";
+import { shareFrames, type FrameClock } from "./live-batch";
 import { selectWorkspaceDirectoryServerIds } from "@/stores/session-store-hooks/selectors";
 import { useWorkspaceLabels } from "@/workspace-labels";
 import type { DirectoryReplicaMutation } from "@/runtime/replica-cache";
@@ -27,6 +29,7 @@ import {
 } from "./index";
 
 import { subscriptionFixture } from "../subscription-fixture";
+import { ConnectLimiter } from "../connection-backoff";
 
 type WorkspaceFetchResult = Awaited<ReturnType<DaemonClient["fetchWorkspaces"]>>;
 type ProjectListResult = Awaited<ReturnType<DaemonClient["listProjects"]>>;
@@ -204,6 +207,7 @@ function createDirectory(
   options?: {
     workspaceLabels?: boolean;
     callbacks?: Partial<ConstructorParameters<typeof DirectorySync>[1]>;
+    pageFetchLimiter?: ConnectLimiter;
   },
 ): {
   client: FakeDirectoryClient;
@@ -212,16 +216,21 @@ function createDirectory(
   serverIds.add(serverId);
   const client = new FakeDirectoryClient();
   client.supportsWorkspaceLabels = options?.workspaceLabels === true;
-  const directory = new DirectorySync(serverId, {
-    onAgentStoppedRunning: () => undefined,
-    markAgentLoading: () => undefined,
-    markAgentReady: () => undefined,
-    markAgentError: () => undefined,
-    markWorkspaceLoading: () => undefined,
-    markWorkspaceReady: () => undefined,
-    markWorkspaceError: () => undefined,
-    ...options?.callbacks,
-  });
+  const directory = new DirectorySync(
+    serverId,
+    {
+      onAgentStoppedRunning: () => undefined,
+      markAgentLoading: () => undefined,
+      markAgentReady: () => undefined,
+      markAgentError: () => undefined,
+      markWorkspaceLoading: () => undefined,
+      markWorkspaceReady: () => undefined,
+      markWorkspaceError: () => undefined,
+      ...options?.callbacks,
+    },
+    undefined,
+    { pageFetchLimiter: options?.pageFetchLimiter },
+  );
   directory.connectionChanged({
     client: client as unknown as DaemonClient,
     status: "online",
@@ -349,6 +358,46 @@ describe("DirectorySync session readiness", () => {
     ]);
     expect(client.fetchAgentsCalls).toBe(0);
     expect(client.fetchWorkspacesCalls).toBe(0);
+    directory.dispose();
+  });
+
+  it("reads its own cache when the startup restore could not apply it", async () => {
+    const serverId = "restore-skipped-host";
+    serverIds.add(serverId);
+    const cachedAgent = createAgent(serverId, "agent-1");
+    let reads = 0;
+    const directory = new DirectorySync(
+      serverId,
+      {
+        onAgentStoppedRunning: () => undefined,
+        markAgentLoading: () => undefined,
+        markAgentReady: () => undefined,
+        markAgentError: () => undefined,
+        markWorkspaceLoading: () => undefined,
+        markWorkspaceReady: () => undefined,
+        markWorkspaceError: () => undefined,
+      },
+      {
+        readAgent: async () => undefined,
+        readWorkspace: async () => undefined,
+        readDirectory: async () => {
+          reads += 1;
+          return {
+            agents: new Map([[cachedAgent.id, cachedAgent]]),
+            workspaces: new Map(),
+            projects: new Map(),
+          };
+        },
+        commitDirectoryMutations: () => undefined,
+      },
+    );
+    useSessionStore.getState().initializeSession(serverId, null);
+
+    directory.adoptCacheRestore(Promise.resolve(false));
+    await directory.restoreCachedDirectory();
+
+    expect(reads).toBe(1);
+    expect(useSessionStore.getState().sessions[serverId]?.agents.has(cachedAgent.id)).toBe(true);
     directory.dispose();
   });
 
@@ -1338,6 +1387,33 @@ describe("DirectorySync session readiness", () => {
     directory.dispose();
   });
 
+  it("shares one page-fetch limit across Hosts, so a fleet reconnect does not fetch at once", async () => {
+    const limiter = new ConnectLimiter(1);
+    const first = createDirectory("paced-pages-a", { pageFetchLimiter: limiter });
+    const second = createDirectory("paced-pages-b", { pageFetchLimiter: limiter });
+    const store = useSessionStore.getState();
+    store.initializeSession("paced-pages-a", first.client as unknown as DaemonClient, 1);
+    store.initializeSession("paced-pages-b", second.client as unknown as DaemonClient, 1);
+    const releaseFirst = first.client.holdAgentFetch();
+    const firstRefresh = first.directory.refreshAgents();
+    await expect.poll(() => first.client.fetchAgentsCalls).toBe(1);
+    const secondRefresh = second.directory.refreshAgents();
+    await vi.waitFor(() => expect(limiter.stats().waiting).toBe(1));
+    expect(second.client.fetchAgentsCalls).toBe(0);
+
+    releaseFirst({
+      requestId: "agents",
+      entries: [],
+      pageInfo: { hasMore: false, nextCursor: null, prevCursor: null },
+    });
+    await Promise.all([firstRefresh, secondRefresh]);
+
+    expect(second.client.fetchAgentsCalls).toBe(1);
+    expect(limiter.stats().peak).toBe(1);
+    first.directory.dispose();
+    second.directory.dispose();
+  });
+
   it("rejects a session wait on disconnect so the reconnect can refresh", async () => {
     const serverId = "session-wait-reconnect";
     const { client, directory } = createDirectory(serverId);
@@ -2062,6 +2138,182 @@ describe("directory demand cancellation", () => {
     await expect(directory.refreshDemand()).rejects.toThrow("Backend denied directory");
     expect(client.fetchAgentsCalls).toBe(1);
     expect(client.fetchWorkspacesCalls).toBe(1);
+    directory.dispose();
+  });
+});
+
+function liveAgentUpdate(
+  serverId: string,
+  id: string,
+  title: string,
+): Extract<SessionOutboundMessage, { type: "agent_update" }> {
+  return {
+    type: "agent_update",
+    payload: {
+      kind: "upsert",
+      agent: projectAgentSnapshot({
+        ...createAgent(serverId, id),
+        title,
+        updatedAt: new Date("2026-08-27T00:00:00.000Z"),
+      }),
+      project: null,
+    },
+  };
+}
+
+async function createFramedDirectory(serverId: string, frames?: FrameClock) {
+  serverIds.add(serverId);
+  const manual = createManualFrameClock();
+  const clock = frames ?? manual;
+  const client = new FakeDirectoryClient();
+  const directory = new DirectorySync(
+    serverId,
+    {
+      onAgentStoppedRunning: () => undefined,
+      markAgentLoading: () => undefined,
+      markAgentReady: () => undefined,
+      markAgentError: () => undefined,
+      markWorkspaceLoading: () => undefined,
+      markWorkspaceReady: () => undefined,
+      markWorkspaceError: () => undefined,
+    },
+    undefined,
+    { frameClock: clock },
+  );
+  const connection = {
+    client: client as unknown as DaemonClient,
+    status: "online" as const,
+    source: { clientGeneration: 1, connectionEpoch: 1 },
+  };
+  directory.connectionChanged(connection);
+  const store = useSessionStore.getState();
+  store.initializeSession(serverId, client as unknown as DaemonClient, 1);
+  store.updateSessionServerInfo(serverId, {
+    serverId,
+    hostname: null,
+    version: "test",
+    features: { workspaceMultiplicity: true },
+  });
+  await directory.refreshAll();
+  const titleOf = (agentId: string) =>
+    useSessionStore.getState().sessions[serverId]?.agents.get(agentId)?.title;
+  return { client, clock: manual, connection, directory, titleOf };
+}
+
+describe("live directory updates within a frame", () => {
+  it("publishes every Host's updates in a frame as one store commit", async () => {
+    const manual = createManualFrameClock();
+    const frames = shareFrames(manual);
+    const first = await createFramedDirectory("shared-frame-a", frames);
+    const second = await createFramedDirectory("shared-frame-b", frames);
+    first.client.emit(liveAgentUpdate("shared-frame-a", "a", "from a"));
+    second.client.emit(liveAgentUpdate("shared-frame-b", "b", "from b"));
+    first.client.emit(liveAgentUpdate("shared-frame-a", "a", "from a, later"));
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    manual.tick();
+
+    unsubscribe();
+    expect({
+      notifications,
+      a: first.titleOf("a"),
+      b: second.titleOf("b"),
+    }).toEqual({ notifications: 1, a: "from a, later", b: "from b" });
+    first.directory.dispose();
+    second.directory.dispose();
+  });
+
+  it("applies one Host's held updates on its own flush and leaves the other's for the frame", async () => {
+    const manual = createManualFrameClock();
+    const frames = shareFrames(manual);
+    const first = await createFramedDirectory("shared-flush-a", frames);
+    const second = await createFramedDirectory("shared-flush-b", frames);
+    first.client.emit(liveAgentUpdate("shared-flush-a", "a", "held a"));
+    second.client.emit(liveAgentUpdate("shared-flush-b", "b", "held b"));
+
+    first.directory.flushLiveUpdates();
+
+    expect([first.titleOf("a"), second.titleOf("b")]).toEqual(["held a", undefined]);
+    manual.tick();
+    expect(second.titleOf("b")).toBe("held b");
+    first.directory.dispose();
+    second.directory.dispose();
+  });
+
+  it("applies a frame's agent and workspace updates in order as one store commit", async () => {
+    const serverId = "framed-live-updates";
+    const { client, clock, directory, titleOf } = await createFramedDirectory(serverId);
+    client.emit(liveAgentUpdate(serverId, "a", "first"));
+    client.emit(liveAgentUpdate(serverId, "b", "kept"));
+    client.emit({
+      type: "workspace_update",
+      payload: { kind: "upsert", workspace: createWorkspaceEntry("w") },
+    });
+    client.emit(liveAgentUpdate(serverId, "a", "second"));
+    client.emit({ type: "agent_update", payload: { kind: "remove", agentId: "b" } });
+    expect(titleOf("a")).toBeUndefined();
+    let notifications = 0;
+    const unsubscribe = useSessionStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    clock.tick();
+
+    unsubscribe();
+    const session = useSessionStore.getState().sessions[serverId];
+    expect({
+      notifications,
+      title: titleOf("a"),
+      agentIds: [...(session?.agents.keys() ?? [])],
+      workspaceIds: [...(session?.workspaces.keys() ?? [])],
+    }).toEqual({ notifications: 1, title: "second", agentIds: ["a"], workspaceIds: ["w"] });
+    directory.dispose();
+  });
+
+  it("applies held updates before a fetch response is committed", async () => {
+    const serverId = "framed-before-fetch";
+    const { client, directory, titleOf } = await createFramedDirectory(serverId);
+    const releaseAgents = client.holdAgentFetch();
+    const refresh = directory.refreshAgents();
+    await expect.poll(() => client.fetchAgentsCalls).toBe(2);
+    client.emit(liveAgentUpdate(serverId, "live", "from the live stream"));
+
+    releaseAgents({
+      requestId: "agents",
+      entries: [],
+      pageInfo: { hasMore: false, nextCursor: null, prevCursor: null },
+    });
+    await refresh;
+
+    expect(titleOf("live")).toBe("from the live stream");
+    directory.dispose();
+  });
+
+  it("applies held updates before the connection changes", async () => {
+    const serverId = "framed-before-reconnect";
+    const { client, connection, directory, titleOf } = await createFramedDirectory(serverId);
+    client.emit(liveAgentUpdate(serverId, "held", "before reconnect"));
+
+    directory.connectionChanged({
+      ...connection,
+      source: { clientGeneration: 1, connectionEpoch: 2 },
+    });
+
+    expect(titleOf("held")).toBe("before reconnect");
+    directory.dispose();
+  });
+
+  it("applies held updates when the app goes to the background", async () => {
+    const serverId = "framed-flush";
+    const { client, directory, titleOf } = await createFramedDirectory(serverId);
+    client.emit(liveAgentUpdate(serverId, "held", "before background"));
+
+    directory.flushLiveUpdates();
+
+    expect(titleOf("held")).toBe("before background");
     directory.dispose();
   });
 });

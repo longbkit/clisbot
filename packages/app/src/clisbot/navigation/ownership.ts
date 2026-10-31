@@ -1,11 +1,8 @@
+import { actorsFromParticipationKey, ownershipKey, type OwnershipKeyInput } from "./ownership-key";
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { isOwnActor, type HubAccountIdentity } from "@/clisbot/session-storage/actor-presentation";
 
-/**
- * `unknown` is "cannot tell": the author is a Hub member but this device has no reader for that
- * Hub to compare with. It is never `mine` (that listed other members' work under For me); the
- * scopes list it under Others and All, since it is not the reader's own work.
- */
+/** Unproven ownership belongs to For me and All, never Others (isReaderOwned). */
 export type Ownership = "mine" | "others" | "unknown";
 export type OwnershipScope = "mine" | "others" | "all";
 
@@ -18,33 +15,58 @@ export interface ReaderAccount extends HubAccountIdentity {
   hubId?: string;
 }
 
-/**
- * Who an item belongs to, from the author recorded today.
- *
- * - No author, a non-user author (automation, system) or a user author with no Hub origin (a
- *   direct connection, the device owner's): **mine**, as the brief's provisional rule.
- * - A Hub member whose Hub has a known reader on this device: **mine** when the reader made it,
- *   else **others**.
- * - A Hub member whose Hub has no known reader (not signed in, never signed in, or the account
- *   not resolved): **unknown**.
- *
- * `watched` is the Round 2 input; it already makes anything the reader's.
- */
-export function resolveOwnership(input: {
-  createdBy: SessionActor | null | undefined;
-  accounts: readonly ReaderAccount[];
-  watched?: boolean;
-}): Ownership {
-  if (input.watched) return "mine";
-  const actor = input.createdBy;
-  if (!actor || actor.kind !== "user") return "mine";
-  // A snapshot without a Hub scope comes from a direct (no Hub) connection: the device owner's.
-  if (!actor.hubOrigin && !actor.hubIdentity) return "mine";
-  const account = input.accounts.find((candidate) => isSameHub(actor, candidate));
-  if (!account?.id) return "unknown";
-  // The Hub is matched; the address no longer needs to agree, whatever form each side wrote.
+export type OwnershipHostKind = "direct" | "hub" | "unknown";
+
+/** Compatibility exception for manually paired Hosts; it is not proof of daemon ownership. */
+export const KEEP_DIRECT_LEGACY_OWNERSHIP = true;
+
+export type OwnershipInput = OwnershipKeyInput;
+
+function actorOwnership(actor: SessionActor, accounts: readonly ReaderAccount[]): Ownership {
+  if (actor.kind !== "user" || (!actor.hubOrigin && !actor.hubIdentity)) return "unknown";
+  const account = accounts.find((candidate) => isSameHub(actor, candidate));
+  if (!account?.id && !account?.memberId) return "unknown";
+  // A channel identity is not a Hub user id: only its verified Member link proves a match.
+  if (actor.connectionId && (!actor.memberId || !account.memberId)) return "others";
   return isOwnActor(actor, { ...account, origin: null }) ? "mine" : "others";
 }
+
+function classify(input: OwnershipInput, keepDirectLegacy: boolean): Ownership {
+  if (input.hostKind === "unknown") return "unknown";
+  if (input.watched) return "mine";
+  const actor = input.createdBy;
+  if (keepDirectLegacy && input.hostKind === "direct") {
+    if (input.directOwner !== undefined) return input.directOwner ? "mine" : "others";
+    if (!actor || actor.kind !== "user" || (!actor.hubOrigin && !actor.hubIdentity)) return "mine";
+  }
+  const creatorOwnership = actor ? actorOwnership(actor, input.accounts) : "unknown";
+  if (creatorOwnership === "mine") return "mine";
+  const participants = input.participationKey
+    ? actorsFromParticipationKey(input.participationKey).map((participant) =>
+        actorOwnership(participant, input.accounts),
+      )
+    : [];
+  if (participants.includes("mine")) return "mine";
+  if (creatorOwnership !== "unknown") return creatorOwnership;
+  // No creator, but verified people other than the reader did the work: it is theirs.
+  return participants.includes("others") ? "others" : "unknown";
+}
+
+/** One bounded resolver for every surface; reader arrays are immutable identity snapshots. */
+export function createOwnershipResolver(keepDirectLegacy = KEEP_DIRECT_LEGACY_OWNERSHIP) {
+  const cache = new Map<string, Ownership>();
+  return (input: OwnershipInput): Ownership => {
+    const key = ownershipKey(input);
+    const cached = cache.get(key);
+    if (cached !== undefined) return cached;
+    const ownership = classify(input, keepDirectLegacy);
+    if (cache.size >= 2048) cache.delete(cache.keys().next().value!);
+    cache.set(key, ownership);
+    return ownership;
+  };
+}
+
+export const resolveOwnership = createOwnershipResolver();
 
 const PAIRED_HUB_SCHEME = "hub://";
 
@@ -73,35 +95,47 @@ function canonicalOrigin(origin: string): string {
   }
 }
 
-/** A Bot's direct chat is whoever's chat it is; before there is one, the Bot's owner decides. */
+export type OwnershipContext = Pick<OwnershipInput, "accounts" | "hostKind">;
+
+/** An existing direct chat decides even when its creator is absent. */
 export function resolveDirectChatOwnership(
   input: {
-    directChatCreatedBy: SessionActor | null | undefined;
+    directChat?: { createdBy?: SessionActor; participationKey?: string };
     bot: { isOwner?: boolean; owner?: SessionActor };
   },
-  accounts: readonly ReaderAccount[],
+  context: OwnershipContext,
 ): Ownership {
-  return input.directChatCreatedBy
-    ? resolveOwnership({ createdBy: input.directChatCreatedBy, accounts })
-    : resolveBotOwnership(input.bot, accounts);
+  return input.directChat
+    ? resolveOwnership({
+        createdBy: input.directChat.createdBy,
+        participationKey: input.directChat.participationKey,
+        ...context,
+      })
+    : resolveBotOwnership(input.bot, context);
 }
 
-/** A Bot row without a chat: the Host's own ownership projection wins over the owner snapshot. */
 export function resolveBotOwnership(
   bot: { isOwner?: boolean; owner?: SessionActor },
-  accounts: readonly ReaderAccount[],
+  context: OwnershipContext,
 ): Ownership {
-  if (bot.isOwner === true) return "mine";
-  if (bot.isOwner === false) return "others";
-  return resolveOwnership({ createdBy: bot.owner, accounts });
+  return resolveOwnership({ createdBy: bot.owner, directOwner: bot.isOwner, ...context });
+}
+
+/**
+ * Whether the reader sees `ownership` as theirs: everything not proven to be someone else's. Work
+ * with no recorded author, such as sessions the desktop app started on its own Host before the
+ * daemon stamped a creator, stays in For me rather than looking like a teammate's.
+ */
+export function isReaderOwned(ownership: Ownership): boolean {
+  return ownership !== "others";
 }
 
 export function inScope(scope: OwnershipScope, ownership: Ownership): boolean {
   if (scope === "all") return true;
-  return scope === "mine" ? ownership === "mine" : ownership !== "mine";
+  return scope === "mine" ? isReaderOwned(ownership) : !isReaderOwned(ownership);
 }
 
-/** `all` is `mine` + `others`; work that cannot be told apart is counted under `others`. */
+/** `all` is `mine` + `others`; work that cannot be told apart is counted under `mine`. */
 export interface ScopeCounts {
   mine: number;
   others: number;
@@ -112,7 +146,7 @@ export const EMPTY_SCOPE_COUNTS: Readonly<ScopeCounts> = { mine: 0, others: 0, a
 
 /** Adds one item to the counts of the scopes it is listed under. */
 export function addToScopeCounts(counts: ScopeCounts, ownership: Ownership): void {
-  counts[ownership === "mine" ? "mine" : "others"] += 1;
+  counts[isReaderOwned(ownership) ? "mine" : "others"] += 1;
   counts.all += 1;
 }
 

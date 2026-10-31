@@ -69,7 +69,11 @@ import {
 } from "@/workspace-tabs/identity";
 import { isSheetTabModified, resolveCompactSheetPolicy } from "@/workspace-tabs/compact-sheet";
 import { panelResourceKey, type CompactSheetPolicy } from "@/panels/panel-manifest";
-import { createValidatedPersistStorage } from "@/storage/validated-persist-storage";
+import {
+  createValidatedPersistStorage,
+  type ValidatedPersistStorageOptions,
+} from "@/storage/validated-persist-storage";
+import { isNative } from "@/constants/platform";
 import { panelTargetSupportsHostForWorkspaceKey } from "@/plugins/workspace-panels/locations";
 
 export {
@@ -1027,6 +1031,7 @@ function advancePanelRevision(
 export function createWorkspaceLayoutStore(
   ids: WorkspaceLayoutIdSource = defaultWorkspaceLayoutIds,
   storage: StateStorage = AsyncStorage,
+  persistence: Pick<ValidatedPersistStorageOptions, "writeAfter"> = {},
 ) {
   return create<WorkspaceLayoutStore>()(
     persist(
@@ -1681,6 +1686,11 @@ export function createWorkspaceLayoutStore(
           if (!normalizedWorkspaceKey) {
             return;
           }
+          // Agents can hydrate before the workspace, which the pending open waits for. Reconciling
+          // first would focus some other agent, show it, and keep it mounted behind the opened one.
+          if (get().pendingOpenByWorkspace[normalizedWorkspaceKey]) {
+            return;
+          }
 
           set((state) => {
             const rawLayout = getWorkspaceLayout(state.layoutByWorkspace, normalizedWorkspaceKey);
@@ -2290,6 +2300,7 @@ export function createWorkspaceLayoutStore(
         version: WORKSPACE_LAYOUT_PERSIST_VERSION,
         storage: createValidatedPersistStorage(storage, WorkspaceLayoutPersistedStateSchema, {
           skipUnchanged: true,
+          writeAfter: persistence.writeAfter,
         }),
         migrate: (persistedState, version) =>
           migrateWorkspaceLayoutPersistedState(persistedState, version, ids),
@@ -2353,7 +2364,16 @@ export function createWorkspaceLayoutStore(
   );
 }
 
-export const useWorkspaceLayoutStore = createWorkspaceLayoutStore();
+// Saving validates and serializes every workspace's layout: tens of milliseconds per change on a
+// phone with a few hundred opened workspaces, inside the press that opens a session. Native saves
+// a moment later instead, once for the changes in between.
+const NATIVE_LAYOUT_WRITE_DELAY_MS = 500;
+
+export const useWorkspaceLayoutStore = createWorkspaceLayoutStore(undefined, AsyncStorage, {
+  writeAfter: isNative
+    ? (flush) => void setTimeout(flush, NATIVE_LAYOUT_WRITE_DELAY_MS)
+    : undefined,
+});
 
 /**
  * The agent tabs that exist right now, including sheet tabs, across every workspace of this host,

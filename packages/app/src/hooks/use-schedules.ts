@@ -4,6 +4,7 @@ import {
   getHostRuntimeStore,
   useHostRuntimeConnectionStatuses,
   useHosts,
+  type HostRuntimeConnectionStatus,
 } from "@/runtime/host-runtime";
 import {
   fetchAggregatedSchedules,
@@ -22,6 +23,24 @@ export type {
 
 export function schedulesQueryKey(serverIds: readonly string[]) {
   return [...schedulesQueryBaseKey, [...serverIds].sort().join("|")] as const;
+}
+
+/**
+ * What the aggregated fetch's answer depends on: the Hosts it asks (online) and whether any Host is
+ * still settling. Keying on every status refetched all Hosts on each offline/error/connecting flip,
+ * which a cold start with a fleet of Hub Hosts produces many times a minute.
+ */
+export function schedulesConnectionKey(
+  serverIds: readonly string[],
+  statuses: ReadonlyMap<string, HostRuntimeConnectionStatus>,
+): string {
+  const statusOf = (serverId: string) => statuses.get(serverId) ?? "connecting";
+  const online = serverIds.filter((serverId) => statusOf(serverId) === "online");
+  const settling = serverIds.some((serverId) => {
+    const status = statusOf(serverId);
+    return status === "connecting" || status === "idle";
+  });
+  return `${online.join("|")}#${settling ? "settling" : "settled"}`;
 }
 
 export interface UseSchedulesResult {
@@ -43,7 +62,7 @@ export function useSchedules(): UseSchedulesResult {
   const serverIds = useMemo(() => hostInputs.map((host) => host.serverId), [hostInputs]);
   const connectionStatuses = useHostRuntimeConnectionStatuses(serverIds);
   const connectionStatusKey = useMemo(
-    () => serverIds.map((serverId) => connectionStatuses.get(serverId) ?? "connecting").join("|"),
+    () => schedulesConnectionKey(serverIds, connectionStatuses),
     [connectionStatuses, serverIds],
   );
 

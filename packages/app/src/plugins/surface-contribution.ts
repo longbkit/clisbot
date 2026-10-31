@@ -70,6 +70,19 @@ export function currentPluginScreen(
   return screenId ? { screenId, params: pluginScreenParamsFromRoute(routeParams) } : null;
 }
 
+export function isSamePluginScreen(
+  left: PluginScreenLocation | null,
+  right: PluginScreenLocation | null,
+): boolean {
+  if (left === null || right === null) return left === right;
+  if (left.screenId !== right.screenId) return false;
+  const leftKeys = Object.keys(left.params);
+  return (
+    leftKeys.length === Object.keys(right.params).length &&
+    leftKeys.every((key) => left.params[key] === right.params[key])
+  );
+}
+
 /** Checks an `openScreen` input against the installation's screens. Throws when it is invalid. */
 export function parsePluginOpenScreenInput(
   plugin: InstalledPlugin,

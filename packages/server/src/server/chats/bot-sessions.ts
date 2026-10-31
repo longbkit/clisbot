@@ -1,3 +1,4 @@
+import type { SessionOperationIdentity } from "../agent/session-authorship.js";
 import { withSessionOperationIdentity } from "../agent/session-operation-context.js";
 // One agent session per (bot, chat) pair (docs/features/bots-and-chats/README.md,
 // D2, D7). The labels on the agent are the truth; `participants[bot].agentId` is a
@@ -37,6 +38,7 @@ export interface BotSessionsDependencies {
 interface SessionStart {
   title: string | undefined;
   systemPrompt: string | undefined;
+  creationIdentity?: SessionOperationIdentity;
 }
 
 export class BotSessions {
@@ -53,9 +55,14 @@ export class BotSessions {
     bot: ChatBot,
     title?: string,
     systemPrompt?: string,
+    creationIdentity?: SessionOperationIdentity,
   ): Promise<ResolvedBotSession> {
     return this.queue.run(pairKey(chat.id, bot.id), () =>
-      this.resolveUnlocked(chat, bot, { title, systemPrompt }),
+      this.resolveUnlocked(chat, bot, {
+        title,
+        systemPrompt,
+        ...(creationIdentity ? { creationIdentity } : {}),
+      }),
     );
   }
 
@@ -121,25 +128,27 @@ export class BotSessions {
   private async create(
     chat: StoredChat,
     bot: ChatBot,
-    { title, systemPrompt }: SessionStart,
+    { title, systemPrompt, creationIdentity }: SessionStart,
     replaced: BotSessionReplacement | null,
   ): Promise<ResolvedBotSession> {
     const launch = chat.launch ?? bot.launch;
-    const result = await withSessionOperationIdentity({ actor: chat.createdBy }, () =>
-      this.deps.createAgent({
-        kind: "mcp",
-        provider: formatProviderModel(launch.provider, launch.model),
-        title: title ?? chat.title ?? bot.displayName,
-        ...(launch.modeId ? { mode: launch.modeId } : {}),
-        ...(launch.thinkingOptionId ? { thinking: launch.thinkingOptionId } : {}),
-        ...(launch.featureValues ? { features: launch.featureValues } : {}),
-        ...(systemPrompt ? { config: { systemPrompt } } : {}),
-        cwd: bot.cwd,
-        workspaceId: bot.workspaceId,
-        labels: { [BOT_ID_LABEL]: bot.id, [CHAT_ID_LABEL]: chat.id },
-        notifyOnFinish: false,
-        promptFailure: "throw",
-      }),
+    const result = await withSessionOperationIdentity(
+      creationIdentity ?? { actor: chat.createdBy },
+      () =>
+        this.deps.createAgent({
+          kind: "mcp",
+          provider: formatProviderModel(launch.provider, launch.model),
+          title: title ?? chat.title ?? bot.displayName,
+          ...(launch.modeId ? { mode: launch.modeId } : {}),
+          ...(launch.thinkingOptionId ? { thinking: launch.thinkingOptionId } : {}),
+          ...(launch.featureValues ? { features: launch.featureValues } : {}),
+          ...(systemPrompt ? { config: { systemPrompt } } : {}),
+          cwd: bot.cwd,
+          workspaceId: bot.workspaceId,
+          labels: { [BOT_ID_LABEL]: bot.id, [CHAT_ID_LABEL]: chat.id },
+          notifyOnFinish: false,
+          promptFailure: "throw",
+        }),
     );
     const agentId = result.snapshot.id;
     await this.deps.store.setParticipantAgent(chat.id, bot.id, agentId);

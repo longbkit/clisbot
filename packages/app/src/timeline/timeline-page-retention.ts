@@ -1,3 +1,5 @@
+import { OFFLINE_CACHE_ENABLED } from "@/runtime/replica-cache/offline-flag";
+
 /** Metadata only. Timeline payloads remain in the existing session/subagent stores. */
 export interface RetainedTimelinePage {
   epoch: string;
@@ -31,6 +33,23 @@ interface TimelineOwner {
   visible: boolean;
   readingItemId: string | null;
   changed: (change: TimelineRetentionChange) => void;
+  cancelHiddenRelease: (() => void) | null;
+}
+
+/**
+ * A session nobody is viewing keeps its pages this long (reopening it within that window is
+ * instant), then releases them. `null` keeps hidden pages until the byte budget needs them.
+ */
+export interface HiddenTimelineRelease {
+  ttlMs: number;
+  schedule: (release: () => void, delayMs: number) => () => void;
+}
+
+export const HIDDEN_TIMELINE_TTL_MS = 5 * 60 * 1000;
+
+function scheduleTimeout(release: () => void, delayMs: number): () => void {
+  const timer = setTimeout(release, delayMs);
+  return () => clearTimeout(timer);
 }
 export const TIMELINE_MEMORY_LIMITS = {
   sessionBytes: 8 * 1024 * 1024,
@@ -103,6 +122,7 @@ export class TimelinePageRetention {
       pageMetadataBytes: number;
       ownerMetadataBytes?: number;
     } = TIMELINE_MEMORY_LIMITS,
+    private readonly hiddenRelease: HiddenTimelineRelease | null = null,
   ) {}
   register(key: string, changed: TimelineOwner["changed"], sessionKey = key): () => void {
     this.remove(key);
@@ -114,6 +134,7 @@ export class TimelinePageRetention {
       visible: false,
       readingItemId: null,
       changed,
+      cancelHiddenRelease: null,
     });
     this.bytes += this.limits.ownerMetadataBytes ?? 0;
     this.enforce();
@@ -132,8 +153,31 @@ export class TimelinePageRetention {
   private remove(key: string): void {
     const owner = this.owners.get(key);
     if (!owner) return;
+    owner.cancelHiddenRelease?.();
     this.bytes -= owner.bytes;
     this.owners.delete(key);
+  }
+  private updateHiddenRelease(owner: TimelineOwner, wasVisible: boolean): void {
+    if (!this.hiddenRelease) return;
+    if (owner.visible) {
+      owner.cancelHiddenRelease?.();
+      owner.cancelHiddenRelease = null;
+      return;
+    }
+    if (owner.cancelHiddenRelease && !wasVisible) return;
+    owner.cancelHiddenRelease?.();
+    owner.cancelHiddenRelease = this.hiddenRelease.schedule(
+      () => this.releaseHidden(owner),
+      this.hiddenRelease.ttlMs,
+    );
+  }
+  private releaseHidden(owner: TimelineOwner): void {
+    owner.cancelHiddenRelease = null;
+    if (owner.visible || owner.pages.size === 0) return;
+    owner.pages.clear();
+    this.recount(owner);
+    owner.changed(retainedRange(owner.pages.values()));
+    for (const listener of this.listeners) listener();
   }
   private sessionBytes(sessionKey: string): number {
     let bytes = 0;
@@ -159,8 +203,10 @@ export class TimelinePageRetention {
   setReading(key: string, visible: boolean, itemId: string | null): void {
     const owner = this.owners.get(key);
     if (!owner) return;
+    const wasVisible = owner.visible;
     owner.visible = visible;
     owner.readingItemId = itemId;
+    this.updateHiddenRelease(owner, wasVisible);
     const page = this.protectedPage(owner);
     if (page) page.accessed = ++this.clock;
     this.enforce();
@@ -334,7 +380,10 @@ export class TimelinePageRetention {
   }
 }
 
-export const timelinePageRetention = new TimelinePageRetention();
+export const timelinePageRetention = new TimelinePageRetention(
+  TIMELINE_MEMORY_LIMITS,
+  OFFLINE_CACHE_ENABLED ? { ttlMs: HIDDEN_TIMELINE_TTL_MS, schedule: scheduleTimeout } : null,
+);
 export function timelineRetentionKey(serverId: string, agentId: string): string {
   return JSON.stringify([serverId, "agent", agentId]);
 }

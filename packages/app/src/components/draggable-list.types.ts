@@ -55,6 +55,8 @@ export interface DraggableListProps<T> {
   waitFor?: MutableRefObject<GestureType | undefined> | MutableRefObject<GestureType | undefined>[];
   /** Called when a drag gesture begins (before items are reordered) */
   onDragBegin?: () => void;
+  /** Called when a native drag has finished settling or was cancelled. */
+  onDragSettled?: () => void;
   /** Called immediately before invoking row `drag()` to lock outer owners. */
   onDragIntent?: () => void;
   /** Called when drag interaction ends (finger released). */

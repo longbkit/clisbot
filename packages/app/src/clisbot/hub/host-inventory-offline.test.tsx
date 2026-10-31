@@ -10,6 +10,8 @@ const ORIGIN = "https://company.example.test";
 
 const state = vi.hoisted(() => ({
   storage: new Map<string, string>(),
+  /** Hosts with a registered ticket resolver (a mounted Hub binding). */
+  bound: new Set<string>(),
   /** What `GET daemons` does next. */
   list: { kind: "ok" as "ok" | "unreachable" | "forbidden", daemonIds: ["build-01"] },
   /** null = the account state could not be read (Hub unreachable). */
@@ -87,10 +89,19 @@ vi.mock("@/runtime/host-runtime", () => ({
   getHostRuntimeStore: () => ({
     getHosts: () => state.hosts,
     removeManagedHost: async () => true,
+    upsertManagedConnectionFromOffer: async ({ offer }: { offer: { serverId: string } }) => ({
+      serverId: offer.serverId,
+    }),
+    adoptHostConnection: async () => undefined,
+    whenHostRegistryLoaded: async () => undefined,
+    markColdStartPhase: () => undefined,
   }),
 }));
 vi.mock("@/runtime/host-session-access", () => ({
-  registerHostAccessTicketResolver: () => () => undefined,
+  registerHostAccessTicketResolver: (serverId: string) => {
+    state.bound.add(serverId);
+    return () => state.bound.delete(serverId);
+  },
 }));
 
 const { useHostInventory } = await import("./host-inventory");
@@ -147,6 +158,7 @@ function remembered(daemonIds: string[], syncedAt = "2026-10-25T09:00:00.000Z") 
 beforeEach(() => {
   vi.stubGlobal("React", React);
   state.storage.clear();
+  state.bound.clear();
   state.list = { kind: "ok", daemonIds: ["build-01"] };
   state.accountState = "active";
   state.hosts = [managedHost("build-01"), managedHost("build-02")];
@@ -227,10 +239,13 @@ describe("Hub Hosts while the Hub is unreachable", () => {
     const view = render(tree());
     await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
     expect(getHubDaemonListCache().get(ORIGIN)?.accountId).toBe("acct");
+    // Before the Hub answers, the remembered list binds its Hosts so they connect at once.
+    expect([...state.bound]).toEqual(["srv-build-01"]);
 
     state.accountState = "signedOut";
     view.rerender(tree());
     await waitFor(() => expect(getHubDaemonListCache().get(ORIGIN)).toBeUndefined());
+    expect([...state.bound]).toEqual([]);
   });
 
   it("does not show another account's list or a list the Hub signed out of", () => {

@@ -12,7 +12,7 @@ import { useStoreWithEqualityFn } from "zustand/traditional";
 import { getChatIdFromLabels } from "@clisbot/protocol/bots/labels";
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { useResourcePrincipalScope } from "@/clisbot/bots/data/resource-principal-scope";
-import { useBotCatalog } from "@/clisbot/bots/data/runtime";
+import { HeldContextValue } from "@/components/held-context";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useHosts } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
@@ -28,9 +28,10 @@ import {
   type IssueRecords,
   type IssueSubject,
 } from "./issues";
-import { usePathname } from "expo-router";
+import { useRoutePath } from "@/navigation/route-source";
 import { parseChatRouteFromPathname } from "@/clisbot/bots/routes";
 import { parseHostWorkspaceRouteFromPathname } from "@/utils/host-routes";
+import { useOwnershipHosts } from "./use-ownership-hosts";
 import { resolveOwnership, type Ownership } from "./ownership";
 import { useReaderAccounts, useRememberVerifiedReaders } from "./reader";
 import { useNavigationAgents } from "./use-navigation-agents";
@@ -40,8 +41,9 @@ const MINUTE = 60_000;
 interface NavigationActivity {
   rows: HomeRow[];
   badge: number;
-  now: number;
-  ownershipOf: (agent: Pick<AggregatedAgent, "serverId" | "workspaceId" | "labels">) => Ownership;
+  ownershipOf: (
+    agent: Pick<AggregatedAgent, "serverId" | "createdBy" | "participationKey">,
+  ) => Ownership;
   /** Author lookup for a workspace, the source of ownership for Work rows and pins. */
   workspaceAuthor: (serverId: string, workspaceId: string) => SessionActor | undefined;
   markSeen: (agent: AggregatedAgent) => void;
@@ -59,6 +61,14 @@ const Context = createContext<NavigationActivity | null>(null);
 export function NavigationActivityProvider({ children }: { children: ReactNode }) {
   if (!NAVIGATION_V2_ENABLED) return children;
   return <ObservedNavigationActivity>{children}</ObservedNavigationActivity>;
+}
+
+/**
+ * The activity as it was when the surrounding retained panel was hidden: a hidden Home tab skips
+ * every directory update and renders once with the latest rows when shown.
+ */
+export function HeldNavigationActivity({ children }: { children: ReactNode }) {
+  return <HeldContextValue context={Context}>{children}</HeldContextValue>;
 }
 
 function ObservedNavigationActivity({ children }: { children: ReactNode }) {
@@ -93,7 +103,6 @@ function ObservedNavigationActivity({ children }: { children: ReactNode }) {
     () => ({
       rows,
       badge: homeBadgeCount(rows),
-      now,
       ...ownership,
       markSeen: (agent) =>
         transition((current) => markIssueSeen(current, subjectOf(agent), Date.now())),
@@ -104,7 +113,9 @@ function ObservedNavigationActivity({ children }: { children: ReactNode }) {
       markAllSeen: (list) =>
         transition((current) => markIssuesSeen(current, list.map(subjectOf), Date.now())),
     }),
-    [rows, now, ownership, subjectOf, transition],
+    // The minute clock reaches readers only through `rows`, which keep their identity unless a
+    // seen failure aged out, so the tick re-renders nobody.
+    [rows, ownership, subjectOf, transition],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
@@ -133,18 +144,27 @@ function useIssueSubjects(): (agent: AggregatedAgent) => IssueSubject {
  * the issues of the sessions it shows. The daemon clears a failure's attention on its own; a
  * request has no daemon signal, so this is what sees it.
  */
+function openedSessionPath(pathname: string): string | null {
+  const opened =
+    parseHostWorkspaceRouteFromPathname(pathname) !== null ||
+    parseChatRouteFromPathname(pathname) !== null;
+  return opened ? pathname : null;
+}
+
 function useMarkOpenedSeen(
   rows: readonly HomeRow[],
   subjectOf: (agent: AggregatedAgent) => IssueSubject,
   transition: (apply: (current: IssueRecords) => IssueRecords) => void,
 ) {
-  const pathname = usePathname();
-  const routeServerId = parseHostWorkspaceRouteFromPathname(pathname)?.serverId;
+  // Tab switches and app pages open no session; only a session route re-renders this provider.
+  const pathname = useRoutePath(openedSessionPath);
+  const routeServerId = parseHostWorkspaceRouteFromPathname(pathname ?? "")?.serverId;
   // A workspace holds many sessions; only the one on screen has been opened.
   const focusedAgentId = useSessionStore((state) =>
     routeServerId ? (state.sessions[routeServerId]?.focusedAgentId ?? null) : null,
   );
   useEffect(() => {
+    if (pathname === null) return;
     const workspace = parseHostWorkspaceRouteFromPathname(pathname);
     const chat = parseChatRouteFromPathname(pathname);
     if (!workspace && !chat) return;
@@ -196,14 +216,7 @@ function useOwnership() {
     (state) => serverIds.map((id) => state.sessions[id]?.workspaces ?? null),
     shallow,
   );
-  const { chats } = useBotCatalog();
-  const chatAuthors = useMemo(() => {
-    const map = new Map<string, SessionActor | undefined>();
-    if (chats.loadState.status !== "loaded") return map;
-    for (const chat of chats.loadState.data)
-      map.set(`${chat.serverId}:${chat.id}`, chat.record?.createdBy);
-    return map;
-  }, [chats.loadState]);
+  const hostKinds = useOwnershipHosts();
   const workspaceAuthor = useCallback(
     (serverId: string, workspaceId: string) => {
       const index = serverIds.indexOf(serverId);
@@ -212,19 +225,14 @@ function useOwnership() {
     [serverIds, workspaceMaps],
   );
   const ownershipOf = useCallback(
-    (
-      agent: Pick<AggregatedAgent, "serverId" | "workspaceId" | "labels" | "createdBy">,
-    ): Ownership => {
-      // A session's own author decides; its chat's or workspace's author only stands in for a
-      // session that records none (the same rule the Workspace list scopes by).
-      const chatId = getChatIdFromLabels(agent.labels);
-      let createdBy: SessionActor | undefined = agent.createdBy;
-      if (!createdBy && chatId) createdBy = chatAuthors.get(`${agent.serverId}:${chatId}`);
-      else if (!createdBy && agent.workspaceId)
-        createdBy = workspaceAuthor(agent.serverId, agent.workspaceId);
-      return resolveOwnership({ createdBy, accounts });
-    },
-    [accounts, chatAuthors, workspaceAuthor],
+    (agent: Pick<AggregatedAgent, "serverId" | "createdBy" | "participationKey">): Ownership =>
+      resolveOwnership({
+        createdBy: agent.createdBy,
+        participationKey: agent.participationKey,
+        accounts,
+        hostKind: hostKinds.get(agent.serverId) ?? "unknown",
+      }),
+    [accounts, hostKinds],
   );
   return useMemo(() => ({ ownershipOf, workspaceAuthor }), [ownershipOf, workspaceAuthor]);
 }

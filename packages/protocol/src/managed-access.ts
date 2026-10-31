@@ -39,8 +39,23 @@ export const MANAGED_ACCESS_UNAVAILABLE_REASON = "Hub admission temporarily unav
  * `status`). Network errors, timeouts and 5xx carry no such status and are worth a retry.
  */
 export function isDefinitiveAdmissionDenial(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
+  const code = hubStatusOf(error);
+  return code !== null && code >= 400 && code < 500 && code !== 408 && code !== 429;
+}
+
+/**
+ * A Hub answer that says this account no longer has the Host (403, 404, 410...). A 401 says our
+ * token was refused and a 400 says our request was wrong; neither says anything about the Host,
+ * so a client must keep the Host and sign in again instead of removing it.
+ */
+export function isAccessRevocation(error: unknown): boolean {
+  const code = hubStatusOf(error);
+  return isDefinitiveAdmissionDenial(error) && code !== 400 && code !== 401;
+}
+
+function hubStatusOf(error: unknown): number | null {
+  if (typeof error !== "object" || error === null) return null;
   const { statusCode, status } = error as { statusCode?: unknown; status?: unknown };
   const code = typeof statusCode === "number" ? statusCode : status;
-  return typeof code === "number" && code >= 400 && code < 500 && code !== 408 && code !== 429;
+  return typeof code === "number" ? code : null;
 }

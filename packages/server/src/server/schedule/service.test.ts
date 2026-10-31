@@ -39,6 +39,7 @@ import {
 } from "./service.js";
 import { ScheduleStore } from "./store.js";
 import type { ScheduleExecutionResult, StoredSchedule } from "@clisbot/protocol/schedule/types";
+import { withSessionOperationIdentity } from "../agent/session-operation-context.js";
 
 interface ScheduleServiceInternals {
   executeSchedule(schedule: StoredSchedule, runId: string): Promise<ScheduleExecutionResult>;
@@ -336,6 +337,168 @@ describe("ScheduleService", () => {
     // ENOTEMPTY races when AgentManager flushes a snapshot mid-cleanup.
     await agentStorage.flush();
     await rm(tempDir, { recursive: true, force: true });
+  });
+
+  const creator = {
+    kind: "user" as const,
+    id: "creator",
+    memberId: "member-creator",
+    hubOrigin: "https://hub.example",
+    organizationId: "organization",
+  };
+  const operator = { ...creator, id: "operator", memberId: "member-operator" };
+  const ownedScheduleInput = () => ({
+    name: "Ownership fixture",
+    prompt: "Report fixture status",
+    cadence: { type: "every" as const, everyMs: 60_000 },
+    target: {
+      type: "new-agent" as const,
+      config: { provider: "claude", model: "test-model", cwd: tempDir },
+    },
+    runOnCreate: false,
+    maxRuns: 1,
+  });
+  function ownershipService(enabled = true) {
+    return createScheduleService({
+      clisbotHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: new AgentManager({
+        logger: createTestLogger(),
+        clients: createTestAgentClients(),
+        registry: agentStorage,
+        agentSessionStorage: enabled,
+      }),
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      now: () => now,
+    });
+  }
+
+  test("schedule ownership survives edit, restart, another operator and authorship recovery", async () => {
+    const service = ownershipService();
+    const input = ownedScheduleInput();
+    const created = await withSessionOperationIdentity({ actor: creator }, () =>
+      service.createOrReplace(input),
+    );
+    expect(created.createdBy).toEqual(creator);
+    const updated = await withSessionOperationIdentity({ actor: operator }, () =>
+      service.createOrReplace({ ...input, prompt: "Updated fixture" }),
+    );
+    expect(updated.id).toBe(created.id);
+    expect(updated.createdBy).toEqual(creator);
+
+    const restarted = ownershipService();
+    await restarted.start();
+    await restarted.stop();
+    expect((await restarted.inspect(created.id)).createdBy).toEqual(creator);
+    await withSessionOperationIdentity({ actor: operator }, () => restarted.runOnce(created.id));
+    const run = (await restarted.inspect(created.id)).runs[0]!;
+    expect(run.status).toBe("succeeded");
+    expect(run.agentId).toBeTruthy();
+    const record = await agentStorage.get(run.agentId!);
+    expect(record?.createdBy).toMatchObject({ kind: "automation", id: created.id });
+    expect(record?.ownerActor).toEqual(creator);
+    await agentStorage.flush();
+    const reloaded = new AgentStorage(join(tempDir, "agents"), createTestLogger());
+    expect((await reloaded.get(run.agentId!))?.ownerActor).toEqual(creator);
+    // A replayed interaction may update participants, never creation ownership.
+    await reloaded.applyAuthorship(run.agentId!, {
+      watermark: "ownership-recovery-fixture",
+      summary: {
+        ownerActor: operator,
+        createdBy: operator,
+        lastMessageBy: operator,
+        participantActors: [operator],
+      },
+    });
+    const recovered = await reloaded.get(run.agentId!);
+    expect(recovered?.createdBy).toMatchObject({ kind: "automation", id: created.id });
+    expect(recovered?.ownerActor).toEqual(creator);
+    expect(recovered?.lastMessageBy).toEqual(operator);
+    await reloaded.flush();
+  });
+
+  test("schedule ownership never comes from MCP arguments or the later run-once operator", async () => {
+    const service = ownershipService();
+    const forged = { ...ownedScheduleInput(), createdBy: creator, ownerActor: creator };
+    const created = await service.create(forged);
+    expect(created.createdBy).toBeUndefined();
+    const restarted = ownershipService();
+    await withSessionOperationIdentity({ actor: operator }, () => restarted.runOnce(created.id));
+    const run = (await restarted.inspect(created.id)).runs[0]!;
+    expect(run.status).toBe("succeeded");
+    const record = await agentStorage.get(run.agentId!);
+    expect(record?.createdBy).toMatchObject({ kind: "automation", id: created.id });
+    expect(record?.ownerActor).toBeUndefined();
+  });
+
+  test("schedule ownership stays disabled with session storage and captures heartbeat creators", async () => {
+    const disabled = ownershipService(false);
+    const created = await withSessionOperationIdentity({ actor: creator }, () =>
+      disabled.create(ownedScheduleInput()),
+    );
+    expect(created.createdBy).toBeUndefined();
+    await disabled.runOnce(created.id);
+    const run = (await disabled.inspect(created.id)).runs[0]!;
+    expect(run.status).toBe("succeeded");
+    const record = await agentStorage.get(run.agentId!);
+    expect(record?.createdBy).toBeUndefined();
+    expect(record?.ownerActor).toBeUndefined();
+    const heartbeat = await withSessionOperationIdentity({ actor: creator }, () =>
+      ownershipService().create({
+        ...ownedScheduleInput(),
+        target: { type: "agent", agentId: run.agentId! },
+      }),
+    );
+    expect(heartbeat.createdBy).toEqual(creator);
+  });
+
+  test("heartbeat creators survive edits and restart without changing the existing session owner", async () => {
+    const agentId = "77777777-7777-4777-8777-777777777777";
+    await agentStorage.upsert({
+      ...buildAgentRecord({
+        id: agentId,
+        cwd: tempDir,
+        iso: now.toISOString(),
+        labels: { "clisbot.bot-id": "bot_a", "clisbot.chat-id": "chat_1" },
+      }),
+      createdBy: operator,
+    });
+    const posts: import("./chat-delivery.js").ScheduleChatPost[] = [];
+    const chats = {
+      postScheduled: async (post: import("./chat-delivery.js").ScheduleChatPost) => {
+        posts.push(post);
+        return { status: "posted" as const, agentId };
+      },
+    };
+    const service = ownershipService();
+    service.attachChats(chats);
+    const input = {
+      ...ownedScheduleInput(),
+      name: "Heartbeat ownership",
+      target: { type: "agent" as const, agentId, chatId: "chat_1" },
+    };
+    const created = await withSessionOperationIdentity({ actor: creator }, () =>
+      service.createOrReplace(input),
+    );
+    await withSessionOperationIdentity({ actor: operator }, () =>
+      service.createOrReplace({ ...input, prompt: "Updated heartbeat" }),
+    );
+    const restarted = ownershipService();
+    restarted.attachChats(chats);
+    expect((await restarted.inspect(created.id)).createdBy).toEqual(creator);
+    await withSessionOperationIdentity({ actor: operator }, () => restarted.runOnce(created.id));
+    expect(posts).toHaveLength(1);
+    expect(posts[0]?.sessionIdentity).toMatchObject({
+      actor: { kind: "automation", id: created.id },
+      ownerActor: creator,
+    });
+    expect(posts[0]?.actor).toMatchObject({
+      kind: "automation",
+      id: created.id,
+      hubOrigin: creator.hubOrigin,
+    });
+    expect((await agentStorage.get(agentId))?.createdBy).toEqual(operator);
   });
 
   test("ticks due schedules and records run history on disk", async () => {

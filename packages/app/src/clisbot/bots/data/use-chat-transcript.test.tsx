@@ -93,6 +93,36 @@ it("retains connection-lost only while authentication has not rejected the admis
   expect(hook.result.current.loadState).toMatchObject({ retainAccepted: false });
 });
 
+it("paints the offline tail before any page is accepted, and never once access is refused", () => {
+  const cached = [
+    { id: "c1", seq: 1, text: "saved", at: "now", sender: { kind: "user" as const } },
+  ];
+  useTranscriptStore
+    .getState()
+    .hydrateCached("host@1:1:chat", { messages: cached, hasOlder: false });
+  state.online = false;
+  const hook = renderHook(
+    (props: { allowed: boolean }) =>
+      useChatTranscriptQuery({
+        serverId: "host",
+        chatId: "chat",
+        runtime,
+        presentationAllowed: props.allowed,
+      }),
+    { initialProps: { allowed: true } },
+  );
+  expect(hook.result.current.transcript.messages).toEqual(cached);
+  expect(hook.result.current.loadState.status).toBe("connecting");
+
+  hook.rerender({ allowed: false });
+  expect(hook.result.current.transcript.messages).toEqual([]);
+
+  hook.rerender({ allowed: true });
+  state.authFailure = true;
+  hook.rerender({ allowed: true });
+  expect(hook.result.current.transcript.messages).toEqual([]);
+});
+
 it("reports an active refresh independently of already loaded content", () => {
   state.data = { messages: [], hasOlder: false };
   state.fetching = true;

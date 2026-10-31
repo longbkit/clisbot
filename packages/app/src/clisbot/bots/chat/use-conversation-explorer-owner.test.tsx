@@ -5,7 +5,7 @@ const native = vi.hoisted(() => ({ back: vi.fn(), remove: vi.fn() }));
 vi.mock("react-native", () => ({
   BackHandler: { addEventListener: native.back },
 }));
-vi.mock("@/constants/platform", () => ({ isWeb: false }));
+vi.mock("@/constants/platform", () => ({ isWeb: false, isNative: false }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
 vi.mock("@/workspace-tabs/open-beside", () => ({
   openWorkspaceTargetAtLocation: vi.fn(),

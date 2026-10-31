@@ -2,6 +2,7 @@ import type { SessionAuthorship } from "@clisbot/protocol/session-authorship";
 import equal from "fast-deep-equal";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
+import { createStoreBatching, type StoreInitializer } from "./store-batching";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { ViewedTimelineOwner } from "@/timeline/viewed-timeline-sync";
 import type { AgentDirectoryEntry } from "@/types/agent-directory";
@@ -51,7 +52,7 @@ import {
   type AgentLastActivityCommitter,
 } from "@/runtime/activity";
 import {
-  buildWorkspaceAgentActivityIndex,
+  advanceWorkspaceAgentActivityIndex,
   type WorkspaceAgentActivity,
 } from "@/utils/workspace-agent-activity";
 import {
@@ -219,6 +220,7 @@ function preserveWorkspaceDescriptorIdentity(
   return incoming;
 }
 
+// May return `incoming` itself: the caller hands the map over and never mutates it again.
 function preserveMapIdentity<Key, Value>(
   existing: Map<Key, Value>,
   incoming: Map<Key, Value>,
@@ -229,12 +231,15 @@ function preserveMapIdentity<Key, Value>(
 
   const next = new Map<Key, Value>();
   let changed = existing.size !== incoming.size;
+  // Whether `next` differs from `incoming` by keeping an equal stored value.
+  let kept = false;
   const existingEntries = existing.entries();
 
   for (const [key, workspace] of incoming) {
     const existingWorkspace = existing.get(key);
     const nextWorkspace =
       existingWorkspace && equal(existingWorkspace, workspace) ? existingWorkspace : workspace;
+    if (nextWorkspace !== workspace) kept = true;
     next.set(key, nextWorkspace);
     const existingEntry = existingEntries.next().value;
     if (!existingEntry || existingEntry[0] !== key || existingEntry[1] !== nextWorkspace) {
@@ -242,7 +247,8 @@ function preserveMapIdentity<Key, Value>(
     }
   }
 
-  return changed ? next : existing;
+  if (!changed) return existing;
+  return kept ? next : incoming;
 }
 
 export type ExplorerEntryKind = "file" | "directory";
@@ -754,8 +760,17 @@ function isSessionServerInfoUnchanged(input: {
   );
 }
 
+const sessionStoreBatching = createStoreBatching<SessionStore>();
+
+/** Clisbot: publishes every session write inside `commit` as one store notification. */
+export const batchSessionStoreUpdates = sessionStoreBatching.batch;
+
+function batchedSubscribeWithSelector(initializer: StoreInitializer<SessionStore>) {
+  return subscribeWithSelector(sessionStoreBatching.wrap(initializer));
+}
+
 export const useSessionStore = create<SessionStore>()(
-  subscribeWithSelector((set, get) => {
+  batchedSubscribeWithSelector((set, get) => {
     const commitActivityUpdates: AgentLastActivityCommitter = (updates) => {
       set((prev) => {
         let nextActivity: Map<string, Date> | null = null;
@@ -1539,7 +1554,10 @@ export const useSessionStore = create<SessionStore>()(
           if (!session) {
             return prev;
           }
-          const nextAgents = typeof agents === "function" ? agents(session.agents) : agents;
+          const nextAgents = preserveMapIdentity(
+            session.agents,
+            typeof agents === "function" ? agents(session.agents) : agents,
+          );
           if (session.agents === nextAgents) {
             return prev;
           }
@@ -1550,7 +1568,8 @@ export const useSessionStore = create<SessionStore>()(
               [serverId]: {
                 ...session,
                 agents: nextAgents,
-                workspaceAgentActivity: buildWorkspaceAgentActivityIndex(
+                workspaceAgentActivity: advanceWorkspaceAgentActivityIndex(
+                  session.agents,
                   nextAgents,
                   session.workspaceAgentActivity,
                 ),

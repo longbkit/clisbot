@@ -15,6 +15,7 @@ import {
 } from "react";
 import { useFetchQuery } from "@/data/query";
 import { i18n } from "@/i18n/i18next";
+import { getColdStartConnectTimeline } from "@/runtime/cold-start-connect";
 import { HubApiClient } from "./api-client";
 import type { HubConfiguration } from "./config";
 import { type HubAccountScopeConfiguration, useHubAccountScopes } from "./account-scopes";
@@ -29,8 +30,10 @@ import { createHubTransport } from "./transport/create";
 import type { HubTransport } from "./transport/contract";
 import { updateHubProfile } from "@/device-access/hub-profiles";
 import { getHubDaemonListCache } from "./hub-daemon-list-cache";
+import { clearHubOfflineData } from "@/clisbot/offline-storage/hub";
 import { useReaderMemory } from "./reader-memory";
 import { hubResourceQueryKey } from "./query-keys";
+import { HubSignInReplacedError } from "./transport/auth-session";
 import { HubAccountRequestError, needsOwnerSetupRecovery } from "@/device-access/hub-account-error";
 import { PairedHubTransport } from "@/device-access/hub-transport";
 import {
@@ -95,7 +98,12 @@ export interface HubAccountContextValue {
   changeMemberRole(input: { memberId: string; role: "owner" | "admin" | "member" }): Promise<void>;
   removeMember(memberId: string): Promise<void>;
   refresh(): Promise<void>;
-  api(): HubApiClient;
+  /**
+   * The signed-in organization's API. `organizationId` names the organization a remembered daemon
+   * list was read for; it is accepted before the account read answers (a cold start) and must
+   * match the signed-in organization after.
+   */
+  api(organizationId?: string): HubApiClient;
 }
 
 /** Every account action of a build without Hub support. */
@@ -337,7 +345,8 @@ function EnabledHubAccountController({
       } catch (error) {
         const message =
           error instanceof Error ? error.message : i18n.t("hub.account.errors.requestFailed");
-        setMutationError(message);
+        // A newer browser sign-in replaced this one and reports its own outcome.
+        if (!(error instanceof HubSignInReplacedError)) setMutationError(message);
         throw error;
       }
     },
@@ -479,11 +488,14 @@ function EnabledHubAccountController({
             await refresh();
             throw error;
           }
+          // Read from the remembered list, so it starts before that list is forgotten.
+          const clearing = clearHubOfflineData(configuration.origin);
           // Signing out hides this Hub's Hosts even while the Hub cannot confirm it.
           getHubDaemonListCache().forget(configuration.origin);
           // Only an explicit sign-out forgets who the reader was on this Hub. It holds against
           // an account answer that is still stale, until a sign-in completes.
           useReaderMemory.getState().forget(configuration.origin, signedInId);
+          await clearing;
         },
         { signsOut: true },
       ),
@@ -558,10 +570,20 @@ function EnabledHubAccountController({
   const state = account.data ?? null;
   const signedIn =
     state?.status === "active" || state?.status === "appSetupRequired" ? state : null;
-  const api = useCallback(() => {
-    if (signedIn === null) throw new Error(i18n.t("hub.account.errors.signInFirst"));
-    return new HubApiClient(transport, signedIn.organization.id);
-  }, [signedIn, transport]);
+  const api = useCallback(
+    (organizationId?: string) => {
+      if (signedIn !== null) {
+        const signedInOrganizationId = signedIn.organization.id;
+        const sameOrganization =
+          organizationId === undefined || organizationId === signedInOrganizationId;
+        if (sameOrganization) return new HubApiClient(transport, signedInOrganizationId);
+      } else if (state === null && organizationId !== undefined) {
+        return new HubApiClient(transport, organizationId);
+      }
+      throw new Error(i18n.t("hub.account.errors.signInFirst"));
+    },
+    [signedIn, state, transport],
+  );
   const accountError = accountErrorMessage(account.error, account.isError);
   const value = useMemo<HubAccountContextValue>(
     () => ({
@@ -660,7 +682,23 @@ export function useHubAccounts(): readonly HubAccountContextValue[] {
   return useContext(HubAccountsContext);
 }
 
+/**
+ * A request without a usable token reads as "signed out". The query stays pending while the
+ * transport reads the stored sign-in once more, so a credential read that missed on a cold start
+ * never shows "sign in" (connection-resilience.md).
+ */
 async function readAccountState(
+  transport: HubTransport,
+  invitationId: string | null,
+): Promise<HubAccountState> {
+  const state = await requestAccountState(transport, invitationId);
+  getColdStartConnectTimeline().mark("hubAccount");
+  if (state.status !== "signedOut" || !transport.recoverSignIn) return state;
+  if (!(await transport.recoverSignIn())) return state;
+  return requestAccountState(transport, invitationId);
+}
+
+async function requestAccountState(
   transport: HubTransport,
   invitationId: string | null,
 ): Promise<HubAccountState> {
