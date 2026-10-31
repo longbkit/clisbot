@@ -4,6 +4,7 @@ import { gotoAppShell } from "../support/helpers/app";
 import { expectAppRoute } from "../support/helpers/route-assertions";
 import {
   addOfflineHostAndReload,
+  addOfflineHostsAndReload,
   expectHostFilterRow,
   openSidebarHostFilter,
   openSidebarHostPicker,
@@ -18,6 +19,10 @@ import { buildHubSettingsRoute } from "@/clisbot/hub/navigation";
 import { clickSettingsBackToWorkspace } from "../support/helpers/settings";
 
 const SECONDARY_HOST_ID = "host-filter-secondary";
+const MANY_OFFLINE_HOSTS = Array.from({ length: 14 }, (_, index) => ({
+  serverId: `host-many-${index + 1}`,
+  label: `Many Host ${index + 1}`,
+}));
 
 test.describe("Sidebar host filter (multi-select)", () => {
   test.describe.configure({ timeout: 120_000 });
@@ -149,6 +154,45 @@ test.describe("Sidebar host filter (multi-select)", () => {
     } finally {
       await seeded.cleanup();
     }
+  });
+
+  test("Add host stays in reach with many Hosts, in the picker and on the Hosts page", async ({
+    page,
+  }) => {
+    await gotoAppShell(page);
+    await addOfflineHostsAndReload(page, MANY_OFFLINE_HOSTS);
+
+    await openSidebarHostPicker(page);
+    const lastHost = page.getByTestId(`sidebar-host-row-${MANY_OFFLINE_HOSTS.at(-1)!.serverId}`);
+    await expect(lastHost).toBeAttached({ timeout: 30_000 });
+    await expect(lastHost).not.toBeInViewport();
+    await expect(page.getByTestId("sidebar-host-add")).toBeInViewport();
+    await page.getByTestId("sidebar-host-add").click();
+    await expect(page.getByTestId("add-host-method-modal")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("add-host-method-modal")).toHaveCount(0);
+
+    await page.getByTestId("settings-hosts").click();
+    await expectAppRoute(page, buildHubSettingsRoute("hosts"));
+    await page.getByTestId("settings-hosts-add-host").click();
+    await expect(page.getByTestId("add-host-method-modal")).toBeVisible();
+    await expect(page).toHaveURL(/\/settings\/hub\/hosts\?addHost=/);
+  });
+
+  test("Add host stays in reach with many Hosts in the phone Host picker", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoAppShell(page);
+    await addOfflineHostsAndReload(page, MANY_OFFLINE_HOSTS);
+
+    const toolbar = page.getByTestId("mobile-toolbar").filter({ visible: true });
+    await toolbar.getByTestId("sidebar-hosts-trigger").click();
+    const lastHost = page.getByTestId(`sidebar-host-row-${MANY_OFFLINE_HOSTS.at(-1)!.serverId}`);
+    await expect(lastHost).toBeAttached({ timeout: 30_000 });
+    await expect(lastHost).not.toBeInViewport();
+    const addHost = page.getByTestId("sidebar-host-add").filter({ visible: true });
+    await expect(addHost).toBeInViewport();
+    await addHost.click();
+    await expect(page.getByTestId("add-host-method-modal")).toBeVisible();
   });
 
   test("footer host picker always searches, including with one or two hosts", async ({ page }) => {
