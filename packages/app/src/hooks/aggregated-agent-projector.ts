@@ -1,4 +1,8 @@
-import { participationKeyOf } from "@/clisbot/navigation/ownership-key";
+import {
+  agentOwnershipEvidence,
+  inheritedOwnershipOf,
+} from "@/clisbot/navigation/ownership-inheritance";
+import { ownershipEvidenceKey } from "@/clisbot/navigation/ownership-key";
 import equal from "fast-deep-equal";
 import type { Agent } from "@/stores/session-store";
 import type { HostProfile } from "@/types/host-connection";
@@ -38,10 +42,12 @@ function projectAgent({
   source,
   serverId,
   serverLabel,
+  hostAgents,
 }: {
   source: Agent;
   serverId: string;
   serverLabel: string;
+  hostAgents: ReadonlyMap<string, Agent>;
 }): AggregatedAgent {
   return {
     id: source.id,
@@ -62,9 +68,19 @@ function projectAgent({
     createdAt: source.createdAt,
     labels: source.labels,
     projectPlacement: source.projectPlacement,
-    createdBy: source.createdBy,
-    participationKey: participationKeyOf(source),
+    ...agentOwnershipEvidence(source, hostAgents),
   };
+}
+
+/** A creatorless subagent whose parent's evidence moved while its own source stayed the same. */
+function inheritanceMoved(
+  row: AggregatedAgent,
+  source: Agent,
+  hostAgents: ReadonlyMap<string, Agent>,
+): boolean {
+  if (!source.parentAgentId) return false;
+  const inherited = inheritedOwnershipOf(source, hostAgents);
+  return ownershipEvidenceKey(inherited) !== ownershipEvidenceKey(row.inheritedOwnership);
 }
 
 function compareAgents(left: AggregatedAgent, right: AggregatedAgent): number {
@@ -184,7 +200,11 @@ function syncHost(state: ProjectionState, sync: HostSync, changes: RowChanges): 
     if (entry) {
       seen += 1;
       if (entry.seq < lastSeq) throw new OrderMoved();
-      if (entry.source !== source || relabel) updateRow(state, sync, entry, source, changes);
+      const stale =
+        entry.source !== source ||
+        relabel ||
+        (entry.projected !== null && inheritanceMoved(entry.projected, source, sources));
+      if (stale) updateRow(state, sync, entry, source, changes);
     } else {
       const inherited = sync.inherited?.agents.get(source.id);
       const reusable = inherited && { ...inherited, label: sync.inherited!.label };
@@ -224,8 +244,19 @@ function projectRow(
 ): AggregatedAgent | null {
   if (!state.includeArchived && source.archivedAt) return null;
   const previous = reusable?.projected ?? null;
-  if (previous && reusable!.source === source && reusable!.label === sync.label) return previous;
-  const next = projectAgent({ source, serverId: sync.serverId, serverLabel: sync.label });
+  if (
+    previous &&
+    reusable!.source === source &&
+    reusable!.label === sync.label &&
+    !inheritanceMoved(previous, source, sync.sources)
+  )
+    return previous;
+  const next = projectAgent({
+    source,
+    serverId: sync.serverId,
+    serverLabel: sync.label,
+    hostAgents: sync.sources,
+  });
   return previous && equal(previous, next) ? previous : next;
 }
 

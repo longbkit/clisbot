@@ -128,6 +128,7 @@ function agentPlacement(
     ownership: resolveOwnership({
       createdBy: agent.createdBy,
       participationKey: agent.participationKey,
+      inheritedOwnership: agent.inheritedOwnership,
       accounts,
       hostKind: hostKinds.get(agent.serverId) ?? "unknown",
     }),

@@ -12,7 +12,7 @@ import { workspaceRootAgentsOf } from "@/stores/workspace-root-agents";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 import { useResourcePins } from "@/clisbot/bots/sidebar/pins";
 import { NAVIGATION_V2_ENABLED } from "./feature";
-import { participationKeyOf } from "./ownership-key";
+import { agentOwnershipEvidence } from "./ownership-inheritance";
 import { useOwnershipHosts } from "./use-ownership-hosts";
 import { useReaderAccounts } from "./reader";
 import { useSourceLiveness } from "./use-source-liveness";
@@ -77,7 +77,9 @@ function workSessionsOf(
   if (
     memo &&
     memo.source.messageSubmissions === source.messageSubmissions &&
-    memo.source.cached === source.cached
+    memo.source.cached === source.cached &&
+    // A subagent's ownership follows its parent, which may have changed outside this list.
+    (memo.source.agents === source.agents || !agents.some((agent) => agent.parentAgentId))
   ) {
     return memo.sessions;
   }
@@ -92,8 +94,7 @@ function workSessionOf(agent: Agent, source: Source): WorkSession {
   return {
     id: agent.id,
     labels: agent.labels,
-    createdBy: agent.createdBy,
-    participationKey: participationKeyOf(agent),
+    ...agentOwnershipEvidence(agent, source.agents),
     statusBucket: status.bucket,
     ...(status.unverified ? { unverified: true } : {}),
   };

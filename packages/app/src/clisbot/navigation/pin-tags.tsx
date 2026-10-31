@@ -15,7 +15,7 @@ import { rememberChatReturn } from "@/clisbot/home/mobile-navigation";
 import { useBotCatalog } from "@/clisbot/bots/data/runtime";
 import { useNavigationActivity } from "./activity";
 import { directChatForBot } from "@/clisbot/bots/sidebar/sidebar-model";
-import { participationKeyOf } from "./ownership-key";
+import { storedAgentOwnershipEvidence } from "./stored-ownership-evidence";
 import { useChatOwnership } from "./use-chat-ownership";
 import { useOwnershipHosts } from "./use-ownership-hosts";
 import { resolveOwnership, type Ownership } from "./ownership";
@@ -65,12 +65,9 @@ function useRowOwnership() {
       }
       if (row.kind === "workspace" || row.kind === "session")
         return resolveOwnership({
-          createdBy:
-            row.kind === "session"
-              ? row.session.agent.createdBy
-              : workspaceAuthor(row.workspace.serverId, row.workspace.workspaceId),
-          participationKey:
-            row.kind === "session" ? participationKeyOf(row.session.agent) : undefined,
+          ...(row.kind === "session"
+            ? storedAgentOwnershipEvidence(row.session.agent)
+            : { createdBy: workspaceAuthor(row.workspace.serverId, row.workspace.workspaceId) }),
           accounts,
           hostKind: hostKinds.get(row.workspace.serverId) ?? "unknown",
         });

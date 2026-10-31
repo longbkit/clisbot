@@ -1,4 +1,4 @@
-import { participationKeyOf } from "@/clisbot/navigation/ownership-key";
+import { storedAgentOwnershipEvidence } from "@/clisbot/navigation/stored-ownership-evidence";
 import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
 import { useTranslation } from "react-i18next";
 import {
@@ -389,8 +389,7 @@ function toSessionLineFilter(
       {
         id: session.agent.id,
         labels: session.agent.labels,
-        createdBy: session.agent.createdBy,
-        participationKey: participationKeyOf(session.agent),
+        ...storedAgentOwnershipEvidence(session.agent),
         statusBucket: session.statusBucket,
         unverified: session.unverified,
       },
