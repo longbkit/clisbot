@@ -329,17 +329,17 @@ export function HostPicker({
     onOpenChange(false);
   }, [onAddHost, onOpenChange]);
   // Add host is pinned below the list so it stays in reach however many Hosts scroll above it.
+  // It is the same ComboboxItem as the rows above, unpadded, so it stays on their icon and text
+  // rails at one-line row height.
   const footer = useMemo(
     () =>
       includeAddHost ? (
-        <View style={styles.footer}>
-          <SystemHostPickerOption
-            kind="add"
-            active={false}
-            onPress={handleAddHost}
-            testID={addHostTestID}
-          />
-        </View>
+        <SystemHostPickerOption
+          kind="add"
+          active={false}
+          onPress={handleAddHost}
+          testID={addHostTestID}
+        />
       ) : undefined,
     [addHostTestID, handleAddHost, includeAddHost],
   );
@@ -434,9 +434,6 @@ function hostOptionDescription(
 }
 
 const styles = StyleSheet.create((theme) => ({
-  footer: {
-    paddingVertical: theme.spacing[1],
-  },
   trailing: {
     flexDirection: "row",
     alignItems: "center",

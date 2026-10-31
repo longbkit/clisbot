@@ -4,6 +4,7 @@
 // Host is set in People & access › Access.
 
 import { useRouter } from "expo-router";
+import { Plus } from "lucide-react-native";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
@@ -50,7 +51,13 @@ export function HostsSettings() {
             {t("hub.settings.hosts.refresh")}
           </Button>
         ) : null}
-        <Button size="sm" onPress={addHost} testID="settings-hosts-add-host">
+        <Button
+          size="sm"
+          variant="outline"
+          leftIcon={Plus}
+          onPress={addHost}
+          testID="settings-hosts-add-host"
+        >
           {t("settings.addHost")}
         </Button>
       </View>

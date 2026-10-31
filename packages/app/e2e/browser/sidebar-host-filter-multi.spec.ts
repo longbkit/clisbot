@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import { expectAppRoute } from "../support/helpers/route-assertions";
@@ -167,6 +167,7 @@ test.describe("Sidebar host filter (multi-select)", () => {
     await expect(lastHost).toBeAttached({ timeout: 30_000 });
     await expect(lastHost).not.toBeInViewport();
     await expect(page.getByTestId("sidebar-host-add")).toBeInViewport();
+    await expectAddHostOnHostRowRails(page);
     await page.getByTestId("sidebar-host-add").click();
     await expect(page.getByTestId("add-host-method-modal")).toBeVisible();
     await page.keyboard.press("Escape");
@@ -174,6 +175,7 @@ test.describe("Sidebar host filter (multi-select)", () => {
 
     await page.getByTestId("settings-hosts").click();
     await expectAppRoute(page, buildHubSettingsRoute("hosts"));
+    await expectButtonLabelCentered(page.getByTestId("settings-hosts-add-host"));
     await page.getByTestId("settings-hosts-add-host").click();
     await expect(page.getByTestId("add-host-method-modal")).toBeVisible();
     await expect(page).toHaveURL(/\/settings\/hub\/hosts\?addHost=/);
@@ -191,6 +193,7 @@ test.describe("Sidebar host filter (multi-select)", () => {
     await expect(lastHost).not.toBeInViewport();
     const addHost = page.getByTestId("sidebar-host-add").filter({ visible: true });
     await expect(addHost).toBeInViewport();
+    await expectAddHostOnHostRowRails(page);
     await addHost.click();
     await expect(page.getByTestId("add-host-method-modal")).toBeVisible();
   });
@@ -230,3 +233,71 @@ test.describe("Sidebar host filter (multi-select)", () => {
     }
   });
 });
+
+interface RowGeometry {
+  height: number;
+  /** Height of the row's parent minus its borders: equals `height` when nothing pads the row. */
+  slotHeight: number;
+  padding: string;
+  iconCenterX: number;
+  iconCenterY: number;
+  labelLeft: number;
+  labelCenterY: number;
+}
+
+/** Leading glyph (first svg) and primary label (first text line) of a picker row. */
+async function rowGeometry(row: Locator, label: string): Promise<RowGeometry> {
+  return row.evaluate((element, text) => {
+    const icon = element.querySelector("svg");
+    const labelNode = Array.from(element.querySelectorAll("div, span")).find(
+      (node) => node.childElementCount === 0 && node.textContent === text,
+    );
+    if (!icon || !labelNode) throw new Error(`Row is missing its icon or "${text}" label`);
+    const iconBox = icon.getBoundingClientRect();
+    const labelBox = labelNode.getBoundingClientRect();
+    const rowStyle = getComputedStyle(element);
+    const slot = element.parentElement!;
+    const slotStyle = getComputedStyle(slot);
+    const slotBorders =
+      Number.parseFloat(slotStyle.borderTopWidth) + Number.parseFloat(slotStyle.borderBottomWidth);
+    return {
+      height: element.getBoundingClientRect().height,
+      slotHeight: slot.getBoundingClientRect().height - slotBorders,
+      padding: `${rowStyle.paddingTop} ${rowStyle.paddingRight} ${rowStyle.paddingBottom} ${rowStyle.paddingLeft}`,
+      iconCenterX: iconBox.left + iconBox.width / 2,
+      iconCenterY: iconBox.top + iconBox.height / 2,
+      labelLeft: labelBox.left,
+      labelCenterY: labelBox.top + labelBox.height / 2,
+    };
+  }, label);
+}
+
+/** Add host in the picker footer sits on the Host rows' icon and text rails, as a one-line row. */
+async function expectAddHostOnHostRowRails(page: Page) {
+  const visibleRow = (testID: string) => page.getByTestId(testID).filter({ visible: true }).first();
+  const host = MANY_OFFLINE_HOSTS[0]!;
+  const hostRow = await rowGeometry(visibleRow(`sidebar-host-row-${host.serverId}`), host.label);
+  const addHost = await rowGeometry(visibleRow("sidebar-host-add"), "Add host");
+
+  const measured = JSON.stringify({ hostRow, addHost });
+  expect(Math.abs(addHost.iconCenterX - hostRow.iconCenterX), measured).toBeLessThanOrEqual(1);
+  expect(Math.abs(addHost.labelLeft - hostRow.labelLeft), measured).toBeLessThanOrEqual(1);
+  expect(Math.abs(addHost.iconCenterY - addHost.labelCenterY), measured).toBeLessThanOrEqual(1);
+  // A one-line menu row: the list rows' padding, and nothing added around it by the footer.
+  expect(addHost.padding, measured).toBe(hostRow.padding);
+  expect(Math.abs(addHost.slotHeight - addHost.height), measured).toBeLessThanOrEqual(1);
+}
+
+async function expectButtonLabelCentered(button: Locator) {
+  await expect(button.locator("svg")).toHaveCount(1);
+  const offset = await button.evaluate((element) => {
+    const label = Array.from(element.querySelectorAll("div, span")).find(
+      (node) => node.childElementCount === 0 && (node.textContent ?? "").trim().length > 0,
+    );
+    if (!label) throw new Error("Button has no label");
+    const buttonBox = element.getBoundingClientRect();
+    const labelBox = label.getBoundingClientRect();
+    return labelBox.top + labelBox.height / 2 - (buttonBox.top + buttonBox.height / 2);
+  });
+  expect(Math.abs(offset), `label center-y offset ${offset}px`).toBeLessThanOrEqual(1);
+}

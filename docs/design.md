@@ -138,7 +138,7 @@ Five primitives. The pick is determined by option count, the need to search, and
 
 `<DropdownMenu>` is for a small fixed set anchored to a trigger. Theme picker, kebab menus on workspace and project rows (`packages/app/src/components/sidebar-workspace-list.tsx:684-770`), row "more" menus. Items can be async (`status: "pending"`) and can include destructive entries. Under ~10 options where the user knows what they're looking for.
 
-`<Combobox>` is for a large or searchable list. Host switcher in the sidebar footer, model selector in the composer, branch switcher in the workspace header (`packages/app/src/components/branch-switcher.tsx`). The user types to find the option, or the list is long enough to scroll.
+`<Combobox>` is for a large or searchable list. Host switcher in the sidebar footer, model selector in the composer, branch switcher in the workspace header (`packages/app/src/components/branch-switcher.tsx`). The user types to find the option, or the list is long enough to scroll. An action that must stay in reach below a long list, such as the Host picker's Add host, goes in the Combobox `footer` as a bare `<ComboboxItem>`. Wrapping it in padding moves it off the rows' height while its icon and label stay on their rails, and the row reads as misaligned (`packages/app/src/components/hosts/host-picker.tsx`).
 
 `<ContextMenu>` is for right-click and long-press on a target. The row is the trigger; there is no visible affordance. Used for incidental actions on workspace rows in the sidebar (`packages/app/src/components/sidebar-workspace-list.tsx`).
 
