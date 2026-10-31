@@ -282,16 +282,15 @@ describe.each(seeds)("ownership properties, seed %i", (seed) => {
         const context = { accounts, hostKind: "hub" as const };
         const creator = resolveOwnership({ createdBy: source.createdBy, ...context });
         const participants = [source.lastMessageBy, ...(source.participantActors ?? [])];
-        const placed = participants.map((actor) =>
-          actor ? resolveOwnership({ createdBy: actor, ...context }) : "unknown",
+        const placed = new Set(
+          participants.map((actor) =>
+            actor ? resolveOwnership({ createdBy: actor, ...context }) : "unknown",
+          ),
         );
         // The reader's part wins; with no creator, a verified teammate's part makes it theirs.
-        const expected =
-          creator === "mine" || placed.includes("mine")
-            ? "mine"
-            : creator === "unknown" && placed.includes("others")
-              ? "others"
-              : creator;
+        let expected = creator;
+        if (creator === "mine" || placed.has("mine")) expected = "mine";
+        else if (creator === "unknown" && placed.has("others")) expected = "others";
         const participationKey = participationKeyOf(source);
         expect(
           resolveOwnership({ ...context, createdBy: source.createdBy, participationKey }),

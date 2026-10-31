@@ -44,7 +44,8 @@ it("subscribes to identity changes only, then reclassifies on reader or Host cha
   expect(view.result.current).toBe(matched);
   context.accounts = [{ origin: "https://hub", id: "other" }];
   view.rerender();
-  expect(view.result.current.chatOwnership(chat)).toBe("unknown");
+  // Another reader sees a creatorless chat someone else took part in as theirs.
+  expect(view.result.current.chatOwnership(chat)).toBe("others");
   context.kinds = new Map([["host", "direct"]]);
   view.rerender();
   expect(view.result.current.chatOwnership(chat)).toBe("mine");
