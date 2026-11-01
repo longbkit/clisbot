@@ -153,8 +153,10 @@ function FilterChipButton<T extends string>({
 export function ChipButton({
   label,
   leading,
+  trailing,
   count,
   selected = false,
+  disabled = false,
   truncate = false,
   role = "button",
   accessibilityLabel,
@@ -164,8 +166,12 @@ export function ChipButton({
 }: {
   label: string;
   leading?: ReactNode;
+  /** After the label and count, such as a clear ✕. */
+  trailing?: ReactNode;
   count?: number;
   selected?: boolean;
+  /** Dimmed and not pressable, as a provider without a search match. */
+  disabled?: boolean;
   /** Long titles (a pinned workspace) stop at a fixed width instead of widening the row. */
   truncate?: boolean;
   role?: Extract<AccessibilityRole, "button" | "tab">;
@@ -175,16 +181,17 @@ export function ChipButton({
   onPress(): void;
   testID?: string;
 }) {
-  const state = useMemo(() => ({ selected }), [selected]);
+  const state = useMemo(() => ({ selected, disabled }), [disabled, selected]);
   const style = useCallback(
     ({ pressed, hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.chip,
       touch && styles.touch,
       truncate && styles.truncate,
-      (pressed || hovered) && styles.hovered,
+      !disabled && (pressed || hovered) && styles.hovered,
       selected && styles.selected,
+      disabled && styles.disabled,
     ],
-    [selected, touch, truncate],
+    [disabled, selected, touch, truncate],
   );
   return (
     <PressHighlight
@@ -192,6 +199,7 @@ export function ChipButton({
       accessibilityState={state}
       accessibilityLabel={accessibilityLabel ?? label}
       onPress={onPress}
+      disabled={disabled}
       testID={testID}
       hitSlop={CHIP_HIT_SLOP}
       style={style}
@@ -204,6 +212,7 @@ export function ChipButton({
         {label}
       </Text>
       {count !== undefined ? <Text style={styles.count}>{String(count)}</Text> : null}
+      {trailing}
     </PressHighlight>
   );
 }
@@ -255,6 +264,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   truncate: { maxWidth: theme.spacing[32] + theme.spacing[16] },
   touch: { minHeight: CONTROL_HEIGHTS.field },
+  disabled: { opacity: theme.opacity[50] },
   hovered: { backgroundColor: theme.colors.surface2 },
   selected: {
     backgroundColor: theme.colors.surface3,

@@ -10,6 +10,8 @@ import { Shortcut } from "@/components/ui/shortcut";
 import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import type { ProviderSelectionModelRow } from "@/provider-selection/provider-selection";
 import { ICON_SIZE } from "@/styles/theme";
+import { HighlightedLabel } from "./highlighted-label";
+import type { TextRange } from "./picker-search";
 import { useTouchRows } from "./use-touch-rows";
 
 export interface ModelRowProps {
@@ -22,6 +24,8 @@ export interface ModelRowProps {
   shortcut: string | null;
   /** Names the provider beside the model, for a list that mixes providers. */
   showProvider: boolean;
+  /** The characters a search matched, drawn in bold. */
+  highlights: readonly TextRange[] | undefined;
   onPick: (row: ProviderSelectionModelRow) => void;
   onToggleFavorite: (key: string) => void;
   onCreateProfile?: (seed: AgentProfileSeed) => void;
@@ -127,10 +131,19 @@ export function ModelRow(props: ModelRowProps) {
     () => <ModelProviderGlyph provider={row.provider} serverId={serverId} size={16} />,
     [row.provider, serverId],
   );
+  const { highlights } = props;
+  const labelContent = useMemo(
+    () =>
+      highlights && highlights.length > 0 ? (
+        <HighlightedLabel text={row.modelLabel} ranges={highlights} />
+      ) : undefined,
+    [highlights, row.modelLabel],
+  );
   return (
     <View style={styles.boundary} onPointerEnter={enter} onPointerLeave={leave}>
       <ComboboxItem
         label={row.modelLabel}
+        labelContent={labelContent}
         description={props.showProvider ? row.providerLabel : undefined}
         active={props.highlighted}
         touch={touch}

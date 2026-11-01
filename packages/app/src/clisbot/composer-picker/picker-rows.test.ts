@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ProviderSelectorProvider } from "@/provider-selection/provider-selection";
 import {
   buildRailItems,
-  buildVisibleRows,
+  buildPickerView,
   limitRows,
   resolveInitialScope,
   shortcutDigit,
@@ -32,6 +32,17 @@ const PROVIDERS = [
 
 function labels(rows: { modelLabel: string }[]): string[] {
   return rows.map((row) => row.modelLabel);
+}
+
+function buildVisibleRows(input: {
+  providers: readonly ProviderSelectorProvider[];
+  scope: Parameters<typeof buildPickerView>[0]["scope"];
+  query: string;
+  favorites: readonly string[];
+  narrow?: Parameters<typeof buildPickerView>[0]["narrow"];
+  currentProvider?: string;
+}) {
+  return buildPickerView({ narrow: null, currentProvider: "", ...input }).rows;
 }
 
 describe("picker rail", () => {
@@ -85,6 +96,61 @@ describe("picker rows", () => {
       favorites: [],
     });
     expect(labels(rows)).toEqual(["GPT-6-Astra", "GPT-6.1-Sol", "GPT-5.4-mini"]);
+  });
+
+  it("groups a query's results by provider and counts each rail entry's matches", () => {
+    const view = buildPickerView({
+      providers: PROVIDERS,
+      scope: { kind: "provider", providerId: "claude" },
+      narrow: null,
+      query: "5",
+      favorites: ["codex:GPT-5.4-mini"],
+      currentProvider: "claude",
+    });
+    expect(view.grouped).toBe(true);
+    expect(labels(view.rows)).toEqual([
+      "Claude Opus 5.5",
+      "Claude Sonnet 5",
+      "Claude Haiku 5",
+      "GPT-5.4-mini",
+    ]);
+    expect(Object.fromEntries(view.counts ?? [])).toEqual({
+      "provider:claude": 3,
+      "provider:codex": 1,
+      favorites: 1,
+    });
+  });
+
+  it("puts the provider with the better match first", () => {
+    const rows = buildVisibleRows({
+      providers: PROVIDERS,
+      scope: { kind: "provider", providerId: "claude" },
+      query: "gpt 6",
+      favorites: [],
+      currentProvider: "claude",
+    });
+    expect(labels(rows)).toEqual(["GPT-6-Astra", "GPT-6.1-Sol"]);
+  });
+
+  it("narrows a query to the provider or the favourites the rail picks", () => {
+    const toCodex = buildPickerView({
+      providers: PROVIDERS,
+      scope: { kind: "provider", providerId: "codex" },
+      narrow: { kind: "provider", providerId: "codex" },
+      query: "so",
+      favorites: [],
+      currentProvider: "claude",
+    });
+    expect(toCodex.grouped).toBe(false);
+    expect(labels(toCodex.rows)).toEqual(["GPT-6.1-Sol"]);
+    const toFavorites = buildVisibleRows({
+      providers: PROVIDERS,
+      scope: { kind: "favorites" },
+      narrow: { kind: "favorites" },
+      query: "so",
+      favorites: ["claude:Claude Sonnet 5"],
+    });
+    expect(labels(toFavorites)).toEqual(["Claude Sonnet 5"]);
   });
 
   it("shows favourites from every provider", () => {

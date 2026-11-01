@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
+import { X } from "lucide-react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { AgentFeature } from "@clisbot/protocol/agent-types";
 import type { AgentProfilePicker, AgentProfileSeed } from "@/agent-profiles";
 import type { SheetHeader } from "@/components/adaptive-modal-sheet";
 import { Combobox } from "@/components/ui/combobox";
+import { ChipButton } from "@/components/ui/filter-chips";
 import { ScrollView } from "@/components/ui/scroll-view";
 import type { AgentModeControlValue } from "@/composer/agent-controls/mode-control";
 import { useComposerPickerPlacement } from "@/composer/picker-placement";
 import { isWeb } from "@/constants/platform";
+import { ICON_SIZE } from "@/styles/theme";
 import type {
   ProviderSelectionModelRow,
   ProviderSelectorProvider,
@@ -71,24 +74,61 @@ export type PanelProps = ModelPickerProps & {
   onHoverRow?: (key: string) => void;
 };
 
-function useSearchHeader(state: ModelPickerState, open: boolean, isCompact: boolean): SheetHeader {
+function useNarrowLabel(state: ModelPickerState, rail: ProviderRailControl): string | null {
   const { t } = useTranslation();
-  const [resetKey, setResetKey] = useState(0);
+  const { narrow } = state;
+  if (!narrow || narrow.kind === "profiles") return null;
+  if (narrow.kind === "favorites") return t("composer.picker.favorites");
+  return rail.providers.find((provider) => provider.id === narrow.providerId)?.label ?? null;
+}
+
+/** "in Codex ×" beside the search field while the rail narrows the results; ✕ widens them. */
+function NarrowChip(props: { name: string; onClear: () => void }) {
+  const { t } = useTranslation();
+  const clear = useMemo(() => <X size={ICON_SIZE.sm} color={styles.chipIcon.color} />, []);
+  return (
+    <ChipButton
+      label={t("composer.picker.narrowedTo", { name: props.name })}
+      accessibilityLabel={t("composer.picker.clearNarrow", { name: props.name })}
+      trailing={clear}
+      selected
+      onPress={props.onClear}
+      testID="composer-picker-narrow-chip"
+    />
+  );
+}
+
+function useSearchHeader(input: {
+  state: ModelPickerState;
+  rail: ProviderRailControl;
+  open: boolean;
+  isCompact: boolean;
+}): SheetHeader {
+  const { state, open, isCompact } = input;
+  const { t } = useTranslation();
+  const [openCount, setOpenCount] = useState(0);
   useEffect(() => {
-    if (open) setResetKey((key) => key + 1);
+    if (open) setOpenCount((key) => key + 1);
   }, [open]);
+  const narrowName = useNarrowLabel(state, input.rail);
+  const { clearNarrow, setQuery, searchResetKey } = state;
+  const trailing = useMemo(
+    () => (narrowName ? <NarrowChip name={narrowName} onClear={clearNarrow} /> : undefined),
+    [clearNarrow, narrowName],
+  );
   return useMemo(
     () => ({
       title: t("composer.picker.title"),
       search: {
-        onChange: state.setQuery,
+        onChange: setQuery,
         placeholder: t("composer.picker.searchPlaceholder"),
         autoFocus: isWeb && !isCompact,
-        resetKey,
+        resetKey: `${openCount}:${searchResetKey}`,
         testID: "composer-picker-search",
+        trailing,
       },
     }),
-    [isCompact, resetKey, state.setQuery, t],
+    [isCompact, openCount, searchResetKey, setQuery, t, trailing],
   );
 }
 
@@ -104,9 +144,10 @@ function PanelBody(props: PanelProps & { onLeaveList: () => void }) {
   const rail = (
     <ProviderRail
       items={railItems}
-      scope={state.scope}
+      scope={state.query.trim() ? state.narrow : state.scope}
+      counts={state.counts}
       serverId={props.serverId}
-      onSelect={state.setScope}
+      onSelect={state.selectRail}
       layout={props.rail.layout}
       onToggleExpanded={isCompact ? undefined : props.rail.toggle}
     />
@@ -187,7 +228,7 @@ export function ModelPicker(props: ModelPickerProps) {
     selectedModelId: props.selectedModelId,
     open: props.open,
   });
-  const header = useSearchHeader(state, props.open, props.isCompact);
+  const header = useSearchHeader({ state, rail, open: props.open, isCompact: props.isCompact });
   const footer = useMemo(() => <PanelFooter {...props} />, [props]);
   const { onPickModel } = props;
   const pick = useCallback(
@@ -288,5 +329,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   mobileContent: {
     paddingHorizontal: 0,
+  },
+  chipIcon: {
+    color: theme.colors.foreground,
   },
 }));

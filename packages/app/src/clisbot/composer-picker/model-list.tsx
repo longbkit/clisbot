@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { Fragment, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { Pencil } from "lucide-react-native";
@@ -9,6 +9,7 @@ import {
   type AgentProfilePickerRow,
   type AgentProfileSeed,
 } from "@/agent-profiles";
+import { ModelProviderGlyph } from "@/components/model-browser";
 import { Button } from "@/components/ui/button";
 import { ComboboxItem } from "@/components/ui/combobox";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -17,6 +18,7 @@ import type { ProviderSelectionModelRow } from "@/provider-selection/provider-se
 import { ICON_SIZE } from "@/styles/theme";
 import { ModelRow } from "./model-row";
 import { shortcutDigit } from "./picker-rows";
+import type { TextRange } from "./picker-search";
 import { useTouchRows } from "./use-touch-rows";
 
 export type ModelListStatus = "ready" | "loading" | { error: string };
@@ -26,8 +28,12 @@ export interface ModelListProps {
   hiddenCount: number;
   status: ModelListStatus;
   emptyText: string;
-  /** Search matches and Favorites mix providers, so each row names its own. */
+  /** Favorites, alone or narrowing a search, mix providers, so each row names its own. */
   showProvider: boolean;
+  /** Search results across providers: a header above each provider's run of rows. */
+  grouped: boolean;
+  /** The characters a search matched in each row's name, by `favoriteKey`. */
+  highlights: ReadonlyMap<string, TextRange[]>;
   selectedKey: string;
   highlightIndex: number;
   favorites: readonly string[];
@@ -64,6 +70,18 @@ function ListMessage(props: { status: ModelListStatus; emptyText: string; onRetr
   );
 }
 
+/** Names the provider whose matches follow, in search results grouped by provider. */
+function GroupHeader(props: { provider: string; label: string; serverId: string | null }) {
+  return (
+    <View style={styles.groupHeader} testID={`composer-picker-group-${props.provider}`}>
+      <ModelProviderGlyph provider={props.provider} serverId={props.serverId} size={ICON_SIZE.sm} />
+      <Text style={styles.groupHeading} numberOfLines={1}>
+        {props.label}
+      </Text>
+    </View>
+  );
+}
+
 /** The center column: the chosen provider's models, Favorites, or every match for a query. */
 export function ModelList(props: ModelListProps) {
   const { t } = useTranslation();
@@ -76,20 +94,29 @@ export function ModelList(props: ModelListProps) {
   return (
     <View testID="composer-picker-models">
       {props.rows.map((row, index) => (
-        <ModelRow
-          key={row.favoriteKey}
-          row={row}
-          serverId={props.serverId}
-          selected={row.favoriteKey === props.selectedKey}
-          highlighted={index === props.highlightIndex}
-          favorite={props.favorites.includes(row.favoriteKey)}
-          shortcut={shortcutDigit(index)}
-          showProvider={props.showProvider}
-          onPick={props.onPick}
-          onToggleFavorite={props.onToggleFavorite}
-          onCreateProfile={props.onCreateProfile}
-          onHover={props.onHoverRow}
-        />
+        <Fragment key={row.favoriteKey}>
+          {props.grouped && props.rows[index - 1]?.provider !== row.provider ? (
+            <GroupHeader
+              provider={row.provider}
+              label={row.providerLabel}
+              serverId={props.serverId}
+            />
+          ) : null}
+          <ModelRow
+            row={row}
+            serverId={props.serverId}
+            selected={row.favoriteKey === props.selectedKey}
+            highlighted={index === props.highlightIndex}
+            favorite={props.favorites.includes(row.favoriteKey)}
+            shortcut={shortcutDigit(index)}
+            showProvider={props.showProvider}
+            highlights={props.highlights.get(row.favoriteKey)}
+            onPick={props.onPick}
+            onToggleFavorite={props.onToggleFavorite}
+            onCreateProfile={props.onCreateProfile}
+            onHover={props.onHoverRow}
+          />
+        </Fragment>
       ))}
       {props.hiddenCount > 0 ? (
         <ComboboxItem
@@ -239,6 +266,20 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
     paddingLeft: theme.spacing[3],
     paddingRight: theme.spacing[1],
+  },
+  groupHeader: {
+    minHeight: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    paddingHorizontal: theme.spacing[3],
+  },
+  groupHeading: {
+    flex: 1,
+    minWidth: 0,
+    color: theme.colors.foregroundExtraMuted,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
   },
   profilesHeading: {
     flex: 1,
