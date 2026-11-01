@@ -110,6 +110,21 @@ const CASES: SpeedCase[] = [
     selected: "standard",
   },
   {
+    // agent.fast.use gates every tier but the cheap ones, so the panel marks the cost the same way.
+    name: "a tier nobody has classified costs more, Auto does not",
+    feature: select("service_tier", "default", [
+      ["default", "Normal", true],
+      ["scale", "Scale"],
+      ["auto", "Auto"],
+    ]),
+    options: [
+      ["standard", "default", false],
+      ["tier:scale", "scale", true],
+      ["tier:auto", "auto", false],
+    ],
+    selected: "standard",
+  },
+  {
     name: "Cursor fast select: Standard | Fast",
     feature: select("fast", "true", [
       ["false", "Off"],
