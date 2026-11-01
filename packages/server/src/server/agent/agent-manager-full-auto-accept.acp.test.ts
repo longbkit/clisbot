@@ -10,8 +10,10 @@ import { GenericACPAgentClient } from "./providers/generic-acp-agent.js";
 
 const logger = createTestLogger();
 const cleanups: Array<() => Promise<void>> = [];
+// Last in, first out: the agent process must exit before its working directory is removed,
+// because Windows will not delete a directory a running process uses as its cwd.
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0)) await cleanup();
+  for (const cleanup of cleanups.splice(0).toReversed()) await cleanup();
 });
 
 /**
@@ -87,7 +89,8 @@ rl.on("line", (line) => {
 
 async function startAcpAgent() {
   const dir = await mkdtemp(path.join(tmpdir(), "clisbot-full-auto-accept-acp-"));
-  cleanups.push(() => rm(dir, { recursive: true, force: true }));
+  // Windows releases the exited process's handle on the directory a moment later.
+  cleanups.push(() => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
   const script = path.join(dir, "fake-acp-agent.cjs");
   await writeFile(script, FAKE_ACP_AGENT, "utf8");
   const client = new GenericACPAgentClient({ logger, command: [process.execPath, script] });
