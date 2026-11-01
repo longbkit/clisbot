@@ -1,61 +1,58 @@
 import { useCallback } from "react";
 import { Text, View, type PressableStateCallbackType } from "react-native";
-import { Menu } from "lucide-react-native";
+import { Menu, X } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { composerActionGeometry } from "@/composer/action-geometry";
 import type { Theme } from "@/styles/theme";
-import { chatComposerInnerAction } from "./geometry";
+import { chatComposerActions } from "./geometry";
 
 const ThemedMenu = withUnistyles(Menu);
-const mutedIcon = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const ThemedX = withUnistyles(X);
 const foregroundIcon = (theme: Theme) => ({ color: theme.colors.foreground });
+const EXPANDED = { expanded: true } as const;
+const COLLAPSED = { expanded: false } as const;
 
 /**
- * Telegram's ☰ beside the pill: it opens the slash command list by doing what typing `/` does
- * (`slash-trigger.ts`), so the list, its filter and its keys are the autocomplete's own. Drawn
- * with the composer's action geometry, like attach, dictation and voice beside it.
+ * Telegram's Menu chip at the container's left edge: it opens the slash command list by doing
+ * what typing `/` does (`slash-trigger.ts`), so the list, its filter and its keys are the
+ * autocomplete's own. While the list is open it shows ✕ and closes it.
  */
 export function ComposerCommandsButton({
   onPress,
   disabled,
   iconSize,
-  inner,
+  open,
 }: {
   onPress: () => void;
   disabled: boolean;
   iconSize: number;
-  /** Inside a phone's pill: no fill at rest, a 44px target as tall as the pill's row. */
-  inner: boolean;
+  /** The command list is open: the chip shows ✕. */
+  open: boolean;
 }) {
   const { t } = useTranslation();
-  const label = t("composer.layout.commands");
+  const label = t(open ? "composer.layout.closeCommands" : "composer.layout.commands");
   const style = useCallback(
-    () => [
-      inner ? chatComposerInnerAction.target : composerActionGeometry.target,
-      disabled && styles.disabled,
-    ],
-    [disabled, inner],
+    () => [chatComposerActions.innerTarget, disabled && styles.disabled],
+    [disabled],
   );
   const renderFace = useCallback(
     ({ hovered }: PressableStateCallbackType & { hovered?: boolean }) => (
       <View
         testID="composer-commands-face"
-        style={
-          inner
-            ? [chatComposerInnerAction.face, hovered && chatComposerInnerAction.hovered]
-            : [
-                composerActionGeometry.face,
-                composerActionGeometry.neutral,
-                hovered && composerActionGeometry.hovered,
-              ]
-        }
+        style={[
+          chatComposerActions.innerFace,
+          hovered ? chatComposerActions.circleHovered : chatComposerActions.chipFace,
+        ]}
       >
-        <ThemedMenu size={iconSize} uniProps={hovered ? foregroundIcon : mutedIcon} />
+        {open ? (
+          <ThemedX size={iconSize} uniProps={foregroundIcon} />
+        ) : (
+          <ThemedMenu size={iconSize} uniProps={foregroundIcon} />
+        )}
       </View>
     ),
-    [iconSize, inner],
+    [iconSize, open],
   );
   return (
     <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>
@@ -64,6 +61,7 @@ export function ComposerCommandsButton({
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={label}
+        accessibilityState={open ? EXPANDED : COLLAPSED}
         testID="composer-commands-button"
         style={style}
       >

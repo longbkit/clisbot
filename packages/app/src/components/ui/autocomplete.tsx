@@ -15,6 +15,7 @@ import { File, Folder } from "lucide-react-native";
 import type { Theme } from "@/styles/theme";
 import { getScrollOffsetToRevealItem } from "./scroll-reveal";
 import { COMPOSER_LAYOUT_ENABLED } from "@/clisbot/composer-layout/feature";
+import { ChatCommandListHandle, ChatCommandRow } from "@/clisbot/composer-layout/command-row";
 
 export interface AutocompleteOption {
   id: string;
@@ -79,6 +80,24 @@ function AutocompleteRow({
     [isSelected],
   );
 
+  // Clisbot chat layout: Telegram's row, what it does then the command and its arguments.
+  const commandRow = COMPOSER_LAYOUT_ENABLED ? (
+    <ChatCommandRow
+      label={optionLabel}
+      detail={removeBoltGlyphs(option.detail)}
+      description={optionDescription}
+    />
+  ) : (
+    <View style={styles.itemMainRow}>
+      <Text style={styles.itemLabel}>{optionLabel}</Text>
+      {optionDescription ? (
+        <Text style={styles.itemDescriptionInline} numberOfLines={1}>
+          {optionDescription}
+        </Text>
+      ) : null}
+    </View>
+  );
+
   return (
     <Pressable onLayout={handleLayout} onPress={handlePress} style={pressableStyle}>
       {isFileOrDir ? (
@@ -105,18 +124,7 @@ function AutocompleteRow({
           </View>
         </>
       ) : (
-        <View style={styles.itemMainRow}>
-          <Text style={styles.itemLabel}>{optionLabel}</Text>
-          {/* Clisbot chat layout: the row names its arguments; no card repeats the row. */}
-          {COMPOSER_LAYOUT_ENABLED && removeBoltGlyphs(option.detail) ? (
-            <Text style={styles.itemDetail}>{removeBoltGlyphs(option.detail)}</Text>
-          ) : null}
-          {optionDescription ? (
-            <Text style={styles.itemDescriptionInline} numberOfLines={1}>
-              {optionDescription}
-            </Text>
-          ) : null}
-        </View>
+        commandRow
       )}
     </Pressable>
   );
@@ -266,6 +274,7 @@ export function Autocomplete({
         </View>
       ) : null}
       <View style={containerStyle}>
+        {COMPOSER_LAYOUT_ENABLED ? <ChatCommandListHandle /> : null}
         <ScrollView
           ref={scrollRef}
           onLayout={handleScrollViewLayout}

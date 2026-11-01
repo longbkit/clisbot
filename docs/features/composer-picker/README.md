@@ -8,77 +8,72 @@ Telegram's input with the settings row of the Claude app.
 
 ## Layout
 
-A chat composer is a one-line pill with its buttons around it and a quiet settings row under it.
+The chat composer follows Telegram's input (Android, 2026-11) with the Claude app's settings row
+under it, on every width:
 
 ```
-Desktop                                            Phone
-[☰] [+] ( Message the agent…        ) [mic] [voice]  ( ☰  +  Message...    ) [mic] [voice]
-        6.1 Sol Medium  🔒 Default permissions  ◯    6.1 Sol  🔒              ◯
-[☰] [+] ( Fix the flaky test          (➤) )          ( ☰  +  Fix the flaky (➤) )
+( [☰]  Message...                    📎  ≋ )  (🎤)      idle
+( [☰]  Fix the flaky test                  )  (➤)       typing: Send takes the mic's place
+  6.1 Sol Medium   🔒 Default permissions      Tools off  ◯
 ```
 
-What lives where:
+**Telegram's anatomy, and ours.**
 
-| Piece                     | Desktop and tablet                     | Phone                             |
-| ------------------------- | -------------------------------------- | --------------------------------- |
-| Commands (☰), attach (+) | Beside the pill, left                  | Inside the pill, on its left edge |
-| Dictation, voice          | Beside the pill, right, until sendable | Same                              |
-| Send, Stop, Create        | Inside the pill, at its end            | Same                              |
-| Expand (from line 3)      | Inside the pill, above Send            | Same                              |
-| Collapse (expanded)       | Text area's top right                  | Same                              |
-| Model, Mode, Tools, ring  | Settings row under the pill            | Same, collapsed                   |
+| Telegram                                                    | Clisbot                                                                          |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| One container: Menu chip, emoji, text, 📎 at its right edge | One container: Commands chip (☰), text, 📎 and realtime voice at its right edge |
+| One circle beside it, as tall as the container: the mic     | Same: dictation                                                                  |
+| Typing: 📎 and the mic hide, the circle becomes Send        | Same: 📎, voice and the mic hide; Send takes the circle, same place and size     |
+| Menu ↔ ✕ Menu; the command list docks above the bar         | ☰ ↔ ✕; the slash list docks above the bar, as wide, with a handle               |
+| Rows: description left, `/command` right and muted          | Same, the command's arguments after it                                           |
+| Expanded: back top left, toolbar and Send at the bottom     | Same, the settings row above the toolbar; no undo or redo                        |
 
-- **Commands** does what typing `/` does (`slash-trigger.ts`): an empty draft becomes `/` and
-  the slash autocomplete opens with every command, its one-line descriptions, the filter as you
-  type and its keys; pressed again on a bare `/` it empties the draft and the list closes; in a
-  draft with text it types ` /` at the caret, which lists skills, as typing it there does.
-  Attach keeps the Plus glyph and menu the composer already had. One list renders: with the
-  flag on, the autocomplete drops the card that repeated the highlighted command above the
-  list, and a command's arguments (`[agent]`) show in its row instead.
-- **Inside the pill on a phone.** Four buttons beside the pill left it 150px wide at 390px and
-  80px at 320px, so on a phone Commands and attach move inside it, as Telegram puts its icons in
-  the field. They have no fill at rest, 20px glyphs in 44px-wide targets as tall as the pill's
-  row, and the text starts after them. Desktop keeps them outside: it has room, and outside
-  they read as the composer's tools rather than as part of the text. The phone placeholder is
-  "Message...": Commands already names `/commands`.
-- **Send replaces dictation and voice.** The first character, pasted text or an attachment
-  that makes the message sendable hides dictation and voice and shows Send at the pill's end, a
-  filled 40px circle in a 48px target (the upstream face was 28 on desktop and 36 on a phone).
-  Emptying the draft brings them back. A running agent with an empty draft shows Stop in the
-  same place; New workspace's always-shown Create sits there too and does not hide them. Realtime
-  voice keeps its overlay with mute and stop.
-- **The pill** is 48px tall inside on every width, so Send, the inner buttons and one line of
-  text share one center; the last of several lines stays on it. It grows with its text up to
-  half the window, then scrolls. One line is a capsule; two lines or attachment chips turn it
-  into the composer's rounded box (`2xl`), because round ends on a tall box read as a lozenge.
-  It keeps the composer's surface, border and shadow (design.md §5). The height does not change
-  when Send swaps with dictation and voice; the pill only widens into the freed room.
-- **Rails.** The pill is inset `spacing[1]` on both sides; buttons sit on that inset, and the
-  text keeps `spacing[3]` only where no button already spaces it from the edge. The settings row
-  starts on the pill's left edge on every width, inset `spacing[2]`, so with its chips' own
-  padding its first glyph sits on the pill's first rail: the text on desktop, ☰ on a phone.
-  Expand is centered on Send's rail.
-- **Expand** shows from the third line, on every width, just above Send, as a 44px target; below
-  three lines it is hidden. It opens the same editor (`useComposerFullscreen`), the same tree
-  with only the text area grown: the text, caret, attachments and draft stay, the pill's buttons
-  become its bottom bar (☰ + on the left on a phone, Send on the right), the buttons beside the
-  pill and the settings row stay where they were, and a "Message" title row sits above it.
-  Collapse is a 44px button at the text area's top right, named "Exit fullscreen"; Escape and
-  the hardware back button collapse too. The editor paints `surfaceComposer`. The bottom bar
-  and the settings row sit in the fullscreen body, which reserves the keyboard's height on
-  native and follows the visible viewport on the web, so they stay above the keyboard. A send
-  error shows under the pill.
-- **The settings row** holds the Model chip, Mode, the Tools chip and, at its end, the context
-  ring. When it runs short of room it collapses in this order: the effort leaves the Model chip,
-  Mode keeps its icon (a phone always shows the icon), Tools keeps its icon and count (the icon
-  alone when off, `useSettingsRowCountLabel`, below 400px). The ring always stays. Accessible
-  names keep the full labels.
+**Where we differ, on purpose.** Two voice modes: dictation is the circle, realtime voice sits in
+the container beside 📎. The settings row (Model, Mode, Tools, context ring) has no Telegram
+counterpart; agent sessions need it in reach. The Commands chip is filled with the secondary
+button's fill (`surface3`), not the accent: accent is Send's, one per surface (design.md §3), and
+"Commands" does not fit as a label at 320px, so the chip is icon-only. No emoji button. Desktop
+uses the same anatomy: it reads as well wide, and one rule is easier to keep than two.
+
+**Rules.**
+
+- **Commands** does what typing `/` does (`slash-trigger.ts`): an empty draft becomes `/` and the
+  slash list opens with every command, filtering as you type, keyboard-navigable; while the draft
+  is one command being typed the chip shows ✕ and, pressed, empties it and closes the list; in a
+  draft with text it types ` /` at the caret, which lists skills, as typing it there does. With
+  the flag on the autocomplete draws Telegram's rows (`command-row.tsx`) under a handle and no
+  longer repeats the highlighted command in a card above the list.
+- **The circle** holds, in order of claim: Send once something is sendable (text, pasted text or
+  an attachment), Stop while the agent runs, an always-shown submit such as New workspace's
+  Create, else dictation. When Stop or Create holds it, dictation sits inside the container's
+  right edge instead. Realtime voice keeps its overlay with mute and stop. The idle mic is a
+  neutral filled circle (`surface2`) and Send the accent one: Telegram fills both with its accent,
+  but here accent marks the one primary action on the surface (design.md §3), and sending exists
+  only once there is something to send. Shape and size never change, only the fill.
+- **Typing hides attach, voice and the mic**; attachments alone keep them, so another file or a
+  spoken message can join them. Expanded, the toolbar keeps ☰, 📎, voice and the mic.
+- **Sizes.** The container's row is 48px on every width, so the chip, 📎, voice and one line of
+  text share one vertical center, and the last of several lines stays on it; the container is
+  50px with its border, and the circle is 50px across. Inner buttons are 44px wide and 48px tall
+  with 36px faces and 20px glyphs; the container is inset `spacing[1]` on both sides. Send, Stop
+  and the mic circle are 50px targets, so nothing moves when they swap. The container keeps the
+  composer's surface, border and shadow (design.md §5); one line is a capsule, two lines or
+  attachment chips the composer's `2xl` box.
+- **Expand** shows from the third line, above the circle, a 44px target; below three lines it is
+  hidden. It opens the same editor (`useComposerFullscreen`), the same tree with the text grown:
+  text, caret, attachments and draft stay; a round filled 44px collapse button sits top left; at the bottom
+  the settings row, then a toolbar with ☰, 📎 and voice, and Send as the circle at the bottom
+  right. The editor paints `surfaceComposer`. The bottom sits in the fullscreen body, which
+  reserves the keyboard's height on native and follows the visible viewport on the web, and the
+  native dock adds the safe areas. A send error shows above the settings row.
+- **The settings row** starts on the container's left edge, inset `spacing[2]`, so with its chips'
+  own padding its first glyph sits on the Commands glyph's rail. When short of room it collapses
+  in this order: the effort leaves the Model chip, Mode keeps its icon (a phone always shows the
+  icon), Tools keeps its icon and count (the icon alone when off, below 400px). The ring stays.
+  Accessible names keep the full labels.
 - **Panels open above the composer.** The Model panel anchors to the whole composer
-  (`frame-anchor.tsx`), not to its chip, so it never covers the text being written. Mode and
-  Tools keep their own anchors.
-- **Targets.** On a phone the buttons beside the pill and Send are 48px targets
-  (`MIN_TOUCH_TARGET_SIZE`); the inner buttons are 44px wide and 48px tall. On desktop the
-  buttons beside it keep the composer's 28px actions.
+  (`frame-anchor.tsx`), so it never covers the text. Mode and Tools keep their own anchors.
+- The phone placeholder is "Message...": Commands already names `/commands`.
 
 One component still serves every chat surface (`MessageInput`): session and workspace chats,
 Home's new session, Bot and group chats, drafts, queue edits, attachments, slash and `@`
@@ -95,9 +90,12 @@ row under the reply box keeps the agent settings visible without crowding the in
 earlier toolbar stays behind the flag for rollback.
 
 **Known limits.** Commands opens the list through the text, so on a phone it raises the keyboard
-too. Inline (` /`) lists skills only, as typing does. Slash and `@` autocomplete stay off in the
+too. Inline (` /`) lists skills only, as typing does. The list's handle is a cue, not a drag
+target; ✕, Escape or deleting the `/` close it. Slash and `@` autocomplete stay off in the
 expanded editor, as in upstream fullscreen: the popover anchors above the composer, which fills
-the surface there. On a native tablet the line count is not measured, so expand does not show. The Mode menu and the Tools sheet still open
+the surface there. The expanded editor has no undo or redo buttons: the text input exposes no
+history, and the platform's own undo (⌘Z, the keyboard's) still works. On a native tablet the
+line count is not measured, so expand does not show. The Mode menu and the Tools sheet still open
 from their chips and can cover the pill while open. The duplicate Mode control (bar and panel
 footer) is unchanged for now. Native iOS and Android were not run for this change.
 
@@ -314,11 +312,11 @@ permission request the agent still raises. Agents sometimes ask under bypass any
 
 ## Code
 
-`packages/app/src/clisbot/composer-layout/`: `chat-composer-presentation.tsx` (the pill, the
-buttons beside it, the settings row and fullscreen in one tree, so the editor never remounts),
-`layout-styles.ts`, `commands-button.tsx`, `slash-trigger.ts`, `settings-row.tsx`,
-`frame-anchor.tsx`, `geometry.ts` and `feature.ts`. `composer/input/input.tsx` builds the same pieces as before and
-hands them to `ChatComposerPresentation` instead of the upstream toolbar while the flag is on and
+`packages/app/src/clisbot/composer-layout/`: `chat-composer-presentation.tsx` (the container,
+the circle, the settings row and the expanded editor in one tree, so the editor never
+remounts), `layout-styles.ts`, `commands-button.tsx`, `command-row.tsx`, `slash-trigger.ts`,
+`input-facts.ts`, `settings-row.tsx`, `frame-anchor.tsx`, `geometry.ts` and `feature.ts`.
+`composer/input/input.tsx` builds the same pieces as before and hands them to `ChatComposerPresentation` instead of the upstream toolbar while the flag is on and
 the composer is a chat one; `composer/input/presentation.tsx` shares its fullscreen chrome
 (`useComposerFullscreenChrome`) with it.
 
@@ -335,10 +333,12 @@ in `i18n/resources/composer-picker.ts` and `composer-layout.ts` for every app la
 upstream Speed control's spec (`e2e/browser/codex-speed.spec.ts`) runs only with the flag off:
 `EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER=0 npx playwright test e2e/browser/codex-speed.spec.ts`.
 
-Layout primitives: the composer's action geometry (`composerActionGeometry`: commands, attach,
-dictation, voice, Send, Stop) with `Tooltip`, `DropdownMenu` (attach), `AutocompletePopover`
-(the command list), `AgentControlTrigger` (Mode, Tools; `sheet` surface for the phone footer's
-Mode) and the composer surface tokens (`surfaceComposer`, `borderComposer`, `shadow.composer`).
+Layout primitives: `chatComposerActions` (`geometry.ts`, the inner targets and the circle, on
+top of `composerActionGeometry`'s faces and fills for Send, Stop and recording) with `Tooltip`,
+`DropdownMenu` (attach), `Autocomplete`/`AutocompletePopover` (the command list),
+`AgentControlTrigger` (Mode, Tools; `sheet` surface for the phone footer's Mode), the fullscreen
+chrome's ghost `Button` (expand, collapse) and the composer surface tokens (`surfaceComposer`,
+`borderComposer`, `shadow.composer`).
 
 Picker primitives: `Combobox` (panel and Mode menu), `ComboboxTrigger` (chip), `AgentControlTrigger`
 (Mode), `ComboboxItem` (rows), `ToolbarButton` (rail on desktop, row star and Create profile),

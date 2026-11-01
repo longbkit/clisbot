@@ -95,9 +95,9 @@ test.describe("Composer control density across tab switches", () => {
   });
 });
 
-// The Clisbot chat layout (docs/features/composer-picker/README.md, "Layout"): dictation and
-// voice beside the pill, and Send inside it as a larger circle.
-test("compact actions paint their faces inside separate 48px targets", async ({ page }) => {
+// The Clisbot chat layout (docs/features/composer-picker/README.md, "Layout"): voice inside the
+// container, dictation as the circle beside it, and Send taking the circle's place.
+test("compact actions paint their faces inside separate touch targets", async ({ page }) => {
   const workspace = await seedWorkspace({ repoPrefix: "composer-touch-target-" });
   try {
     const agent = await seedSettledMockAgent(workspace, "Touch target");
@@ -109,11 +109,11 @@ test("compact actions paint their faces inside separate 48px targets", async ({ 
     async function expectGeometry(
       button: import("@playwright/test").Locator,
       faceId: string,
-      target: number,
+      target: { width: number; height: number },
       face: number,
     ) {
-      await expect.poll(async () => (await button.boundingBox())?.width).toBe(target);
-      await expect.poll(async () => (await button.boundingBox())?.height).toBe(target);
+      await expect.poll(async () => (await button.boundingBox())?.width).toBe(target.width);
+      await expect.poll(async () => (await button.boundingBox())?.height).toBe(target.height);
       const painted = button.getByTestId(faceId);
       await expect.poll(async () => (await painted.boundingBox())?.width).toBe(face);
       await expect.poll(async () => (await painted.boundingBox())?.height).toBe(face);
@@ -128,26 +128,26 @@ test("compact actions paint their faces inside separate 48px targets", async ({ 
       expect(first.y + first.height / 2).toBe(second.y + second.height / 2);
       expect(second.x + second.width).toBeLessThanOrEqual(page.viewportSize()!.width);
     }
-    await expectGeometry(dictation, "composer-dictation-face", 48, 36);
-    await expectGeometry(voice, "composer-realtime-voice-face", 48, 36);
-    await expectSeparateAligned(dictation, voice);
+    const circle = { width: 50, height: 50 };
+    await expectGeometry(dictation, "composer-dictation-face", circle, 50);
+    await expectGeometry(voice, "composer-realtime-voice-face", { width: 44, height: 48 }, 36);
+    await expectSeparateAligned(voice, dictation);
     await input.fill("A multiline draft\nwith a larger Send target");
     const send = page.getByRole("button", { name: "Send message", exact: true });
     await expect(send).toBeVisible();
     await expect(dictation).toHaveCount(0);
-    await expectGeometry(send, "composer-send-face", 48, 40);
+    await expectGeometry(send, "composer-send-face", circle, 50);
 
     await page.setViewportSize({ width: 1280, height: 900 });
-    await expectGeometry(send, "composer-send-face", 48, 40);
+    await expectGeometry(send, "composer-send-face", circle, 50);
     await page.setViewportSize({ width: 360, height: 740 });
-    await expectGeometry(send, "composer-send-face", 48, 40);
+    await expectGeometry(send, "composer-send-face", circle, 50);
     const bounds = (await send.boundingBox())!;
-    // Inside the touch padding, outside the painted face.
-    await page.mouse.click(bounds.x + 2, bounds.y + bounds.height / 2);
+    await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
     await expect(input).toHaveValue("");
     const stop = page.getByRole("button", { name: "Stop agent", exact: true });
     await expect(stop).toBeVisible();
-    await expectGeometry(stop, "composer-stop-face", 48, 36);
+    await expectGeometry(stop, "composer-stop-face", circle, 50);
     const stopBounds = (await stop.boundingBox())!;
     await page.mouse.click(stopBounds.x + 4, stopBounds.y + stopBounds.height / 2);
     await expect(stop).not.toBeVisible({ timeout: 30_000 });

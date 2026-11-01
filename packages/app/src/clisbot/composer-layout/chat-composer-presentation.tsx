@@ -1,42 +1,39 @@
-import { useRef, type ReactNode, type Ref } from "react";
-import { Text, View, type ViewProps } from "react-native";
-import { useTranslation } from "react-i18next";
+import { Children, useRef, type ReactNode, type Ref } from "react";
+import { View, type ViewProps } from "react-native";
 import { ComposerFullscreenBody } from "@/composer/dock";
 import { useComposerFullscreenChrome } from "@/composer/input/presentation";
-import { SPACING } from "@/styles/theme";
 import { ComposerFrameProvider } from "./frame-anchor";
-import { resolveChatComposerGeometry } from "./geometry";
-import {
-  chatLayoutStyles as styles,
-  resolveOuterStartWidth,
-  useChatLayoutStyles,
-} from "./layout-styles";
+import { chatLayoutStyles as styles, useChatLayoutStyles } from "./layout-styles";
 import { ComposerSettingsRow } from "./settings-row";
 
 /** The pieces `MessageInput` builds, placed by the chat layout. */
 export interface ChatComposerSlots {
-  /**
-   * Commands, then attach: beside the pill on its left on a wide window, inside it on its left
-   * edge on a phone, where four buttons beside the pill left the text no room.
-   */
+  /** The Commands chip at the container's left edge. */
   commands: ReactNode;
+  /** Attach and realtime voice at the container's right edge, until something is sendable. */
   attach: ReactNode;
-  /** Beside the pill on the right while nothing is sendable: dictation, then realtime voice. */
-  dictation: ReactNode;
   realtimeVoice: ReactNode;
-  /** Something is sendable: Send replaces dictation and voice, inside the pill. */
+  /** Dictation: the circle beside the container, or inside it when the circle is taken. */
+  dictation: ReactNode;
+  /** Something is sendable: the circle becomes Send. */
   sendable: boolean;
-  /** Send, Stop while the agent runs, or an always-shown submit (Create); the pill's end. */
+  /**
+   * Text is typed: attach, voice and dictation hide, as Telegram's. Attachments alone keep them,
+   * so another file or a spoken message can join them.
+   */
+  typing: boolean;
+  /** Send, Stop while the agent runs, or an always-shown submit (Create): the circle. */
   primary: ReactNode;
-  /** Under the pill: Model, Mode and Tools at the start, the context ring at the end. */
+  /** Under the container: Model, Mode and Tools at the start, the context ring at the end. */
   settings: ReactNode;
   settingsEnd: ReactNode;
 }
 
 export interface ChatComposerPresentationProps {
+  /** The expanded editor: the text fills the surface, the buttons move to a bottom toolbar. */
   fullscreen: boolean;
   compact: boolean;
-  /** More than one line: the pill becomes a rounded box. */
+  /** More than one line: the container becomes a rounded box. */
   multiline: boolean;
   /** Attachment chips above the text: a rounded box too. */
   hasAttachments: boolean;
@@ -45,7 +42,7 @@ export interface ChatComposerPresentationProps {
   error: ReactNode;
   onExit: () => void;
   inputWrapperRef: Ref<View>;
-  /** The caller's pill style (compact shadow, read-only border, caller background). */
+  /** The caller's container style (compact shadow, read-only border, caller background). */
   pillStyle: ViewProps["style"];
   inputOpacity: number;
   inputPointerEvents: ViewProps["pointerEvents"];
@@ -56,102 +53,102 @@ export interface ChatComposerPresentationProps {
   slots: ChatComposerSlots;
 }
 
-type LayoutStyles = ReturnType<typeof useChatLayoutStyles>;
-
-function countPresent(...nodes: ReactNode[]): number {
-  return nodes.filter((node) => node != null).length;
+interface Placement {
+  circle: ReactNode;
+  /** Attach, voice and an inner dictation; empty once something is sendable. */
+  end: ReactNode[];
 }
 
-function ChatComposerPill({
-  props,
-  layout,
-  expand,
-  collapse,
-}: {
-  props: ChatComposerPresentationProps;
-  layout: LayoutStyles;
-  /** From the third line, above Send. */
-  expand: ReactNode;
-  /** The expanded editor's collapse button, at the text area's top right. */
-  collapse: ReactNode;
-}) {
-  const { compact, slots } = props;
-  const innerStart = compact && countPresent(slots.commands, slots.attach) > 0;
-  const end = slots.primary ?? null;
+/** Where dictation goes: the circle unless Send, Stop or Create holds it. */
+export function resolvePlacement(slots: ChatComposerSlots): Placement {
+  const circle = slots.primary ?? slots.dictation;
+  if (slots.typing) return { circle, end: [] };
+  const innerMic = slots.primary != null ? slots.dictation : null;
+  const end = [slots.attach, slots.realtimeVoice, innerMic].filter((node) => node != null);
+  return { circle, end };
+}
+
+function Group({ nodes, testID }: { nodes: ReactNode[]; testID: string }) {
   return (
-    <View
-      ref={props.inputWrapperRef}
-      style={layout.pill}
-      pointerEvents={props.inputPointerEvents}
-      testID="composer-pill"
-    >
-      {props.attachmentSlot}
-      <View style={layout.pillRow}>
-        {innerStart ? (
-          <View style={layout.innerStart} testID="composer-inner-start">
-            {slots.commands}
-            {slots.attach}
-          </View>
-        ) : null}
-        <View style={layout.textSurface}>{props.surface}</View>
-        {end !== null ? (
-          <View style={layout.pillEnd}>
-            {expand}
-            <View style={layout.endSlot} testID="composer-pill-primary">
-              {end}
-            </View>
-          </View>
-        ) : null}
-        {collapse ? <View style={styles.collapseSlot}>{collapse}</View> : null}
+    <View style={styles.innerGroup} testID={testID}>
+      {Children.toArray(nodes)}
+    </View>
+  );
+}
+
+/** Expanded, Send always holds the circle and the toolbar keeps ☰, 📎, voice and the mic. */
+function ExpandedToolbar({ slots, placement }: { slots: ChatComposerSlots; placement: Placement }) {
+  const buttons = [slots.commands, slots.attach, slots.realtimeVoice, slots.dictation];
+  return (
+    <View style={styles.toolbarRow} testID="composer-expanded-toolbar">
+      <View style={styles.toolbar}>
+        <Group nodes={buttons.filter((node) => node != null)} testID="composer-toolbar-buttons" />
+      </View>
+      <View style={styles.circleColumn} testID="composer-circle">
+        {placement.circle}
       </View>
     </View>
   );
 }
 
-function useLayout(props: ChatComposerPresentationProps): LayoutStyles {
-  const { compact, slots } = props;
-  const geometry = resolveChatComposerGeometry(compact);
-  const outerStartCount = compact ? 0 : countPresent(slots.commands, slots.attach);
-  return useChatLayoutStyles({
-    compact,
-    fullscreen: props.fullscreen,
-    multiline: props.multiline,
-    hasAttachments: props.hasAttachments,
-    hasInnerStart: compact && countPresent(slots.commands, slots.attach) > 0,
-    hasEnd: slots.primary != null,
-    outerStartWidth: resolveOuterStartWidth(outerStartCount, geometry.outerTarget, SPACING[1]),
-    pillStyle: props.pillStyle,
-    inputOpacity: props.inputOpacity,
-  });
-}
-
-function ExpandedTitle({ style }: { style: ViewProps["style"] }) {
-  const { t } = useTranslation();
+function ChatComposerContainer({
+  props,
+  layout,
+  placement,
+}: {
+  props: ChatComposerPresentationProps;
+  layout: ReturnType<typeof useChatLayoutStyles>;
+  placement: Placement;
+}) {
+  const inline = !props.fullscreen;
+  const { commands } = props.slots;
   return (
-    <View style={style}>
-      <Text style={styles.title} accessibilityRole="header">
-        {t("composer.layout.expandedTitle")}
-      </Text>
+    <View
+      ref={props.inputWrapperRef}
+      style={layout.container}
+      pointerEvents={props.inputPointerEvents}
+      testID="composer-pill"
+    >
+      {props.attachmentSlot}
+      <View style={layout.containerRow}>
+        {inline && commands != null ? (
+          <Group nodes={[commands]} testID="composer-inner-start" />
+        ) : null}
+        <View style={layout.textSurface}>{props.surface}</View>
+        {inline && placement.end.length > 0 ? (
+          <Group nodes={placement.end} testID="composer-inner-end" />
+        ) : null}
+      </View>
     </View>
   );
 }
 
 /**
- * The chat composer, Telegram-style (docs/features/composer-picker/README.md, "Layout"): a pill
- * that grows with its text, Commands and attach on its left (inside it on a phone), dictation
- * and voice beside it on the right until something is sendable, Send inside it, and the
- * settings row under it. Expanded, it is the same tree with the text area grown to fill the
- * surface, so the editor and every control keep their place.
+ * The chat composer, after Telegram's input (docs/features/composer-picker/README.md, "Layout"):
+ * one container with the Commands chip at its left edge, the text, then attach and voice at its
+ * right edge; beside it one circle, dictation until something is sendable and Send after; the
+ * settings row under it. Expanded, the text fills the surface and the buttons form a toolbar
+ * at the bottom. The editor keeps its place in the tree in both modes, as in
+ * `ComposerInputPresentation`, so its text, caret and focus survive the switch.
  */
 export function ChatComposerPresentation(props: ChatComposerPresentationProps) {
-  const { fullscreen, compact, slots } = props;
+  const { fullscreen, slots } = props;
   const frameRef = useRef<View>(null);
   const { exitScopeRef, exitButton, enterButton } = useComposerFullscreenChrome({
     ...props,
     inFlow: true,
   });
-  const layout = useLayout(props);
-  const outerStart = !compact && countPresent(slots.commands, slots.attach) > 0;
+  const placement = resolvePlacement(slots);
+  const inline = !fullscreen;
+  const layout = useChatLayoutStyles({
+    fullscreen,
+    multiline: props.multiline,
+    hasAttachments: props.hasAttachments,
+    hasStart: slots.commands != null,
+    hasEnd: placement.end.length > 0,
+    pillStyle: props.pillStyle,
+    inputOpacity: props.inputOpacity,
+  });
   const hasSettings = slots.settings != null || slots.settingsEnd != null;
   return (
     <View
@@ -159,40 +156,30 @@ export function ChatComposerPresentation(props: ChatComposerPresentationProps) {
       style={layout.root}
       testID={fullscreen ? "composer-fullscreen" : "composer-chat-layout"}
     >
-      {fullscreen ? <ExpandedTitle style={layout.titleRow} /> : null}
+      {fullscreen ? <View style={styles.topRow}>{exitButton}</View> : null}
       <ComposerFullscreenBody fullscreen={fullscreen}>
         <View ref={frameRef} collapsable={false} style={layout.body}>
           <ComposerFrameProvider frameRef={frameRef}>
-            <View style={layout.outerRow}>
-              {outerStart ? (
-                <View style={layout.outer} testID="composer-outer-start">
-                  {slots.commands}
-                  {slots.attach}
+            <View style={layout.barRow}>
+              <ChatComposerContainer props={props} layout={layout} placement={placement} />
+              {inline ? (
+                // From the third line the expand button sits above the circle.
+                <View style={styles.circleColumn} testID="composer-circle">
+                  {enterButton}
+                  {placement.circle}
                 </View>
               ) : null}
-              <ChatComposerPill
-                props={props}
-                layout={layout}
-                expand={enterButton}
-                collapse={exitButton}
-              />
-              {slots.sendable ? null : (
-                <View style={layout.outer} testID="composer-outer-end">
-                  {slots.dictation}
-                  {slots.realtimeVoice}
-                </View>
-              )}
             </View>
-            {/* The send error stays with the editor it belongs to; inline it shows above. */}
             {fullscreen ? props.error : null}
             {hasSettings ? (
               <ComposerSettingsRow
                 start={slots.settings}
                 end={slots.settingsEnd}
-                initialNarrow={compact}
-                style={layout.settingsRow}
+                initialNarrow={props.compact}
+                style={styles.settingsRow}
               />
             ) : null}
+            {fullscreen ? <ExpandedToolbar slots={slots} placement={placement} /> : null}
           </ComposerFrameProvider>
         </View>
       </ComposerFullscreenBody>

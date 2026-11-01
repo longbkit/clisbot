@@ -69,7 +69,7 @@ export function useComposerFullscreenChrome({
       accessibilityLabel={t("composer.input.exitFullscreen")}
       onPointerDown={keepEditorFocused}
       onPress={onExit}
-      style={inFlow ? styles.inFlowButton : exitStyle}
+      style={inFlow ? styles.inFlowExit : exitStyle}
       leftIcon={minimizeIcon}
       hitSlop={8}
     >
@@ -188,6 +188,15 @@ const styles = StyleSheet.create((theme) => ({
     padding: 0,
     borderWidth: 0,
     borderRadius: theme.borderRadius.full,
+  },
+  // The expanded editor's collapse: a round filled button, top left.
+  inFlowExit: {
+    width: 44,
+    height: 44,
+    padding: 0,
+    borderWidth: 0,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.surface2,
   },
   enterButton: {
     position: "absolute",

@@ -2,93 +2,77 @@ import { useMemo } from "react";
 import type { ViewProps } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { isWeb } from "@/constants/platform";
-import { resolveChatComposerGeometry } from "./geometry";
+import { CHAT_CONTAINER_ROW } from "./geometry";
 
 export interface ChatLayoutStyleInput {
-  compact: boolean;
-  /** The expanded editor: the text area grows to fill the surface. */
+  /** The expanded editor: the text fills the surface, the buttons move to a bottom toolbar. */
   fullscreen: boolean;
   multiline: boolean;
   hasAttachments: boolean;
-  /** Commands and attach sit inside the pill (a phone). */
-  hasInnerStart: boolean;
-  /** Send, Stop or Create sits at the pill's end. */
+  /** Commands sits at the container's left edge. */
+  hasStart: boolean;
+  /** Attach, voice or an inner mic sit at the container's right edge. */
   hasEnd: boolean;
-  /** How far the settings row starts from the composer's edge: the pill's left edge. */
-  outerStartWidth: number;
   pillStyle: ViewProps["style"];
   inputOpacity: number;
 }
 
 /** The chat layout's styles for one render (docs/features/composer-picker/README.md, "Layout"). */
 export function useChatLayoutStyles(input: ChatLayoutStyleInput) {
-  const geometry = resolveChatComposerGeometry(input.compact);
-  const { multiline, hasAttachments, hasInnerStart, hasEnd, outerStartWidth } = input;
-  const { pillStyle, inputOpacity, fullscreen } = input;
+  const { fullscreen, multiline, hasAttachments, hasStart, hasEnd } = input;
+  const { pillStyle, inputOpacity } = input;
   return useMemo(
     () => ({
       root: fullscreen ? styles.rootExpanded : styles.root,
       body: [styles.body, fullscreen && styles.grow, { opacity: inputOpacity }],
-      outerRow: [styles.outerRow, fullscreen && styles.outerRowExpanded],
-      pill: [
-        styles.pill,
-        multiline || hasAttachments || fullscreen ? styles.pillBox : styles.pillRound,
-        hasAttachments && styles.pillWithAttachments,
-        fullscreen && styles.grow,
-        pillStyle,
-      ],
-      pillRow: [styles.pillRow, { minHeight: geometry.pillRowHeight }, fullscreen && styles.grow],
-      // Text keeps an inset only where no button already spaces it from the pill's edge.
-      textSurface: [
-        styles.textSurface,
-        { minHeight: geometry.pillRowHeight },
-        !hasInnerStart && styles.textInsetStart,
-        !hasEnd && styles.textInsetEnd,
-        fullscreen && styles.textSurfaceExpanded,
-        fullscreen && { paddingBottom: geometry.pillRowHeight },
-      ],
-      endSlot: [styles.endSlot, { height: geometry.pillRowHeight }],
-      // Expanded, the buttons form the pill's bottom bar and the text fills the space above it.
-      innerStart: [chatLayoutStyles.innerStart, fullscreen && styles.barStart],
-      pillEnd: [chatLayoutStyles.pillEnd, fullscreen && styles.barEnd],
-      titleRow: [chatLayoutStyles.titleRow, { marginLeft: outerStartWidth }],
-      outer: [styles.outerGroup, { marginBottom: geometry.outerLift }],
-      settingsRow: [styles.settingsRow, { marginLeft: outerStartWidth }],
+      barRow: [styles.barRow, fullscreen && styles.barRowExpanded],
+      container: fullscreen
+        ? [styles.containerExpanded, pillStyle]
+        : [
+            styles.container,
+            multiline || hasAttachments ? styles.containerBox : styles.containerRound,
+            hasAttachments && styles.containerWithAttachments,
+            pillStyle,
+          ],
+      containerRow: fullscreen ? styles.grow : styles.containerRow,
+      // Text keeps an inset only where no button already spaces it from the edge.
+      textSurface: fullscreen
+        ? styles.textExpanded
+        : [
+            styles.textSurface,
+            hasStart ? styles.textAfterChip : styles.textInsetStart,
+            !hasEnd && styles.textInsetEnd,
+          ],
     }),
-    [
-      fullscreen,
-      geometry,
-      hasAttachments,
-      hasEnd,
-      hasInnerStart,
-      inputOpacity,
-      multiline,
-      outerStartWidth,
-      pillStyle,
-    ],
+    [fullscreen, hasAttachments, hasEnd, hasStart, inputOpacity, multiline, pillStyle],
   );
 }
 
 export const chatLayoutStyles = StyleSheet.create((theme) => ({
-  pillEnd: {
-    alignSelf: "stretch",
+  innerGroup: { flexDirection: "row", alignItems: "center", flexShrink: 0 },
+  circleColumn: { flexShrink: 0, alignItems: "center", alignSelf: "flex-end" },
+  topRow: { flexDirection: "row", paddingBottom: theme.spacing[2] },
+  // The expanded editor's toolbar: the container's look around its buttons, Send beside it.
+  toolbarRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
+    gap: theme.spacing[2],
   },
-  innerStart: { flexDirection: "row", alignItems: "center", flexShrink: 0 },
-  collapseSlot: { position: "absolute", top: 0, right: 0 },
-  titleRow: { minHeight: theme.spacing[12], justifyContent: "center" },
-  title: {
-    fontSize: theme.fontSize.base,
-    fontWeight: theme.fontWeight.medium,
-    color: theme.colors.foreground,
+  toolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: theme.spacing[1],
+    backgroundColor: theme.colors.surfaceComposer,
+    borderWidth: theme.borderWidth[1],
+    borderColor: theme.colors.borderComposer,
+    borderRadius: theme.borderRadius.full,
+    ...theme.shadow.composer,
   },
+  // The settings row starts on the container's left edge; its chips' own padding puts the first
+  // glyph on the Commands glyph's rail.
+  settingsRow: { paddingHorizontal: theme.spacing[2] },
 }));
-
-/** The settings row starts on the pill's edge on every width; the outer row's gap is part of it. */
-export function resolveOuterStartWidth(count: number, outerTarget: number, gap: number): number {
-  return count === 0 ? 0 : count * outerTarget + gap;
-}
 
 const styles = StyleSheet.create((theme) => ({
   root: { flexShrink: 1, position: "relative" },
@@ -97,25 +81,20 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     position: "relative",
     backgroundColor: theme.colors.surfaceComposer,
-    paddingHorizontal: theme.spacing[4],
-    paddingBottom: theme.spacing[2],
+    padding: theme.spacing[4],
   },
   grow: { flex: 1, minHeight: 0 },
+  barRowExpanded: { flex: 1, minHeight: 0, alignItems: "stretch" },
   body: { flexShrink: 1, gap: theme.spacing[1] },
-  outerRow: {
+  barRow: {
     flexShrink: 1,
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: theme.spacing[1],
+    gap: theme.spacing[2],
   },
-  // The pill fills the height; the buttons beside it stay at its bottom.
-  outerRowExpanded: { flex: 1, minHeight: 0, alignItems: "stretch" },
-  // The targets carry their own padding around the painted faces.
-  outerGroup: { flexShrink: 0, flexDirection: "row", alignItems: "center", alignSelf: "flex-end" },
   // The composer is the one input that floats (design.md §5): the same surface, border and
-  // shadow as the upstream box, drawn as a pill. The same inset on both sides: buttons and Send
-  // sit spacing[1] in from the border.
-  pill: {
+  // shadow as the upstream box, drawn as a pill. The same inset on both sides.
+  container: {
     flex: 1,
     minWidth: 0,
     flexShrink: 1,
@@ -134,37 +113,31 @@ const styles = StyleSheet.create((theme) => ({
         }
       : {}),
   },
-  pillRound: { borderRadius: theme.borderRadius.full },
-  // A round end on a tall box reads as a capsule; a grown pill keeps the composer's corner.
-  pillBox: { borderRadius: theme.borderRadius["2xl"] },
-  pillWithAttachments: { paddingTop: theme.spacing[2] },
-  pillRow: {
-    position: "relative",
+  containerRound: { borderRadius: theme.borderRadius.full },
+  // A round end on a tall box reads as a capsule; a grown container keeps the composer's corner.
+  containerBox: { borderRadius: theme.borderRadius["2xl"] },
+  containerWithAttachments: { paddingTop: theme.spacing[2] },
+  // Expanded, the text sits on the page: no frame, the page's padding.
+  containerExpanded: { flex: 1, minHeight: 0, gap: theme.spacing[2] },
+  containerRow: {
     flexShrink: 1,
     flexDirection: "row",
     alignItems: "flex-end",
+    minHeight: CHAT_CONTAINER_ROW,
   },
   // One line sits on the row's center; the last of several lines stays there too.
   textSurface: {
     flex: 1,
     minWidth: 0,
     flexShrink: 1,
+    minHeight: CHAT_CONTAINER_ROW,
     justifyContent: "center",
     position: "relative",
     paddingVertical: isWeb ? theme.spacing[3] : theme.spacing[2],
   },
-  // Text runs the full width, clear of the collapse button in the top right corner.
-  textSurfaceExpanded: {
-    alignSelf: "stretch",
-    justifyContent: "flex-start",
-    minHeight: 0,
-    paddingLeft: theme.spacing[3],
-    paddingRight: theme.spacing[12],
-  },
-  barStart: { position: "absolute", left: 0, bottom: 0 },
-  barEnd: { position: "absolute", right: 0, bottom: 0 },
   textInsetStart: { paddingLeft: theme.spacing[3] },
+  // The chip's target already spaces it; one step more keeps the text off its fill.
+  textAfterChip: { paddingLeft: theme.spacing[1] },
   textInsetEnd: { paddingRight: theme.spacing[3] },
-  endSlot: { flexShrink: 0, alignItems: "center", justifyContent: "center" },
-  settingsRow: { paddingHorizontal: theme.spacing[2] },
+  textExpanded: { flex: 1, minHeight: 0 },
 }));

@@ -190,9 +190,7 @@ async function expectFullscreenErrorAboveSend(page: Page): Promise<void> {
     .boundingBox())!;
   const editorBox = (await composerLocator(page).boundingBox())!;
   expect(alertBox.y).toBeGreaterThanOrEqual(editorBox.y + editorBox.height);
-  // The Clisbot chat layout keeps Send inside the pill; the error sits under the pill.
-  if (CHAT_LAYOUT) expect(alertBox.y).toBeGreaterThanOrEqual(sendBox.y + sendBox.height);
-  else expect(alertBox.y + alertBox.height).toBeLessThanOrEqual(sendBox.y);
+  expect(alertBox.y + alertBox.height).toBeLessThanOrEqual(sendBox.y);
 }
 
 async function writeCompactDraft(page: Page, text: string): Promise<void> {

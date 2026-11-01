@@ -105,24 +105,50 @@ async function expectMinTarget(target: Locator, size: number) {
   expect(Math.round(value.height)).toBeGreaterThanOrEqual(size);
 }
 
-/** Empty: dictation and voice beside the pill, no Send. Typing swaps them for Send inside it. */
-async function expectSendSwap(page: Page, shot: string) {
+async function centerY(target: Locator): Promise<number> {
+  const value = await box(target);
+  return value.y + value.height / 2;
+}
+
+/**
+ * Empty: attach and voice inside the container's right edge, the mic as the circle beside it.
+ * Typing hides attach and voice and turns the circle into Send, same place and size.
+ */
+async function expectCircleSwap(page: Page, shot: string) {
   const input = composerLocator(page);
-  const pill = visible(page, "composer-pill");
-  await expect(dictation(page)).toBeVisible();
-  await expect(realtimeVoice(page)).toBeVisible();
+  const container = visible(page, "composer-pill");
+  const circle = visible(page, "composer-circle");
+  await expectInside(visible(page, "composer-commands-button"), container);
+  await expectInside(visible(page, "message-input-attach-button"), container);
+  await expectInside(realtimeVoice(page), container);
+  await expectInside(dictation(page), circle);
   await expect(send(page)).toHaveCount(0);
-  const pillBefore = await box(pill);
+  const containerBox = await box(container);
+  const mic = await box(dictation(page));
+  // The circle is as tall as the container, and shares its center.
+  expect(Math.round(mic.height)).toBe(Math.round(containerBox.height));
+  expect(Math.abs((await centerY(dictation(page))) - (await centerY(container)))).toBeLessThan(1);
+  // Icons inside share the text line's center.
+  for (const target of [
+    visible(page, "composer-commands-button"),
+    visible(page, "message-input-attach-button"),
+  ]) {
+    expect(Math.abs((await centerY(target)) - (await centerY(input)))).toBeLessThan(1.5);
+  }
   await screenshot(page, `${shot}-idle`);
 
   await input.fill("h");
   await expect(send(page)).toBeVisible();
+  const sendBox = await box(send(page));
+  // Send takes the mic's place and size: nothing moves.
+  expect(Math.round(sendBox.x)).toBe(Math.round(mic.x));
+  expect(Math.round(sendBox.y)).toBe(Math.round(mic.y));
+  expect(Math.round(sendBox.width)).toBe(Math.round(mic.width));
   await expect(dictation(page)).toHaveCount(0);
   await expect(realtimeVoice(page)).toHaveCount(0);
-  await expectInside(send(page), pill);
-  // The pill widens into the freed room; its height does not jump.
-  expect(Math.round((await box(pill)).height)).toBe(Math.round(pillBefore.height));
-  await input.fill("Typing in the pill, the Send button sits inside it");
+  await expect(visible(page, "message-input-attach-button")).toHaveCount(0);
+  expect(Math.round((await box(container)).height)).toBe(Math.round(containerBox.height));
+  await input.fill("Typing in the pill, Send takes the mic's place");
   await screenshot(page, `${shot}-typing`);
 
   await input.fill("");
@@ -130,37 +156,49 @@ async function expectSendSwap(page: Page, shot: string) {
   await expect(send(page)).toHaveCount(0);
 }
 
-/** The commands button types `/`; the list filters as you type and Enter inserts a command. */
+/** ☰ opens the command list and turns into ✕; the list filters, picks with keys, closes. */
 async function expectCommandList(page: Page, shot: string) {
   const input = composerLocator(page);
-  await visible(page, "composer-commands-button").click();
+  const chip = visible(page, "composer-commands-button");
+  await expect(chip).toHaveAccessibleName("Commands");
+  await chip.click();
   await expect(input).toHaveValue("/");
+  await expect(chip).toHaveAccessibleName("Close commands");
   const popover = page.getByTestId("composer-autocomplete-popover");
   await expect(popover.getByText("/review", { exact: true }).first()).toBeVisible({
     timeout: 30_000,
   });
   await expect(input).toBeFocused();
-  // One list: no card above it repeats the highlighted row.
+  // One list, as wide as the bar, its rows "description … /command".
   await expect(popover.getByText("/exit", { exact: true })).toHaveCount(1);
-  await expect(popover.getByText("/review", { exact: true })).toHaveCount(1);
+  const listBox = await box(popover);
+  const composerBox = await box(visible(page, "composer-chat-layout"));
+  expect(Math.abs(listBox.width - composerBox.width)).toBeLessThan(2);
+  const description = await box(popover.getByText("Review the current changes", { exact: true }));
+  const command = await box(popover.getByText("/review", { exact: true }));
+  expect(command.x).toBeGreaterThan(description.x + description.width);
   await screenshot(page, `${shot}-command-list`);
   await input.press("h");
   await expect(popover.getByText("/review", { exact: true })).toHaveCount(0);
   await expect(popover.getByText("/hello", { exact: true }).first()).toBeVisible();
+  // ✕ closes the list.
+  await chip.click();
+  await expect(input).toHaveValue("");
+  await expect(chip).toHaveAccessibleName("Commands");
+  // Keys pick a command.
+  await chip.click();
+  await input.press("h");
   await input.press("ArrowDown");
   await input.press("Enter");
   await expect(input).toHaveValue(/^\/(help|hello)\s?$/);
-  // Pressed again on a bare slash, the button takes it back out.
-  await input.fill("/");
-  await visible(page, "composer-commands-button").click();
-  await expect(input).toHaveValue("");
+  await input.fill("");
 }
 
 async function caret(page: Page): Promise<number> {
   return composerLocator(page).evaluate((node) => (node as HTMLTextAreaElement).selectionStart);
 }
 
-/** From the third line an expand button sits above Send; expanding keeps the text and caret. */
+/** From the third line an expand button sits above the circle; expanding keeps every control. */
 async function expectExpand(page: Page, shot: string) {
   const input = composerLocator(page);
   const expand = page.getByRole("button", { name: "Fullscreen", exact: true });
@@ -169,37 +207,33 @@ async function expectExpand(page: Page, shot: string) {
   await expect(expand).toHaveCount(0);
   const draft = "First line\nSecond line\nThird line";
   await input.fill(draft);
+  await expectMinTarget(expand, 44);
   const glyph = await box(expand);
   const sendBox = await box(send(page));
   expect(glyph.y + glyph.height).toBeLessThanOrEqual(sendBox.y + 0.5);
-  // On Send's rail.
   expect(Math.abs(glyph.x + glyph.width / 2 - (sendBox.x + sendBox.width / 2))).toBeLessThan(1);
-  await expectInside(expand, visible(page, "composer-pill"));
   await screenshot(page, `${shot}-3-lines`);
   await input.evaluate((node) => (node as HTMLTextAreaElement).setSelectionRange(5, 5));
   await expand.click();
   await expectComposerFullscreenControls(page);
   await expect(input).toHaveValue(draft);
   await expect.poll(() => caret(page)).toBe(5);
-  // The same controls in the same order; only the text area grows.
   const expanded = page.getByTestId("composer-fullscreen");
-  for (const id of ["composer-commands-button", "message-input-attach-button"]) {
-    await expect(expanded.getByTestId(id)).toBeVisible();
-  }
+  const toolbar = expanded.getByTestId("composer-expanded-toolbar");
+  await expect(toolbar.getByTestId("composer-commands-button")).toBeVisible();
   await expect(expanded.getByTestId("composer-settings-row")).toBeVisible();
-  await expect(expanded.getByTestId("composer-model-chip")).toBeVisible();
+  // The settings row sits right above the toolbar; Send is the circle at the bottom right.
+  const row = await box(expanded.getByTestId("composer-settings-row"));
+  const bar = await box(toolbar);
+  expect(row.y + row.height).toBeLessThanOrEqual(bar.y + 0.5);
+  await expectInside(send(page), toolbar);
   const collapse = page.getByRole("button", { name: "Exit fullscreen", exact: true });
   await expectMinTarget(collapse, 44);
-  // Collapse sits at the text area's top right; the buttons form the pill's bottom bar.
-  const pillBox = await box(visible(page, "composer-pill"));
   const collapseBox = await box(collapse);
-  expect(collapseBox.y - pillBox.y).toBeLessThan(collapseBox.height);
-  expect(pillBox.x + pillBox.width - (collapseBox.x + collapseBox.width)).toBeLessThan(12);
-  expect(pillBox.height).toBeGreaterThan(300);
-  const barSend = await box(send(page));
-  expect(pillBox.y + pillBox.height - (barSend.y + barSend.height)).toBeLessThan(4);
-  const text = await box(input);
-  expect(text.y + text.height).toBeLessThanOrEqual(barSend.y + 0.5);
+  const frame = await box(expanded);
+  expect(collapseBox.x - frame.x).toBeLessThan(24);
+  expect(collapseBox.y - frame.y).toBeLessThan(24);
+  expect((await box(input)).height).toBeGreaterThan(200);
   await screenshot(page, `${shot}-expanded`);
   await exitComposerFullscreen(page);
   await expect(input).toHaveValue(draft);
@@ -210,27 +244,31 @@ async function expectExpand(page: Page, shot: string) {
 async function darkShots(page: Page, shot: string) {
   await page.emulateMedia({ colorScheme: "dark" });
   await screenshot(page, `${shot}-idle-dark`);
-  await composerLocator(page).fill("Typing in the pill, the Send button sits inside it");
+  await composerLocator(page).fill("Typing in the pill, Send takes the mic's place");
   await screenshot(page, `${shot}-typing-dark`);
   await composerLocator(page).fill("");
   await page.emulateMedia({ colorScheme: "light" });
 }
 
-test("desktop: the pill, Send inside it, commands and the settings row", async ({ page }) => {
+test("desktop: one container, the circle beside it, the settings row under it", async ({
+  page,
+}) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1280, height: 850 });
   await installListCommandsResponse(page, COMMANDS);
   const workspace = await openCodexAgent(page, "composer-layout-desktop-");
   try {
-    await expectSendSwap(page, "desktop");
+    await expectCircleSwap(page, "desktop");
 
     const row = visible(page, "composer-settings-row");
     for (const id of ["composer-model-chip", "mode-control"]) {
       await expectInside(visible(page, id), row);
     }
     await expect(visible(page, "mode-control")).toHaveText("Default permissions");
-    const pill = await box(visible(page, "composer-pill"));
-    expect((await box(row)).y).toBeGreaterThanOrEqual(pill.y + pill.height);
+    const container = await box(visible(page, "composer-pill"));
+    const rowBox = await box(row);
+    expect(rowBox.y).toBeGreaterThanOrEqual(container.y + container.height);
+    expect(Math.abs(rowBox.x - container.x)).toBeLessThan(1);
     await visible(page, "composer-chat-layout").screenshot({
       path: path.join(SCREENSHOTS, "desktop-settings-row.png"),
     });
@@ -245,51 +283,45 @@ test("desktop: the pill, Send inside it, commands and the settings row", async (
 
     // The model panel opens above the composer, never over the text being written.
     await visible(page, "composer-model-chip").click();
-    const panel = visible(page, "composer-picker-panel");
-    await expect(panel).toBeVisible();
+    await expect(visible(page, "composer-picker-panel")).toBeVisible();
     const footer = await box(visible(page, "composer-picker-footer"));
-    expect(footer.y + footer.height).toBeLessThanOrEqual(pill.y + 1);
+    expect(footer.y + footer.height).toBeLessThanOrEqual(container.y + 1);
     await screenshot(page, "desktop-model-panel");
     await page.keyboard.press("Escape");
 
     // An attachment alone makes the message sendable.
     await attachImageFromMenu(page, { name: "pixel.png", mimeType: "image/png", buffer: PIXEL });
     await expect(send(page)).toBeVisible({ timeout: 15_000 });
-    await expect(dictation(page)).toHaveCount(0);
+    // Attachments alone keep attach and the mic, inside the container, to add more.
+    await expectInside(dictation(page), visible(page, "composer-pill"));
+    await expectInside(
+      visible(page, "message-input-attach-button"),
+      visible(page, "composer-pill"),
+    );
     await screenshot(page, "desktop-attachment");
   } finally {
     await workspace.cleanup();
   }
 });
 
-test("phone: Commands and attach inside the pill, voice beside it, a collapsed row", async ({
-  page,
-}) => {
+test("phone: 44px targets, Send in the mic's place, a collapsed row", async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await installListCommandsResponse(page, COMMANDS);
   const workspace = await openCodexAgent(page, "composer-layout-phone-");
   try {
-    const pill = visible(page, "composer-pill");
-    const commands = visible(page, "composer-commands-button");
-    const attach = visible(page, "message-input-attach-button");
-    for (const target of [commands, attach, dictation(page), realtimeVoice(page)]) {
+    for (const target of [
+      visible(page, "composer-commands-button"),
+      visible(page, "message-input-attach-button"),
+      dictation(page),
+      realtimeVoice(page),
+    ]) {
       await expectMinTarget(target, 44);
     }
-    await expectInside(commands, pill);
-    await expectInside(attach, pill);
-    const pillBox = await box(pill);
-    expect((await box(dictation(page))).x).toBeGreaterThanOrEqual(pillBox.x + pillBox.width);
-    expect((await box(realtimeVoice(page))).x).toBeGreaterThanOrEqual(pillBox.x + pillBox.width);
-    // The inner buttons and the text share the pill's one-line center.
-    const commandsBox = await box(commands);
-    expect(
-      Math.abs(commandsBox.y + commandsBox.height / 2 - (pillBox.y + pillBox.height / 2)),
-    ).toBeLessThan(1);
-    await expectSendSwap(page, "phone");
+    await expectCircleSwap(page, "phone");
     await composerLocator(page).fill("h");
     await expectMinTarget(send(page), 44);
-    await expectInside(commands, pill);
+    await composerLocator(page).fill("");
     await expectExpand(page, "phone");
     await darkShots(page, "phone");
 

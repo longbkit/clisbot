@@ -1,45 +1,44 @@
 /** The chat composer layout (docs/features/composer-picker/README.md, "Layout"). */
 const en = {
   commands: "Commands",
-  /** The expanded editor's title. */
-  expandedTitle: "Message",
+  closeCommands: "Close commands",
 };
 
 export type ComposerLayoutResources = typeof en;
 export const composerLayout: ComposerLayoutResources = en;
 export const composerLayoutVi: ComposerLayoutResources = {
   commands: "Lệnh",
-  expandedTitle: "Tin nhắn",
+  closeCommands: "Đóng danh sách lệnh",
 };
 export const composerLayoutAr: ComposerLayoutResources = {
   commands: "الأوامر",
-  expandedTitle: "رسالة",
+  closeCommands: "إغلاق الأوامر",
 };
 export const composerLayoutEs: ComposerLayoutResources = {
   commands: "Comandos",
-  expandedTitle: "Mensaje",
+  closeCommands: "Cerrar comandos",
 };
 export const composerLayoutFr: ComposerLayoutResources = {
   commands: "Commandes",
-  expandedTitle: "Message",
+  closeCommands: "Fermer les commandes",
 };
 export const composerLayoutJa: ComposerLayoutResources = {
   commands: "コマンド",
-  expandedTitle: "メッセージ",
+  closeCommands: "コマンドを閉じる",
 };
 export const composerLayoutKo: ComposerLayoutResources = {
   commands: "명령",
-  expandedTitle: "메시지",
+  closeCommands: "명령 닫기",
 };
 export const composerLayoutPtBR: ComposerLayoutResources = {
   commands: "Comandos",
-  expandedTitle: "Mensagem",
+  closeCommands: "Fechar comandos",
 };
 export const composerLayoutRu: ComposerLayoutResources = {
   commands: "Команды",
-  expandedTitle: "Сообщение",
+  closeCommands: "Закрыть команды",
 };
 export const composerLayoutZhCN: ComposerLayoutResources = {
   commands: "命令",
-  expandedTitle: "消息",
+  closeCommands: "关闭命令",
 };

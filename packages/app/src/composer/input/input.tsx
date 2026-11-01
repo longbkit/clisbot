@@ -29,7 +29,7 @@ import {
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
-import { ArrowUp, Mic, MicOff, CornerDownLeft, Plus, Square } from "lucide-react-native";
+import { ArrowUp, Mic, MicOff, CornerDownLeft, Paperclip, Plus, Square } from "lucide-react-native";
 import { useDictation } from "@/hooks/use-dictation";
 import { hasFinePointer } from "@/hooks/use-fine-pointer";
 import { DictationOverlay } from "@/components/dictation-controls";
@@ -70,13 +70,16 @@ import { COMPOSER_LAYOUT_ENABLED } from "@/clisbot/composer-layout/feature";
 import { ChatComposerPresentation } from "@/clisbot/composer-layout/chat-composer-presentation";
 import { ComposerCommandsButton } from "@/clisbot/composer-layout/commands-button";
 import {
-  CHAT_COMPOSER_WEB_MIN_INPUT_HEIGHT,
-  chatComposerInnerAction,
-  resolveChatActionPlacement,
-  resolveChatComposerGeometry,
-  type ChatActionPlacement,
+  chatComposerActions,
+  chatInnerFace,
+  chatMicFace,
+  chatMicTarget,
 } from "@/clisbot/composer-layout/geometry";
-import { resolveSlashTriggerEdit } from "@/clisbot/composer-layout/slash-trigger";
+import { resolveChatInputFacts } from "@/clisbot/composer-layout/input-facts";
+import {
+  isSlashCommandDraft,
+  resolveSlashTriggerEdit,
+} from "@/clisbot/composer-layout/slash-trigger";
 import { resolveComposerInputMode, type ComposerInputMode } from "@/composer/input-mode";
 import type { NativePastedFile } from "@/composer/native-pasted-image";
 import {
@@ -256,25 +259,21 @@ function AttachButtonIcon({
   hovered: boolean;
   onAttachButtonRef: ((node: View | null) => void) | undefined;
   buttonIconSize: number;
-  /**
-   * Clisbot chat layout: beside the pill the composer's action face, like dictation; inside a
-   * phone's pill a face with no fill at rest.
-   */
-  chatLayout: ChatActionPlacement | null;
+  /** Clisbot chat layout: the paperclip inside the container's right edge, as Telegram's. */
+  chatLayout: boolean;
 }) {
   const colorMapping = hovered ? iconForegroundMapping : iconForegroundMutedMapping;
-  const chatFace =
-    chatLayout === "inner"
-      ? [chatComposerInnerAction.face, hovered && chatComposerInnerAction.hovered]
-      : [
-          composerActionGeometry.face,
-          composerActionGeometry.neutral,
-          hovered && composerActionGeometry.hovered,
-        ];
-  const faceStyle = chatLayout ? chatFace : styles.attachButtonAnchor;
   return (
-    <View ref={onAttachButtonRef} collapsable={false} style={faceStyle}>
-      <ThemedPlus size={buttonIconSize} uniProps={colorMapping} />
+    <View
+      ref={onAttachButtonRef}
+      collapsable={false}
+      style={chatLayout ? chatInnerFace(hovered) : styles.attachButtonAnchor}
+    >
+      {chatLayout ? (
+        <ThemedPaperclip size={buttonIconSize} uniProps={colorMapping} />
+      ) : (
+        <ThemedPlus size={buttonIconSize} uniProps={colorMapping} />
+      )}
     </View>
   );
 }
@@ -1308,9 +1307,15 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const mode = resolveComposerInputMode(inputMode);
     // Clisbot: a chat composer takes the Telegram-style layout; a terminal prompt keeps its own.
     const usesChatLayout = COMPOSER_LAYOUT_ENABLED && inputMode === "chat";
+    const chatMinInputHeight = resolveChatInputFacts({
+      chatLayout: usesChatLayout,
+      web: isWeb,
+      compact: false,
+      fullscreen: false,
+      primaryAction: "none",
+    }).minInputHeight;
     const { t } = useTranslation();
     const isCompact = useIsCompactFormFactor();
-    const chatGeometry = resolveChatComposerGeometry(isCompact);
     const { height: windowHeight } = useWindowDimensions();
     const editingSession = useComposerEditingSession(inputMode, props.editingSession);
     const isFullscreen = useComposerFullscreen(editingSession);
@@ -1340,7 +1345,10 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const [webTextArea, setWebTextArea] = useState<HTMLElement | null>(null);
     const appliedTextReplacementKeyRef = useRef(textReplacement.key);
     const webTextareaRef = useRef<HTMLElement | null>(null);
+    // Clisbot chat layout: the Commands chip shows ✕ while the draft is one command being typed.
+    const [commandsOpen, setCommandsOpen] = useState(false);
     const updateLiveTextPresence = useCallback((text: string) => {
+      setCommandsOpen(isSlashCommandDraft(text));
       const nextHasLiveText = text.trim().length > 0;
       if (hasLiveTextRef.current === nextHasLiveText) return;
       hasLiveTextRef.current = nextHasLiveText;
@@ -1405,7 +1413,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const composerHeight = useComposerHeight({
       getText: getLiveText,
       textareaRef: webTextareaRef,
-      minHeight: usesChatLayout && isWeb ? CHAT_COMPOSER_WEB_MIN_INPUT_HEIGHT : MIN_INPUT_HEIGHT,
+      minHeight: chatMinInputHeight ?? MIN_INPUT_HEIGHT,
       maxHeight: maxInputHeight,
       onRenderedLinesChange: setRenderedLines,
       presentationKey: isFullscreen,
@@ -1911,21 +1919,31 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const attachButtonStyle = useCallback(
       ({ hovered }: { hovered?: boolean }) =>
         usesChatLayout
-          ? [
-              isCompact ? chatComposerInnerAction.target : composerActionGeometry.target,
-              (!isConnected || disabled) && styles.buttonDisabled,
-            ]
+          ? [chatComposerActions.innerTarget, (!isConnected || disabled) && styles.buttonDisabled]
           : [
               styles.attachButton,
               Boolean(hovered) && styles.iconButtonHovered,
               (!isConnected || disabled) && styles.buttonDisabled,
             ],
-      [isConnected, disabled, usesChatLayout, isCompact],
+      [isConnected, disabled, usesChatLayout],
     );
 
+    // Clisbot chat layout: dictation is the circle beside the container unless Send, Stop or
+    // Create holds it; then it sits inside the container's right edge.
+    const chatFacts = resolveChatInputFacts({
+      chatLayout: usesChatLayout,
+      web: isWeb,
+      compact: isCompact,
+      fullscreen: isFullscreen,
+      primaryAction: primaryActionKind,
+    });
+    const { micPlacement } = chatFacts;
     const voiceButtonStyle = useCallback(
-      () => [composerActionGeometry.target, !isDictationStartEnabled && styles.buttonDisabled],
-      [isDictationStartEnabled],
+      () => [
+        usesChatLayout ? chatMicTarget(micPlacement) : composerActionGeometry.target,
+        !isDictationStartEnabled && styles.buttonDisabled,
+      ],
+      [isDictationStartEnabled, micPlacement, usesChatLayout],
     );
 
     const handleRealtimeVoiceStop = useCallback(() => {
@@ -1984,24 +2002,15 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const sendButtonCombinedStyle = useMemo(
       () => [
         usesChatLayout
-          ? [
-              styles.chatLayoutSendTarget,
-              { width: chatGeometry.pillRowHeight, height: chatGeometry.pillRowHeight },
-            ]
+          ? chatComposerActions.circleTarget
           : [composerActionGeometry.target, styles.sendButton],
         submitLabel ? styles.sendButtonLabeled : undefined,
         isPresentedSendDisabled && styles.buttonDisabled,
       ],
-      [chatGeometry.pillRowHeight, isPresentedSendDisabled, submitLabel, usesChatLayout],
+      [isPresentedSendDisabled, submitLabel, usesChatLayout],
     );
-    // Clisbot chat layout: Send is the pill's one filled circle, larger than the upstream face.
-    const chatLayoutSendFaceStyle = useMemo(
-      () =>
-        usesChatLayout
-          ? { width: chatGeometry.sendFace, height: chatGeometry.sendFace }
-          : undefined,
-      [chatGeometry.sendFace, usesChatLayout],
-    );
+    // Clisbot chat layout: Send is the circle beside the container, as tall as it.
+    const chatLayoutSendFaceStyle = chatFacts.sendFaceStyle;
     const overlayContainerStyle = useMemo(
       () => [styles.overlayContainer, { opacity: surfacePresentation.overlay.opacity }],
       [surfacePresentation.overlay.opacity],
@@ -2012,11 +2021,11 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         <AttachButtonIcon
           hovered={Boolean(hovered)}
           onAttachButtonRef={onAttachButtonRef}
-          buttonIconSize={usesChatLayout && isCompact ? ICON_SIZE.lg : buttonIconSize}
-          chatLayout={resolveChatActionPlacement(usesChatLayout, isCompact)}
+          buttonIconSize={usesChatLayout ? ICON_SIZE.lg : buttonIconSize}
+          chatLayout={usesChatLayout}
         />
       ),
-      [onAttachButtonRef, buttonIconSize, usesChatLayout, isCompact],
+      [onAttachButtonRef, buttonIconSize, usesChatLayout],
     );
 
     const renderVoiceButtonIcon = useCallback(
@@ -2024,9 +2033,13 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         <View
           testID="composer-dictation-face"
           style={[
-            composerActionGeometry.face,
-            composerActionGeometry.neutral,
-            hovered && composerActionGeometry.hovered,
+            usesChatLayout
+              ? chatMicFace(micPlacement, Boolean(hovered))
+              : [
+                  composerActionGeometry.face,
+                  composerActionGeometry.neutral,
+                  hovered && composerActionGeometry.hovered,
+                ],
             isDictating && composerActionGeometry.recording,
           ]}
         >
@@ -2034,11 +2047,19 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             hovered={Boolean(hovered)}
             isDictating={isDictating}
             isMutedRealtime={Boolean(isRealtimeVoiceForCurrentAgent && voice?.isMuted)}
-            buttonIconSize={isCompact ? ICON_SIZE.lg : buttonIconSize}
+            buttonIconSize={isCompact || usesChatLayout ? ICON_SIZE.lg : buttonIconSize}
           />
         </View>
       ),
-      [isDictating, isRealtimeVoiceForCurrentAgent, voice?.isMuted, buttonIconSize, isCompact],
+      [
+        isDictating,
+        isRealtimeVoiceForCurrentAgent,
+        voice?.isMuted,
+        buttonIconSize,
+        isCompact,
+        usesChatLayout,
+        micPlacement,
+      ],
     );
 
     const sendButton = useMemo(
@@ -2122,7 +2143,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             compact={isCompact}
             onRenderedLinesChange={setRenderedLines}
             focusHintVisible={
-              !isFullscreen && isWeb && !isInputFocused && !value && !(usesChatLayout && isCompact)
+              !isFullscreen && isWeb && !isInputFocused && !value && !chatFacts.hideFocusHint
             }
             focusInputKeys={focusInputKeys}
             focusHintLabel={t("composer.input.focusHint", {
@@ -2157,7 +2178,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         isInputFocused,
         value,
         focusInputKeys,
-        usesChatLayout,
+        chatFacts.hideFocusHint,
       ],
     );
     const attachDropdown = useMemo(
@@ -2249,8 +2270,8 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             <ComposerCommandsButton
               onPress={handleCommandsPress}
               disabled={Boolean(disabled) || isDictating || isRealtimeVoiceForCurrentAgent}
-              iconSize={isCompact ? ICON_SIZE.lg : buttonIconSize}
-              inner={isCompact}
+              iconSize={ICON_SIZE.lg}
+              open={commandsOpen}
             />
           ) : null,
         attach: showAttachments ? attachDropdown : null,
@@ -2258,6 +2279,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         realtimeVoice: rightContent,
         // Content, not an always-shown submit such as New workspace's Create, hides the voice.
         sendable: hasSendableContent,
+        typing: hasLiveText,
         // The expanded editor always shows Send, disabled while empty, as upstream fullscreen does.
         primary: primaryActionKind === "none" && !isFullscreen ? null : sendButton,
         settings: leftContent,
@@ -2270,13 +2292,13 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         disabled,
         isDictating,
         isRealtimeVoiceForCurrentAgent,
-        isCompact,
-        buttonIconSize,
+        commandsOpen,
         showAttachments,
         attachDropdown,
         voiceButton,
         rightContent,
         hasSendableContent,
+        hasLiveText,
         primaryActionKind,
         isFullscreen,
         sendButton,
@@ -2331,7 +2353,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     );
     // Clisbot chat layout: the expand button shows from the third line on every width.
     const showFullscreenButton = shouldShowFullscreenControl(
-      isCompact || usesChatLayout,
+      isCompact || chatFacts.expandOnEveryWidth,
       readOnly,
       showOverlay,
       renderedLines,
@@ -2532,12 +2554,6 @@ const styles = StyleSheet.create((theme: Theme) => ({
   sendButton: {
     marginLeft: { xs: 0, md: theme.spacing[1] },
   },
-  chatLayoutSendTarget: {
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    borderRadius: theme.borderRadius.full,
-  },
   sendButtonLabeled: {
     width: "auto",
     minWidth: { xs: MIN_TOUCH_TARGET_SIZE, md: 28 },
@@ -2584,6 +2600,7 @@ const styles = StyleSheet.create((theme: Theme) => ({
 })) as unknown as Record<string, object>;
 
 const ThemedPlus = withUnistyles(Plus);
+const ThemedPaperclip = withUnistyles(Paperclip);
 const ThemedMic = withUnistyles(Mic);
 const ThemedMicOff = withUnistyles(MicOff);
 const ThemedArrowUp = withUnistyles(ArrowUp);

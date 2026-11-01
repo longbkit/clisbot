@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveSlashTriggerEdit } from "./slash-trigger";
+import { isSlashCommandDraft, resolveSlashTriggerEdit } from "./slash-trigger";
 
 describe("resolveSlashTriggerEdit", () => {
   it("opens the command list on an empty draft", () => {
@@ -10,11 +10,20 @@ describe("resolveSlashTriggerEdit", () => {
     expect(resolveSlashTriggerEdit("  \n", { start: 3, end: 3 }).text).toBe("/");
   });
 
-  it("closes it again when the draft is only the slash", () => {
+  it("closes it again while the draft is only a command being typed", () => {
     expect(resolveSlashTriggerEdit("/", { start: 1, end: 1 })).toEqual({
       text: "",
       selection: { start: 0, end: 0 },
     });
+    expect(resolveSlashTriggerEdit("/rev", { start: 4, end: 4 }).text).toBe("");
+  });
+
+  it("knows when the command list is open", () => {
+    expect(isSlashCommandDraft("/")).toBe(true);
+    expect(isSlashCommandDraft("/review")).toBe(true);
+    expect(isSlashCommandDraft("/review now")).toBe(false);
+    expect(isSlashCommandDraft("fix /")).toBe(false);
+    expect(isSlashCommandDraft("")).toBe(false);
   });
 
   it("types a slash at the caret, after a space when it would touch a word", () => {

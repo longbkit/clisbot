@@ -48,7 +48,11 @@ it("lists each command once, with no card repeating the highlighted row", () => 
   expect(text.split("Archive the current agent").length - 1).toBe(1);
 });
 
-it("names a command's arguments in its row", () => {
+it("reads description first, then the command and its arguments", () => {
   render(<Autocomplete options={OPTIONS} selectedIndex={0} onSelect={vi.fn()} />);
-  expect(screen.getByText("[agent]")).toBeTruthy();
+  const names = screen.getAllByTestId("composer-command-name").map((node) => node.textContent);
+  expect(names).toEqual(["/review", "/handoff [agent]", "/exit"]);
+  const description = screen.getByText("Prepare a handoff note").getBoundingClientRect();
+  const command = screen.getByText("/handoff [agent]").getBoundingClientRect();
+  expect(command.left).toBeGreaterThan(description.right);
 });
