@@ -90,8 +90,9 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
   levels the current model sells, so GPT-6 Sol with only Priority shows Standard | Fast. A tier
   that is none of them, such as Codex Flex (slower and cheaper), is its own segment under the
   provider's label. Every segment writes the provider's own feature id and value, never one the
-  model does not offer; a model with one tier shows no control. Fast and Ultra fast carry
-  "Higher cost". Who may pick a dearer tier is the daemon's and the Hub's call, not the panel's
+  model does not offer; a model with one tier shows no control. A segment carries "Higher cost"
+  when `isFasterTier` (`@clisbot/protocol/speed-tier`) says so: Fast, Ultra fast and any tier
+  not listed as cheap, which is also what needs `agent.fast.use`. Who may pick a dearer tier is the daemon's and the Hub's call, not the panel's
   ([permissions](../../permissions.md#channel-command-access-hub)).
 - **Touch targets.** In the phone sheet and on touch devices every row and control a thumb
   presses is at least 44px tall: model and profile rows, Show more, effort and provider chips,
@@ -186,8 +187,8 @@ permission request the agent still raises. Agents sometimes ask under bypass any
   (`tools/agent-unattended-guard.ts`). An agent doing so would approve its own calls, as
   `respond_to_permission` already refuses for Connector cards. The request is judged, not the
   target: a child still inherits its caller's mode. A schedule an agent creates or changes must
-  name a mode that asks (`create_schedule`'s `mode`), because a run with no mode starts in the
-  provider's no-prompt mode. A person's paths are unchanged.
+  name a mode that asks (`create_schedule`'s `mode`); a schedule whose mode an agent clears runs
+  in the provider's mode that asks. A person's paths are unchanged.
 - **Observers.** A request Full auto-accept is answering is not a wait for a person:
   `waitForAgentEvent` and finish subscriptions skip it, and it raises no attention. Every
   approval is logged at info with the agent id, request id and tool name, and recorded with the
@@ -206,7 +207,7 @@ permission request the agent still raises. Agents sometimes ask under bypass any
   `server_info.features.fullAutoAccept` is set (`COMPAT(fullAutoAccept)`), and then hides the
   per-provider `auto_accept` toggle.
 - **A provider's own `auto_accept` shows as Full auto-accept.** Hiding the toggle does not turn
-  it off: unattended creates (schedules, children of an unattended parent) and older apps still
+  it off: unattended creates (children of an unattended parent) and older apps still
   set it on ACP, Copilot and OpenCode sessions. While it is on, the Mode reads Full auto-accept,
   and picking any other mode also writes `auto_accept: false` (`mode-options.ts`), on a live
   agent and on a draft.
@@ -263,9 +264,12 @@ ACP agent process) and `codex-app-server-agent.features.test.ts`.
   who relied on restricted members driving those Bots must re-grant every `approval.*` privilege
   or move the Bots to a mode that asks
   ([permissions](../../permissions.md#approval-leaves)).
-- **A schedule with no mode starts in the provider's no-prompt mode** (Claude Bypass, Codex Full
-  access, Copilot Allow all, OMP Full access); ACP, Copilot and OpenCode runs also turn on their
-  own `auto_accept` whatever the mode. Pinned in `schedule-run-mode.test.ts` while the owner
-  decides; agents can no longer create such schedules.
+- **A schedule with no mode now asks for approval.** On 2.2.1 a schedule without a mode ran
+  Claude in Bypass, Codex in Full access, Copilot in Allow all and OMP in Full access, and ACP,
+  Copilot and OpenCode runs turned their own `auto_accept` on. Now every provider's run starts in
+  its mode that asks (OMP: Write approval) with `auto_accept` off, and its approval requests reach
+  the app like any agent's. To keep a schedule running without prompts, pick Full access, Bypass,
+  Allow all or Full auto-accept on it. The schedule form preselects the mode that asks by its
+  name, and new schedules store it ([permissions](../../permissions.md#approval-leaves)).
 - **Channel commands gate every faster tier**, not only `fast_mode`: a Codex `service_tier`
   other than default, standard, flex or auto, and Cursor `fast`, now need `agent.fast.use`.

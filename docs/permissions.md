@@ -210,12 +210,20 @@ attended. With the marks, a member without every approval leaf is refused, every
 Access judges a configuration: selecting one of those modes, changing any other setting of a
 session already running in one, `resume_agent_request` for such a session, Chat delivery to a
 Bot whose session runs in one, and a schedule launch. A Codex Plan over Full access counts as
-Full access. Three consequences outside Managed Access follow from the same marks: a schedule
-with no mode, and a child agent created for another provider than its unattended parent, start
-in that provider's no-prompt mode; a child of a Full auto-accept parent gets the no-prompt mode
-but not the Full auto-accept flag. `provider-modes.test.ts` checks the classification against the
-real provider registry, and `schedule-run-mode.test.ts` pins what a schedule run starts in per
-provider.
+Full access. Two consequences outside Managed Access follow from the same marks: a child agent
+created for another provider than its unattended parent starts in that provider's no-prompt mode,
+and a child of a Full auto-accept parent gets the no-prompt mode but not the Full auto-accept flag.
+`provider-modes.test.ts` checks the classification against the real provider registry.
+
+A schedule runs without prompts only when someone picked such a mode on it. A `new-agent`
+schedule with no mode runs in the provider's mode that asks: its default, or its first mode that
+asks when the default does not (OMP's Full access gives Write approval), never Plan
+(`resolveScheduleDefaultModeId` in `@clisbot/protocol/schedule/default-mode`). The daemon stores
+that mode when a schedule is created or updated without one (CLI, RPC and MCP), resolves it again
+at run time for schedules stored without one, and no longer creates runs as unattended, so ACP,
+Copilot and OpenCode do not turn their own `auto_accept` on. The run's approval requests reach the
+app like any agent's. Managed Access judges a schedule launch without a mode as that create; it no
+longer needs every approval leaf. `schedule/schedule-mode.test.ts` pins the mode per provider.
 
 An agent's Clisbot tools ask the same question of what an agent requests: an agent caller cannot
 create, switch or prompt an agent into an unattended mode or turn on a provider's `auto_accept`,
