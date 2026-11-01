@@ -276,4 +276,32 @@ describe("Full auto-accept", () => {
     await expect.poll(() => client.session?.answers.length).toBe(1);
     expect(toAgentPayload(manager.getAgent(agent.id)!).fullAutoAccept).toBe(true);
   });
+
+  test("leaves Connector send and connect cards to a person", async () => {
+    const { manager, agentId } = await startAgent(claudeClient());
+    await manager.setAgentMode(agentId, FULL_AUTO_ACCEPT_MODE_ID);
+
+    const send = manager.requestDaemonPermission(agentId, {
+      id: "connector-send",
+      name: "Send email",
+      kind: "tool",
+      metadata: { clisbotConnector: { kind: "send", app: "gmail" } },
+    });
+    const connect = manager.requestDaemonPermission(agentId, {
+      id: "connector-connect",
+      name: "Connect Gmail",
+      kind: "tool",
+      metadata: { clisbotConnector: { kind: "connect", app: "gmail" } },
+    });
+
+    await expect.poll(() => manager.getAgent(agentId)?.pendingPermissions.size).toBe(2);
+    expect([...(manager.getAgent(agentId)?.pendingPermissions.keys() ?? [])].sort()).toEqual([
+      "connector-connect",
+      "connector-send",
+    ]);
+    await manager.resolveDaemonPermission(agentId, "connector-send", { behavior: "deny" });
+    await manager.resolveDaemonPermission(agentId, "connector-connect", { behavior: "deny" });
+    await expect(send).resolves.toMatchObject({ behavior: "deny" });
+    await expect(connect).resolves.toMatchObject({ behavior: "deny" });
+  });
 });

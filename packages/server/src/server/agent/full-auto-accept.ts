@@ -1,3 +1,4 @@
+import { CONNECTOR_CARD_METADATA } from "@clisbot/protocol/connectors/types";
 import { FULL_AUTO_ACCEPT_MODE_ID } from "@clisbot/protocol/full-auto-accept";
 import type {
   AgentMode,
@@ -19,6 +20,23 @@ export { FULL_AUTO_ACCEPT_MODE_ID };
  */
 export const PERMISSION_CHOICE_METADATA = "clisbotChoice";
 
+/**
+ * Set on a request the daemon raised itself (`AgentManager.requestDaemonPermission`), such as
+ * a Connector's connect and send cards. Only a person answers those.
+ */
+export const DAEMON_PERMISSION_METADATA = "clisbotDaemonPermission";
+
+/** Requests a person must answer whatever the mode: daemon-owned cards and Connector cards. */
+function isPersonOnlyRequest(request: AgentPermissionRequest): boolean {
+  const metadata = request.metadata;
+  if (!metadata) return false;
+  return (
+    metadata[DAEMON_PERMISSION_METADATA] === true ||
+    metadata[CONNECTOR_CARD_METADATA] !== undefined ||
+    metadata[PERMISSION_CHOICE_METADATA] === true
+  );
+}
+
 /** The answer the daemon gives on the user's behalf. Each provider picks its "allow once". */
 export const FULL_AUTO_ACCEPT_RESPONSE: AgentPermissionResponse = { behavior: "allow" };
 
@@ -34,10 +52,13 @@ export function resolveFullAutoAcceptProviderMode(
   return modes.find((mode) => mode.isUnattended === true)?.id ?? currentModeId;
 }
 
-/** A tool approval that offers an allow. Never a question, a plan, a mode switch or a choice. */
+/**
+ * A tool approval that offers an allow. Never a question, a plan, a mode switch, a choice, or
+ * a card the daemon raised itself (Connector connect and send cards).
+ */
 export function isAutoAcceptablePermission(request: AgentPermissionRequest): boolean {
   if (request.kind !== "tool") return false;
-  if (request.metadata?.[PERMISSION_CHOICE_METADATA] === true) return false;
+  if (isPersonOnlyRequest(request)) return false;
   const actions = request.actions ?? [];
   return actions.length === 0 || actions.some((action) => action.behavior === "allow");
 }

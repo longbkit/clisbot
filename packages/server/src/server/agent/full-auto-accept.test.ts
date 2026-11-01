@@ -32,6 +32,31 @@ describe("Full auto-accept provider mode", () => {
 });
 
 describe("which requests Full auto-accept approves", () => {
+  test("never answers a Connector send card, which only a person may answer", () => {
+    const send = request({
+      name: "Connector send",
+      metadata: { clisbotConnector: { kind: "send", app: "gmail" } },
+    });
+    expect(isAutoAcceptablePermission(send)).toBe(false);
+  });
+
+  test("never answers a Connector connect card", () => {
+    const connect = request({
+      name: "Connect Gmail",
+      metadata: {
+        clisbotConnector: { kind: "connect", app: "gmail" },
+        clisbotDaemonPermission: true,
+      },
+    });
+    expect(isAutoAcceptablePermission(connect)).toBe(false);
+  });
+
+  test("never answers any card the daemon raised itself", () => {
+    expect(
+      isAutoAcceptablePermission(request({ metadata: { clisbotDaemonPermission: true } })),
+    ).toBe(false);
+  });
+
   test("approves a Claude tool request", () => {
     expect(isAutoAcceptablePermission(request({ input: { command: "ls" } }))).toBe(true);
   });

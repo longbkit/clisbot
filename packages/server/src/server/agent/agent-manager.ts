@@ -5,6 +5,7 @@ import {
 import { readConnectorsOff, skillsInOffList } from "@clisbot/protocol/connectors/types";
 import {
   FULL_AUTO_ACCEPT_RESPONSE,
+  DAEMON_PERMISSION_METADATA,
   isFullAutoAcceptMode,
   resolveFullAutoAcceptProviderMode,
   shouldDaemonAutoAccept,
@@ -172,7 +173,6 @@ function assertMcpServersSupported(
 }
 
 /** Marks a permission request the daemon raised, so its answer never reaches the provider. */
-const DAEMON_PERMISSION_METADATA = "clisbotDaemonPermission";
 const DAEMON_PERMISSION_TIMEOUT_MS = 15 * 60_000;
 
 /** Runtime-only MCP servers for one launch, and the tools on them that need no prompt. */
