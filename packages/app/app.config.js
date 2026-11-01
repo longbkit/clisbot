@@ -269,6 +269,6 @@ export default {
         projectId: "9314cc2c-4abe-4637-b1cf-647fbbfbd807",
       },
     },
-    owner: "lbk-company",
+    owner: "clisbot-team",
   },
 };

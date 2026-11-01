@@ -52,13 +52,13 @@ git fetch --no-tags upstream refs/tags/vX.Y.Z:refs/upstream-releases/vX.Y.Z
 git rev-parse 'refs/upstream-releases/vX.Y.Z^{}'      # record the raw commit
 git worktree add -b sync/rebranded-vX.Y.Z <rebrand-wt> refs/upstream-releases/vX.Y.Z
 node scripts/rebrand-clisbot.mjs --root <rebrand-wt> --apply \
-  --expo-owner lbk-company --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807
+  --expo-owner clisbot-team --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807
 node scripts/branding/apply.mjs --root <rebrand-wt>            # dry run, review
 node scripts/branding/apply.mjs --root <rebrand-wt> --apply
 (cd <rebrand-wt> && <main>/node_modules/.bin/oxfmt . && <main>/node_modules/.bin/oxlint)
 git -c core.excludesFile=/dev/null -C <rebrand-wt> add -A
 node scripts/rebrand-clisbot.mjs --root <rebrand-wt> --check \
-  --expo-owner lbk-company --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807
+  --expo-owner clisbot-team --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807
 ```
 
 - The rename script stops on upstream copy it does not recognize (README

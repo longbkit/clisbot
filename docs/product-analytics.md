@@ -60,7 +60,7 @@ lifecycle metrics may be collected while native analytics is enabled.
   `GOOGLE_SERVICE_INFO_PLIST_PROD` build inputs. Native SDK changes require a
   fresh native build; Expo Go and an OTA-only update cannot add this SDK.
   Both inputs are stored as EAS secret files for production and preview on
-  `@lbk-company/clisbot`; development builds do not use them.
+  `@clisbot-team/clisbot`; development builds do not use them.
   When enabled, leave Firebase's React Native platform configuration intact:
   Expo replaces a project's `platforms` override rather than merging the
   library's CMake paths and iOS script phases into it.
