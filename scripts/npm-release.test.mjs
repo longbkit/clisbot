@@ -6,7 +6,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { createRequire } from "node:module";
 import { stageBundleDependencies } from "./npm-bundle-dependencies.mjs";
-import { releasePackages } from "./npm-release.mjs";
+import { readReleaseToken, releasePackages } from "./npm-release.mjs";
 
 test("the CLI release includes every runtime dependency and publishes clisbot last", () => {
   const packages = releasePackages();
@@ -249,4 +249,13 @@ test("a package-local bundle preserves upstream metadata across repeated staging
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("reads the release token from the environment first, then the checkout's .env", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "npm-release-token-"));
+  const envFile = path.join(dir, ".env");
+  writeFileSync(envFile, 'OTHER=1\nexport NPM_RELEASE_TOKEN="from-file" # note\n');
+  assert.equal(readReleaseToken({ NPM_RELEASE_TOKEN: "from-env" }, envFile), "from-env");
+  assert.equal(readReleaseToken({}, envFile), "from-file");
+  assert.equal(readReleaseToken({}, path.join(dir, "missing.env")), undefined);
 });
