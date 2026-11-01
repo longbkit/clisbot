@@ -52,7 +52,9 @@ export function SectionHeader({
   const right = useMemo(() => <View style={styles.actions}>{actions}</View>, [actions]);
   return (
     <View testID={testID} style={styles.frame}>
-      <ScreenHeader borderless left={left} right={right} />
+      {/* A section header sits on its pane's surface (the sidebar's gray on desktop, the page's
+          white on a phone); ScreenHeader's own white drew a strip across the gray column. */}
+      <ScreenHeader borderless transparent left={left} right={right} />
       {middle ? (
         <View style={styles.middle} pointerEvents="box-none">
           {center}

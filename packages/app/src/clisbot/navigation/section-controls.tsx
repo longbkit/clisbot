@@ -48,10 +48,7 @@ export function SectionControls<T extends string>({
   children?: ReactNode;
 }) {
   return (
-    <View
-      style={[styles.controls, backdrop === "surface0" && !leading && styles.pageTop]}
-      testID={`${section}-controls`}
-    >
+    <View style={[styles.controls, !leading && styles.pageTop]} testID={`${section}-controls`}>
       {leading}
       <ScopeTabs section={section} counts={scopeCounts} />
       <FilterChips
@@ -71,8 +68,8 @@ export function SectionControls<T extends string>({
 
 const styles = StyleSheet.create((theme) => ({
   controls: { gap: theme.spacing[2], paddingBottom: theme.spacing[2] },
-  // On a page the block sits right under the screen header, so it brings its own gap; in the
-  // sidebar the header row carries it, and Home's leading Host row brings its own.
+  // The block sits right under the section header, so it brings its own gap; Home's leading
+  // Host row brings its own.
   pageTop: { paddingTop: theme.spacing[2] },
   inset: { paddingHorizontal: theme.spacing[3] },
   display: { flexDirection: "row", alignItems: "center" },
