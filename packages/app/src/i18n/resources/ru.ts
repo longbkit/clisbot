@@ -1,3 +1,4 @@
+import { composerPickerRu as composerPicker } from "./composer-picker";
 import { hostQueueRu as hostQueue } from "./host-queue";
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
@@ -133,6 +134,7 @@ export const ru: TranslationResources = {
   },
   composer: {
     hostQueue,
+    picker: composerPicker,
     placeholders: {
       desktop: "Напишите агенту сообщение, отметьте @files или используйте /commands и /skills.",
       mobile: "Сообщение,@files,/commands",

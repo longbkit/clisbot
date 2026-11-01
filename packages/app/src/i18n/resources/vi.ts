@@ -1,3 +1,4 @@
+import { composerPickerVi as composerPicker } from "./composer-picker";
 import { hostQueueVi as hostQueue } from "./host-queue";
 import type { TranslationResources } from "./en";
 import { bots } from "./bots";
@@ -132,6 +133,7 @@ export const vi: TranslationResources = {
   },
   composer: {
     hostQueue,
+    picker: composerPicker,
     placeholders: {
       desktop: "Nhắn cho agent, gắn @file hoặc dùng /lệnh và /skill",
       mobile: "Tin nhắn, @file, /lệnh",

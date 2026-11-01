@@ -25,6 +25,7 @@ export const CalendarClock = StubIcon;
 export const Camera = StubIcon;
 export const Captions = StubIcon;
 export const ChevronUp = StubIcon;
+export const CheckCheck = StubIcon;
 export const CircleDashed = StubIcon;
 export const CircleHelp = StubIcon;
 export const Clock = StubIcon;
@@ -208,6 +209,7 @@ export const ZoomIn = StubIcon;
 export const ZoomOut = StubIcon;
 
 export const Laptop = StubIcon;
+export const Lock = StubIcon;
 export const LockKeyhole = StubIcon;
 export const PencilLine = StubIcon;
 export const Send = StubIcon;
