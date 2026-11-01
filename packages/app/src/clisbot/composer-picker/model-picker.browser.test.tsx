@@ -91,6 +91,8 @@ interface HarnessExtras {
   onRefreshProvider?: ModelPickerProps["onRefreshProvider"];
   profiles?: ModelPickerProps["profiles"];
   providers?: ProviderSelectorProvider[];
+  onEditProfiles?: () => void;
+  onEditProfile?: (profileId: string) => void;
 }
 
 function Harness({
@@ -162,6 +164,8 @@ function Harness({
         onSetFeature={setFeature}
         mode={null}
         profiles={extras.profiles ?? null}
+        onEditProfiles={extras.onEditProfiles}
+        onEditProfile={extras.onEditProfile}
       />
     </>
   );
@@ -422,15 +426,21 @@ it("opens the provider's settings from its menu over the open panel", async () =
 
 it("keeps the Profiles entry on a Host with no profiles, offering Create profile", async () => {
   const applyProfile = vi.fn();
-  mount(undefined, { serverId: "host-1", profiles: { rows: [], applyProfile } });
+  const onEditProfiles = vi.fn();
+  mount(undefined, { profiles: { rows: [], applyProfile }, onEditProfiles });
   await userEvent.click(await screen.findByTestId("composer-picker-rail-profiles"));
   expect(await screen.findByText("No agent profiles yet")).toBeTruthy();
-  expect(screen.getByTestId("composer-picker-profiles-create").textContent).toBe("Create profile");
+  const create = screen.getByTestId("composer-picker-profiles-create");
+  expect(create.textContent).toBe("Create profile");
   expect(screen.queryByLabelText("Edit agent profiles")).toBeNull();
+  await userEvent.click(create);
+  expect(onEditProfiles).toHaveBeenCalledTimes(1);
 });
 
-it("applies a profile from the Profiles entry and leads to the Host's profiles", async () => {
+it("applies a profile, and edits one profile or all of them", async () => {
   const applyProfile = vi.fn();
+  const onEditProfile = vi.fn();
+  const onEditProfiles = vi.fn();
   const row = {
     id: "profile-ui",
     provider: "codex",
@@ -440,11 +450,16 @@ it("applies a profile from the Profiles entry and leads to the Host's profiles",
     name: "UI work",
     summary: "Codex · GPT-6.1-Sol",
   };
-  mount(undefined, { serverId: "host-1", profiles: { rows: [row], applyProfile } });
+  mount(undefined, { profiles: { rows: [row], applyProfile }, onEditProfiles, onEditProfile });
   await userEvent.click(await screen.findByTestId("composer-picker-rail-profiles"));
-  expect(screen.getByLabelText("Edit agent profiles")).toBeTruthy();
   await userEvent.click(await screen.findByTestId("composer-picker-profile-row-profile-ui"));
   expect(applyProfile).toHaveBeenCalledWith("profile-ui");
+  // Each profile has its own Edit beside the row, never a button inside the row's button.
+  await userEvent.click(screen.getByLabelText("Edit UI work"));
+  expect(onEditProfile).toHaveBeenCalledWith("profile-ui");
+  expect(document.querySelectorAll("button button")).toHaveLength(0);
+  await userEvent.click(screen.getByLabelText("Edit agent profiles"));
+  expect(onEditProfiles).toHaveBeenCalledTimes(1);
 });
 
 it("refreshes the provider's models in place, with a spinner, an error and Retry", async () => {

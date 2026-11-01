@@ -103,23 +103,44 @@ export function ModelList(props: ModelListProps) {
   );
 }
 
-function ProfileRow(props: { row: AgentProfilePickerRow; onApply: (id: string) => void }) {
-  const { row, onApply } = props;
+function ProfileRow(props: {
+  row: AgentProfilePickerRow;
+  onApply: (id: string) => void;
+  onEdit?: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const { row, onApply, onEdit } = props;
   const touch = useTouchRows();
   const apply = useCallback(() => onApply(row.id), [onApply, row.id]);
+  const editRow = useCallback(() => onEdit?.(row.id), [onEdit, row.id]);
   const glyph = useMemo(
     () => <AgentProfileGlyph icon={row.icon} color={row.color} size={16} />,
     [row.color, row.icon],
   );
+  // Edit sits beside the row's pressable, not inside it: a button in a button is invalid HTML.
   return (
-    <ComboboxItem
-      label={row.name}
-      description={row.summary}
-      onPress={apply}
-      leadingSlot={glyph}
-      touch={touch}
-      testID={`composer-picker-profile-row-${row.id}`}
-    />
+    <View style={styles.profileRow}>
+      <View style={styles.profileRowItem}>
+        <ComboboxItem
+          label={row.name}
+          description={row.summary}
+          onPress={apply}
+          leadingSlot={glyph}
+          touch={touch}
+          testID={`composer-picker-profile-row-${row.id}`}
+        />
+      </View>
+      {onEdit ? (
+        <ToolbarButton
+          label={t("modelSelector.editProfileLabel", { name: row.name })}
+          compact
+          onPress={editRow}
+          testID={`composer-picker-profile-edit-${row.id}`}
+        >
+          <Pencil size={ICON_SIZE.sm} color={styles.muted.color} />
+        </ToolbarButton>
+      ) : null}
+    </View>
   );
 }
 
@@ -153,6 +174,7 @@ export function ProfileList(props: {
   profiles: AgentProfilePicker;
   emptyText: string;
   onEditProfiles?: () => void;
+  onEditProfile?: (profileId: string) => void;
 }) {
   const { t } = useTranslation();
   const { onEditProfiles } = props;
@@ -177,7 +199,12 @@ export function ProfileList(props: {
     <View>
       <ProfilesHeader onEditProfiles={onEditProfiles} />
       {props.profiles.rows.map((row) => (
-        <ProfileRow key={row.id} row={row} onApply={props.profiles.applyProfile} />
+        <ProfileRow
+          key={row.id}
+          row={row}
+          onApply={props.profiles.applyProfile}
+          onEdit={props.onEditProfile}
+        />
       ))}
     </View>
   );
@@ -195,6 +222,15 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
     textAlign: "center",
+  },
+  profileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: theme.spacing[1],
+  },
+  profileRowItem: {
+    flex: 1,
+    minWidth: 0,
   },
   profilesHeader: {
     minHeight: 32,

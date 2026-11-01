@@ -58,6 +58,8 @@ export interface ModelPickerProps {
   mode: AgentModeControlValue | null;
   profiles: AgentProfilePicker | null;
   onCreateProfile?: (seed: AgentProfileSeed) => void;
+  onEditProfiles?: () => void;
+  onEditProfile?: (profileId: string) => void;
   /** Reloads one provider's model list (the provider snapshot refresh Settings uses). */
   onRefreshProvider?: ProviderRefresh;
 }

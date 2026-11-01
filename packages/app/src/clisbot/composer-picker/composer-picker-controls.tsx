@@ -27,6 +27,9 @@ export interface ComposerPickerControlsProps {
   modeControl: AgentModeControlValue | null;
   profiles: AgentProfilePicker | null;
   onCreateProfile?: (seed: AgentProfileSeed) => void;
+  /** Opens the Host's Agent profiles settings. */
+  onEditProfiles?: () => void;
+  onEditProfile?: (profileId: string) => void;
   onRefreshProvider?: ProviderRefresh;
   serverId: string | null;
   disabled: boolean;
@@ -68,6 +71,22 @@ function useChipLabels(props: ComposerPickerControlsProps) {
       value: effort ? `${modelLabel}, ${effort.label}` : modelLabel,
     }),
   };
+}
+
+function useClosingFirst<A extends unknown[]>(
+  close: () => void,
+  action: ((...args: A) => void) | undefined,
+): ((...args: A) => void) | undefined {
+  return useMemo(
+    () =>
+      action
+        ? (...args: A) => {
+            close();
+            action(...args);
+          }
+        : undefined,
+    [action, close],
+  );
 }
 
 /**
@@ -115,18 +134,12 @@ export function ComposerPickerControls(props: ComposerPickerControlsProps) {
     [onClose, onOpen],
   );
   const toggle = useCallback(() => handleOpenChange(!open), [handleOpenChange, open]);
-  const { onCreateProfile } = props;
-  // The profile editor is a sheet of its own; it opens once the panel has closed.
-  const createProfile = useMemo(
-    () =>
-      onCreateProfile
-        ? (seed: AgentProfileSeed) => {
-            handleOpenChange(false);
-            onCreateProfile(seed);
-          }
-        : undefined,
-    [handleOpenChange, onCreateProfile],
-  );
+  // The profile editor and Host settings are surfaces of their own; they open once the panel
+  // has closed.
+  const close = useCallback(() => handleOpenChange(false), [handleOpenChange]);
+  const createProfile = useClosingFirst(close, props.onCreateProfile);
+  const editProfiles = useClosingFirst(close, props.onEditProfiles);
+  const editProfile = useClosingFirst(close, props.onEditProfile);
   const reasoning = useMemo(
     () => ({
       modelName: labels.modelName,
@@ -182,6 +195,8 @@ export function ComposerPickerControls(props: ComposerPickerControlsProps) {
         mode={props.modeControl}
         profiles={props.profiles}
         onCreateProfile={createProfile}
+        onEditProfiles={editProfiles}
+        onEditProfile={editProfile}
         onRefreshProvider={props.onRefreshProvider}
       />
     </>

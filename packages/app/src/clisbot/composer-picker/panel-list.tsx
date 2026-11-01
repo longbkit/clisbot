@@ -1,8 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
-import { router } from "expo-router";
-import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import type { PanelProps } from "./model-picker";
 import { ModelList, ProfileList } from "./model-list";
 import { ProviderHeader } from "./provider-header";
@@ -30,31 +28,19 @@ function useProviderActions(props: PanelProps) {
   return { provider: index >= 0 ? rail.providers[index] : null, index, move, openSettings, retry };
 }
 
-/** Agent profiles are Host config, so their editor is the Host settings section that owns them. */
-function useOpenAgentProfileSettings(props: PanelProps): (() => void) | undefined {
-  const { serverId, onOpenChange } = props;
-  return useMemo(() => {
-    if (!serverId) return undefined;
-    return () => {
-      onOpenChange(false);
-      router.push(buildSettingsHostSectionRoute(serverId, "agents"));
-    };
-  }, [onOpenChange, serverId]);
-}
-
 /** The center column: the chosen provider's header and models, Favorites, matches, or Profiles. */
 export function PanelList(props: PanelProps) {
   const { t } = useTranslation();
   const { state } = props;
   const actions = useProviderActions(props);
-  const openProfileSettings = useOpenAgentProfileSettings(props);
   const query = state.query.trim();
   if (state.scope.kind === "profiles" && props.profiles && !query) {
     return (
       <ProfileList
         profiles={props.profiles}
         emptyText={t("composer.picker.noProfiles")}
-        onEditProfiles={openProfileSettings}
+        onEditProfiles={props.onEditProfiles}
+        onEditProfile={props.onEditProfile}
       />
     );
   }
