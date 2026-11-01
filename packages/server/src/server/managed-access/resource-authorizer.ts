@@ -640,7 +640,7 @@ export class ManagedResourceAuthorizer {
     if (!this.authorization.allowsProject(projectId, requiredPrivilege)) return false;
     const grant = this.authorization.project(projectId);
     if (!grant) return false;
-    if (config.featureValues?.fast_mode === true && !grant.privileges.has("agent.fast.use")) {
+    if (usesFasterTier(config.featureValues) && !grant.privileges.has("agent.fast.use")) {
       return false;
     }
     if (config.toolPolicy?.preapproved.length && !hasEveryApprovalPrivilege(grant.privileges)) {
@@ -955,8 +955,7 @@ export class ManagedResourceAuthorizer {
   ): Promise<boolean | undefined> {
     if (
       message.type === "set_agent_feature_request" &&
-      message.featureId === "fast_mode" &&
-      message.value === true &&
+      isFasterTier(message.featureId, message.value) &&
       !(await this.allowsAgent(message.agentId, "agent.fast.use"))
     ) {
       return false;
@@ -1733,4 +1732,25 @@ function withoutLeftFullAutoAccept(
   }
   const { fullAutoAccept: _left, ...rest } = config;
   return rest;
+}
+
+/** A Codex `service_tier` above the standard one: Fast, Priority, Turbo or Ultra fast. */
+const FASTER_SERVICE_TIER = /fast|priority|turbo|ultra/i;
+
+/**
+ * A faster, dearer tier, which `agent.fast.use` gates: Claude's and OMP's `fast_mode`, Codex's
+ * `service_tier` above standard (not the cheaper Flex) and Cursor's `fast`.
+ */
+function isFasterTier(featureId: string, value: unknown): boolean {
+  if (featureId === "fast_mode") return value === true;
+  if (featureId === "fast") return value === true || value === "true";
+  if (featureId === "service_tier")
+    return typeof value === "string" && FASTER_SERVICE_TIER.test(value);
+  return false;
+}
+
+function usesFasterTier(featureValues: Record<string, unknown> | undefined): boolean {
+  return Object.entries(featureValues ?? {}).some(([featureId, value]) =>
+    isFasterTier(featureId, value),
+  );
 }

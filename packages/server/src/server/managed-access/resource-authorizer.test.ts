@@ -267,6 +267,57 @@ describe("ManagedResourceAuthorizer", () => {
     expect(authorizer.allowsAgentRecordSync({ labels: {} })).toBe(false);
   });
 
+  it("gates every faster tier behind agent.fast.use, on create and on set", async () => {
+    const create = (featureValues: Record<string, unknown>) => ({
+      type: "create_agent_request" as const,
+      requestId: "create-tier",
+      workspaceId: "workspace-a",
+      config: {
+        provider: "codex",
+        cwd: "/work/a",
+        model: "gpt-5.6",
+        thinkingOptionId: "high",
+        featureValues,
+      },
+      labels: {},
+    });
+    const set = (featureId: string, value: unknown) => ({
+      type: "set_agent_feature_request" as const,
+      requestId: "set-tier",
+      agentId: "agent-a",
+      featureId,
+      value,
+    });
+    const without = createHarness(["project.use", "agent.create", "agent.interact"]);
+    const withFast = createHarness([
+      "project.use",
+      "agent.create",
+      "agent.interact",
+      "agent.fast.use",
+    ]);
+    for (const [featureId, value] of [
+      ["service_tier", "priority"],
+      ["service_tier", "ultrafast"],
+      ["service_tier", "fast"],
+      ["fast", "true"],
+      ["fast_mode", true],
+    ] as const) {
+      await expect(without.allowsInbound(create({ [featureId]: value }))).resolves.toBe(false);
+      await expect(without.allowsInbound(set(featureId, value))).resolves.toBe(false);
+      await expect(withFast.allowsInbound(create({ [featureId]: value }))).resolves.toBe(true);
+      await expect(withFast.allowsInbound(set(featureId, value))).resolves.toBe(true);
+    }
+    // Standard and slower tiers need no grant.
+    for (const [featureId, value] of [
+      ["service_tier", "default"],
+      ["service_tier", "flex"],
+      ["fast", "false"],
+    ] as const) {
+      await expect(without.allowsInbound(create({ [featureId]: value }))).resolves.toBe(true);
+      await expect(without.allowsInbound(set(featureId, value))).resolves.toBe(true);
+    }
+  });
+
   it("checks explicit Agent configuration and Fast mode at creation", async () => {
     const authorizer = createHarness(["project.use", "agent.create"]);
     await expect(

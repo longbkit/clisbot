@@ -272,8 +272,10 @@ links and changing the configuration (`/agent`, `/model`, `/provider`,
 changes need `approval.config`. Approvals retain the open prompt's two authority
 checks; an unattended mode also needs the matching `approval.*` privilege.
 Configuration menus and mutations must fit the sender's `AgentConfigurationGrant`
-and conversation visibility. A final configuration with
-`featureValues.fast_mode: true` additionally requires `agent.fast.use`. The check
+and conversation visibility. A final configuration with a faster tier additionally
+requires `agent.fast.use`: `fast_mode: true` (Claude, OMP), a Codex `service_tier` above
+standard (Fast, Priority, Ultra fast; not the cheaper Flex) or Cursor `fast: true`, on create
+and on set (`resource-authorizer.ts` `isFasterTier`). The check
 runs when a sender makes the change; later sessions in the conversation use the
 stored choice without re-checking whoever speaks next. Validation includes
 features preserved from a running session when a staged provider selection
