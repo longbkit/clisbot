@@ -53,7 +53,7 @@ function verifyDesktopRenderer(root) {
   } catch (error) {
     throw new Error(
       `Refusing to package an unverified desktop renderer: ${error.message}. ` +
-        "Run npm run build:desktop from the repository root.",
+        "Run npm run build:desktop (or build:desktop-renderer) from the repository root.",
       { cause: error },
     );
   }

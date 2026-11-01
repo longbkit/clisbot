@@ -174,6 +174,14 @@ test("focused contracts stay inside existing required checks", () => {
   assert.ok(!jobs.has("playwright-desktop"));
 });
 
+test("every desktop package build exports the renderer with its build receipt", () => {
+  const nixDesktop = readFileSync(new URL("nix/desktop-package.nix", repoRoot), "utf8");
+  const scripts = JSON.parse(readFileSync(new URL("package.json", repoRoot), "utf8")).scripts;
+  assert.match(nixDesktop, /npm run build:desktop-renderer/);
+  assert.doesNotMatch(nixDesktop, /expo export/);
+  assert.match(scripts["build:desktop"], /npm run build:desktop-renderer/);
+});
+
 test("server builds exclude test utilities at every domain depth", () => {
   const tsconfig = JSON.parse(readFileSync(serverTsconfigPath, "utf8"));
   assert.ok(tsconfig.exclude.includes("src/server/**/test-utils/**"));
