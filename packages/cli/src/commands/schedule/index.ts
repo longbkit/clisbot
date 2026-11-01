@@ -30,7 +30,7 @@ export function createScheduleCommand(): Command {
       )
       .option(
         "--mode <mode>",
-        "Provider-specific mode (e.g. claude bypassPermissions, opencode build)",
+        "Provider-specific mode (e.g. claude bypassPermissions, opencode build). Defaults to the provider's mode that asks for approval",
       )
       .option("--thinking <id>", "Thinking option ID for new-agent runs")
       .option("--cwd <path>", "Working directory (default: current; required with --host)")

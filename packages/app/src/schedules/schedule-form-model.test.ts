@@ -646,6 +646,82 @@ describe("schedule form model", () => {
     });
   });
 
+  describe("mode preselect", () => {
+    // OMP's shape: the provider default runs without prompts, so a schedule starts in the first
+    // mode that asks, never Plan, and a remembered composer mode does not carry over.
+    const OMP_LIKE_MODES: AgentMode[] = [
+      { id: "plan", label: "Plan" },
+      { id: "full", label: "Full access", isUnattended: true },
+      { id: "write", label: "Write approval" },
+    ];
+    const ompLikeSnapshot = {
+      entries: [
+        {
+          ...providerSnapshot(HOST_A_MODELS).entries[0]!,
+          modes: OMP_LIKE_MODES,
+          defaultModeId: "full",
+        },
+      ],
+    };
+
+    it("preselects the provider's mode that asks, with its label, on create", () => {
+      const form = open({
+        mode: "create",
+        defaults: {
+          serverId: "host-a",
+          projectTargets: PROJECT_TARGETS,
+          preferences: { provider: "mock", providerPreferences: { mock: { mode: "full" } } },
+        },
+      });
+      form.setProject(buildProjectOptionId("host-a", "project-a"), { label: "Project A" });
+      form.applyProviderSnapshot("host-a", ompLikeSnapshot);
+      form.setModel("mock", "model-a");
+
+      expect(form.getState()).toMatchObject({
+        selectedProvider: "mock",
+        selectedMode: "write",
+        selectedModeDisplay: { label: "Write approval" },
+      });
+    });
+
+    it("preselects it for a schedule stored without a mode, so saving stores one", () => {
+      const schedule = scheduleOnHost({
+        serverId: "host-a",
+        serverName: "Host A",
+        cwd: "/repo/a",
+        model: "model-a",
+      });
+      if (schedule.target.type !== "new-agent") throw new Error("new-agent expected");
+      const { modeId: _stored, ...config } = schedule.target.config;
+      const form = open({
+        mode: "edit",
+        schedule: { ...schedule, target: { type: "new-agent", config } },
+        defaults: { serverId: null, projectTargets: PROJECT_TARGETS, preferences: {} },
+      });
+      form.applyProviderSnapshot("host-a", ompLikeSnapshot);
+
+      expect(form.getState()).toMatchObject({
+        selectedMode: "write",
+        selectedModeDisplay: { label: "Write approval" },
+      });
+    });
+
+    it("keeps a mode the schedule stored", () => {
+      const form = open({
+        mode: "edit",
+        schedule: scheduleOnHost({
+          serverId: "host-a",
+          serverName: "Host A",
+          cwd: "/repo/a",
+          model: "model-a",
+        }),
+        defaults: { serverId: null, projectTargets: PROJECT_TARGETS, preferences: {} },
+      });
+      form.applyProviderSnapshot("host-a", providerSnapshot(HOST_A_MODELS));
+      expect(form.getState().selectedMode).toBe("load-test");
+    });
+  });
+
   it("clears provider selection while resolving a different project", () => {
     const form = open({
       mode: "create",
