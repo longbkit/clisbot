@@ -189,7 +189,9 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.normal,
   },
   sheetRow: {
-    minHeight: 44,
+    // A set height, not a minimum: ComboboxTrigger's row is `minHeight: "100%"`, and on Yoga that
+    // stretched this row over the whole sheet when it sat in the picker's stacked footer.
+    height: 44,
     minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
