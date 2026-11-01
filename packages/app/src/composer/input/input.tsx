@@ -1815,12 +1815,13 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       ],
     );
 
+    const hasSendableContent = hasSendableComposerContent({
+      hasText: hasLiveText,
+      attachments,
+      hasExternalContent,
+    });
     const primaryActionKind = resolvePrimaryActionKind({
-      hasSendableContent: hasSendableComposerContent({
-        hasText: hasLiveText,
-        attachments,
-        hasExternalContent,
-      }),
+      hasSendableContent,
       allowEmptySubmit,
       isAgentRunning,
       isSubmitLoading,
@@ -2243,7 +2244,8 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         attach: attachDropdown,
         dictation: voiceButton,
         realtimeVoice: rightContent,
-        sendable: primaryActionKind === "send",
+        // Content, not an always-shown submit such as New workspace's Create, hides the voice.
+        sendable: hasSendableContent,
         primary: primaryActionKind === "none" ? null : sendButton,
         settings: leftContent,
         settingsEnd: beforeVoiceContent,
@@ -2260,6 +2262,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         attachDropdown,
         voiceButton,
         rightContent,
+        hasSendableContent,
         primaryActionKind,
         sendButton,
         leftContent,

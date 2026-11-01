@@ -4,7 +4,12 @@ import type { Locator } from "@playwright/test";
 import { expect, test, type Page } from "../support/fixtures";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { openAgentRoute } from "../support/helpers/mock-agent";
-import { attachImageFromMenu, composerLocator } from "../support/helpers/composer";
+import {
+  attachImageFromMenu,
+  composerLocator,
+  exitComposerFullscreen,
+  expectComposerFullscreenControls,
+} from "../support/helpers/composer";
 import { installListCommandsResponse } from "../support/helpers/list-commands-stub";
 
 // The chat composer layout (docs/features/composer-picker/README.md, "Layout"): the pill, the
@@ -211,6 +216,18 @@ test("phone: 44px buttons beside the pill, Send inside, a collapsed settings row
     await expectSendSwap(page, "phone");
     await composerLocator(page).fill("h");
     await expectMinTarget(send(page), 44);
+    // A grown pill puts the fullscreen button above Send; the text keeps its width.
+    const draft = "First line\nSecond line\nThird line";
+    await composerLocator(page).fill(draft);
+    const fullscreen = page.getByRole("button", { name: "Fullscreen", exact: true });
+    const glyph = await box(fullscreen);
+    expect(glyph.y + glyph.height).toBeLessThanOrEqual((await box(send(page))).y + 0.5);
+    await expectInside(fullscreen, visible(page, "composer-pill"));
+    await screenshot(page, "phone-grown");
+    await fullscreen.click();
+    await expectComposerFullscreenControls(page);
+    await exitComposerFullscreen(page);
+    await expect(composerLocator(page)).toHaveValue(draft);
     await composerLocator(page).fill("");
 
     // A phone shows the mode as its icon, named for assistive tech.

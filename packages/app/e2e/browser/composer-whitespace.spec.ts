@@ -380,6 +380,12 @@ async function reservedBandPoints(
 }
 
 test("the reserved band beside the inline editor focuses it", async ({ page }) => {
+  // The Clisbot chat layout puts the fullscreen button above Send, so the text keeps the band;
+  // composer-layout.spec.ts covers that button.
+  test.skip(
+    process.env.EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER !== "0",
+    "the chat layout reserves no band beside the editor",
+  );
   const agent = await seedMockAgentWorkspace({
     repoPrefix: "composer-band-focus-",
     title: "Composer band focus",

@@ -478,7 +478,7 @@ export async function activateRetainedComposerTab(page: Page, title: string): Pr
 
 export async function recordVisibleComposerGeometry(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const frames: { input: number; root: number }[] = [];
+    const frames: { input: number; root: number; minInput: number }[] = [];
     Reflect.set(window, "__composerGeometryFrames", frames);
     let running = true;
     const tick = () => {
@@ -486,10 +486,13 @@ export async function recordVisibleComposerGeometry(page: Page): Promise<void> {
       for (const root of document.querySelectorAll('[data-testid="message-input-root"]')) {
         if (root.getClientRects().length === 0) continue;
         const input = root.querySelector("textarea");
+        // The Clisbot chat layout's pill holds one 24px line; the upstream box starts at 46px.
+        const minInput = root.querySelector('[data-testid="composer-pill"]') ? 22 : 42;
         if (input)
           frames.push({
             input: input.getBoundingClientRect().height,
             root: root.getBoundingClientRect().height,
+            minInput,
           });
       }
       requestAnimationFrame(tick);
@@ -503,10 +506,14 @@ export async function recordVisibleComposerGeometry(page: Page): Promise<void> {
 export async function expectNoCollapsedVisibleComposer(page: Page): Promise<void> {
   const frames = await page.evaluate(() => {
     Reflect.get(window, "__stopComposerGeometry")?.();
-    return Reflect.get(window, "__composerGeometryFrames") as { input: number; root: number }[];
+    return Reflect.get(window, "__composerGeometryFrames") as {
+      input: number;
+      root: number;
+      minInput: number;
+    }[];
   });
   expect(frames.length).toBeGreaterThan(0);
-  expect(frames.filter((frame) => frame.root < 42 || frame.input < 42)).toEqual([]);
+  expect(frames.filter((frame) => frame.root < 42 || frame.input < frame.minInput)).toEqual([]);
 }
 
 /** Exercise the quick-return race before a hidden pane gets a rendering frame. */

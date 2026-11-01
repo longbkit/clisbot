@@ -50,7 +50,9 @@ A chat composer is a one-line pill with its buttons around it and a quiet settin
 - **Targets.** On a phone every button beside the pill and Send inside it is a 48px target
   (`MIN_TOUCH_TARGET_SIZE`, more than the 44px asked for); the pill is 50px so they line up. On
   desktop the buttons beside it keep the composer's 28px actions.
-- **Fullscreen** shows only the editor and the footer's Send, as before.
+- **Fullscreen.** On a phone a pill of three lines or more shows the fullscreen button above
+  Send, so the text keeps its full width (the upstream box reserved a 36px band beside the text
+  for it). Fullscreen shows only the editor and the footer's Send, as before.
 
 One component still serves every chat surface (`MessageInput`): session and workspace chats,
 Home's new session, Bot and group chats, drafts, queue edits, attachments, slash and `@`
