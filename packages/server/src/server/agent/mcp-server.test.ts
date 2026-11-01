@@ -1597,55 +1597,225 @@ describe("update_agent MCP tool", () => {
   });
 });
 
-describe("Full auto-accept from an agent", () => {
+describe("Unattended configuration from an agent", () => {
   const logger = createTestLogger();
+  const REFUSAL = "Only a person can";
 
-  it("refuses an agent turning on Full auto-accept for itself", async () => {
-    const { agentManager, agentStorage, spies } = createTestDeps();
+  function liveAgent(provider: string, currentModeId: string | null = null) {
+    return createManagedAgent({
+      id: "target",
+      provider,
+      cwd: process.cwd(),
+      currentModeId,
+      config: { provider, cwd: process.cwd() },
+    } as Partial<ManagedAgent>);
+  }
+
+  async function serverFor(options: {
+    callerAgentId?: string;
+    target?: ManagedAgent;
+    scheduleService?: ScheduleService;
+  }) {
+    const deps = createTestDeps();
+    if (options.target) deps.spies.agentManager.getAgent.mockReturnValue(options.target);
     const server = await createAgentMcpServer({
-      agentManager,
-      agentStorage,
+      agentManager: deps.agentManager,
+      agentStorage: deps.agentStorage,
       providerSnapshotManager: createOpenCodeManager().manager,
-      callerAgentId: "agent-1",
+      ...(options.callerAgentId ? { callerAgentId: options.callerAgentId } : {}),
+      ...(options.scheduleService ? { scheduleService: options.scheduleService } : {}),
       logger,
     });
+    return { server, spies: deps.spies };
+  }
+
+  it.each([
+    ["claude", "full-auto-accept"],
+    ["claude", "bypassPermissions"],
+    ["codex", "full-access"],
+    ["copilot", "allow-all"],
+    ["omp", "full"],
+  ])("update_agent and set_agent_mode refuse %s %s from an agent", async (provider, modeId) => {
+    const { server, spies } = await serverFor({
+      callerAgentId: "caller",
+      target: liveAgent(provider),
+    });
     await expect(
-      registeredTool(server, "update_agent").handler({
-        agentId: "agent-1",
-        settings: { modeId: "full-auto-accept" },
-      }),
-    ).rejects.toThrow("Only a person can turn on Full auto-accept");
+      registeredTool(server, "update_agent").handler({ agentId: "target", settings: { modeId } }),
+    ).rejects.toThrow(REFUSAL);
+    await expect(
+      registeredTool(server, "set_agent_mode").handler({ agentId: "target", modeId }),
+    ).rejects.toThrow(REFUSAL);
     expect(spies.agentManager.setAgentMode).not.toHaveBeenCalled();
   });
 
-  it("refuses an agent creating a child in Full auto-accept", async () => {
-    const { agentManager, agentStorage, spies } = createTestDeps();
-    spies.agentManager.getAgent.mockReturnValue({
-      id: "parent-agent",
-      config: {},
-      cwd: process.cwd(),
-      workspaceId: "wks_parent",
-      provider: "codex",
-      currentModeId: "auto",
-    } as ManagedAgent);
-    const server = await createAgentMcpServer({
-      agentManager,
-      agentStorage,
-      providerSnapshotManager: createOpenCodeManager().manager,
-      callerAgentId: "parent-agent",
-      logger,
+  it("update_agent refuses a provider's own auto_accept from an agent", async () => {
+    const { server, spies } = await serverFor({
+      callerAgentId: "caller",
+      target: liveAgent("opencode"),
     });
     await expect(
-      registeredTool(server, "create_agent").handler({
-        relationship: { kind: "subagent" },
-        workspace: { kind: "current" },
-        title: "Child",
-        provider: "codex/gpt-5.4",
-        initialPrompt: "Do work",
-        settings: { modeId: "full-auto-accept" },
+      registeredTool(server, "update_agent").handler({
+        agentId: "target",
+        settings: { features: { auto_accept: true } },
       }),
-    ).rejects.toThrow("Only a person can turn on Full auto-accept");
-    expect(spies.agentManager.createAgent).not.toHaveBeenCalled();
+    ).rejects.toThrow(REFUSAL);
+    expect(spies.agentManager.setAgentFeature).not.toHaveBeenCalled();
+  });
+
+  it("send_agent_prompt refuses an unattended sessionMode from an agent", async () => {
+    const { server } = await serverFor({ callerAgentId: "caller", target: liveAgent("codex") });
+    await expect(
+      registeredTool(server, "send_agent_prompt").handler({
+        agentId: "target",
+        prompt: "go",
+        sessionMode: "full-access",
+      }),
+    ).rejects.toThrow(REFUSAL);
+  });
+
+  it("an agent may still pick a mode that asks", async () => {
+    const { server, spies } = await serverFor({
+      callerAgentId: "caller",
+      target: liveAgent("claude"),
+    });
+    await registeredTool(server, "set_agent_mode").handler({
+      agentId: "target",
+      modeId: "default",
+    });
+    expect(spies.agentManager.setAgentMode).toHaveBeenCalledWith("target", "default");
+  });
+
+  it("a person is not refused", async () => {
+    const { server, spies } = await serverFor({ target: liveAgent("claude") });
+    await registeredTool(server, "set_agent_mode").handler({
+      agentId: "target",
+      modeId: "bypassPermissions",
+    });
+    expect(spies.agentManager.setAgentMode).toHaveBeenCalledWith("target", "bypassPermissions");
+  });
+
+  it.each([["full-auto-accept"], ["full-access"]])(
+    "create_agent refuses a child in %s",
+    async (modeId) => {
+      const parent = {
+        id: "parent-agent",
+        config: {},
+        cwd: process.cwd(),
+        workspaceId: "wks_parent",
+        provider: "codex",
+        currentModeId: "auto",
+      } as ManagedAgent;
+      const { server, spies } = await serverFor({ callerAgentId: "parent-agent", target: parent });
+      await expect(
+        registeredTool(server, "create_agent").handler({
+          relationship: { kind: "subagent" },
+          workspace: { kind: "current" },
+          title: "Child",
+          provider: "codex/gpt-5.4",
+          initialPrompt: "Do work",
+          settings: { modeId },
+        }),
+      ).rejects.toThrow(REFUSAL);
+      expect(spies.agentManager.createAgent).not.toHaveBeenCalled();
+    },
+  );
+
+  describe("schedules", () => {
+    const caller = () => liveAgent("claude", null);
+    function scheduleService(
+      target: StoredSchedule["target"] = {
+        type: "new-agent",
+        config: { provider: "claude", cwd: "/tmp" },
+      },
+    ) {
+      const stored = {
+        id: "schedule-1",
+        prompt: "p",
+        cadence: { type: "cron", expression: "0 9 * * *" },
+        target,
+      } as unknown as StoredSchedule;
+      return {
+        createOrReplace: vi.fn(async (input: CreateScheduleInput) => createStoredSchedule(input)),
+        update: vi.fn(async () => stored),
+        inspect: vi.fn(async () => stored),
+      };
+    }
+    const create = { prompt: "p", cron: "0 9 * * *", provider: "claude" };
+
+    it("create_schedule from an agent needs a mode", async () => {
+      const service = scheduleService();
+      const { server } = await serverFor({
+        callerAgentId: "target",
+        target: caller(),
+        scheduleService: service as unknown as ScheduleService,
+      });
+      await expect(registeredTool(server, "create_schedule").handler(create)).rejects.toThrow(
+        "pass `mode`",
+      );
+      expect(service.createOrReplace).not.toHaveBeenCalled();
+    });
+
+    it("create_schedule from an agent refuses an unattended mode", async () => {
+      const service = scheduleService();
+      const { server } = await serverFor({
+        callerAgentId: "target",
+        target: caller(),
+        scheduleService: service as unknown as ScheduleService,
+      });
+      await expect(
+        registeredTool(server, "create_schedule").handler({ ...create, mode: "bypassPermissions" }),
+      ).rejects.toThrow(REFUSAL);
+      expect(service.createOrReplace).not.toHaveBeenCalled();
+    });
+
+    it("create_schedule from an agent keeps a mode that asks", async () => {
+      const service = scheduleService();
+      const { server } = await serverFor({
+        callerAgentId: "target",
+        target: caller(),
+        scheduleService: service as unknown as ScheduleService,
+      });
+      await registeredTool(server, "create_schedule").handler({ ...create, mode: "default" });
+      expect(service.createOrReplace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          target: expect.objectContaining({
+            config: expect.objectContaining({ modeId: "default" }),
+          }),
+        }),
+      );
+    });
+
+    it("update_schedule from an agent refuses leaving a schedule without a mode", async () => {
+      const service = scheduleService({
+        type: "new-agent",
+        config: { provider: "claude", cwd: "/tmp", modeId: "default" },
+      });
+      const { server } = await serverFor({
+        callerAgentId: "target",
+        target: caller(),
+        scheduleService: service as unknown as ScheduleService,
+      });
+      await expect(
+        registeredTool(server, "update_schedule").handler({ id: "schedule-1", mode: null }),
+      ).rejects.toThrow("pass `mode`");
+      await expect(
+        registeredTool(server, "update_schedule").handler({
+          id: "schedule-1",
+          mode: "bypassPermissions",
+        }),
+      ).rejects.toThrow(REFUSAL);
+      expect(service.update).not.toHaveBeenCalled();
+    });
+
+    it("a person's create_schedule with no mode is unchanged", async () => {
+      const service = scheduleService();
+      const { server } = await serverFor({
+        scheduleService: service as unknown as ScheduleService,
+      });
+      await registeredTool(server, "create_schedule").handler(create);
+      expect(service.createOrReplace).toHaveBeenCalled();
+    });
   });
 });
 
@@ -5267,7 +5437,7 @@ describe("create_schedule MCP tool", () => {
       config: {
         title: "Parent agent",
         model: "openai/gpt-5.5",
-        featureValues: { auto_accept: true },
+        featureValues: { auto_accept: false },
       },
     } as ManagedAgent);
     const createOrReplace = vi.fn(async (input: CreateScheduleInput) =>
@@ -5299,9 +5469,40 @@ describe("create_schedule MCP tool", () => {
         cwd: REPO_CWD,
         modeId: "build",
         model: "openai/gpt-5.5",
-        featureValues: { auto_accept: true },
+        featureValues: { auto_accept: false },
       },
     });
+  });
+
+  it("refuses a schedule whose inherited features run unattended", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    spies.agentManager.getAgent.mockReturnValue({
+      id: "parent-agent",
+      provider: "opencode",
+      cwd: REPO_CWD,
+      lifecycle: "idle",
+      currentModeId: "build",
+      availableModes: [],
+      config: { featureValues: { auto_accept: true } },
+    } as ManagedAgent);
+    const createOrReplace = vi.fn();
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      scheduleService: { createOrReplace } as unknown as ScheduleService,
+      callerAgentId: "parent-agent",
+      logger,
+    });
+
+    await expect(
+      registeredTool(server, "create_schedule").handler({
+        prompt: "say hello",
+        cron: "*/5 * * * *",
+        maxRuns: 3,
+      }),
+    ).rejects.toThrow("Only a person can");
+    expect(createOrReplace).not.toHaveBeenCalled();
   });
 
   it("passes timezone through cron create_schedule input", async () => {

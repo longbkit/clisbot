@@ -3,7 +3,7 @@ import { assertRunLimit, assertRunLimitForUpdate } from "../../schedule/run-limi
 import { BOT_ID_LABEL, CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import type { FinishSubscriptions, FinishRegistration } from "../finish-subscriptions/index.js";
 import type { AgentMessageDelivery } from "../agent-messages/index.js";
-import { isFullAutoAcceptMode } from "../full-auto-accept.js";
+import { type AgentLocation, createAgentUnattendedGuard } from "./agent-unattended-guard.js";
 import {
   createHostResolver,
   HostOperationRejectedError,
@@ -645,6 +645,14 @@ function createToolCatalog(
   } = options;
   const childLogger = logger.child({ module: "agent", component: "clisbot-tool-catalog" });
   const callerContext = callerAgentId ? (resolveCallerContext?.(callerAgentId) ?? null) : null;
+  const unattendedGuard = createAgentUnattendedGuard({
+    callerAgentId,
+    judge: providerSnapshotManager,
+    async locateAgent(agentId: string): Promise<AgentLocation | null> {
+      const agent = agentManager.getAgent(agentId) ?? (await agentStorage.get(agentId));
+      return agent ? { provider: agent.provider, cwd: agent.cwd } : null;
+    },
+  });
 
   const parseToolInput = async (tool: ClisbotToolDefinition, input: unknown): Promise<unknown> => {
     const inputSchema = tool.inputSchema;
@@ -869,6 +877,17 @@ function createToolCatalog(
     }
     return parentAgent;
   };
+
+  /** An agent creating an agent may not ask for an unattended mode or features. */
+  const refuseUnattendedCreate = (
+    provider: string,
+    cwd: string | undefined,
+    settings: { modeId?: string; features?: Record<string, unknown> } | undefined,
+  ) =>
+    unattendedGuard.refuseCreate(
+      { provider, cwd: cwd ?? resolveCallerAgent()?.cwd ?? process.cwd() },
+      { modeId: settings?.modeId, featureValues: settings?.features },
+    );
 
   const resolveInheritedProviderConfig = (
     selectedProvider: string,
@@ -1616,7 +1635,6 @@ function createToolCatalog(
     async (args: unknown) => {
       const resolvedArgs = await resolveCreateAgentToolArgs(args);
       const { parsedArgs } = resolvedArgs;
-      refuseFullAutoAcceptFromAgent(callerAgentId, parsedArgs.settings?.modeId);
       let notifyOnFinish: boolean;
       if (resolvedArgs.kind === "agent-scoped") {
         notifyOnFinish = parsedArgs.notifyOnFinish;
@@ -1624,6 +1642,7 @@ function createToolCatalog(
         notifyOnFinish = resolvedArgs.parsedArgs.notifyOnFinish ?? false;
       }
       const selectedProvider = resolveRequiredProviderModel(parsedArgs.provider).provider;
+      await refuseUnattendedCreate(selectedProvider, resolvedArgs.cwd, parsedArgs.settings);
       const inheritedConfig = resolveInheritedProviderConfig(selectedProvider);
       const { snapshot, initialPromptStarted } = await createAgentCommand(
         {
@@ -1975,7 +1994,7 @@ function createToolCatalog(
       notifyOnFinish = Boolean(callerAgentId),
       activeTurnBehavior = callerAgentId ? "steer" : "interrupt",
     }) => {
-      refuseFullAutoAcceptFromAgent(callerAgentId, sessionMode);
+      await unattendedGuard.refuseChange(agentId, { modeId: sessionMode });
       if (callerAgentId && !agentManager.getAgent(agentId) && !(await agentStorage.get(agentId))) {
         throw new ClisbotToolInputError(`Agent ${agentId} not found`);
       }
@@ -2293,7 +2312,10 @@ function createToolCatalog(
     },
     async ({ agentId, name, labels, settings }) => {
       refuseProtectedLabels(labels);
-      refuseFullAutoAcceptFromAgent(callerAgentId, settings?.modeId);
+      await unattendedGuard.refuseChange(agentId, {
+        modeId: settings?.modeId,
+        featureValues: settings?.features,
+      });
       if (settings?.modeId !== undefined) {
         await agentManager.setAgentMode(agentId, settings.modeId);
       }
@@ -2677,6 +2699,14 @@ function createToolCatalog(
           provider: (scope === "agent" ? AgentProviderEnum.optional() : AgentProviderEnum).describe(
             "Provider, or provider/model (for example: codex or codex/gpt-5.4). Defaults to the caller's provider in an agent-scoped session.",
           ),
+          mode: z
+            .string()
+            .trim()
+            .min(1)
+            .optional()
+            .describe(
+              "Mode each run starts in. Required from an agent, and it must ask for approval: a run with no mode starts in the provider's no-prompt mode.",
+            ),
           cwd: z.string().optional(),
           isolation: z.enum(["local", "worktree"]).optional(),
           maxRuns: z
@@ -2690,7 +2720,18 @@ function createToolCatalog(
         .superRefine(addScheduleCadenceIssue),
       outputSchema: ScheduleSummarySchema.shape,
     },
-    async ({ prompt, cron, timezone, name, provider, cwd, isolation, maxRuns, expiresIn }) => {
+    async ({
+      prompt,
+      cron,
+      timezone,
+      name,
+      provider,
+      mode,
+      cwd,
+      isolation,
+      maxRuns,
+      expiresIn,
+    }) => {
       if (!scheduleService) {
         throw new Error("Schedule service is not configured");
       }
@@ -2701,10 +2742,13 @@ function createToolCatalog(
         ...(timezone !== undefined ? { timezone } : {}),
       });
       assertRunLimit(cadence, maxRuns);
+      const target = resolveNewAgentScheduleTarget({ provider, cwd, isolation });
+      if (mode) target.config.modeId = mode;
+      await unattendedGuard.refuseScheduleRun(target.config);
       const schedule = await scheduleService.createOrReplace({
         prompt: prompt.trim(),
         cadence,
-        target: resolveNewAgentScheduleTarget({ provider, cwd, isolation }),
+        target,
         ...(name?.trim() ? { name: name.trim() } : {}),
         ...(maxRuns === undefined ? {} : { maxRuns }),
         ...(expiresAt === undefined ? {} : { expiresAt }),
@@ -2986,9 +3030,14 @@ function createToolCatalog(
         throw new Error("Schedule service is not configured");
       }
 
-      refuseFullAutoAcceptFromAgent(callerAgentId, input.mode ?? undefined);
       const current = await requireScheduleTarget(input.id, "new-agent");
       const update = buildScheduleUpdateInput(input);
+      if (current.target.type === "new-agent") {
+        await unattendedGuard.refuseScheduleRun({
+          ...current.target.config,
+          ...update.newAgentConfig,
+        });
+      }
       await assertRunLimitForUpdate(async () => current, update);
       const schedule = await scheduleService.update(update);
 
@@ -3236,7 +3285,7 @@ function createToolCatalog(
       },
     },
     async ({ agentId, modeId }) => {
-      refuseFullAutoAcceptFromAgent(callerAgentId, modeId);
+      await unattendedGuard.refuseChange(agentId, { modeId });
       const result = await setAgentModeCommand({ agentManager }, { agentId, modeId });
       return {
         content: [],
@@ -3382,19 +3431,6 @@ function archiveWorktreeDependencies(
  * could undo a limit, so `update_agent` and `create_agent` refuse them.
  */
 const PROTECTED_LABELS = [CONNECTORS_OFF_LABEL, BOT_ID_LABEL, CHAT_ID_LABEL];
-
-/**
- * Full auto-accept approves every tool request the agent raises, so an agent switching it on,
- * for itself or for a child, would approve its own calls. Only a person turns it on.
- */
-function refuseFullAutoAcceptFromAgent(
-  callerAgentId: string | undefined,
-  modeId: string | undefined,
-): void {
-  if (callerAgentId && isFullAutoAcceptMode(modeId)) {
-    throw new Error("Only a person can turn on Full auto-accept, in Clisbot or on its channel.");
-  }
-}
 
 function refuseProtectedLabels(labels: Record<string, string> | undefined): void {
   const named = PROTECTED_LABELS.find((label) => labels && Object.hasOwn(labels, label));
