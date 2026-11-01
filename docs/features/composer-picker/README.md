@@ -142,6 +142,15 @@ mode on its own (a plan approved for implementation) the daemon reports a mode c
 does for ExitPlanMode. A session saved with `featureValues.plan_mode = true` resumes in Plan, and
 an old app's `setFeature plan_mode` still works behind `COMPAT(codex-plan-mode-feature)`.
 
+- **Managed Access** judges Plan by the permission underneath as well, because an approved plan
+  returns to it: a member without every approval privilege cannot pick Plan on a Full access
+  agent, nor change the configuration of one already in Plan over Full access
+  (`permissionUnderPlan` in `resource-authorizer.ts`).
+- **Rollback.** A record saved with `modeId: plan` and `permissionModeId` fails
+  `validateCodexMode` on a daemon older than this branch (2.2.1), so such a session does not
+  resume after a downgrade until its mode is changed. Moving the agent out of Plan before
+  downgrading avoids it.
+
 ## Full auto-accept
 
 The last mode on every provider that lists modes. Selecting it runs the provider's no-prompt

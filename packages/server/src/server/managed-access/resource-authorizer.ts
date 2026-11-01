@@ -708,7 +708,15 @@ export class ManagedResourceAuthorizer {
         ? { featureValues: { ...base.featureValues, ...update.featureValues } }
         : {}),
     };
-    return await this.configurationMatchesProject(workspace.projectId, next, "agent.interact");
+    if (!(await this.configurationMatchesProject(workspace.projectId, next, "agent.interact"))) {
+      return false;
+    }
+    // Codex Plan keeps a permission underneath and returns to it when the plan is approved, so
+    // Plan is judged by that permission too: Plan over Full access is unattended.
+    const underlying = permissionUnderPlan(next.modeId, base.modeId, record.persistence);
+    if (!underlying) return true;
+    const returned: AgentSessionConfig = { ...next, modeId: underlying };
+    return await this.configurationMatchesProject(workspace.projectId, returned, "agent.interact");
   }
 
   /** Explain forbidden actions only after every supplied target is visible to this session. */
@@ -1753,4 +1761,21 @@ function usesFasterTier(featureValues: Record<string, unknown> | undefined): boo
   return Object.entries(featureValues ?? {}).some(([featureId, value]) =>
     isFasterTier(featureId, value),
   );
+}
+
+const PLAN_MODE_ID = "plan";
+
+/**
+ * The permission a Plan mode returns to: the mode it was picked from, or the one a session
+ * already in Plan saved as `permissionModeId` (Codex). Null when the mode is not Plan.
+ */
+function permissionUnderPlan(
+  nextModeId: string | undefined,
+  currentModeId: string | undefined,
+  persistence: { metadata?: Record<string, unknown> } | null | undefined,
+): string | null {
+  if (nextModeId !== PLAN_MODE_ID) return null;
+  if (currentModeId && currentModeId !== PLAN_MODE_ID) return currentModeId;
+  const saved = persistence?.metadata?.permissionModeId;
+  return typeof saved === "string" && saved !== PLAN_MODE_ID ? saved : null;
 }

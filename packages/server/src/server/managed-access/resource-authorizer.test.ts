@@ -63,6 +63,9 @@ function createHarness(
     archivedAgent?: boolean;
     /** agent-a runs Full auto-accept on Codex Full access. */
     fullAutoAccept?: boolean;
+    /** agent-a's mode, and the Codex permission under Plan. */
+    agentAModeId?: string;
+    agentAPermissionModeId?: string;
   } = {},
   grant: {
     terminalProfiles?: ProjectAuthorization["terminalProfiles"];
@@ -92,8 +95,15 @@ function createHarness(
           model: "gpt-5.6",
           thinkingOptionId: "high",
           ...(paths.fullAutoAccept ? { modeId: "full-access", fullAutoAccept: true } : {}),
+          ...(paths.agentAModeId ? { modeId: paths.agentAModeId } : {}),
         },
-        persistence: { provider: "codex", sessionId: "session-a" },
+        persistence: {
+          provider: "codex",
+          sessionId: "session-a",
+          ...(paths.agentAPermissionModeId
+            ? { metadata: { permissionModeId: paths.agentAPermissionModeId } }
+            : {}),
+        },
       } as StoredAgentRecord,
     ],
     [
@@ -483,6 +493,36 @@ describe("ManagedResourceAuthorizer", () => {
         requestId: "stay-full-auto-accept",
         agentId: "agent-a",
         modeId: "full-auto-accept",
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("judges Codex Plan by the permission it returns to", async () => {
+    const limited = ["project.use", "agent.create", "agent.interact", "approval.file"] as const;
+    const planRequest = {
+      type: "set_agent_mode_request" as const,
+      requestId: "plan",
+      agentId: "agent-a",
+      modeId: "plan",
+    };
+    // Plan on a Full access agent returns to Full access when the plan is approved.
+    await expect(
+      createHarness([...limited], { agentAModeId: "full-access" }).allowsInbound(planRequest),
+    ).resolves.toBe(false);
+    await expect(
+      createHarness([...limited], { agentAModeId: "auto" }).allowsInbound(planRequest),
+    ).resolves.toBe(true);
+    // An agent already in Plan over Full access is judged as Full access too.
+    const inPlan = createHarness([...limited], {
+      agentAModeId: "plan",
+      agentAPermissionModeId: "full-access",
+    });
+    await expect(
+      inPlan.allowsInbound({
+        type: "set_agent_thinking_request",
+        requestId: "thinking",
+        agentId: "agent-a",
+        thinkingOptionId: "high",
       }),
     ).resolves.toBe(false);
   });
