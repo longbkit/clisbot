@@ -1,10 +1,79 @@
-# Composer picker
+# Composer picker and layout
 
-Flag: `EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER` (on unless `0`).
+Flag: `EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER` (on unless `0`). It switches both the picker and the
+chat layout; `0` renders the upstream composer, toolbar and model sheet.
 
-CURRENT — `feat/plan-in-modes`, 2026-11-01. Modelled on T3 Code's picker.
+CURRENT — `feat/plan-in-modes`, 2026-11-01. The picker is modelled on T3 Code's; the layout on
+Telegram's input with the settings row of the Claude app.
 
-The composer bar shows two agent controls besides attach, tools, the context ring and voice:
+## Layout
+
+A chat composer is a one-line pill with its buttons around it and a quiet settings row under it:
+
+```
+[☰] [+] ( Message the agent…              ) [mic] [voice]
+ 6.1 Sol Medium   🔒 Default permissions        Tools off  ◯
+
+[☰] [+] ( Fix the flaky test          (➤) )
+ 6.1 Sol Medium   🔒 Default permissions        Tools off  ◯
+```
+
+- **Left of the pill: Commands (☰), then attach (+).** Commands does what typing `/` does
+  (`slash-trigger.ts`): an empty draft becomes `/` and the slash autocomplete opens with every
+  command, its one-line descriptions, the filter as you type and its keys; pressed again on a
+  bare `/` it empties the draft and the list closes; in a draft with text it types ` /` at the
+  caret, which lists skills, as typing it there does. Attach keeps the Plus glyph and menu the
+  composer already had.
+- **Right of the pill: dictation, then realtime voice**, while nothing is sendable.
+- **Send replaces them, inside the pill.** The first character, pasted text or an attachment
+  that makes the message sendable hides dictation and voice and shows Send at the pill's end, a
+  filled 36px circle on desktop and 40px on a phone (the upstream face was 28 and 36). Emptying
+  the draft brings them back. A running agent with an empty draft shows Stop in the same place.
+  Realtime voice keeps its overlay with mute and stop.
+- **On a phone voice waits inside the pill**, in the place Send takes. Four buttons beside the
+  pill left it 150px wide at 390px and 80px at 320px. The phone placeholder is "Message...": the
+  commands button already names `/commands`, and the longer hint did not fit.
+- **The pill** grows with its text up to half the window, then scrolls. One line is a capsule;
+  two lines or attachment chips turn it into the composer's rounded box (`2xl`), because round
+  ends on a tall box read as a lozenge. It keeps the composer's surface, border and shadow
+  (design.md §5). The height does not change when Send swaps with dictation and voice; the pill
+  only widens into the freed room.
+- **The settings row** holds the Model chip, Mode, the Tools chip and, at its end, the context
+  ring. Nothing in it sits inside the input frame any more. When it runs short of room it
+  collapses in this order: the effort leaves the Model chip, Mode keeps its icon (a phone always
+  shows the icon), Tools keeps its icon and count (the icon alone when off,
+  `useSettingsRowCountLabel`, below 400px). The ring always stays. Accessible names keep the
+  full labels.
+- **Panels open above the composer.** The Model panel anchors to the whole composer
+  (`frame-anchor.tsx`), not to its chip, so it never covers the text being written. Mode and
+  Tools keep their own anchors.
+- **Targets.** On a phone every button beside the pill and Send inside it is a 48px target
+  (`MIN_TOUCH_TARGET_SIZE`, more than the 44px asked for); the pill is 50px so they line up. On
+  desktop the buttons beside it keep the composer's 28px actions.
+- **Fullscreen** shows only the editor and the footer's Send, as before.
+
+One component still serves every chat surface (`MessageInput`): session and workspace chats,
+Home's new session, Bot and group chats, drafts, queue edits, attachments, slash and `@`
+autocomplete and voice. Surfaces that hide a control keep hiding it: a Chat without
+configuration rights has no settings row, a surface without voice has no voice button. A
+terminal prompt (`inputMode="terminal"`) keeps the upstream presentation unchanged.
+
+**Why.** The upstream box spent a second line on a toolbar that mixed sending, voice, the model,
+the mode, tools and the ring, so a one-line message took a three-line box, and slash commands
+were only discoverable by knowing to type `/`. Clisbot blends work sessions, chats and Bot chats,
+so the input should feel like a chat app first. Telegram's input solves space and the send
+affordance (one obvious button that appears when there is something to send); the Claude app's
+row under the reply box keeps the agent settings visible without crowding the input. The
+earlier toolbar stays behind the flag for rollback.
+
+**Known limits.** Commands opens the list through the text, so on a phone it raises the keyboard
+too. Inline (` /`) lists skills only, as typing does. The Mode menu and the Tools sheet still open
+from their chips and can cover the pill while open. The duplicate Mode control (bar and panel
+footer) is unchanged for now.
+
+## Agent controls
+
+The settings row shows two agent controls besides the Tools chip and the context ring:
 
 - **Model chip** — the provider icon and a short name with the effort: `6 Astra Medium` for
   GPT-6-Astra at Medium, `Opus 5.5 High` for Claude Opus 5.5. `formatCompactModelName`
@@ -19,7 +88,7 @@ The composer bar shows two agent controls besides attach, tools, the context rin
   (`mode-options.ts`, `mode-presentation.ts`). Known modes are named and described in the app's
   language; any other mode keeps the daemon's label.
 
-When the bar is short of room (`resolveComposerControlDensity`) the effort leaves the chip
+When the row is short of room (`resolveComposerControlDensity`) the effort leaves the chip
 first, then the Mode label; a phone always shows the mode as its icon.
 
 ## The panel
@@ -34,7 +103,7 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
 | Rail      | Favorites, providers, Profiles; icons or names      | Icon and name chips in a scrolling row |
 | Models    | The rail's choice, or every match for a query       | Same                                   |
 | Reasoning | A column beside the list, Default marked            | A chip row under the list              |
-| Footer    | Speed levels with "Higher cost", then Mode          | Same, pinned above the safe area       |
+| Footer    | Speed levels with "Higher cost", then Mode          | Speed, then a full-width Mode row      |
 | More      | Other provider options (Copilot Agent, ACP options) | Same                                   |
 
 - **The rail opens on the current model's provider**, so the check is on screen; Favorites is
@@ -92,6 +161,10 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
   provider's label. Every segment writes the provider's own feature id and value, never one the
   model does not offer; a model with one tier shows no control. Fast and Ultra fast carry
   "Higher cost".
+- **The phone footer stacks.** Standard | Fast | Ultra fast and the Mode name collided on one
+  line at 390px, so the sheet puts the segments on their own line (wrapping "Higher cost" under
+  them when needed) and Mode under them as a 44px row naming "Mode" and its value (the
+  `sheet` surface of `AgentControlTrigger`). Desktop keeps one line.
 - **Touch targets.** In the phone sheet and on touch devices every row and control a thumb
   presses is at least 44px tall: model and profile rows, Show more, effort and provider chips,
   Mode rows and the speed segments (`use-touch-rows.ts`). They use the `touch` size of the shared
@@ -211,6 +284,14 @@ permission request the agent still raises. Agents sometimes ask under bypass any
 
 ## Code
 
+`packages/app/src/clisbot/composer-layout/`: `chat-composer-presentation.tsx` (the pill, the
+buttons beside it, the settings row and fullscreen in one tree, so the editor never remounts),
+`commands-button.tsx`, `slash-trigger.ts`, `settings-row.tsx`, `frame-anchor.tsx`,
+`geometry.ts` and `feature.ts`. `composer/input/input.tsx` builds the same pieces as before and
+hands them to `ChatComposerPresentation` instead of the upstream toolbar while the flag is on and
+the composer is a chat one; `composer/input/presentation.tsx` shares its fullscreen chrome
+(`useComposerFullscreenChrome`) with it.
+
 `packages/app/src/clisbot/composer-picker/`: `composer-picker-controls.tsx` (the bar),
 `model-picker.tsx` (the panel), `provider-rail.tsx`, `model-list.tsx`, `model-row.tsx`,
 `reasoning-column.tsx`, `speed-segment.tsx`, `more-features.tsx`, `mode-dropdown.tsx`, and the
@@ -220,9 +301,16 @@ and feeds the live agent's or the draft's data to `picker-agent-controls.tsx` in
 while the picker is on. `feature.ts` holds the switch: `EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER=0`
 renders the upstream toolbar, its mode control and model sheet again, without Full auto-accept
 in the Mode list; the daemon side is unchanged. Strings live
-in `i18n/resources/composer-picker.ts` for every app language.
+in `i18n/resources/composer-picker.ts` and `composer-layout.ts` for every app language. The
+upstream Speed control's spec (`e2e/browser/codex-speed.spec.ts`) runs only with the flag off:
+`EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER=0 npx playwright test e2e/browser/codex-speed.spec.ts`.
 
-Primitives: `Combobox` (panel and Mode menu), `ComboboxTrigger` (chip), `AgentControlTrigger`
+Layout primitives: the composer's action geometry (`composerActionGeometry`: commands, attach,
+dictation, voice, Send, Stop) with `Tooltip`, `DropdownMenu` (attach), `AutocompletePopover`
+(the command list), `AgentControlTrigger` (Mode, Tools; `sheet` surface for the phone footer's
+Mode) and the composer surface tokens (`surfaceComposer`, `borderComposer`, `shadow.composer`).
+
+Picker primitives: `Combobox` (panel and Mode menu), `ComboboxTrigger` (chip), `AgentControlTrigger`
 (Mode), `ComboboxItem` (rows), `ToolbarButton` (rail on desktop, row star and Create profile),
 `ChipRow` + `ChipButton` (rail and efforts on a phone), `SegmentedControl` (Speed),
 `StatusBadge` (Higher cost), `Switch` and `Button` (More options, Retry).
@@ -230,7 +318,10 @@ Primitives: `Combobox` (panel and Mode menu), `ComboboxTrigger` (chip), `AgentCo
 `rail-store.ts`, `use-provider-rail.ts`, `use-provider-refresh.ts`, `provider-header.tsx` and
 `panel-list.tsx` hold the rail's order, width and per-provider actions.
 
-Tests: `model-picker.browser.test.tsx`, `mode-dropdown.browser.test.tsx`, the unit tests beside
+Tests: `chat-composer-presentation.browser.test.tsx` and `slash-trigger.test.ts` for the layout,
+`e2e/browser/composer-layout.spec.ts` (desktop 1280, phone 390 and 320; screenshots to
+`.debug/composer-layout/`), `composer-control-density.spec.ts` (targets and faces),
+`model-picker.browser.test.tsx`, `mode-dropdown.browser.test.tsx`, the unit tests beside
 each pure module, `e2e/browser/composer-picker.spec.ts` (desktop and 390px phone, screenshots
 to `.debug/composer-picker/`), and on the daemon `full-auto-accept.test.ts`,
 `agent-manager-full-auto-accept.test.ts`, `agent-manager-full-auto-accept.acp.test.ts` (a real
