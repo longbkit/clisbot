@@ -23,6 +23,8 @@ export interface ModeDropdownProps extends AgentModeControlValue {
   ownsCycleShortcut: boolean;
   onClose?: () => void;
   testID: string;
+  /** `sheet` draws a full-width 44px row with "Mode" and the value (the phone panel footer). */
+  surface?: "toolbar" | "sheet";
 }
 
 function ModeOptionRow(props: {
@@ -124,7 +126,7 @@ export function ModeDropdown(props: ModeDropdownProps) {
       <AgentControlTrigger
         ref={anchorRef}
         icon={current.icon}
-        surface="toolbar"
+        surface={props.surface ?? "toolbar"}
         label={t("agentControls.mode.title")}
         value={current.label}
         showToolbarLabel={props.showLabel}

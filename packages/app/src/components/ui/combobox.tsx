@@ -117,6 +117,8 @@ export interface ComboboxProps {
   mobileChildrenScrollEnabled?: boolean;
   /** Let custom desktop children own scrolling, for example a virtualized list. */
   desktopChildrenScrollEnabled?: boolean;
+  /** Custom children without options handle ArrowUp and ArrowDown themselves (Clisbot model picker). */
+  desktopArrowKeysToChildren?: boolean;
   /** Overrides the mobile scroll container spacing for custom child content. */
   mobileChildrenContentContainerStyle?: StyleProp<ViewStyle>;
   presentation?: "push" | "replace";
@@ -561,6 +563,7 @@ interface DesktopKeyHandlerInput {
   setActiveIndex: React.Dispatch<React.SetStateAction<number>>;
   handleSelect: (id: string) => void;
   handleClose: () => void;
+  arrowKeysToChildren: boolean;
 }
 
 function handleDesktopArrowKey(input: DesktopKeyHandlerInput, key: "ArrowDown" | "ArrowUp") {
@@ -906,8 +909,8 @@ function dispatchDesktopKey(
   if (!IS_WEB && input.isMobile) return false;
 
   if (key === "ArrowDown" || key === "ArrowUp") {
-    // A Combobox drawn with custom children and no options leaves the arrows to them.
-    if (input.orderedVisibleOptions.length === 0) return false;
+    // Opted in: custom children with no options of the Combobox's own take the arrows.
+    if (input.arrowKeysToChildren && input.orderedVisibleOptions.length === 0) return false;
     event?.preventDefault();
     handleDesktopArrowKey(input, key);
     return true;
@@ -1324,6 +1327,7 @@ export function Combobox({
   header,
   mobileChildrenScrollEnabled = true,
   desktopChildrenScrollEnabled = true,
+  desktopArrowKeysToChildren = false,
   mobileChildrenContentContainerStyle,
   presentation,
   open,
@@ -1592,12 +1596,21 @@ export function Combobox({
           setActiveIndex,
           handleSelect,
           handleClose,
+          arrowKeysToChildren: desktopArrowKeysToChildren,
         },
         key,
         event,
       );
     },
-    [activeIndex, handleClose, handleSelect, isMobile, isOpen, orderedVisibleOptions],
+    [
+      activeIndex,
+      desktopArrowKeysToChildren,
+      handleClose,
+      handleSelect,
+      isMobile,
+      isOpen,
+      orderedVisibleOptions,
+    ],
   );
 
   useDismissKeyboardOnOpen(isOpen, isMobile);
