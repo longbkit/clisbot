@@ -592,16 +592,39 @@ function applyProfile(state: AgentFormReducerState, action: ApplyProfileAction) 
   };
 }
 
+/** A fallback gives way once the remembered provider it stood in for can run again. */
+function restoreRememberedProvider(
+  state: AgentFormReducerState,
+  action: AgentFormInputs,
+): AgentFormReducerState {
+  const remembered = action.preferences?.provider;
+  const untouched = !Object.values(state.userModified).some(Boolean);
+  if (!state.draftDefault || !untouched || !remembered) return state;
+  if (remembered === state.form.provider || !action.allowedProviderMap.has(remembered)) {
+    return state;
+  }
+  const form = resolveFormStateFromProviderModels(
+    action.initialValues,
+    action.preferences,
+    action.providerModelsByProvider,
+    state.userModified,
+    state.form,
+    action.allowedProviderMap,
+  );
+  return { ...state, draftDefault: false, form };
+}
+
 /**
  * Fills a draft nobody chose for yet (`pickDraftDefaultProvider`). It runs on every input so a
  * provider that finishes loading after the form resolved still fills it. Nothing here marks
  * `userModified`, so a remembered preference or a later resolution still replaces it.
  */
 function applyDraftDefault(
-  state: AgentFormReducerState,
+  input: AgentFormReducerState,
   action: AgentFormInputs,
 ): AgentFormReducerState {
-  if (!action.draftDefaultOrder) return state;
+  if (!action.draftDefaultOrder) return input;
+  const state = restoreRememberedProvider(input, action);
   const { form, userModified } = state;
   const { allowedProviderMap, providerModelsByProvider } = action;
   const provider = pickDraftDefaultProvider({

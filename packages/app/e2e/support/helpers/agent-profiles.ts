@@ -491,7 +491,7 @@ export async function selectModelRow(
 
 export { searchComposerPicker as searchAllModels } from "./composer-picker";
 
-/** A match from another provider names that provider under the model. */
+/** Matches are grouped under a header that names their provider. */
 export async function expectModelSearchResult(
   page: Page,
   expected: { provider: string; modelId: string; providerLabel: string; modelLabel: string },
@@ -499,7 +499,11 @@ export async function expectModelSearchResult(
   const row = composerPickerModelRow(page, expected);
   await expect(row).toBeVisible({ timeout: 30_000 });
   await expect(row.getByText(expected.modelLabel, { exact: true })).toBeVisible();
-  await expect(row.getByText(expected.providerLabel, { exact: true })).toBeVisible();
+  await expect(
+    composerPickerPanel(page)
+      .getByTestId(`composer-picker-group-${expected.provider}`)
+      .getByText(expected.providerLabel, { exact: true }),
+  ).toBeVisible();
 }
 
 /** Search results replace the panel's list, so no profile row is shown with them. */

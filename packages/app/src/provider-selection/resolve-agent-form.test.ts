@@ -1428,6 +1428,37 @@ describe("a fresh draft's default", () => {
     expect(form).toMatchObject({ provider: "codex", model: "gpt-5.3-codex", modeId: "auto" });
   });
 
+  it("gives the fallback back when the remembered provider recovers", () => {
+    const preferences = {
+      provider: "claude",
+      providerPreferences: { claude: { model: "opus" } },
+    };
+    const fallback = resolve({ preferences, allowedProviderMap: codexProviderMap });
+    expect(fallback.form.provider).toBe("codex");
+    const { form, draftDefault } = resolve(
+      {
+        preferences,
+        providerModelsByProvider: makeProviderModelsByProvider([
+          ["claude", [OPUS, SONNET]],
+          ["codex", CODEX_MODELS],
+        ]),
+      },
+      fallback,
+    );
+    expect(form).toMatchObject({ provider: "claude", model: "opus", modeId: "default" });
+    expect(draftDefault).toBe(false);
+  });
+
+  it("keeps the fallback once the person changed something on it", () => {
+    const preferences = { provider: "claude" };
+    const fallback = resolve({ preferences, allowedProviderMap: codexProviderMap });
+    const picked = resolveAgentForm(fallback, {
+      type: "SET_MODE_FROM_USER",
+      modeId: "full-access",
+    });
+    expect(resolve({ preferences }, picked).form.provider).toBe("codex");
+  });
+
   it("stays empty when no provider is ready", () => {
     const { form, draftDefault } = resolve({
       providerModelsByProvider: makeProviderModelsByProvider([
