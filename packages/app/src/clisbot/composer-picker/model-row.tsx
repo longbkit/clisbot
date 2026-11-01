@@ -8,10 +8,9 @@ import { ModelProviderGlyph } from "@/components/model-browser";
 import { ComboboxItem } from "@/components/ui/combobox";
 import { Shortcut } from "@/components/ui/shortcut";
 import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
-import { useIsCompactFormFactor } from "@/constants/layout";
-import { isNative } from "@/constants/platform";
 import type { ProviderSelectionModelRow } from "@/provider-selection/provider-selection";
 import { ICON_SIZE } from "@/styles/theme";
+import { useTouchRows } from "./use-touch-rows";
 
 export interface ModelRowProps {
   row: ProviderSelectionModelRow;
@@ -59,9 +58,8 @@ function RowAction(props: {
 
 function RowActions(props: ModelRowProps & { hovered: boolean }) {
   const { t } = useTranslation();
-  const isCompact = useIsCompactFormFactor();
+  const touch = useTouchRows();
   const { row, favorite, onToggleFavorite, onCreateProfile } = props;
-  const touch = isNative || isCompact;
   const toggle = useCallback(() => onToggleFavorite(row.favoriteKey), [onToggleFavorite, row]);
   const create = useCallback(
     () => onCreateProfile?.({ provider: row.provider, modelId: row.modelId, name: row.modelLabel }),
@@ -101,6 +99,7 @@ function RowActions(props: ModelRowProps & { hovered: boolean }) {
  */
 export function ModelRow(props: ModelRowProps) {
   const [hovered, setHovered] = useState(false);
+  const touch = useTouchRows();
   const { row, onPick } = props;
   const pick = useCallback(() => onPick(row), [onPick, row]);
   const enter = useCallback(() => setHovered(true), []);
@@ -128,6 +127,7 @@ export function ModelRow(props: ModelRowProps) {
         label={row.modelLabel}
         description={props.showProvider ? row.providerLabel : undefined}
         active={props.highlighted}
+        touch={touch}
         onPress={pick}
         leadingSlot={leading}
         trailingSlot={trailing}

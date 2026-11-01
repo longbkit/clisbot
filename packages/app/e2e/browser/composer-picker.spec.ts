@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import type { Locator } from "@playwright/test";
 import { expect, test, type Page } from "../support/fixtures";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { openAgentRoute } from "../support/helpers/mock-agent";
@@ -60,6 +61,13 @@ async function openCodexAgent(page: Page, repoPrefix: string) {
   return { workspace, agentId: agent.id };
 }
 
+async function expectTouchHeight(target: Locator) {
+  await expect(target).toBeVisible();
+  const box = await target.boundingBox();
+  // Layout can land a hair under a whole pixel.
+  expect(Math.round(box?.height ?? 0)).toBeGreaterThanOrEqual(44);
+}
+
 function chip(page: Page) {
   return page.getByTestId("composer-model-chip").filter({ visible: true }).first();
 }
@@ -78,6 +86,9 @@ test("desktop: one chip opens every option and stays open while you pick", async
     const panel = page.getByTestId("composer-picker-panel").filter({ visible: true });
     await expect(panel).toBeVisible();
     await expect(page.getByTestId("composer-picker-search")).toBeFocused();
+    // Desktop rows keep the shared row height.
+    const rowBox = await page.getByTestId("composer-picker-model-codex:gpt-6.1-sol").boundingBox();
+    expect(rowBox?.height ?? 0).toBeLessThan(44);
     await expect(page.getByTestId("composer-picker-reasoning")).toContainText("6.1 Sol");
     // A wide window opens the rail with names for a first-time user.
     await expect(page.getByTestId("composer-picker-rail-expanded")).toContainText("Codex");
@@ -170,6 +181,19 @@ test("phone: the chip and the mode icon, and the panel as a bottom sheet", async
     await page.getByTestId("composer-picker-model-codex:gpt-6-sol").click();
     await expect(panel).toBeVisible();
     await screenshot(page, "phone-sheet-after-pick");
+
+    // Everything a thumb presses in the sheet is at least 44px tall.
+    for (const testId of [
+      "composer-picker-model-codex:gpt-6-sol",
+      "composer-picker-effort-high",
+      "composer-picker-rail-provider:codex",
+      "composer-picker-standard",
+      "composer-picker-fast",
+    ]) {
+      await expectTouchHeight(page.getByTestId(testId).filter({ visible: true }).first());
+    }
+    await page.getByTestId("composer-picker-mode").filter({ visible: true }).click();
+    await expectTouchHeight(page.getByTestId("mode-option-full-auto-accept").first());
   } finally {
     await workspace.cleanup();
   }

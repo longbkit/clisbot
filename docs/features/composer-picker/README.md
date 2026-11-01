@@ -79,6 +79,10 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
   provider's label. Every segment writes the provider's own feature id and value, never one the
   model does not offer; a model with one tier shows no control. Fast and Ultra fast carry
   "Higher cost".
+- **Touch targets.** In the phone sheet and on touch devices every row and control a thumb
+  presses is at least 44px tall: model and profile rows, Show more, effort and provider chips,
+  Mode rows and the speed segments (`use-touch-rows.ts`). They use the `touch` size of the shared
+  `ComboboxItem`, `ChipButton` and `SegmentedControl`; desktop rows keep their height.
 - **Mode rows show their one-line description on every row**, not only the highlighted one, so
   a row never changes height as the pointer moves (design.md §11).
 

@@ -6,6 +6,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { SpeedLevel, SpeedOption, SpeedControl } from "./speed";
+import { useTouchRows } from "./use-touch-rows";
 
 /** The value shown when the agent runs a tier the control does not offer. */
 const NONE = "none";
@@ -62,9 +63,8 @@ function useSegmentOptions(options: readonly SpeedOption[]): SegmentedControlOpt
 export function SpeedSegment(props: {
   control: SpeedControl;
   onSetFeature: (featureId: string, value: unknown) => void;
-  /** The phone sheet's taller segments, for a thumb. */
-  touch?: boolean;
 }) {
+  const touch = useTouchRows();
   const { t } = useTranslation();
   const { control, onSetFeature } = props;
   const options = useSegmentOptions(control.options);
@@ -82,7 +82,8 @@ export function SpeedSegment(props: {
         options={options}
         value={control.selectedKey ?? NONE}
         onValueChange={change}
-        size={props.touch ? "md" : "sm"}
+        size={touch ? "md" : "sm"}
+        touch={touch}
         accessibilityLabel={t("composer.picker.speed")}
         testID="composer-picker-speed"
       />

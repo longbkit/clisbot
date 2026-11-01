@@ -17,6 +17,7 @@ import type { ProviderSelectionModelRow } from "@/provider-selection/provider-se
 import { ICON_SIZE } from "@/styles/theme";
 import { ModelRow } from "./model-row";
 import { shortcutDigit } from "./picker-rows";
+import { useTouchRows } from "./use-touch-rows";
 
 export type ModelListStatus = "ready" | "loading" | { error: string };
 
@@ -65,6 +66,7 @@ function ListMessage(props: { status: ModelListStatus; emptyText: string; onRetr
 /** The center column: the chosen provider's models, Favorites, or every match for a query. */
 export function ModelList(props: ModelListProps) {
   const { t } = useTranslation();
+  const touch = useTouchRows();
   if (props.rows.length === 0) {
     return (
       <ListMessage status={props.status} emptyText={props.emptyText} onRetry={props.onRetry} />
@@ -91,6 +93,7 @@ export function ModelList(props: ModelListProps) {
         <ComboboxItem
           label={t("composer.picker.showMore", { count: props.hiddenCount })}
           onPress={props.onShowMore}
+          touch={touch}
           testID="composer-picker-show-more"
         />
       ) : null}
@@ -100,6 +103,7 @@ export function ModelList(props: ModelListProps) {
 
 function ProfileRow(props: { row: AgentProfilePickerRow; onApply: (id: string) => void }) {
   const { row, onApply } = props;
+  const touch = useTouchRows();
   const apply = useCallback(() => onApply(row.id), [onApply, row.id]);
   const glyph = useMemo(
     () => <AgentProfileGlyph icon={row.icon} color={row.color} size={16} />,
@@ -111,6 +115,7 @@ function ProfileRow(props: { row: AgentProfilePickerRow; onApply: (id: string) =
       description={row.summary}
       onPress={apply}
       leadingSlot={glyph}
+      touch={touch}
       testID={`composer-picker-profile-row-${row.id}`}
     />
   );

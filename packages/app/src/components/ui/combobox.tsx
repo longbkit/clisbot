@@ -245,6 +245,8 @@ export interface ComboboxItemProps {
   accessibilityLabel?: string;
   /** When true, bumps hover/pressed colors up one surface level (for items on elevated backgrounds). */
   elevated?: boolean;
+  /** At least 44px tall for a thumb, as in a phone sheet; desktop rows keep their height. */
+  touch?: boolean;
   onPress: () => void;
   testID?: string;
 }
@@ -261,6 +263,7 @@ export function ComboboxItem({
   disabled,
   accessibilityLabel,
   elevated,
+  touch,
   onPress,
   testID,
 }: ComboboxItemProps): ReactElement {
@@ -286,12 +289,13 @@ export function ComboboxItem({
   const itemPressableStyle = useCallback(
     ({ pressed, hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.comboboxItem,
+      touch && styles.comboboxItemTouch,
       hovered && (elevated ? styles.comboboxItemHoveredElevated : styles.comboboxItemHovered),
       pressed && (elevated ? styles.comboboxItemPressedElevated : styles.comboboxItemPressed),
       active && styles.comboboxItemActive,
       disabled && styles.comboboxItemDisabled,
     ],
-    [elevated, active, disabled],
+    [elevated, active, disabled, touch],
   );
 
   const itemContentStyle = useMemo(
@@ -1737,6 +1741,9 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[3],
     color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
+  },
+  comboboxItemTouch: {
+    minHeight: 44,
   },
   comboboxItem: {
     flexDirection: "row",

@@ -14,6 +14,7 @@ import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
 import type { KeyboardActionDefinition } from "@/keyboard/keyboard-action-dispatcher";
 import { resolveModeProvider } from "./mode-options";
 import { useModePresentation, type ModePresentation } from "./mode-presentation";
+import { useTouchRows } from "./use-touch-rows";
 
 export interface ModeDropdownProps extends AgentModeControlValue {
   /** False collapses the trigger to its icon when the composer bar is short of room. */
@@ -32,6 +33,7 @@ function ModeOptionRow(props: {
   onPress: () => void;
 }): ReactElement {
   const Icon = props.presentation.icon;
+  const touch = useTouchRows();
   const leading = useMemo(() => <Icon size={16} color={styles.optionIcon.color} />, [Icon]);
   return (
     <ComboboxItem
@@ -42,6 +44,7 @@ function ModeOptionRow(props: {
       active={props.active}
       onPress={props.onPress}
       leadingSlot={leading}
+      touch={touch}
       testID={`mode-option-${props.option.id}`}
     />
   );

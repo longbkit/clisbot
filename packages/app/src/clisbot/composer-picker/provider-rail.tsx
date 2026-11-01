@@ -73,6 +73,7 @@ function RailButton(props: {
         label={props.label}
         leading={glyph}
         selected={props.selected}
+        touch
         onPress={press}
         testID={testID}
       />

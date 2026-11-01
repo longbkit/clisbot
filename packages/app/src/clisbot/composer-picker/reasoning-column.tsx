@@ -37,6 +37,7 @@ function ReasoningRow(props: {
         role="tab"
         label={option.label}
         selected={props.selected}
+        touch
         onPress={press}
         testID={testID}
       />

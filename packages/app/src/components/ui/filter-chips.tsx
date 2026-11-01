@@ -158,6 +158,7 @@ export function ChipButton({
   truncate = false,
   role = "button",
   accessibilityLabel,
+  touch = false,
   onPress,
   testID,
 }: {
@@ -169,6 +170,8 @@ export function ChipButton({
   truncate?: boolean;
   role?: Extract<AccessibilityRole, "button" | "tab">;
   accessibilityLabel?: string;
+  /** At least 44px tall for a thumb, as in a phone sheet. */
+  touch?: boolean;
   onPress(): void;
   testID?: string;
 }) {
@@ -176,11 +179,12 @@ export function ChipButton({
   const style = useCallback(
     ({ pressed, hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.chip,
+      touch && styles.touch,
       truncate && styles.truncate,
       (pressed || hovered) && styles.hovered,
       selected && styles.selected,
     ],
-    [selected, truncate],
+    [selected, touch, truncate],
   );
   return (
     <PressHighlight
@@ -250,6 +254,7 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface1,
   },
   truncate: { maxWidth: theme.spacing[32] + theme.spacing[16] },
+  touch: { minHeight: CONTROL_HEIGHTS.field },
   hovered: { backgroundColor: theme.colors.surface2 },
   selected: {
     backgroundColor: theme.colors.surface3,
