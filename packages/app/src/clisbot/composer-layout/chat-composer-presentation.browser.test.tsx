@@ -114,7 +114,7 @@ it("holds Commands, the text, attach, voice and the mic circle in one container"
   expect(within("composer-pill", "composer-circle")).toBe(true);
 });
 
-it("turns the circle into Send once something is sendable, and hides attach and voice", async () => {
+it("turns the circle into Send once something is sendable, hides voice and keeps attach", async () => {
   await page.viewport(390, 844);
   mount({
     compact: true,
@@ -122,7 +122,7 @@ it("turns the circle into Send once something is sendable, and hides attach and 
   });
   expect(within("composer-circle", "send")).toBe(true);
   expect(screen.queryByTestId("dictation")).toBeNull();
-  expect(screen.queryByTestId("attach")).toBeNull();
+  expect(within("composer-inner-end", "attach")).toBe(true);
   expect(screen.queryByTestId("voice")).toBeNull();
   expect(within("composer-inner-start", "commands")).toBe(true);
 });

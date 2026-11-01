@@ -29,6 +29,8 @@ import {
   type TerminalProfile,
 } from "../support/helpers/new-workspace-launch";
 
+const CHAT_LAYOUT = process.env.EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER !== "0";
+
 // Someone who wants a terminal agent instead of a chat: they pick a profile
 // from the meta-row control, type a prompt, and the daemon actually spawns the
 // resolved command with their prompt substituted in — no mocking Clisbot's own
@@ -206,7 +208,13 @@ async function expectNewWorkspaceFullscreen(
 ): Promise<void> {
   const frame = page.getByTestId("composer-fullscreen");
   await expect(page.getByRole("button", { name: "Exit fullscreen", exact: true })).toBeVisible();
-  await expect(frame.getByRole("button")).toHaveCount(2);
+  if (CHAT_LAYOUT && (await frame.getByTestId("composer-commands-button").count()) > 0) {
+    // The Clisbot chat layout keeps its controls expanded (Commands, attach, settings row);
+    // only the text grows (docs/features/composer-picker/README.md).
+    await expect(frame.getByTestId("composer-commands-button")).toBeVisible();
+  } else {
+    await expect(frame.getByRole("button")).toHaveCount(2);
+  }
   await expect(frame.getByRole("button", { name: submitLabel })).toBeVisible();
   await expectNewWorkspaceHeaderHidden(page);
   const projectPicker = page.getByRole("button", { name: "Workspace project" });
