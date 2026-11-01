@@ -24,6 +24,19 @@ export function normalizeProviderModes(
   });
 }
 
+/**
+ * The mode list when the daemon does not ask the running provider (a profile replaces its models):
+ * the manifest's modes without those the provider lists only when it offers them, such as Codex
+ * Plan, which needs a plan collaboration mode the probe has not confirmed.
+ */
+export function staticProviderModes(
+  definitionModes: readonly AgentProviderModeDefinition[],
+): AgentMode[] {
+  return definitionModes
+    .filter((mode) => mode.onlyWhenOffered !== true)
+    .map(({ onlyWhenOffered: _onlyWhenOffered, ...mode }) => mode);
+}
+
 export function normalizeProviderModesEvent(
   event: AgentStreamEvent,
   definitionModes: readonly AgentProviderModeDefinition[],

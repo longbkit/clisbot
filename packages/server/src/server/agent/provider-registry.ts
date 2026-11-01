@@ -58,7 +58,11 @@ import {
   type AgentProviderDefinition,
   type AgentProviderModeDefinition,
 } from "@clisbot/protocol/provider-manifest";
-import { normalizeProviderModes, normalizeProviderModesEvent } from "./provider-modes.js";
+import {
+  normalizeProviderModes,
+  normalizeProviderModesEvent,
+  staticProviderModes,
+} from "./provider-modes.js";
 
 function isNonEmptyStringArray(value: string[]): value is [string, ...string[]] {
   return value.length > 0;
@@ -720,7 +724,7 @@ function createRegistryEntry(
           );
           return {
             models,
-            modes: decorateModes(resolved.definition.modes),
+            modes: decorateModes(staticProviderModes(resolved.definition.modes)),
             defaultModeId,
           };
         }
