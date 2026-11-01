@@ -34,6 +34,7 @@ import {
   buildComposerModeOptions,
   isProviderAutoAcceptOn,
   PROVIDER_AUTO_ACCEPT_FEATURE_ID,
+  resolveAgentModes,
   resolveComposerModeId,
   shouldClearProviderAutoAccept,
 } from "@/clisbot/composer-picker/mode-options";
@@ -323,12 +324,16 @@ export function useLiveAgentModeControl(
     [agentId, client, hiddenAutoAccept, slice?.provider, toast, updatePreferences],
   );
 
+  const modes = COMPOSER_PICKER_ENABLED
+    ? resolveAgentModes(availableModes, providerDefinitions[0]?.modes)
+    : availableModes;
+
   return useMemo(() => {
-    if (!slice || availableModes.length === 0) return null;
+    if (!slice || modes.length === 0) return null;
     return {
       provider: slice.provider,
       providerDefinitions,
-      modeOptions: buildComposerModeOptions(availableModes, fullAutoAcceptSupported),
+      modeOptions: buildComposerModeOptions(modes, fullAutoAcceptSupported),
       // Flag off: the provider's own mode id, as the base toolbar always showed it.
       selectedModeId: fullAutoAcceptSupported
         ? resolveComposerModeId(slice.currentModeId, slice.fullAutoAccept, hiddenAutoAccept)
@@ -337,11 +342,11 @@ export function useLiveAgentModeControl(
       disabled: !client,
     };
   }, [
-    availableModes,
     client,
     fullAutoAcceptSupported,
     handleSelectMode,
     hiddenAutoAccept,
+    modes,
     providerDefinitions,
     slice,
   ]);

@@ -305,7 +305,7 @@ New status pills use `<StatusBadge>`. Identity, shortcut, and interactive link b
 
 ## 14. Forbidden
 
-- `fontWeight.medium` on row titles, body text, button labels, badge text, or `<SidebarCallout>` titles. Medium is reserved for the structural-label tier described in §3 — section labels, modal/sheet titles, dense metadata emphasis, and tight action labels. Anything else is `normal`. `<ScreenTitle>` is responsive `400/300` and is never overridden.
+- `fontWeight.medium` on row titles, body text, button labels, badge text, or `<SidebarCallout>` titles. Medium is reserved for the structural-label tier described in §3 — section labels, modal/sheet titles, dense metadata emphasis, and tight action labels. Anything else is `normal`. `<ScreenTitle>` is responsive `400/300` and is never overridden. One exception: a phone's `/command` row in the command list (`clisbot/composer-layout/command-row.tsx`) is `medium`, because its two lines need the command to stand apart from its description.
 - `<Pressable>` wrapping `<Text>` to make a button. `<Button>` exists.
 - Importing `Pressable` or a `Touchable*` outside `components/ui/`. A raw pressable has no standard press or hover feedback, so every one drifts. `clisbot/no-raw-pressable` reports it; the files on its burn-down list in `.oxlintrc.json` may only leave it.
 - Bare `<Text>` for a section header inside settings. `<SettingsSection>` exists.

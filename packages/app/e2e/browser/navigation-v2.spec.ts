@@ -139,6 +139,23 @@ test.describe("Navigation V2", () => {
     }
   });
 
+  test("the line under Home's header shows only once the list has scrolled", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 420 });
+    await gotoAppShell(page);
+    const scroller = page.getByTestId("home-scroll").filter({ visible: true }).first();
+    await expect(scroller).toBeVisible({ timeout: 30_000 });
+    const line = page.getByTestId("section-scroll-edge");
+    await expect(line).toHaveCount(0);
+    await scroller.evaluate((node) => {
+      node.scrollTop = 120;
+    });
+    await expect(line).toHaveCount(1);
+    await scroller.evaluate((node) => {
+      node.scrollTop = 0;
+    });
+    await expect(line).toHaveCount(0);
+  });
+
   test("phone tabs, Chats, Work, More and a conversation's Back", async ({ page }) => {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 390, height: 844 });

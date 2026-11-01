@@ -39,7 +39,7 @@ import {
 } from "@/provider-selection/resolve-agent-form";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { COMPOSER_PICKER_ENABLED } from "@/clisbot/composer-picker/feature";
-import { orderProviderIds, useProviderRailStore } from "@/clisbot/composer-picker/rail-store";
+import { useDraftDefaultOrder } from "@/clisbot/composer-picker/use-draft-default-order";
 import type { MaterializedAgentProfile } from "@/agent-profiles";
 
 export type { FormInitialValues } from "@/provider-selection/resolve-agent-form";
@@ -277,12 +277,8 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
       isAwaitingDraftDefault);
   const isAllModelsLoading = isModelSelectionLoading;
 
-  const savedRailOrder = useProviderRailStore((state) => state.order);
-  const draftDefaultOrder = useMemo(() => {
-    if (!COMPOSER_PICKER_ENABLED) return null;
-    const ids = allProviderEntries.map((entry) => entry.provider);
-    return orderProviderIds(ids, savedRailOrder) as AgentProvider[];
-  }, [allProviderEntries, savedRailOrder]);
+  const railDraftOrder = useDraftDefaultOrder(allProviderEntries, serverId);
+  const draftDefaultOrder = COMPOSER_PICKER_ENABLED ? railDraftOrder : null;
 
   useEffect(() => {
     dispatch({

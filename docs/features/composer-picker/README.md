@@ -86,6 +86,8 @@ under it, on every width:
   Enter and the arrows read the same. On a phone it may take 60% of the screen and scrolls
   inside, and each row stacks: the command whole in medium weight, then its description muted on
   up to two lines. Desktop keeps the one-line row and its 220px height.
+- **A send error belongs to the draft that was sent.** Removing or adding an attachment or
+  editing the text clears it (`composer/use-send-error-draft-reset.ts`).
 - **Panels open above the composer.** The Model panel anchors to the whole composer
   (`frame-anchor.tsx`), so it never covers the text. Mode and Tools keep their own anchors.
 - The phone placeholder is "Message...": Commands already names `/commands`. The composer's
@@ -126,7 +128,9 @@ The settings row shows two agent controls besides the Tools chip and the context
   name keeps the full model name and the effort, even when the chip drops the effort:
   "Model and options: GPT-6-Astra, Medium". The e2e helpers read the model and effort from it
   (`e2e/support/helpers/composer-picker.ts`).
-- **Mode dropdown** — the mode's icon and name. Each mode reads as one concept, so one icon means
+- **Mode dropdown** — the mode's icon and name. A session the daemon has not loaded, such as a
+  closed one after a restart, reports no modes, so the provider's list stands in; its stored mode
+  stays selected, and picking another loads the session. Each mode reads as one concept, so one icon means
   one thing on every provider: lock (asks), pencil (accepts edits), sparkles (auto), shield off
   (bypass, full access), checklist (Plan) and double check (Full auto-accept)
   (`mode-options.ts`, `mode-presentation.ts`). Known modes are named and described in the app's
@@ -154,11 +158,15 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
   `resolve-agent-form.ts`; only the composer's draft form asks for it, so schedule and Bot forms
   keep their own rules). With no explicit value and no usable preference it takes the first ready
   provider on the rail, that provider's default model and its default mode, so Home shows the
-  chip and Mode and the first send works. A remembered provider still loading is waited for
+  chip and Mode and the first send works. While the rail's first provider loads, the draft waits
+  for it for 1.5 seconds before taking the next ready one, so the default does not depend on which
+  provider answered first (`use-draft-default-order.ts`). A remembered provider still loading is waited for
   ("Loading..."); one that cannot run falls back the same way, and the fallback gives way when
   it recovers, unless the person changed something on it; a provider whose model list is empty is
   skipped. The default is not a pick: nothing marks it modified and sending with it
   saves no preference. With nothing ready the chip says Select model, and only Send complains.
+- **The search field takes names, not prose:** no autocorrect, capitalization, spell check or
+  autocomplete, on every sheet and popover search (iOS offered "got" for "gpt6").
 - **The rail opens on the current model's provider**, so the check is on screen; Favorites is
   one press away. A running agent is one provider's process, so its rail holds Favorites and
   that provider only.
@@ -182,7 +190,9 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
 - **Search reads like an autocomplete** (`picker-search.ts`). Text is lowercased, accents drop
   (`đ` too) and `-` `.` `_` `/` and spaces separate words. Every word of the query must match the
   model's name, id or provider, in any order, at the start of a word, as a run of words read
-  without separators (`gpt6`, `opus55`) or inside a word. Rows rank exact, then prefix, then word
+  without separators (`gpt6`, `opus55`) or inside a word. A number matches only where it starts:
+  `gpt 6` finds 6, 6.1 and 6-Astra but not 5.6, whose 6 ends a number. Digits joined by one
+  separator other than a space are one number, in the query too, so `5.6` and `5.6-sol` find it. Rows rank exact, then prefix, then word
   prefix, then inside a word; on a tie the current provider's, then favourites, then the
   catalog's order. Results follow every keystroke, the first is highlighted so Enter picks it,
   and the matched characters are bold. A provider name matches at word prefix best: `codex` lists

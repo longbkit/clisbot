@@ -72,6 +72,17 @@ export function buildComposerModeOptions(
   return [...own, { id: FULL_AUTO_ACCEPT_MODE_ID, label: "Full auto-accept" }];
 }
 
+/**
+ * The modes to offer on an agent. A session the daemon has not loaded, such as a closed one after
+ * a restart, reports none, so the provider's list stands in: picking one loads the session.
+ */
+export function resolveAgentModes(
+  agentModes: readonly AgentMode[],
+  providerModes: readonly AgentMode[] | undefined,
+): readonly AgentMode[] {
+  return agentModes.length > 0 ? agentModes : (providerModes ?? agentModes);
+}
+
 export const PROVIDER_AUTO_ACCEPT_FEATURE_ID = "auto_accept";
 
 /**

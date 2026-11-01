@@ -68,6 +68,14 @@ export interface SheetHeader {
   search?: SheetHeaderSearch;
 }
 
+// A search field types names, not prose: iOS offered "got" for "gpt6".
+const SEARCH_INPUT_TYPING = {
+  autoCapitalize: "none",
+  autoCorrect: false,
+  autoComplete: "off",
+  spellCheck: false,
+} as const;
+
 const SCROLL_CONTENT_GROW = { flexGrow: 1 };
 const ABSOLUTE_FILL_STYLE = { ...StyleSheet.absoluteFill };
 const NATIVE_DIALOG_SNAP_POINTS = ["100%"];
@@ -408,8 +416,7 @@ export function SheetHeaderView({
             onChangeText={handleSearchChange}
             onFocus={search.onFocus}
             onBlur={search.onBlur}
-            autoCapitalize="none"
-            autoCorrect={false}
+            {...SEARCH_INPUT_TYPING}
             autoFocus={search.autoFocus}
             testID={search.testID}
           />
@@ -468,8 +475,7 @@ export function InlineHeaderView({ header }: { header: SheetHeader }) {
             onChangeText={header.search.onChange}
             onFocus={header.search.onFocus}
             onBlur={header.search.onBlur}
-            autoCapitalize="none"
-            autoCorrect={false}
+            {...SEARCH_INPUT_TYPING}
             autoFocus={header.search.autoFocus}
             testID={header.search.testID}
           />
