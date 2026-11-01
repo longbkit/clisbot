@@ -155,6 +155,11 @@ permission request the agent still raises. Agents sometimes ask under bypass any
   persisted in the agent config and restored on resume. The app offers the mode only when
   `server_info.features.fullAutoAccept` is set (`COMPAT(fullAutoAccept)`), and then hides the
   per-provider `auto_accept` toggle.
+- **A provider's own `auto_accept` shows as Full auto-accept.** Hiding the toggle does not turn
+  it off: unattended creates (schedules, children of an unattended parent) and older apps still
+  set it on ACP, Copilot and OpenCode sessions. While it is on, the Mode reads Full auto-accept,
+  and picking any other mode also writes `auto_accept: false` (`mode-options.ts`), on a live
+  agent and on a draft.
 - **Authorization.** Managed Access counts it as unattended (`isUnattendedConfiguration`), so it
   needs every approval privilege, as Bypass and `toolPolicy.preapproved` do
   ([permissions](../../permissions.md#approval-leaves)). The app cannot tell in advance for a

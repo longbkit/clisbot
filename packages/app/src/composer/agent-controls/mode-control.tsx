@@ -13,7 +13,10 @@ import type { AgentProviderDefinition } from "@clisbot/protocol/provider-manifes
 import { useHostFeature } from "@/runtime/host-features";
 import {
   buildComposerModeOptions,
+  isProviderAutoAcceptOn,
+  PROVIDER_AUTO_ACCEPT_FEATURE_ID,
   resolveComposerModeId,
+  shouldClearProviderAutoAccept,
 } from "@/clisbot/composer-picker/mode-options";
 
 export interface AgentModeControlValue {
@@ -44,6 +47,7 @@ export function useLiveAgentModeControl(
         cwd: agent.cwd,
         currentModeId: agent.currentModeId,
         fullAutoAccept: agent.fullAutoAccept === true,
+        providerAutoAccept: isProviderAutoAcceptOn(agent.features),
       };
     }),
   );
@@ -64,9 +68,16 @@ export function useLiveAgentModeControl(
     return definition ? [definition] : [];
   }, [slice?.provider, snapshotEntries]);
 
+  // Only a Host with Full auto-accept hides the provider's toggle and presents it as the mode.
+  const hiddenAutoAccept = fullAutoAcceptSupported && slice?.providerAutoAccept === true;
   const handleSelectMode = useCallback(
     (modeId: string) => {
       if (!client || !slice?.provider) return;
+      if (shouldClearProviderAutoAccept(modeId, hiddenAutoAccept)) {
+        void client
+          .setAgentFeature(agentId, PROVIDER_AUTO_ACCEPT_FEATURE_ID, false)
+          .catch((error) => toast.error(toErrorMessage(error)));
+      }
       void updatePreferences((current) =>
         mergeProviderPreferences({
           preferences: current,
@@ -84,7 +95,7 @@ export function useLiveAgentModeControl(
           toast.error(toErrorMessage(error));
         });
     },
-    [agentId, client, slice?.provider, toast, updatePreferences],
+    [agentId, client, hiddenAutoAccept, slice?.provider, toast, updatePreferences],
   );
 
   return useMemo(() => {
@@ -93,7 +104,11 @@ export function useLiveAgentModeControl(
       provider: slice.provider,
       providerDefinitions,
       modeOptions: buildComposerModeOptions(availableModes, fullAutoAcceptSupported),
-      selectedModeId: resolveComposerModeId(slice.currentModeId, slice.fullAutoAccept),
+      selectedModeId: resolveComposerModeId(
+        slice.currentModeId,
+        slice.fullAutoAccept,
+        hiddenAutoAccept,
+      ),
       onSelectMode: handleSelectMode,
       disabled: !client,
     };
@@ -102,6 +117,7 @@ export function useLiveAgentModeControl(
     client,
     fullAutoAcceptSupported,
     handleSelectMode,
+    hiddenAutoAccept,
     providerDefinitions,
     slice,
   ]);

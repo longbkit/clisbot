@@ -1,4 +1,5 @@
 import type { AgentFeature } from "@clisbot/protocol/agent-types";
+import { PROVIDER_AUTO_ACCEPT_FEATURE_ID } from "./mode-options";
 
 /**
  * Providers sell faster, dearer tiers under three shapes: Claude's and OMP's `fast_mode`
@@ -30,7 +31,6 @@ export interface SpeedControl {
 }
 
 const SPEED_FEATURE_IDS = new Set(["fast_mode", "service_tier", "fast"]);
-const AUTO_ACCEPT_FEATURE_ID = "auto_accept";
 const STANDARD_TIER = /^(default|normal|standard|off|false|none)$/i;
 const ULTRA_TIER = /ultra/i;
 const FAST_TIER = /fast|priority|turbo|^on$|^true$/i;
@@ -105,7 +105,7 @@ export function resolvePanelFeatures(
   const speed = resolveSpeedControl(features);
   const more = features.filter((feature) => {
     if (speed && feature.id === speed.featureId) return false;
-    return !(options.fullAutoAcceptSupported && feature.id === AUTO_ACCEPT_FEATURE_ID);
+    return !(options.fullAutoAcceptSupported && feature.id === PROVIDER_AUTO_ACCEPT_FEATURE_ID);
   });
   return { speed, more };
 }

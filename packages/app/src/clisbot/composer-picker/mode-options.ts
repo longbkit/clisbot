@@ -60,10 +60,33 @@ export function buildComposerModeOptions(
   return [...own, { id: FULL_AUTO_ACCEPT_MODE_ID, label: "Full auto-accept" }];
 }
 
+export const PROVIDER_AUTO_ACCEPT_FEATURE_ID = "auto_accept";
+
+/**
+ * A provider's own `auto_accept` toggle (ACP, Copilot, OpenCode) is on. A Host with Full
+ * auto-accept hides that toggle, yet unattended creates, schedules and older apps still turn
+ * it on, so the composer presents it as Full auto-accept rather than hiding it.
+ */
+export function isProviderAutoAcceptOn(
+  features: readonly { id: string; value?: unknown }[] | undefined,
+): boolean {
+  return (
+    features?.some(
+      (feature) => feature.id === PROVIDER_AUTO_ACCEPT_FEATURE_ID && feature.value === true,
+    ) ?? false
+  );
+}
+
+/** Picking any mode but Full auto-accept turns a hidden provider `auto_accept` off. */
+export function shouldClearProviderAutoAccept(modeId: string, providerAutoAccept: boolean) {
+  return providerAutoAccept && modeId !== FULL_AUTO_ACCEPT_MODE_ID;
+}
+
 /** While Full auto-accept is on the daemon reports the provider mode under it. */
 export function resolveComposerModeId(
   currentModeId: string | null | undefined,
   fullAutoAccept: boolean | undefined,
+  providerAutoAccept = false,
 ): string | null {
-  return fullAutoAccept ? FULL_AUTO_ACCEPT_MODE_ID : (currentModeId ?? null);
+  return fullAutoAccept || providerAutoAccept ? FULL_AUTO_ACCEPT_MODE_ID : (currentModeId ?? null);
 }

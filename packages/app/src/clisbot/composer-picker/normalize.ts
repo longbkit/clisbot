@@ -2,6 +2,7 @@ import type { AgentFeature, AgentMode, AgentSelectOption } from "@clisbot/protoc
 import { formatThinkingOptionLabel } from "@/agent-controls/labels";
 import {
   buildComposerModeOptions,
+  isProviderAutoAcceptOn,
   resolveComposerModeId,
   resolveModeConcept,
 } from "./mode-options";
@@ -63,7 +64,11 @@ export function normalizeComposerOptions(input: ComposerOptionsInput): ComposerO
   const plan = input.modes.find((mode) => resolveModeConcept(input.provider, mode) === "plan");
   return {
     modes: buildComposerModeOptions(input.modes, input.fullAutoAcceptSupported),
-    selectedModeId: resolveComposerModeId(input.currentModeId, input.fullAutoAccept),
+    selectedModeId: resolveComposerModeId(
+      input.currentModeId,
+      input.fullAutoAccept,
+      input.fullAutoAcceptSupported && isProviderAutoAcceptOn(input.features),
+    ),
     planModeId: plan?.id ?? null,
     fullAutoAcceptRunsOn: resolveFullAutoAcceptRunsOn(input.modes, input.currentModeId),
     reasoning: normalizeReasoning(input.model),

@@ -3,8 +3,10 @@ import type { AgentMode } from "@clisbot/protocol/agent-types";
 import { FULL_AUTO_ACCEPT_MODE_ID } from "@clisbot/protocol/full-auto-accept";
 import {
   buildComposerModeOptions,
+  isProviderAutoAcceptOn,
   resolveComposerModeId,
   resolveModeConcept,
+  shouldClearProviderAutoAccept,
   resolveModeLabelKey,
 } from "./mode-options";
 
@@ -31,6 +33,21 @@ describe("composer mode list", () => {
   it("shows Full auto-accept as the current mode while it is on", () => {
     expect(resolveComposerModeId("bypassPermissions", true)).toBe(FULL_AUTO_ACCEPT_MODE_ID);
     expect(resolveComposerModeId("default", false)).toBe("default");
+  });
+
+  // A newer Host hides the provider's own auto_accept toggle; a session can still have it on
+  // (an unattended create, a schedule, an older app), so the composer shows it as what it is.
+  it("shows a provider's own auto_accept as Full auto-accept", () => {
+    const features = [{ type: "toggle" as const, id: "auto_accept", label: "Auto", value: true }];
+    expect(isProviderAutoAcceptOn(features)).toBe(true);
+    expect(isProviderAutoAcceptOn([{ ...features[0], value: false }])).toBe(false);
+    expect(resolveComposerModeId("ask", false, true)).toBe(FULL_AUTO_ACCEPT_MODE_ID);
+  });
+
+  it("clears the provider's auto_accept when another mode is picked", () => {
+    expect(shouldClearProviderAutoAccept("ask", true)).toBe(true);
+    expect(shouldClearProviderAutoAccept(FULL_AUTO_ACCEPT_MODE_ID, true)).toBe(false);
+    expect(shouldClearProviderAutoAccept("ask", false)).toBe(false);
   });
 });
 

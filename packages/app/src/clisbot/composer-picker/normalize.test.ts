@@ -493,4 +493,20 @@ describe("normalized composer options, per provider", () => {
     });
     expect(options.selectedModeId).toBe(FULL_AUTO_ACCEPT_MODE_ID);
   });
+
+  it("presents a provider's own auto_accept as Full auto-accept on a newer Host only", () => {
+    const input = {
+      provider: "copilot",
+      modes: [{ id: "agent", label: "Agent" }],
+      currentModeId: "agent",
+      model: null,
+      features: [{ type: "toggle" as const, id: "auto_accept", label: "Auto", value: true }],
+    };
+    const newer = normalizeComposerOptions({ ...input, fullAutoAcceptSupported: true });
+    expect(newer.selectedModeId).toBe(FULL_AUTO_ACCEPT_MODE_ID);
+    expect(newer.more.map((feature) => feature.id)).toEqual([]);
+    const older = normalizeComposerOptions({ ...input, fullAutoAcceptSupported: false });
+    expect(older.selectedModeId).toBe("agent");
+    expect(older.more.map((feature) => feature.id)).toEqual(["auto_accept"]);
+  });
 });

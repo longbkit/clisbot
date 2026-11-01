@@ -54,7 +54,13 @@ import {
   type DraftAgentProfileControls,
 } from "@/agent-profiles";
 import { ComposerPickerControls } from "@/clisbot/composer-picker/composer-picker-controls";
-import { buildComposerModeOptions } from "@/clisbot/composer-picker/mode-options";
+import {
+  buildComposerModeOptions,
+  isProviderAutoAcceptOn,
+  PROVIDER_AUTO_ACCEPT_FEATURE_ID,
+  resolveComposerModeId,
+  shouldClearProviderAutoAccept,
+} from "@/clisbot/composer-picker/mode-options";
 import { useHostFeature } from "@/runtime/host-features";
 
 interface AgentControlOption {
@@ -768,6 +774,18 @@ export function DraftAgentControls({
   const profileActions = resolveAgentProfileEditorActions(agentProfiles !== null, profileEditor);
 
   const fullAutoAcceptSupported = useHostFeature(modelSelectorServerId, "fullAutoAccept");
+  // A draft can carry the provider's own auto_accept (a saved preference); a Host with Full
+  // auto-accept hides that toggle, so the Mode shows it and the next pick turns it off.
+  const hiddenAutoAccept = fullAutoAcceptSupported && isProviderAutoAcceptOn(features);
+  const handleSelectMode = useCallback(
+    (modeId: string) => {
+      if (shouldClearProviderAutoAccept(modeId, hiddenAutoAccept)) {
+        onSetFeature?.(PROVIDER_AUTO_ACCEPT_FEATURE_ID, false);
+      }
+      onSelectMode(modeId);
+    },
+    [hiddenAutoAccept, onSelectMode, onSetFeature],
+  );
   const modeControl = useMemo<AgentModeControlValue | null>(
     () =>
       selectedProvider && modeOptions.length > 0
@@ -775,8 +793,8 @@ export function DraftAgentControls({
             provider: selectedProvider,
             providerDefinitions,
             modeOptions: buildComposerModeOptions(modeOptions, fullAutoAcceptSupported),
-            selectedModeId: selectedMode,
-            onSelectMode,
+            selectedModeId: resolveComposerModeId(selectedMode, false, hiddenAutoAccept),
+            onSelectMode: handleSelectMode,
             disabled,
           }
         : null,
@@ -786,7 +804,8 @@ export function DraftAgentControls({
       modeOptions,
       fullAutoAcceptSupported,
       selectedMode,
-      onSelectMode,
+      hiddenAutoAccept,
+      handleSelectMode,
       disabled,
     ],
   );
