@@ -1,4 +1,4 @@
-import { Children, useRef, type ReactNode, type Ref } from "react";
+import { Fragment, useRef, type ReactNode, type Ref } from "react";
 import { View, type ViewProps } from "react-native";
 import { ComposerFullscreenBody } from "@/composer/dock";
 import { useComposerFullscreenChrome } from "@/composer/input/presentation";
@@ -53,35 +53,30 @@ export interface ChatComposerPresentationProps {
   slots: ChatComposerSlots;
 }
 
+/** A control before the circle, keyed by its slot so React keeps each one across swaps. */
+interface EndControl {
+  slot: "attach" | "realtimeVoice" | "dictation";
+  node: ReactNode;
+}
+
 interface Placement {
   circle: ReactNode;
   /** Attach, voice and a displaced dictation; only attach once text is typed. */
-  end: ReactNode[];
+  end: EndControl[];
 }
 
 /** Where dictation goes: the circle unless Send, Stop or Create holds it. */
 export function resolvePlacement(slots: ChatComposerSlots): Placement {
   const circle = slots.primary ?? slots.dictation;
-  if (slots.typing) return { circle, end: slots.attach != null ? [slots.attach] : [] };
+  const attach: EndControl = { slot: "attach", node: slots.attach };
+  if (slots.typing) return { circle, end: slots.attach != null ? [attach] : [] };
   const displacedMic = slots.primary != null ? slots.dictation : null;
-  const end = [slots.attach, slots.realtimeVoice, displacedMic].filter((node) => node != null);
-  return { circle, end };
-}
-
-function Group({
-  nodes,
-  style,
-  testID,
-}: {
-  nodes: ReactNode[];
-  style: ViewProps["style"];
-  testID: string;
-}) {
-  return (
-    <View style={style} testID={testID}>
-      {Children.toArray(nodes)}
-    </View>
-  );
+  const end: EndControl[] = [
+    attach,
+    { slot: "realtimeVoice", node: slots.realtimeVoice },
+    { slot: "dictation", node: displacedMic },
+  ];
+  return { circle, end: end.filter((control) => control.node != null) };
 }
 
 function ChatComposerContainer({
@@ -107,11 +102,17 @@ function ChatComposerContainer({
       {props.attachmentSlot}
       <View style={layout.containerRow}>
         {commands != null ? (
-          <Group nodes={[commands]} style={layout.startGroup} testID="composer-inner-start" />
+          <View style={layout.startGroup} testID="composer-inner-start">
+            {commands}
+          </View>
         ) : null}
         <View style={layout.textSurface}>{props.surface}</View>
         {placement.end.length > 0 ? (
-          <Group nodes={placement.end} style={layout.endGroup} testID="composer-inner-end" />
+          <View style={layout.endGroup} testID="composer-inner-end">
+            {placement.end.map((control) => (
+              <Fragment key={control.slot}>{control.node}</Fragment>
+            ))}
+          </View>
         ) : null}
         <View style={layout.circleColumn} testID="composer-circle">
           {expand}
