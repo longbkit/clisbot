@@ -141,20 +141,26 @@ function PanelBody(props: PanelProps & { onLeaveList: () => void }) {
   );
 }
 
+/**
+ * Speed, then Mode. A phone has no room for both on one line (Standard | Fast | Ultra fast and
+ * a mode name collided at 390px), so the sheet stacks them: the segments, then Mode as a
+ * full-width row, both 44px tall.
+ */
 function PanelFooter(props: ModelPickerProps) {
   if (!props.speed && !props.mode) return null;
+  const { isCompact } = props;
+  const speed = props.speed ? (
+    <SpeedSegment control={props.speed} onSetFeature={props.onSetFeature} />
+  ) : null;
   return (
-    <View style={styles.footer} testID="composer-picker-footer">
-      {props.speed ? (
-        <SpeedSegment control={props.speed} onSetFeature={props.onSetFeature} />
-      ) : (
-        <View />
-      )}
+    <View style={isCompact ? styles.footerStacked : styles.footer} testID="composer-picker-footer">
+      {speed ?? (isCompact ? null : <View />)}
       {props.mode ? (
         <ModeDropdown
           {...props.mode}
           showLabel
           ownsCycleShortcut={false}
+          surface={isCompact ? "sheet" : "toolbar"}
           testID="composer-picker-mode"
         />
       ) : null}
@@ -231,6 +237,7 @@ export function ModelPicker(props: ModelPickerProps) {
       desktopLockWidth
       desktopFixedHeight={PANEL_HEIGHT}
       desktopChildrenScrollEnabled={false}
+      desktopArrowKeysToChildren
       header={header}
       footer={footer}
       mobileChildrenContentContainerStyle={styles.mobileContent}
@@ -268,6 +275,13 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "space-between",
     gap: theme.spacing[2],
     paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.borderSubtle,
+  },
+  footerStacked: {
+    gap: theme.spacing[2],
+    paddingHorizontal: theme.spacing[4],
     paddingVertical: theme.spacing[2],
     borderTopWidth: 1,
     borderTopColor: theme.colors.borderSubtle,

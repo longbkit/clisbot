@@ -97,6 +97,7 @@ export function SpeedSegment(props: {
 const styles = StyleSheet.create((theme) => ({
   row: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: theme.spacing[2],
     minWidth: 0,

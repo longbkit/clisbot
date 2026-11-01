@@ -355,8 +355,8 @@ const lightSemanticColors = buildLightSemanticColors({
   surface0: "#ffffff",
   surface1: "#fafafa",
   surface2: "#f4f4f5",
-  surface3: "#e2e2e2",
-  surface4: "#cecece",
+  surface3: "#e4e4e7",
+  surface4: "#d4d4d8",
   surfaceDiffEmpty: "#f6f6f6",
   surfaceSidebar: "#f5f5f5",
   // Hover lightens toward the white selected card, half way, so hover and selection

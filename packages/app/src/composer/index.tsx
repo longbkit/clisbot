@@ -1,3 +1,5 @@
+import { COMPOSER_LAYOUT_ENABLED } from "@/clisbot/composer-layout/feature";
+import { chatComposerActions, chatInnerFace } from "@/clisbot/composer-layout/geometry";
 import { resolveQueueCapability } from "./queue-capability";
 import { useClientInputQueue, type ClientInputQueue } from "./client-input-queue";
 import { queueEditRevision } from "./queue-edit-revision";
@@ -241,8 +243,11 @@ function resolveMessagePlaceholder(
   if (inputMode === "terminal") {
     return t("composer.placeholders.terminal");
   }
-  return isDesktopWebBreakpoint
-    ? t("composer.placeholders.desktop")
+  if (isDesktopWebBreakpoint) return t("composer.placeholders.desktop");
+  // Clisbot chat layout: the commands button names /commands, and a phone's pill has room for
+  // one word beside its four buttons.
+  return COMPOSER_LAYOUT_ENABLED
+    ? t("composer.placeholders.fallback")
     : t("composer.placeholders.mobile");
 }
 
@@ -260,11 +265,15 @@ function resolveCheckoutRemoteUrl(
   return checkoutStatus?.remoteUrl ?? null;
 }
 
-function buildCancelButtonStyle(isConnected: boolean, isCancellingAgent: boolean): object[] {
+function buildCancelButtonStyle(
+  isConnected: boolean,
+  isCancellingAgent: boolean,
+  chatLayout: boolean,
+): object[] {
   const disabled = !isConnected || isCancellingAgent ? styles.buttonDisabled : undefined;
-  return [composerActionGeometry.target, styles.cancelButton, disabled].filter(
-    (value): value is object => Boolean(value),
-  );
+  // Clisbot chat layout: Stop is the circle beside the container.
+  const target = chatLayout ? chatComposerActions.circleTarget : composerActionGeometry.target;
+  return [target, styles.cancelButton, disabled].filter((value): value is object => Boolean(value));
 }
 
 function buildRealtimeVoiceButtonStyle(
@@ -272,6 +281,9 @@ function buildRealtimeVoiceButtonStyle(
   reserveLeadingSpace: boolean,
 ): object[] {
   const disabledStyle = voiceButtonDisabled ? styles.buttonDisabled : undefined;
+  // Clisbot chat layout: voice sits inside the container's right edge (voice is chat-only).
+  if (COMPOSER_LAYOUT_ENABLED)
+    return [chatComposerActions.innerTarget, disabledStyle].filter(Boolean) as object[];
   const reserveStyle = reserveLeadingSpace ? styles.realtimeVoiceButtonCompactReserve : undefined;
   return [composerActionGeometry.target, reserveStyle, disabledStyle].filter(
     (value): value is object => Boolean(value),
@@ -1064,9 +1076,12 @@ interface ComposerCancelButtonProps {
   isCancellingAgent: boolean;
   agentInterruptKeys: ReturnType<typeof useShortcutKeys>;
   t: TFunction;
+  /** Clisbot chat layout: the circle's face. */
+  chatLayout: boolean;
 }
 
 function ComposerCancelButton({
+  chatLayout,
   buttonIconSize,
   cancelButtonStyle,
   handleCancelAgent,
@@ -1095,7 +1110,11 @@ function ComposerCancelButton({
       >
         <View
           testID="composer-stop-face"
-          style={[composerActionGeometry.face, composerActionGeometry.stop]}
+          style={[
+            composerActionGeometry.face,
+            composerActionGeometry.stop,
+            chatLayout && chatComposerActions.circleFace,
+          ]}
         >
           {icon}
         </View>
@@ -1169,11 +1188,15 @@ function ComposerVoiceModeButton({
       return (
         <View
           testID="composer-realtime-voice-face"
-          style={[
-            composerActionGeometry.face,
-            composerActionGeometry.neutral,
-            hovered && composerActionGeometry.hovered,
-          ]}
+          style={
+            COMPOSER_LAYOUT_ENABLED
+              ? chatInnerFace(Boolean(hovered))
+              : [
+                  composerActionGeometry.face,
+                  composerActionGeometry.neutral,
+                  hovered && composerActionGeometry.hovered,
+                ]
+          }
         >
           {isVoiceSwitching ? (
             <LoadingSpinner size="small" color="white" />
@@ -2324,9 +2347,10 @@ function ComposerContentImpl({
     [],
   );
 
+  const chatLayout = COMPOSER_LAYOUT_ENABLED && inputMode === "chat";
   const cancelButtonStyle = useMemo(
-    () => buildCancelButtonStyle(isConnected, isCancellingAgent),
-    [isConnected, isCancellingAgent],
+    () => buildCancelButtonStyle(isConnected, isCancellingAgent, chatLayout),
+    [isConnected, isCancellingAgent, chatLayout],
   );
 
   const isVoiceSwitching = voice?.isVoiceSwitching ?? false;
@@ -2339,7 +2363,8 @@ function ComposerContentImpl({
   const activeActionContent = useMemo(
     () => (
       <ComposerCancelButton
-        buttonIconSize={isCompactFormFactor ? ICON_SIZE.lg : buttonIconSize}
+        chatLayout={chatLayout}
+        buttonIconSize={isCompactFormFactor || chatLayout ? ICON_SIZE.lg : buttonIconSize}
         cancelButtonStyle={cancelButtonStyle}
         handleCancelAgent={handleCancelAgent}
         isConnected={isConnected}
@@ -2351,6 +2376,7 @@ function ComposerContentImpl({
     [
       agentInterruptKeys,
       buttonIconSize,
+      chatLayout,
       isCompactFormFactor,
       cancelButtonStyle,
       handleCancelAgent,
@@ -2370,7 +2396,7 @@ function ComposerContentImpl({
         hasSendableContent={hasSendableContent}
         isCompact={isCompactLayout}
         showVoice={mode.showVoice && realtimeVoiceEnabled}
-        buttonIconSize={isCompactFormFactor ? ICON_SIZE.lg : buttonIconSize}
+        buttonIconSize={isCompactFormFactor || chatLayout ? ICON_SIZE.lg : buttonIconSize}
         handleToggleRealtimeVoice={handleToggleRealtimeVoice}
         isConnected={isConnected}
         isVoiceSwitching={isVoiceSwitching}
@@ -2380,6 +2406,7 @@ function ComposerContentImpl({
       />
     ),
     [
+      chatLayout,
       pendingSessionReason,
       realtimeVoiceEnabled,
       buttonIconSize,

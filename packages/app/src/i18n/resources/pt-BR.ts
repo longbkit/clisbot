@@ -1,3 +1,4 @@
+import { composerLayoutPtBR as composerLayout } from "./composer-layout";
 import { composerPickerPtBR as composerPicker } from "./composer-picker";
 import { hostQueuePtBR as hostQueue } from "./host-queue";
 import { en, type TranslationResources } from "./en";
@@ -134,6 +135,7 @@ export const ptBR: TranslationResources = {
   composer: {
     hostQueue,
     picker: composerPicker,
+    layout: composerLayout,
     placeholders: {
       desktop: "Envie uma mensagem ao agente, marque @files ou use /commands e /skills",
       mobile: "Mensagem, @files, /commands",

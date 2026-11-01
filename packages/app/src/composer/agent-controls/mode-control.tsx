@@ -329,11 +329,10 @@ export function useLiveAgentModeControl(
       provider: slice.provider,
       providerDefinitions,
       modeOptions: buildComposerModeOptions(availableModes, fullAutoAcceptSupported),
-      selectedModeId: resolveComposerModeId(
-        slice.currentModeId,
-        slice.fullAutoAccept,
-        hiddenAutoAccept,
-      ),
+      // Flag off: the provider's own mode id, as the base toolbar always showed it.
+      selectedModeId: fullAutoAcceptSupported
+        ? resolveComposerModeId(slice.currentModeId, slice.fullAutoAccept, hiddenAutoAccept)
+        : slice.currentModeId,
       onSelectMode: handleSelectMode,
       disabled: !client,
     };

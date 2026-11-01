@@ -14,6 +14,8 @@ import { useTranslation } from "react-i18next";
 import { File, Folder } from "lucide-react-native";
 import type { Theme } from "@/styles/theme";
 import { getScrollOffsetToRevealItem } from "./scroll-reveal";
+import { COMPOSER_LAYOUT_ENABLED } from "@/clisbot/composer-layout/feature";
+import { ChatCommandListHandle, ChatCommandRow } from "@/clisbot/composer-layout/command-row";
 
 export interface AutocompleteOption {
   id: string;
@@ -78,6 +80,24 @@ function AutocompleteRow({
     [isSelected],
   );
 
+  // Clisbot chat layout: Telegram's row, what it does then the command and its arguments.
+  const commandRow = COMPOSER_LAYOUT_ENABLED ? (
+    <ChatCommandRow
+      label={optionLabel}
+      detail={removeBoltGlyphs(option.detail)}
+      description={optionDescription}
+    />
+  ) : (
+    <View style={styles.itemMainRow}>
+      <Text style={styles.itemLabel}>{optionLabel}</Text>
+      {optionDescription ? (
+        <Text style={styles.itemDescriptionInline} numberOfLines={1}>
+          {optionDescription}
+        </Text>
+      ) : null}
+    </View>
+  );
+
   return (
     <Pressable onLayout={handleLayout} onPress={handlePress} style={pressableStyle}>
       {isFileOrDir ? (
@@ -104,14 +124,7 @@ function AutocompleteRow({
           </View>
         </>
       ) : (
-        <View style={styles.itemMainRow}>
-          <Text style={styles.itemLabel}>{optionLabel}</Text>
-          {optionDescription ? (
-            <Text style={styles.itemDescriptionInline} numberOfLines={1}>
-              {optionDescription}
-            </Text>
-          ) : null}
-        </View>
+        commandRow
       )}
     </Pressable>
   );
@@ -245,7 +258,9 @@ export function Autocomplete({
 
   return (
     <View style={styles.outerWrapper}>
-      {selectedOption?.kind === "command" && selectedOption.description ? (
+      {!COMPOSER_LAYOUT_ENABLED &&
+      selectedOption?.kind === "command" &&
+      selectedOption.description ? (
         <View style={styles.detailCard}>
           <Text style={styles.detailLabel}>
             {removeBoltGlyphs(selectedOption.label) ?? selectedOption.label}
@@ -259,6 +274,7 @@ export function Autocomplete({
         </View>
       ) : null}
       <View style={containerStyle}>
+        {COMPOSER_LAYOUT_ENABLED ? <ChatCommandListHandle /> : null}
         <ScrollView
           ref={scrollRef}
           onLayout={handleScrollViewLayout}

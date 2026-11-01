@@ -6,6 +6,7 @@ import type { AgentProfilePicker, AgentProfileSeed } from "@/agent-profiles";
 import type { AgentModeControlValue } from "@/composer/agent-controls/mode-control";
 import type { ProviderSelectorProvider } from "@/provider-selection/provider-selection";
 import { useHostFeature } from "@/runtime/host-features";
+import { useComposerFrameAnchor } from "@/clisbot/composer-layout/frame-anchor";
 import { ModeDropdown } from "./mode-dropdown";
 import { ModelChip } from "./model-chip";
 import { formatCompactModelName, formatModelChipLabel } from "./model-name";
@@ -115,6 +116,8 @@ function usePickModelWithEffort(props: ComposerPickerControlsProps) {
 /** The composer bar's two controls: the Model chip, which opens the panel, and Mode. */
 export function ComposerPickerControls(props: ComposerPickerControlsProps) {
   const anchorRef = useRef<View>(null);
+  // Under the chat layout's pill the panel opens above the whole composer, never over its text.
+  const panelAnchorRef = useComposerFrameAnchor(anchorRef);
   const [open, setOpen] = useState(false);
   const fullAutoAcceptSupported = useHostFeature(props.serverId, "fullAutoAccept");
   const labels = useChipLabels(props);
@@ -180,7 +183,7 @@ export function ComposerPickerControls(props: ComposerPickerControlsProps) {
       <ModelPicker
         open={open}
         onOpenChange={handleOpenChange}
-        anchorRef={anchorRef}
+        anchorRef={panelAnchorRef}
         isCompact={props.isCompact}
         providers={props.providers}
         selectedProvider={props.provider}

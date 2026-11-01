@@ -51,7 +51,8 @@ Placeholder text is `colors.placeholder` (`#a1a1aa` in Light, each dark theme's 
 The Light palette follows the contrast of Slack's bright neutral theme: charcoal primary text
 (`#1d1c1d`), dark gray secondary text and icons (`#4a4a4a`), and passive chrome (`#707070`).
 Content sits on white: cards and inputs are `surface0`, grouped by a `#e4e4e4` border, and
-`surface1`/`surface2` stay at the near-white upstream values (`#fafafa`/`#f4f4f5`). Gray is
+`surface1` to `surface4` stay at the near-white upstream values (`#fafafa`, `#f4f4f5`,
+`#e4e4e7`, `#d4d4d8`). Gray is
 for state and regions, never under text you read: muted text and placeholders drop below 4.5:1
 on `#f3f3f3`, and an input filled `#ededed` on a `#f3f3f3` card is 1.06:1, invisible. The
 sidebar is light gray (`#f5f5f5`); the selected navigation, workspace, session, Bot and
@@ -80,6 +81,10 @@ The button is `<Button>` (`packages/app/src/components/ui/button.tsx`). It has f
 `outline` is the low-frequency action that lives on a row — transparent with `borderAccent`. Restart, Remove, Update on host detail (`packages/app/src/screens/settings/host-page.tsx:585-594`).
 
 `ghost` is structural and non-committal — no border, no fill. Back arrows, header toggles, "Load more" footers (`packages/app/src/screens/sessions-screen.tsx:54-63`), more-affordances. Ghost is used when the affordance is part of the chrome, not a decision.
+
+A control that rests filled inside the composer or any input surface uses `surface2`;
+`surface3` is for hovered, pressed, open and selected only (the composer's Commands chip rests on
+`surface2` and turns `surface3` while its list is open).
 
 Header and toolbar controls use `interactionHighlight` for hovered, pressed, open, and selected
 backgrounds. It is a translucent semantic fill so the same control works over the main surface and
@@ -124,7 +129,7 @@ A list that is itself the page content — sidebar items in `sidebar-workspace-l
 
 Pane chrome — the workspace pane header, the file-explorer header, the diff pane header — uses a single bottom border to separate the header from the content (`packages/app/src/components/git-diff-pane.tsx:2328-2331`). One border, no shadow.
 
-The composer is the one input that floats. It paints `surfaceComposer` with a `borderComposer` outline and `theme.shadow.composer`: in Light a white card with a soft shadow, so the place to type stands off the workspace; in dark themes a filled `surface1` box with `borderAccent` and an empty shadow (`packages/app/src/composer/input/input.tsx`). The tokens carry the scheme difference; a `theme.colorScheme` check inside a style did not resolve at runtime and left the box gray.
+The composer is the one input that floats. It paints `surfaceComposer` with a `borderComposer` outline and `theme.shadow.composer`: in Light a white card with a soft shadow, so the place to type stands off the workspace; in dark themes a filled `surface1` box with `borderAccent` and an empty shadow (`packages/app/src/composer/input/input.tsx`). The Clisbot chat layout draws the same surface as a pill with its buttons beside it ([composer layout](features/composer-picker/README.md#layout)). The tokens carry the scheme difference; a `theme.colorScheme` check inside a style did not resolve at runtime and left the box gray.
 
 Dropdown menus float the same way, one step further: `surfacePopover` with `borderAccent` and `theme.shadow.popover` (`packages/app/src/components/ui/menu/menu-overlay.tsx`). In Light that is a white card with a wide, soft shadow (`0 8px 28px` at 14%), so a menu reads above whatever it opens over, including the white composer; in dark themes `surface1` with the dark `md` shadow. Group headings and row descriptions inside a menu use `foregroundExtraMuted`, a step back from the rows.
 
@@ -336,7 +341,7 @@ Home exploration (proposal): [three complete HTML directions and a synthesis](au
 | Live list of items with sections (agents)           | `packages/app/src/components/agent-list.tsx`                                                                                                                                                                                                                                                             |
 | Historical list (sessions)                          | `packages/app/src/screens/sessions-screen.tsx`                                                                                                                                                                                                                                                           |
 | Workspace pane (multi-tab, split)                   | `packages/app/src/screens/workspace/workspace-screen.tsx`                                                                                                                                                                                                                                                |
-| Composer / message input                            | `packages/app/src/components/composer.tsx`, `packages/app/src/components/message-input.tsx`                                                                                                                                                                                                              |
+| Composer / message input                            | `packages/app/src/composer/index.tsx`, `packages/app/src/composer/input/input.tsx`; the chat layout in `packages/app/src/clisbot/composer-layout/` ([composer picker and layout](features/composer-picker/README.md))                                                                                    |
 | Pane chrome with single bottom border               | `packages/app/src/components/git-diff-pane.tsx`, `packages/app/src/components/file-explorer-pane.tsx`, `packages/app/src/components/terminal-pane.tsx`                                                                                                                                                   |
 | Page-level alert (info / success / warning / error) | `packages/app/src/components/ui/alert.tsx`, `packages/app/src/screens/project-settings-screen.tsx`                                                                                                                                                                                                       |
 | Sidebar callout (cross-cutting alert)               | `packages/app/src/components/sidebar-callout.tsx`, `packages/app/src/contexts/sidebar-callout-context.tsx`, `packages/app/src/components/worktree-setup-callout-source.tsx`, `packages/app/src/desktop/updates/rosetta-callout-source.tsx`, `packages/app/src/desktop/updates/update-callout-source.tsx` |
