@@ -1,10 +1,21 @@
 import type { ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { FilterChips, type FilterChip } from "@/components/ui/filter-chips";
 import type { ScopeCounts } from "./ownership";
 import { ScopeTabs } from "./scope-tabs";
 import type { ScopedSection } from "./store";
+
+export type SectionBackdrop = "surface0" | "surfaceSidebar";
+
+/**
+ * The surface a list section sits on: a phone tab is a page on white, as Home is (docs/design.md:
+ * content sits on white); the desktop list is the sidebar column.
+ */
+export function useSectionBackdrop(): SectionBackdrop {
+  return useIsCompactFormFactor() ? "surface0" : "surfaceSidebar";
+}
 
 /**
  * The block under every list section's header, in one order and on one inset: For me / Others /
@@ -28,7 +39,7 @@ export function SectionControls<T extends string>({
   chip: T;
   onChip(value: T): void;
   /** The surface the chip row's fade dissolves into. */
-  backdrop: "surface0" | "surfaceSidebar";
+  backdrop: SectionBackdrop;
   /** The Display menu, alone on its row. */
   display?: ReactNode;
   /** A row above the scope tabs for a wider choice (Home's Host filter); it brings its inset. */
@@ -37,7 +48,10 @@ export function SectionControls<T extends string>({
   children?: ReactNode;
 }) {
   return (
-    <View style={styles.controls} testID={`${section}-controls`}>
+    <View
+      style={[styles.controls, backdrop === "surface0" && !leading && styles.pageTop]}
+      testID={`${section}-controls`}
+    >
       {leading}
       <ScopeTabs section={section} counts={scopeCounts} />
       <FilterChips
@@ -57,6 +71,9 @@ export function SectionControls<T extends string>({
 
 const styles = StyleSheet.create((theme) => ({
   controls: { gap: theme.spacing[2], paddingBottom: theme.spacing[2] },
+  // On a page the block sits right under the screen header, so it brings its own gap; in the
+  // sidebar the header row carries it, and Home's leading Host row brings its own.
+  pageTop: { paddingTop: theme.spacing[2] },
   inset: { paddingHorizontal: theme.spacing[3] },
   display: { flexDirection: "row", alignItems: "center" },
 }));

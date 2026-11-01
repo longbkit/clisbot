@@ -53,7 +53,7 @@ import { ListState } from "./list-state";
 import { OutsideFilterNotice } from "./outside-filter-notice";
 import { useHeldOrder } from "./held-order";
 import { inScope, type OwnershipScope } from "./ownership";
-import { SectionControls } from "./section-controls";
+import { SectionControls, useSectionBackdrop } from "./section-controls";
 import {
   HeaderMenuIcon,
   HeaderSearchButton,
@@ -140,6 +140,7 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
     () => <ChatsListState catalog={catalog} filtered={entries.length > 0} />,
     [catalog, entries.length],
   );
+  const backdrop = useSectionBackdrop();
   const headerActions = useMemo(
     () => (
       <>
@@ -170,7 +171,7 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
           chips={chips}
           chip={chip}
           onChip={setChip}
-          backdrop="surfaceSidebar"
+          backdrop={backdrop}
           display={displayMenu}
         />
         <OutsideFilterNotice list="chats" />

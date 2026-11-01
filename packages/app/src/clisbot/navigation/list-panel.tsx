@@ -207,6 +207,7 @@ function EnabledCreationHost() {
 
 const styles = StyleSheet.create((theme) => ({
   desktop: { flexDirection: "row", height: "100%" },
-  phoneList: { flex: 1, minHeight: 0, backgroundColor: theme.colors.surfaceSidebar },
+  // A phone tab is a page: white like Home, not the desktop sidebar's gray.
+  phoneList: { flex: 1, minHeight: 0, backgroundColor: theme.colors.surface0 },
   content: { flex: 1, minHeight: 0 },
 }));
