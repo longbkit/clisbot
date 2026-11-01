@@ -75,7 +75,7 @@ clisbot run --provider claude --worktree refactor-auth "refactor auth"
 clisbot run --host devbox:6767 "run the test suite"
 clisbot ls
 clisbot send <agent-id> "add tests"
-clisbot schedule create --cron "0 9 * * 1" "audit the codebase"
+clisbot schedule create --provider codex --mode auto-review --cron "0 9 * * 1" "audit the codebase"
 ```
 
 `clisbot run --host` 连接到远程 daemon。`clisbot schedule` 按 cron 运行 Agent。MCP 服务器让其他 Agent 能够创建 worktree、启动 Agent、打开终端和发送提示词。

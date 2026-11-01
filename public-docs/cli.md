@@ -345,7 +345,7 @@ Useful in scripts or when one agent needs to wait for another.
 Run an agent on a cron schedule. The CLI also accepts simple cadence presets and compiles them to cron. See [Schedules from the CLI](/docs/schedules-cli) for the full reference.
 
 ```bash
-clisbot schedule create --every 30m --cwd ~/dev/my-app "Continue the refactor and leave a note."
+clisbot schedule create --every 30m --provider codex --mode auto-review --cwd ~/dev/my-app "Continue the refactor and leave a note."
 clisbot schedule ls
 clisbot schedule pause <id>
 ```

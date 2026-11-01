@@ -215,8 +215,12 @@ created for another provider than its unattended parent starts in that provider'
 and a child of a Full auto-accept parent gets the no-prompt mode but not the Full auto-accept flag.
 `provider-modes.test.ts` checks the classification against the real provider registry.
 
-A schedule runs without prompts only when someone picked such a mode on it. A `new-agent`
-schedule with no mode runs in the provider's mode that asks: its default, or its first mode that
+A schedule runs without prompts only when someone picked such a mode on it, and creating one
+names its mode: `clisbot schedule create` refuses a provider that lists modes without `--mode`
+(the error marks the default that asks and the modes that run without asking), the app's form
+will not save without one, and an agent's tools need one that asks. The wire keeps `modeId`
+optional for 2.2.1 apps and CLIs (`COMPAT(schedule-mode-required)`). A `new-agent` schedule with
+no mode, from such a client or stored before, runs in the provider's mode that asks: its default, or its first mode that
 asks when the default does not (OMP's Full access gives Write approval), never Plan
 (`resolveScheduleDefaultModeId` in `@clisbot/protocol/schedule/default-mode`). The daemon stores
 that mode when a schedule is created or updated without one (CLI, RPC and MCP), resolves it again

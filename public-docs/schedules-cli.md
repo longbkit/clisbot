@@ -14,6 +14,8 @@ Run workspaces are archived when each run ends by default. The CLI has no **Arch
 
 ## Create
 
+Without `--mode`, the command fails and lists the provider's modes.
+
 Overnight refactor on Codex:
 
 ```bash
@@ -21,6 +23,7 @@ clisbot schedule create \
   --every 30m \
   --name overnight-refactor \
   --provider codex/gpt-5.5 \
+  --mode auto-review \
   --cwd ~/dev/my-app \
   --max-runs 16 \
   --expires-in 10h \
@@ -34,6 +37,7 @@ clisbot schedule create \
   --every 5m \
   --name build-watch \
   --provider claude/opus-4.7 \
+  --mode auto \
   --cwd ~/dev/my-app \
   --max-runs 24 \
   "Check the release build. If it failed, inspect logs, fix the cause, and rerun."
@@ -48,6 +52,7 @@ clisbot schedule create \
   --run-now \
   --name github-triage \
   --provider opencode/openrouter/glm-5.1 \
+  --mode build \
   --cwd ~/dev/my-app \
   "Triage GitHub issues, PRs, and failing checks. Summarize what needs attention."
 ```
@@ -60,6 +65,7 @@ clisbot schedule create \
   --timezone America/New_York \
   --name morning-triage \
   --provider codex/gpt-5.5 \
+  --mode auto-review \
   --cwd ~/dev/my-app \
   "Review overnight CI failures and summarize anything urgent."
 ```

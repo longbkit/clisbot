@@ -269,7 +269,12 @@ ACP agent process) and `codex-app-server-agent.features.test.ts`.
   Copilot and OpenCode runs turned their own `auto_accept` on. Now every provider's run starts in
   its mode that asks (OMP: Write approval) with `auto_accept` off, and its approval requests reach
   the app like any agent's. To keep a schedule running without prompts, pick Full access, Bypass,
-  Allow all or Full auto-accept on it. The schedule form preselects the mode that asks by its
-  name, and new schedules store it ([permissions](../../permissions.md#approval-leaves)).
+  Allow all or Full auto-accept on it.
+- **A new schedule names its mode.** `clisbot schedule create` now needs `--mode` when the
+  provider lists modes; without it the command fails and lists them, marking the default that
+  asks and those that run without asking. Scripts that created schedules without `--mode` must add
+  it. The app's schedule form preselects the mode that asks by its name and will not save
+  without a mode. A 2.2.1 app or CLI can still create one without a mode; the daemon stores the
+  mode that asks ([permissions](../../permissions.md#approval-leaves)).
 - **Channel commands gate every faster tier**, not only `fast_mode`: a Codex `service_tier`
   other than default, standard, flex or auto, and Cursor `fast`, now need `agent.fast.use`.
