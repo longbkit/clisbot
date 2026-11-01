@@ -32,7 +32,7 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
 | Rail      | Favorites, providers, Profiles; icons or names      | Icon and name chips in a scrolling row |
 | Models    | The rail's choice, or every match for a query       | Same                                   |
 | Reasoning | A column beside the list, Default marked            | A chip row under the list              |
-| Footer    | Standard \| ⚡ Fast with "Higher cost", then Mode   | Same, pinned above the safe area       |
+| Footer    | Speed levels with "Higher cost", then Mode          | Same, pinned above the safe area       |
 | More      | Other provider options (Copilot Agent, ACP options) | Same                                   |
 
 - **The rail opens on the current model's provider**, so the check is on screen; Favorites is
@@ -70,10 +70,15 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
   preference, which migrated into Agent profiles.
 - **Reasoning follows the selected model.** Picking a model updates the column and its header at
   once because the panel stays open; a hovered row does not preview its efforts.
-- **Standard | Fast** normalizes three provider features: Claude's and OMP's `fast_mode` toggle,
-  Codex's `service_tier` select and Cursor's `fast` select (`speed.ts`). With several faster
-  tiers, Fast picks the fastest (`Ultra…` before `Fast`, `Priority`, `Turbo`). A model with no
-  faster tier shows no control; a value that is neither (Codex Flex) selects neither segment.
+- **Speed** normalizes three provider features, Claude's and OMP's `fast_mode` toggle, Codex's
+  `service_tier` select and Cursor's `fast` select, into at most three levels by what each tier
+  means (`speed.ts`): Standard (the default tier), Fast (`fast_mode` on, Codex `fast` or
+  `priority`, Cursor `fast` on) and Ultra fast (Codex `ultrafast`). The control shows only the
+  levels the current model sells, so GPT-6 Sol with only Priority shows Standard | Fast. A tier
+  that is none of them, such as Codex Flex (slower and cheaper), is its own segment under the
+  provider's label. Every segment writes the provider's own feature id and value, never one the
+  model does not offer; a model with one tier shows no control. Fast and Ultra fast carry
+  "Higher cost".
 - **Mode rows show their one-line description on every row**, not only the highlighted one, so
   a row never changes height as the pointer moves (design.md §11).
 
@@ -87,14 +92,14 @@ Provider differences live in two places and nowhere else:
   once reported Full access without the no-prompt mark; Full auto-accept and Managed Access both
   read that mark.
 - **In the app**, `normalizeComposerOptions` (`normalize.ts`, with `mode-options.ts` and
-  `speed.ts`) turns modes, efforts and features into the Mode list, Reasoning, Standard | Fast
+  `speed.ts`) turns modes, efforts and features into the Mode list, Reasoning, Speed
   and Other options. Components read only that shape.
 
-| Provider                      | Modes, Plan, Full auto-accept runs on                   | Reasoning       | Fast                    | Other options  |
+| Provider                      | Modes, Plan, Full auto-accept runs on                   | Reasoning       | Speed                   | Other options  |
 | ----------------------------- | ------------------------------------------------------- | --------------- | ----------------------- | -------------- |
 | Claude                        | Plan, Always ask, Accept edits, Auto, Bypass; on Bypass | per model       | `fast_mode` (some Opus) | —              |
 | Claude on Bedrock or Vertex   | as Claude without Auto                                  | per model       | —                       | —              |
-| Codex                         | Plan (when offered), permissions; on Full access        | per model       | `service_tier`, fastest | —              |
+| Codex                         | Plan (when offered), permissions; on Full access        | per model       | `service_tier` tiers    | —              |
 | Copilot (ACP)                 | Agent, Plan, Allow all; on Allow all                    | `thought_level` | —                       | Agent select   |
 | OpenCode v1/v2                | Build, Plan, runtime agents; on the current mode        | per model       | —                       | —              |
 | Pi, Hoplite                   | no modes, so no Mode control                            | Pi: per model   | —                       | —              |
@@ -162,7 +167,7 @@ in `i18n/resources/composer-picker.ts` for every app language.
 
 Primitives: `Combobox` (panel and Mode menu), `ComboboxTrigger` (chip), `AgentControlTrigger`
 (Mode), `ComboboxItem` (rows), `ToolbarButton` (rail on desktop, row star and Create profile),
-`ChipRow` + `ChipButton` (rail and efforts on a phone), `SegmentedControl` (Standard | Fast),
+`ChipRow` + `ChipButton` (rail and efforts on a phone), `SegmentedControl` (Speed),
 `StatusBadge` (Higher cost), `Switch` and `Button` (More options, Retry).
 
 `rail-store.ts`, `use-provider-rail.ts`, `use-provider-refresh.ts`, `provider-header.tsx` and

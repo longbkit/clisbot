@@ -103,16 +103,25 @@ test("desktop: one chip opens every option and stays open while you pick", async
     await page.getByTestId("composer-picker-effort-high").click();
     await expect(chip(page)).toHaveText("6 Sol High");
     await page.getByTestId("composer-picker-model-codex:gpt-6.1-sol").click();
-    await page.getByTestId("composer-picker-fast").click();
+    const serviceTier = async () =>
+      (await readAgent(agentId))?.features?.find((f) => f.id === "service_tier")?.value;
     const footer = page.getByTestId("composer-picker-footer").filter({ visible: true });
+    // GPT-6.1 Sol sells Fast (priority) and Ultrafast: each is its own level.
+    await page.getByTestId("composer-picker-fast").click();
+    await expect.poll(serviceTier).toBe("priority");
     await expect(footer.getByText("Higher cost")).toBeVisible();
-    // Fast picks the fastest tier the model sells.
-    await expect
-      .poll(
-        async () =>
-          (await readAgent(agentId))?.features?.find((f) => f.id === "service_tier")?.value,
-      )
-      .toBe("ultrafast");
+    await page.getByTestId("composer-picker-ultra").click();
+    await expect.poll(serviceTier).toBe("ultrafast");
+    await expect(footer.getByText("Higher cost")).toBeVisible();
+    await page.getByTestId("composer-picker-model-codex:gpt-6-sol").click();
+    // GPT-6 Sol sells Fast only, so Ultra fast is not offered.
+    await expect(page.getByTestId("composer-picker-ultra")).toHaveCount(0);
+    await page.getByTestId("composer-picker-model-codex:gpt-6.1-sol").click();
+    await page.getByTestId("composer-picker-standard").click();
+    await expect.poll(serviceTier).toBe("default");
+    await expect(footer.getByText("Higher cost")).toHaveCount(0);
+    await page.getByTestId("composer-picker-ultra").click();
+    await expect.poll(serviceTier).toBe("ultrafast");
 
     await page.getByTestId("composer-picker-search").fill("codex");
     await expect(page.locator('[data-testid^="composer-picker-model-"]')).toHaveCount(2);

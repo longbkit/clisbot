@@ -1,61 +1,92 @@
 import type { AgentFeature } from "@clisbot/protocol/agent-types";
 
 /**
- * Three providers offer a faster, dearer tier under three shapes: Claude's and OMP's
- * `fast_mode` toggle, Codex's `service_tier` select and Cursor's `fast` select. The panel
- * shows one Standard | Fast control and writes the right feature id and value back. When a
- * provider has several faster tiers, Fast picks the fastest ("Ultra…" before "Fast").
+ * Providers sell faster, dearer tiers under three shapes: Claude's and OMP's `fast_mode`
+ * toggle, Codex's `service_tier` select and Cursor's `fast` select. The panel shows them as
+ * at most three standard levels, Standard, Fast and Ultra fast, by what each tier means, and
+ * only the levels the model offers. A tier that is none of them (Codex Flex, slower and
+ * cheaper) keeps its own label as an extra option. Each option writes back the provider's own
+ * feature id and value, so older apps and the daemon see the writes they always did.
  */
-export type SpeedChoice = "standard" | "fast";
+export type SpeedLevel = "standard" | "fast" | "ultra";
+
+export interface SpeedOption {
+  /** "standard", "fast", "ultra", or `tier:<id>` for a tier outside the levels. */
+  key: string;
+  level: SpeedLevel | null;
+  /** The provider's label, for a tier outside the levels. */
+  label: string;
+  value: unknown;
+  /** Fast and Ultra fast cost more than Standard. */
+  costsMore: boolean;
+}
 
 export interface SpeedControl {
   featureId: string;
-  /** Null when the current value is neither, for example Codex's slower Flex tier. */
-  selected: SpeedChoice | null;
-  values: Record<SpeedChoice, unknown>;
+  /** Standard, Fast, Ultra fast in that order, then any other tier. */
+  options: SpeedOption[];
+  /** Null when the current value is none of the options. */
+  selectedKey: string | null;
 }
 
 const SPEED_FEATURE_IDS = new Set(["fast_mode", "service_tier", "fast"]);
 const AUTO_ACCEPT_FEATURE_ID = "auto_accept";
-const STANDARD_OPTION = /^(default|normal|standard|off|false|none)$/i;
-const FASTEST_OPTION = [/ultra/i, /fast|priority|turbo|^on$|^true$/i];
+const STANDARD_TIER = /^(default|normal|standard|off|false|none)$/i;
+const ULTRA_TIER = /ultra/i;
+const FAST_TIER = /fast|priority|turbo|^on$|^true$/i;
+const LEVEL_ORDER: readonly SpeedLevel[] = ["standard", "fast", "ultra"];
 
 type SelectFeature = Extract<AgentFeature, { type: "select" }>;
+type SelectOption = SelectFeature["options"][number];
 
-function pickStandard(feature: SelectFeature) {
-  return (
-    feature.options.find((option) => option.isDefault) ??
-    feature.options.find((option) => STANDARD_OPTION.test(option.id)) ??
-    feature.options[0]
-  );
+function levelOption(level: SpeedLevel, tier: { id: string; label: string }): SpeedOption {
+  return { key: level, level, label: tier.label, value: tier.id, costsMore: level !== "standard" };
 }
 
-function pickFastest(feature: SelectFeature, standardId: string | undefined) {
-  const candidates = feature.options.filter((option) => option.id !== standardId);
-  for (const pattern of FASTEST_OPTION) {
-    const match = candidates.find(
-      (option) => pattern.test(option.id) || pattern.test(option.label),
-    );
-    if (match) return match;
-  }
-  return undefined;
+function matches(pattern: RegExp, tier: SelectOption): boolean {
+  return pattern.test(tier.id) || pattern.test(tier.label);
 }
 
-function choiceFor(value: unknown, values: Record<SpeedChoice, unknown>): SpeedChoice | null {
-  if (value === values.fast) return "fast";
-  return value === values.standard ? "standard" : null;
+function findStandard(tiers: readonly SelectOption[]): SelectOption | undefined {
+  return tiers.find((tier) => tier.isDefault) ?? tiers.find((tier) => STANDARD_TIER.test(tier.id));
+}
+
+/** Each level takes the first tier that means it; the rest stay as their own options. */
+function selectOptions(feature: SelectFeature): SpeedOption[] {
+  const standard = findStandard(feature.options);
+  const rest = feature.options.filter((tier) => tier !== standard);
+  const ultra = rest.find((tier) => matches(ULTRA_TIER, tier));
+  const fast = rest.find((tier) => tier !== ultra && matches(FAST_TIER, tier));
+  const byLevel: Record<SpeedLevel, SelectOption | undefined> = { standard, fast, ultra };
+  const levels = LEVEL_ORDER.flatMap((level) => {
+    const tier = byLevel[level];
+    return tier ? [levelOption(level, tier)] : [];
+  });
+  const others = rest
+    .filter((tier) => tier !== ultra && tier !== fast)
+    .map<SpeedOption>((tier) => ({
+      key: `tier:${tier.id}`,
+      level: null,
+      label: tier.label,
+      value: tier.id,
+      costsMore: false,
+    }));
+  return [...levels, ...others];
+}
+
+function toggleOptions(): SpeedOption[] {
+  return [
+    { key: "standard", level: "standard", label: "", value: false, costsMore: false },
+    { key: "fast", level: "fast", label: "", value: true, costsMore: true },
+  ];
 }
 
 function fromFeature(feature: AgentFeature): SpeedControl | null {
-  if (feature.type === "toggle") {
-    const values = { standard: false, fast: true };
-    return { featureId: feature.id, selected: choiceFor(feature.value, values), values };
-  }
-  const standard = pickStandard(feature);
-  const fast = pickFastest(feature, standard?.id);
-  if (!standard || !fast) return null;
-  const values = { standard: standard.id, fast: fast.id };
-  return { featureId: feature.id, selected: choiceFor(feature.value, values), values };
+  const options = feature.type === "toggle" ? toggleOptions() : selectOptions(feature);
+  // A model with a single tier has nothing to choose.
+  if (options.length < 2) return null;
+  const selected = options.find((option) => option.value === feature.value);
+  return { featureId: feature.id, options, selectedKey: selected?.key ?? null };
 }
 
 export function resolveSpeedControl(features: readonly AgentFeature[]): SpeedControl | null {

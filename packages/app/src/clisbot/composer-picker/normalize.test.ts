@@ -80,7 +80,8 @@ interface Case {
   runsOn: string | null;
   reasoning: string[];
   defaultEffort?: string;
-  speed: { featureId: string; fast: unknown } | null;
+  /** The speed control as level key → the value it writes. */
+  speed: { featureId: string; levels: Record<string, unknown> } | null;
   more: string[];
 }
 
@@ -99,7 +100,7 @@ const CASES: Case[] = [
     runsOn: "bypassPermissions",
     reasoning: ["low", "medium", "high", "max"],
     defaultEffort: "high",
-    speed: { featureId: "fast_mode", fast: true },
+    speed: { featureId: "fast_mode", levels: { standard: false, fast: true } },
     more: [],
   },
   {
@@ -147,7 +148,10 @@ const CASES: Case[] = [
     runsOn: "full-access",
     reasoning: ["low", "medium", "high", "xhigh"],
     defaultEffort: "medium",
-    speed: { featureId: "service_tier", fast: "ultrafast" },
+    speed: {
+      featureId: "service_tier",
+      levels: { standard: "default", fast: "priority", ultra: "ultrafast" },
+    },
     more: [],
   },
   {
@@ -275,7 +279,7 @@ const CASES: Case[] = [
     plan: null,
     runsOn: "full",
     reasoning: [],
-    speed: { featureId: "fast_mode", fast: true },
+    speed: { featureId: "fast_mode", levels: { standard: false, fast: true } },
     more: [],
   },
   {
@@ -375,7 +379,7 @@ const CASES: Case[] = [
     runsOn: "agent",
     reasoning: ["low", "medium", "high"],
     defaultEffort: "medium",
-    speed: { featureId: "fast", fast: "true" },
+    speed: { featureId: "fast", levels: { standard: "false", fast: "true" } },
     more: [],
   },
   {
@@ -455,7 +459,10 @@ describe("normalized composer options, per provider", () => {
     expect(options.reasoning.options.map((item) => item.id)).toEqual(entry.reasoning);
     expect(options.reasoning.defaultId).toBe(entry.defaultEffort);
     expect(
-      options.speed && { featureId: options.speed.featureId, fast: options.speed.values.fast },
+      options.speed && {
+        featureId: options.speed.featureId,
+        levels: Object.fromEntries(options.speed.options.map((item) => [item.key, item.value])),
+      },
     ).toEqual(entry.speed);
     expect(options.more.map((feature) => feature.id)).toEqual(entry.more);
   });
