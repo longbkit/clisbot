@@ -1,28 +1,50 @@
 # Changelog
 
-## 2.2.1 - 2026-10-29
-
-### Changed
-
-- Home, Chats and Workspace all open on For me and remember your last choice
-- For me now lists every session you created or took part in, including ones someone else started
+## 2.2.1 - 2026-11-01
 
 ### Added
 
+- Added an offline copy of your session list and recent chat text, so Home, Chats and Work show your sessions while Hosts are still connecting
+- Added Storage to Settings → General, which shows the space the offline copy uses and clears it
+- Added Add host to the Settings → Hosts header
 - Added the creator to sessions started by schedules, heartbeats and workflows, so they can be attributed to the person who set them up; this takes effect once the Host and the Hub are updated
+- Added the reason and the blocked path from the Claude SDK to Claude approval prompts ([#41](https://github.com/longbkit/clisbot/pull/41))
+
+### Changed
+
+- Changed Workspace to Work in the rail, the phone tabs and Home's mode switch
+- Changed Add host in the Host picker to stay below the list instead of at its end
+- Changed Home, Chats and Work to open on For me and remember your last choice
+- Changed For me to list every session you created or took part in, including ones someone else started
+- Changed sessions with no recorded author, such as ones started from the desktop app, to appear under For me
+- Changed signing out of a Hub to clear the offline copy of its sessions
+- Changed the analytics setting to read "Anonymous stats, never your content", with its switch on the title line
+- Changed Back on Home in the Android app to keep the app in the background when it was opened from a notification or a sign-in link
 
 ### Improved
 
-- Improved Home speed with many Hosts connected: the session list is computed once per update and only the sessions that changed are rebuilt
-- Improved Workspace speed with many Hosts connected: the counts are reused when an update does not change them
+- Improved switching phone tabs: every tab is kept loaded after startup, so a switch shows the tab in the next frame
+- Improved opening a session or chat: its header appears as soon as you tap the row, and one you left in the last five minutes reopens without loading
+- Improved startup with many Hub-managed Hosts: Hosts from your last session connect without waiting for the Hub's list
+- Improved the Android app sending Hub requests together instead of five at a time
+- Improved Home speed with many Hosts connected: only the sessions that changed are rebuilt
+- Improved Work speed with many Hosts connected: the counts are reused when an update does not change them
+- Improved idle use: tabs you are not looking at no longer update in the background
+- Improved daemon start and session list time on Hosts with many old sessions ([#43](https://github.com/longbkit/clisbot/pull/43) by [@victorNguyen1](https://github.com/victorNguyen1))
 
 ### Fixed
 
+- Fixed long sessions failing to open with "Projected history exceeds its read memory budget" ([#44](https://github.com/longbkit/clisbot/pull/44) by [@quangnguyenbh](https://github.com/quangnguyenbh))
 - Fixed the desktop app asking you to sign in to a Hub again after a brief network error or a Hub restart
+- Fixed the phone app showing a Hub as signed out after a restart while its sign-in was still valid
+- Fixed Continue in browser doing nothing when an earlier sign-in was still open
 - Fixed Hosts disappearing from the phone app when the Hub answered a ticket with 401 or 400; the app now asks for a new ticket once and keeps your Hosts
-- Fixed work with no known author or participant appearing under For me; it now appears under Others and All
+- Fixed a quick tap on a session in Work sometimes not opening it
+- Fixed Home's composer switching Host and project while Hosts connect
+- Fixed an opened session link briefly showing another session first
+- Fixed analytics showing "could not be enabled" in builds that have no analytics
 - Fixed cached sessions from a Host that cannot be reached being shown as live
-- Fixed Home and Workspace listing Hosts that were not selected in the Host picker
+- Fixed Home and Work listing Hosts that were not selected in the Host picker
 - Fixed signing out of a Hub leaving its sessions classified by the previous account
 - Fixed the Hosts icon in the rail not showing how many Hosts are online
 

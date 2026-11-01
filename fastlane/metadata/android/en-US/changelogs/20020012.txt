@@ -1,11 +1,6 @@
-Changed
-- Home, Chats and Workspace all open on For me and remember your last choice
-
-Improved
-- Improved Home speed with many Hosts connected: the session list is computed once per update and only the sessions that changed are rebuilt
-
-Fixed
-- Fixed the desktop app asking you to sign in to a Hub again after a brief network error or a Hub restart
-- Fixed work with no known author appearing under For me; it now appears under Others and All
+Added
+- Added an offline copy of your session list and recent chat text, so Home, Chats and Work show your sessions while Hosts are still connecting
+- Added Storage to Settings → General, which shows the space the offline copy uses and clears it
+- Added Add host to the Settings → Hosts header
 
 Full notes: https://clisbot.com/changelog
