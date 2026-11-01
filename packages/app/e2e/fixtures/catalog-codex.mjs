@@ -7,6 +7,10 @@ const ultra = {
   name: "Ultrafast",
   description: "Lowest latency, increased usage",
 };
+const efforts = ["low", "medium", "high", "xhigh"].map((effort) => ({
+  reasoningEffort: effort,
+  description: effort,
+}));
 const models = [
   { id: "gpt-6.1-sol", displayName: "GPT-6.1 Sol", isDefault: true, serviceTiers: [fast, ultra] },
   { id: "gpt-6-sol", displayName: "GPT-6 Sol", serviceTiers: [fast] },
@@ -14,7 +18,7 @@ const models = [
   Object.assign(model, {
     model: model.id,
     defaultReasoningEffort: "medium",
-    supportedReasoningEfforts: [{ reasoningEffort: "medium", description: "Medium" }],
+    supportedReasoningEfforts: efforts,
   }),
 );
 

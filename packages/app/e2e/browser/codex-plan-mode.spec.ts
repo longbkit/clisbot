@@ -39,9 +39,9 @@ async function openModePicker(page: Page, currentLabel: string) {
 }
 
 async function agentModeId(agentId: string): Promise<string | null> {
-  const client = await connectDaemonClient<Pick<DaemonClient, "fetchAgent" | "close" | "connect">>(
-    { clientIdPrefix: "codex-plan-mode" },
-  );
+  const client = await connectDaemonClient<Pick<DaemonClient, "fetchAgent" | "close" | "connect">>({
+    clientIdPrefix: "codex-plan-mode",
+  });
   try {
     return (await client.fetchAgent({ agentId }))?.agent.currentModeId ?? null;
   } finally {

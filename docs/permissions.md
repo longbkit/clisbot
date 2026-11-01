@@ -197,7 +197,7 @@ request that no level can answer reads to the user as a prompt that hangs foreve
 
 Suppressing prompts requires holding every leaf, `approval.other` included. An
 assignment stored before that leaf existed therefore stops qualifying for
-unattended modes, `toolPolicy.preapproved`, and auto-accept delegation until an
+unattended modes, Full auto-accept, `toolPolicy.preapproved`, and auto-accept delegation until an
 operator re-saves it — re-selecting its access level is enough. Nothing warns
 about this, so check assignments that relied on unattended execution.
 

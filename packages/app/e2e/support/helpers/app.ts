@@ -318,67 +318,28 @@ export const selectProvider = async (page: Page, provider: string) => {
   await option.click();
 };
 
+/** Picks a model in the composer's options panel, then closes the panel (it stays open on picks). */
 export const selectModel = async (page: Page, model: string) => {
   const normalizedModel = model.trim();
   if (!normalizedModel) {
     throw new Error("Model must be a non-empty string.");
   }
-
-  const modelTrigger = page
-    .locator(
-      '[data-testid="agent-model-selector"]:visible, [data-testid="draft-model-select"]:visible',
-    )
-    .first();
-  if (
-    await modelTrigger
-      .getByText(new RegExp(`^${escapeRegex(normalizedModel)}$`, "i"))
-      .first()
-      .isVisible()
-      .catch(() => false)
-  ) {
-    return;
-  }
-
-  if (await modelTrigger.isVisible().catch(() => false)) {
-    await modelTrigger.click();
-  } else {
-    const modelButton = page
-      .getByRole("button", { name: /Select model/i })
-      .filter({ visible: true })
-      .first();
-    if (await modelButton.isVisible().catch(() => false)) {
-      await modelButton.click();
-    } else {
-      const modelLabel = page.getByText("MODEL", { exact: true }).first();
-      await expect(modelLabel).toBeVisible();
-      await modelLabel.click();
-    }
-  }
-
-  // Wait for the model dropdown to open
-  const searchInput = page.getByRole("textbox", { name: /search model/i });
+  const chip = page.getByTestId("composer-model-chip").filter({ visible: true }).first();
+  await chip.click();
+  const searchInput = page.getByTestId("composer-picker-search").filter({ visible: true }).first();
   await expect(searchInput).toBeVisible({ timeout: 10000 });
-
-  // Type to search/filter models
   await searchInput.fill(normalizedModel);
-
-  const dialog = page.getByRole("dialog");
-  const exactOption = dialog
-    .getByText(new RegExp(`^${escapeRegex(normalizedModel)}$`, "i"))
-    .first();
-  // Model IDs and display labels differ. Wait for the requested row rather than
-  // confirming the previous search result before the filtered list has rendered.
-  const modelOption = dialog
-    .getByTestId(new RegExp(`^model-row-.+-${escapeRegex(normalizedModel)}$`))
-    .or(exactOption)
-    .first();
-  await expect(modelOption).toBeVisible();
-  const selectedLabel = (await modelOption.innerText()).split("\n")[0].trim();
-  await modelOption.click();
+  const byId = page.locator(
+    `[data-testid$=":${normalizedModel}"][data-testid^="composer-picker-model-"]`,
+  );
+  const byLabel = page
+    .locator('[data-testid^="composer-picker-model-"]')
+    .filter({ hasText: new RegExp(`^${escapeRegex(normalizedModel)}`, "i") });
+  const row = byId.or(byLabel).first();
+  await expect(row).toBeVisible();
+  await row.click();
+  await page.keyboard.press("Escape");
   await expect(searchInput).not.toBeVisible({ timeout: 5000 });
-  await expect(
-    page.getByTestId("combined-model-selector").filter({ visible: true }).first(),
-  ).toHaveAccessibleName(new RegExp(escapeRegex(selectedLabel)));
 };
 
 export const selectMode = async (page: Page, mode: string) => {

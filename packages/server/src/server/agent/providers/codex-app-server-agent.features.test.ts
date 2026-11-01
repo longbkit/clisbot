@@ -2,10 +2,7 @@ import pino from "pino";
 import { describe, expect, test } from "vitest";
 
 import type { AgentSession, AgentSessionConfig } from "../agent-sdk-types.js";
-import {
-  CodexAppServerAgentClient,
-  CodexAppServerAgentSession,
-} from "./codex-app-server-agent.js";
+import { CodexAppServerAgentClient, CodexAppServerAgentSession } from "./codex-app-server-agent.js";
 import {
   createFakeCodexAppServer,
   type FakeCodexAppServer,

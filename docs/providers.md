@@ -36,6 +36,23 @@ server and tool identity without approving native tools. A custom ACP provider f
 declares `exactMcpPreapproval` in its options ([custom providers](custom-providers.md#channel-reply-tool-on-a-tool-path-route);
 why and the probe: [2026-09-16 ACP preapproval audit](audits/2026-09-16-acp-mcp-tool-preapproval.md)).
 
+## Modes and composer options
+
+The composer shows a Model chip and a Mode dropdown; everything else lives in the chip's panel
+([Composer picker](features/composer-picker/README.md)). Shape a provider's modes and features
+for it:
+
+- **Plan is a mode, never a feature.** List planning among the modes with
+  `colorTier: "planning"` and id `plan` (ACP agents may use `…#plan`). A provider whose planning
+  is a separate setting maps it into the list, as Codex does with its plan collaboration mode;
+  its old `plan_mode` feature survives only as `COMPAT(codex-plan-mode-feature)`.
+- **Mark the no-prompt mode `isUnattended: true`.** Clisbot's Full auto-accept runs on it, and
+  Managed Access needs every approval privilege for it.
+- **A faster, dearer tier** is a `fast_mode` toggle or a select with id `service_tier` or `fast`;
+  the panel shows it as Standard | Fast. Any other feature lands in the panel's More section.
+- **A permission request that asks the user to choose** carries `metadata.clisbotChoice = true`
+  (ACP choosers do), so no automatic policy answers it.
+
 ## Core adapter patterns
 
 ### ACP (Agent Client Protocol) -- recommended
@@ -46,7 +63,7 @@ The only built-in ACP provider today is `copilot` (`copilot-acp-agent.ts`). `Gen
 
 Copilot custom agents are exposed through ACP session config, not the slash-command list. When custom agents are available, Copilot returns a select config option with `id: "agent"` and `category: "_agent"`; Clisbot maps that to the `agent` provider feature. Copilot uses the agent display name as the option value, and the blank value means the default Copilot agent.
 
-ACP permission options are rendered as ordered actions and Clisbot returns the selected option's exact `optionId`. Agents can therefore encode a single-choice question as multiple options of the same allow kind. Auto-accept does not resolve those chooser requests; they always wait for the user.
+ACP permission options are rendered as ordered actions and Clisbot returns the selected option's exact `optionId`. Agents can therefore encode a single-choice question as multiple options of the same allow kind. Neither ACP auto-accept nor Full auto-accept resolves those chooser requests (`clisbotChoice`); they always wait for the user.
 
 ACP shims can own model discovery through `catalogModelResolver`; the shared client owns the probe
 process and refresh deadline. Keep vendor RPCs in the shim. Cursor uses
@@ -318,6 +335,7 @@ const MY_PROVIDER_MODES: AgentProviderModeDefinition[] = [
     description: "Runs without prompting",
     icon: "ShieldOff",
     colorTier: "dangerous",
+    isUnattended: true,
   },
 ];
 ```

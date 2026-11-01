@@ -5516,11 +5516,9 @@ test("mode changes refresh the provider's persistence metadata", async () => {
     logger,
     idFactory: () => "00000000-0000-4000-8000-000000000134",
   });
-  const snapshot = await manager.createAgent(
-    { provider: "codex", cwd: workdir },
-    undefined,
-    { workspaceId: undefined },
-  );
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
 
   await manager.setAgentMode(snapshot.id, "plan");
   await manager.flush();
