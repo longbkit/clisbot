@@ -872,9 +872,8 @@ export class ManagedResourceAuthorizer {
       : null;
     const projectId = workspace ? workspace.projectId : await this.projectIdForCwd(config.cwd);
     if (!projectId) return false;
-    // Without a mode the run takes the provider's unattended one, which needs every approval.
-    const grant = this.authorization.project(projectId);
-    if (!config.modeId && !(grant && hasEveryApprovalPrivilege(grant.privileges))) return false;
+    // Without a mode the run takes the provider's asking default (schedule/schedule-mode.ts),
+    // which is judged as a create with no mode.
     return this.allowsAgentConfigurationForProject(projectId, config.workspaceId, {
       provider: config.provider,
       cwd: config.cwd,

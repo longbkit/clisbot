@@ -88,7 +88,7 @@ const SCHEDULE_TEST_CAPABILITIES: AgentCapabilityFlags = {
 const NO_UNATTENDED_SCHEDULE_POLICY: Pick<ProviderSnapshotManager, "resolveCreateConfig"> = {
   async resolveCreateConfig(input) {
     return {
-      modeId: input.unattended ? input.requestedMode : "interactive",
+      modeId: input.requestedMode ?? "interactive",
       featureValues: input.featureValues,
     };
   },
@@ -2110,28 +2110,29 @@ describe("ScheduleService", () => {
     });
   });
 
-  test("defaults new-agent modeId to provider's unattended mode", async () => {
+  // A schedule never runs in a no-prompt mode unless someone chose it: one created without a
+  // mode stores the provider's asking default, and the run asks for approval like any agent.
+  test("stores and runs a new-agent schedule with no mode in the provider's asking default", async () => {
     const manager = new AgentManager({
       logger: createTestLogger(),
       clients: createTestAgentClients(),
       registry: agentStorage,
     });
+    const resolveScheduleModeId = vi.fn(async () => "default");
     const service = createScheduleService({
       clisbotHome: tempDir,
       logger: createTestLogger(),
       agentManager: manager,
       agentStorage,
+      resolveScheduleModeId,
       providerSnapshotManager: {
         async resolveCreateConfig(input) {
           expect(input).toMatchObject({
             parent: null,
-            unattended: true,
-            requestedMode: undefined,
+            unattended: false,
+            requestedMode: "default",
           });
-          return {
-            modeId: input.unattended ? "bypassPermissions" : "interactive",
-            featureValues: input.featureValues,
-          };
+          return { modeId: input.requestedMode, featureValues: input.featureValues };
         },
       },
       now: () => now,
@@ -2150,6 +2151,8 @@ describe("ScheduleService", () => {
       },
       maxRuns: 1,
     });
+    expect(created.target).toMatchObject({ config: { modeId: "default" } });
+    expect(resolveScheduleModeId).toHaveBeenCalledWith("claude", tempDir);
 
     now = new Date("2026-01-01T00:01:00.000Z");
     await service.tick();
@@ -2158,11 +2161,46 @@ describe("ScheduleService", () => {
     const agentId = inspected.runs[0]?.agentId;
     expect(agentId).toBeTruthy();
     const agent = await agentStorage.get(agentId!);
-    expect(agent?.lastModeId).toBe("bypassPermissions");
+    expect(agent?.lastModeId).toBe("default");
     expect(agent?.archivedAt).toBeTruthy();
   });
 
-  test("defaults OpenCode new-agent schedules to build plus auto accept", async () => {
+  test("runs a schedule stored without a mode in the provider's asking default", async () => {
+    const manager = new AgentManager({
+      logger: createTestLogger(),
+      clients: createTestAgentClients(),
+      registry: agentStorage,
+    });
+    // Created before this rule (or while the provider could not answer): no mode stored.
+    const resolveScheduleModeId = vi
+      .fn<(provider: string, cwd: string) => Promise<string | undefined>>()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValue("default");
+    const service = createScheduleService({
+      clisbotHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: manager,
+      agentStorage,
+      resolveScheduleModeId,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      now: () => now,
+    });
+    const created = await service.create({
+      prompt: "Respond with exactly hello",
+      cadence: { type: "every", everyMs: 60_000 },
+      target: { type: "new-agent", config: { provider: "claude", cwd: tempDir } },
+      maxRuns: 1,
+    });
+    expect(created.target).not.toMatchObject({ config: { modeId: expect.anything() } });
+
+    now = new Date("2026-01-01T00:01:00.000Z");
+    await service.tick();
+
+    const agent = await agentStorage.get((await service.inspect(created.id)).runs[0]!.agentId!);
+    expect(agent?.lastModeId).toBe("default");
+  });
+
+  test("runs OpenCode schedules with no mode in build without turning on auto accept", async () => {
     const createdConfigs: AgentSessionConfig[] = [];
     const clients = createTestAgentClients();
     const opencodeClient = clients.opencode;
@@ -2190,15 +2228,16 @@ describe("ScheduleService", () => {
       logger: createTestLogger(),
       agentManager: manager,
       agentStorage,
+      resolveScheduleModeId: async () => "build",
       providerSnapshotManager: {
         async resolveCreateConfig(input) {
           expect(input).toMatchObject({
             parent: null,
-            unattended: true,
-            requestedMode: undefined,
+            unattended: false,
+            requestedMode: "build",
           });
           return {
-            modeId: input.unattended ? "build" : "interactive",
+            modeId: input.requestedMode,
             featureValues: input.unattended
               ? { ...input.featureValues, auto_accept: true }
               : input.featureValues,
@@ -2227,10 +2266,8 @@ describe("ScheduleService", () => {
 
     const inspected = await service.inspect(created.id);
     expect(inspected.runs[0]?.error).toBeNull();
-    expect(createdConfigs[0]).toMatchObject({
-      modeId: "build",
-      featureValues: { auto_accept: true },
-    });
+    expect(createdConfigs[0]).toMatchObject({ modeId: "build" });
+    expect(createdConfigs[0]?.featureValues?.auto_accept).toBeUndefined();
   });
 
   test("forwards stored new-agent session config to the launched scheduled agent", async () => {
@@ -2266,7 +2303,7 @@ describe("ScheduleService", () => {
         async resolveCreateConfig(input) {
           expect(input).toMatchObject({
             parent: null,
-            unattended: true,
+            unattended: false,
             requestedMode: "stored-mode",
           });
           return {

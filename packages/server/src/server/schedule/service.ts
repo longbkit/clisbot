@@ -27,6 +27,12 @@ import {
   type ScheduleChats,
 } from "./chat-delivery.js";
 import { computeNextRunAt, validateScheduleCadence } from "./cron.js";
+import {
+  type ResolveScheduleModeId,
+  resolveNoScheduleModeId,
+  resolveScheduleRunModeId,
+  withScheduleMode,
+} from "./schedule-mode.js";
 import type {
   CreateScheduleInput,
   ScheduleExecutionResult,
@@ -322,6 +328,8 @@ export interface ScheduleServiceOptions {
   findWorkspace?: (workspaceId: string) => Promise<PersistedWorkspaceRecord | null>;
   now?: () => Date;
   runner?: (schedule: StoredSchedule, runId: string) => Promise<ScheduleExecutionResult>;
+  /** The provider's asking default for a `new-agent` schedule with no mode (`schedule-mode.ts`). */
+  resolveScheduleModeId?: ResolveScheduleModeId;
 }
 
 export class ScheduleService {
@@ -339,6 +347,7 @@ export class ScheduleService {
   private readonly archiveWorkspace: (workspaceId: string) => Promise<void>;
   private readonly findWorkspace: (workspaceId: string) => Promise<PersistedWorkspaceRecord | null>;
   private readonly now: () => Date;
+  private readonly resolveScheduleModeId: ResolveScheduleModeId;
   private readonly runner: (
     schedule: StoredSchedule,
     runId: string,
@@ -358,6 +367,7 @@ export class ScheduleService {
     this.archiveWorkspace = options.archiveWorkspace;
     this.findWorkspace = options.findWorkspace ?? (async () => null);
     this.now = options.now ?? (() => new Date());
+    this.resolveScheduleModeId = options.resolveScheduleModeId ?? resolveNoScheduleModeId;
     this.runner =
       options.runner ??
       ((schedule, runId) =>
@@ -395,7 +405,7 @@ export class ScheduleService {
     return this.createScheduleRecord(input, {
       name: trimOptionalName(input.name),
       prompt,
-      target: input.target,
+      target: await withScheduleMode(input.target, this.resolveScheduleModeId),
     });
   }
 
@@ -437,7 +447,11 @@ export class ScheduleService {
   // Idempotent create for the MCP write path: repeating a create with the same
   // name and target (e.g. babysit-pr re-registering its heartbeat) refreshes the
   // existing non-completed schedule in place instead of minting a duplicate.
-  async createOrReplace(input: CreateScheduleInput): Promise<StoredSchedule> {
+  async createOrReplace(createInput: CreateScheduleInput): Promise<StoredSchedule> {
+    const input = {
+      ...createInput,
+      target: await withScheduleMode(createInput.target, this.resolveScheduleModeId),
+    };
     const name = trimOptionalName(input.name);
     const prompt = normalizePrompt(input.prompt);
     validateScheduleCadence(input.cadence);
@@ -579,7 +593,10 @@ export class ScheduleService {
         if (updated.target.type !== "new-agent") {
           throw new Error("new-agent config updates are only valid for new-agent target schedules");
         }
-        const patchedTarget = applyNewAgentConfig(updated.target, input.newAgentConfig);
+        const patchedTarget = await withScheduleMode(
+          applyNewAgentConfig(updated.target, input.newAgentConfig),
+          this.resolveScheduleModeId,
+        );
         updated = {
           ...updated,
           target: patchedTarget,
@@ -1140,7 +1157,13 @@ export class ScheduleService {
         workspaceId: workspace.workspaceId,
         agentId: null,
       });
-      const runConfig = { ...config, cwd: workspace.cwd };
+      // A schedule stored without a mode runs in the provider's asking default, never in its
+      // no-prompt mode; nothing is switched on that nobody chose.
+      const runConfig = {
+        ...config,
+        cwd: workspace.cwd,
+        modeId: await resolveScheduleRunModeId(config, workspace.cwd, this.resolveScheduleModeId),
+      };
       const runWorkspace = workspace;
       const identity = this.creationIdentity(schedule);
       const created = await withSessionOperationIdentity(identity, () =>
@@ -1155,10 +1178,9 @@ export class ScheduleService {
             "clisbot.schedule-id": schedule.id,
             "clisbot.schedule-run": runId,
           },
-          mode: config.modeId,
+          mode: runConfig.modeId,
           thinking: config.thinkingOptionId,
           features: config.featureValues,
-          unattended: true,
           promptFailure: "return-error",
           notifyOnFinish: false,
         }),

@@ -1786,7 +1786,7 @@ describe("Unattended configuration from an agent", () => {
       );
     });
 
-    it("update_schedule from an agent refuses leaving a schedule without a mode", async () => {
+    it("update_schedule from an agent may clear the mode but not pick an unattended one", async () => {
       const service = scheduleService({
         type: "new-agent",
         config: { provider: "claude", cwd: "/tmp", modeId: "default" },
@@ -1796,16 +1796,16 @@ describe("Unattended configuration from an agent", () => {
         target: caller(),
         scheduleService: service as unknown as ScheduleService,
       });
-      await expect(
-        registeredTool(server, "update_schedule").handler({ id: "schedule-1", mode: null }),
-      ).rejects.toThrow("pass `mode`");
+      // Cleared, the schedule runs in the provider's asking default.
+      await registeredTool(server, "update_schedule").handler({ id: "schedule-1", mode: null });
+      expect(service.update).toHaveBeenCalledTimes(1);
       await expect(
         registeredTool(server, "update_schedule").handler({
           id: "schedule-1",
           mode: "bypassPermissions",
         }),
       ).rejects.toThrow(REFUSAL);
-      expect(service.update).not.toHaveBeenCalled();
+      expect(service.update).toHaveBeenCalledTimes(1);
     });
 
     it("a person's create_schedule with no mode is unchanged", async () => {

@@ -2705,7 +2705,7 @@ function createToolCatalog(
             .min(1)
             .optional()
             .describe(
-              "Mode each run starts in. Required from an agent, and it must ask for approval: a run with no mode starts in the provider's no-prompt mode.",
+              "Mode each run starts in; defaults to the provider's mode that asks for approval. Required from an agent, and it must ask for approval.",
             ),
           cwd: z.string().optional(),
           isolation: z.enum(["local", "worktree"]).optional(),
@@ -2744,7 +2744,7 @@ function createToolCatalog(
       assertRunLimit(cadence, maxRuns);
       const target = resolveNewAgentScheduleTarget({ provider, cwd, isolation });
       if (mode) target.config.modeId = mode;
-      await unattendedGuard.refuseScheduleRun(target.config);
+      await unattendedGuard.refuseScheduleRun(target.config, { requireMode: true });
       const schedule = await scheduleService.createOrReplace({
         prompt: prompt.trim(),
         cadence,
@@ -3033,10 +3033,10 @@ function createToolCatalog(
       const current = await requireScheduleTarget(input.id, "new-agent");
       const update = buildScheduleUpdateInput(input);
       if (current.target.type === "new-agent") {
-        await unattendedGuard.refuseScheduleRun({
-          ...current.target.config,
-          ...update.newAgentConfig,
-        });
+        await unattendedGuard.refuseScheduleRun(
+          { ...current.target.config, ...update.newAgentConfig },
+          { requireMode: false },
+        );
       }
       await assertRunLimitForUpdate(async () => current, update);
       const schedule = await scheduleService.update(update);

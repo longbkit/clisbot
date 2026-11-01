@@ -19,7 +19,7 @@ export const AGENT_UNATTENDED_REFUSAL =
   "An agent cannot turn on a mode that runs without approval prompts (Full auto-accept, Bypass, Full access, Allow all or auto-accept). Only a person can, in Clisbot or on its channel.";
 
 export const AGENT_SCHEDULE_MODE_REQUIRED =
-  "A schedule an agent creates needs a mode that asks for approval: pass `mode`. Without one, its runs start in the provider's no-prompt mode.";
+  "A schedule an agent creates needs a mode that asks for approval: pass `mode`.";
 
 type Judge = Pick<ProviderSnapshotManager, "isUnattendedConfiguration">;
 
@@ -38,8 +38,14 @@ export interface AgentUnattendedGuard {
   refuseCreate(target: AgentLocation, request: UnattendedRequest): Promise<void>;
   /** Refuses an agent asking an existing agent for an unattended mode or features. */
   refuseChange(agentId: string, request: UnattendedRequest): Promise<void>;
-  /** Refuses an agent creating or changing a schedule whose runs would be unattended. */
-  refuseScheduleRun(config: AgentLocation & UnattendedRequest): Promise<void>;
+  /**
+   * Refuses an agent creating (`requireMode`) or changing a schedule whose runs would be
+   * unattended. A schedule left without a mode runs in the provider's asking default.
+   */
+  refuseScheduleRun(
+    config: AgentLocation & UnattendedRequest,
+    options: { requireMode: boolean },
+  ): Promise<void>;
 }
 
 function asksForSomething(request: UnattendedRequest): boolean {
@@ -83,11 +89,12 @@ export function createAgentUnattendedGuard(input: {
       const target = await input.locateAgent(agentId);
       if (target) await refuseIfUnattended(toConfig(target, request));
     },
-    async refuseScheduleRun(config) {
+    async refuseScheduleRun(config, options) {
       if (!callerAgentId) return;
-      // Schedule runs are unattended creates: with no mode they take the no-prompt mode.
-      if (!config.modeId) throw new ClisbotToolInputError(AGENT_SCHEDULE_MODE_REQUIRED);
-      await refuseIfUnattended(toConfig(config, config));
+      if (options.requireMode && !config.modeId) {
+        throw new ClisbotToolInputError(AGENT_SCHEDULE_MODE_REQUIRED);
+      }
+      if (asksForSomething(config)) await refuseIfUnattended(toConfig(config, config));
     },
   };
 }

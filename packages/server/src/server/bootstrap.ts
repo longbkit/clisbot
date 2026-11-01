@@ -177,6 +177,7 @@ import {
 } from "./workspace-registry.js";
 import { CheckoutDiffManager } from "./checkout-diff-manager.js";
 import { ScheduleService } from "./schedule/service.js";
+import { createScheduleModeResolver } from "./schedule/schedule-mode.js";
 import { startChatRuntime } from "./chats/chat-runtime.js";
 import { createBotServiceFromConfig } from "./bots/index.js";
 import {
@@ -1689,6 +1690,7 @@ export async function createClisbotDaemon(
     createClisbotWorktreeWorkspace: createScheduleClisbotWorktreeExternal,
     archiveWorkspace: archiveScheduleWorkspaceExternal,
     findWorkspace: async (workspaceId) => (await workspaceRegistry?.get(workspaceId)) ?? null,
+    resolveScheduleModeId: createScheduleModeResolver(providerSnapshotManager, logger),
   });
   await scheduleService.start();
   agentManager.setAgentArchivedCallback(async (agentId) => {
