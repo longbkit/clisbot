@@ -133,7 +133,7 @@ import type { KeyboardActionDefinition } from "@/keyboard/keyboard-action-dispat
 import type { MessageInputKeyboardActionKind } from "@/keyboard/actions";
 import { submitOneOffInput, submitAgentInput } from "@/composer/submit";
 import { createMessageSubmissionWriter } from "@/composer/submission/writer";
-import { useSendErrorDraftReset } from "@/composer/use-send-error-draft-reset";
+import { useSendErrorDraftReset, type SentDraft } from "@/composer/use-send-error-draft-reset";
 import { ComposerKeyboardScopeProvider, useComposerKeyboardScope } from "@/composer/keyboard-scope";
 import { useAppSettings } from "@/hooks/use-settings";
 import { RenderProfile } from "@/utils/render-profiler";
@@ -1480,11 +1480,13 @@ function ComposerContentImpl({
   const isFullscreen = useComposerFullscreen(editingSession);
   const [sendError, setSendError] = useState<string | null>(null);
   const clearSendError = useCallback(() => setSendError(null), []);
+  const sentDraft = useRef<SentDraft | null>(null);
   useSendErrorDraftReset({
     sendError,
     clearSendError,
     attachmentCount: selectedAttachments.length,
     textSource,
+    sentDraft,
   });
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false);
   const [isGithubPickerOpen, setIsGithubPickerOpen] = useState(false);
@@ -1892,6 +1894,11 @@ function ComposerContentImpl({
       forceSend?: boolean,
       behavior?: "steer" | "interrupt",
     ) => {
+      sentDraft.current = {
+        text: outgoingMessage.trim(),
+        attachmentCount:
+          composerWorkspaceAttachment.userAttachmentsOnly(outgoingAttachments).length,
+      };
       const result = await submitAgentInput({
         message: outgoingMessage,
         attachments: outgoingAttachments,
