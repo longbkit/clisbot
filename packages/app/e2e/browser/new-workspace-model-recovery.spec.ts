@@ -1,4 +1,5 @@
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { composerModelChip, composerPickerModelRow } from "../support/helpers/composer-picker";
 import { test, expect, type Page } from "../support/fixtures";
 import {
   closeModelPicker,
@@ -34,11 +35,10 @@ async function rememberModel(page: Page) {
 
 async function expectRecoveredModelInPicker(page: Page) {
   await openModelPicker(page);
-  await page.getByRole("dialog").getByRole("button", { name: "Back", exact: true }).click();
   await drillIntoProvider(page, PROVIDER);
-  await expect(
-    page.getByTestId("combobox-desktop-container").getByText(LABEL, { exact: true }),
-  ).toBeVisible();
+  await expect(composerPickerModelRow(page, { provider: PROVIDER, modelId: MODEL })).toContainText(
+    LABEL,
+  );
   await closeModelPicker(page);
 }
 
@@ -86,9 +86,7 @@ test("restores the remembered model when a provider recovers after New workspace
     await waitForSidebarHydration(page);
     await setProviderAvailability(client, workspace.repoPath, false);
     await openGlobalNewWorkspaceComposer(page);
-    await expect(
-      page.getByTestId("combined-model-selector").filter({ visible: true }),
-    ).not.toContainText("Loading...");
+    await expect(composerModelChip(page)).not.toContainText("Loading");
 
     await setProviderAvailability(client, workspace.repoPath, true);
     await expectSavedSelection(page, PROVIDER, MODEL);

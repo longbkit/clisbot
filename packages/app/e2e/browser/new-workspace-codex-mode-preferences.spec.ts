@@ -1,4 +1,10 @@
 import { hostFormPreferencesKey } from "../support/helpers/form-preferences";
+import {
+  closeComposerPicker,
+  composerModeControl,
+  openComposerPicker,
+  selectComposerMode,
+} from "../support/helpers/composer-picker";
 import { expect, type Page } from "../support/fixtures";
 import { test } from "../support/creation-fixtures";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
@@ -13,7 +19,6 @@ import {
   submitNewWorkspacePrompt,
 } from "../support/helpers/new-workspace";
 import { expectNoTruncation } from "../support/helpers/no-truncation";
-import { escapeRegex } from "../support/helpers/regex";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
 
@@ -79,35 +84,21 @@ async function readCodexModePreference(page: Page): Promise<unknown> {
 }
 
 async function selectMode(page: Page, label: string): Promise<void> {
-  const modeControl = page.getByRole("button", { name: /^Select agent mode \(/ });
-  await expect(modeControl).toBeVisible({ timeout: 30_000 });
-  await modeControl.click();
-
+  await expect(composerModeControl(page)).toBeVisible({ timeout: 30_000 });
+  await composerModeControl(page).click();
   const popup = page.getByTestId("combobox-desktop-container").last();
   await expect(popup).toBeVisible({ timeout: 10_000 });
   await expectNoTruncation(popup);
-
-  const searchInput = page.getByRole("textbox", { name: /search mode/i });
-  await expect(searchInput).toBeVisible({ timeout: 10_000 });
-  await searchInput.fill(label);
-
-  const option = popup.getByText(new RegExp(`^${escapeRegex(label)}$`, "i")).first();
-  await expect(option).toBeVisible({ timeout: 10_000 });
-  await option.click({ force: true });
-  await expect(searchInput).not.toBeVisible({ timeout: 5_000 });
+  await page.keyboard.press("Escape");
+  await expect(popup).toHaveCount(0, { timeout: 5_000 });
+  await selectComposerMode(page, label);
 }
 
+/** The options panel's Reasoning column names every effort in full. */
 async function expectThinkingOptionsFit(page: Page): Promise<void> {
-  const thinkingControl = page.getByTestId("agent-thinking-selector").first();
-  await expect(thinkingControl).toBeVisible({ timeout: 30_000 });
-  await thinkingControl.click();
-
-  const popup = page.getByTestId("combobox-desktop-container").last();
-  await expect(popup).toBeVisible({ timeout: 10_000 });
-  await expectNoTruncation(popup);
-
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("combobox-desktop-container")).toHaveCount(0, { timeout: 5_000 });
+  await openComposerPicker(page);
+  await expectNoTruncation(page.getByTestId("composer-picker-reasoning"));
+  await closeComposerPicker(page);
 }
 
 test.describe("New workspace Codex mode preferences", () => {

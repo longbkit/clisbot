@@ -1,4 +1,5 @@
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { composerModelChip } from "../support/helpers/composer-picker";
 import { expect, test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
@@ -57,7 +58,7 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
       "aria-selected",
       "true",
     );
-    await expect(page.getByRole("button", { name: /Select model/ })).toBeVisible();
+    await expect(composerModelChip(page)).toBeVisible();
     await fillNewWorkspaceDraft(page, "Quick chat test");
     await page.getByTestId("workspace-create-submit").click();
     await expect(page).toHaveURL(/\/workspace\//, { timeout: 30000 });
@@ -87,7 +88,7 @@ test("mobile Quick chat and Bot keep agent controls and Back returns to Home", a
     await page.getByRole("tab", { name: "Home", exact: true }).click();
     await page.getByRole("button", { name: "With a bot", exact: true }).click();
     await page.getByTestId(`start-destination-bot-${bot.bot!.id}`).click();
-    await expect(page.getByRole("button", { name: /Select model/ })).toBeVisible();
+    await expect(composerModelChip(page)).toBeVisible();
     await fillNewWorkspaceDraft(page, "Triage this bug");
     await page.getByTestId("workspace-create-submit").click();
     await expect(page).toHaveURL(/\/chat\/chat_/, { timeout: 30000 });

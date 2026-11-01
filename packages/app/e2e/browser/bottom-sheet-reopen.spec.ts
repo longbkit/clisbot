@@ -1,5 +1,12 @@
 import { expect, test, type Page } from "../support/fixtures";
 import { expectComposerVisible } from "../support/helpers/composer";
+import {
+  composerModelChip,
+  composerPickerModelRow,
+  composerPickerPanel,
+  expectComposerModel,
+  searchComposerPicker,
+} from "../support/helpers/composer-picker";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 
 const MOBILE_VIEWPORT = { width: 390, height: 844 };
@@ -17,9 +24,7 @@ async function openMockAgentAtMobileBreakpoint(page: Page) {
     timeout: 30_000,
   });
   await expectComposerVisible(page);
-  await expect(page.getByRole("button", { name: /Select model/ })).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(composerModelChip(page)).toBeVisible({ timeout: 30_000 });
   return session;
 }
 
@@ -79,26 +84,9 @@ async function openTabSwitcher(page: Page) {
 }
 
 async function openModelSelector(page: Page) {
-  await page.getByRole("button", { name: /Select model/ }).click();
+  await composerModelChip(page).click();
   await expectBottomSheetOpen(page);
-  await expect(page.getByTestId("agent-controls-settings-list")).toBeVisible({ timeout: 10_000 });
-}
-
-async function dismissStackedModelPickerWithBackdrop(page: Page) {
-  await page
-    .getByTestId("agent-controls-settings-list")
-    .getByRole("button", { name: /Select model/ })
-    .click();
-  await expect(page.getByTestId("agent-controls-model-browser-sheet")).toBeInViewport();
-  await page
-    .getByRole("button", { name: "Bottom sheet backdrop" })
-    .last()
-    .click({
-      position: { x: MOBILE_VIEWPORT.width / 2, y: 24 },
-    });
-  await expect(page.getByTestId("agent-controls-model-browser-sheet")).not.toBeInViewport();
-  await expect(page.getByTestId("agent-controls-model-sheet")).toBeVisible();
-  await expect(page.getByTestId("agent-controls-settings-list")).toBeVisible();
+  await expect(composerPickerPanel(page)).toBeVisible({ timeout: 10_000 });
 }
 
 async function openAndCloseTabSwitcherTwice(page: Page) {
@@ -116,7 +104,7 @@ async function openAndCloseModelSelectorTwice(page: Page) {
 }
 
 test.describe("mobile bottom sheet reopen", () => {
-  test("sheets reopen and model search returns to configuration", async ({ page }) => {
+  test("sheets reopen and a model search pick keeps the panel open", async ({ page }) => {
     const session = await openMockAgentAtMobileBreakpoint(page);
     try {
       await test.step("tab switcher opens, closes, and reopens", async () => {
@@ -127,24 +115,20 @@ test.describe("mobile bottom sheet reopen", () => {
         await openAndCloseModelSelectorTwice(page);
       });
 
-      await test.step("model search returns to configuration", async () => {
+      await test.step("a model picked from a search keeps the panel open", async () => {
         await openModelSelector(page);
-        const sheet = page.getByTestId("agent-controls-model-sheet");
-
-        await dismissStackedModelPickerWithBackdrop(page);
-
-        await page.getByTestId("model-search-all-input").click();
-        const model = page.getByRole("button", { name: /^Ten second stream/ });
-        await expect(model).toBeVisible({
-          timeout: 10_000,
+        await searchComposerPicker(page, "one minute");
+        const model = composerPickerModelRow(page, {
+          provider: "mock",
+          modelId: "one-minute-stream",
         });
-
+        await expect(model).toBeVisible({ timeout: 10_000 });
         await model.click();
 
-        await expect(sheet).toBeVisible();
-        await expect(page.getByTestId("agent-controls-settings-list")).toBeVisible();
-        await expect(page.getByTestId("agent-controls-model")).toContainText("Ten second stream");
-        await expect(page.getByTestId("agent-controls-model-browser-sheet")).not.toBeInViewport();
+        await expectComposerModel(page, "One minute stream");
+        await expect(composerPickerPanel(page)).toBeVisible();
+        await closeBottomSheetWithBackdrop(page);
+        await expect(composerPickerPanel(page)).toHaveCount(0);
       });
     } finally {
       await session.cleanup();

@@ -1,4 +1,5 @@
-import { expect, test } from "../support/fixtures";
+import { test } from "../support/fixtures";
+import { expectComposerThinking } from "../support/helpers/composer-picker";
 import type { FormPreferences } from "@/create-agent-preferences/preferences";
 import { closeCommandCenter, openCommandCenter } from "../support/helpers/command-center";
 import {
@@ -93,9 +94,7 @@ test.describe("Command Center agent controls", () => {
         agentId: workspace.agentId,
       });
 
-      await expect(
-        page.getByTestId("agent-thinking-selector").filter({ visible: true }),
-      ).toHaveAccessibleName("Select thinking option (Max)");
+      await expectComposerThinking(page, "Max");
     } finally {
       await workspace.cleanup();
     }

@@ -4,6 +4,7 @@ import path from "node:path";
 import type { FormPreferences } from "@/create-agent-preferences/preferences";
 import {
   applyProfileFromPicker,
+  closeModelPicker,
   drillIntoProvider,
   openModelPicker,
   seedAgentProfiles,
@@ -120,7 +121,8 @@ test.describe("Agent profiles repair modeless provider preferences", () => {
 
       await openModelPicker(page);
       await drillIntoProvider(page, MODELESS_PROVIDER);
-      await page.getByRole("button", { name: /Pi profile model/ }).click();
+      await page.getByRole("button", { name: "Pi profile model", exact: true }).click();
+      await closeModelPicker(page);
 
       await submitNewWorkspacePrompt(page, "Create a Pi agent after repairing preferences.");
       const createAgentRequest = await createAgentRecorder.waitForRequest();
