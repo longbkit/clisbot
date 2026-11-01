@@ -9,6 +9,8 @@ export const hostQueue = {
   queueOnce: "Queue this send",
   steerOnce: "Steer this send",
   unsupported: "Update this Host to use its durable queue",
+  tooManyImagesForEdit:
+    "A queued message holds at most 32 images. Your draft is kept: remove some images to save.",
   attachments: "Attachments ({{count}})",
   unknown: "Outcome unknown",
   edit: "Edit",
@@ -39,6 +41,8 @@ export const hostQueueVi: Record<keyof typeof hostQueue, string> = {
   queueOnce: "Đưa lần gửi này vào hàng chờ",
   steerOnce: "Steer lần gửi này",
   unsupported: "Cập nhật Host để dùng hàng chờ bền vững",
+  tooManyImagesForEdit:
+    "Một tin trong hàng chờ chứa tối đa 32 ảnh. Bản nháp vẫn được giữ: bỏ bớt ảnh để lưu.",
   attachments: "Tệp đính kèm ({{count}})",
   unknown: "Chưa rõ kết quả",
   edit: "Sửa",
@@ -68,6 +72,8 @@ export const hostQueueEs: Record<keyof typeof hostQueue, string> = {
   queueOnce: "Poner este envío en cola",
   steerOnce: "Guiar este envío",
   unsupported: "Actualiza este Host para usar la cola persistente",
+  tooManyImagesForEdit:
+    "Un mensaje en cola admite como máximo 32 imágenes. Tu borrador se conserva: quita algunas para guardar.",
   attachments: "Adjuntos ({{count}})",
   unknown: "Resultado desconocido",
   edit: "Editar",
@@ -98,6 +104,8 @@ export const hostQueueFr: Record<keyof typeof hostQueue, string> = {
   queueOnce: "Mettre cet envoi en file",
   steerOnce: "Guider cet envoi",
   unsupported: "Mettez à jour cet hôte pour utiliser la file persistante",
+  tooManyImagesForEdit:
+    "Un message en file contient au plus 32 images. Votre brouillon est conservé : retirez des images pour enregistrer.",
   attachments: "Pièces jointes ({{count}})",
   unknown: "Résultat inconnu",
   edit: "Modifier",
@@ -128,6 +136,8 @@ export const hostQueueJa: Record<keyof typeof hostQueue, string> = {
   queueOnce: "今回の送信をキューに追加",
   steerOnce: "今回の送信で方向を修正",
   unsupported: "永続キューを使うにはホストを更新してください",
+  tooManyImagesForEdit:
+    "キュー内のメッセージに添付できる画像は最大32枚です。下書きは保持されます。画像を減らして保存してください。",
   attachments: "添付ファイル ({{count}})",
   unknown: "結果不明",
   edit: "編集",
@@ -157,6 +167,8 @@ export const hostQueueKo: Record<keyof typeof hostQueue, string> = {
   queueOnce: "이번 전송을 대기열에 추가",
   steerOnce: "이번 전송으로 방향 조정",
   unsupported: "영구 대기열을 사용하려면 호스트를 업데이트하세요",
+  tooManyImagesForEdit:
+    "대기열 메시지에는 이미지를 최대 32개까지 담을 수 있습니다. 초안은 유지됩니다. 이미지를 줄여 저장하세요.",
   attachments: "첨부 파일 ({{count}})",
   unknown: "결과 알 수 없음",
   edit: "편집",
@@ -186,6 +198,8 @@ export const hostQueuePtBR: Record<keyof typeof hostQueue, string> = {
   queueOnce: "Colocar este envio na fila",
   steerOnce: "Orientar este envio",
   unsupported: "Atualize este Host para usar a fila persistente",
+  tooManyImagesForEdit:
+    "Uma mensagem na fila comporta no máximo 32 imagens. Seu rascunho foi mantido: remova algumas para salvar.",
   attachments: "Anexos ({{count}})",
   unknown: "Resultado desconhecido",
   edit: "Editar",
@@ -216,6 +230,8 @@ export const hostQueueRu: Record<keyof typeof hostQueue, string> = {
   queueOnce: "Поставить эту отправку в очередь",
   steerOnce: "Направить эту отправку",
   unsupported: "Обновите хост для использования постоянной очереди",
+  tooManyImagesForEdit:
+    "Сообщение в очереди вмещает не более 32 изображений. Черновик сохранён: уберите часть изображений, чтобы сохранить.",
   attachments: "Вложения ({{count}})",
   unknown: "Результат неизвестен",
   edit: "Изменить",
@@ -245,6 +261,7 @@ export const hostQueueZhCN: Record<keyof typeof hostQueue, string> = {
   queueOnce: "将本次发送加入队列",
   steerOnce: "用本次发送引导",
   unsupported: "请更新主机以使用持久队列",
+  tooManyImagesForEdit: "队列中的一条消息最多包含 32 张图片。草稿已保留：删除部分图片后再保存。",
   attachments: "附件 ({{count}})",
   unknown: "结果未知",
   edit: "编辑",
@@ -274,6 +291,8 @@ export const hostQueueAr: Record<keyof typeof hostQueue, string> = {
   queueOnce: "إضافة هذا الإرسال إلى الانتظار",
   steerOnce: "توجيه بهذا الإرسال",
   unsupported: "حدّث هذا المضيف لاستخدام قائمة الانتظار الدائمة",
+  tooManyImagesForEdit:
+    "تحمل الرسالة في قائمة الانتظار 32 صورة كحد أقصى. تم الاحتفاظ بالمسودة: أزل بعض الصور للحفظ.",
   attachments: "المرفقات ({{count}})",
   unknown: "النتيجة غير معروفة",
   edit: "تعديل",

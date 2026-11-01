@@ -1,4 +1,6 @@
 import { uploadLocalQueueCopies } from "./host-queue-content";
+import { splitIntoMessageParts } from "./message-parts";
+import type { SendImage } from "@/attachments/image-send-preparation";
 import type { SelectedFile } from "@/attachments/selected-file";
 import { FILE_UPLOAD_MAX_BYTES } from "@/attachments/upload-limit";
 import type { ForgeSearchItem } from "@clisbot/protocol/messages";
@@ -206,9 +208,8 @@ export interface DispatchComposerAgentMessageInput {
   text: string;
   attachments: ComposerAttachment[];
   attachmentSubmitFormat?: ComposerAttachmentSubmitFormat;
-  encodeImages: (
-    images: AttachmentMetadata[],
-  ) => Promise<Array<{ data: string; mimeType: string }> | undefined>;
+  /** Send copies split into one image list per message; see encodeImageMessagesForSend. */
+  encodeImageMessages: (images: AttachmentMetadata[]) => Promise<SendImage[][]>;
   submission: MessageSubmissionWriter;
   activeTurnBehavior?: ActiveTurnBehavior;
   activeTurnId?: string;
@@ -234,16 +235,23 @@ export async function dispatchComposerAgentMessage(
   });
   input.submission.begin(input.agentId, userMessage);
   try {
-    const imagesData = await input.encodeImages(wirePayload.images);
-    await input.client.sendAgentMessage(input.agentId, input.text, {
-      messageId: clientMessageId,
-      ...(input.activeTurnBehavior ? { activeTurnBehavior: input.activeTurnBehavior } : {}),
-      ...(input.activeTurnBehavior === "steer" && input.activeTurnId
-        ? { expectedTurnId: input.activeTurnId }
-        : {}),
-      images: imagesData ?? [],
+    const parts = splitIntoMessageParts({
+      text: input.text,
       attachments: wirePayload.attachments,
+      imageMessages: await input.encodeImageMessages(wirePayload.images),
     });
+    // The optimistic row shows the text, so its ID goes to the part that carries the text.
+    for (const [index, part] of parts.entries()) {
+      await input.client.sendAgentMessage(input.agentId, part.text, {
+        messageId: index === parts.length - 1 ? clientMessageId : generateMessageId(),
+        ...(input.activeTurnBehavior ? { activeTurnBehavior: input.activeTurnBehavior } : {}),
+        ...(input.activeTurnBehavior === "steer" && input.activeTurnId
+          ? { expectedTurnId: input.activeTurnId }
+          : {}),
+        images: part.images,
+        attachments: part.attachments,
+      });
+    }
     input.submission.accept(input.agentId, clientMessageId);
   } catch (error) {
     input.submission.reject(input.agentId, clientMessageId);
