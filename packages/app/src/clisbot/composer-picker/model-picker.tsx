@@ -18,7 +18,7 @@ import { ModeDropdown } from "./mode-dropdown";
 import { MoreFeatures } from "./more-features";
 import { buildRailItems } from "./picker-rows";
 import { ProviderRail } from "./provider-rail";
-import { ReasoningColumn, type ReasoningColumnProps } from "./reasoning-column";
+import { ReasoningColumn } from "./reasoning-column";
 import { SpeedSegment } from "./speed-segment";
 import type { SpeedControl } from "./speed";
 import { useModelPickerState, type ModelPickerState } from "./use-model-picker-state";
@@ -26,6 +26,11 @@ import { usePickerKeyboard } from "./use-picker-keyboard";
 import { PanelList } from "./panel-list";
 import type { ProviderRefresh } from "./use-provider-refresh";
 import { useProviderRail, type ProviderRailControl } from "./use-provider-rail";
+import {
+  useReasoningPreview,
+  type PickModelWithEffort,
+  type ReasoningProps,
+} from "./use-reasoning-preview";
 
 const EMPTY_OPTIONS: never[] = [];
 const PANEL_HEIGHT = 440;
@@ -44,7 +49,9 @@ export interface ModelPickerProps {
   selectedModelId: string;
   serverId: string | null;
   onPickModel: (provider: string, modelId: string) => void;
-  reasoning: Omit<ReasoningColumnProps, "orientation">;
+  reasoning: ReasoningProps;
+  /** Picks a previewed model with one of its efforts. */
+  onPickModelWithEffort?: (provider: string, modelId: string, effortId: string) => void;
   speed: SpeedControl | null;
   moreFeatures: readonly AgentFeature[];
   onSetFeature: (featureId: string, value: unknown) => void;
@@ -59,6 +66,7 @@ export type PanelProps = ModelPickerProps & {
   state: ModelPickerState;
   rail: ProviderRailControl;
   onPick: (row: ProviderSelectionModelRow) => void;
+  onHoverRow?: (key: string) => void;
 };
 
 function useSearchHeader(state: ModelPickerState, open: boolean, isCompact: boolean): SheetHeader {
@@ -82,7 +90,7 @@ function useSearchHeader(state: ModelPickerState, open: boolean, isCompact: bool
   );
 }
 
-function PanelBody(props: PanelProps) {
+function PanelBody(props: PanelProps & { onLeaveList: () => void }) {
   const { state, isCompact } = props;
   const railItems = useMemo(
     () =>
@@ -117,10 +125,14 @@ function PanelBody(props: PanelProps) {
     <View style={styles.desktopPanel} testID="composer-picker-panel">
       <View style={styles.columns}>
         {rail}
-        <ScrollView style={styles.listScroll} keyboardShouldPersistTaps="handled">
-          <PanelList {...props} />
-        </ScrollView>
-        {reasoning}
+        {/* Leaving the list and its Reasoning column ends a preview; moving onto the column
+            keeps it, so a previewed effort can be pressed. */}
+        <View style={styles.columns} onPointerLeave={props.onLeaveList}>
+          <ScrollView style={styles.listScroll} keyboardShouldPersistTaps="handled">
+            <PanelList {...props} />
+          </ScrollView>
+          {reasoning}
+        </View>
       </View>
       {more}
     </View>
@@ -181,6 +193,22 @@ export function ModelPicker(props: ModelPickerProps) {
     },
     [pick, state.rows],
   );
+  const { onPickModelWithEffort } = props;
+  const pickWithEffort = useCallback<PickModelWithEffort>(
+    (row, effortId) =>
+      onPickModelWithEffort
+        ? onPickModelWithEffort(row.provider, row.modelId, effortId)
+        : pick(row),
+    [onPickModelWithEffort, pick],
+  );
+  const preview = useReasoningPreview({
+    enabled: !props.isCompact,
+    rows: state.rows,
+    highlight: state.highlight,
+    selectedKey: state.selectedKey,
+    reasoning: props.reasoning,
+    onPickWithEffort: pickWithEffort,
+  });
   usePickerKeyboard({
     enabled: props.open && !props.isCompact,
     rowCount: state.rows.length,
@@ -205,7 +233,15 @@ export function ModelPicker(props: ModelPickerProps) {
       footer={footer}
       mobileChildrenContentContainerStyle={styles.mobileContent}
     >
-      <PanelBody {...props} state={state} rail={rail} onPick={pick} />
+      <PanelBody
+        {...props}
+        reasoning={preview.reasoning}
+        state={state}
+        rail={rail}
+        onPick={pick}
+        onHoverRow={preview.onHoverRow}
+        onLeaveList={preview.onLeaveList}
+      />
     </Combobox>
   );
 }

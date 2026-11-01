@@ -36,6 +36,7 @@ export interface ModelListProps {
   onShowMore: () => void;
   onToggleFavorite: (key: string) => void;
   onCreateProfile?: (seed: AgentProfileSeed) => void;
+  onHoverRow?: (key: string) => void;
   /** Reloads a provider whose models failed to load. */
   onRetry?: () => void;
 }
@@ -87,6 +88,7 @@ export function ModelList(props: ModelListProps) {
           onPick={props.onPick}
           onToggleFavorite={props.onToggleFavorite}
           onCreateProfile={props.onCreateProfile}
+          onHover={props.onHoverRow}
         />
       ))}
       {props.hiddenCount > 0 ? (

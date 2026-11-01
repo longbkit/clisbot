@@ -105,6 +105,19 @@ test("desktop: one chip opens every option and stays open while you pick", async
     await expect(panel).toBeVisible();
     await expect(chip(page)).toHaveText("6.1 Sol Medium");
 
+    // Hovering another model previews its efforts without picking it; leaving restores.
+    const reasoning = page.getByTestId("composer-picker-reasoning");
+    await page.getByTestId("composer-picker-model-codex:gpt-6-sol").hover();
+    await expect(reasoning).toContainText("Reasoning · 6 Sol");
+    await expect(chip(page)).toHaveText("6.1 Sol Medium");
+    await page.getByTestId("composer-picker-rail-favorites").hover();
+    await expect(reasoning).toContainText("Reasoning · 6.1 Sol");
+    // The arrows move the highlight from the search field, and it previews too.
+    await page.getByTestId("composer-picker-search").focus();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    await expect(reasoning).toContainText("Reasoning · 6 Sol");
+
     // ⌘2 picks the second row; the panel stays open and the chip follows.
     const mod = process.platform === "darwin" ? "Meta" : "Control";
     await page.keyboard.press(`${mod}+2`);
@@ -133,6 +146,13 @@ test("desktop: one chip opens every option and stays open while you pick", async
     await expect(footer.getByText("Higher cost")).toHaveCount(0);
     await page.getByTestId("composer-picker-ultra").click();
     await expect.poll(serviceTier).toBe("ultrafast");
+
+    // An effort picked from a previewed model selects that model with that effort.
+    await page.getByTestId("composer-picker-model-codex:gpt-6-sol").hover();
+    await expect(reasoning).toContainText("Reasoning · 6 Sol");
+    await page.getByTestId("composer-picker-effort-low").click();
+    await expect(chip(page)).toHaveText("6 Sol Low");
+    await expect.poll(async () => (await readAgent(agentId))?.model).toBe("gpt-6-sol");
 
     await page.getByTestId("composer-picker-search").fill("codex");
     await expect(page.locator('[data-testid^="composer-picker-model-"]')).toHaveCount(2);

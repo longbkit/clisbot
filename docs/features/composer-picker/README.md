@@ -64,12 +64,21 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
 - **Rows**: provider icon, name, ⌘1…⌘9 (Ctrl elsewhere, hidden on touch), the favorite star and
   Create profile on hover (always shown on touch), and a check on the selected model. The arrows
   move, Enter and ⌘N pick. The panel takes these keys in the capture phase while open, so the
-  app's own ⌘N shortcuts do not fire behind it.
+  app's own ⌘N shortcuts do not fire behind it, but only from the search field, a model row, a
+  rail entry or nothing focused (`use-picker-keyboard.web.ts`): the footer's Mode dropdown and
+  speed segments, a provider menu, Retry and the Provider settings sheet keep their own keys.
+  The Combobox leaves the arrows alone when it has no options of its own, as here.
 - **Favorites** are per device, for every Host (`favorites-store.ts`, AsyncStorage key
   `composer-model-favorites`). They are unrelated to the retired `favoriteModels` form
   preference, which migrated into Agent profiles.
-- **Reasoning follows the selected model.** Picking a model updates the column and its header at
-  once because the panel stays open; a hovered row does not preview its efforts.
+- **Reasoning follows the selected model, and previews on desktop.** Picking a model updates the
+  column and its header at once because the panel stays open. On desktop, hovering or
+  keyboard-highlighting another model shows that model's efforts and short name in the column
+  without changing the selection; leaving the list (the column itself keeps the preview) brings
+  the selected model's back. Picking an effort while previewing selects that model with that
+  effort; the effort is written once the composer reports the new model
+  (`use-reasoning-preview.ts`, `composer-picker-controls.tsx`). Touch has no hover, so the
+  column follows the selected model.
 - **Speed** normalizes three provider features, Claude's and OMP's `fast_mode` toggle, Codex's
   `service_tier` select and Cursor's `fast` select, into at most three levels by what each tier
   means (`speed.ts`): Standard (the default tier), Fast (`fast_mode` on, Codex `fast` or

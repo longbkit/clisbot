@@ -23,6 +23,9 @@ export interface ProviderSelectionModelRow {
   modelLabel: string;
   description?: string;
   isDefault?: boolean;
+  /** The model's efforts, so a picker can preview them before the model is chosen. */
+  thinkingOptions?: AgentModelDefinition["thinkingOptions"];
+  defaultThinkingOptionId?: string;
 }
 
 function buildModelRowKey(provider: string, modelId: string): string {
@@ -67,6 +70,10 @@ function buildModelRows(
     modelLabel: model.label,
     description: model.description ?? model.id,
     isDefault: model.isDefault,
+    thinkingOptions: model.thinkingOptions ?? [],
+    ...(model.defaultThinkingOptionId
+      ? { defaultThinkingOptionId: model.defaultThinkingOptionId }
+      : {}),
   }));
 }
 

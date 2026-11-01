@@ -19,6 +19,8 @@ export interface ReasoningColumnProps {
   onSelect: (id: string) => void;
   /** A column beside the list, or a chip row in the phone sheet. */
   orientation: "vertical" | "horizontal";
+  /** Showing a hovered model's efforts; kept on screen even when it has none. */
+  previewing?: boolean;
 }
 
 function ReasoningRow(props: {
@@ -57,7 +59,7 @@ function ReasoningRow(props: {
 /** The selected model's effort levels; the provider's default is marked Default. */
 export function ReasoningColumn(props: ReasoningColumnProps) {
   const { t } = useTranslation();
-  if (props.options.length === 0) return null;
+  if (props.options.length === 0 && !props.previewing) return null;
   const rows = props.options.map((option) => (
     <ReasoningRow
       key={option.id}

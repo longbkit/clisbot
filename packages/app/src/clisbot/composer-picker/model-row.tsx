@@ -25,6 +25,8 @@ export interface ModelRowProps {
   onPick: (row: ProviderSelectionModelRow) => void;
   onToggleFavorite: (key: string) => void;
   onCreateProfile?: (seed: AgentProfileSeed) => void;
+  /** The pointer reached this row (desktop), so Reasoning can preview its efforts. */
+  onHover?: (key: string) => void;
 }
 
 function RowAction(props: {
@@ -102,7 +104,11 @@ export function ModelRow(props: ModelRowProps) {
   const touch = useTouchRows();
   const { row, onPick } = props;
   const pick = useCallback(() => onPick(row), [onPick, row]);
-  const enter = useCallback(() => setHovered(true), []);
+  const { onHover } = props;
+  const enter = useCallback(() => {
+    setHovered(true);
+    onHover?.(row.favoriteKey);
+  }, [onHover, row.favoriteKey]);
   const leave = useCallback(() => setHovered(false), []);
   const { shortcut, selected, serverId } = props;
   const trailing = useMemo(

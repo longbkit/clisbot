@@ -76,6 +76,7 @@ describe("combined model selector data", () => {
               modelLabel: "GPT-5.4",
               description: "gpt-5.4",
               isDefault: undefined,
+              thinkingOptions: [],
             },
           ],
         },

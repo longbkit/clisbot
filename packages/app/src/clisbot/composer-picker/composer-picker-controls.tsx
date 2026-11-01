@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Keyboard, View } from "react-native";
 import type { AgentFeature } from "@clisbot/protocol/agent-types";
@@ -70,12 +70,36 @@ function useChipLabels(props: ComposerPickerControlsProps) {
   };
 }
 
+/**
+ * Picks a model, then its effort once the composer reports the model as selected: a live
+ * agent confirms the model asynchronously, and the effort list belongs to the new model.
+ */
+function usePickModelWithEffort(props: ComposerPickerControlsProps) {
+  const pending = useRef<{ provider: string; modelId: string; effortId: string } | null>(null);
+  const { onPickModel, onSelectThinking, provider, selectedModelId, thinkingOptions } = props;
+  useEffect(() => {
+    const next = pending.current;
+    if (!next || next.provider !== provider || next.modelId !== selectedModelId) return;
+    if (!thinkingOptions.some((option) => option.id === next.effortId)) return;
+    pending.current = null;
+    onSelectThinking(next.effortId);
+  }, [onSelectThinking, provider, selectedModelId, thinkingOptions]);
+  return useCallback(
+    (nextProvider: string, modelId: string, effortId: string) => {
+      pending.current = { provider: nextProvider, modelId, effortId };
+      onPickModel(nextProvider, modelId);
+    },
+    [onPickModel],
+  );
+}
+
 /** The composer bar's two controls: the Model chip, which opens the panel, and Mode. */
 export function ComposerPickerControls(props: ComposerPickerControlsProps) {
   const anchorRef = useRef<View>(null);
   const [open, setOpen] = useState(false);
   const fullAutoAcceptSupported = useHostFeature(props.serverId, "fullAutoAccept");
   const labels = useChipLabels(props);
+  const pickModelWithEffort = usePickModelWithEffort(props);
   const { onOpen, onClose } = props;
   const panelFeatures = useMemo(
     () => resolvePanelFeatures(props.features ?? [], { fullAutoAcceptSupported }),
@@ -150,6 +174,7 @@ export function ComposerPickerControls(props: ComposerPickerControlsProps) {
         selectedModelId={props.selectedModelId}
         serverId={props.serverId}
         onPickModel={props.onPickModel}
+        onPickModelWithEffort={pickModelWithEffort}
         reasoning={reasoning}
         speed={panelFeatures.speed}
         moreFeatures={panelFeatures.more}

@@ -86,6 +86,7 @@ export function PanelList(props: PanelProps) {
         onShowMore={state.showMore}
         onToggleFavorite={state.toggleFavorite}
         onCreateProfile={props.onCreateProfile}
+        onHoverRow={props.onHoverRow}
         onRetry={actions.retry}
       />
     </View>

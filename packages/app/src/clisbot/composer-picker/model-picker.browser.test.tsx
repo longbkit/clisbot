@@ -74,6 +74,7 @@ const CODEX_SPEED: AgentFeature = {
 
 interface Calls {
   picks: Array<[string, string]>;
+  picksWithEffort: Array<[string, string, string]>;
   efforts: string[];
   features: Array<[string, unknown]>;
   openChanges: boolean[];
@@ -124,6 +125,11 @@ function Harness({
     [calls],
   );
   const openChange = useCallback((open: boolean) => calls.openChanges.push(open), [calls]);
+  const pickWithEffort = useCallback(
+    (providerId: string, model: string, effort: string) =>
+      calls.picksWithEffort.push([providerId, model, effort]),
+    [calls],
+  );
   const reasoning = useMemo(
     () => ({
       modelName: selected.model,
@@ -149,6 +155,7 @@ function Harness({
         serverId={extras.serverId ?? null}
         onRefreshProvider={extras.onRefreshProvider}
         onPickModel={pick}
+        onPickModelWithEffort={pickWithEffort}
         reasoning={reasoning}
         speed={panel.speed}
         moreFeatures={panel.more}
@@ -161,7 +168,7 @@ function Harness({
 }
 
 function newCalls(): Calls {
-  return { picks: [], efforts: [], features: [], openChanges: [] };
+  return { picks: [], picksWithEffort: [], efforts: [], features: [], openChanges: [] };
 }
 
 function mount(initial?: AgentFeature[], extras: HarnessExtras = {}): Calls {
@@ -236,6 +243,80 @@ it("collapses a broad query's matches behind Show more", async () => {
     .toBe(40);
   await search("bulk model 3");
   expect(await screen.findByTestId("composer-picker-show-more")).toBeTruthy();
+});
+
+function withEfforts(
+  entry: ProviderSelectorProvider,
+  efforts: Record<string, string[]>,
+): ProviderSelectorProvider {
+  if (entry.modelSelection.kind !== "models") return entry;
+  return {
+    ...entry,
+    modelSelection: {
+      kind: "models",
+      rows: entry.modelSelection.rows.map((row) => ({
+        ...row,
+        thinkingOptions: (efforts[row.modelId] ?? []).map((id) => ({ id, label: id })),
+      })),
+    },
+  };
+}
+
+const PREVIEW_PROVIDERS = [
+  PROVIDERS[0]!,
+  withEfforts(PROVIDERS[1]!, {
+    "GPT-6-Astra": ["low", "medium", "high"],
+    "GPT-6.1-Sol": ["minimal", "max"],
+    "GPT-5.4-mini": [],
+  }),
+];
+
+function reasoningText(): string {
+  return screen.getByTestId("composer-picker-reasoning").textContent ?? "";
+}
+
+it("previews a hovered model's reasoning and restores the selected one's on leaving", async () => {
+  const calls = mount(undefined, { providers: PREVIEW_PROVIDERS });
+  await userEvent.hover(await modelRow("codex:GPT-6.1-Sol"));
+  await expect.poll(reasoningText).toContain("6.1 Sol");
+  expect(screen.queryByTestId("composer-picker-effort-high")).toBeNull();
+  expect(screen.getByTestId("composer-picker-effort-max")).toBeTruthy();
+  // The selection does not change while previewing.
+  expect(calls.picks).toEqual([]);
+
+  // Picking a previewed effort picks that model with that effort.
+  await userEvent.click(screen.getByTestId("composer-picker-effort-max"));
+  expect(calls.picksWithEffort).toEqual([["codex", "GPT-6.1-Sol", "max"]]);
+
+  // Leaving the list for the rail restores the selected model's column.
+  await userEvent.hover(screen.getByTestId("composer-picker-rail-favorites"));
+  await expect.poll(reasoningText).toContain("GPT-6-Astra");
+  expect(screen.getByTestId("composer-picker-effort-high")).toBeTruthy();
+});
+
+it("previews the keyboard-highlighted model's reasoning", async () => {
+  mount(undefined, { providers: PREVIEW_PROVIDERS });
+  await modelRow("codex:GPT-6.1-Sol");
+  await userEvent.keyboard("{ArrowDown}{ArrowDown}");
+  await expect.poll(reasoningText).toContain("6.1 Sol");
+  await userEvent.keyboard("{ArrowDown}");
+  // A model with no efforts keeps the column, empty, rather than shifting the panel.
+  await expect.poll(reasoningText).toContain("5.4 mini");
+});
+
+it("leaves keys to the footer and the provider menu, and takes them from the search", async () => {
+  const calls = mount([CODEX_SPEED]);
+  await modelRow("codex:GPT-6.1-Sol");
+  const mod = getShortcutOs() === "mac" ? "Meta" : "Control";
+  act(() => screen.getByTestId("composer-picker-standard").focus());
+  await userEvent.keyboard(`{ArrowDown}{Enter}{${mod}>}2{/${mod}}`);
+  // Enter would open the menu, whose animation cannot run in this harness.
+  act(() => screen.getByTestId("composer-picker-provider-menu").focus());
+  await userEvent.keyboard(`{ArrowDown}{${mod}>}2{/${mod}}`);
+  expect(calls.picks).toEqual([]);
+  act(() => screen.getByTestId("composer-picker-search").focus());
+  await userEvent.keyboard(`{${mod}>}2{/${mod}}`);
+  expect(calls.picks).toEqual([["codex", "GPT-6.1-Sol"]]);
 });
 
 it("picks the Nth row with the ⌘ shortcut", async () => {
