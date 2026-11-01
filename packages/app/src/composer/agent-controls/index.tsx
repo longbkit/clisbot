@@ -83,7 +83,7 @@ interface ControlledAgentControlsProps {
   onSetFeature?: (featureId: string, value: unknown) => void;
   onDropdownClose?: () => void;
   onModelSelectorOpen?: () => void;
-  onRetryModelProvider?: (provider: AgentProvider) => void;
+  onRetryModelProvider?: (provider: AgentProvider) => void | Promise<void>;
   modeControl?: AgentModeControlValue | null;
   modelSelectorServerId?: string | null;
   isCompactLayout?: boolean;
@@ -418,7 +418,7 @@ function ControlledAgentControls({
           modeControl={modeControl ?? null}
           profiles={agentProfiles}
           onCreateProfile={onCreateAgentProfile}
-          onRetryProvider={onRetryModelProvider}
+          onRefreshProvider={onRetryModelProvider}
           serverId={modelSelectorServerId}
           disabled={disabled || !onSelectModel}
           isModelLoading={isModelLoading}
@@ -664,9 +664,7 @@ export const AgentControls = memo(function AgentControls({
   }, [agentProvider, refetchSnapshotIfStale]);
 
   const handleRetryModelProvider = useCallback(
-    (provider: AgentProvider) => {
-      void refreshSnapshot([provider]);
-    },
+    (provider: AgentProvider) => refreshSnapshot([provider]),
     [refreshSnapshot],
   );
 

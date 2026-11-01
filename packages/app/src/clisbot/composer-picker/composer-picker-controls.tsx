@@ -12,6 +12,7 @@ import { formatCompactModelName, formatModelChipLabel } from "./model-name";
 import { ModelPicker } from "./model-picker";
 import type { ReasoningOption } from "./reasoning-column";
 import { resolvePanelFeatures } from "./speed";
+import type { ProviderRefresh } from "./use-provider-refresh";
 
 export interface ComposerPickerControlsProps {
   provider: string;
@@ -26,7 +27,7 @@ export interface ComposerPickerControlsProps {
   modeControl: AgentModeControlValue | null;
   profiles: AgentProfilePicker | null;
   onCreateProfile?: (seed: AgentProfileSeed) => void;
-  onRetryProvider?: (provider: string) => void;
+  onRefreshProvider?: ProviderRefresh;
   serverId: string | null;
   disabled: boolean;
   isModelLoading: boolean;
@@ -152,7 +153,7 @@ export function ComposerPickerControls(props: ComposerPickerControlsProps) {
         mode={props.modeControl}
         profiles={props.profiles}
         onCreateProfile={createProfile}
-        onRetryProvider={props.onRetryProvider}
+        onRefreshProvider={props.onRefreshProvider}
       />
     </>
   );

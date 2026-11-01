@@ -1,9 +1,10 @@
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
-import { Star, UserRound } from "lucide-react-native";
+import { PanelLeftClose, PanelLeftOpen, Star, UserRound } from "lucide-react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ModelProviderGlyph } from "@/components/model-browser";
+import { ComboboxItem } from "@/components/ui/combobox";
 import { ChipButton, ChipRow } from "@/components/ui/filter-chips";
 import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import { ICON_SIZE } from "@/styles/theme";
@@ -14,9 +15,16 @@ interface ProviderRailProps {
   scope: PickerScope;
   serverId: string | null;
   onSelect: (scope: PickerScope) => void;
-  /** A column of icons with tooltips beside the list, or a labelled chip row on a phone. */
-  orientation: "vertical" | "horizontal";
+  /**
+   * `collapsed`: a column of icons with tooltips. `expanded`: icon and name per row.
+   * `horizontal`: a scrolling chip row with names, on a phone.
+   */
+  layout: RailLayout;
+  /** Shows or hides the names; the vertical rail's bottom button. */
+  onToggleExpanded?: () => void;
 }
+
+export type RailLayout = "collapsed" | "expanded" | "horizontal";
 
 function RailGlyph({ item, serverId }: { item: PickerRailItem; serverId: string | null }) {
   if (item.scope.kind === "favorites") {
@@ -47,7 +55,7 @@ function RailButton(props: {
   label: string;
   selected: boolean;
   serverId: string | null;
-  orientation: ProviderRailProps["orientation"];
+  layout: RailLayout;
   onSelect: (scope: PickerScope) => void;
 }) {
   const { item, onSelect } = props;
@@ -57,7 +65,7 @@ function RailButton(props: {
     [item, props.serverId],
   );
   const testID = `composer-picker-rail-${item.key}`;
-  if (props.orientation === "horizontal") {
+  if (props.layout === "horizontal") {
     return (
       <ChipButton
         role="tab"
@@ -72,20 +80,47 @@ function RailButton(props: {
   return (
     <View style={styles.railSlot}>
       {props.selected ? <View style={styles.accentBar} /> : null}
+      {props.layout === "expanded" ? (
+        <ComboboxItem
+          label={props.label}
+          leadingSlot={glyph}
+          active={props.selected}
+          onPress={press}
+          testID={testID}
+        />
+      ) : (
+        <ToolbarButton
+          label={props.label}
+          selected={props.selected}
+          tooltipSide="right"
+          onPress={press}
+          testID={testID}
+        >
+          {glyph}
+        </ToolbarButton>
+      )}
+    </View>
+  );
+}
+
+function ExpandToggle(props: { expanded: boolean; onToggle: () => void }) {
+  const { t } = useTranslation();
+  const Icon = props.expanded ? PanelLeftClose : PanelLeftOpen;
+  return (
+    <View style={props.expanded ? styles.toggleExpanded : styles.toggle}>
       <ToolbarButton
-        label={props.label}
-        selected={props.selected}
+        label={t(props.expanded ? "composer.picker.collapseRail" : "composer.picker.expandRail")}
         tooltipSide="right"
-        onPress={press}
-        testID={testID}
+        onPress={props.onToggle}
+        testID="composer-picker-rail-toggle"
       >
-        {glyph}
+        <Icon size={ICON_SIZE.md} color={styles.glyph.color} />
       </ToolbarButton>
     </View>
   );
 }
 
-/** Favorites, each provider, then the Host's Agent profiles. */
+/** Favorites, each provider in the user's order, then the Host's Agent profiles. */
 export function ProviderRail(props: ProviderRailProps) {
   const labelOf = useRailLabel();
   const current = scopeKey(props.scope);
@@ -96,34 +131,63 @@ export function ProviderRail(props: ProviderRailProps) {
       label={labelOf(item)}
       selected={item.key === current}
       serverId={props.serverId}
-      orientation={props.orientation}
+      layout={props.layout}
       onSelect={props.onSelect}
     />
   ));
-  if (props.orientation === "vertical") {
+  if (props.layout === "horizontal") {
     return (
-      <View style={styles.column} accessibilityRole="tablist">
-        {buttons}
-      </View>
+      <ChipRow backdrop="surface0" contentStyle={styles.chipRowContent}>
+        <View style={styles.chipLine} accessibilityRole="tablist">
+          {buttons}
+        </View>
+      </ChipRow>
     );
   }
+  const expanded = props.layout === "expanded";
   return (
-    <ChipRow backdrop="surface0" contentStyle={styles.chipRowContent}>
-      <View style={styles.chipLine} accessibilityRole="tablist">
+    <View
+      style={expanded ? styles.columnExpanded : styles.column}
+      testID={`composer-picker-rail-${props.layout}`}
+    >
+      <View style={expanded ? styles.rowsExpanded : styles.rows} accessibilityRole="tablist">
         {buttons}
       </View>
-    </ChipRow>
+      {props.onToggleExpanded ? (
+        <ExpandToggle expanded={expanded} onToggle={props.onToggleExpanded} />
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
   column: {
-    alignItems: "center",
-    gap: theme.spacing[1],
+    justifyContent: "space-between",
     paddingVertical: theme.spacing[2],
     paddingHorizontal: theme.spacing[1],
     borderRightWidth: 1,
     borderRightColor: theme.colors.borderSubtle,
+  },
+  columnExpanded: {
+    width: 176,
+    justifyContent: "space-between",
+    paddingVertical: theme.spacing[2],
+    borderRightWidth: 1,
+    borderRightColor: theme.colors.borderSubtle,
+  },
+  rows: {
+    alignItems: "center",
+    gap: theme.spacing[1],
+  },
+  rowsExpanded: {
+    gap: 0,
+  },
+  toggle: {
+    alignItems: "center",
+  },
+  toggleExpanded: {
+    alignItems: "flex-start",
+    paddingLeft: theme.spacing[2],
   },
   railSlot: {
     position: "relative",

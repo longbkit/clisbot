@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import type { AgentFeature } from "@clisbot/protocol/agent-types";
@@ -9,6 +9,8 @@ import { i18n } from "@/i18n/i18next";
 import type { ProviderSelectorProvider } from "@/provider-selection/provider-selection";
 import { getShortcutOs } from "@/utils/shortcut-platform";
 import { useModelFavoritesStore } from "./favorites-store";
+import { useProviderRailStore } from "./rail-store";
+import { useProviderSettingsStore } from "@/stores/provider-settings-store";
 import { ModelPicker, type ModelPickerProps } from "./model-picker";
 import { resolvePanelFeatures } from "./speed";
 
@@ -83,7 +85,20 @@ const EFFORTS = [
   { id: "high", label: "High" },
 ];
 
-function Harness({ calls, features: initial }: { calls: Calls; features?: AgentFeature[] }) {
+interface HarnessExtras {
+  serverId?: string | null;
+  onRefreshProvider?: ModelPickerProps["onRefreshProvider"];
+}
+
+function Harness({
+  calls,
+  features: initial,
+  extras,
+}: {
+  calls: Calls;
+  features?: AgentFeature[];
+  extras: HarnessExtras;
+}) {
   const anchorRef = useRef<View | null>(null);
   const [selected, setSelected] = useState({ provider: "codex", model: "GPT-6-Astra" });
   const [features, setFeatures] = useState(initial ?? []);
@@ -129,7 +144,8 @@ function Harness({ calls, features: initial }: { calls: Calls; features?: AgentF
         providers={PROVIDERS}
         selectedProvider={selected.provider}
         selectedModelId={selected.model}
-        serverId={null}
+        serverId={extras.serverId ?? null}
+        onRefreshProvider={extras.onRefreshProvider}
         onPickModel={pick}
         reasoning={reasoning}
         speed={panel.speed}
@@ -146,12 +162,12 @@ function newCalls(): Calls {
   return { picks: [], efforts: [], features: [], openChanges: [] };
 }
 
-function mount(initial?: AgentFeature[]): Calls {
+function mount(initial?: AgentFeature[], extras: HarnessExtras = {}): Calls {
   const calls = newCalls();
   // The composer opens pickers upward; this anchor sits at the top, so the panel opens down.
   render(
     <ComposerPickerPlacementProvider value="bottom-start">
-      <Harness calls={calls} features={initial} />
+      <Harness calls={calls} features={initial} extras={extras} />
     </ComposerPickerPlacementProvider>,
   );
   return calls;
@@ -164,6 +180,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await page.viewport(1280, 900);
   useModelFavoritesStore.setState({ keys: [] });
+  useProviderRailStore.setState({ expanded: false, order: [] });
 });
 afterEach(() => {
   cleanup();
@@ -242,4 +259,86 @@ it("switches to Fast and warns that it costs more", async () => {
   expect(calls.features).toEqual([["service_tier", "fast"]]);
   expect(await screen.findByText("Higher cost")).toBeTruthy();
   expect(calls.openChanges).toEqual([]);
+});
+
+// The menu's entering animation never settles in this harness, so the item is pressed directly.
+async function pressMenuItem(testID: string) {
+  const item = await screen.findByTestId(testID);
+  act(() => item.click());
+}
+
+function railOrder(): string[] {
+  return [...document.querySelectorAll('[data-testid^="composer-picker-rail-"]')]
+    .map((node) => node.getAttribute("data-testid") ?? "")
+    .filter((id) => /rail-(favorites|provider:)/.test(id));
+}
+
+it("shows icons only when collapsed and names when expanded, and remembers it", async () => {
+  mount();
+  const rail = await screen.findByTestId("composer-picker-rail-collapsed");
+  expect(rail.textContent).not.toContain("Codex");
+  await userEvent.click(screen.getByTestId("composer-picker-rail-toggle"));
+  expect((await screen.findByTestId("composer-picker-rail-expanded")).textContent).toContain(
+    "Codex",
+  );
+  expect(useProviderRailStore.getState().expanded).toBe(true);
+});
+
+it("moves a provider up from its menu and keeps Favorites first", async () => {
+  mount();
+  expect(railOrder()).toEqual([
+    "composer-picker-rail-favorites",
+    "composer-picker-rail-provider:claude",
+    "composer-picker-rail-provider:codex",
+  ]);
+  await userEvent.click(await screen.findByTestId("composer-picker-provider-menu"));
+  expect(await screen.findByTestId("composer-picker-provider-move-down")).toBeTruthy();
+  await pressMenuItem("composer-picker-provider-move-up");
+  expect(useProviderRailStore.getState().order).toEqual(["codex", "claude"]);
+  await expect
+    .poll(railOrder)
+    .toEqual([
+      "composer-picker-rail-favorites",
+      "composer-picker-rail-provider:codex",
+      "composer-picker-rail-provider:claude",
+    ]);
+});
+
+it("opens the provider's settings from its menu, closing the panel", async () => {
+  const open = vi.fn();
+  useProviderSettingsStore.setState({ open });
+  const calls = mount(undefined, { serverId: "host-1" });
+  await userEvent.click(await screen.findByTestId("composer-picker-provider-menu"));
+  await pressMenuItem("composer-picker-provider-settings");
+  await expect
+    .poll(() => open.mock.calls[0]?.[0])
+    .toMatchObject({ serverId: "host-1", provider: "codex" });
+  expect(calls.openChanges).toEqual([false]);
+});
+
+it("refreshes the provider's models in place, with a spinner, an error and Retry", async () => {
+  let fail: (error: Error) => void = () => {};
+  const refresh = vi.fn(
+    () =>
+      new Promise<void>((_resolve, reject) => {
+        fail = reject;
+      }),
+  );
+  const calls = mount(undefined, { onRefreshProvider: refresh });
+  const button = await screen.findByTestId("composer-picker-provider-refresh");
+  await userEvent.click(button);
+  await userEvent.click(button, { force: true });
+  expect(refresh).toHaveBeenCalledTimes(1);
+  expect(refresh).toHaveBeenCalledWith("codex");
+  fail(new Error("catalog timed out"));
+  const error = await screen.findByTestId("composer-picker-provider-refresh-error");
+  expect(error.textContent).toContain("catalog timed out");
+  refresh.mockImplementation(() => Promise.resolve());
+  await userEvent.click(screen.getByText("Retry"));
+  expect(refresh).toHaveBeenCalledTimes(2);
+  await expect
+    .poll(() => screen.queryByTestId("composer-picker-provider-refresh-error"))
+    .toBeNull();
+  expect(calls.openChanges).toEqual([]);
+  expect(screen.getByTestId("composer-picker-model-codex:GPT-6-Astra")).toBeTruthy();
 });

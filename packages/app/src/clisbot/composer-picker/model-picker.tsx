@@ -15,7 +15,6 @@ import type {
   ProviderSelectorProvider,
 } from "@/provider-selection/provider-selection";
 import { ModeDropdown } from "./mode-dropdown";
-import { ModelList, ProfileList } from "./model-list";
 import { MoreFeatures } from "./more-features";
 import { buildRailItems } from "./picker-rows";
 import { ProviderRail } from "./provider-rail";
@@ -24,10 +23,14 @@ import { SpeedSegment } from "./speed-segment";
 import type { SpeedControl } from "./speed";
 import { useModelPickerState, type ModelPickerState } from "./use-model-picker-state";
 import { usePickerKeyboard } from "./use-picker-keyboard";
+import { PanelList } from "./panel-list";
+import type { ProviderRefresh } from "./use-provider-refresh";
+import { useProviderRail, type ProviderRailControl } from "./use-provider-rail";
 
 const EMPTY_OPTIONS: never[] = [];
 const PANEL_HEIGHT = 440;
 const PANEL_WIDTH = 640;
+const PANEL_WIDTH_EXPANDED = 760;
 
 function noop() {}
 
@@ -48,8 +51,15 @@ export interface ModelPickerProps {
   mode: AgentModeControlValue | null;
   profiles: AgentProfilePicker | null;
   onCreateProfile?: (seed: AgentProfileSeed) => void;
-  onRetryProvider?: (provider: string) => void;
+  /** Reloads one provider's model list (the provider snapshot refresh Settings uses). */
+  onRefreshProvider?: ProviderRefresh;
 }
+
+export type PanelProps = ModelPickerProps & {
+  state: ModelPickerState;
+  rail: ProviderRailControl;
+  onPick: (row: ProviderSelectionModelRow) => void;
+};
 
 function useSearchHeader(state: ModelPickerState, open: boolean, isCompact: boolean): SheetHeader {
   const { t } = useTranslation();
@@ -72,55 +82,14 @@ function useSearchHeader(state: ModelPickerState, open: boolean, isCompact: bool
   );
 }
 
-function PanelList(
-  props: ModelPickerProps & {
-    state: ModelPickerState;
-    onPick: (row: ProviderSelectionModelRow) => void;
-  },
-) {
-  const { t } = useTranslation();
-  const { state, onRetryProvider } = props;
-  const { scope } = state;
-  const retry = useMemo(
-    () =>
-      scope.kind === "provider" && onRetryProvider
-        ? () => onRetryProvider(scope.providerId)
-        : undefined,
-    [onRetryProvider, scope],
-  );
-  if (scope.kind === "profiles" && props.profiles && !state.query.trim()) {
-    return <ProfileList profiles={props.profiles} emptyText={t("composer.picker.noMatches")} />;
-  }
-  const emptyKey = scope.kind === "favorites" && !state.query.trim() ? "noFavorites" : "noMatches";
-  return (
-    <ModelList
-      rows={state.rows}
-      hiddenCount={state.hiddenCount}
-      status={state.status}
-      emptyText={t(`composer.picker.${emptyKey}`)}
-      selectedKey={state.selectedKey}
-      highlightIndex={state.highlight}
-      favorites={state.favorites}
-      serverId={props.serverId}
-      onPick={props.onPick}
-      onShowMore={state.showMore}
-      onToggleFavorite={state.toggleFavorite}
-      onCreateProfile={props.onCreateProfile}
-      onRetry={retry}
-    />
-  );
-}
-
-function PanelBody(
-  props: ModelPickerProps & {
-    state: ModelPickerState;
-    onPick: (row: ProviderSelectionModelRow) => void;
-  },
-) {
+function PanelBody(props: PanelProps) {
   const { state, isCompact } = props;
   const railItems = useMemo(
-    () => buildRailItems(props.providers, { hasProfiles: (props.profiles?.rows.length ?? 0) > 0 }),
-    [props.profiles, props.providers],
+    () =>
+      buildRailItems(props.rail.providers, {
+        hasProfiles: (props.profiles?.rows.length ?? 0) > 0,
+      }),
+    [props.profiles, props.rail.providers],
   );
   const orientation = isCompact ? "horizontal" : "vertical";
   const rail = (
@@ -129,7 +98,8 @@ function PanelBody(
       scope={state.scope}
       serverId={props.serverId}
       onSelect={state.setScope}
-      orientation={orientation}
+      layout={props.rail.layout}
+      onToggleExpanded={isCompact ? undefined : props.rail.toggle}
     />
   );
   const reasoning = <ReasoningColumn {...props.reasoning} orientation={orientation} />;
@@ -186,8 +156,17 @@ function PanelFooter(props: ModelPickerProps) {
  */
 export function ModelPicker(props: ModelPickerProps) {
   const placement = useComposerPickerPlacement();
-  const state = useModelPickerState({
+  const { onOpenChange } = props;
+  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
+  const rail = useProviderRail({
     providers: props.providers,
+    isCompact: props.isCompact,
+    serverId: props.serverId,
+    close,
+    refresh: props.onRefreshProvider,
+  });
+  const state = useModelPickerState({
+    providers: rail.providers,
     selectedProvider: props.selectedProvider,
     selectedModelId: props.selectedModelId,
     open: props.open,
@@ -222,7 +201,7 @@ export function ModelPicker(props: ModelPickerProps) {
       onOpenChange={props.onOpenChange}
       anchorRef={props.anchorRef}
       desktopPlacement={placement}
-      desktopMinWidth={PANEL_WIDTH}
+      desktopMinWidth={rail.layout === "expanded" ? PANEL_WIDTH_EXPANDED : PANEL_WIDTH}
       desktopLockWidth
       desktopFixedHeight={PANEL_HEIGHT}
       desktopChildrenScrollEnabled={false}
@@ -230,7 +209,7 @@ export function ModelPicker(props: ModelPickerProps) {
       footer={footer}
       mobileChildrenContentContainerStyle={styles.mobileContent}
     >
-      <PanelBody {...props} state={state} onPick={pick} />
+      <PanelBody {...props} state={state} rail={rail} onPick={pick} />
     </Combobox>
   );
 }

@@ -4,6 +4,14 @@
  * app knows; any other mode keeps the daemon's label.
  */
 const en = {
+  expandRail: "Show provider names",
+  collapseRail: "Hide provider names",
+  providerSettings: "Provider settings…",
+  refreshModels: "Refresh models",
+  refreshFailed: "Couldn't refresh models",
+  moveUp: "Move up",
+  moveDown: "Move down",
+  providerOptions: "{{provider}} options",
   chip: "Model and options: {{value}}",
   title: "Model",
   searchPlaceholder: "Search models…",
@@ -64,6 +72,14 @@ export type ComposerPickerResources = typeof en;
 export const composerPicker: ComposerPickerResources = en;
 
 export const composerPickerVi: ComposerPickerResources = {
+  expandRail: "Hiện tên nhà cung cấp",
+  collapseRail: "Ẩn tên nhà cung cấp",
+  providerSettings: "Cài đặt nhà cung cấp…",
+  refreshModels: "Làm mới danh sách mô hình",
+  refreshFailed: "Không làm mới được danh sách mô hình",
+  moveUp: "Lên trên",
+  moveDown: "Xuống dưới",
+  providerOptions: "Tùy chọn {{provider}}",
   chip: "Mô hình và tùy chọn: {{value}}",
   title: "Mô hình",
   searchPlaceholder: "Tìm mô hình…",
@@ -121,6 +137,14 @@ export const composerPickerVi: ComposerPickerResources = {
 };
 
 export const composerPickerAr: ComposerPickerResources = {
+  expandRail: "إظهار أسماء المزوّدين",
+  collapseRail: "إخفاء أسماء المزوّدين",
+  providerSettings: "إعدادات المزوّد…",
+  refreshModels: "تحديث النماذج",
+  refreshFailed: "تعذّر تحديث النماذج",
+  moveUp: "نقل لأعلى",
+  moveDown: "نقل لأسفل",
+  providerOptions: "خيارات {{provider}}",
   chip: "النموذج والخيارات: {{value}}",
   title: "النموذج",
   searchPlaceholder: "ابحث عن نموذج…",
@@ -178,6 +202,14 @@ export const composerPickerAr: ComposerPickerResources = {
 };
 
 export const composerPickerEs: ComposerPickerResources = {
+  expandRail: "Mostrar nombres de proveedores",
+  collapseRail: "Ocultar nombres de proveedores",
+  providerSettings: "Ajustes del proveedor…",
+  refreshModels: "Actualizar modelos",
+  refreshFailed: "No se pudieron actualizar los modelos",
+  moveUp: "Subir",
+  moveDown: "Bajar",
+  providerOptions: "Opciones de {{provider}}",
   chip: "Modelo y opciones: {{value}}",
   title: "Modelo",
   searchPlaceholder: "Buscar modelos…",
@@ -235,6 +267,14 @@ export const composerPickerEs: ComposerPickerResources = {
 };
 
 export const composerPickerFr: ComposerPickerResources = {
+  expandRail: "Afficher les noms des fournisseurs",
+  collapseRail: "Masquer les noms des fournisseurs",
+  providerSettings: "Réglages du fournisseur…",
+  refreshModels: "Actualiser les modèles",
+  refreshFailed: "Impossible d'actualiser les modèles",
+  moveUp: "Monter",
+  moveDown: "Descendre",
+  providerOptions: "Options de {{provider}}",
   chip: "Modèle et options : {{value}}",
   title: "Modèle",
   searchPlaceholder: "Rechercher un modèle…",
@@ -292,6 +332,14 @@ export const composerPickerFr: ComposerPickerResources = {
 };
 
 export const composerPickerJa: ComposerPickerResources = {
+  expandRail: "プロバイダー名を表示",
+  collapseRail: "プロバイダー名を隠す",
+  providerSettings: "プロバイダー設定…",
+  refreshModels: "モデルを更新",
+  refreshFailed: "モデルを更新できませんでした",
+  moveUp: "上へ移動",
+  moveDown: "下へ移動",
+  providerOptions: "{{provider}} のオプション",
   chip: "モデルとオプション: {{value}}",
   title: "モデル",
   searchPlaceholder: "モデルを検索…",
@@ -349,6 +397,14 @@ export const composerPickerJa: ComposerPickerResources = {
 };
 
 export const composerPickerKo: ComposerPickerResources = {
+  expandRail: "제공자 이름 표시",
+  collapseRail: "제공자 이름 숨기기",
+  providerSettings: "제공자 설정…",
+  refreshModels: "모델 새로 고침",
+  refreshFailed: "모델을 새로 고치지 못했습니다",
+  moveUp: "위로 이동",
+  moveDown: "아래로 이동",
+  providerOptions: "{{provider}} 옵션",
   chip: "모델 및 옵션: {{value}}",
   title: "모델",
   searchPlaceholder: "모델 검색…",
@@ -406,6 +462,14 @@ export const composerPickerKo: ComposerPickerResources = {
 };
 
 export const composerPickerPtBR: ComposerPickerResources = {
+  expandRail: "Mostrar nomes dos provedores",
+  collapseRail: "Ocultar nomes dos provedores",
+  providerSettings: "Configurações do provedor…",
+  refreshModels: "Atualizar modelos",
+  refreshFailed: "Não foi possível atualizar os modelos",
+  moveUp: "Mover para cima",
+  moveDown: "Mover para baixo",
+  providerOptions: "Opções de {{provider}}",
   chip: "Modelo e opções: {{value}}",
   title: "Modelo",
   searchPlaceholder: "Buscar modelos…",
@@ -463,6 +527,14 @@ export const composerPickerPtBR: ComposerPickerResources = {
 };
 
 export const composerPickerRu: ComposerPickerResources = {
+  expandRail: "Показать названия провайдеров",
+  collapseRail: "Скрыть названия провайдеров",
+  providerSettings: "Настройки провайдера…",
+  refreshModels: "Обновить модели",
+  refreshFailed: "Не удалось обновить модели",
+  moveUp: "Выше",
+  moveDown: "Ниже",
+  providerOptions: "Параметры {{provider}}",
   chip: "Модель и параметры: {{value}}",
   title: "Модель",
   searchPlaceholder: "Поиск моделей…",
@@ -520,6 +592,14 @@ export const composerPickerRu: ComposerPickerResources = {
 };
 
 export const composerPickerZhCN: ComposerPickerResources = {
+  expandRail: "显示提供方名称",
+  collapseRail: "隐藏提供方名称",
+  providerSettings: "提供方设置…",
+  refreshModels: "刷新模型",
+  refreshFailed: "无法刷新模型",
+  moveUp: "上移",
+  moveDown: "下移",
+  providerOptions: "{{provider}} 选项",
   chip: "模型和选项：{{value}}",
   title: "模型",
   searchPlaceholder: "搜索模型…",
