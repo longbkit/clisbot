@@ -142,7 +142,10 @@ vi.mock("./hosts-unreachable-state", () => ({ HostsUnreachableState: () => null 
 vi.mock("./list-state", () => ({ ListState: () => null }));
 vi.mock("./outside-filter-notice", () => ({ OutsideFilterNotice: () => null }));
 vi.mock("./held-order", () => ({ useHeldOrder: () => ({ held: null, handlers: {} }) }));
-vi.mock("./section-controls", () => ({ SectionControls: () => null }));
+vi.mock("./section-controls", () => ({
+  SectionControls: () => null,
+  useSectionBackdrop: () => "surfaceSidebar",
+}));
 vi.mock("./section-header", () => ({
   HeaderMenuIcon: () => null,
   HeaderSearchButton: () => null,
