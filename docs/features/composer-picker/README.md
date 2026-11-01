@@ -3,7 +3,7 @@
 Flag: `EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER` (on unless `0`). It switches both the picker and the
 chat layout; `0` renders the upstream composer, toolbar and model sheet.
 
-CURRENT — `feat/plan-in-modes`, 2026-11-01. The picker is modelled on T3 Code's; the layout on
+CURRENT — `fix/home-select-model-chip`, 2026-11-01. The picker is modelled on T3 Code's; the layout on
 Telegram's input with the settings row of the Claude app.
 
 ## Layout
@@ -23,8 +23,8 @@ under it, on every width:
 | ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | One container: Menu chip, emoji, text, 📎, the mic circle           | One container: Commands chip (☰), text, 📎, realtime voice, the mic circle |
 | Typing: 📎 hides, the circle becomes Send in place                  | Voice hides, 📎 stays; Send takes the circle, same place and size           |
-| Menu ↔ ✕ Menu; the command list docks above the bar                 | ☰ ↔ ✕; the slash list docks above the bar, as wide, with a handle          |
-| Rows: description left, `/command` right and muted                  | Same, the command's arguments after it                                      |
+| Menu ↔ ✕ Menu; the command list docks above the bar                 | ☰ ↔ ✕; the slash list docks on the side with more room, with a handle      |
+| Rows: description left, `/command` right and muted                  | Same, arguments after it; a phone stacks `/command` over the description    |
 | Expanded: back top left, the text above, the controls at the bottom | Same controls in the same places, the text grown; no undo or redo           |
 
 **Where we differ, on purpose.**
@@ -79,6 +79,13 @@ under it, on every width:
   in this order: the effort leaves the Model chip, Mode keeps its icon (a phone always shows the
   icon), Tools keeps its icon and count (the icon alone when off, below 400px). The ring stays.
   Accessible names keep the full labels.
+- **The command list opens on the side with more room** (`command-list-placement.ts`): above a
+  chat's composer at the bottom, below Home's near the top, where above it left two truncated
+  rows under the header (2026-11). The room counts the settled keyboard and the anchor's lift, so
+  the list stays above the keyboard; the best match sits next to the composer on either side, so
+  Enter and the arrows read the same. On a phone it may take 60% of the screen and scrolls
+  inside, and each row stacks: the command whole in medium weight, then its description muted on
+  up to two lines. Desktop keeps the one-line row and its 220px height.
 - **Panels open above the composer.** The Model panel anchors to the whole composer
   (`frame-anchor.tsx`), so it never covers the text. Mode and Tools keep their own anchors.
 - The phone placeholder is "Message...": Commands already names `/commands`. The composer's
@@ -146,6 +153,9 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
 - **The rail opens on the current model's provider**, so the check is on screen; Favorites is
   one press away. A running agent is one provider's process, so its rail holds Favorites and
   that provider only.
+- **Rail size.** Collapsed, each entry is a 44px target with a 20px glyph, the count under the
+  glyph while searching; expanded rows are 44px with names. Small 16px icons in 32px buttons read
+  as chrome rather than as the place to pick a provider.
 - **Icons or names.** The rail's bottom button shows or hides provider names. The choice is per
   device (`rail-store.ts`, key `composer-provider-rail`). Until someone chooses, a window at
   least 1200px wide opens with names, friendlier for a first look, and a narrower one with icons.
@@ -160,11 +170,23 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
   while one runs, keeps the panel open and the selection, and shows an error with Retry beside
   the list. Provider settings opens the provider's settings sheet over the panel, where the
   model list and advanced options live; closing it returns to the panel.
-- **A query searches every provider** and matches provider names too: `codex` lists every Codex
-  model, `so` every model containing "so". Search matches and Favorites mix providers, so each
-  of their rows names its provider under the model; two providers can sell the same label. Like
-  a provider's list, matches past the first eight wait behind Show more, so a broad query over a
-  large catalog never mounts hundreds of rows.
+- **Search reads like an autocomplete** (`picker-search.ts`). Text is lowercased, accents drop
+  (`đ` too) and `-` `.` `_` `/` and spaces separate words. Every word of the query must match the
+  model's name, id or provider, in any order, at the start of a word, as a run of words read
+  without separators (`gpt6`, `opus55`) or inside a word. Rows rank exact, then prefix, then word
+  prefix, then inside a word; on a tie the current provider's, then favourites, then the
+  catalog's order. Results follow every keystroke, the first is highlighted so Enter picks it,
+  and the matched characters are bold. A provider name matches at word prefix best: `codex` lists
+  every Codex model without ranking them above a model named so.
+- **While searching the rail filters.** Each entry shows its match count; a provider without one
+  is dimmed and cannot be pressed. Pressing a provider or Favorites narrows the results to it and
+  selects it, and "in Codex ×" beside the search field widens them again. Without narrowing the
+  results are grouped under a header per provider, in rail order except that a provider with a
+  better match comes first, so the first row is always the best. Profiles is not searched:
+  pressing it ends the search and lists the profiles. Clearing the query returns to the plain
+  rail, on the entry last pressed. Favorites, alone or narrowing, mix providers, so their rows
+  name their provider. Matches past the first eight wait behind Show more, so a broad query over
+  a large catalog never mounts hundreds of rows.
 - **Profiles** is on the rail whenever the Host supports Agent profiles, even with none that
   apply: its list applies a profile with one press (the panel stays open), its header pencil
   opens the Host's Agent profiles settings, and with none it offers Create profile, which goes
@@ -341,15 +363,19 @@ permission request the agent still raises. Agents sometimes ask under bypass any
 `packages/app/src/clisbot/composer-layout/`: `chat-composer-presentation.tsx` (the container,
 its circle, the settings row and the expanded editor in one tree, so the editor never
 remounts), `layout-styles.ts`, `commands-button.tsx`, `command-row.tsx`, `slash-trigger.ts`,
-`input-facts.ts`, `settings-row.tsx`, `frame-anchor.tsx`, `geometry.ts` and `feature.ts`.
+`input-facts.ts`, `settings-row.tsx`, `frame-anchor.tsx`, `geometry.ts`,
+`command-list-placement.ts` and `feature.ts`. The upstream `AutocompletePopover`,
+`Autocomplete` and `useAgentAutocomplete` take the side the list opens on
+(`optionsPosition`); with the flag off it is always above.
 `composer/input/input.tsx` builds the same pieces as before and hands them to `ChatComposerPresentation` instead of the upstream toolbar while the flag is on and
 the composer is a chat one; `composer/input/presentation.tsx` shares its fullscreen chrome
 (`useComposerFullscreenChrome`) with it.
 
 `packages/app/src/clisbot/composer-picker/`: `composer-picker-controls.tsx` (the bar),
 `model-picker.tsx` (the panel), `provider-rail.tsx`, `model-list.tsx`, `model-row.tsx`,
-`reasoning-column.tsx`, `speed-segment.tsx`, `more-features.tsx`, `mode-dropdown.tsx`, and the
-pure modules `picker-rows.ts`, `speed.ts`, `mode-options.ts`, `model-name.ts`, `picker-keys.ts`.
+`reasoning-column.tsx`, `speed-segment.tsx`, `more-features.tsx`, `mode-dropdown.tsx`,
+`highlighted-label.tsx`, and the pure modules `picker-search.ts`, `picker-rows.ts`, `speed.ts`,
+`mode-options.ts`, `model-name.ts`, `picker-keys.ts`.
 `composer/agent-controls/index.tsx` stays the upstream file, model sheet and toolbar included,
 and feeds the live agent's or the draft's data to `picker-agent-controls.tsx` in their place
 while the picker is on. `feature.ts` holds the switch: `EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER=0`
@@ -369,15 +395,19 @@ chrome's ghost `Button` (expand, collapse) and the composer surface tokens (`sur
 `borderComposer`, `shadow.composer`).
 
 Picker primitives: `Combobox` (panel and Mode menu), `ComboboxTrigger` (chip), `AgentControlTrigger`
-(Mode), `ComboboxItem` (rows), `ToolbarButton` (rail on desktop, row star and Create profile),
-`ChipRow` + `ChipButton` (rail and efforts on a phone), `SegmentedControl` (Speed),
+(Mode), `ComboboxItem` (rows, `labelContent` for the bold matches), `ToolbarButton` (rail on
+desktop, row star and Create profile), `ChipRow` + `ChipButton` (rail and efforts on a phone,
+the "in Codex ×" chip with its `trailing` slot, dimmed entries with `disabled`),
+`SegmentedControl` (Speed),
 `StatusBadge` (Higher cost), `Switch` and `Button` (More options, Retry).
 
 `rail-store.ts`, `use-provider-rail.ts`, `use-provider-refresh.ts`, `provider-header.tsx` and
 `panel-list.tsx` hold the rail's order, width and per-provider actions.
 
-Tests: `chat-composer-presentation.browser.test.tsx`, `command-list.browser.test.tsx` and
-`slash-trigger.test.ts` for the layout, `e2e/browser/composer-layout.spec.ts` (desktop 1280,
+Tests: `chat-composer-presentation.browser.test.tsx`, `command-list.browser.test.tsx`,
+`command-list-placement.test.ts` and `slash-trigger.test.ts` for the layout (the Home phone list
+in `composer-layout.spec.ts`; screenshots to `.debug/composer-picker-search/`),
+`picker-search.test.ts` for search and ranking, `e2e/browser/composer-layout.spec.ts` (desktop 1280,
 phone 390 and 320, light and dark, expand at three lines with the caret kept; screenshots to
 `.debug/composer-layout/`), `composer-control-density.spec.ts` (targets and faces),
 `model-picker.browser.test.tsx`, `mode-dropdown.browser.test.tsx`, the unit tests beside

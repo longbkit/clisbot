@@ -103,6 +103,7 @@ import { Shortcut } from "@/components/ui/shortcut";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { AutocompletePopover } from "@/components/ui/autocomplete-popover";
 import type { AutocompleteOption } from "@/components/ui/autocomplete";
+import type { AutocompleteOptionsPosition } from "@/components/ui/autocomplete-utils";
 import { useAgentAutocomplete } from "@/hooks/use-agent-autocomplete";
 import { usePluginClientSlashCommands } from "@/plugins/client-slash-commands";
 import {
@@ -1016,8 +1017,12 @@ function ComposerAutocompleteBinding({
 }) {
   const userInput = useSyncExternalStore(text.subscribe, text.getSnapshot, text.getSnapshot);
   const cursorIndex = useStore(cursor);
+  // The popover reports which side of the composer it opened on; the options follow it.
+  const [optionsPosition, setOptionsPosition] =
+    useState<AutocompleteOptionsPosition>("above-input");
   const autocomplete = useAgentAutocomplete({
     ...configuration,
+    optionsPosition,
     userInput,
     cursorIndex: Math.min(cursorIndex, userInput.length),
     onAutocompleteApplied: () => inputRef.current?.focus(),
@@ -1043,6 +1048,7 @@ function ComposerAutocompleteBinding({
       errorMessage={autocomplete.errorMessage}
       loadingText={autocomplete.loadingText}
       emptyText={autocomplete.emptyText}
+      onPositionChange={setOptionsPosition}
     />
   );
 }

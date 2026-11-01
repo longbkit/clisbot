@@ -9,7 +9,10 @@ import {
   type DraftCommandConfig,
   type DraftCommandTarget,
 } from "./use-agent-commands-query";
-import { orderAutocompleteOptions } from "@/components/ui/autocomplete-utils";
+import {
+  orderAutocompleteOptions,
+  type AutocompleteOptionsPosition,
+} from "@/components/ui/autocomplete-utils";
 import { useAutocomplete } from "./use-autocomplete";
 import { useSessionStore } from "@/stores/session-store";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
@@ -50,6 +53,11 @@ interface UseAgentAutocompleteInput {
   pluginClientSlashCommands?: readonly PluginClientSlashCommand[];
   /** Group chat members offered before files when typing `@` (Clisbot Bots & Chats). */
   mentionMembers?: readonly AutocompleteMentionMember[];
+  /**
+   * Which side of the input the list opens on (Clisbot chat layout); the best match sits next
+   * to the input either way. Upstream always opens above.
+   */
+  optionsPosition?: AutocompleteOptionsPosition;
 }
 
 interface AgentAutocompleteKeyPressEvent {
@@ -545,10 +553,12 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
       t,
     ],
   );
-  const options = useMemo(
-    () => (memberOptions.length > 0 ? [...memberOptions, ...commandOptions] : commandOptions),
-    [commandOptions, memberOptions],
-  );
+  const optionsPosition = input.optionsPosition ?? "above-input";
+  const options = useMemo(() => {
+    const aboveInput =
+      memberOptions.length > 0 ? [...memberOptions, ...commandOptions] : commandOptions;
+    return optionsPosition === "below-input" ? aboveInput.toReversed() : aboveInput;
+  }, [commandOptions, memberOptions, optionsPosition]);
 
   const onSelectOption = useCallback(
     (option: AutocompleteOption, snapshot?: AgentAutocompleteInputSnapshot) => {
@@ -628,6 +638,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
   const { selectedIndex, onKeyPress } = useAutocomplete({
     isVisible,
     options,
+    optionsPosition,
     query: mode === "command" ? commandFilterQuery : fileFilterQuery,
     onSelectOption: selectOptionFromKeyPress,
     onEscape:
