@@ -1,6 +1,7 @@
 import { uploadLocalQueueCopies } from "./host-queue-content";
 import { splitIntoMessageParts } from "./message-parts";
 import type { SendImage } from "@/attachments/image-send-preparation";
+import type { QueueMessageParts } from "./types";
 import type { SelectedFile } from "@/attachments/selected-file";
 import { FILE_UPLOAD_MAX_BYTES } from "@/attachments/upload-limit";
 import type { ForgeSearchItem } from "@clisbot/protocol/messages";
@@ -213,6 +214,7 @@ export interface DispatchComposerAgentMessageInput {
   submission: MessageSubmissionWriter;
   activeTurnBehavior?: ActiveTurnBehavior;
   activeTurnId?: string;
+  queueParts?: QueueMessageParts;
 }
 
 export async function dispatchComposerAgentMessage(
@@ -240,6 +242,13 @@ export async function dispatchComposerAgentMessage(
       attachments: wirePayload.attachments,
       imageMessages: await input.encodeImageMessages(wirePayload.images),
     });
+    // A Host with a queue refuses a Steer without the turn the first part just started, so
+    // parts go through the queue, which delivers them in order; the queue row replaces this one.
+    if (parts.length > 1 && input.queueParts) {
+      await input.queueParts(parts);
+      input.submission.reject(input.agentId, clientMessageId);
+      return;
+    }
     // The optimistic row shows the text, so its ID goes to the part that carries the text.
     for (const [index, part] of parts.entries()) {
       await input.client.sendAgentMessage(input.agentId, part.text, {

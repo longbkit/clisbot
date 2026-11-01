@@ -751,6 +751,53 @@ describe("dispatchComposerAgentMessage over one message's image limit", () => {
     expect(row?.kind === "user_message" && row.id).toBe(client.calls[1].options.messageId);
     expect(new Set(client.calls.map((call) => call.options.messageId)).size).toBe(2);
   });
+
+  it("hands the parts to the Host queue when it has one, so no later part needs a turn ID", async () => {
+    const client = createFakeSendClient();
+    const stream = createFakeStream();
+    const queued: Array<{ text: string; images: string[] }> = [];
+    const images = ["a", "b"].map((id) => imageWithId(id));
+    await dispatchComposerAgentMessage({
+      client,
+      agentId: "agent",
+      text: "Compare both",
+      attachments: images.map((metadata) => ({ kind: "image" as const, metadata })),
+      encodeImageMessages: async (values) => [
+        values.slice(0, 1).map((image) => ({ data: image.id, mimeType: "image/jpeg" })),
+        values.slice(1).map((image) => ({ data: image.id, mimeType: "image/jpeg" })),
+      ],
+      submission: stream,
+      activeTurnBehavior: "steer",
+      queueParts: async (parts) => {
+        for (const part of parts) queued.push({ text: part.text, images: imageData(part.images) });
+      },
+    });
+    expect(client.calls).toEqual([]);
+    expect(queued).toEqual([
+      {
+        text: "[Images 1–1 of 2. The message continues in the next part; wait for it before you answer.]",
+        images: ["a"],
+      },
+      { text: "Compare both", images: ["b"] },
+    ]);
+    expect(stream.tail.get("agent") ?? []).toEqual([]);
+  });
+
+  it("sends one message directly even when the Host has a queue", async () => {
+    const client = createFakeSendClient();
+    await dispatchComposerAgentMessage({
+      client,
+      agentId: "agent",
+      text: "One image",
+      attachments: [{ kind: "image", metadata: imageWithId("a") }],
+      encodeImageMessages: passthroughEncodeImages,
+      submission: createFakeStream(),
+      queueParts: async () => {
+        throw new Error("Wrong owner");
+      },
+    });
+    expect(client.calls).toHaveLength(1);
+  });
 });
 
 describe("queueComposerMessage", () => {

@@ -328,28 +328,34 @@ test("busy session prepares large image Queue and Steer submissions through the 
   }
 });
 
-test("more images than one message carries send as ordered parts, the text last", async ({
+test("more images than one message carries queue as ordered parts while a turn runs them", async ({
   page,
 }, info) => {
   test.setTimeout(120_000);
-  const sends: Array<{ text: string; messageId?: string; images?: { data: string }[] }> = [];
+  const enqueues: Array<{ id: string; text: string; images?: unknown[] }> = [];
+  const sends: string[] = [];
   await page.routeWebSocket(daemonWsRoutePattern(), (browser) => {
     const server = browser.connectToServer();
     browser.onMessage((raw) => {
       if (typeof raw === "string" && raw.startsWith("{")) {
         const envelope = JSON.parse(raw);
         const message = envelope.type === "session" ? envelope.message : envelope;
-        if (message.type === "send_agent_message_request") sends.push(message);
+        if (message.type === "agent.queue.execute.request" && message.command.action === "enqueue")
+          enqueues.push(message.command);
+        if (message.type === "send_agent_message_request") sends.push(message.text);
       }
       server.send(raw);
     });
     server.onMessage((raw) => browser.send(raw));
   });
+  // The first part's turn outlives the test, as a real provider's does: a later part must not
+  // depend on that turn being over.
   const workspace = await seedMockAgentWorkspace({
     repoPrefix: "image-parts-",
     title: "Image parts",
-    model: "e2e-fast-stream",
+    model: "thirty-minute-stream",
   });
+  const client = await connectDaemonClient<DaemonClient>({ clientIdPrefix: "image-parts" });
   const files = await Promise.all(
     Array.from({ length: 33 }, async (_, index) => ({
       name: `reference-${index + 1}.png`,
@@ -372,21 +378,34 @@ test("more images than one message carries send as ordered parts, the text last"
     await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(33);
     await input.fill("Compare every reference");
     await page.getByTestId("composer-send-button").last().click();
-    await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(2);
-    expect(sends.map((send) => [send.text, send.images?.length])).toEqual([
+    await expect.poll(() => enqueues.length, { timeout: 30_000 }).toBe(2);
+    expect(enqueues.map((command) => [command.text, command.images?.length])).toEqual([
       [
         "[Images 1–17 of 33. The message continues in the next part; wait for it before you answer.]",
         17,
       ],
       ["Compare every reference", 16],
     ]);
+    expect(sends).toEqual([]);
     await expect(input).toHaveValue("");
     await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(0);
-    await expect(
-      page.getByTestId("user-message").filter({ hasText: "Compare every reference" }),
-    ).toBeVisible();
-    await page.screenshot({ path: info.outputPath("image-parts-sent.png") });
+    await expect(page.getByText("Active turn identity is unavailable")).toHaveCount(0);
+    // The first part's turn holds the second in the queue, in order.
+    await expect(page.getByTestId(`host-queue-${enqueues[1].id}`)).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(async () => {
+        const result = await client.executeAgentQueueCommand({
+          agentId: workspace.agentId,
+          command: { action: "fetch" },
+        });
+        return result.queue?.items.map((item) => item.text);
+      })
+      .toEqual(["Compare every reference"]);
+    await expect(page.getByTestId("turn-working-indicator").first()).toBeVisible();
+    await page.screenshot({ path: info.outputPath("image-parts-queued.png") });
   } finally {
+    await client.cancelAgent(workspace.agentId).catch(() => {});
+    await client.close();
     await workspace.cleanup();
   }
 });

@@ -270,12 +270,14 @@ identities and non-image file uploads are unchanged.
 A draft over those limits becomes several ordered messages: `encodeImageMessagesForSend`
 splits evenly at 32 images and halves any group that misses its budget at the
 smallest step. Earlier parts carry a note that more follows; the user's text and
-files ride with the last part, so the agent answers once it has every image. A
-Session or Chat send delivers the parts in order and the Queue admits them as
-ordered items. Paths that must stay one message (creating an agent, saving an
-edited queue row) refuse with what to do. When a later part of a Session send
-fails, earlier parts have already been delivered; the draft stays, so a retry
-repeats them. A Chat send and the Queue deduplicate parts by ID.
+files ride with the last part, so the agent answers once it has every image. On
+a Host with a queue, Send hands every part to the Queue: a Steer needs the exact
+turn, and the first part's turn has no ID the app can know yet, so a direct second
+send is refused (`Active turn identity is unavailable`). The Queue deduplicates
+parts by ID, so a retry resumes after the accepted parts. A Host without a queue
+gets the parts as ordered sends; there, a failed later part means a retry repeats
+the earlier ones. Paths that must stay one message (creating an agent, saving an
+edited queue row) refuse with what to do.
 
 This output fits the existing Host 16 MiB operation reservation, one Chat log
 row and relay frame. It benefits a new app talking to an old Host without a wire

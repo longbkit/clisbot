@@ -33,6 +33,11 @@ export async function sendChatInput(input: {
     chat: input.chat,
     behavior: input.payload.activeTurnBehavior,
   });
+  // A Host with a queue refuses a later part while the first part's turn runs.
+  if (parts.length > 1 && input.payload.queueParts) {
+    await input.payload.queueParts(parts);
+    return { targets: [] };
+  }
   input.beforeSend?.();
   const send = async (part: (typeof parts)[number], messageId: string) => {
     const result = await input.client.sendChatMessage({

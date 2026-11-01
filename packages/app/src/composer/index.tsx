@@ -80,7 +80,7 @@ import {
   type ComposerKeyPressEvent,
   type MessageInputRef,
 } from "./input/input";
-import type { ImageAttachment, MessagePayload, TextReplacement } from "./types";
+import type { ImageAttachment, MessagePayload, QueueMessageParts, TextReplacement } from "./types";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 import type { DraftCommandTarget } from "@/hooks/use-agent-commands-query";
 import { splitIntoMessageParts } from "./message-parts";
@@ -1629,18 +1629,33 @@ function ComposerContentImpl({
     onFocusInput?.(focusInput);
   }, [focusInput, onFocusInput]);
 
+  const queuePartsOf = useCallback(
+    (text: string, values: ComposerAttachment[]): QueueMessageParts | undefined =>
+      queueSupported
+        ? (parts) =>
+            queueAdmission.enqueue({
+              draft: JSON.stringify({ text, values }),
+              prepare: async () => parts,
+              execute: executeQueueCommand,
+            })
+        : undefined,
+    [queueSupported, queueAdmission, executeQueueCommand],
+  );
+
   const submitMessage = useCallback(
     async (
       text: string,
       submitAttachments: ComposerAttachment[],
       behavior?: "steer" | "interrupt",
     ) => {
+      const draftAttachments = submitAttachments;
       submitAttachments = await uploadLocalQueueCopies(client, submitAttachments);
       onMessageSent?.();
       if (onSubmitMessageRef.current) {
         await onSubmitMessageRef.current({
           text,
           attachments: submitAttachments,
+          queueParts: queuePartsOf(text, draftAttachments),
           cwd,
           activeTurnBehavior:
             legacyChat && !behavior
@@ -1659,7 +1674,7 @@ function ComposerContentImpl({
         behavior ?? (appSettings.sendBehavior === "steer" ? "steer" : "interrupt"),
       );
     },
-    [appSettings.sendBehavior, client, cwd, legacyChat, onMessageSent, t],
+    [appSettings.sendBehavior, client, cwd, legacyChat, onMessageSent, queuePartsOf, t],
   );
 
   useEffect(() => {
@@ -1686,6 +1701,7 @@ function ComposerContentImpl({
         }),
         encodeImageMessages: encodeImageMessagesForSend,
         submission: createMessageSubmissionWriter(serverId),
+        queueParts: queuePartsOf(text, sendAttachments),
         activeTurnBehavior,
         activeTurnId:
           activeTurnBehavior === "steer" && hostQueueSupported
@@ -1702,6 +1718,7 @@ function ComposerContentImpl({
     client,
     hostQueueSupported,
     onAttentionPromptSend,
+    queuePartsOf,
     serverId,
     supportsForgeSearch,
     t,
