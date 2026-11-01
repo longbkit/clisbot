@@ -28,6 +28,7 @@ import {
 } from "./chat-delivery.js";
 import { computeNextRunAt, validateScheduleCadence } from "./cron.js";
 import {
+  adoptModelessTwin,
   type ResolveScheduleModeId,
   resolveNoScheduleModeId,
   resolveScheduleRunModeId,
@@ -461,6 +462,7 @@ export class ScheduleService {
 
     await this.assertChatTarget(input.target);
     const inputTarget = input.target;
+    await adoptModelessTwin(this.store, name, inputTarget, this.resolveScheduleModeId);
     return this.store.upsertByNameAndTarget(name, inputTarget, {
       create: async () => {
         return this.buildScheduleRecord(input, { name, prompt, target: inputTarget });

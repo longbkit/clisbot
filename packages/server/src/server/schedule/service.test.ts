@@ -2165,6 +2165,53 @@ describe("ScheduleService", () => {
     expect(agent?.archivedAt).toBeTruthy();
   });
 
+  test("re-registering a named schedule stored without a mode replaces it and stores the mode", async () => {
+    const manager = new AgentManager({
+      logger: createTestLogger(),
+      clients: createTestAgentClients(),
+      registry: agentStorage,
+    });
+    // The first registration predates stored modes (or the provider could not answer).
+    const resolveScheduleModeId = vi
+      .fn<(provider: string, cwd: string) => Promise<string | undefined>>()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValue("default");
+    const service = createScheduleService({
+      clisbotHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: manager,
+      agentStorage,
+      resolveScheduleModeId,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      now: () => now,
+    });
+    const input = {
+      name: "Nightly",
+      prompt: "Respond with exactly hello",
+      cadence: { type: "cron" as const, expression: "0 9 * * *" },
+      target: {
+        type: "new-agent" as const,
+        config: { provider: "claude", model: "test-model", cwd: tempDir },
+      },
+    };
+    const first = await service.createOrReplace(input);
+    expect(first.target).not.toMatchObject({ config: { modeId: expect.anything() } });
+
+    const second = await service.createOrReplace({ ...input, prompt: "Updated" });
+
+    expect(second.id).toBe(first.id);
+    expect(second).toMatchObject({ prompt: "Updated", target: { config: { modeId: "default" } } });
+    expect(await service.list()).toHaveLength(1);
+
+    // Naming another mode is another schedule.
+    const third = await service.createOrReplace({
+      ...input,
+      target: { ...input.target, config: { ...input.target.config, modeId: "bypassPermissions" } },
+    });
+    expect(third.id).not.toBe(first.id);
+    expect(await service.list()).toHaveLength(2);
+  });
+
   test("runs a schedule stored without a mode in the provider's asking default", async () => {
     const manager = new AgentManager({
       logger: createTestLogger(),

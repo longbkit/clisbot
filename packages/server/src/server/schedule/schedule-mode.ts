@@ -1,8 +1,9 @@
 import type { Logger } from "pino";
 import { getAgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
 import { resolveScheduleDefaultModeId } from "@clisbot/protocol/schedule/default-mode";
-import type { ScheduleTarget } from "@clisbot/protocol/schedule/types";
+import type { ScheduleTarget, StoredSchedule } from "@clisbot/protocol/schedule/types";
 import type { ProviderSnapshotManager } from "../agent/provider-snapshot-manager.js";
+import type { ScheduleStore } from "./store.js";
 
 /**
  * A `new-agent` schedule never runs in a no-prompt mode unless someone chose it
@@ -57,4 +58,43 @@ export async function resolveScheduleRunModeId(
   resolve: ResolveScheduleModeId,
 ): Promise<string | undefined> {
   return config.modeId ?? (await resolve(config.provider, cwd));
+}
+
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, entry: unknown) =>
+    entry && typeof entry === "object" && !Array.isArray(entry)
+      ? Object.fromEntries(Object.entries(entry).sort(([a], [b]) => a.localeCompare(b)))
+      : entry,
+  );
+}
+
+/** A named schedule stored without a mode whose target is `target` but for its mode. */
+function isModelessTwin(schedule: StoredSchedule, name: string, target: ScheduleTarget): boolean {
+  if (target.type !== "new-agent" || schedule.target.type !== "new-agent") return false;
+  if (schedule.status === "completed" || schedule.name?.trim() !== name.trim()) return false;
+  if (schedule.target.config.modeId) return false;
+  const { modeId: _modeId, ...config } = target.config;
+  return canonicalJson(schedule.target.config) === canonicalJson(config);
+}
+
+/**
+ * Re-registering a named schedule (`createOrReplace`) matches by name and target. A schedule
+ * stored before schedules carried a mode has none, while the same request now resolves to the
+ * provider's asking default, which is what that schedule runs in. Before matching, such a twin
+ * gets the concrete mode, so it is replaced instead of duplicated. A twin is adopted only when the
+ * target's mode is that default: a request naming another mode is another schedule.
+ */
+export async function adoptModelessTwin(
+  store: Pick<ScheduleStore, "list" | "update">,
+  name: string,
+  target: ScheduleTarget,
+  resolve: ResolveScheduleModeId,
+): Promise<void> {
+  if (target.type !== "new-agent" || !target.config.modeId) return;
+  const twin = (await store.list()).find((schedule) => isModelessTwin(schedule, name, target));
+  if (!twin) return;
+  if (target.config.modeId !== (await resolve(target.config.provider, target.config.cwd))) return;
+  await store.update(twin.id, (current) =>
+    isModelessTwin(current, name, target) ? { ...current, target } : current,
+  );
 }
