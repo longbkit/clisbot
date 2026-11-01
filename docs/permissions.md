@@ -214,7 +214,14 @@ Full access. Three consequences outside Managed Access follow from the same mark
 with no mode, and a child agent created for another provider than its unattended parent, start
 in that provider's no-prompt mode; a child of a Full auto-accept parent gets the no-prompt mode
 but not the Full auto-accept flag. `provider-modes.test.ts` checks the classification against the
-real provider registry.
+real provider registry, and `schedule-run-mode.test.ts` pins what a schedule run starts in per
+provider.
+
+An agent's Clisbot tools ask the same question of what an agent requests: an agent caller cannot
+create, switch or prompt an agent into an unattended mode or turn on a provider's `auto_accept`,
+and a schedule it creates or changes must name a mode that asks
+([composer picker](features/composer-picker/README.md#full-auto-accept)). A person's requests
+are judged only by Managed Access.
 
 A daemon drops a Project privilege it does not know, so a ticket from a newer Hub
 grants it less, never more. Daemons that send the `x-clisbot-project-privileges`
@@ -288,9 +295,12 @@ changes need `approval.config`. Approvals retain the open prompt's two authority
 checks; an unattended mode also needs the matching `approval.*` privilege.
 Configuration menus and mutations must fit the sender's `AgentConfigurationGrant`
 and conversation visibility. A final configuration with a faster tier additionally
-requires `agent.fast.use`: `fast_mode: true` (Claude, OMP), a Codex `service_tier` above
-standard (Fast, Priority, Ultra fast; not the cheaper Flex) or Cursor `fast: true`, on create
-and on set (`resource-authorizer.ts` `isFasterTier`). The check
+requires `agent.fast.use`: `fast_mode` on (Claude, OMP), Cursor `fast` on, or a Codex
+`service_tier` other than `default`, `standard`, `flex` and `auto`. The cheap tiers are listed
+and every other value counts as faster, so a tier nobody has classified needs the privilege
+(`isFasterTier` in `@clisbot/protocol/speed-tier`). The daemon's Managed Access (create and set)
+and the Hub's channel commands (the `/agent` menu, configuration validation, Route delegation
+and the open-Route warning) use that one function. The check
 runs when a sender makes the change; later sessions in the conversation use the
 stored choice without re-checking whoever speaks next. Validation includes
 features preserved from a running session when a staged provider selection

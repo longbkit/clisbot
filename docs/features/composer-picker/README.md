@@ -91,7 +91,8 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
   that is none of them, such as Codex Flex (slower and cheaper), is its own segment under the
   provider's label. Every segment writes the provider's own feature id and value, never one the
   model does not offer; a model with one tier shows no control. Fast and Ultra fast carry
-  "Higher cost".
+  "Higher cost". Who may pick a dearer tier is the daemon's and the Hub's call, not the panel's
+  ([permissions](../../permissions.md#channel-command-access-hub)).
 - **Touch targets.** In the phone sheet and on touch devices every row and control a thumb
   presses is at least 44px tall: model and profile rows, Show more, effort and provider chips,
   Mode rows and the speed segments (`use-touch-rows.ts`). They use the `touch` size of the shared
@@ -140,7 +141,9 @@ labels.
 Codex keeps two independent settings: permissions (Default permissions, Auto-review, Full
 access) and the collaboration mode (Default or Plan). The daemon presents them as one Mode list:
 Plan appears when the running Codex offers a plan collaboration mode, chosen by its returned
-`mode` value and by name only when no entry carries one. Selecting Plan turns plan on and keeps
+`mode` value and by name only when no entry carries one. When a profile replaces Codex's models
+the daemon lists modes without asking Codex, so Plan is left out there: the manifest marks it
+`onlyWhenOffered` (`staticProviderModes` in `provider-modes.ts`). Selecting Plan turns plan on and keeps
 the last permission underneath; selecting a permission turns plan off. When Codex leaves plan
 mode on its own (a plan approved for implementation) the daemon reports a mode change, as Claude
 does for ExitPlanMode. A session saved with `featureValues.plan_mode = true` resumes in Plan, and
@@ -167,20 +170,33 @@ permission request the agent still raises. Agents sometimes ask under bypass any
   (`packages/server/src/server/agent/full-auto-accept.ts`). Requests already waiting when it is
   turned on are answered too, and an auto-answered request raises no attention.
 - **Never a question.** Only `kind: "tool"` requests that offer an allow are answered. Questions,
-  plans, mode switches, ACP choices (marked `clisbotChoice`) and every card the daemon raises
+  plans, mode switches, ACP choices (marked `clisbotChoice`), an MCP server's elicitation (Codex
+  maps it to `kind: "tool"`; marked `clisbotMcpElicitation`) and every card the daemon raises
   itself (marked `clisbotDaemonPermission`, such as a Connector's connect and send cards, which
   also carry `clisbotConnector`) wait for a person. A provider whose own `auto_accept` is on
-  answers first.
-- **Only a person turns it on.** An agent's Clisbot tools refuse `full-auto-accept` from an agent
-  caller: `update_agent`, `set_agent_mode`, `send_agent_prompt`'s `sessionMode`, `create_agent`
-  for a child and `update_schedule`. An agent switching it on would approve its own calls, as
-  `respond_to_permission` already refuses for Connector cards.
+  answers first. Whether the daemon answers is one function, `isDaemonAutoAccepted`, used by the
+  daemon and by every observer: it reads the `auto_accept` toggle the provider reports (the
+  snapshot's `features`), which is what the provider answers from, not the stored
+  `featureValues`.
+- **An agent cannot ask for any unattended configuration.** When the caller is an agent,
+  `create_agent`, `update_agent`, `set_agent_mode`, `send_agent_prompt`'s `sessionMode`,
+  `create_schedule` and `update_schedule` refuse whatever the provider judges unattended
+  (`isUnattendedConfiguration`, as Managed Access asks): Full auto-accept, Claude Bypass, Codex
+  Full access, Copilot Allow all, OMP Full access and a provider's own `auto_accept`
+  (`tools/agent-unattended-guard.ts`). An agent doing so would approve its own calls, as
+  `respond_to_permission` already refuses for Connector cards. The request is judged, not the
+  target: a child still inherits its caller's mode. A schedule an agent creates or changes must
+  name a mode that asks (`create_schedule`'s `mode`), because a run with no mode starts in the
+  provider's no-prompt mode. A person's paths are unchanged.
 - **Observers.** A request Full auto-accept is answering is not a wait for a person:
   `waitForAgentEvent` and finish subscriptions skip it, and it raises no attention. Every
   approval is logged at info with the agent id, request id and tool name, and recorded with the
   `full-auto-accept` actor like a person's answer. If an approval fails while the request still
-  waits, the request is marked `clisbotAutoAcceptFailed` and treated as a person's again
-  (attention, waiters). Requests the provider still holds after a resume are answered too.
+  waits, the request is marked `clisbotAutoAcceptFailed` and treated as a person's again: the
+  agent asks for attention and the daemon raises the marked request as a new
+  `permission_requested` stream event, because finish subscriptions and remote waiters skipped
+  the first one and learn of a request only from a stream event. Requests the provider still
+  holds after a resume are answered too.
 - **It ends** when another mode is picked or the provider leaves the mode it runs on.
 - **Wire.** The mode id is `full-auto-accept` (`@clisbot/protocol/full-auto-accept`), accepted
   by `set_agent_mode` and in a create config. The daemon never lists it among a provider's
@@ -219,7 +235,9 @@ pure modules `picker-rows.ts`, `speed.ts`, `mode-options.ts`, `model-name.ts`, `
 and feeds the live agent's or the draft's data to `picker-agent-controls.tsx` in their place
 while the picker is on. `feature.ts` holds the switch: `EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER=0`
 renders the upstream toolbar, its mode control and model sheet again, without Full auto-accept
-in the Mode list; the daemon side is unchanged. Strings live
+in the Mode list. The flag is the app's only: the daemon keeps offering Full auto-accept to
+newer apps, its no-prompt marks, Managed Access checks and agent-tool refusals whatever an app
+renders. Strings live
 in `i18n/resources/composer-picker.ts` for every app language.
 
 Primitives: `Combobox` (panel and Mode menu), `ComboboxTrigger` (chip), `AgentControlTrigger`
@@ -235,3 +253,19 @@ each pure module, `e2e/browser/composer-picker.spec.ts` (desktop and 390px phone
 to `.debug/composer-picker/`), and on the daemon `full-auto-accept.test.ts`,
 `agent-manager-full-auto-accept.test.ts`, `agent-manager-full-auto-accept.acp.test.ts` (a real
 ACP agent process) and `codex-app-server-agent.features.test.ts`.
+
+## Release notes
+
+- **Managed Access now reaches Bots and sessions in Codex Full access, Claude Bypass and Copilot
+  Allow all.** The daemon marks those modes unattended, so a member without every approval
+  privilege can no longer change the configuration of such a session, resume it
+  (`resume_agent_request`) or deliver Chat messages to a Bot whose session runs in one. Owners
+  who relied on restricted members driving those Bots must re-grant every `approval.*` privilege
+  or move the Bots to a mode that asks
+  ([permissions](../../permissions.md#approval-leaves)).
+- **A schedule with no mode starts in the provider's no-prompt mode** (Claude Bypass, Codex Full
+  access, Copilot Allow all, OMP Full access); ACP, Copilot and OpenCode runs also turn on their
+  own `auto_accept` whatever the mode. Pinned in `schedule-run-mode.test.ts` while the owner
+  decides; agents can no longer create such schedules.
+- **Channel commands gate every faster tier**, not only `fast_mode`: a Codex `service_tier`
+  other than default, standard, flex or auto, and Cursor `fast`, now need `agent.fast.use`.
