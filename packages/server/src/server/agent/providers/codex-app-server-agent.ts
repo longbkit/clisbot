@@ -114,6 +114,7 @@ import {
   THINKING_APPLIES_NEXT_TURN_NOTICE,
 } from "../provider-notices.js";
 import { PermissionResponseNotDeliveredError } from "../permission-response-not-delivered-error.js";
+import { MCP_ELICITATION_METADATA } from "../full-auto-accept.js";
 import type { WorkspaceGitService } from "../../workspace-git-service.js";
 import {
   applyCodexToolPolicy,
@@ -7351,6 +7352,7 @@ export class CodexAppServerAgentSession implements AgentSession {
         turnId: parsed.turnId ?? null,
         serverName: parsed.serverName,
         elicitationId: parsed.elicitationId ?? null,
+        [MCP_ELICITATION_METADATA]: true,
       },
     };
     this.pendingPermissions.set(requestId, request);

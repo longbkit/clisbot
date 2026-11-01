@@ -3,6 +3,7 @@ import type { AgentPermissionRequest } from "./agent-sdk-types.js";
 import { classifyOmpRpcUiPermissionRequest } from "./providers/omp/rpc-ui-permission-mapper.js";
 import {
   isAutoAcceptablePermission,
+  MCP_ELICITATION_METADATA,
   PERMISSION_CHOICE_METADATA,
   resolveFullAutoAcceptProviderMode,
   isDaemonAutoAccepted,
@@ -98,6 +99,16 @@ describe("which requests Full auto-accept approves", () => {
       ],
     });
     expect(isAutoAcceptablePermission(chooser)).toBe(false);
+  });
+
+  test("never answers an MCP server's elicitation, even one that asks for nothing", () => {
+    const elicitation = request({
+      name: "CodexMcpElicitation",
+      input: { mode: "openai/form", requestedSchema: { type: "object", properties: {} } },
+      metadata: { serverName: "browser", [MCP_ELICITATION_METADATA]: true },
+    });
+    expect(isAutoAcceptablePermission(elicitation)).toBe(false);
+    expect(isDaemonAutoAccepted({ fullAutoAccept: true }, elicitation)).toBe(false);
   });
 
   test("never approves a request that offers no allow", () => {

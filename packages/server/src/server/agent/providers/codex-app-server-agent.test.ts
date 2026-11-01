@@ -96,6 +96,7 @@ import {
 import { createTestLogger } from "../../../test-utils/test-logger.js";
 import { asInternals as castInternals, createStub } from "../../test-utils/class-mocks.js";
 import { AgentManager } from "../agent-manager.js";
+import { isAutoAcceptablePermission } from "../full-auto-accept.js";
 import { buildProviderRegistry } from "../provider-registry.js";
 
 interface CollaborationModeRecord {
@@ -1819,8 +1820,11 @@ describe("Codex app-server provider", () => {
         turnId: "turn-1",
         serverName: "browser",
         elicitationId: null,
+        clisbotMcpElicitation: true,
       },
     });
+    // An MCP server's question is a person's to answer, even under Full auto-accept.
+    expect(isAutoAcceptablePermission(permission.request)).toBe(false);
     await session.respondToPermission(permission.request.id, { behavior: "allow" });
 
     await expect(appServer.waitForMcpElicitationDecision()).resolves.toEqual({

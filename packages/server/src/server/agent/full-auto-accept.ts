@@ -25,10 +25,20 @@ export const PERMISSION_CHOICE_METADATA = "clisbotChoice";
  */
 export const DAEMON_PERMISSION_METADATA = "clisbotDaemonPermission";
 
+/**
+ * Set by a provider on an MCP server's elicitation (Codex `mcpServer/elicitation/request`). An MCP
+ * server asks the user for input or consent it chose to ask for; it is not one of the agent's
+ * tool calls, so no automatic policy answers it.
+ */
+export const MCP_ELICITATION_METADATA = "clisbotMcpElicitation";
+
 /** Set when the daemon's automatic approval failed: the request now waits for a person. */
 export const AUTO_ACCEPT_FAILED_METADATA = "clisbotAutoAcceptFailed";
 
-/** Requests a person must answer whatever the mode: daemon-owned cards and Connector cards. */
+/**
+ * Requests a person must answer whatever the mode: daemon-owned cards, Connector cards, choices,
+ * MCP elicitations and a request the daemon already failed to approve.
+ */
 function isPersonOnlyRequest(request: AgentPermissionRequest): boolean {
   const metadata = request.metadata;
   if (!metadata) return false;
@@ -36,7 +46,8 @@ function isPersonOnlyRequest(request: AgentPermissionRequest): boolean {
     metadata[DAEMON_PERMISSION_METADATA] === true ||
     metadata[AUTO_ACCEPT_FAILED_METADATA] === true ||
     metadata[CONNECTOR_CARD_METADATA] !== undefined ||
-    metadata[PERMISSION_CHOICE_METADATA] === true
+    metadata[PERMISSION_CHOICE_METADATA] === true ||
+    metadata[MCP_ELICITATION_METADATA] === true
   );
 }
 
