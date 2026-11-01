@@ -1,5 +1,6 @@
 import type { SessionInboundMessage, SessionOutboundMessage } from "../messages.js";
 import type { AgentManager } from "../agent/agent-manager.js";
+import { isFullAutoAcceptMode } from "../agent/full-auto-accept.js";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
 import type {
@@ -697,7 +698,7 @@ export class ManagedResourceAuthorizer {
       ? live.config
       : storedAgentConfig(stored as StoredAgentRecord);
     const next: AgentSessionConfig = {
-      ...base,
+      ...withoutLeftFullAutoAccept(base, update.modeId),
       ...(update.model !== undefined ? { model: update.model ?? undefined } : {}),
       ...(update.modeId !== undefined ? { modeId: update.modeId } : {}),
       ...(update.thinkingOptionId !== undefined
@@ -1716,4 +1717,20 @@ function isQuickStartMessage(type: string): boolean {
 
 function hasResourceAuthorityHandler(type: string) {
   return isQuickStartMessage(type) || type.startsWith("chat.");
+}
+
+/**
+ * Picking any other mode turns Full auto-accept off (AgentManager.setAgentMode), so the
+ * configuration being judged no longer carries it. Without this a member who may not run
+ * unattended could never leave it.
+ */
+function withoutLeftFullAutoAccept(
+  config: AgentSessionConfig,
+  modeId: string | undefined,
+): AgentSessionConfig {
+  if (modeId === undefined || isFullAutoAcceptMode(modeId) || !config.fullAutoAccept) {
+    return config;
+  }
+  const { fullAutoAccept: _left, ...rest } = config;
+  return rest;
 }

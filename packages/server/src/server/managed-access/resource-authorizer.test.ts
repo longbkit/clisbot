@@ -57,7 +57,13 @@ function workspace(workspaceId: string, projectId: string, cwd: string): Persist
 
 function createHarness(
   privileges: readonly ProjectPrivilege[],
-  paths: { projectA?: string; projectB?: string; archivedAgent?: boolean } = {},
+  paths: {
+    projectA?: string;
+    projectB?: string;
+    archivedAgent?: boolean;
+    /** agent-a runs Full auto-accept on Codex Full access. */
+    fullAutoAccept?: boolean;
+  } = {},
   grant: {
     terminalProfiles?: ProjectAuthorization["terminalProfiles"];
     daemonPrivileges?: readonly ProjectPrivilege[];
@@ -85,6 +91,7 @@ function createHarness(
           cwd: projectA,
           model: "gpt-5.6",
           thinkingOptionId: "high",
+          ...(paths.fullAutoAccept ? { modeId: "full-access", fullAutoAccept: true } : {}),
         },
         persistence: { provider: "codex", sessionId: "session-a" },
       } as StoredAgentRecord,
@@ -198,8 +205,14 @@ function createHarness(
   const agentConfigurationSafety = {
     isUnattendedConfiguration: async (config: {
       modeId?: string;
+      fullAutoAccept?: boolean;
       featureValues?: Record<string, unknown>;
-    }) => config.modeId === "unattended" || config.featureValues?.auto_accept === true,
+    }) =>
+      config.modeId === "unattended" ||
+      config.modeId === "full-access" ||
+      config.modeId === "full-auto-accept" ||
+      config.fullAutoAccept === true ||
+      config.featureValues?.auto_accept === true,
   };
 
   return new ManagedResourceAuthorizer(
@@ -398,6 +411,29 @@ describe("ManagedResourceAuthorizer", () => {
         modeId: "unattended",
       }),
     ).resolves.toBe(true);
+  });
+
+  it("lets a member without every approval turn Full auto-accept off, not on", async () => {
+    const limited = createHarness(
+      ["project.use", "agent.create", "agent.interact", "approval.file"],
+      { fullAutoAccept: true },
+    );
+    await expect(
+      limited.allowsInbound({
+        type: "set_agent_mode_request",
+        requestId: "leave-full-auto-accept",
+        agentId: "agent-a",
+        modeId: "auto",
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      limited.allowsInbound({
+        type: "set_agent_mode_request",
+        requestId: "stay-full-auto-accept",
+        agentId: "agent-a",
+        modeId: "full-auto-accept",
+      }),
+    ).resolves.toBe(false);
   });
 
   it("projects Provider catalogs and denies daemon-global reads", async () => {
