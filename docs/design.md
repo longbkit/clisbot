@@ -51,7 +51,8 @@ Placeholder text is `colors.placeholder` (`#a1a1aa` in Light, each dark theme's 
 The Light palette follows the contrast of Slack's bright neutral theme: charcoal primary text
 (`#1d1c1d`), dark gray secondary text and icons (`#4a4a4a`), and passive chrome (`#707070`).
 Content sits on white: cards and inputs are `surface0`, grouped by a `#e4e4e4` border, and
-`surface1`/`surface2` stay at the near-white upstream values (`#fafafa`/`#f4f4f5`). Gray is
+`surface1` to `surface4` stay at the near-white upstream values (`#fafafa`, `#f4f4f5`,
+`#e4e4e7`, `#d4d4d8`). Gray is
 for state and regions, never under text you read: muted text and placeholders drop below 4.5:1
 on `#f3f3f3`, and an input filled `#ededed` on a `#f3f3f3` card is 1.06:1, invisible. The
 sidebar is light gray (`#f5f5f5`); the selected navigation, workspace, session, Bot and
@@ -80,6 +81,10 @@ The button is `<Button>` (`packages/app/src/components/ui/button.tsx`). It has f
 `outline` is the low-frequency action that lives on a row — transparent with `borderAccent`. Restart, Remove, Update on host detail (`packages/app/src/screens/settings/host-page.tsx:585-594`).
 
 `ghost` is structural and non-committal — no border, no fill. Back arrows, header toggles, "Load more" footers (`packages/app/src/screens/sessions-screen.tsx:54-63`), more-affordances. Ghost is used when the affordance is part of the chrome, not a decision.
+
+A control that rests filled inside the composer or any input surface uses `surface2`;
+`surface3` is for hovered, pressed, open and selected only (the composer's Commands chip rests on
+`surface2` and turns `surface3` while its list is open).
 
 Header and toolbar controls use `interactionHighlight` for hovered, pressed, open, and selected
 backgrounds. It is a translucent semantic fill so the same control works over the main surface and
