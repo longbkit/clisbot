@@ -1,3 +1,4 @@
+import type { ScheduleModeSource } from "./mode.js";
 export type ScheduleStatus = "active" | "paused" | "completed";
 
 export type ScheduleCadence =
@@ -157,7 +158,7 @@ export interface ScheduleUpdatePayload {
   error: string | null;
 }
 
-export interface ScheduleDaemonClient {
+export interface ScheduleDaemonClient extends ScheduleModeSource {
   scheduleCreate(input: CreateScheduleInput): Promise<ScheduleCreatePayload>;
   scheduleList(): Promise<ScheduleListPayload>;
   scheduleInspect(input: { id: string }): Promise<ScheduleInspectPayload>;

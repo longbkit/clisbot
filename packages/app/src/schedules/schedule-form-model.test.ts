@@ -706,6 +706,23 @@ describe("schedule form model", () => {
       });
     });
 
+    it("refuses to save a new-agent schedule without a mode", () => {
+      const form = open({
+        mode: "create",
+        defaults: { serverId: "host-a", projectTargets: PROJECT_TARGETS, preferences: {} },
+      });
+      form.setPrompt("Nightly checks");
+      form.setProject(buildProjectOptionId("host-a", "project-a"), { label: "Project A" });
+      form.applyProviderSnapshot("host-a", ompLikeSnapshot);
+      form.setModel("mock", "model-a");
+      expect(form.getState()).toMatchObject({ selectedMode: "write", canSubmit: true });
+
+      form.setSessionMode("");
+      expect(form.getState().canSubmit).toBe(false);
+      form.setSessionMode("full");
+      expect(form.getState().canSubmit).toBe(true);
+    });
+
     it("keeps a mode the schedule stored", () => {
       const form = open({
         mode: "edit",

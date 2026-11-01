@@ -30,7 +30,7 @@ export function createScheduleCommand(): Command {
       )
       .option(
         "--mode <mode>",
-        "Provider-specific mode (e.g. claude bypassPermissions, opencode build). Defaults to the provider's mode that asks for approval",
+        "Mode each run starts in; required when the provider lists modes (see `clisbot provider ls`). The error lists them and marks which ask and which run without asking",
       )
       .option("--thinking <id>", "Thinking option ID for new-agent runs")
       .option("--cwd <path>", "Working directory (default: current; required with --host)")
@@ -94,7 +94,10 @@ export function createScheduleCommand(): Command {
         "New agent provider, or provider/model (only for new-agent target)",
       )
       .option("--model <model>", "New agent model (only for new-agent target)")
-      .option("--mode <mode>", "New agent provider mode (only for new-agent target)")
+      .option(
+        "--mode <mode>",
+        "New agent provider mode (only for new-agent target); omitted, the stored mode is kept",
+      )
       .option("--cwd <path>", "New working directory (only for new-agent target)")
       .option("--max-runs <n>", "Set or change maximum number of runs")
       .option("--no-max-runs", "Clear the max-runs limit")

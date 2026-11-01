@@ -24,6 +24,8 @@ try {
         "review-prs",
         "--provider",
         "claude",
+        "--mode",
+        "default",
         "--cwd",
         ctx.workDir,
         "--json",
@@ -82,6 +84,8 @@ try {
         "10",
         "--provider",
         "codex/gpt-5.4",
+        "--mode",
+        "auto",
         "--thinking",
         "high",
         "--cwd",
@@ -100,10 +104,36 @@ try {
     assert.strictEqual(inspectedJson.target.config.provider, "codex");
     assert.strictEqual(inspectedJson.target.config.model, "gpt-5.4");
     assert.strictEqual(inspectedJson.target.config.thinkingOptionId, "high");
+    assert.strictEqual(inspectedJson.target.config.modeId, "auto");
 
     const deleted = await ctx.clisbot(["schedule", "delete", createdJson.id, "--json"]);
     assert.strictEqual(deleted.exitCode, 0, deleted.stderr);
     console.log("schedule provider/model syntax works\n");
+  }
+
+  {
+    console.log("Test 1b2: schedule create without --mode lists the provider's modes");
+    const result = await ctx.clisbot(
+      [
+        "schedule",
+        "create",
+        "Unattended by accident",
+        "--every",
+        "10m",
+        "--max-runs",
+        "10",
+        "--provider",
+        "codex",
+        "--cwd",
+        ctx.workDir,
+      ],
+      { timeout: 30000 },
+    );
+    assert.notStrictEqual(result.exitCode, 0, "should require --mode");
+    const output = result.stdout + result.stderr;
+    assert(output.includes("--mode is required. Modes for codex:"), output);
+    assert(output.includes("full-access (runs without asking)"), output);
+    console.log("schedule create requires --mode\n");
   }
 
   {
@@ -143,6 +173,8 @@ try {
       "0 0 1 1 *",
       "--provider",
       "claude",
+      "--mode",
+      "default",
       "--cwd",
       ctx.workDir,
       "--max-runs",

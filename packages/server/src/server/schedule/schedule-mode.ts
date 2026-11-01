@@ -41,7 +41,12 @@ export function createScheduleModeResolver(
   };
 }
 
-/** The target with the provider's asking default when it names no mode. */
+/**
+ * The target with the provider's asking default when it names no mode. The CLI, the app and the
+ * agent tools now always send a mode for a provider that lists modes; a 2.2.1 app or CLI still
+ * creates and updates schedules without one, and the wire keeps `modeId` optional for it.
+ */
+// COMPAT(schedule-mode-required): added in v2.2.2, remove after 2027-05-01 once 2.2.1 clients are gone.
 export async function withScheduleMode(
   target: ScheduleTarget,
   resolve: ResolveScheduleModeId,

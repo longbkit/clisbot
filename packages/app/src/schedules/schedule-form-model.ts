@@ -642,6 +642,10 @@ function resolveCanSubmit(state: ScheduleFormState): boolean {
   if (!hasWorkingDir) {
     return false;
   }
+  // A new-agent schedule names its mode: preselected to the provider's mode that asks.
+  if (state.modeOptions.length > 0 && !state.selectedMode.trim()) {
+    return false;
+  }
   return isSelectedModelValidForProviders({
     providers: state.modelSelectorProviders,
     selectedProvider: state.selectedProvider,

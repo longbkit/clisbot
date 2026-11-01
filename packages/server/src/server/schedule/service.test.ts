@@ -2112,7 +2112,8 @@ describe("ScheduleService", () => {
 
   // A schedule never runs in a no-prompt mode unless someone chose it: one created without a
   // mode stores the provider's asking default, and the run asks for approval like any agent.
-  test("stores and runs a new-agent schedule with no mode in the provider's asking default", async () => {
+  // An old (2.2.1) app or CLI still creates a new-agent schedule without a mode.
+  test("stores and runs an old client's new-agent schedule with no mode in the provider's asking default", async () => {
     const manager = new AgentManager({
       logger: createTestLogger(),
       clients: createTestAgentClients(),
