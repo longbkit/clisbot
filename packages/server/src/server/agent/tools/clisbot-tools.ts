@@ -3,6 +3,7 @@ import { assertRunLimit, assertRunLimitForUpdate } from "../../schedule/run-limi
 import { BOT_ID_LABEL, CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import type { FinishSubscriptions, FinishRegistration } from "../finish-subscriptions/index.js";
 import type { AgentMessageDelivery } from "../agent-messages/index.js";
+import { isFullAutoAcceptMode } from "../full-auto-accept.js";
 import {
   createHostResolver,
   HostOperationRejectedError,
@@ -1615,6 +1616,7 @@ function createToolCatalog(
     async (args: unknown) => {
       const resolvedArgs = await resolveCreateAgentToolArgs(args);
       const { parsedArgs } = resolvedArgs;
+      refuseFullAutoAcceptFromAgent(callerAgentId, parsedArgs.settings?.modeId);
       let notifyOnFinish: boolean;
       if (resolvedArgs.kind === "agent-scoped") {
         notifyOnFinish = parsedArgs.notifyOnFinish;
@@ -1973,6 +1975,7 @@ function createToolCatalog(
       notifyOnFinish = Boolean(callerAgentId),
       activeTurnBehavior = callerAgentId ? "steer" : "interrupt",
     }) => {
+      refuseFullAutoAcceptFromAgent(callerAgentId, sessionMode);
       if (callerAgentId && !agentManager.getAgent(agentId) && !(await agentStorage.get(agentId))) {
         throw new ClisbotToolInputError(`Agent ${agentId} not found`);
       }
@@ -2290,6 +2293,7 @@ function createToolCatalog(
     },
     async ({ agentId, name, labels, settings }) => {
       refuseProtectedLabels(labels);
+      refuseFullAutoAcceptFromAgent(callerAgentId, settings?.modeId);
       if (settings?.modeId !== undefined) {
         await agentManager.setAgentMode(agentId, settings.modeId);
       }
@@ -2982,6 +2986,7 @@ function createToolCatalog(
         throw new Error("Schedule service is not configured");
       }
 
+      refuseFullAutoAcceptFromAgent(callerAgentId, input.mode ?? undefined);
       const current = await requireScheduleTarget(input.id, "new-agent");
       const update = buildScheduleUpdateInput(input);
       await assertRunLimitForUpdate(async () => current, update);
@@ -3231,6 +3236,7 @@ function createToolCatalog(
       },
     },
     async ({ agentId, modeId }) => {
+      refuseFullAutoAcceptFromAgent(callerAgentId, modeId);
       const result = await setAgentModeCommand({ agentManager }, { agentId, modeId });
       return {
         content: [],
@@ -3376,6 +3382,19 @@ function archiveWorktreeDependencies(
  * could undo a limit, so `update_agent` and `create_agent` refuse them.
  */
 const PROTECTED_LABELS = [CONNECTORS_OFF_LABEL, BOT_ID_LABEL, CHAT_ID_LABEL];
+
+/**
+ * Full auto-accept approves every tool request the agent raises, so an agent switching it on,
+ * for itself or for a child, would approve its own calls. Only a person turns it on.
+ */
+function refuseFullAutoAcceptFromAgent(
+  callerAgentId: string | undefined,
+  modeId: string | undefined,
+): void {
+  if (callerAgentId && isFullAutoAcceptMode(modeId)) {
+    throw new Error("Only a person can turn on Full auto-accept, in Clisbot or on its channel.");
+  }
+}
 
 function refuseProtectedLabels(labels: Record<string, string> | undefined): void {
   const named = PROTECTED_LABELS.find((label) => labels && Object.hasOwn(labels, label));

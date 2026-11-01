@@ -139,8 +139,14 @@ permission request the agent still raises. Agents sometimes ask under bypass any
   (`packages/server/src/server/agent/full-auto-accept.ts`). Requests already waiting when it is
   turned on are answered too, and an auto-answered request raises no attention.
 - **Never a question.** Only `kind: "tool"` requests that offer an allow are answered. Questions,
-  plans, mode switches and ACP choices (marked `clisbotChoice`) wait for a person. A provider
-  whose own `auto_accept` is on answers first.
+  plans, mode switches, ACP choices (marked `clisbotChoice`) and every card the daemon raises
+  itself (marked `clisbotDaemonPermission`, such as a Connector's connect and send cards, which
+  also carry `clisbotConnector`) wait for a person. A provider whose own `auto_accept` is on
+  answers first.
+- **Only a person turns it on.** An agent's Clisbot tools refuse `full-auto-accept` from an agent
+  caller: `update_agent`, `set_agent_mode`, `send_agent_prompt`'s `sessionMode`, `create_agent`
+  for a child and `update_schedule`. An agent switching it on would approve its own calls, as
+  `respond_to_permission` already refuses for Connector cards.
 - **It ends** when another mode is picked or the provider leaves the mode it runs on.
 - **Wire.** The mode id is `full-auto-accept` (`@clisbot/protocol/full-auto-accept`), accepted
   by `set_agent_mode` and in a create config. The daemon never lists it among a provider's

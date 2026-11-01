@@ -1597,6 +1597,58 @@ describe("update_agent MCP tool", () => {
   });
 });
 
+describe("Full auto-accept from an agent", () => {
+  const logger = createTestLogger();
+
+  it("refuses an agent turning on Full auto-accept for itself", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      callerAgentId: "agent-1",
+      logger,
+    });
+    await expect(
+      registeredTool(server, "update_agent").handler({
+        agentId: "agent-1",
+        settings: { modeId: "full-auto-accept" },
+      }),
+    ).rejects.toThrow("Only a person can turn on Full auto-accept");
+    expect(spies.agentManager.setAgentMode).not.toHaveBeenCalled();
+  });
+
+  it("refuses an agent creating a child in Full auto-accept", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    spies.agentManager.getAgent.mockReturnValue({
+      id: "parent-agent",
+      config: {},
+      cwd: process.cwd(),
+      workspaceId: "wks_parent",
+      provider: "codex",
+      currentModeId: "auto",
+    } as ManagedAgent);
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      callerAgentId: "parent-agent",
+      logger,
+    });
+    await expect(
+      registeredTool(server, "create_agent").handler({
+        relationship: { kind: "subagent" },
+        workspace: { kind: "current" },
+        title: "Child",
+        provider: "codex/gpt-5.4",
+        initialPrompt: "Do work",
+        settings: { modeId: "full-auto-accept" },
+      }),
+    ).rejects.toThrow("Only a person can turn on Full auto-accept");
+    expect(spies.agentManager.createAgent).not.toHaveBeenCalled();
+  });
+});
+
 describe("create_agent MCP tool", () => {
   const logger = createTestLogger();
   const existingCwd = process.cwd();
