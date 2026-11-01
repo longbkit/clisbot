@@ -485,6 +485,11 @@ export const ProviderSnapshotEntrySchema = z.object({
   description: z.string().optional(),
   iconSvg: z.string().optional(),
   defaultModeId: z.string().nullable().optional(),
+  /**
+   * The built-in provider a custom provider extends, through any chain of `extends`, so a
+   * client can name and draw its modes as the built-in's. Absent for built-ins and ACP.
+   */
+  baseProvider: z.string().optional(),
 });
 
 export const CompactProviderSnapshotModelSchema = AgentModelDefinitionSchema.omit({

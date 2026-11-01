@@ -108,13 +108,15 @@ Provider differences live in two places and nowhere else:
 | Muse Code                     | Default, Ask, Strict, Full access; on Full access       | per model       | —                       | —              |
 | Generic ACP, Kimi, custom ACP | the session's modes; on the current mode                | `thought_level` | —                       | config options |
 | Cursor (ACP)                  | the session's modes, Plan; on the current mode          | per model       | `fast` select           | —              |
-| Custom `extends: claude`      | as Claude, daemon labels                                | per model       | as configured           | —              |
+| Custom `extends: claude`      | as Claude, the app's labels and icons                   | per model       | as configured           | —              |
 
 Every provider with modes ends with Full auto-accept. The per-provider cases are
 `normalize.test.ts` (app) and `provider-modes.test.ts` (daemon). A provider whose own
-`auto_accept` exists keeps it on an older Host; a newer Host hides it. Known modes of a custom
-provider that extends a built-in keep the daemon's English labels, because the app names modes
-by built-in provider id.
+`auto_accept` exists keeps it on an older Host; a newer Host hides it. A custom provider that
+extends a built-in (`extends: claude`, `extends: codex`) shows the built-in's translated labels
+and icons: the provider snapshot names its `baseProvider`, and `resolveModeProvider` names and
+draws its modes by that id. An ACP custom provider has no built-in base and keeps the daemon's
+labels.
 
 ## Plan is a mode on every provider
 

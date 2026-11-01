@@ -43,6 +43,18 @@ export function resolveModeConcept(provider: string, mode: AgentMode): ModeConce
   return "ask";
 }
 
+/**
+ * The provider id the app names and draws modes by: a custom provider that extends a built-in
+ * (`extends: claude`) has the built-in's modes, so it reads as that built-in. An ACP custom
+ * provider has no built-in base and keeps the daemon's labels.
+ */
+export function resolveModeProvider(
+  provider: string,
+  definitions: readonly { id: string; baseProvider?: string }[],
+): string {
+  return definitions.find((definition) => definition.id === provider)?.baseProvider ?? provider;
+}
+
 /** The `composer.picker.modeLabels` key for a mode the app names itself, else null. */
 export function resolveModeLabelKey(provider: string, modeId: string): ModeLabelKey | null {
   if (modeId === FULL_AUTO_ACCEPT_MODE_ID) return "fullAutoAccept";

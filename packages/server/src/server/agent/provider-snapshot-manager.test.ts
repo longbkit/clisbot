@@ -367,6 +367,27 @@ describe("ProviderSnapshotManager public surface", () => {
     }
   });
 
+  test("names the built-in a custom provider extends, and none for ACP", () => {
+    const manager = new ProviderSnapshotManager({
+      logger: createTestLogger(),
+      providerOverrides: {
+        "zai-claude": { extends: "claude", label: "ZAI", enabled: true },
+        "qwen-codex": { extends: "codex", label: "Qwen Code", enabled: true },
+        grok: { extends: "acp", label: "Grok", enabled: true, command: ["grok"] },
+      },
+    });
+    try {
+      const entries = manager.getSnapshot("/tmp/project").records.map(({ entry }) => entry);
+      const base = (id: string) => entries.find((entry) => entry.provider === id)?.baseProvider;
+      expect(base("zai-claude")).toBe("claude");
+      expect(base("qwen-codex")).toBe("codex");
+      expect(base("grok")).toBeUndefined();
+      expect(base("claude")).toBeUndefined();
+    } finally {
+      manager.destroy();
+    }
+  });
+
   test("getSnapshot returns loading entries for built-in providers before warmup", () => {
     const manager = new ProviderSnapshotManager({ logger: createTestLogger() });
     try {

@@ -908,6 +908,7 @@ export class ProviderSnapshotManager {
           description: definition.description,
           iconSvg: definition.iconSvg,
           defaultModeId: definition.defaultModeId ?? null,
+          ...baseProviderField(provider, definitions),
         }),
       });
     }
@@ -1244,6 +1245,15 @@ function createFetchCatalogOptions(
 
 export function isGlobalProviderSnapshotKey(cwd: string): boolean {
   return cwd === GLOBAL_PROVIDER_SNAPSHOT_KEY;
+}
+
+/** The built-in a custom provider extends (`extends` names a built-in); nothing for a built-in. */
+function baseProviderField(
+  provider: AgentProvider,
+  definitions: Record<AgentProvider, ProviderDefinition>,
+): { baseProvider?: string } {
+  const base = definitions[provider]?.derivedFromProviderId;
+  return base ? { baseProvider: base } : {};
 }
 
 export function identifyEntry(entry: ProviderSnapshotEntry): ProviderSnapshotRecord {

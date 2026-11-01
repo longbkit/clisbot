@@ -12,6 +12,7 @@ import { useComposerKeyboardScope } from "@/composer/keyboard-scope";
 import { useComposerPickerPlacement } from "@/composer/picker-placement";
 import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
 import type { KeyboardActionDefinition } from "@/keyboard/keyboard-action-dispatcher";
+import { resolveModeProvider } from "./mode-options";
 import { useModePresentation, type ModePresentation } from "./mode-presentation";
 
 export interface ModeDropdownProps extends AgentModeControlValue {
@@ -84,7 +85,8 @@ export function ModeDropdown(props: ModeDropdownProps) {
   const anchorRef = useRef<View>(null);
   const [open, setOpen] = useState(false);
   useModeCycleShortcut(props);
-  const { provider, modeOptions, selectedModeId, onSelectMode, onClose } = props;
+  const { modeOptions, selectedModeId, onSelectMode, onClose } = props;
+  const provider = resolveModeProvider(props.provider, props.providerDefinitions);
   const selected = modeOptions.find((mode) => mode.id === selectedModeId) ?? modeOptions[0];
   const options = useMemo(
     () => modeOptions.map((mode) => ({ id: mode.id, label: present(provider, mode).label })),

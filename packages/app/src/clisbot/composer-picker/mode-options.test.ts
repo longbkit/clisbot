@@ -8,6 +8,7 @@ import {
   resolveModeConcept,
   shouldClearProviderAutoAccept,
   resolveModeLabelKey,
+  resolveModeProvider,
 } from "./mode-options";
 
 const CLAUDE: AgentMode[] = [
@@ -48,6 +49,31 @@ describe("composer mode list", () => {
     expect(shouldClearProviderAutoAccept("ask", true)).toBe(true);
     expect(shouldClearProviderAutoAccept(FULL_AUTO_ACCEPT_MODE_ID, true)).toBe(false);
     expect(shouldClearProviderAutoAccept("ask", false)).toBe(false);
+  });
+});
+
+describe("custom providers", () => {
+  const definitions = [
+    { id: "zai-claude", baseProvider: "claude" },
+    { id: "qwen-codex", baseProvider: "codex" },
+    { id: "grok" },
+  ];
+
+  it("name and draw an extended built-in's modes as the built-in's", () => {
+    const zai = resolveModeProvider("zai-claude", definitions);
+    expect(resolveModeLabelKey(zai, "bypassPermissions")).toBe("claudeBypass");
+    expect(resolveModeConcept(zai, { id: "acceptEdits", label: "Accept File Edits" })).toBe(
+      "acceptEdits",
+    );
+    const qwen = resolveModeProvider("qwen-codex", definitions);
+    expect(resolveModeLabelKey(qwen, "full-access")).toBe("codexFullAccess");
+    expect(resolveModeConcept(qwen, { id: "auto", label: "Default" })).toBe("ask");
+  });
+
+  it("an ACP custom provider keeps the daemon's labels", () => {
+    const grok = resolveModeProvider("grok", definitions);
+    expect(grok).toBe("grok");
+    expect(resolveModeLabelKey(grok, "default")).toBeNull();
   });
 });
 

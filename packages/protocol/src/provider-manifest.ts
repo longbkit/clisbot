@@ -28,6 +28,8 @@ export interface AgentProviderDefinition {
   enabledByDefault?: boolean;
   defaultModeId: string | null;
   modes: AgentProviderModeDefinition[];
+  /** The built-in a custom provider extends, from the provider snapshot; absent otherwise. */
+  baseProvider?: string;
   voice?: {
     enabled: boolean;
     defaultModeId: string;

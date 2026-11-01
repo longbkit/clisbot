@@ -30,6 +30,7 @@ export function buildProviderDefinitions(
     description: entry.description ?? "",
     defaultModeId: entry.defaultModeId ?? null,
     modes: buildProviderModes(entry),
+    ...(entry.baseProvider ? { baseProvider: entry.baseProvider } : {}),
   }));
 }
 

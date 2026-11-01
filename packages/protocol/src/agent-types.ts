@@ -130,6 +130,8 @@ export interface ProviderSnapshotEntry {
   description?: string;
   iconSvg?: string;
   defaultModeId?: string | null;
+  /** The built-in a custom provider extends; absent for built-ins and ACP providers. */
+  baseProvider?: string;
 }
 
 export interface AgentFeatureToggle {
