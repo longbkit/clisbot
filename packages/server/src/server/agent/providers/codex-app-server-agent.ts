@@ -339,13 +339,23 @@ interface CodexAppServerCatalog {
 }
 
 // Codex versions without collaborationMode/list have no plan collaboration mode.
-async function probeCodexPlanCollaborationMode(client: CodexAppServerClient): Promise<boolean> {
+/**
+ * Whether the running Codex offers a plan collaboration mode. Plan is optional, so any failure
+ * (an older Codex without the method, a transport error, a timeout) means no Plan, never a
+ * failed catalog.
+ */
+export async function probeCodexPlanCollaborationMode(
+  client: Pick<CodexAppServerClient, "request">,
+  logger: Logger,
+): Promise<boolean> {
   try {
     const modes = parseCodexCollaborationModes(await client.request("collaborationMode/list", {}));
     return findCodexCollaborationMode(modes, "plan") !== null;
   } catch (error) {
-    if (error instanceof CodexAppServerRpcError) return false;
-    throw error;
+    if (!(error instanceof CodexAppServerRpcError)) {
+      logger.warn({ err: error }, "Codex plan collaboration mode probe failed; offering no Plan");
+    }
+    return false;
   }
 }
 
@@ -7661,7 +7671,7 @@ export class CodexAppServerAgentClient implements AgentClient {
       const planAvailable = await runProviderRefreshActivity(
         context,
         "collaborationMode/list",
-        () => probeCodexPlanCollaborationMode(client!),
+        () => probeCodexPlanCollaborationMode(client!, this.logger),
       );
       return {
         models: models.map((model) =>

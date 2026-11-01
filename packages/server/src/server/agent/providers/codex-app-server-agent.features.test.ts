@@ -2,7 +2,11 @@ import pino from "pino";
 import { describe, expect, test } from "vitest";
 
 import type { AgentSession, AgentSessionConfig } from "../agent-sdk-types.js";
-import { CodexAppServerAgentClient, CodexAppServerAgentSession } from "./codex-app-server-agent.js";
+import {
+  CodexAppServerAgentClient,
+  CodexAppServerAgentSession,
+  probeCodexPlanCollaborationMode,
+} from "./codex-app-server-agent.js";
 import {
   createFakeCodexAppServer,
   type FakeCodexAppServer,
@@ -143,6 +147,17 @@ async function createConnectedSession(
   harness.appServer.assertNoErrors();
   return harness;
 }
+
+describe("Codex plan probe", () => {
+  test("offers no Plan, and never fails, when the probe cannot reach Codex", async () => {
+    const client = {
+      request: async () => {
+        throw new Error("transport closed");
+      },
+    };
+    await expect(probeCodexPlanCollaborationMode(client, createTestLogger())).resolves.toBe(false);
+  });
+});
 
 describe("Codex provider catalog modes", () => {
   async function catalogModeIds(collaborationModes: CollaborationModeRecord[]): Promise<string[]> {
