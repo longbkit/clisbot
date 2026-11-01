@@ -13,7 +13,7 @@ const {
   recordDesktopRenderer,
 } = require("../packages/desktop/scripts/renderer-build.js");
 
-if (!process.env.npm_execpath) throw new Error("Run through npm run build:desktop");
+if (!process.env.npm_execpath) throw new Error("Run through npm run build:desktop-renderer");
 rmSync(resolve(dist, MANIFEST_NAME), { force: true });
 const result = spawnSync(
   process.execPath,

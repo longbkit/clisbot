@@ -112,8 +112,9 @@ buildNpmPackage {
     # App workspace deps not covered by build:server
     npm run build --workspace=@clisbot/expo-two-way-audio
 
-    # Expo web export for the Electron renderer
-    ( cd packages/app && CLISBOT_WEB_PLATFORM=electron npx expo export --platform web )
+    # Expo web export for the Electron renderer, with the build receipt that
+    # electron-builder's beforePack checks before packaging it
+    npm run build:desktop-renderer
 
     # Desktop main process
     npm run build:main --workspace=@clisbot/desktop
