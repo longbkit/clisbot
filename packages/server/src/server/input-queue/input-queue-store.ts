@@ -26,10 +26,16 @@ export interface QueueStorage {
   write(snapshot: QueueSnapshot): Promise<void>;
 }
 
+/** `already_accepted`: the sender's retry of an ID held or delivered with other bytes; the draft is done. */
+export type QueueConflictCode = "queue_conflict" | "already_accepted";
+export const SENDER_CONFLICT = "Queue ID conflicts with accepted content";
+export const ALREADY_ACCEPTED =
+  "This message was already accepted. Clear the draft, or change it to send it again.";
 export class QueueConflict extends Error {
   constructor(
     message: string,
     readonly snapshot: QueueSnapshot,
+    readonly code: QueueConflictCode = "queue_conflict",
   ) {
     super(message);
   }
@@ -80,13 +86,11 @@ export class InputQueueStore {
       const next = await this.load();
       const existing = next.items.find((value) => value.id === item.id);
       if (existing) {
-        if (
-          existing.senderId !== item.senderId ||
-          (options?.matches
-            ? !options.matches(existing)
-            : JSON.stringify(existing.payload) !== JSON.stringify(item.payload))
-        )
-          throw new QueueConflict("Queue ID conflicts with accepted content", next);
+        if (existing.senderId !== item.senderId) throw new QueueConflict(SENDER_CONFLICT, next);
+        const sameContent = options?.matches
+          ? options.matches(existing)
+          : JSON.stringify(existing.payload) === JSON.stringify(item.payload);
+        if (!sameContent) throw new QueueConflict(ALREADY_ACCEPTED, next, "already_accepted");
         return next;
       }
       if (options && (await options.delivered())) return next;

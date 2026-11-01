@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import type { AgentPromptInput } from "../agent/agent-sdk-types.js";
 import { buildAgentPrompt } from "../agent/prompt-attachments.js";
-import { resolveClientMessageId } from "../client-message-id.js";
+import { ClientMessageIdConflict, resolveClientMessageId } from "../client-message-id.js";
 import { wrapSpokenInput } from "../voice-config.js";
 import type { ChatMessageFiles, SendMessageInput, SendMessageResult } from "./chat-engine.js";
 import type { ChatBot } from "./chat-record.js";
@@ -35,7 +35,10 @@ export function duplicateSend(
       ? existing.attachmentContentDigest !== messageContentDigest(input)
       : messageContent(existing) !== messageContent(input)
   )
-    throw new Error(`Message ${existing.id} already exists with different text or attachments`);
+    throw new ClientMessageIdConflict(
+      `Message ${existing.id} already exists with different text or attachments`,
+      "content",
+    );
   return { messageId: existing.id, seq: existing.seq, targets: [], duplicate: true };
 }
 
