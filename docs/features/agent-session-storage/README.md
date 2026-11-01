@@ -257,14 +257,25 @@ lines, which show this authorship for each session, live in
 
 The shared app attachment service prepares image send copies before Session,
 Chat, Queue and Steer submission. It reads and prepares one original at a time,
-with at most 32 images and a 32 MiB per-original bound (trusted store metadata
-precheck plus an actual base64-length check). Original aggregate size alone is
-not a refusal: three large phone photos can be prepared sequentially. The send
-copies together contain at most 2 MiB of base64 characters. Small images fitting
-their remaining share stay byte-identical; larger images first try lossless PNG
-at up to 2560 pixels, then progressively smaller JPEG/WebP copies. Non-JPEG
-sources use WebP for lossy steps to retain transparency. Persisted originals,
-draft identities and non-image file uploads are unchanged.
+with a 32 MiB per-original bound (trusted store metadata precheck plus an actual
+base64-length check). Original aggregate size alone is not a refusal: three large
+phone photos can be prepared sequentially. One message carries at most 32 images
+and 2 MiB of base64 characters. Small images fitting their remaining share stay
+byte-identical; larger images first try lossless PNG at up to 2560 pixels, then
+progressively smaller JPEG/WebP copies. Non-JPEG sources use WebP for lossy steps
+to retain transparency; where the platform cannot write WebP (it throws, or
+Safari's canvas returns PNG) JPEG takes over. Persisted originals, draft
+identities and non-image file uploads are unchanged.
+
+A draft over those limits becomes several ordered messages: `encodeImageMessagesForSend`
+splits evenly at 32 images and halves any group that misses its budget at the
+smallest step. Earlier parts carry a note that more follows; the user's text and
+files ride with the last part, so the agent answers once it has every image. A
+Session or Chat send delivers the parts in order and the Queue admits them as
+ordered items. Paths that must stay one message (creating an agent, saving an
+edited queue row) refuse with what to do. When a later part of a Session send
+fails, earlier parts have already been delivered; the draft stays, so a retry
+repeats them. A Chat send and the Queue deduplicate parts by ID.
 
 This output fits the existing Host 16 MiB operation reservation, one Chat log
 row and relay frame. It benefits a new app talking to an old Host without a wire
