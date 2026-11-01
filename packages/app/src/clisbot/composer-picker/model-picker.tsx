@@ -86,9 +86,8 @@ function PanelBody(props: PanelProps) {
   const { state, isCompact } = props;
   const railItems = useMemo(
     () =>
-      buildRailItems(props.rail.providers, {
-        hasProfiles: (props.profiles?.rows.length ?? 0) > 0,
-      }),
+      // A Host with Agent profiles keeps the entry with none applicable: it leads to them.
+      buildRailItems(props.rail.providers, { hasProfiles: props.profiles !== null }),
     [props.profiles, props.rail.providers],
   );
   const orientation = isCompact ? "horizontal" : "vertical";
@@ -156,13 +155,10 @@ function PanelFooter(props: ModelPickerProps) {
  */
 export function ModelPicker(props: ModelPickerProps) {
   const placement = useComposerPickerPlacement();
-  const { onOpenChange } = props;
-  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
   const rail = useProviderRail({
     providers: props.providers,
     isCompact: props.isCompact,
     serverId: props.serverId,
-    close,
     refresh: props.onRefreshProvider,
   });
   const state = useModelPickerState({

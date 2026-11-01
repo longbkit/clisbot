@@ -62,7 +62,11 @@ function useChipLabels(props: ComposerPickerControlsProps) {
   return {
     modelName: formatCompactModelName(modelLabel),
     chip: props.showEffort ? full : formatCompactModelName(modelLabel),
-    accessibility: t("composer.picker.chip", { value: full }),
+    // A screen reader has room for the model's full name, and the effort even when the chip
+    // has dropped it.
+    accessibility: t("composer.picker.chip", {
+      value: effort ? `${modelLabel}, ${effort.label}` : modelLabel,
+    }),
   };
 }
 

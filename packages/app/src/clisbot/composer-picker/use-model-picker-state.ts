@@ -44,15 +44,18 @@ export function useModelPickerState(input: {
   }, [open]);
   const setQuery = useCallback((next: string) => {
     setQueryState(next);
+    setExpanded(false);
     setHighlight(next.trim() ? 0 : -1);
   }, []);
   const all = useMemo(
     () => buildVisibleRows({ providers, scope, query, favorites }),
     [favorites, providers, query, scope],
   );
+  // A broad query over a large catalog collapses behind Show more too, so the panel never
+  // mounts hundreds of rows at once.
   const visible = useMemo(
-    () => limitRows(all, { expanded: expanded || query.trim().length > 0, selectedKey }),
-    [all, expanded, query, selectedKey],
+    () => limitRows(all, { expanded, selectedKey }),
+    [all, expanded, selectedKey],
   );
   const showMore = useCallback(() => setExpanded(true), []);
   const status = resolveStatus(providers, scope, query);

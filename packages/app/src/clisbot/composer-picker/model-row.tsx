@@ -21,6 +21,8 @@ export interface ModelRowProps {
   favorite: boolean;
   /** ⌘1…⌘9 for the first nine rows; null past them. */
   shortcut: string | null;
+  /** Names the provider beside the model, for a list that mixes providers. */
+  showProvider: boolean;
   onPick: (row: ProviderSelectionModelRow) => void;
   onToggleFavorite: (key: string) => void;
   onCreateProfile?: (seed: AgentProfileSeed) => void;
@@ -124,6 +126,7 @@ export function ModelRow(props: ModelRowProps) {
     <View style={styles.boundary} onPointerEnter={enter} onPointerLeave={leave}>
       <ComboboxItem
         label={row.modelLabel}
+        description={props.showProvider ? row.providerLabel : undefined}
         active={props.highlighted}
         onPress={pick}
         leadingSlot={leading}

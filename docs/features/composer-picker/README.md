@@ -7,7 +7,10 @@ The composer bar shows two agent controls besides attach, tools, the context rin
 - **Model chip** — the provider icon and a short name with the effort: `6 Astra Medium` for
   GPT-6-Astra at Medium, `Opus 5.5 High` for Claude Opus 5.5. `formatCompactModelName`
   (`packages/app/src/clisbot/composer-picker/model-name.ts`) drops the family prefix the icon
-  already shows (`GPT-`, `Claude `, `Gemini `) and turns hyphens into spaces.
+  already shows (`GPT-`, `Claude `, `Gemini `) and turns hyphens into spaces. Its accessible
+  name keeps the full model name and the effort, even when the chip drops the effort:
+  "Model and options: GPT-6-Astra, Medium". The e2e helpers read the model and effort from it
+  (`e2e/support/helpers/composer-picker.ts`).
 - **Mode dropdown** — the mode's icon and name. Each mode reads as one concept, so one icon means
   one thing on every provider: lock (asks), pencil (accepts edits), sparkles (auto), shield off
   (bypass, full access), checklist (Plan) and double check (Full auto-accept)
@@ -47,10 +50,17 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
   (Provider settings…, Refresh models, Move up, Move down), on every layout. Refresh reloads that
   provider through the same snapshot refresh as Settings, shows a spinner, ignores a second press
   while one runs, keeps the panel open and the selection, and shows an error with Retry beside
-  the list. Provider settings closes the panel and opens the provider's settings sheet, where
-  the model list and advanced options live.
+  the list. Provider settings opens the provider's settings sheet over the panel, where the
+  model list and advanced options live; closing it returns to the panel.
 - **A query searches every provider** and matches provider names too: `codex` lists every Codex
-  model, `so` every model containing "so".
+  model, `so` every model containing "so". Search matches and Favorites mix providers, so each
+  of their rows names its provider under the model; two providers can sell the same label. Like
+  a provider's list, matches past the first eight wait behind Show more, so a broad query over a
+  large catalog never mounts hundreds of rows.
+- **Profiles** is on the rail whenever the Host supports Agent profiles, even with none that
+  apply: its list applies a profile with one press (the panel stays open), its header pencil
+  opens the Host's Agent profiles settings, and with none it offers Create profile, which goes
+  there too.
 - **Rows**: provider icon, name, ⌘1…⌘9 (Ctrl elsewhere, hidden on touch), the favorite star and
   Create profile on hover (always shown on touch), and a check on the selected model. The arrows
   move, Enter and ⌘N pick. The panel takes these keys in the capture phase while open, so the

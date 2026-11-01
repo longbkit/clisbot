@@ -7,6 +7,7 @@ import { ModelProviderGlyph } from "@/components/model-browser";
 import { ComboboxItem } from "@/components/ui/combobox";
 import { ChipButton, ChipRow } from "@/components/ui/filter-chips";
 import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
+import { ScrollView } from "@/components/ui/scroll-view";
 import { ICON_SIZE } from "@/styles/theme";
 import { scopeKey, type PickerRailItem, type PickerScope } from "./picker-rows";
 
@@ -150,9 +151,17 @@ export function ProviderRail(props: ProviderRailProps) {
       style={expanded ? styles.columnExpanded : styles.column}
       testID={`composer-picker-rail-${props.layout}`}
     >
-      <View style={expanded ? styles.rowsExpanded : styles.rows} accessibilityRole="tablist">
-        {buttons}
-      </View>
+      {/* A Host with many providers outgrows the panel's height, so the entries scroll and the
+          toggle stays pinned below them. */}
+      <ScrollView
+        style={styles.rowsScroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={expanded ? styles.rowsExpanded : styles.rows} accessibilityRole="tablist">
+          {buttons}
+        </View>
+      </ScrollView>
       {props.onToggleExpanded ? (
         <ExpandToggle expanded={expanded} onToggle={props.onToggleExpanded} />
       ) : null}
@@ -174,6 +183,10 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[2],
     borderRightWidth: 1,
     borderRightColor: theme.colors.borderSubtle,
+  },
+  rowsScroll: {
+    flex: 1,
+    minHeight: 0,
   },
   rows: {
     alignItems: "center",

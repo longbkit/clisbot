@@ -88,6 +88,8 @@ const EFFORTS = [
 interface HarnessExtras {
   serverId?: string | null;
   onRefreshProvider?: ModelPickerProps["onRefreshProvider"];
+  profiles?: ModelPickerProps["profiles"];
+  providers?: ProviderSelectorProvider[];
 }
 
 function Harness({
@@ -141,7 +143,7 @@ function Harness({
         onOpenChange={openChange}
         anchorRef={anchorRef}
         isCompact={false}
-        providers={PROVIDERS}
+        providers={extras.providers ?? PROVIDERS}
         selectedProvider={selected.provider}
         selectedModelId={selected.model}
         serverId={extras.serverId ?? null}
@@ -152,7 +154,7 @@ function Harness({
         moreFeatures={panel.more}
         onSetFeature={setFeature}
         mode={null}
-        profiles={null}
+        profiles={extras.profiles ?? null}
       />
     </>
   );
@@ -208,12 +210,32 @@ it("stays open after picking a model and closes on Escape", async () => {
 it("searches every provider and matches provider names", async () => {
   mount();
   await search("so");
-  expect(await modelRow("claude:Claude Sonnet 5")).toBeTruthy();
+  // Matches mix providers, so each row names its own.
+  expect((await modelRow("claude:Claude Sonnet 5")).textContent).toContain("Claude Sonnet 5Claude");
+  expect((await modelRow("codex:GPT-6.1-Sol")).textContent).toContain("GPT-6.1-SolCodex");
   expect(await modelRow("codex:GPT-6.1-Sol")).toBeTruthy();
   expect(screen.queryByTestId("composer-picker-model-codex:GPT-6-Astra")).toBeNull();
   await search("claude");
   expect(await modelRow("claude:Claude Haiku 5")).toBeTruthy();
   expect(screen.queryByTestId("composer-picker-model-codex:GPT-6.1-Sol")).toBeNull();
+});
+
+it("collapses a broad query's matches behind Show more", async () => {
+  const bulk = provider(
+    "bulk",
+    "Bulk",
+    Array.from({ length: 40 }, (_, index) => `Bulk model ${index}`),
+  );
+  mount(undefined, { providers: [...PROVIDERS, bulk] });
+  await search("bulk model");
+  const showMore = await screen.findByTestId("composer-picker-show-more");
+  expect(document.querySelectorAll('[data-testid^="composer-picker-model-bulk:"]')).toHaveLength(8);
+  await userEvent.click(showMore);
+  await expect
+    .poll(() => document.querySelectorAll('[data-testid^="composer-picker-model-bulk:"]').length)
+    .toBe(40);
+  await search("bulk model 3");
+  expect(await screen.findByTestId("composer-picker-show-more")).toBeTruthy();
 });
 
 it("picks the Nth row with the ⌘ shortcut", async () => {
@@ -304,7 +326,7 @@ it("moves a provider up from its menu and keeps Favorites first", async () => {
     ]);
 });
 
-it("opens the provider's settings from its menu, closing the panel", async () => {
+it("opens the provider's settings from its menu over the open panel", async () => {
   const open = vi.fn();
   useProviderSettingsStore.setState({ open });
   const calls = mount(undefined, { serverId: "host-1" });
@@ -313,7 +335,35 @@ it("opens the provider's settings from its menu, closing the panel", async () =>
   await expect
     .poll(() => open.mock.calls[0]?.[0])
     .toMatchObject({ serverId: "host-1", provider: "codex" });
-  expect(calls.openChanges).toEqual([false]);
+  // Closing the settings sheet returns to the panel.
+  expect(calls.openChanges).toEqual([]);
+});
+
+it("keeps the Profiles entry on a Host with no profiles, offering Create profile", async () => {
+  const applyProfile = vi.fn();
+  mount(undefined, { serverId: "host-1", profiles: { rows: [], applyProfile } });
+  await userEvent.click(await screen.findByTestId("composer-picker-rail-profiles"));
+  expect(await screen.findByText("No agent profiles yet")).toBeTruthy();
+  expect(screen.getByTestId("composer-picker-profiles-create").textContent).toBe("Create profile");
+  expect(screen.queryByLabelText("Edit agent profiles")).toBeNull();
+});
+
+it("applies a profile from the Profiles entry and leads to the Host's profiles", async () => {
+  const applyProfile = vi.fn();
+  const row = {
+    id: "profile-ui",
+    provider: "codex",
+    modelId: "GPT-6.1-Sol",
+    icon: "",
+    color: "",
+    name: "UI work",
+    summary: "Codex · GPT-6.1-Sol",
+  };
+  mount(undefined, { serverId: "host-1", profiles: { rows: [row], applyProfile } });
+  await userEvent.click(await screen.findByTestId("composer-picker-rail-profiles"));
+  expect(screen.getByLabelText("Edit agent profiles")).toBeTruthy();
+  await userEvent.click(await screen.findByTestId("composer-picker-profile-row-profile-ui"));
+  expect(applyProfile).toHaveBeenCalledWith("profile-ui");
 });
 
 it("refreshes the provider's models in place, with a spinner, an error and Retry", async () => {

@@ -12,13 +12,12 @@ export function useProviderRail(input: {
   providers: readonly ProviderSelectorProvider[];
   isCompact: boolean;
   serverId: string | null;
-  close: () => void;
   refresh: ProviderRefresh | undefined;
 }) {
   const { width } = useWindowDimensions();
   const storedExpanded = useProviderRailStore((state) => state.expanded);
   const order = useProviderRailStore((state) => state.order);
-  const { providers, serverId, close } = input;
+  const { providers, serverId } = input;
   const ordered = useMemo(() => {
     const ids = orderProviderIds(
       providers.map((provider) => provider.id),
@@ -42,14 +41,13 @@ export function useProviderRail(input: {
       ),
     [ordered],
   );
+  // The settings sheet stacks over the panel, and closing it returns to the panel.
   const overlayParentLayer = useCurrentOverlayLayer();
   const openSettings = useMemo(() => {
     if (!serverId) return undefined;
-    return (provider: string) => {
-      close();
+    return (provider: string) =>
       useProviderSettingsStore.getState().open({ serverId, provider, overlayParentLayer });
-    };
-  }, [close, overlayParentLayer, serverId]);
+  }, [overlayParentLayer, serverId]);
   const refresh = useProviderRefresh(input.refresh);
   return { providers: ordered, layout, toggle, move, openSettings, refresh };
 }
