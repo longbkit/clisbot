@@ -24,6 +24,7 @@ import {
   requiredPermissionForOutbound,
 } from "../authorization/operation-permissions.js";
 import { requiredPrivilegeForOperation } from "@clisbot/protocol/managed-access-privileges";
+import { isFasterTier, usesFasterTier } from "@clisbot/protocol/speed-tier";
 import {
   PROJECT_PRIVILEGES,
   type ProjectAuthorization,
@@ -1740,27 +1741,6 @@ function withoutLeftFullAutoAccept(
   }
   const { fullAutoAccept: _left, ...rest } = config;
   return rest;
-}
-
-/** A Codex `service_tier` above the standard one: Fast, Priority, Turbo or Ultra fast. */
-const FASTER_SERVICE_TIER = /fast|priority|turbo|ultra/i;
-
-/**
- * A faster, dearer tier, which `agent.fast.use` gates: Claude's and OMP's `fast_mode`, Codex's
- * `service_tier` above standard (not the cheaper Flex) and Cursor's `fast`.
- */
-function isFasterTier(featureId: string, value: unknown): boolean {
-  if (featureId === "fast_mode") return value === true;
-  if (featureId === "fast") return value === true || value === "true";
-  if (featureId === "service_tier")
-    return typeof value === "string" && FASTER_SERVICE_TIER.test(value);
-  return false;
-}
-
-function usesFasterTier(featureValues: Record<string, unknown> | undefined): boolean {
-  return Object.entries(featureValues ?? {}).some(([featureId, value]) =>
-    isFasterTier(featureId, value),
-  );
 }
 
 const PLAN_MODE_ID = "plan";

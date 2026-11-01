@@ -185,6 +185,8 @@ it("applies profiles as concrete bundles and filters by grants", async () => {
       featureValues: { fast: true },
     },
   ];
+  // Cursor's `fast` is a faster tier.
+  input.canUseFastMode = true;
   const result = await runConfigurationCommand(input);
   expect(result.selection).toMatchObject({
     selectedModel: "large",
@@ -223,6 +225,9 @@ it("an empty same-provider profile preserves live feature values", async () => {
   input.daemon.listAgentProfiles = async () => [
     { id: "empty", name: "Empty", provider: "codex", featureValues: {} },
   ];
+  // The preserved live `fast` is still checked: refused without agent.fast.use.
+  expect((await runConfigurationCommand(input)).text).toContain("agent.fast.use");
+  input.canUseFastMode = true;
   expect((await runConfigurationCommand(input)).selection?.selectedFeatureValues).toEqual({
     fast: true,
   });
@@ -341,6 +346,41 @@ it("checks fast mode for final mint and resume authority, defaulting to refusal"
   await expect(
     validateAgentConfigurationAuthority(input.daemon, config, input.access, true, true),
   ).resolves.toBeUndefined();
+});
+it("gates every faster tier, not only fast_mode: Codex service_tier and Cursor fast", async () => {
+  const input = fixture("model", "large");
+  for (const featureValues of [
+    { service_tier: "priority" },
+    { service_tier: "ultrafast" },
+    { service_tier: "scale" },
+    { fast: "true" },
+  ]) {
+    const config = { ...input.config, featureValues };
+    await expect(
+      validateAgentConfigurationAuthority(input.daemon, config, input.access, true),
+    ).rejects.toThrow("agent.fast.use");
+  }
+  for (const featureValues of [{ service_tier: "default" }, { service_tier: "flex" }]) {
+    const config = { ...input.config, featureValues };
+    await expect(
+      validateAgentConfigurationAuthority(input.daemon, config, input.access, true),
+    ).resolves.toBeUndefined();
+  }
+});
+it("filters profiles with a faster Codex tier from /agent without agent.fast.use", async () => {
+  const input = fixture("agent", "list");
+  input.daemon.listAgentProfiles = async () => [
+    {
+      id: "priority-preset",
+      name: "P",
+      provider: "codex",
+      featureValues: { service_tier: "priority" },
+    },
+    { id: "flex-preset", name: "F", provider: "codex", featureValues: { service_tier: "flex" } },
+  ];
+  const listed = await runConfigurationCommand(input);
+  expect(listed.text).not.toContain("priority-preset");
+  expect(listed.text).toContain("flex-preset");
 });
 it("provider switch picks the first model and effort the grant allows", async () => {
   const input = fixture("provider", "claude");

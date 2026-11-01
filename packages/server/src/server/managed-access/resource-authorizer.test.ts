@@ -309,6 +309,8 @@ describe("ManagedResourceAuthorizer", () => {
       ["service_tier", "priority"],
       ["service_tier", "ultrafast"],
       ["service_tier", "fast"],
+      // A tier nobody has classified costs more until someone says otherwise.
+      ["service_tier", "scale"],
       ["fast", "true"],
       ["fast_mode", true],
     ] as const) {
@@ -321,6 +323,7 @@ describe("ManagedResourceAuthorizer", () => {
     for (const [featureId, value] of [
       ["service_tier", "default"],
       ["service_tier", "flex"],
+      ["service_tier", "auto"],
       ["fast", "false"],
     ] as const) {
       await expect(without.allowsInbound(create({ [featureId]: value }))).resolves.toBe(true);

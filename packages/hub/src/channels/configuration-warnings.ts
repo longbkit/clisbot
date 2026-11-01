@@ -5,6 +5,7 @@
 // these are information for the person saving, never a refusal.
 
 import { AGENT_PROVIDER_DEFINITIONS } from "@clisbot/protocol/provider-manifest";
+import { usesFasterTier } from "@clisbot/protocol/speed-tier";
 import type { CompiledHubBundle } from "../config/bundle.js";
 import type { Database } from "../db/types.js";
 import {
@@ -117,7 +118,7 @@ export function openRouteWarnings(route: CompiledRoute): string[] {
 export function openAgentWarnings(agent: WarnedAgent | undefined): string[] {
   if (agent === undefined) return ["The Agent configuration for this Route is unknown."];
   const warnings: string[] = [];
-  if (agent.featureValues?.["fast_mode"] === true) {
+  if (usesFasterTier(agent.featureValues)) {
     warnings.push("Fast mode is on for anyone in the conversation.");
   }
   const provider = AGENT_PROVIDER_DEFINITIONS.find(({ id }) => id === agent.provider);
