@@ -92,52 +92,55 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Free runner disk space
+        shell: bash
+        run: |
+          # A four-ABI release build needs more than the runner's default free space.
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost
+          df -h /
+
       - name: Setup Expo and EAS
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build Android APK on EAS
-        id: eas_build
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd packages/app
-
-          build_json="$(npx eas build --platform android --profile production-apk --non-interactive --wait --json)"
-          echo "$build_json" > "$RUNNER_TEMP/eas-build.json"
-
-          build_id="$(jq -r 'if type == "array" then .[0].id // empty else .id // empty end' "$RUNNER_TEMP/eas-build.json")"
-          if [ -z "$build_id" ]; then
-            echo "Failed to determine EAS build ID."
-            cat "$RUNNER_TEMP/eas-build.json"
-            exit 1
-          fi
-
-          echo "build_id=$build_id" >> "$GITHUB_OUTPUT"
-
-      - name: Resolve APK artifact URL
+      # The Expo account has no paid plan, and production-apk needs the `large` cloud resource
+      # class, so the APK is built on this runner. EAS still supplies the remote signing keystore.
+      - name: Build Android APK locally
         id: artifact
         shell: bash
+        env:
+          GOOGLE_SERVICES_JSON_PROD: ${{ secrets.GOOGLE_SERVICES_JSON_PROD }}
+          GOOGLE_SERVICE_INFO_PLIST_PROD_CONTENT: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_PROD }}
+          EAS_SKIP_AUTO_FINGERPRINT: "1"
+          LEFTHOOK: "0"
         run: |
           set -euo pipefail
-          cd packages/app
-
-          build_view_json="$(npx eas build:view '${{ steps.eas_build.outputs.build_id }}' --json)"
-          echo "$build_view_json" > "$RUNNER_TEMP/eas-build-view.json"
-
-          artifact_url="$(jq -r '.artifacts.buildUrl // .artifacts.applicationArchiveUrl // empty' "$RUNNER_TEMP/eas-build-view.json")"
-          if [ -z "$artifact_url" ]; then
-            echo "Failed to determine APK artifact URL."
-            cat "$RUNNER_TEMP/eas-build-view.json"
-            exit 1
+          # EAS archives the project by .gitignore, so the Firebase files are passed by absolute path.
+          if [[ -n "${GOOGLE_SERVICES_JSON_PROD:-}" ]]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON_PROD" > "$RUNNER_TEMP/google-services.prod.json"
+            export GOOGLE_SERVICES_FILE_PROD="$RUNNER_TEMP/google-services.prod.json"
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON_PROD is not set; the APK ships without product analytics."
           fi
+          if [[ -n "${GOOGLE_SERVICE_INFO_PLIST_PROD_CONTENT:-}" ]]; then
+            printf '%s' "$GOOGLE_SERVICE_INFO_PLIST_PROD_CONTENT" > "$RUNNER_TEMP/GoogleService-Info.prod.plist"
+            export GOOGLE_SERVICE_INFO_PLIST_PROD="$RUNNER_TEMP/GoogleService-Info.prod.plist"
+          fi
+          unset GOOGLE_SERVICES_JSON_PROD GOOGLE_SERVICE_INFO_PLIST_PROD_CONTENT
 
           asset_name="clisbot-${RELEASE_TAG}-android.apk"
           asset_path="$RUNNER_TEMP/$asset_name"
-
-          curl --fail --location --output "$asset_path" "$artifact_url"
+          cd packages/app
+          npx eas build --local --platform android --profile production-apk --non-interactive \
+            --output "$asset_path"
 
           echo "asset_name=$asset_name" >> "$GITHUB_OUTPUT"
           echo "asset_path=$asset_path" >> "$GITHUB_OUTPUT"

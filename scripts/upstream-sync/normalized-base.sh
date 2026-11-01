@@ -15,7 +15,7 @@ git -C "$repo" worktree add --detach "$target" "$base_sha" >/dev/null
 # The rename stops after moving files when Git ignores a destination; that only
 # matters for committed snapshots, not this throwaway comparison copy.
 node "$repo/scripts/rebrand-clisbot.mjs" --root "$target" --apply \
-  --expo-owner lbk-company --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807 ||
+  --expo-owner clisbot-team --expo-project-id 9314cc2c-4abe-4637-b1cf-647fbbfbd807 ||
   echo "normalized-base: rename reported ignored destinations (expected); continuing" >&2
 node "$repo/scripts/branding/apply.mjs" --root "$target" --apply >/dev/null
 npm --prefix "$repo" run format:files -- "$target" >/dev/null

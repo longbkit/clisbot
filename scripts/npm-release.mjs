@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import fs, { readFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseReleaseVersion } from "./release-version-utils.mjs";
@@ -41,10 +42,43 @@ export function releasePackages(directory = root) {
   return ordered;
 }
 
+/**
+ * The release token, from the environment or the checkout's .env, so a stale login in
+ * ~/.npmrc never decides whether a release can publish. Never printed.
+ */
+export function readReleaseToken(env = process.env, envFile = path.join(root, ".env")) {
+  if (env.NPM_RELEASE_TOKEN) return env.NPM_RELEASE_TOKEN;
+  if (!fs.existsSync(envFile)) return undefined;
+  for (const line of fs.readFileSync(envFile, "utf8").split(/\r?\n/)) {
+    const match = /^\s*(?:export\s+)?NPM_RELEASE_TOKEN\s*=\s*["']?([^"'\s#]+)/.exec(line);
+    if (match) return match[1];
+  }
+  return undefined;
+}
+
+let releaseUserConfig;
+/** A private npmrc holding only the release token, written once per run and removed on exit. */
+function releaseNpmEnv() {
+  const token = readReleaseToken();
+  if (!token) return process.env;
+  if (!releaseUserConfig) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clisbot-npm-release-"));
+    releaseUserConfig = path.join(dir, ".npmrc");
+    fs.writeFileSync(
+      releaseUserConfig,
+      `//registry.npmjs.org/:_authToken=${token}\nregistry=https://registry.npmjs.org/\n`,
+      { mode: 0o600 },
+    );
+    process.on("exit", () => fs.rmSync(dir, { recursive: true, force: true }));
+  }
+  return { ...process.env, NPM_CONFIG_USERCONFIG: releaseUserConfig };
+}
+
 function npm(args, options = {}) {
   return execFileSync("npm", args, {
     cwd: root,
     shell: process.platform === "win32",
+    env: releaseNpmEnv(),
     ...options,
   });
 }

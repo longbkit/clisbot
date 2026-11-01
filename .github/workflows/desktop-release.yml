@@ -161,6 +161,10 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Notarization with an App Store Connect API key; preferred over the Apple ID pair.
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           CLISBOT_DESKTOP_SMOKE: "1"
           CLISBOT_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
           # Metro's jest workers OOM on the generated ws-outbound.aot.js validator,
@@ -175,6 +179,18 @@ jobs:
             unset CSC_LINK CSC_KEY_PASSWORD
             echo "::warning::No Apple signing certificate configured; macOS artifacts will not be Developer ID signed or notarized."
           fi
+          # electron-builder reads APPLE_API_KEY as a path to the .p8 file.
+          if [[ -n "${APPLE_API_KEY_CONTENT:-}" && -n "${APPLE_API_KEY_ID:-}" && -n "${APPLE_API_ISSUER:-}" ]]; then
+            key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+            printf '%s' "$APPLE_API_KEY_CONTENT" > "$key_path"
+            chmod 600 "$key_path"
+            export APPLE_API_KEY="$key_path"
+            unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD
+          else
+            unset APPLE_API_KEY_ID APPLE_API_ISSUER
+            [[ -n "${APPLE_ID:-}" ]] || unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          fi
+          unset APPLE_API_KEY_CONTENT
           build_args=(-- --publish never --mac --${{ matrix.electron_arch }})
           build_args+=("-c.publish.releaseType=$RELEASE_TYPE")
           build_args+=("-c.publish.channel=$RELEASE_CHANNEL")

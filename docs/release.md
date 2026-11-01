@@ -29,6 +29,22 @@ Rules that apply to both steps:
 - Invoking a release skill is intent to start the flow, not blanket authorization to publish.
 - If the user asks for a release preview, show the prospective changelog/release contents and answer questions, but do not commit, tag, publish, or run release commands until they explicitly authorize the release.
 
+## Release credentials
+
+Each release step reads one credential. The originals live in the owner's private credentials
+folder (`08.credentials/clisbot/`); never paste a value into chat, logs or Git.
+
+| Step                                 | Credential                                                                                                                                                                   | Where it is read                                                                                                                                                    |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| npm publish (local)                  | `NPM_RELEASE_TOKEN`                                                                                                                                                          | The environment, else the checkout's `.env`. `scripts/npm-release.mjs` writes it to a temporary npmrc for the run, so a stale `~/.npmrc` login does not matter      |
+| macOS signing (Desktop Release)      | `APPLE_CERTIFICATE` (base64 of the Developer ID `identity-keychain-compatible.p12`), `APPLE_CERTIFICATE_PASSWORD`                                                            | GitHub secrets                                                                                                                                                      |
+| macOS notarization (Desktop Release) | `APPLE_API_KEY` (the App Store Connect `.p8` text), `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_TEAM_ID`                                                                  | GitHub secrets; the workflow writes the key to a file for electron-builder. `APPLE_ID` + `APPLE_PASSWORD` are a fallback only                                       |
+| Android APK (Android APK Release)    | `EXPO_TOKEN` (token of the `github-release` robot on the Expo account `clisbot-team`, which owns the project), `GOOGLE_SERVICES_JSON_PROD`, `GOOGLE_SERVICE_INFO_PLIST_PROD` | GitHub secrets. The APK is built on the runner with `eas build --local`: `production-apk` needs the paid `large` cloud class. EAS still serves the signing keystore |
+| iOS and Google Play                  | Apple distribution certificate, App Store Connect key, Play account                                                                                                          | The App Store operator agent, which asks the owner before each outward-facing step                                                                                  |
+
+A missing Apple secret builds unsigned macOS artifacts with a warning; a missing Firebase secret
+builds an APK without product analytics. Check `gh secret list` before tagging.
+
 ## Release source and CI
 
 The default release source is `origin/main`. Fetch `origin`, then record the
