@@ -407,6 +407,7 @@ const AgentModeSchema: z.ZodType<AgentMode> = z.object({
   description: z.string().optional(),
   icon: z.string().optional(),
   colorTier: z.string().optional(),
+  isUnattended: z.boolean().optional(),
 });
 
 const ProviderStatusSchema: z.ZodType<ProviderStatus> = z.enum([

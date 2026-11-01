@@ -10,6 +10,7 @@ import type {
   SteerResult,
   ImportedTimelineEntry,
 } from "./agent-sdk-types.js";
+import { getAgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
 import { wrapSessionProvider } from "./provider-registry.js";
 
 type OptionalAgentSessionMethodName = {
@@ -239,6 +240,19 @@ describe("wrapSessionProvider", () => {
       error,
     );
     expect(session.recordedCalls).toEqual([]);
+  });
+
+  test("a custom provider extending Claude reports its no-prompt mode from the manifest", async () => {
+    const session = new FakeSession();
+    session.getAvailableModes = async () => [
+      { id: "default", label: "Always Ask" },
+      { id: "bypassPermissions", label: "Bypass" },
+    ];
+    const claude = getAgentProviderDefinition("claude").modes;
+    const modes = await wrapSessionProvider("custom-claude", session, claude).getAvailableModes();
+    expect(modes.filter((mode) => mode.isUnattended).map((mode) => mode.id)).toEqual([
+      "bypassPermissions",
+    ]);
   });
 
   test("leaves steering unavailable when the provider has no implementation", () => {

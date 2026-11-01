@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { AgentPermissionRequest } from "./agent-sdk-types.js";
+import { classifyOmpRpcUiPermissionRequest } from "./providers/omp/rpc-ui-permission-mapper.js";
 import {
   isAutoAcceptablePermission,
   PERMISSION_CHOICE_METADATA,
@@ -90,5 +91,82 @@ describe("which requests Full auto-accept approves", () => {
       ),
     ).toBe(false);
     expect(shouldDaemonAutoAccept(base, tool)).toBe(false);
+  });
+});
+
+describe("Full auto-accept against each provider's request shapes", () => {
+  const omp = classifyOmpRpcUiPermissionRequest({
+    type: "extension_ui_request",
+    id: "bash",
+    method: "select",
+    title: "Allow tool: bash\nCommand: echo hi",
+    options: ["Approve", "Deny"],
+  });
+  if (omp.kind !== "tool") throw new Error("OMP tool approval expected");
+
+  // Shapes copied from each provider's mapper (file named per row).
+  test.each<[string, AgentPermissionRequest, boolean]>([
+    // claude/agent.ts resolvePermissionKind
+    ["Claude Bash", request({ name: "Bash", input: { command: "ls" } }), true],
+    ["Claude AskUserQuestion", request({ name: "AskUserQuestion", kind: "question" }), false],
+    ["Claude ExitPlanMode", request({ name: "ExitPlanMode", kind: "plan" }), false],
+    // codex-app-server-agent.ts command and file-change approvals, request_user_input
+    ["Codex command", request({ provider: "codex", name: "CodexBash" }), true],
+    [
+      "Codex question",
+      request({ provider: "codex", name: "request_user_input", kind: "question" }),
+      false,
+    ],
+    // acp-agent.ts mapPermissionRequest (Copilot, generic ACP, Cursor, Kimi)
+    [
+      "ACP allow options",
+      request({
+        provider: "copilot",
+        name: "execute",
+        actions: [
+          { id: "allow", label: "Allow once", behavior: "allow" },
+          { id: "always", label: "Always allow", behavior: "allow" },
+          { id: "reject", label: "Reject", behavior: "deny" },
+        ],
+      }),
+      true,
+    ],
+    [
+      "ACP chooser",
+      request({
+        provider: "kimi",
+        name: "AskUserQuestion",
+        metadata: { [PERMISSION_CHOICE_METADATA]: true },
+        actions: [
+          { id: "a", label: "A", behavior: "allow" },
+          { id: "b", label: "B", behavior: "allow" },
+        ],
+      }),
+      false,
+    ],
+    ["ACP mode switch", request({ provider: "copilot", name: "switch_mode", kind: "mode" }), false],
+    // opencode-agent.ts buildOpenCodePermissionActions and question events
+    [
+      "OpenCode tool",
+      request({
+        provider: "opencode",
+        name: "bash",
+        actions: [
+          { id: "deny", label: "Deny", behavior: "deny" },
+          { id: "always", label: "Allow always", behavior: "allow" },
+          { id: "once", label: "Allow once", behavior: "allow" },
+        ],
+      }),
+      true,
+    ],
+    [
+      "OpenCode question",
+      request({ provider: "opencode", name: "question", kind: "question" }),
+      false,
+    ],
+    // omp/rpc-ui-permission-mapper.ts, the real mapper
+    ["OMP bash", omp.request, true],
+  ])("%s", (_name, shape, approved) => {
+    expect(isAutoAcceptablePermission(shape)).toBe(approved);
   });
 });
