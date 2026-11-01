@@ -5,7 +5,7 @@ import {
   isAutoAcceptablePermission,
   PERMISSION_CHOICE_METADATA,
   resolveFullAutoAcceptProviderMode,
-  shouldDaemonAutoAccept,
+  isDaemonAutoAccepted,
 } from "./full-auto-accept.js";
 
 function request(overrides: Partial<AgentPermissionRequest>): AgentPermissionRequest {
@@ -107,15 +107,30 @@ describe("which requests Full auto-accept approves", () => {
 
   test("leaves the answer to a provider whose own auto-accept is on", () => {
     const tool = request({});
-    const base = { provider: "copilot", cwd: "/tmp" };
-    expect(shouldDaemonAutoAccept({ ...base, fullAutoAccept: true }, tool)).toBe(true);
-    expect(
-      shouldDaemonAutoAccept(
-        { ...base, fullAutoAccept: true, featureValues: { auto_accept: true } },
-        tool,
-      ),
-    ).toBe(false);
-    expect(shouldDaemonAutoAccept(base, tool)).toBe(false);
+    const toggle = (value: unknown) => [{ id: "auto_accept", value }];
+    expect(isDaemonAutoAccepted({ fullAutoAccept: true }, tool)).toBe(true);
+    expect(isDaemonAutoAccepted({ fullAutoAccept: true, features: toggle(true) }, tool)).toBe(
+      false,
+    );
+    expect(isDaemonAutoAccepted({ fullAutoAccept: true, features: toggle("true") }, tool)).toBe(
+      false,
+    );
+    expect(isDaemonAutoAccepted({ fullAutoAccept: true, features: toggle(false) }, tool)).toBe(
+      true,
+    );
+    expect(isDaemonAutoAccepted({}, tool)).toBe(false);
+  });
+
+  // The daemon, local waiters and a remote observer holding only a snapshot used to read two
+  // sources (config.featureValues and snapshot.features) and could disagree. They now all read
+  // the toggle the provider reports, which is what the provider itself answers from.
+  test("judges a live agent and its snapshot from the same source", () => {
+    const tool = request({});
+    const reported = { fullAutoAccept: true, features: [{ id: "auto_accept", value: false }] };
+    const live = { ...reported, config: { featureValues: { auto_accept: true } } };
+    const snapshot = { ...reported, status: "running" };
+    expect(isDaemonAutoAccepted(live, tool)).toBe(isDaemonAutoAccepted(snapshot, tool));
+    expect(isDaemonAutoAccepted(live, tool)).toBe(true);
   });
 });
 

@@ -4,7 +4,6 @@ import type {
   AgentMode,
   AgentPermissionRequest,
   AgentPermissionResponse,
-  AgentSessionConfig,
 } from "./agent-sdk-types.js";
 
 /**
@@ -67,33 +66,42 @@ export function isAutoAcceptablePermission(request: AgentPermissionRequest): boo
   return actions.length === 0 || actions.some((action) => action.behavior === "allow");
 }
 
+/** The provider's own auto-accept toggle (ACP, Copilot, OpenCode). */
+const PROVIDER_AUTO_ACCEPT_FEATURE_ID = "auto_accept";
+
 /**
- * The same decision from an agent snapshot, for observers that see the payload rather than the
- * session config (finish subscriptions): a request the daemon answers is not a wait for a person.
+ * What decides whether the daemon answers: the agent's Full auto-accept flag and the features the
+ * provider reports. A live agent and its snapshot carry both, so the daemon, local waiters and a
+ * remote observer reading a snapshot judge the same request the same way.
  */
-export function isDaemonAutoAcceptedForSnapshot(
-  snapshot: { fullAutoAccept?: boolean; features?: readonly { id: string; value?: unknown }[] },
-  request: AgentPermissionRequest,
-): boolean {
-  const providerAutoAccept = snapshot.features?.some(
-    (feature) => feature.id === "auto_accept" && feature.value === true,
-  );
-  return (
-    snapshot.fullAutoAccept === true && !providerAutoAccept && isAutoAcceptablePermission(request)
-  );
+export interface AutoAcceptState {
+  fullAutoAccept?: boolean;
+  features?: readonly { id: string; value?: unknown }[] | null;
 }
 
 /**
- * A provider whose own auto-accept is on (ACP, Copilot, OpenCode `auto_accept`) answers
- * first; the daemon answering too would race it.
+ * A provider whose own auto-accept is on answers first; the daemon answering too would race it.
+ * The provider answers from the toggle it reports, so that is what is read here, not the stored
+ * `featureValues`, which a provider without the toggle ignores.
  */
-export function shouldDaemonAutoAccept(
-  config: AgentSessionConfig,
+function providerAutoAccepts(features: AutoAcceptState["features"]): boolean {
+  return (
+    features?.some(
+      (feature) =>
+        feature.id === PROVIDER_AUTO_ACCEPT_FEATURE_ID &&
+        (feature.value === true || feature.value === "true"),
+    ) === true
+  );
+}
+
+/** True when the daemon answers this request for the user, so no person is waited on. */
+export function isDaemonAutoAccepted(
+  state: AutoAcceptState,
   request: AgentPermissionRequest,
 ): boolean {
   return (
-    config.fullAutoAccept === true &&
-    config.featureValues?.auto_accept !== true &&
+    state.fullAutoAccept === true &&
+    !providerAutoAccepts(state.features) &&
     isAutoAcceptablePermission(request)
   );
 }

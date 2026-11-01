@@ -9,7 +9,7 @@ import {
   DAEMON_PERMISSION_METADATA,
   isFullAutoAcceptMode,
   resolveFullAutoAcceptProviderMode,
-  shouldDaemonAutoAccept,
+  isDaemonAutoAccepted,
 } from "./full-auto-accept.js";
 import { CommittedEventOutbox } from "./session-storage/committed-event-outbox.js";
 import { currentSessionOperationIdentity } from "./session-operation-context.js";
@@ -4162,7 +4162,7 @@ export class AgentManager {
   /** The first request waiting for a person; one Full auto-accept answers is not waiting. */
   private peekPendingPermission(agent: ManagedAgent): AgentPermissionRequest | null {
     for (const request of agent.pendingPermissions.values()) {
-      if (!shouldDaemonAutoAccept(agent.config, request)) return request;
+      if (!this.daemonAutoAccepts(agent, request)) return request;
     }
     return null;
   }
@@ -4458,7 +4458,7 @@ export class AgentManager {
             if (event.event.type === "permission_requested") {
               const owner = this.agents.get(agentId);
               // Full auto-accept answers it; the wait continues to the turn's end.
-              if (owner && shouldDaemonAutoAccept(owner.config, event.event.request)) return;
+              if (owner && this.daemonAutoAccepts(owner, event.event.request)) return;
               finish(event.event.request);
               return;
             }
@@ -5271,8 +5271,7 @@ export class AgentManager {
       );
       // Requests restored from the provider (a resumed session) are answered too.
       for (const request of pending) {
-        if (shouldDaemonAutoAccept(agent.config, request))
-          this.autoAcceptPermission(agent, request);
+        if (this.daemonAutoAccepts(agent, request)) this.autoAcceptPermission(agent, request);
       }
     } catch {
       for (const [id, request] of agent.pendingPermissions) {
@@ -6095,12 +6094,18 @@ export class AgentManager {
     }
     agent.pendingPermissions.set(event.request.id, event.request);
     this.refreshSessionPersistence(agent);
-    const autoAccepted = shouldDaemonAutoAccept(agent.config, event.request);
+    const autoAccepted = this.daemonAutoAccepts(agent, event.request);
     if (!hadPendingPermissions && !agent.internal && !autoAccepted) {
       this.broadcastAgentAttention(agent, "permission");
     }
     this.emitState(agent);
     if (autoAccepted) this.autoAcceptPermission(agent, event.request);
+  }
+
+  /** Whether Full auto-accept answers this request, judged as a snapshot observer judges it. */
+  private daemonAutoAccepts(agent: ManagedAgent, request: AgentPermissionRequest): boolean {
+    const features = ("session" in agent ? agent.session?.features : undefined) ?? agent.features;
+    return isDaemonAutoAccepted({ fullAutoAccept: agent.config.fullAutoAccept, features }, request);
   }
 
   private applyFullAutoAccept(agent: ActiveManagedAgent, enabled: boolean): void {
@@ -6110,7 +6115,7 @@ export class AgentManager {
     }
     agent.config.fullAutoAccept = true;
     for (const request of agent.pendingPermissions.values()) {
-      if (shouldDaemonAutoAccept(agent.config, request)) this.autoAcceptPermission(agent, request);
+      if (this.daemonAutoAccepts(agent, request)) this.autoAcceptPermission(agent, request);
     }
   }
 
