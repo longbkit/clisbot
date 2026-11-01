@@ -3,7 +3,8 @@ import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import type { MessagePayload } from "@/composer/types";
 import { uploadLocalQueueCopies } from "@/composer/host-queue-content";
 import { splitComposerAttachmentsForSubmit } from "@/composer/attachments/submit";
-import { encodeImages } from "@/utils/encode-images";
+import { encodeImageMessagesForSend } from "@/attachments/service";
+import { splitIntoMessageParts } from "@/composer/message-parts";
 import { resolveChatSendAction } from "./chat-send-action";
 
 /** Canonical Chat handoff: normal composer and client queue share files, wire and receipt owner. */
@@ -22,21 +23,37 @@ export async function sendChatInput(input: {
     input.freshFiles,
   );
   const content = splitComposerAttachmentsForSubmit(values);
-  const images = await encodeImages(content.images);
+  const parts = splitIntoMessageParts({
+    text: input.payload.text,
+    attachments: content.attachments,
+    imageMessages: await encodeImageMessagesForSend(content.images),
+  });
   const action = resolveChatSendAction({
     serverId: input.serverId,
     chat: input.chat,
     behavior: input.payload.activeTurnBehavior,
   });
+  // A Host with a queue refuses a later part while the first part's turn runs.
+  if (parts.length > 1 && input.payload.queueParts) {
+    await input.payload.queueParts(parts);
+    return { targets: [] };
+  }
   input.beforeSend?.();
-  const result = await input.client.sendChatMessage({
-    chatId: input.chat.id,
-    text: input.payload.text,
-    messageId: input.messageId,
-    ...action,
-    images,
-    attachments: content.attachments,
-  });
-  if (result.error) throw new Error(result.error);
-  return result;
+  const send = async (part: (typeof parts)[number], messageId: string) => {
+    const result = await input.client.sendChatMessage({
+      chatId: input.chat.id,
+      text: part.text,
+      messageId,
+      ...action,
+      images: part.images,
+      attachments: part.attachments,
+    });
+    if (result.error) throw new Error(result.error);
+    return result;
+  };
+  const last = parts.length - 1;
+  // Derived IDs keep a retried draft's earlier parts deduplicated by the Host.
+  for (let index = 0; index < last; index++)
+    await send(parts[index], `${input.messageId}-part-${index + 1}`);
+  return send(parts[last], input.messageId);
 }

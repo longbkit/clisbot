@@ -290,7 +290,9 @@ function createFakeQueue(
 }
 
 const passthroughEncodeImages = async (images: AttachmentMetadata[]) =>
-  images.map((image) => ({ data: image.id, mimeType: image.mimeType }));
+  images.length === 0
+    ? []
+    : [images.map((image) => ({ data: image.id, mimeType: image.mimeType }))];
 
 describe("cancelComposerAgent", () => {
   function baseInput(): {
@@ -428,7 +430,7 @@ describe("dispatchComposerAgentMessage", () => {
       agentId: "agent",
       text: "steer this turn",
       attachments: [],
-      encodeImages: async () => [],
+      encodeImageMessages: async () => [],
       submission: stream,
       activeTurnBehavior: "steer",
     });
@@ -444,7 +446,7 @@ describe("dispatchComposerAgentMessage", () => {
       agentId: "agent",
       text: "hello",
       attachments: [],
-      encodeImages: async () => [],
+      encodeImageMessages: async () => [],
       submission: stream,
       activeTurnBehavior: "steer",
       activeTurnId: "turn-1",
@@ -456,7 +458,7 @@ describe("dispatchComposerAgentMessage", () => {
       agentId: "legacy",
       text: "hello",
       attachments: [],
-      encodeImages: async () => [],
+      encodeImageMessages: async () => [],
       submission: legacy,
       activeTurnBehavior: "steer",
     });
@@ -474,7 +476,7 @@ describe("dispatchComposerAgentMessage", () => {
         agentId: "agent",
         text: "rejected prompt",
         attachments: [],
-        encodeImages: passthroughEncodeImages,
+        encodeImageMessages: passthroughEncodeImages,
         submission: stream,
       }),
     ).rejects.toBe(rejection);
@@ -494,7 +496,7 @@ describe("dispatchComposerAgentMessage", () => {
         agentId: "agent",
         text: "force send",
         attachments: [],
-        encodeImages: passthroughEncodeImages,
+        encodeImageMessages: passthroughEncodeImages,
         submission: stream,
       }),
     ).rejects.toBe(transportError);
@@ -517,7 +519,7 @@ describe("dispatchComposerAgentMessage", () => {
         agentId: "agent",
         text: "unknown state",
         attachments: [],
-        encodeImages: passthroughEncodeImages,
+        encodeImageMessages: passthroughEncodeImages,
         submission,
       }),
     ).rejects.toBe(transportError);
@@ -538,7 +540,7 @@ describe("dispatchComposerAgentMessage", () => {
         agentId: "agent",
         text: "ambiguous steer",
         attachments: [],
-        encodeImages: passthroughEncodeImages,
+        encodeImageMessages: passthroughEncodeImages,
         submission,
         activeTurnBehavior: "steer",
       }),
@@ -558,7 +560,7 @@ describe("dispatchComposerAgentMessage", () => {
         { kind: "image", metadata: image },
         { kind: "github_pr", item: prItem },
       ],
-      encodeImages: passthroughEncodeImages,
+      encodeImageMessages: passthroughEncodeImages,
       submission: stream,
     });
 
@@ -604,7 +606,7 @@ describe("dispatchComposerAgentMessage", () => {
       text: "send old attachment",
       attachments: [{ kind: "forge_change_request", item: prItem }],
       attachmentSubmitFormat: "legacy-github",
-      encodeImages: passthroughEncodeImages,
+      encodeImageMessages: passthroughEncodeImages,
       submission: stream,
     });
 
@@ -637,7 +639,7 @@ describe("dispatchComposerAgentMessage", () => {
       agentId: "agent",
       text: "next message",
       attachments: [],
-      encodeImages: passthroughEncodeImages,
+      encodeImageMessages: passthroughEncodeImages,
       submission: stream,
     });
 
@@ -654,7 +656,7 @@ describe("dispatchComposerAgentMessage", () => {
       agentId: "agent",
       text: "plain message",
       attachments: [],
-      encodeImages: passthroughEncodeImages,
+      encodeImageMessages: passthroughEncodeImages,
       submission: stream,
     });
 
@@ -674,7 +676,7 @@ describe("dispatchComposerAgentMessage", () => {
       agentId: "agent",
       text: "review this",
       attachments: [review],
-      encodeImages: passthroughEncodeImages,
+      encodeImageMessages: passthroughEncodeImages,
       submission: stream,
     });
 
@@ -692,7 +694,7 @@ describe("dispatchComposerAgentMessage", () => {
       agentId: "agent",
       text: "inspect element",
       attachments: [browserElement],
-      encodeImages: passthroughEncodeImages,
+      encodeImageMessages: passthroughEncodeImages,
       submission: stream,
     });
 
@@ -704,6 +706,97 @@ describe("dispatchComposerAgentMessage", () => {
         text: browserElement.attachment.formatted,
       },
     ]);
+  });
+});
+
+const imageData = (images: Array<{ data: string }>) => images.map((image) => image.data);
+
+describe("dispatchComposerAgentMessage over one message's image limit", () => {
+  it("sends the images as ordered parts, the text and files with the last, its row under the last ID", async () => {
+    const client = createFakeSendClient();
+    const stream = createFakeStream();
+    const images = ["a", "b", "c"].map((id) => imageWithId(id));
+    await dispatchComposerAgentMessage({
+      client,
+      agentId: "agent",
+      text: "Compare all three",
+      attachments: [
+        ...images.map((metadata) => ({ kind: "image" as const, metadata })),
+        { kind: "github_pr", item: prItem },
+      ],
+      encodeImageMessages: async (values) => [
+        values.slice(0, 2).map((image) => ({ data: image.id, mimeType: "image/jpeg" })),
+        values.slice(2).map((image) => ({ data: image.id, mimeType: "image/jpeg" })),
+      ],
+      submission: stream,
+      activeTurnBehavior: "steer",
+    });
+    expect(
+      client.calls.map((call) => ({
+        text: call.text,
+        images: imageData(call.options.images),
+        attachments: call.options.attachments.length,
+        behavior: call.options.activeTurnBehavior,
+      })),
+    ).toEqual([
+      {
+        text: "[Images 1–2 of 3. The message continues in the next part; wait for it before you answer.]",
+        images: ["a", "b"],
+        attachments: 0,
+        behavior: "steer",
+      },
+      { text: "Compare all three", images: ["c"], attachments: 1, behavior: "steer" },
+    ]);
+    const row = stream.tail.get("agent")?.[0];
+    expect(row?.kind === "user_message" && row.id).toBe(client.calls[1].options.messageId);
+    expect(new Set(client.calls.map((call) => call.options.messageId)).size).toBe(2);
+  });
+
+  it("hands the parts to the Host queue when it has one, so no later part needs a turn ID", async () => {
+    const client = createFakeSendClient();
+    const stream = createFakeStream();
+    const queued: Array<{ text: string; images: string[] }> = [];
+    const images = ["a", "b"].map((id) => imageWithId(id));
+    await dispatchComposerAgentMessage({
+      client,
+      agentId: "agent",
+      text: "Compare both",
+      attachments: images.map((metadata) => ({ kind: "image" as const, metadata })),
+      encodeImageMessages: async (values) => [
+        values.slice(0, 1).map((image) => ({ data: image.id, mimeType: "image/jpeg" })),
+        values.slice(1).map((image) => ({ data: image.id, mimeType: "image/jpeg" })),
+      ],
+      submission: stream,
+      activeTurnBehavior: "steer",
+      queueParts: async (parts) => {
+        for (const part of parts) queued.push({ text: part.text, images: imageData(part.images) });
+      },
+    });
+    expect(client.calls).toEqual([]);
+    expect(queued).toEqual([
+      {
+        text: "[Images 1–1 of 2. The message continues in the next part; wait for it before you answer.]",
+        images: ["a"],
+      },
+      { text: "Compare both", images: ["b"] },
+    ]);
+    expect(stream.tail.get("agent") ?? []).toEqual([]);
+  });
+
+  it("sends one message directly even when the Host has a queue", async () => {
+    const client = createFakeSendClient();
+    await dispatchComposerAgentMessage({
+      client,
+      agentId: "agent",
+      text: "One image",
+      attachments: [{ kind: "image", metadata: imageWithId("a") }],
+      encodeImageMessages: passthroughEncodeImages,
+      submission: createFakeStream(),
+      queueParts: async () => {
+        throw new Error("Wrong owner");
+      },
+    });
+    expect(client.calls).toHaveLength(1);
   });
 });
 

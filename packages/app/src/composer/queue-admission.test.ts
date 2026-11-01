@@ -58,7 +58,7 @@ test("a failed Host write retains text and attachments with a recoverable error"
     setIsProcessing: () => {},
   });
   expect(result).toBe("failed");
-  expect(effects).toEqual(["disk full"]);
+  expect(effects).toEqual(["null", "disk full"]);
 });
 
 for (const action of ["queue", "steer"] as const) {
@@ -110,4 +110,31 @@ test("an earlier item leaving only changes position; changed or claimed original
     [{ ...original, state: "sending" as const }],
   ])
     expect(queueEditRevision(original.id, fingerprint, { revision: 4, items })).toBeNull();
+});
+test("the next queue attempt clears the previous error, so a recovered queue is not left red", async () => {
+  let error: string | null = null;
+  let fail = true;
+  const queue = () =>
+    submitAgentInput({
+      message: "next",
+      attachments: [],
+      isAgentRunning: true,
+      canSubmit: true,
+      queueMessage: async () => {
+        if (fail) throw new Error("Request timed out");
+      },
+      submitMessage: async () => {},
+      clearDraft: () => {},
+      setUserInput: () => {},
+      setAttachments: () => {},
+      setSendError: (message) => {
+        error = message;
+      },
+      setIsProcessing: () => {},
+    });
+  expect(await queue()).toBe("failed");
+  expect(error).toBe("Request timed out");
+  fail = false;
+  expect(await queue()).toBe("queued");
+  expect(error).toBeNull();
 });

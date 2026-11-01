@@ -148,7 +148,7 @@ describe("submitAgentInput", () => {
     expect(submitMessage).not.toHaveBeenCalled();
     expect(setUserInput).toHaveBeenCalledWith("");
     expect(setAttachments).toHaveBeenCalledWith([]);
-    expect(setSendError).not.toHaveBeenCalled();
+    expect(setSendError.mock.calls).toEqual([[null]]);
     expect(setIsProcessing.mock.calls).toEqual([[true], [false]]);
     expect(clearDraft).not.toHaveBeenCalled();
   });

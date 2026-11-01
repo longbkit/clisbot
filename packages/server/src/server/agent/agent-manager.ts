@@ -13,6 +13,7 @@ import {
 } from "./full-auto-accept.js";
 import { CommittedEventOutbox } from "./session-storage/committed-event-outbox.js";
 import { currentSessionOperationIdentity } from "./session-operation-context.js";
+import { ClientMessageIdConflict } from "../client-message-id.js";
 import { isDeepStrictEqual } from "node:util";
 import { TimelineRetentionBudget } from "./session-storage/timeline-retention.js";
 import type { ProjectedTimelineFetchResult } from "./session-storage/projected-timeline.js";
@@ -6332,16 +6333,17 @@ export class AgentManager {
     const context = currentSessionOperationIdentity();
     if (
       !submission ||
-      submission.digest !==
-        createHash("sha256")
-          .update(JSON.stringify(prepareAgentMessage(prompt, undefined, id).prompt))
-          .digest("hex") ||
       !isDeepStrictEqual(submission.identity, {
         ...(context?.actor ? { actor: context.actor } : {}),
         ...(context?.channel ? { channel: context.channel } : {}),
       })
     )
-      throw new Error("Queue ID conflicts with submitted content or sender");
+      throw new ClientMessageIdConflict("Queue ID conflicts with submitted sender", "sender");
+    const digest = createHash("sha256")
+      .update(JSON.stringify(prepareAgentMessage(prompt, undefined, id).prompt))
+      .digest("hex");
+    if (submission.digest !== digest)
+      throw new ClientMessageIdConflict("Queue ID conflicts with submitted content", "content");
   }
 
   async waitForDurableSubmittedMessage(
