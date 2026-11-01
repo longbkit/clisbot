@@ -317,6 +317,8 @@ it("does not preview when the selected model shows no reasoning column", async (
 it("previews the keyboard-highlighted model's reasoning", async () => {
   mount(undefined, { providers: PREVIEW_PROVIDERS });
   await modelRow("codex:GPT-6.1-Sol");
+  // The pointer is left wherever the last test put it; keep it off the rows.
+  await userEvent.hover(screen.getByTestId("composer-picker-rail-favorites"));
   await userEvent.keyboard("{ArrowDown}{ArrowDown}");
   await expect.poll(reasoningText).toContain("6.1 Sol");
   await userEvent.keyboard("{ArrowDown}");
