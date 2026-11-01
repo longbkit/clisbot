@@ -95,8 +95,8 @@ test.describe("Composer control density across tab switches", () => {
   });
 });
 
-// The Clisbot chat layout (docs/features/composer-picker/README.md, "Layout"): voice inside the
-// container, dictation as the circle beside it, and Send taking the circle's place.
+// The Clisbot chat layout (docs/features/composer-picker/README.md, "Layout"): voice and the
+// dictation circle inside the container, and Send taking the circle's place.
 test("compact actions paint their faces inside separate touch targets", async ({ page }) => {
   const workspace = await seedWorkspace({ repoPrefix: "composer-touch-target-" });
   try {
@@ -128,26 +128,26 @@ test("compact actions paint their faces inside separate touch targets", async ({
       expect(first.y + first.height / 2).toBe(second.y + second.height / 2);
       expect(second.x + second.width).toBeLessThanOrEqual(page.viewportSize()!.width);
     }
-    const circle = { width: 50, height: 50 };
-    await expectGeometry(dictation, "composer-dictation-face", circle, 50);
+    const circle = { width: 48, height: 48 };
+    await expectGeometry(dictation, "composer-dictation-face", circle, 40);
     await expectGeometry(voice, "composer-realtime-voice-face", { width: 44, height: 48 }, 36);
     await expectSeparateAligned(voice, dictation);
     await input.fill("A multiline draft\nwith a larger Send target");
     const send = page.getByRole("button", { name: "Send message", exact: true });
     await expect(send).toBeVisible();
     await expect(dictation).toHaveCount(0);
-    await expectGeometry(send, "composer-send-face", circle, 50);
+    await expectGeometry(send, "composer-send-face", circle, 40);
 
     await page.setViewportSize({ width: 1280, height: 900 });
-    await expectGeometry(send, "composer-send-face", circle, 50);
+    await expectGeometry(send, "composer-send-face", circle, 40);
     await page.setViewportSize({ width: 360, height: 740 });
-    await expectGeometry(send, "composer-send-face", circle, 50);
+    await expectGeometry(send, "composer-send-face", circle, 40);
     const bounds = (await send.boundingBox())!;
     await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
     await expect(input).toHaveValue("");
     const stop = page.getByRole("button", { name: "Stop agent", exact: true });
     await expect(stop).toBeVisible();
-    await expectGeometry(stop, "composer-stop-face", circle, 50);
+    await expectGeometry(stop, "composer-stop-face", circle, 40);
     const stopBounds = (await stop.boundingBox())!;
     await page.mouse.click(stopBounds.x + 4, stopBounds.y + stopBounds.height / 2);
     await expect(stop).not.toBeVisible({ timeout: 30_000 });

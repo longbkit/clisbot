@@ -111,23 +111,26 @@ async function centerY(target: Locator): Promise<number> {
 }
 
 /**
- * Empty: attach and voice inside the container's right edge, the mic as the circle beside it.
- * Typing hides attach and voice and turns the circle into Send, same place and size.
+ * Empty: attach, voice and the mic circle at the container's right end. Typing hides attach and
+ * voice and turns the circle into Send, same place and size.
  */
 async function expectCircleSwap(page: Page, shot: string) {
   const input = composerLocator(page);
   const container = visible(page, "composer-pill");
-  const circle = visible(page, "composer-circle");
   await expectInside(visible(page, "composer-commands-button"), container);
   await expectInside(visible(page, "message-input-attach-button"), container);
   await expectInside(realtimeVoice(page), container);
-  await expectInside(dictation(page), circle);
+  await expectInside(dictation(page), container);
   await expect(send(page)).toHaveCount(0);
   const containerBox = await box(container);
   const mic = await box(dictation(page));
-  // The circle is as tall as the container, and shares its center.
-  expect(Math.round(mic.height)).toBe(Math.round(containerBox.height));
   expect(Math.abs((await centerY(dictation(page))) - (await centerY(container)))).toBeLessThan(1);
+  // ☰ and the circle sit the same distance from the container's ends.
+  const chip = await box(visible(page, "composer-commands-face"));
+  const micFace = await box(dictation(page).getByTestId("composer-dictation-face"));
+  const startInset = chip.x - containerBox.x;
+  const endInset = containerBox.x + containerBox.width - (micFace.x + micFace.width);
+  expect(Math.abs(startInset - endInset)).toBeLessThan(1.5);
   // Icons inside share the text line's center.
   for (const target of [
     visible(page, "composer-commands-button"),
@@ -140,7 +143,8 @@ async function expectCircleSwap(page: Page, shot: string) {
   await input.fill("h");
   await expect(send(page)).toBeVisible();
   const sendBox = await box(send(page));
-  // Send takes the mic's place and size: nothing moves.
+  // Send takes the mic's place and size inside the container: nothing moves.
+  await expectInside(send(page), container);
   expect(Math.round(sendBox.x)).toBe(Math.round(mic.x));
   expect(Math.round(sendBox.y)).toBe(Math.round(mic.y));
   expect(Math.round(sendBox.width)).toBe(Math.round(mic.width));
@@ -187,7 +191,10 @@ async function expectCommandList(page: Page, shot: string) {
   await expect(chip).toHaveAccessibleName("Commands");
   // Keys pick a command.
   await chip.click();
+  await expect(input).toHaveValue("/");
+  await expect(input).toBeFocused();
   await input.press("h");
+  await expect(input).toHaveValue("/h");
   await input.press("ArrowDown");
   await input.press("Enter");
   await expect(input).toHaveValue(/^\/(help|hello)\s?$/);
@@ -219,14 +226,16 @@ async function expectExpand(page: Page, shot: string) {
   await expect(input).toHaveValue(draft);
   await expect.poll(() => caret(page)).toBe(5);
   const expanded = page.getByTestId("composer-fullscreen");
-  const toolbar = expanded.getByTestId("composer-expanded-toolbar");
-  await expect(toolbar.getByTestId("composer-commands-button")).toBeVisible();
-  await expect(expanded.getByTestId("composer-settings-row")).toBeVisible();
-  // The settings row sits right above the toolbar; Send is the circle at the bottom right.
+  const container = expanded.getByTestId("composer-pill");
+  await expectInside(expanded.getByTestId("composer-commands-button"), container);
+  await expectInside(send(page), container);
+  // Same order as collapsed: the container, then the settings row under it.
   const row = await box(expanded.getByTestId("composer-settings-row"));
-  const bar = await box(toolbar);
-  expect(row.y + row.height).toBeLessThanOrEqual(bar.y + 0.5);
-  await expectInside(send(page), toolbar);
+  const containerBox = await box(container);
+  expect(row.y).toBeGreaterThanOrEqual(containerBox.y + containerBox.height - 0.5);
+  // ☰ and Send stay on the container's bottom row.
+  const sendBox2 = await box(send(page));
+  expect(containerBox.y + containerBox.height - (sendBox2.y + sendBox2.height)).toBeLessThan(6);
   const collapse = page.getByRole("button", { name: "Exit fullscreen", exact: true });
   await expectMinTarget(collapse, 44);
   const collapseBox = await box(collapse);

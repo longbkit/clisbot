@@ -103,7 +103,7 @@ function within(parentId: string, childId: string): boolean {
   return screen.getByTestId(parentId).contains(screen.getByTestId(childId));
 }
 
-it("holds Commands left and attach and voice right inside the container, the mic beside it", async () => {
+it("holds Commands, the text, attach, voice and the mic circle in one container", async () => {
   await page.viewport(1280, 900);
   mount();
   expect(within("composer-inner-start", "commands")).toBe(true);
@@ -111,7 +111,7 @@ it("holds Commands left and attach and voice right inside the container, the mic
   expect(within("composer-inner-end", "voice")).toBe(true);
   expect(within("composer-pill", "surface")).toBe(true);
   expect(within("composer-circle", "dictation")).toBe(true);
-  expect(within("composer-pill", "dictation")).toBe(false);
+  expect(within("composer-pill", "composer-circle")).toBe(true);
 });
 
 it("turns the circle into Send once something is sendable, and hides attach and voice", async () => {
@@ -160,23 +160,17 @@ it("drops the settings row and Commands where a surface hides them", async () =>
   expect(screen.queryByTestId("composer-inner-start")).toBeNull();
 });
 
-it("keeps every control in the expanded editor; the buttons form a bottom toolbar", async () => {
+it("keeps the collapsed layout in the expanded editor; only the text grows", async () => {
   await page.viewport(390, 844);
-  mount({
-    fullscreen: true,
-    compact: true,
-    slots: slots({ sendable: true, typing: true, primary: <Piece id="send" /> }),
-  });
+  mount({ fullscreen: true, compact: true, slots: slots({ primary: <Piece id="send" /> }) });
   expect(screen.getByTestId("composer-fullscreen")).toBeTruthy();
-  for (const id of ["commands", "attach", "voice", "dictation", "send"]) {
-    expect(within("composer-expanded-toolbar", id)).toBe(true);
-  }
-  for (const id of ["model", "mode", "ring"]) {
-    expect(within("composer-settings-row", id)).toBe(true);
-  }
+  expect(within("composer-inner-start", "commands")).toBe(true);
+  expect(within("composer-inner-end", "attach")).toBe(true);
+  expect(within("composer-circle", "send")).toBe(true);
+  expect(within("composer-pill", "composer-circle")).toBe(true);
+  const container = screen.getByTestId("composer-pill").getBoundingClientRect();
   const row = screen.getByTestId("composer-settings-row").getBoundingClientRect();
-  const toolbar = screen.getByTestId("composer-expanded-toolbar").getBoundingClientRect();
-  expect(row.bottom).toBeLessThanOrEqual(toolbar.top);
+  expect(row.top).toBeGreaterThanOrEqual(container.bottom);
   expect(screen.getByRole("button", { name: "Exit fullscreen" })).toBeTruthy();
 });
 

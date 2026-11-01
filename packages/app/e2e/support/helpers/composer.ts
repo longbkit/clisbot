@@ -412,7 +412,7 @@ export async function expectComposerFullscreenControls(page: Page): Promise<void
   if ((await fullscreen.getByTestId("composer-pill").count()) === 0) {
     await expect(fullscreen.getByRole("button")).toHaveCount(2);
   } else {
-    await expect(fullscreen.getByTestId("composer-expanded-toolbar")).toBeVisible();
+    await expect(fullscreen.getByTestId("composer-circle")).toBeVisible();
   }
   await expect(composerInput(page)).toHaveCount(1);
 }

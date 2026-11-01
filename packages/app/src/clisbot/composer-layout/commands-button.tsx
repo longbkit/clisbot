@@ -42,7 +42,7 @@ export function ComposerCommandsButton({
         testID="composer-commands-face"
         style={[
           chatComposerActions.innerFace,
-          hovered ? chatComposerActions.circleHovered : chatComposerActions.chipFace,
+          hovered || open ? chatComposerActions.chipActive : chatComposerActions.chipFace,
         ]}
       >
         {open ? (
