@@ -5,7 +5,9 @@ import { useClientInputQueue, type ClientInputQueue } from "./client-input-queue
 import { queueEditRevision } from "./queue-edit-revision";
 import { resolveQueueSteerTarget } from "./queue-steer-target";
 import { HostInputQueuePanel } from "./host-input-queue-panel";
-import { useHostInputQueue, QueueMutationConflict } from "./use-host-input-queue";
+import { useHostInputQueue } from "./use-host-input-queue";
+import { QueueMutationConflict } from "./host-queue-projection";
+import { createHostQueueAdmission } from "./host-queue-admission";
 import { queueItemAttachments, uploadLocalQueueCopies } from "./host-queue-content";
 import { splitComposerAttachmentsForSubmit } from "./attachments/submit";
 import { generateMessageId } from "@/types/stream";
@@ -81,7 +83,7 @@ import {
 import type { ImageAttachment, MessagePayload, TextReplacement } from "./types";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 import type { DraftCommandTarget } from "@/hooks/use-agent-commands-query";
-import { encodeImages } from "@/utils/encode-images";
+import { splitIntoMessageParts } from "./message-parts";
 import { focusWithRetries } from "@/utils/web-focus";
 import {
   cancelComposerAgent,
@@ -116,6 +118,7 @@ import {
 } from "@/runtime/host-runtime";
 import {
   deleteAttachments,
+  encodeImageMessagesForSend,
   persistAttachmentFromBytes,
   persistAttachmentFromBlob,
   persistAttachmentFromDataUrl,
@@ -1358,10 +1361,10 @@ function ComposerContentImpl({
     chatId: queueChatId,
   });
 
-  const queueAttempt = useRef<{ fingerprint: string; id: string } | null>(null);
+  const [queueAdmission] = useState(() => createHostQueueAdmission(generateMessageId));
   useEffect(() => {
-    queueAttempt.current = null;
-  }, [serverId, agentId, queueChatId]);
+    queueAdmission.reset();
+  }, [queueAdmission, serverId, agentId, queueChatId]);
 
   const isCompactFormFactor = useIsCompactFormFactor();
   const isCompactLayout = resolveCompactLayout(isCompactLayoutOverride, isCompactFormFactor);
@@ -1681,7 +1684,7 @@ function ComposerContentImpl({
         attachmentSubmitFormat: resolveComposerAttachmentSubmitFormat({
           supportsForgeAttachments: supportsForgeSearch,
         }),
-        encodeImages,
+        encodeImageMessages: encodeImageMessagesForSend,
         submission: createMessageSubmissionWriter(serverId),
         activeTurnBehavior,
         activeTurnId:
@@ -1729,16 +1732,25 @@ function ComposerContentImpl({
     appSettings.sendBehavior,
     submissionTarget === "conversation" ? conversationHasPermission : hasPendingPermission,
   );
-  const prepareQueueContent = useCallback(
+  const prepareQueueParts = useCallback(
     async (text: string, values: ComposerAttachment[]) => {
       const wire = splitComposerAttachmentsForSubmit(await uploadLocalQueueCopies(client, values));
-      return {
+      return splitIntoMessageParts({
         text,
         attachments: wire.attachments,
-        images: (await encodeImages(wire.images)) ?? [],
-      };
+        imageMessages: await encodeImageMessagesForSend(wire.images),
+      });
     },
     [client],
+  );
+  // An edited queue row stays one row; only a new draft may become several.
+  const prepareQueueContent = useCallback(
+    async (text: string, values: ComposerAttachment[]) => {
+      const parts = await prepareQueueParts(text, values);
+      if (parts.length > 1) throw new Error(t("composer.hostQueue.tooManyImagesForEdit"));
+      return parts[0];
+    },
+    [prepareQueueParts, t],
   );
 
   const queueMessage = useCallback(
@@ -1758,12 +1770,11 @@ function ComposerContentImpl({
                 : "composer.hostQueue.unsupported",
             ),
           );
-        const content = await prepareQueueContent(text, values);
-        const fingerprint = JSON.stringify(content);
-        if (queueAttempt.current?.fingerprint !== fingerprint)
-          queueAttempt.current = { fingerprint, id: generateMessageId() };
-        await executeQueueCommand({ action: "enqueue", id: queueAttempt.current.id, ...content });
-        queueAttempt.current = null;
+        await queueAdmission.enqueue({
+          draft: JSON.stringify({ text, values }),
+          prepare: () => prepareQueueParts(text, values),
+          execute: executeQueueCommand,
+        });
       }
       replaceUserInput("");
       setSelectedAttachments([]);
@@ -1777,7 +1788,8 @@ function ComposerContentImpl({
       queueCapability,
       clientQueue,
       clientInputQueue,
-      prepareQueueContent,
+      prepareQueueParts,
+      queueAdmission,
       executeQueueCommand,
       replaceUserInput,
       setSelectedAttachments,
@@ -2233,6 +2245,7 @@ function ComposerContentImpl({
 
   const handleSendQueuedNow = useCallback(
     async (id: string, owner: "host" | "client" = "host") => {
+      setSendError(null);
       if (owner === "client") {
         if (!isConnected) return;
         if (clientQueue.dispatch) {
@@ -2256,7 +2269,7 @@ function ComposerContentImpl({
       try {
         await executeQueueCommand({ action: "send_now", id, revision: queueView.revision });
       } catch (error) {
-        setSendError(String(error));
+        setSendError(error instanceof Error ? error.message : String(error));
       }
     },
     [executeQueueCommand, queueView.revision, clientQueue, isConnected, agentId, submitMessage],
@@ -2264,6 +2277,7 @@ function ComposerContentImpl({
 
   const handleSteerQueuedNow = useCallback(
     async (id: string, owner: "host" | "client" = "host") => {
+      setSendError(null);
       if (owner === "client") {
         if (!isConnected) return;
         if (clientQueue.dispatch) {
@@ -2325,6 +2339,7 @@ function ComposerContentImpl({
         commands: pluginClientSlashCommands,
       });
       if (pluginSlashCommand && runPluginClientSlashCommand(pluginSlashCommand)) return;
+      setSendError(null);
       void queueMessage(payload.text, outgoingAttachments).catch((error) =>
         setSendError(error instanceof Error ? error.message : String(error)),
       );
@@ -2711,6 +2726,7 @@ function ComposerContentImpl({
         clientQueue.remove(id);
         return;
       }
+      setSendError(null);
       const queued = queueView.items.find((candidate) => candidate.id === id);
       void executeQueueCommand({
         action: queued?.state === "needs_review" ? "discard" : "delete",
