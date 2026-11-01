@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import type { SingleResult } from "../../output/index.js";
+import { assertScheduleModeChosen } from "./mode.js";
 import { scheduleSchema } from "./schema.js";
 import {
   connectScheduleClient,
@@ -50,6 +51,7 @@ export async function runCreateCommand(
   });
   const { client } = await connectScheduleClient(options.daemonTarget);
   try {
+    await assertScheduleModeChosen(client, input.target);
     const payload = await client.scheduleCreate(input);
     if (payload.error || !payload.schedule) {
       throw new Error(payload.error ?? "Schedule creation failed");

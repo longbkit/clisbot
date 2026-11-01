@@ -69,6 +69,8 @@ export interface AgentMode {
   description?: string;
   icon?: string;
   colorTier?: string;
+  /** The provider's no-prompt mode; Full auto-accept runs on it. Daemons send it since v2.2.2. */
+  isUnattended?: boolean;
 }
 
 export type ProviderStatus = "ready" | "loading" | "error" | "unavailable";
@@ -128,6 +130,8 @@ export interface ProviderSnapshotEntry {
   description?: string;
   iconSvg?: string;
   defaultModeId?: string | null;
+  /** The built-in a custom provider extends; absent for built-ins and ACP providers. */
+  baseProvider?: string;
 }
 
 export interface AgentFeatureToggle {

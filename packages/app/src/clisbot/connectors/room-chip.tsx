@@ -8,6 +8,7 @@ import type { ChatTools } from "./chat-tools";
 import { useProjectGrants } from "./project-grants";
 import { roomOnCount, roomTools } from "./room-tools";
 import { RoomToolsSheet } from "./room-tools-sheet";
+import { useSettingsRowCountLabel } from "@/clisbot/composer-layout/settings-row";
 
 /**
  * The Tools chip of a group chat: what the room's Bots can use together, and the room's own off
@@ -42,17 +43,19 @@ export function RoomToolsChip({ chat }: { chat: ChatTools }) {
   const [open, setOpen] = useState(false);
   const show = useCallback(() => setOpen(true), []);
   const hide = useCallback(() => setOpen(false), []);
-  if (!grants.data || room.groups.length + room.connectors.length === 0) return null;
   const on = roomOnCount(room, chat.off);
   const label =
     on === 0 ? t("connectors.tools.room.chipOff") : t("connectors.tools.room.chipCount", { on });
+  const chip = useSettingsRowCountLabel(label, on);
+  if (!grants.data || room.groups.length + room.connectors.length === 0) return null;
   return (
     <>
       <AgentControlTrigger
         icon={Plug}
         surface="toolbar"
         label={label}
-        value={label}
+        value={chip.value}
+        showToolbarLabel={chip.showLabel}
         open={open}
         onPress={show}
         accessibilityLabel={t("connectors.tools.room.chipAccessibilityLabel", { label })}

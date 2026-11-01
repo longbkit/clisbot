@@ -294,7 +294,7 @@ describe("Codex app-server provider (local e2e)", () => {
         );
 
         try {
-          await session.setFeature?.("plan_mode", true);
+          await session.setMode("plan");
 
           const events: AgentStreamEvent[] = [];
           session.subscribe((event) => {

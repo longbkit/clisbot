@@ -44,6 +44,9 @@ import {
   swipeOpenMobileExplorer,
 } from "../support/helpers/sidebar";
 
+/** The Clisbot chat layout (docs/features/composer-picker/README.md) is on unless its flag is 0. */
+const CHAT_LAYOUT = process.env.EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER !== "0";
+
 async function composerHeight(page: Page): Promise<number> {
   return composerLocator(page).evaluate((element) => element.getBoundingClientRect().height);
 }
@@ -185,6 +188,11 @@ async function expectFullscreenErrorAboveSend(page: Page): Promise<void> {
   const sendBox = (await page
     .getByRole("button", { name: "Send message", exact: true })
     .boundingBox())!;
+  if (CHAT_LAYOUT) {
+    // The chat layout keeps Send inside the container, so the error sits right under it.
+    expect(alertBox.y).toBeGreaterThanOrEqual(sendBox.y + sendBox.height);
+    return;
+  }
   const editorBox = (await composerLocator(page).boundingBox())!;
   expect(alertBox.y).toBeGreaterThanOrEqual(editorBox.y + editorBox.height);
   expect(alertBox.y + alertBox.height).toBeLessThanOrEqual(sendBox.y);
@@ -243,7 +251,10 @@ test("compact fullscreen editing preserves the live draft and selection and retu
       await expectComposerFullscreenControls(page);
       await expectWorkspaceHeaderHidden(page);
       await expectComposerDraftSelection(page, 4, 17);
-      await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(0);
+      // The Clisbot chat layout keeps the attachments in the expanded editor.
+      await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(
+        CHAT_LAYOUT ? 1 : 0,
+      );
       await writeCompactDraft(page, "Edited fullscreen draft\nSecond line\nThird line");
       await selectComposerDraftRange(page, 3, 12);
     });
@@ -380,6 +391,9 @@ async function reservedBandPoints(
 }
 
 test("the reserved band beside the inline editor focuses it", async ({ page }) => {
+  // The Clisbot chat layout puts the fullscreen button above Send, so the text keeps the band;
+  // composer-layout.spec.ts covers that button.
+  test.skip(CHAT_LAYOUT, "the chat layout reserves no band beside the editor");
   const agent = await seedMockAgentWorkspace({
     repoPrefix: "composer-band-focus-",
     title: "Composer band focus",

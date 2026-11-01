@@ -83,6 +83,8 @@ export interface Agent extends SessionAuthorship {
   lastActivityAt: Date;
   capabilities: AgentCapabilityFlags;
   currentModeId: string | null;
+  /** Full auto-accept is on; `currentModeId` stays the provider mode it runs on. */
+  fullAutoAccept?: boolean;
   availableModes: AgentMode[];
   pendingPermissions: AgentPermissionRequest[];
   persistence: AgentPersistenceHandle | null;

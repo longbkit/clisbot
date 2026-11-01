@@ -1,3 +1,4 @@
+import { usesFasterTier } from "@clisbot/protocol/speed-tier";
 import type { CompiledHubBundle } from "../config/bundle.js";
 import {
   parseCompiledHubConfig,
@@ -222,7 +223,7 @@ function executionFromAgent(
     ...(agent.model === undefined ? {} : { modelId: agent.model }),
     ...(agent.mode === undefined ? {} : { modeId: agent.mode }),
     ...(agent.thinkingOptionId === undefined ? {} : { thinkingOptionId: agent.thinkingOptionId }),
-    fastMode: agent.featureValues?.["fast_mode"] === true,
+    fastMode: usesFasterTier(agent.featureValues),
     requiredPrivileges: uniquePrivileges([
       ...requiredPrivileges,
       ...(agent.featureValues?.["auto_accept"] === true ||

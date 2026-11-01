@@ -12,6 +12,7 @@ import { SessionToolsSheet, type SheetScope } from "./session-tools-sheet";
 import { useConversationProjectContext } from "@/clisbot/bots/chat/conversation-project-context";
 import { useChatTools, type ChatTools } from "./chat-tools";
 import { RoomToolsChip } from "./room-chip";
+import { useSettingsRowCountLabel } from "@/clisbot/composer-layout/settings-row";
 
 /**
  * The composer's Tools chip (docs/features/connectors/README.md, "Per session"): what this session
@@ -99,13 +100,16 @@ function ChipForProject({
     on === 0
       ? t("connectors.tools.composerChip.off")
       : t("connectors.tools.composerChip.count", { on });
+  // In a narrow settings row the chip keeps its icon and count (composer-layout).
+  const chip = useSettingsRowCountLabel(label, on);
   return (
     <>
       <AgentControlTrigger
         icon={Plug}
         surface="toolbar"
         label={label}
-        value={label}
+        value={chip.value}
+        showToolbarLabel={chip.showLabel}
         open={open}
         onPress={show}
         accessibilityLabel={t("connectors.tools.composerChip.accessibilityLabel", { label })}

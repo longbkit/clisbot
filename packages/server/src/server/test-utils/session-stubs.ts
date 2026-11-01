@@ -7,7 +7,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CreationService } from "../creation/index.js";
 
-import { getAgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
+import {
+  AGENT_PROVIDER_DEFINITIONS,
+  getAgentProviderDefinition,
+} from "@clisbot/protocol/provider-manifest";
+import { FULL_AUTO_ACCEPT_MODE_ID } from "@clisbot/protocol/full-auto-accept";
 
 import type { ProviderSnapshotEntry } from "../agent/agent-sdk-types.js";
 import type { ProviderSnapshot } from "../agent/provider-snapshot-manager.js";
@@ -172,6 +176,9 @@ export interface ProviderSnapshotManagerSpies {
   listModels: ReturnType<typeof vi.fn<ProviderSnapshotManager["listModels"]>>;
   listModes: ReturnType<typeof vi.fn<ProviderSnapshotManager["listModes"]>>;
   resolveCreateConfig: ReturnType<typeof vi.fn<ProviderSnapshotManager["resolveCreateConfig"]>>;
+  isUnattendedConfiguration: ReturnType<
+    typeof vi.fn<ProviderSnapshotManager["isUnattendedConfiguration"]>
+  >;
   resolveDefaultModel: ReturnType<typeof vi.fn<ProviderSnapshotManager["resolveDefaultModel"]>>;
   getProviderDiagnostic: ReturnType<typeof vi.fn<ProviderSnapshotManager["getProviderDiagnostic"]>>;
   applyMutableProviderConfig: ReturnType<
@@ -225,6 +232,19 @@ export function createProviderSnapshotManagerStub(): {
     modeId: undefined,
     featureValues: undefined,
   }));
+  // The manifest's no-prompt marks, Full auto-accept and a provider's own auto_accept, as the
+  // real manager judges them for built-in providers.
+  const isUnattendedConfiguration = vi.fn<ProviderSnapshotManager["isUnattendedConfiguration"]>(
+    async (config) =>
+      config.fullAutoAccept === true ||
+      config.modeId === FULL_AUTO_ACCEPT_MODE_ID ||
+      config.featureValues?.auto_accept === true ||
+      AGENT_PROVIDER_DEFINITIONS.some(
+        (provider) =>
+          provider.id === config.provider &&
+          provider.modes.some((mode) => mode.id === config.modeId && mode.isUnattended === true),
+      ),
+  );
   const resolveDefaultModel = vi.fn<ProviderSnapshotManager["resolveDefaultModel"]>(
     async () => undefined,
   );
@@ -256,6 +276,7 @@ export function createProviderSnapshotManagerStub(): {
     listModels,
     listModes,
     resolveCreateConfig,
+    isUnattendedConfiguration,
     resolveDefaultModel,
     getProviderDiagnostic,
     applyMutableProviderConfig,
@@ -282,6 +303,7 @@ export function createProviderSnapshotManagerStub(): {
     listModels,
     listModes,
     resolveCreateConfig,
+    isUnattendedConfiguration,
     resolveDefaultModel,
     getProviderDiagnostic,
     applyMutableProviderConfig,

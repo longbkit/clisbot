@@ -1,5 +1,6 @@
 import type { SessionInboundMessage, SessionOutboundMessage } from "../messages.js";
 import type { AgentManager } from "../agent/agent-manager.js";
+import { isFullAutoAcceptMode } from "../agent/full-auto-accept.js";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
 import type {
@@ -23,6 +24,7 @@ import {
   requiredPermissionForOutbound,
 } from "../authorization/operation-permissions.js";
 import { requiredPrivilegeForOperation } from "@clisbot/protocol/managed-access-privileges";
+import { isFasterTier, usesFasterTier } from "@clisbot/protocol/speed-tier";
 import {
   PROJECT_PRIVILEGES,
   type ProjectAuthorization,
@@ -639,7 +641,7 @@ export class ManagedResourceAuthorizer {
     if (!this.authorization.allowsProject(projectId, requiredPrivilege)) return false;
     const grant = this.authorization.project(projectId);
     if (!grant) return false;
-    if (config.featureValues?.fast_mode === true && !grant.privileges.has("agent.fast.use")) {
+    if (usesFasterTier(config.featureValues) && !grant.privileges.has("agent.fast.use")) {
       return false;
     }
     if (config.toolPolicy?.preapproved.length && !hasEveryApprovalPrivilege(grant.privileges)) {
@@ -697,7 +699,7 @@ export class ManagedResourceAuthorizer {
       ? live.config
       : storedAgentConfig(stored as StoredAgentRecord);
     const next: AgentSessionConfig = {
-      ...base,
+      ...withoutLeftFullAutoAccept(base, update.modeId),
       ...(update.model !== undefined ? { model: update.model ?? undefined } : {}),
       ...(update.modeId !== undefined ? { modeId: update.modeId } : {}),
       ...(update.thinkingOptionId !== undefined
@@ -707,7 +709,15 @@ export class ManagedResourceAuthorizer {
         ? { featureValues: { ...base.featureValues, ...update.featureValues } }
         : {}),
     };
-    return await this.configurationMatchesProject(workspace.projectId, next, "agent.interact");
+    if (!(await this.configurationMatchesProject(workspace.projectId, next, "agent.interact"))) {
+      return false;
+    }
+    // Codex Plan keeps a permission underneath and returns to it when the plan is approved, so
+    // Plan is judged by that permission too: Plan over Full access is unattended.
+    const underlying = permissionUnderPlan(next.modeId, base.modeId, record.persistence);
+    if (!underlying) return true;
+    const returned: AgentSessionConfig = { ...next, modeId: underlying };
+    return await this.configurationMatchesProject(workspace.projectId, returned, "agent.interact");
   }
 
   /** Explain forbidden actions only after every supplied target is visible to this session. */
@@ -862,9 +872,8 @@ export class ManagedResourceAuthorizer {
       : null;
     const projectId = workspace ? workspace.projectId : await this.projectIdForCwd(config.cwd);
     if (!projectId) return false;
-    // Without a mode the run takes the provider's unattended one, which needs every approval.
-    const grant = this.authorization.project(projectId);
-    if (!config.modeId && !(grant && hasEveryApprovalPrivilege(grant.privileges))) return false;
+    // Without a mode the run takes the provider's asking default (schedule/schedule-mode.ts),
+    // which is judged as a create with no mode.
     return this.allowsAgentConfigurationForProject(projectId, config.workspaceId, {
       provider: config.provider,
       cwd: config.cwd,
@@ -954,8 +963,7 @@ export class ManagedResourceAuthorizer {
   ): Promise<boolean | undefined> {
     if (
       message.type === "set_agent_feature_request" &&
-      message.featureId === "fast_mode" &&
-      message.value === true &&
+      isFasterTier(message.featureId, message.value) &&
       !(await this.allowsAgent(message.agentId, "agent.fast.use"))
     ) {
       return false;
@@ -1558,6 +1566,7 @@ function storedAgentConfig(record: StoredAgentRecord): AgentSessionConfig {
     ...(config?.featureValues ? { featureValues: config.featureValues } : {}),
     ...(config?.providerOptions ? { providerOptions: config.providerOptions } : {}),
     ...(config?.toolPolicy ? { toolPolicy: config.toolPolicy } : {}),
+    ...(config?.fullAutoAccept ? { fullAutoAccept: true } : {}),
     ...(config?.systemPrompt ? { systemPrompt: config.systemPrompt } : {}),
     ...(config?.mcpServers ? { mcpServers: config.mcpServers } : {}),
   };
@@ -1715,4 +1724,37 @@ function isQuickStartMessage(type: string): boolean {
 
 function hasResourceAuthorityHandler(type: string) {
   return isQuickStartMessage(type) || type.startsWith("chat.");
+}
+
+/**
+ * Picking any other mode turns Full auto-accept off (AgentManager.setAgentMode), so the
+ * configuration being judged no longer carries it. Without this a member who may not run
+ * unattended could never leave it.
+ */
+function withoutLeftFullAutoAccept(
+  config: AgentSessionConfig,
+  modeId: string | undefined,
+): AgentSessionConfig {
+  if (modeId === undefined || isFullAutoAcceptMode(modeId) || !config.fullAutoAccept) {
+    return config;
+  }
+  const { fullAutoAccept: _left, ...rest } = config;
+  return rest;
+}
+
+const PLAN_MODE_ID = "plan";
+
+/**
+ * The permission a Plan mode returns to: the mode it was picked from, or the one a session
+ * already in Plan saved as `permissionModeId` (Codex). Null when the mode is not Plan.
+ */
+function permissionUnderPlan(
+  nextModeId: string | undefined,
+  currentModeId: string | undefined,
+  persistence: { metadata?: Record<string, unknown> } | null | undefined,
+): string | null {
+  if (nextModeId !== PLAN_MODE_ID) return null;
+  if (currentModeId && currentModeId !== PLAN_MODE_ID) return currentModeId;
+  const saved = persistence?.metadata?.permissionModeId;
+  return typeof saved === "string" && saved !== PLAN_MODE_ID ? saved : null;
 }

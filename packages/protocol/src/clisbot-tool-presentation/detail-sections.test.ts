@@ -222,5 +222,7 @@ assert.deepEqual(build("mcp__clisbot__send_agent_prompt", { prompt: "Hello", age
     } finally {
       rmSync(fixture, { recursive: true, force: true });
     }
-  }, 30_000);
+    // Two full tsc runs over the whole package: ~10s locally, near 30s on CI runners, and the
+    // package keeps growing.
+  }, 120_000);
 });

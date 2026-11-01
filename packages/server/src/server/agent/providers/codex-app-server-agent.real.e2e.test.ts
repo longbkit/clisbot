@@ -34,7 +34,9 @@ describe("Codex app-server provider (real)", () => {
         modeId: "auto",
       });
       try {
-        expect(session.features?.some((feature) => feature.id === "plan_mode")).toBe(true);
+        const modes = await session.getAvailableModes();
+        expect(modes[0]?.id).toBe("plan");
+        expect(session.features?.some((feature) => feature.id === "plan_mode")).toBe(false);
 
         const result = await session.run("Say hello in one sentence.");
         expect(result.finalText.length).toBeGreaterThan(0);

@@ -26,6 +26,15 @@ test.use({
   },
 });
 
+// The upstream toolbar's Speed control, shown only with the Clisbot composer picker off
+// (docs/features/composer-picker/README.md). The picker's Speed segments are covered by
+// composer-picker.spec.ts. Run this one with
+// `EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER=0 npx playwright test e2e/browser/codex-speed.spec.ts`.
+test.skip(
+  process.env.EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER !== "0",
+  "covers the upstream toolbar; the composer picker replaces it while its flag is on",
+);
+
 // Rendered light-theme semantic colors: warning for Fast/Ultrafast, muted foreground for Normal.
 const ACTIVE_SPEED_COLOR = "rgb(123, 93, 57)";
 const NORMAL_SPEED_COLOR = "rgb(74, 74, 74)";

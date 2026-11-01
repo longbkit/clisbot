@@ -30,7 +30,7 @@ class Host implements HostObservation {
       this.released = true;
     };
   }
-  emit(status: "idle" | "running", event?: AgentStreamEvent) {
+  emit(status: "idle" | "running", event?: AgentStreamEvent, fullAutoAccept = false) {
     this.handler!(
       buildStoredAgentPayload(
         {
@@ -41,6 +41,9 @@ class Host implements HostObservation {
           lastStatus: status,
           createdAt: "2026-01-01",
           updatedAt: "2026-01-01",
+          ...(fullAutoAccept
+            ? { config: { provider: "codex", cwd: "/tmp", fullAutoAccept: true } }
+            : {}),
         },
         ["codex"],
       ),
@@ -140,6 +143,17 @@ test("late initial permission snapshot cannot resurrect an already resolved requ
     await host.baseline.promise;
     await Promise.resolve();
     host.emit("idle", { type: "turn_completed", provider: "codex" });
+    expect((await observation.next()).status).toBe("idle");
+  } finally {
+    await observation.close();
+  }
+});
+
+test("a request Full auto-accept answers is not reported as waiting for permission", async () => {
+  const { host, observation } = await scenario();
+  try {
+    host.emit("running", permission("auto"), true);
+    host.emit("idle", { type: "turn_completed", provider: "codex" }, true);
     expect((await observation.next()).status).toBe("idle");
   } finally {
     await observation.close();

@@ -1,6 +1,6 @@
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { expect, type Page } from "../fixtures";
-import { drillIntoProvider, openModelPicker } from "./agent-profiles";
+import { expectComposerModel, pickComposerModel } from "./composer-picker";
 import {
   DEVICE_FORM_PREFERENCES_KEY,
   hostFormPreferencesKey,
@@ -17,28 +17,13 @@ export async function startWithoutRememberedModel(page: Page) {
 }
 
 export async function chooseModel(page: Page, provider: string, label: string) {
-  await openModelPicker(page);
-  await expect(
-    page.getByRole("dialog").getByRole("button", { name: "Back", exact: true }),
-  ).toHaveCount(0);
-  await selectProviderModel(page, provider, label);
+  await pickComposerModel(page, { provider, label });
 }
 
+/** Picks the remembered model again: the panel opens on its provider with it checked. */
 export async function reselectModel(page: Page, provider: string, label: string) {
   await expectRememberedModel(page, label);
-  await openModelPicker(page);
-  await page.getByRole("dialog").getByRole("button", { name: "Back", exact: true }).click();
-  await selectProviderModel(page, provider, label);
-}
-
-async function selectProviderModel(page: Page, provider: string, label: string) {
-  await drillIntoProvider(page, provider);
-  await page.getByTestId("combobox-desktop-container").getByText(label, { exact: true }).click();
-  await expect(
-    page
-      .getByRole("button", { name: `Select model (${label})`, exact: true })
-      .filter({ visible: true }),
-  ).toBeVisible();
+  await pickComposerModel(page, { provider, label });
 }
 
 export async function expectSavedSelection(page: Page, provider: string, model: string) {
@@ -69,9 +54,5 @@ export async function expectCreatedModelAgents(
 }
 
 export async function expectRememberedModel(page: Page, label: string) {
-  await expect(
-    page
-      .getByRole("button", { name: `Select model (${label})`, exact: true })
-      .filter({ visible: true }),
-  ).toBeVisible();
+  await expectComposerModel(page, label);
 }

@@ -1,3 +1,5 @@
+import { composerLayoutJa as composerLayout } from "./composer-layout";
+import { composerPickerJa as composerPicker } from "./composer-picker";
 import { hostQueueJa as hostQueue } from "./host-queue";
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
@@ -132,6 +134,8 @@ export const ja: TranslationResources = {
   },
   composer: {
     hostQueue,
+    picker: composerPicker,
+    layout: composerLayout,
     placeholders: {
       desktop: "エージェントにメッセージ、@ファイル、/コマンドや/スキルを入力",
       mobile: "メッセージ、@ファイル、/コマンド",

@@ -74,11 +74,11 @@ test.describe("Agent profiles in the model picker", () => {
         await expectComposerMode(page, "Load test");
       });
 
-      await test.step("the sole provider opens directly", async () => {
+      await test.step("the panel opens on the agent's provider, its profile one press away", async () => {
         await openModelPicker(page);
-        await expect(page.getByTestId("model-search-input").first()).toBeVisible();
-        await expect(page.getByTestId("sheet-header-back")).toHaveCount(0);
-        await expect(page.locator('[data-testid^="model-provider-"]')).toHaveCount(0);
+        await expect(page.getByTestId("composer-picker-provider-header")).toContainText(
+          "Mock Load Test",
+        );
         await expectProfileVisibleForProvider(page, {
           name: PROFILE.name,
           summary: PROFILE_SUMMARY,
@@ -103,14 +103,17 @@ test.describe("Agent profiles in the model picker", () => {
         await expectComposerDoesNotName(page, PROFILE.name);
       });
 
-      await test.step("reopening returns directly to the provider models", async () => {
+      await test.step("reopening returns to the provider's models", async () => {
         await openModelPicker(page);
-        await expect(page.getByTestId("model-search-input").first()).toBeVisible();
+        await expectModelRowSelected(page, {
+          provider: "mock",
+          modelId: "one-minute-stream",
+          modelLabel: "One minute stream",
+        });
         await expectProfileVisibleForProvider(page, {
           name: PROFILE.name,
           summary: PROFILE_SUMMARY,
         });
-        await expectModelRowSelected(page, { provider: "mock", modelId: "one-minute-stream" });
         await closeModelPicker(page);
       });
     } finally {

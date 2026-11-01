@@ -197,9 +197,43 @@ request that no level can answer reads to the user as a prompt that hangs foreve
 
 Suppressing prompts requires holding every leaf, `approval.other` included. An
 assignment stored before that leaf existed therefore stops qualifying for
-unattended modes, `toolPolicy.preapproved`, and auto-accept delegation until an
+unattended modes, Full auto-accept, `toolPolicy.preapproved`, and auto-accept delegation until an
 operator re-saves it — re-selecting its access level is enough. Nothing warns
 about this, so check assignments that relied on unattended execution.
+
+Which modes are unattended comes from the provider manifest's `isUnattended` marks:
+Claude Bypass (`bypassPermissions`), Codex Full access (`full-access`), Copilot Allow all
+(`allow-all`) and OMP Full access (`full`). The daemon copies those marks onto the bare modes a
+running provider reports (`provider-modes.ts`); before it did, Managed Access read Claude, Codex
+and Copilot sessions' runtime modes unmarked, so their no-prompt modes slipped through as
+attended. With the marks, a member without every approval leaf is refused, everywhere Managed
+Access judges a configuration: selecting one of those modes, changing any other setting of a
+session already running in one, `resume_agent_request` for such a session, Chat delivery to a
+Bot whose session runs in one, and a schedule launch. A Codex Plan over Full access counts as
+Full access. Two consequences outside Managed Access follow from the same marks: a child agent
+created for another provider than its unattended parent starts in that provider's no-prompt mode,
+and a child of a Full auto-accept parent gets the no-prompt mode but not the Full auto-accept flag.
+`provider-modes.test.ts` checks the classification against the real provider registry.
+
+A schedule runs without prompts only when someone picked such a mode on it, and creating one
+names its mode: `clisbot schedule create` refuses a provider that lists modes without `--mode`
+(the error marks the default that asks and the modes that run without asking), the app's form
+will not save without one, and an agent's tools need one that asks. The wire keeps `modeId`
+optional for 2.2.1 apps and CLIs (`COMPAT(schedule-mode-required)`). A `new-agent` schedule with
+no mode, from such a client or stored before, runs in the provider's mode that asks: its default, or its first mode that
+asks when the default does not (OMP's Full access gives Write approval), never Plan
+(`resolveScheduleDefaultModeId` in `@clisbot/protocol/schedule/default-mode`). The daemon stores
+that mode when a schedule is created or updated without one (CLI, RPC and MCP), resolves it again
+at run time for schedules stored without one, and no longer creates runs as unattended, so ACP,
+Copilot and OpenCode do not turn their own `auto_accept` on. The run's approval requests reach the
+app like any agent's. Managed Access judges a schedule launch without a mode as that create; it no
+longer needs every approval leaf. `schedule/schedule-mode.test.ts` pins the mode per provider.
+
+An agent's Clisbot tools ask the same question of what an agent requests: an agent caller cannot
+create, switch or prompt an agent into an unattended mode or turn on a provider's `auto_accept`,
+and a schedule it creates or changes must name a mode that asks
+([composer picker](features/composer-picker/README.md#full-auto-accept)). A person's requests
+are judged only by Managed Access.
 
 A daemon drops a Project privilege it does not know, so a ticket from a newer Hub
 grants it less, never more. Daemons that send the `x-clisbot-project-privileges`
@@ -272,8 +306,13 @@ links and changing the configuration (`/agent`, `/model`, `/provider`,
 changes need `approval.config`. Approvals retain the open prompt's two authority
 checks; an unattended mode also needs the matching `approval.*` privilege.
 Configuration menus and mutations must fit the sender's `AgentConfigurationGrant`
-and conversation visibility. A final configuration with
-`featureValues.fast_mode: true` additionally requires `agent.fast.use`. The check
+and conversation visibility. A final configuration with a faster tier additionally
+requires `agent.fast.use`: `fast_mode` on (Claude, OMP), Cursor `fast` on, or a Codex
+`service_tier` other than `default`, `standard`, `flex` and `auto`. The cheap tiers are listed
+and every other value counts as faster, so a tier nobody has classified needs the privilege
+(`isFasterTier` in `@clisbot/protocol/speed-tier`). The daemon's Managed Access (create and set)
+and the Hub's channel commands (the `/agent` menu, configuration validation, Route delegation
+and the open-Route warning) use that one function. The check
 runs when a sender makes the change; later sessions in the conversation use the
 stored choice without re-checking whoever speaks next. Validation includes
 features preserved from a running session when a staged provider selection

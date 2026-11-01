@@ -1,4 +1,7 @@
 import { useComposerPickerPlacement } from "@/composer/picker-placement";
+import { COMPOSER_PICKER_ENABLED } from "@/clisbot/composer-picker/feature";
+import { PickerAgentControls } from "@/clisbot/composer-picker/picker-agent-controls";
+import { useDraftModeControl } from "@/clisbot/composer-picker/use-draft-mode-control";
 import {
   memo,
   useCallback,
@@ -103,13 +106,15 @@ import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
 interface AgentControlOption {
   id: string;
   label: string;
+  /** The model's default effort, which the composer picker marks Default. */
+  isDefault?: boolean;
 }
 
 type AgentControlSelector = "provider" | "mode" | "model" | "thinking" | `feature-${string}`;
 
 const EMPTY_AGENT_PROVIDER_DEFINITIONS: AgentProviderDefinition[] = [];
 
-interface ControlledAgentControlsProps {
+export interface ControlledAgentControlsProps {
   provider: string;
   providerOptions?: AgentControlOption[];
   selectedProviderId?: string;
@@ -133,7 +138,7 @@ interface ControlledAgentControlsProps {
   onSetFeature?: (featureId: string, value: unknown) => void;
   onDropdownClose?: () => void;
   onModelSelectorOpen?: () => void;
-  onRetryModelProvider?: (provider: AgentProvider) => void;
+  onRetryModelProvider?: (provider: AgentProvider) => void | Promise<void>;
   isRetryingModelProvider?: boolean;
   modeControl?: AgentModeControlValue | null;
   modelSelectorServerId?: string | null;
@@ -1545,6 +1550,24 @@ function ThinkingComboboxOption({
   );
 }
 
+/** The running model's efforts, its default marked for the composer picker. */
+function toLiveThinkingOptions(
+  options: ReadonlyArray<{ id: string; label?: string; isDefault?: boolean }> | null | undefined,
+  model: { defaultThinkingOptionId?: string } | null | undefined,
+): AgentControlOption[] {
+  const defaultId = model?.defaultThinkingOptionId;
+  return (options ?? []).map((option) => ({
+    id: option.id,
+    label: formatThinkingOptionLabel(option),
+    isDefault: option.isDefault === true || option.id === defaultId,
+  }));
+}
+
+/** The composer picker replaces the toolbar's controls when it is on (`clisbot/composer-picker`). */
+const ToolbarAgentControls = COMPOSER_PICKER_ENABLED
+  ? PickerAgentControls
+  : ControlledAgentControls;
+
 export const AgentControls = memo(function AgentControls({
   agentId,
   serverId,
@@ -1608,12 +1631,10 @@ export const AgentControls = memo(function AgentControls({
     return (models ?? []).map((model) => ({ id: model.id, label: model.label }));
   }, [models]);
 
-  const thinkingOptions = useMemo<AgentControlOption[]>(() => {
-    return (modelSelection.thinkingOptions ?? []).map((option) => ({
-      id: option.id,
-      label: formatThinkingOptionLabel(option),
-    }));
-  }, [modelSelection.thinkingOptions]);
+  const thinkingOptions = useMemo<AgentControlOption[]>(
+    () => toLiveThinkingOptions(modelSelection.thinkingOptions, modelSelection.selectedModel),
+    [modelSelection.selectedModel, modelSelection.thinkingOptions],
+  );
 
   const agentProvider = agent?.provider;
   const activeModelId = modelSelection.activeModelId;
@@ -1774,10 +1795,9 @@ export const AgentControls = memo(function AgentControls({
     refetchSnapshotIfStale(agentProvider);
   }, [agentProvider, refetchSnapshotIfStale]);
 
+  // The composer picker shows a spinner until the refresh settles.
   const handleRetryModelProvider = useCallback(
-    (provider: AgentProvider) => {
-      void refreshSnapshot([provider]);
-    },
+    (provider: AgentProvider) => refreshSnapshot([provider]),
     [refreshSnapshot],
   );
 
@@ -1789,7 +1809,7 @@ export const AgentControls = memo(function AgentControls({
     <>
       {commandCenterRegistration}
       {profileEditor.element}
-      <ControlledAgentControls
+      <ToolbarAgentControls
         provider={agent.provider}
         modelSelectorProviders={agentModelSelectorProviders}
         modelOptions={modelOptions}
@@ -1889,25 +1909,22 @@ export function DraftAgentControls({
   const profileEditor = useAgentProfileEditor(modelSelectorServerId);
   const profileActions = resolveAgentProfileEditorActions(agentProfiles !== null, profileEditor);
 
-  const modeControl = useMemo<AgentModeControlValue | null>(
-    () =>
-      selectedProvider && modeOptions.length > 0
-        ? {
-            provider: selectedProvider,
-            providerDefinitions,
-            modeOptions,
-            selectedModeId: selectedMode,
-            onSelectMode,
-            disabled,
-          }
-        : null,
-    [selectedProvider, providerDefinitions, modeOptions, selectedMode, onSelectMode, disabled],
-  );
+  const modeControl = useDraftModeControl({
+    selectedProvider,
+    providerDefinitions,
+    modeOptions,
+    selectedMode,
+    onSelectMode,
+    features,
+    onSetFeature,
+    disabled,
+    serverId: modelSelectorServerId,
+  });
 
   return (
     <>
       {profileEditor.element}
-      <ControlledAgentControls
+      <ToolbarAgentControls
         provider={selectedProvider ?? ""}
         modelSelectorProviders={modelSelectorProviders}
         modelOptions={modelOptions}

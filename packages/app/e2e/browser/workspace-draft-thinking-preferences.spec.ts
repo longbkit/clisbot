@@ -1,4 +1,9 @@
 import path from "node:path";
+import {
+  expectComposerMode,
+  expectComposerModel,
+  expectComposerThinking,
+} from "../support/helpers/composer-picker";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import {
   hostFormPreferencesKey,
@@ -28,20 +33,6 @@ async function openNewAgentTab(page: Page): Promise<void> {
 async function chooseDraftControl(page: Page, query: string, choice: string): Promise<void> {
   await openCommandCenter(page);
   await chooseCommandCenterAgentControl({ page, query, choice });
-}
-
-async function expectThinkingSelected(page: Page, label: string): Promise<void> {
-  await expect(
-    page
-      .getByRole("button", { name: `Select thinking option (${label})` })
-      .filter({ visible: true }),
-  ).toBeVisible({ timeout: 30_000 });
-}
-
-async function expectModeSelected(page: Page, label: string): Promise<void> {
-  await expect(
-    page.getByRole("button", { name: `Select agent mode (${label})` }).filter({ visible: true }),
-  ).toBeVisible({ timeout: 30_000 });
 }
 
 async function reloadWithPersistedPreferences(page: Page): Promise<void> {
@@ -110,7 +101,7 @@ test.describe("Workspace draft thinking preferences", () => {
         "Model › Mock Load Test › Five minute stream",
       );
       await chooseDraftControl(page, "medium", "Thinking › Medium");
-      await expectThinkingSelected(page, "Medium");
+      await expectComposerThinking(page, "Medium");
       await chooseDraftControl(
         page,
         "ten second stream",
@@ -121,11 +112,11 @@ test.describe("Workspace draft thinking preferences", () => {
         "five minute stream",
         "Model › Mock Load Test › Five minute stream",
       );
-      await expectThinkingSelected(page, "Medium");
+      await expectComposerThinking(page, "Medium");
       await submitDraftAgent(page, "Remember medium thinking for this model");
 
       await openNewAgentTab(page);
-      await expectThinkingSelected(page, "Medium");
+      await expectComposerThinking(page, "Medium");
       await chooseDraftControl(
         page,
         "ten second stream",
@@ -142,7 +133,7 @@ test.describe("Workspace draft thinking preferences", () => {
         "Model › Mock Load Test › Five minute stream",
       );
 
-      await expectThinkingSelected(page, "Medium");
+      await expectComposerThinking(page, "Medium");
     } finally {
       await workspace.cleanup();
     }
@@ -191,20 +182,18 @@ test.describe("Workspace draft thinking preferences", () => {
         "Model › Mock Load Test › Five minute stream",
       );
       await chooseDraftControl(page, "approval test", "Mode › Approval test");
-      await expectModeSelected(page, "Approval test");
+      await expectComposerMode(page, "Approval test");
       await submitDraftAgent(page, "Remember this permission mode");
 
       await openNewAgentTab(page);
-      await expectModeSelected(page, "Approval test");
+      await expectComposerMode(page, "Approval test");
       // Use a synthetic provider and the host-wide picker, not the current provider's models.
       await chooseDraftControl(
         page,
         "gemini 3.5 flash",
         "Model › Draft Mode Catalog › Gemini 3.5 Flash",
       );
-      await expect(
-        page.getByRole("button", { name: "Select model (Gemini 3.5 Flash)", exact: true }),
-      ).toBeVisible();
+      await expectComposerModel(page, "Gemini 3.5 Flash");
       await expect
         .poll(async () => (await readHostFormPreferences(page))?.provider)
         .toBe(catalogProvider);
@@ -221,7 +210,7 @@ test.describe("Workspace draft thinking preferences", () => {
       );
       await expect.poll(async () => (await readHostFormPreferences(page))?.provider).toBe("mock");
 
-      await expectModeSelected(page, "Approval test");
+      await expectComposerMode(page, "Approval test");
     } finally {
       try {
         await client?.patchDaemonConfig({ removeProviders: [catalogProvider] });
@@ -246,10 +235,8 @@ test.describe("Workspace draft thinking preferences", () => {
       await seedLegacyModelPreference(page);
       await reloadWithPersistedPreferences(page);
 
-      await expect(
-        page.getByRole("button", { name: "Select model (Five minute stream)" }),
-      ).toBeVisible({ timeout: 30_000 });
-      await expectThinkingSelected(page, "Medium");
+      await expectComposerModel(page, "Five minute stream");
+      await expectComposerThinking(page, "Medium");
     } finally {
       await workspace.cleanup();
     }

@@ -16,6 +16,8 @@ export type AgentProviderModeDefinition = Omit<AgentMode, "icon" | "colorTier"> 
   AgentModeVisuals & {
     // Marks the provider's most-permissioned no-prompt mode. Selecting it means tools run without approval; the runtime mechanism is provider-specific.
     isUnattended?: boolean;
+    // The running provider lists this mode only when it offers it (Codex Plan needs a plan collaboration mode), so a mode list built without asking the provider leaves it out.
+    onlyWhenOffered?: boolean;
   };
 
 // TODO: `modes` should not be static. Providers (especially ACP) report their
@@ -28,6 +30,8 @@ export interface AgentProviderDefinition {
   enabledByDefault?: boolean;
   defaultModeId: string | null;
   modes: AgentProviderModeDefinition[];
+  /** The built-in a custom provider extends, from the provider snapshot; absent otherwise. */
+  baseProvider?: string;
   voice?: {
     enabled: boolean;
     defaultModeId: string;
@@ -74,7 +78,16 @@ const CLAUDE_MODES: AgentProviderModeDefinition[] = [
   },
 ];
 
+// The daemon lists Plan only when the running Codex offers a plan collaboration mode.
 const CODEX_MODES: AgentProviderModeDefinition[] = [
+  {
+    id: "plan",
+    label: "Plan",
+    description: "Plan the work with Codex's plan collaboration mode before changing anything.",
+    icon: "ShieldEllipsis",
+    colorTier: "planning",
+    onlyWhenOffered: true,
+  },
   {
     id: "auto",
     label: "Default Permissions",

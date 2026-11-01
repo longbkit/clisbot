@@ -5,6 +5,7 @@ import type {
   ProviderSnapshotEntry,
 } from "@clisbot/protocol/agent-types";
 import type { ScheduleCadence, ScheduleSummary } from "@clisbot/protocol/schedule/types";
+import { resolveScheduleDefaultModeId } from "@clisbot/protocol/schedule/default-mode";
 import type { FormPreferences } from "@/create-agent-preferences/preferences";
 import { formatThinkingOptionLabel } from "@/agent-controls/labels";
 import {
@@ -258,6 +259,19 @@ function resolveModeOptions(
   provider: AgentProvider | null,
 ): AgentMode[] {
   return resolveSelectedEntry(entries, provider)?.modes ?? [];
+}
+
+/**
+ * The mode a schedule starts in until someone picks another: the provider's mode that asks for
+ * approval (`resolveScheduleDefaultModeId`), as the daemon stores it, never a remembered composer
+ * mode. Empty only for a provider without such a mode.
+ */
+function resolveScheduleModeForProvider(
+  entries: readonly ProviderSnapshotEntry[],
+  provider: AgentProvider | null,
+): string {
+  const entry = resolveSelectedEntry(entries, provider);
+  return resolveScheduleDefaultModeId(entry?.modes ?? [], entry?.defaultModeId) ?? "";
 }
 
 function resolveAvailableModels(
@@ -628,6 +642,10 @@ function resolveCanSubmit(state: ScheduleFormState): boolean {
   if (!hasWorkingDir) {
     return false;
   }
+  // A new-agent schedule names its mode: preselected to the provider's mode that asks.
+  if (state.modeOptions.length > 0 && !state.selectedMode.trim()) {
+    return false;
+  }
   return isSelectedModelValidForProviders({
     providers: state.modelSelectorProviders,
     selectedProvider: state.selectedProvider,
@@ -824,7 +842,12 @@ function resolveSnapshotSelection(input: {
     toFormState(input.state),
     allowedProviderMap,
   );
-  return applyResolvedFormState(input.state, resolved);
+  const next = applyResolvedFormState(input.state, resolved);
+  if (input.userModified.modeId || input.initialValues?.modeId) return next;
+  return {
+    ...next,
+    selectedMode: resolveScheduleModeForProvider(input.providerEntries, next.selectedProvider),
+  };
 }
 
 function preferencesForSnapshotResolution(
@@ -844,8 +867,7 @@ function pickModeForProvider(input: {
   if (input.currentProvider === input.provider && currentMode) {
     return currentMode;
   }
-  const entry = resolveSelectedEntry(input.entries, input.provider);
-  return entry?.defaultModeId ?? entry?.modes?.[0]?.id ?? "";
+  return resolveScheduleModeForProvider(input.entries, input.provider);
 }
 
 function pickModelForProvider(input: {

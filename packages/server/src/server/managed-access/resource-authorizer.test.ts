@@ -57,7 +57,16 @@ function workspace(workspaceId: string, projectId: string, cwd: string): Persist
 
 function createHarness(
   privileges: readonly ProjectPrivilege[],
-  paths: { projectA?: string; projectB?: string; archivedAgent?: boolean } = {},
+  paths: {
+    projectA?: string;
+    projectB?: string;
+    archivedAgent?: boolean;
+    /** agent-a runs Full auto-accept on Codex Full access. */
+    fullAutoAccept?: boolean;
+    /** agent-a's mode, and the Codex permission under Plan. */
+    agentAModeId?: string;
+    agentAPermissionModeId?: string;
+  } = {},
   grant: {
     terminalProfiles?: ProjectAuthorization["terminalProfiles"];
     daemonPrivileges?: readonly ProjectPrivilege[];
@@ -85,8 +94,16 @@ function createHarness(
           cwd: projectA,
           model: "gpt-5.6",
           thinkingOptionId: "high",
+          ...(paths.fullAutoAccept ? { modeId: "full-access", fullAutoAccept: true } : {}),
+          ...(paths.agentAModeId ? { modeId: paths.agentAModeId } : {}),
         },
-        persistence: { provider: "codex", sessionId: "session-a" },
+        persistence: {
+          provider: "codex",
+          sessionId: "session-a",
+          ...(paths.agentAPermissionModeId
+            ? { metadata: { permissionModeId: paths.agentAPermissionModeId } }
+            : {}),
+        },
       } as StoredAgentRecord,
     ],
     [
@@ -198,8 +215,14 @@ function createHarness(
   const agentConfigurationSafety = {
     isUnattendedConfiguration: async (config: {
       modeId?: string;
+      fullAutoAccept?: boolean;
       featureValues?: Record<string, unknown>;
-    }) => config.modeId === "unattended" || config.featureValues?.auto_accept === true,
+    }) =>
+      config.modeId === "unattended" ||
+      config.modeId === "full-access" ||
+      config.modeId === "full-auto-accept" ||
+      config.fullAutoAccept === true ||
+      config.featureValues?.auto_accept === true,
   };
 
   return new ManagedResourceAuthorizer(
@@ -252,6 +275,60 @@ describe("ManagedResourceAuthorizer", () => {
       false,
     );
     expect(authorizer.allowsAgentRecordSync({ labels: {} })).toBe(false);
+  });
+
+  it("gates every faster tier behind agent.fast.use, on create and on set", async () => {
+    const create = (featureValues: Record<string, unknown>) => ({
+      type: "create_agent_request" as const,
+      requestId: "create-tier",
+      workspaceId: "workspace-a",
+      config: {
+        provider: "codex",
+        cwd: "/work/a",
+        model: "gpt-5.6",
+        thinkingOptionId: "high",
+        featureValues,
+      },
+      labels: {},
+    });
+    const set = (featureId: string, value: unknown) => ({
+      type: "set_agent_feature_request" as const,
+      requestId: "set-tier",
+      agentId: "agent-a",
+      featureId,
+      value,
+    });
+    const without = createHarness(["project.use", "agent.create", "agent.interact"]);
+    const withFast = createHarness([
+      "project.use",
+      "agent.create",
+      "agent.interact",
+      "agent.fast.use",
+    ]);
+    for (const [featureId, value] of [
+      ["service_tier", "priority"],
+      ["service_tier", "ultrafast"],
+      ["service_tier", "fast"],
+      // A tier nobody has classified costs more until someone says otherwise.
+      ["service_tier", "scale"],
+      ["fast", "true"],
+      ["fast_mode", true],
+    ] as const) {
+      await expect(without.allowsInbound(create({ [featureId]: value }))).resolves.toBe(false);
+      await expect(without.allowsInbound(set(featureId, value))).resolves.toBe(false);
+      await expect(withFast.allowsInbound(create({ [featureId]: value }))).resolves.toBe(true);
+      await expect(withFast.allowsInbound(set(featureId, value))).resolves.toBe(true);
+    }
+    // Standard and slower tiers need no grant.
+    for (const [featureId, value] of [
+      ["service_tier", "default"],
+      ["service_tier", "flex"],
+      ["service_tier", "auto"],
+      ["fast", "false"],
+    ] as const) {
+      await expect(without.allowsInbound(create({ [featureId]: value }))).resolves.toBe(true);
+      await expect(without.allowsInbound(set(featureId, value))).resolves.toBe(true);
+    }
   });
 
   it("checks explicit Agent configuration and Fast mode at creation", async () => {
@@ -398,6 +475,59 @@ describe("ManagedResourceAuthorizer", () => {
         modeId: "unattended",
       }),
     ).resolves.toBe(true);
+  });
+
+  it("lets a member without every approval turn Full auto-accept off, not on", async () => {
+    const limited = createHarness(
+      ["project.use", "agent.create", "agent.interact", "approval.file"],
+      { fullAutoAccept: true },
+    );
+    await expect(
+      limited.allowsInbound({
+        type: "set_agent_mode_request",
+        requestId: "leave-full-auto-accept",
+        agentId: "agent-a",
+        modeId: "auto",
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      limited.allowsInbound({
+        type: "set_agent_mode_request",
+        requestId: "stay-full-auto-accept",
+        agentId: "agent-a",
+        modeId: "full-auto-accept",
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("judges Codex Plan by the permission it returns to", async () => {
+    const limited = ["project.use", "agent.create", "agent.interact", "approval.file"] as const;
+    const planRequest = {
+      type: "set_agent_mode_request" as const,
+      requestId: "plan",
+      agentId: "agent-a",
+      modeId: "plan",
+    };
+    // Plan on a Full access agent returns to Full access when the plan is approved.
+    await expect(
+      createHarness([...limited], { agentAModeId: "full-access" }).allowsInbound(planRequest),
+    ).resolves.toBe(false);
+    await expect(
+      createHarness([...limited], { agentAModeId: "auto" }).allowsInbound(planRequest),
+    ).resolves.toBe(true);
+    // An agent already in Plan over Full access is judged as Full access too.
+    const inPlan = createHarness([...limited], {
+      agentAModeId: "plan",
+      agentAPermissionModeId: "full-access",
+    });
+    await expect(
+      inPlan.allowsInbound({
+        type: "set_agent_thinking_request",
+        requestId: "thinking",
+        agentId: "agent-a",
+        thinkingOptionId: "high",
+      }),
+    ).resolves.toBe(false);
   });
 
   it("projects Provider catalogs and denies daemon-global reads", async () => {

@@ -114,6 +114,7 @@ import {
   THINKING_APPLIES_NEXT_TURN_NOTICE,
 } from "../provider-notices.js";
 import { PermissionResponseNotDeliveredError } from "../permission-response-not-delivered-error.js";
+import { MCP_ELICITATION_METADATA } from "../full-auto-accept.js";
 import type { WorkspaceGitService } from "../../workspace-git-service.js";
 import {
   applyCodexToolPolicy,
@@ -265,6 +266,123 @@ const CODEX_MODES: AgentMode[] = [
 ];
 
 const DEFAULT_CODEX_MODE_ID = "auto";
+
+// Codex keeps permissions and collaboration mode as two settings. Clisbot shows one Mode
+// list: Plan turns on the plan collaboration mode and keeps the permission underneath.
+const CODEX_PLAN_MODE: AgentMode = {
+  id: "plan",
+  label: "Plan",
+  description: "Plan the work with Codex's plan collaboration mode before changing anything.",
+};
+
+function codexModeList(input: { autoReviewEnabled: boolean; planAvailable: boolean }): AgentMode[] {
+  const permissions = input.autoReviewEnabled
+    ? CODEX_MODES
+    : CODEX_MODES.filter((mode) => mode.id !== "auto-review");
+  return input.planAvailable ? [CODEX_PLAN_MODE, ...permissions] : permissions;
+}
+
+interface CodexCollaborationMode {
+  name: string;
+  mode?: string | null;
+  model?: string | null;
+  reasoning_effort?: string | null;
+  developer_instructions?: string | null;
+}
+
+function parseCodexCollaborationModes(response: unknown): CodexCollaborationMode[] {
+  const record = toObjectRecord(response);
+  const data = Array.isArray(record?.data) ? record.data : [];
+  return data.map((entry) => {
+    const item = toObjectRecord(entry);
+    return {
+      name: typeof item?.name === "string" ? item.name : "",
+      mode: typeof item?.mode === "string" ? item.mode : null,
+      model: typeof item?.model === "string" ? item.model : null,
+      reasoning_effort: typeof item?.reasoning_effort === "string" ? item.reasoning_effort : null,
+      developer_instructions:
+        typeof item?.developer_instructions === "string" ? item.developer_instructions : null,
+    };
+  });
+}
+
+function findCodexCollaborationModeByName(
+  modes: CodexCollaborationMode[],
+  target: "code" | "plan",
+): CodexCollaborationMode | null {
+  const findByName = (predicate: (name: string) => boolean) =>
+    modes.find((entry) => predicate(entry.name.toLowerCase()));
+  if (target === "plan") {
+    return findByName((name) => name.includes("plan") || name.includes("read")) ?? null;
+  }
+  return (
+    findByName((name) => name.includes("auto") || name.includes("code")) ??
+    findByName((name) => !name.includes("plan") && !name.includes("read")) ??
+    modes[0] ??
+    null
+  );
+}
+
+function findCodexCollaborationMode(
+  modes: CodexCollaborationMode[],
+  target: "code" | "plan",
+): CodexCollaborationMode | null {
+  // Codex versions without a mode value only name their collaboration modes.
+  if (!modes.some((entry) => entry.mode)) return findCodexCollaborationModeByName(modes, target);
+  const isPlan = (entry: CodexCollaborationMode) => entry.mode === "plan";
+  const match = target === "plan" ? modes.find(isPlan) : modes.find((entry) => !isPlan(entry));
+  return match ?? null;
+}
+
+interface CodexAppServerCatalog {
+  models: AgentModelDefinition[];
+  planAvailable: boolean;
+}
+
+// Codex versions without collaborationMode/list have no plan collaboration mode.
+/**
+ * Whether the running Codex offers a plan collaboration mode. Plan is optional, so any failure
+ * (an older Codex without the method, a transport error, a timeout) means no Plan, never a
+ * failed catalog.
+ */
+export async function probeCodexPlanCollaborationMode(
+  client: Pick<CodexAppServerClient, "request">,
+  logger: Logger,
+): Promise<boolean> {
+  try {
+    const modes = parseCodexCollaborationModes(await client.request("collaborationMode/list", {}));
+    return findCodexCollaborationMode(modes, "plan") !== null;
+  } catch (error) {
+    if (!(error instanceof CodexAppServerRpcError)) {
+      logger.warn({ err: error }, "Codex plan collaboration mode probe failed; offering no Plan");
+    }
+    return false;
+  }
+}
+
+interface CodexRestoredModes {
+  permissionModeId: string | undefined;
+  planModeEnabled: boolean;
+}
+
+function restoreCodexModes(input: {
+  modeId: string | undefined;
+  featureValues: Record<string, unknown> | undefined;
+  metadata: Record<string, unknown> | undefined;
+}): CodexRestoredModes {
+  const saved = input.metadata?.permissionModeId;
+  const savedPermission = typeof saved === "string" && saved in MODE_PRESETS ? saved : undefined;
+  if (input.modeId === CODEX_PLAN_MODE.id) {
+    return { permissionModeId: savedPermission, planModeEnabled: true };
+  }
+  // A record written by a daemon that shows Plan as a mode always carries permissionModeId,
+  // so its modeId is authoritative and a leftover plan_mode flag is ignored.
+  // COMPAT(codex-plan-mode-feature): added in v2.2.2, remove after 2027-05-01 once sessions saved with featureValues.plan_mode have been resumed.
+  const legacyPlan =
+    !(input.metadata && "permissionModeId" in input.metadata) &&
+    input.featureValues?.plan_mode === true;
+  return { permissionModeId: input.modeId, planModeEnabled: legacyPlan };
+}
 
 interface CodexAppServerClientLike {
   request(method: string, params?: unknown): Promise<unknown>;
@@ -3522,13 +3640,7 @@ export class CodexAppServerAgentSession implements AgentSession {
   private connectionPromise: Promise<void> | null = null;
   private closed = false;
   private readonly backgroundWork = new CodexBackgroundWork();
-  private collaborationModes: Array<{
-    name: string;
-    mode?: string | null;
-    model?: string | null;
-    reasoning_effort?: string | null;
-    developer_instructions?: string | null;
-  }> = [];
+  private collaborationModes: CodexCollaborationMode[] = [];
   private resolvedCollaborationMode: {
     mode: string;
     settings: Record<string, unknown>;
@@ -3566,11 +3678,17 @@ export class CodexAppServerAgentSession implements AgentSession {
       provider: CODEX_PROVIDER,
       agentId: this.agentId,
     });
-    if (config.modeId !== undefined) {
-      validateCodexMode(config.modeId);
+    const restoredModes = restoreCodexModes({
+      modeId: config.modeId,
+      featureValues: config.featureValues,
+      metadata: resumeHandle?.metadata,
+    });
+    if (restoredModes.permissionModeId !== undefined) {
+      validateCodexMode(restoredModes.permissionModeId);
     }
-    this.hasWorkflowModeOverride = config.modeId !== undefined;
-    this.currentMode = config.modeId ?? DEFAULT_CODEX_MODE_ID;
+    this.hasWorkflowModeOverride = restoredModes.permissionModeId !== undefined;
+    this.currentMode = restoredModes.permissionModeId ?? DEFAULT_CODEX_MODE_ID;
+    this.planModeEnabled = restoredModes.planModeEnabled;
     this.providerOptions =
       validateProviderOptions("codex", CodexProviderOptionsSchema, config.providerOptions) ?? {};
     this.config = config;
@@ -3579,9 +3697,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     this.codexHome = deps.codexHome ?? resolveCodexHomeDir(process.env);
     this.config.thinkingOptionId = normalizeCodexThinkingOptionId(this.config.thinkingOptionId);
     this.serviceTier = readCodexServiceTier(this.config.featureValues);
-    if (this.config.featureValues?.plan_mode) {
-      this.planModeEnabled = true;
-    }
+    this.config.modeId = this.persistedModeId();
 
     if (this.resumeHandle?.sessionId) {
       this.currentThreadId = this.resumeHandle.sessionId;
@@ -3599,8 +3715,6 @@ export class CodexAppServerAgentSession implements AgentSession {
     return buildCodexFeatures({
       serviceTiers: this.currentServiceTiers(),
       serviceTier: this.serviceTier ?? "default",
-      planModeEnabled: this.planModeEnabled,
-      planModeAvailable: this.hasPlanCollaborationMode(),
     });
   }
 
@@ -3745,22 +3859,9 @@ export class CodexAppServerAgentSession implements AgentSession {
   private async loadCollaborationModes(): Promise<void> {
     if (!this.client) return;
     try {
-      const response = toObjectRecord(await this.client.request("collaborationMode/list", {}));
-      const data = Array.isArray(response?.data) ? response.data : [];
-      this.collaborationModes = data.map((entry) => {
-        const record = toObjectRecord(entry);
-        return {
-          name: typeof record?.name === "string" ? record.name : "",
-          mode: typeof record?.mode === "string" ? record.mode : null,
-          model: typeof record?.model === "string" ? record.model : null,
-          reasoning_effort:
-            typeof record?.reasoning_effort === "string" ? record.reasoning_effort : null,
-          developer_instructions:
-            typeof record?.developer_instructions === "string"
-              ? record.developer_instructions
-              : null,
-        };
-      });
+      this.collaborationModes = parseCodexCollaborationModes(
+        await this.client.request("collaborationMode/list", {}),
+      );
     } catch (error) {
       this.logger.trace(
         {
@@ -3773,6 +3874,10 @@ export class CodexAppServerAgentSession implements AgentSession {
         "provider.codex.metadata.collaboration_modes_failed",
       );
       this.collaborationModes = [];
+    }
+    if (this.planModeEnabled && !this.hasPlanCollaborationMode()) {
+      this.applyPlanModeAndReport(false);
+      return;
     }
     this.refreshResolvedCollaborationMode();
   }
@@ -3808,30 +3913,8 @@ export class CodexAppServerAgentSession implements AgentSession {
     }
   }
 
-  private findCollaborationMode(target: "code" | "plan"): {
-    name: string;
-    mode?: string | null;
-    model?: string | null;
-    reasoning_effort?: string | null;
-    developer_instructions?: string | null;
-  } | null {
-    if (this.collaborationModes.length === 0) return null;
-    const findByName = (predicate: (name: string) => boolean) =>
-      this.collaborationModes.find((entry) => predicate(entry.name.toLowerCase()));
-
-    if (target === "plan") {
-      return findByName((name) => name.includes("plan") || name.includes("read")) ?? null;
-    }
-
-    return (
-      findByName((name) => name.includes("auto") || name.includes("code")) ??
-      this.collaborationModes.find((entry) => {
-        const name = entry.name.toLowerCase();
-        return !name.includes("plan") && !name.includes("read");
-      }) ??
-      this.collaborationModes[0] ??
-      null
-    );
+  private findCollaborationMode(target: "code" | "plan"): CodexCollaborationMode | null {
+    return findCodexCollaborationMode(this.collaborationModes, target);
   }
 
   private hasPlanCollaborationMode(): boolean {
@@ -3843,7 +3926,8 @@ export class CodexAppServerAgentSession implements AgentSession {
     settings: Record<string, unknown>;
     name: string;
   } | null {
-    const match = this.findCollaborationMode(this.planModeEnabled ? "plan" : "code");
+    const target = this.planModeEnabled ? "plan" : "code";
+    const match = this.findCollaborationMode(target);
     if (!match) return null;
 
     const settings: Record<string, unknown> = {};
@@ -3858,7 +3942,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     if (this.config.model) settings.model = this.config.model;
     const thinkingOptionId = normalizeCodexThinkingOptionId(this.config.thinkingOptionId);
     if (thinkingOptionId) settings.reasoning_effort = thinkingOptionId;
-    return { mode: match.mode ?? "code", settings, name: match.name };
+    return { mode: match.mode ?? target, settings, name: match.name };
   }
 
   private refreshResolvedCollaborationMode(): void {
@@ -3887,11 +3971,46 @@ export class CodexAppServerAgentSession implements AgentSession {
     this.config.featureValues = { ...values, service_tier: this.serviceTier ?? "default" };
   }
 
-  private applyFeatureValue(featureId: "plan_mode", value: boolean): void {
-    this.config.featureValues = { ...this.config.featureValues, [featureId]: value };
-    this.planModeEnabled = value;
+  private reportedModeId(): string {
+    return this.planModeEnabled ? CODEX_PLAN_MODE.id : this.currentMode;
+  }
+
+  private persistedModeId(): string | undefined {
+    if (this.planModeEnabled) return CODEX_PLAN_MODE.id;
+    return this.hasWorkflowModeOverride ? this.currentMode : undefined;
+  }
+
+  private availableModes(): AgentMode[] {
+    return codexModeList({
+      autoReviewEnabled: this.autoReviewEnabled,
+      planAvailable: this.hasPlanCollaborationMode(),
+    });
+  }
+
+  private applyPlanMode(enabled: boolean): void {
+    // COMPAT(codex-plan-mode-feature): added in v2.2.2, remove after 2027-05-01 with restoreCodexModes' legacy flag.
+    if (this.config.featureValues && "plan_mode" in this.config.featureValues) {
+      const { plan_mode: _legacyPlan, ...featureValues } = this.config.featureValues;
+      this.config.featureValues = featureValues;
+    }
+    this.planModeEnabled = enabled;
+    this.config.modeId = this.persistedModeId();
     this.refreshResolvedCollaborationMode();
     this.cachedRuntimeInfo = null;
+  }
+
+  // Plan can change without setMode (plan approved, legacy plan_mode); report it like
+  // Claude's ExitPlanMode so the composer's Mode follows.
+  private applyPlanModeAndReport(enabled: boolean): void {
+    const changed = this.planModeEnabled !== enabled;
+    this.applyPlanMode(enabled);
+    if (!changed) return;
+    this.emitEvent({
+      type: "mode_changed",
+      provider: CODEX_PROVIDER,
+      currentModeId: this.reportedModeId(),
+      availableModes: this.availableModes(),
+    });
   }
 
   private rememberPlanResult(item: ToolCallTimelineItem): void {
@@ -3980,7 +4099,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     const planText =
       typeof params.planText === "string" ? normalizePlanMarkdown(params.planText) : "";
 
-    this.applyFeatureValue("plan_mode", false);
+    this.applyPlanModeAndReport(false);
 
     return buildCodexPlanImplementationPrompt(planText);
   }
@@ -4634,7 +4753,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       sessionId: this.currentThreadId,
       model: this.config.model ?? null,
       thinkingOptionId: normalizeCodexThinkingOptionId(this.config.thinkingOptionId) ?? null,
-      modeId: this.currentMode ?? null,
+      modeId: this.reportedModeId(),
       extra: this.resolvedCollaborationMode
         ? { collaborationMode: this.resolvedCollaborationMode.name }
         : undefined,
@@ -4644,22 +4763,25 @@ export class CodexAppServerAgentSession implements AgentSession {
   }
 
   async getAvailableModes(): Promise<AgentMode[]> {
-    if (this.autoReviewEnabled) {
-      return CODEX_MODES;
-    }
-    return CODEX_MODES.filter((mode) => mode.id !== "auto-review");
+    return this.availableModes();
   }
 
   async getCurrentMode(): Promise<string | null> {
-    return this.currentMode ?? null;
+    return this.reportedModeId();
   }
 
   async setMode(modeId: string): Promise<void | AgentProviderNotice> {
-    validateCodexMode(modeId);
-    this.currentMode = modeId;
-    this.hasWorkflowModeOverride = true;
-    this.config.modeId = modeId;
-    this.cachedRuntimeInfo = null;
+    if (modeId === CODEX_PLAN_MODE.id) {
+      if (!this.hasPlanCollaborationMode()) {
+        throw new Error("This Codex version does not offer a plan collaboration mode");
+      }
+      this.applyPlanMode(true);
+    } else {
+      validateCodexMode(modeId);
+      this.currentMode = modeId;
+      this.hasWorkflowModeOverride = true;
+      this.applyPlanMode(false);
+    }
     if (this.activeForegroundTurnId) {
       return MODE_APPLIES_NEXT_TURN_NOTICE;
     }
@@ -4705,8 +4827,12 @@ export class CodexAppServerAgentSession implements AgentSession {
       this.cachedRuntimeInfo = null;
       return;
     }
+    // COMPAT(codex-plan-mode-feature): added in v2.2.2, remove after 2027-05-01 once apps select the Plan mode.
     if (featureId === "plan_mode") {
-      this.applyFeatureValue("plan_mode", Boolean(value));
+      if (value && !this.hasPlanCollaborationMode()) {
+        throw new Error("This Codex version does not offer a plan collaboration mode");
+      }
+      this.applyPlanModeAndReport(Boolean(value));
       return;
     }
     throw new Error(`Unknown Codex feature: ${featureId}`);
@@ -4978,6 +5104,8 @@ export class CodexAppServerAgentSession implements AgentSession {
         title: this.config.title ?? null,
         threadId: this.currentThreadId,
         modeId: this.config.modeId,
+        // Always written: restoreCodexModes reads its presence as "modeId is authoritative".
+        permissionModeId: this.hasWorkflowModeOverride ? this.currentMode : null,
         model: this.config.model ?? null,
         thinkingOptionId,
         toolPolicy: this.config.toolPolicy,
@@ -7224,6 +7352,7 @@ export class CodexAppServerAgentSession implements AgentSession {
         turnId: parsed.turnId ?? null,
         serverName: parsed.serverName,
         elicitationId: parsed.elicitationId ?? null,
+        [MCP_ELICITATION_METADATA]: true,
       },
     };
     this.pendingPermissions.set(requestId, request);
@@ -7482,7 +7611,7 @@ export class CodexAppServerAgentClient implements AgentClient {
     _options: FetchCatalogOptions,
     context?: ProviderRefreshContext,
   ): Promise<ProviderCatalog> {
-    const [models, autoReviewEnabled] = await Promise.all([
+    const [{ models, planAvailable }, autoReviewEnabled] = await Promise.all([
       this.fetchModelsFromAppServer(context),
       runProviderRefreshActivity(context, "version", () =>
         this.resolveAutoReviewEnabled(context?.signal),
@@ -7491,9 +7620,7 @@ export class CodexAppServerAgentClient implements AgentClient {
     return {
       models,
       defaultModeId: autoReviewEnabled ? "auto-review" : DEFAULT_CODEX_MODE_ID,
-      modes: autoReviewEnabled
-        ? CODEX_MODES
-        : CODEX_MODES.filter((mode) => mode.id !== "auto-review"),
+      modes: codexModeList({ autoReviewEnabled, planAvailable }),
     };
   }
 
@@ -7505,7 +7632,7 @@ export class CodexAppServerAgentClient implements AgentClient {
 
   private async fetchModelsFromAppServer(
     context?: ProviderRefreshContext,
-  ): Promise<AgentModelDefinition[]> {
+  ): Promise<CodexAppServerCatalog> {
     // Codex model/list is global to the app server in this flow; cwd/force are intentionally ignored.
     let client: CodexAppServerClient | undefined;
     let disposePromise: Promise<void> | undefined;
@@ -7543,13 +7670,21 @@ export class CodexAppServerAgentClient implements AgentClient {
         typeof configuredDefaultModelId === "string"
           ? models.some((model) => model?.id === configuredDefaultModelId)
           : false;
-      return models.map((model) =>
-        buildCodexModelDefinition(model, {
-          configuredDefaultModelId,
-          configuredDefaultThinkingOptionId,
-          hasConfiguredDefaultModel,
-        }),
+      const planAvailable = await runProviderRefreshActivity(
+        context,
+        "collaborationMode/list",
+        () => probeCodexPlanCollaborationMode(client!, this.logger),
       );
+      return {
+        models: models.map((model) =>
+          buildCodexModelDefinition(model, {
+            configuredDefaultModelId,
+            configuredDefaultThinkingOptionId,
+            hasConfiguredDefaultModel,
+          }),
+        ),
+        planAvailable,
+      };
     } finally {
       context?.signal.removeEventListener("abort", handleAbort);
       await dispose();

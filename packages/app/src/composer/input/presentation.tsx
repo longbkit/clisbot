@@ -19,6 +19,83 @@ function keepEditorFocused(event: import("react-native").PointerEvent) {
 }
 
 /**
+ * The fullscreen chrome both inline presentations share: the exit scope, the exit button for
+ * the fullscreen header and the enter button the inline surface shows top right.
+ */
+export function useComposerFullscreenChrome({
+  fullscreen,
+  sendIconSize,
+  showFullscreenButton,
+  onExit,
+  onEnter,
+  inFlow = false,
+}: {
+  fullscreen: boolean;
+  sendIconSize: number;
+  showFullscreenButton: boolean;
+  onExit: () => void;
+  onEnter: () => void;
+  /**
+   * Both buttons lay out in their parent as 44px targets (the Clisbot chat layout puts them
+   * above Send) instead of pinning to the text's corner and the fullscreen header.
+   */
+  inFlow?: boolean;
+}) {
+  const { t } = useTranslation();
+  // A retained tab keeps its fullscreen editor mounted while hidden; the global exit
+  // action (Escape, hardware back) belongs only to the pane the user is in.
+  const { isActiveComposer } = useComposerKeyboardScope();
+  const exitScopeRef = useComposerFullscreenExit(fullscreen && isActiveComposer, onExit);
+  const railOffset = resolveGlyphRailOffset({
+    controlSize: CONTROL_SIZE,
+    sendIconSize,
+    glyphIconSize: FULLSCREEN_GLYPH_SIZE,
+  });
+  const maximizeIcon = useCallback(
+    (color: string) => <Maximize2 color={color} size={FULLSCREEN_GLYPH_SIZE} />,
+    [],
+  );
+  const minimizeIcon = useCallback(
+    (color: string) => <Minimize2 color={color} size={FULLSCREEN_GLYPH_SIZE} />,
+    [],
+  );
+  // The toolbar row bleeds 6px past the input padding; the inline glyph sits on that edge.
+  const enterStyle = useMemo(() => [styles.enterButton, { right: -6 + railOffset }], [railOffset]);
+  const exitStyle = useMemo(() => [styles.iconButton, { marginRight: railOffset }], [railOffset]);
+  const exit = fullscreen ? (
+    <Button
+      variant="ghost"
+      size="xs"
+      accessibilityLabel={t("composer.input.exitFullscreen")}
+      onPointerDown={keepEditorFocused}
+      onPress={onExit}
+      style={inFlow ? styles.inFlowExit : exitStyle}
+      leftIcon={minimizeIcon}
+      hitSlop={8}
+    >
+      {null}
+    </Button>
+  ) : null;
+  const exitButton = exit && !inFlow ? <View style={styles.exitRow}>{exit}</View> : exit;
+  const enterButton =
+    showFullscreenButton && !fullscreen ? (
+      <Button
+        variant="ghost"
+        size="xs"
+        accessibilityLabel={t("composer.input.fullscreen")}
+        leftIcon={maximizeIcon}
+        onPointerDown={keepEditorFocused}
+        onPress={onEnter}
+        style={inFlow ? styles.inFlowButton : enterStyle}
+        hitSlop={8}
+      >
+        {null}
+      </Button>
+    ) : null;
+  return { exitScopeRef, exitButton, enterButton };
+}
+
+/**
  * One tree for both layout modes. The editing surface keeps its position so the
  * mounted editor, its native buffer, selection, and focus survive every toggle;
  * only the chrome around it changes. Fullscreen shows exit top right and Send
@@ -56,49 +133,20 @@ export function ComposerInputPresentation({
   onEnter: () => void;
   overlay: ReactNode;
 }) {
-  const { t } = useTranslation();
-  // A retained tab keeps its fullscreen editor mounted while hidden; the global exit
-  // action (Escape, hardware back) belongs only to the pane the user is in.
-  const { isActiveComposer } = useComposerKeyboardScope();
-  const exitScopeRef = useComposerFullscreenExit(fullscreen && isActiveComposer, onExit);
-  const railOffset = resolveGlyphRailOffset({
-    controlSize: CONTROL_SIZE,
+  const { exitScopeRef, exitButton, enterButton } = useComposerFullscreenChrome({
+    fullscreen,
     sendIconSize,
-    glyphIconSize: FULLSCREEN_GLYPH_SIZE,
+    showFullscreenButton,
+    onExit,
+    onEnter,
   });
-  const maximizeIcon = useCallback(
-    (color: string) => <Maximize2 color={color} size={FULLSCREEN_GLYPH_SIZE} />,
-    [],
-  );
-  const minimizeIcon = useCallback(
-    (color: string) => <Minimize2 color={color} size={FULLSCREEN_GLYPH_SIZE} />,
-    [],
-  );
-  // The toolbar row bleeds 6px past the input padding; the inline glyph sits on that edge.
-  const enterStyle = useMemo(() => [styles.enterButton, { right: -6 + railOffset }], [railOffset]);
-  const exitStyle = useMemo(() => [styles.iconButton, { marginRight: railOffset }], [railOffset]);
   return (
     <View
       ref={exitScopeRef}
       style={fullscreen ? styles.fullscreen : styles.inline}
       testID={fullscreen ? "composer-fullscreen" : undefined}
     >
-      {fullscreen ? (
-        <View style={styles.exitRow}>
-          <Button
-            variant="ghost"
-            size="xs"
-            accessibilityLabel={t("composer.input.exitFullscreen")}
-            onPointerDown={keepEditorFocused}
-            onPress={onExit}
-            style={exitStyle}
-            leftIcon={minimizeIcon}
-            hitSlop={8}
-          >
-            {null}
-          </Button>
-        </View>
-      ) : null}
+      {exitButton}
       <ComposerFullscreenBody fullscreen={fullscreen}>
         <View
           ref={inputWrapperRef}
@@ -108,20 +156,7 @@ export function ComposerInputPresentation({
           {fullscreen ? null : attachmentSlot}
           <View style={fullscreen ? styles.fullscreenTextSurface : styles.inlineTextSurface}>
             {surface}
-            {showFullscreenButton && !fullscreen ? (
-              <Button
-                variant="ghost"
-                size="xs"
-                accessibilityLabel={t("composer.input.fullscreen")}
-                leftIcon={maximizeIcon}
-                onPointerDown={keepEditorFocused}
-                onPress={onEnter}
-                style={enterStyle}
-                hitSlop={8}
-              >
-                {null}
-              </Button>
-            ) : null}
+            {enterButton}
           </View>
           {fullscreen ? null : toolbar}
         </View>
@@ -147,6 +182,22 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 0,
     borderRadius: theme.borderRadius.full,
   },
+  inFlowButton: {
+    width: 44,
+    height: 44,
+    padding: 0,
+    borderWidth: 0,
+    borderRadius: theme.borderRadius.full,
+  },
+  // The expanded editor's collapse: a round filled button, top left.
+  inFlowExit: {
+    width: 44,
+    height: 44,
+    padding: 0,
+    borderWidth: 0,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.surface2,
+  },
   enterButton: {
     position: "absolute",
     top: 0,
@@ -169,3 +220,6 @@ const styles = StyleSheet.create((theme) => ({
   footer: { flexShrink: 0, gap: theme.spacing[3] },
   sendRow: { alignItems: "flex-end" },
 }));
+
+/** The fullscreen frame, shared with the Clisbot chat layout (`clisbot/composer-layout`). */
+export const composerFullscreenStyles = styles;

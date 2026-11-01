@@ -28,6 +28,16 @@ import { showProviderNoticeToast } from "@/utils/provider-notice-toast";
 import type { AgentMode } from "@clisbot/protocol/agent-types";
 import type { AgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
 import { getAgentModeIcon, getAgentModeOptionIcon } from "@/agent-controls/icons";
+import { FULL_AUTO_ACCEPT_MODE_ID } from "@clisbot/protocol/full-auto-accept";
+import { useHostFeature } from "@/runtime/host-features";
+import {
+  buildComposerModeOptions,
+  isProviderAutoAcceptOn,
+  PROVIDER_AUTO_ACCEPT_FEATURE_ID,
+  resolveComposerModeId,
+  shouldClearProviderAutoAccept,
+} from "@/clisbot/composer-picker/mode-options";
+import { COMPOSER_PICKER_ENABLED } from "@/clisbot/composer-picker/feature";
 interface ModeComboboxOptionProps {
   option: ComboboxOption;
   selected: boolean;
@@ -256,6 +266,8 @@ export function useLiveAgentModeControl(
         provider: agent.provider,
         cwd: agent.cwd,
         currentModeId: agent.currentModeId,
+        fullAutoAccept: agent.fullAutoAccept === true,
+        providerAutoAccept: isProviderAutoAcceptOn(agent.features),
       };
     }),
   );
@@ -268,6 +280,9 @@ export function useLiveAgentModeControl(
   const { updatePreferences } = useFormPreferences(serverId);
   const toast = useToast();
   const { entries: snapshotEntries } = useProvidersSnapshot(serverId, { cwd: slice?.cwd });
+  // The upstream toolbar (picker off) keeps the provider's own list and auto_accept toggle.
+  const fullAutoAcceptSupported =
+    useHostFeature(serverId, "fullAutoAccept") && COMPOSER_PICKER_ENABLED;
 
   const providerDefinitions = useMemo<AgentProviderDefinition[]>(() => {
     if (!slice?.provider) return [];
@@ -275,18 +290,28 @@ export function useLiveAgentModeControl(
     return definition ? [definition] : [];
   }, [slice?.provider, snapshotEntries]);
 
+  // Only a Host with Full auto-accept hides the provider's toggle and presents it as the mode.
+  const hiddenAutoAccept = fullAutoAcceptSupported && slice?.providerAutoAccept === true;
   const handleSelectMode = useCallback(
     (modeId: string) => {
       if (!client || !slice?.provider) return;
-      void updatePreferences((current) =>
-        mergeProviderPreferences({
-          preferences: current,
-          provider: slice.provider,
-          updates: { mode: modeId || undefined },
-        }),
-      ).catch((error) => {
-        console.warn("[AgentModeControl] persist mode preference failed", error);
-      });
+      if (shouldClearProviderAutoAccept(modeId, hiddenAutoAccept)) {
+        void client
+          .setAgentFeature(agentId, PROVIDER_AUTO_ACCEPT_FEATURE_ID, false)
+          .catch((error) => toast.error(toErrorMessage(error)));
+      }
+      // Full auto-accept is chosen for this agent, never remembered as the provider's default.
+      if (modeId !== FULL_AUTO_ACCEPT_MODE_ID) {
+        void updatePreferences((current) =>
+          mergeProviderPreferences({
+            preferences: current,
+            provider: slice.provider,
+            updates: { mode: modeId || undefined },
+          }),
+        ).catch((error) => {
+          console.warn("[AgentModeControl] persist mode preference failed", error);
+        });
+      }
       void client
         .setAgentMode(agentId, modeId)
         .then((notice) => showProviderNoticeToast(toast, notice))
@@ -295,7 +320,7 @@ export function useLiveAgentModeControl(
           toast.error(toErrorMessage(error));
         });
     },
-    [agentId, client, slice?.provider, toast, updatePreferences],
+    [agentId, client, hiddenAutoAccept, slice?.provider, toast, updatePreferences],
   );
 
   return useMemo(() => {
@@ -303,12 +328,23 @@ export function useLiveAgentModeControl(
     return {
       provider: slice.provider,
       providerDefinitions,
-      modeOptions: availableModes,
-      selectedModeId: slice.currentModeId,
+      modeOptions: buildComposerModeOptions(availableModes, fullAutoAcceptSupported),
+      // Flag off: the provider's own mode id, as the base toolbar always showed it.
+      selectedModeId: fullAutoAcceptSupported
+        ? resolveComposerModeId(slice.currentModeId, slice.fullAutoAccept, hiddenAutoAccept)
+        : slice.currentModeId,
       onSelectMode: handleSelectMode,
       disabled: !client,
     };
-  }, [availableModes, client, handleSelectMode, providerDefinitions, slice]);
+  }, [
+    availableModes,
+    client,
+    fullAutoAcceptSupported,
+    handleSelectMode,
+    hiddenAutoAccept,
+    providerDefinitions,
+    slice,
+  ]);
 }
 
 const styles = StyleSheet.create((theme) => ({

@@ -1,5 +1,10 @@
 import { expect, type Page } from "@playwright/test";
-import { readScrollMetrics, waitForContentGrowth, expectNearBottom } from "./agent-bottom-anchor";
+import {
+  readScrollMetrics,
+  waitForContentGrowth,
+  waitForScrollableChat,
+  expectNearBottom,
+} from "./agent-bottom-anchor";
 
 export async function awaitAssistantMessage(page: Page, hasText?: string | RegExp): Promise<void> {
   const messages = page.getByTestId("assistant-message");
@@ -73,6 +78,9 @@ export async function expectTurnCopyButton(page: Page): Promise<void> {
 }
 
 export async function expectScrollFollowsNewContent(page: Page): Promise<void> {
+  // Growth is only measurable once the reply overflows the list; a shorter composer leaves a
+  // taller list, so wait for that first instead of racing the stream.
+  await waitForScrollableChat(page, { minScrollableDistance: 0, timeout: 30_000 });
   const { contentHeight } = await readScrollMetrics(page);
   await waitForContentGrowth(page, contentHeight);
   await expectNearBottom(page);

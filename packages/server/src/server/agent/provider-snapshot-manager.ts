@@ -39,6 +39,7 @@ import {
   type ProviderDefinition,
 } from "./provider-registry.js";
 import { BUILTIN_PROVIDER_IDS } from "@clisbot/protocol/provider-manifest";
+import { isFullAutoAcceptMode, resolveFullAutoAcceptProviderMode } from "./full-auto-accept.js";
 import { applyMutableProviderConfigToOverrides } from "../daemon-config-store.js";
 import {
   formatProviderDiagnostic,
@@ -172,6 +173,8 @@ export interface ResolveProviderCreateConfigOptions {
 export interface ResolvedProviderCreateConfig {
   modeId: string | undefined;
   featureValues: Record<string, unknown> | undefined;
+  /** The caller asked for Full auto-accept; `modeId` is the provider mode it runs on. */
+  fullAutoAccept?: true;
 }
 
 interface ResolveDefaultModelOptions {
@@ -558,6 +561,7 @@ export class ProviderSnapshotManager {
    * provider-specific mode or feature ids.
    */
   async isUnattendedConfiguration(config: AgentSessionConfig): Promise<boolean> {
+    if (config.fullAutoAccept === true || isFullAutoAcceptMode(config.modeId)) return true;
     const entry = await this.getReadyProvider({
       provider: config.provider,
       cwd: config.cwd,
@@ -600,14 +604,19 @@ export class ProviderSnapshotManager {
     });
     const definition = this.requireProvider(input.provider);
     const parent = input.parent ? this.resolveParent(input.parent) : null;
-    return definition.resolveCreateConfig({
+    const availableModes = entry.modes ?? [];
+    const fullAutoAccept = isFullAutoAcceptMode(input.requestedMode);
+    const resolved = definition.resolveCreateConfig({
       provider: input.provider,
-      requestedMode: input.requestedMode,
+      requestedMode: fullAutoAccept
+        ? (resolveFullAutoAcceptProviderMode(availableModes, null) ?? undefined)
+        : input.requestedMode,
       featureValues: input.featureValues,
       parent,
       unattended: input.unattended || parent?.isUnattended === true,
-      availableModes: entry.modes ?? [],
+      availableModes,
     });
+    return fullAutoAccept ? { ...resolved, fullAutoAccept: true } : resolved;
   }
 
   async getProviderDiagnostic(provider: AgentProvider): Promise<ProviderDiagnosticResult> {
@@ -782,12 +791,14 @@ export class ProviderSnapshotManager {
     return {
       provider: parent.provider,
       modeId: parent.currentModeId,
-      isUnattended: definition.isCreateConfigUnattended({
-        modeId: parent.currentModeId,
-        config: parent.config,
-        features: parent.features,
-        availableModes: parent.availableModes ?? definition.modes ?? [],
-      }),
+      isUnattended:
+        parent.config.fullAutoAccept === true ||
+        definition.isCreateConfigUnattended({
+          modeId: parent.currentModeId,
+          config: parent.config,
+          features: parent.features,
+          availableModes: parent.availableModes ?? definition.modes ?? [],
+        }),
     };
   }
 
@@ -897,6 +908,7 @@ export class ProviderSnapshotManager {
           description: definition.description,
           iconSvg: definition.iconSvg,
           defaultModeId: definition.defaultModeId ?? null,
+          ...baseProviderField(provider, definitions),
         }),
       });
     }
@@ -1233,6 +1245,15 @@ function createFetchCatalogOptions(
 
 export function isGlobalProviderSnapshotKey(cwd: string): boolean {
   return cwd === GLOBAL_PROVIDER_SNAPSHOT_KEY;
+}
+
+/** The built-in a custom provider extends (`extends` names a built-in); nothing for a built-in. */
+function baseProviderField(
+  provider: AgentProvider,
+  definitions: Record<AgentProvider, ProviderDefinition>,
+): { baseProvider?: string } {
+  const base = definitions[provider]?.derivedFromProviderId;
+  return base ? { baseProvider: base } : {};
 }
 
 export function identifyEntry(entry: ProviderSnapshotEntry): ProviderSnapshotRecord {

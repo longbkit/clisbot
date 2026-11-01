@@ -1,3 +1,5 @@
+import { composerLayoutFr as composerLayout } from "./composer-layout";
+import { composerPickerFr as composerPicker } from "./composer-picker";
 import { hostQueueFr as hostQueue } from "./host-queue";
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
@@ -134,6 +136,8 @@ export const fr: TranslationResources = {
   },
   composer: {
     hostQueue,
+    picker: composerPicker,
+    layout: composerLayout,
     placeholders: {
       desktop: "Écrivez à l’agent, mentionnez des @fichiers ou utilisez les /commandes et /skills",
       mobile: "Message, @fichiers, /commandes",

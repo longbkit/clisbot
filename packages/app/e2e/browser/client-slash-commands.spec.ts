@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "../support/fixtures";
+import { expectComposerMode, expectComposerModel } from "../support/helpers/composer-picker";
 import { composerLocator, expectComposerVisible, submitMessage } from "../support/helpers/composer";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 import {
@@ -66,10 +67,8 @@ async function expectAgentArchivedInSessions(page: Page, title: string): Promise
 
 async function expectReplacementDraftMatchesPreviousSetup(page: Page): Promise<void> {
   await expectComposerVisible(page);
-  await expect(
-    page.getByRole("button", { name: "Select model (Ten second stream)" }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Select agent mode (Load test)" })).toBeVisible();
+  await expectComposerModel(page, "Ten second stream");
+  await expectComposerMode(page, "Load test");
 }
 
 async function createAgentFromReplacementDraft(page: Page): Promise<void> {

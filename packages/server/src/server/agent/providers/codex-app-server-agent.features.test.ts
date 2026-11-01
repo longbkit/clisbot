@@ -2,7 +2,11 @@ import pino from "pino";
 import { describe, expect, test } from "vitest";
 
 import type { AgentSession, AgentSessionConfig } from "../agent-sdk-types.js";
-import { CodexAppServerAgentSession } from "./codex-app-server-agent.js";
+import {
+  CodexAppServerAgentClient,
+  CodexAppServerAgentSession,
+  probeCodexPlanCollaborationMode,
+} from "./codex-app-server-agent.js";
 import {
   createFakeCodexAppServer,
   type FakeCodexAppServer,
@@ -98,21 +102,33 @@ function createConfig(overrides: Partial<AgentSessionConfig> = {}): AgentSession
   };
 }
 
+interface SessionHarnessOptions {
+  logger?: pino.Logger;
+  models?: unknown[];
+  collaborationModes?: CollaborationModeRecord[];
+  resumeMetadata?: Record<string, unknown>;
+}
+
 function createSessionHarness(
   configOverrides: Partial<AgentSessionConfig> = {},
-  options: { logger?: pino.Logger; models?: unknown[] } = {},
+  options: SessionHarnessOptions = {},
 ): {
   session: CodexFeaturesTestSession;
   appServer: FakeCodexAppServer;
 } {
   const config = createConfig(configOverrides);
   const appServer = createFakeCodexAppServer({
-    "collaborationMode/list": () => ({ data: TEST_COLLABORATION_MODES }),
+    "collaborationMode/list": () => ({
+      data: options.collaborationModes ?? TEST_COLLABORATION_MODES,
+    }),
     "model/list": () => ({ data: options.models ?? TEST_SPEED_MODELS }),
   });
+  const resumeHandle = options.resumeMetadata
+    ? { sessionId: "thread-restored", metadata: options.resumeMetadata }
+    : null;
   const session = new CodexAppServerAgentSession(
     { ...config, provider: CODEX_PROVIDER },
-    null,
+    resumeHandle,
     options.logger ?? createTestLogger(),
     async () => appServer.child,
   ) as CodexFeaturesTestSession;
@@ -121,7 +137,7 @@ function createSessionHarness(
 
 async function createConnectedSession(
   configOverrides: Partial<AgentSessionConfig> = {},
-  options: { logger?: pino.Logger; models?: unknown[] } = {},
+  options: SessionHarnessOptions = {},
 ): Promise<{
   session: CodexFeaturesTestSession;
   appServer: FakeCodexAppServer;
@@ -131,6 +147,50 @@ async function createConnectedSession(
   harness.appServer.assertNoErrors();
   return harness;
 }
+
+describe("Codex plan probe", () => {
+  test("offers no Plan, and never fails, when the probe cannot reach Codex", async () => {
+    const client = {
+      request: async () => {
+        throw new Error("transport closed");
+      },
+    };
+    await expect(probeCodexPlanCollaborationMode(client, createTestLogger())).resolves.toBe(false);
+  });
+});
+
+describe("Codex provider catalog modes", () => {
+  async function catalogModeIds(collaborationModes: CollaborationModeRecord[]): Promise<string[]> {
+    const appServer = createFakeCodexAppServer({
+      "collaborationMode/list": () => ({ data: collaborationModes }),
+    });
+    const client = new CodexAppServerAgentClient(createTestLogger(), {
+      command: { mode: "replace", argv: ["/nonexistent/codex-binary-that-does-not-exist"] },
+    });
+    Object.assign(client, { spawnAppServer: async () => appServer.child });
+    const catalog = await client.fetchCatalog({
+      scope: "workspace",
+      cwd: "/tmp/codex-catalog-modes",
+      force: false,
+    });
+    return catalog.modes.map((mode) => mode.id);
+  }
+
+  test("lists Plan first when Codex offers a plan collaboration mode", async () => {
+    await expect(catalogModeIds(TEST_COLLABORATION_MODES)).resolves.toEqual([
+      "plan",
+      "auto",
+      "full-access",
+    ]);
+  });
+
+  test("leaves Plan out when Codex offers no plan collaboration mode", async () => {
+    await expect(catalogModeIds([{ name: "Code", mode: "code" }])).resolves.toEqual([
+      "auto",
+      "full-access",
+    ]);
+  });
+});
 
 describe("Codex app-server provider features", () => {
   test("GPT-6.1 Sol offers catalog speed tiers and sends Ultrafast", async () => {
@@ -341,7 +401,7 @@ describe("Codex app-server provider features", () => {
       featureValues: { fast_mode: true },
     });
     try {
-      expect(session.features.map((feature) => feature.id)).toEqual(["plan_mode"]);
+      expect(session.features).toEqual([]);
       await expect(session.setFeature?.("fast_mode", true)).rejects.toThrow(
         `Codex fast mode is not available for model '${model}'`,
       );
@@ -378,53 +438,21 @@ describe("Codex app-server provider features", () => {
     }
   });
 
-  test("features returns speed selector and plan toggle when supported", async () => {
+  test("features returns only the speed selector", async () => {
     const { session } = await createConnectedSession();
 
-    expect(session.features).toEqual([
-      speedFeature("default"),
-      {
-        type: "toggle",
-        id: "plan_mode",
-        label: "Plan",
-        description: "Switch Codex into planning-only collaboration mode",
-        tooltip: "Toggle plan mode",
-        icon: "list-todo",
-        value: false,
-      },
-    ]);
+    expect(session.features).toEqual([speedFeature("default")]);
 
     await session.setFeature?.("service_tier", "priority");
-    await session.setFeature?.("plan_mode", true);
+    await session.setMode("plan");
 
-    expect(session.features).toEqual([
-      speedFeature("priority"),
-      {
-        type: "toggle",
-        id: "plan_mode",
-        label: "Plan",
-        description: "Switch Codex into planning-only collaboration mode",
-        tooltip: "Toggle plan mode",
-        icon: "list-todo",
-        value: true,
-      },
-    ]);
+    expect(session.features).toEqual([speedFeature("priority")]);
   });
 
-  test("features returns only plan toggle when model does not support fast mode", async () => {
+  test("features is empty when the model does not support fast mode", async () => {
     const { session } = await createConnectedSession({ model: "gpt-3.5-turbo" });
 
-    expect(session.features).toEqual([
-      {
-        type: "toggle",
-        id: "plan_mode",
-        label: "Plan",
-        description: "Switch Codex into planning-only collaboration mode",
-        tooltip: "Toggle plan mode",
-        icon: "list-todo",
-        value: false,
-      },
-    ]);
+    expect(session.features).toEqual([]);
   });
 
   test("constructor ignores restored fast mode when model does not support it", async () => {
@@ -433,17 +461,7 @@ describe("Codex app-server provider features", () => {
       featureValues: { fast_mode: true },
     });
 
-    expect(session.features).toEqual([
-      {
-        type: "toggle",
-        id: "plan_mode",
-        label: "Plan",
-        description: "Switch Codex into planning-only collaboration mode",
-        tooltip: "Toggle plan mode",
-        icon: "list-todo",
-        value: false,
-      },
-    ]);
+    expect(session.features).toEqual([]);
 
     await session.startTurn("hello");
     await expect(appServer.waitForTurnStart()).resolves.toMatchObject({
@@ -483,16 +501,17 @@ describe("Codex app-server provider features", () => {
     );
   });
 
-  test("setFeature invalidates runtime info", async () => {
+  test("selecting Plan invalidates runtime info", async () => {
     const { session } = await createConnectedSession();
 
     await expect(session.getRuntimeInfo()).resolves.not.toMatchObject({
       extra: { collaborationMode: "Plan" },
     });
 
-    await session.setFeature?.("plan_mode", true);
+    await session.setMode("plan");
 
     await expect(session.getRuntimeInfo()).resolves.toMatchObject({
+      modeId: "plan",
       extra: { collaborationMode: "Plan" },
     });
   });
@@ -505,23 +524,13 @@ describe("Codex app-server provider features", () => {
     );
   });
 
-  test("constructor restores feature flags from config.featureValues", async () => {
+  test("constructor restores Fast and legacy plan_mode from config.featureValues", async () => {
     const { session, appServer } = await createConnectedSession({
       featureValues: { fast_mode: true, plan_mode: true },
     });
 
-    expect(session.features).toEqual([
-      speedFeature("priority"),
-      {
-        type: "toggle",
-        id: "plan_mode",
-        label: "Plan",
-        description: "Switch Codex into planning-only collaboration mode",
-        tooltip: "Toggle plan mode",
-        icon: "list-todo",
-        value: true,
-      },
-    ]);
+    expect(session.features).toEqual([speedFeature("priority")]);
+    await expect(session.getCurrentMode()).resolves.toBe("plan");
 
     await session.startTurn("hello");
     await expect(appServer.waitForTurnStart()).resolves.toMatchObject({
@@ -573,22 +582,200 @@ describe("Codex app-server provider features", () => {
     await session.setFeature?.("service_tier", "priority");
     await session.setModel("gpt-3.5-turbo");
 
-    expect(session.features).toEqual([
-      {
-        type: "toggle",
-        id: "plan_mode",
-        label: "Plan",
-        description: "Switch Codex into planning-only collaboration mode",
-        tooltip: "Toggle plan mode",
-        icon: "list-todo",
-        value: false,
-      },
-    ]);
+    expect(session.features).toEqual([]);
     await session.startTurn("hello");
 
     await expect(appServer.waitForTurnStart()).resolves.toMatchObject({
       serviceTier: "default",
     });
+  });
+
+  test("Plan joins the Mode list before the permission modes instead of being a toggle", async () => {
+    const { session } = await createConnectedSession();
+    try {
+      const modes = await session.getAvailableModes();
+      expect(modes.map((mode) => mode.id)).toEqual(["plan", "auto", "full-access"]);
+      expect(modes[0]).toMatchObject({ id: "plan", label: "Plan" });
+      expect(session.features.map((feature) => feature.id)).toEqual(["service_tier"]);
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("Plan is absent when Codex offers no plan collaboration mode", async () => {
+    const { session } = await createConnectedSession(
+      {},
+      { collaborationModes: [{ name: "Code", mode: "code" }] },
+    );
+    try {
+      const modes = await session.getAvailableModes();
+      expect(modes.map((mode) => mode.id)).toEqual(["auto", "full-access"]);
+      await expect(session.setMode("plan")).rejects.toThrow("plan");
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("a session started in Plan leaves it when Codex offers no plan collaboration mode", async () => {
+    const { session, appServer } = await createConnectedSession(
+      { modeId: "plan" },
+      {
+        collaborationModes: [{ name: "Code", mode: "code" }],
+        resumeMetadata: { modeId: "plan", permissionModeId: "full-access" },
+      },
+    );
+    try {
+      await expect(session.getCurrentMode()).resolves.toBe("full-access");
+      await session.startTurn("hello");
+      await expect(appServer.waitForTurnStart()).resolves.toMatchObject({
+        approvalPolicy: "never",
+        collaborationMode: expect.objectContaining({ mode: "code" }),
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("selecting Plan turns on plan collaboration and keeps the chosen permission", async () => {
+    const { session, appServer } = await createConnectedSession({ modeId: "full-access" });
+    try {
+      await session.setMode("plan");
+      await expect(session.getCurrentMode()).resolves.toBe("plan");
+      await session.startTurn("hello");
+      await expect(appServer.waitForTurnStart()).resolves.toMatchObject({
+        approvalPolicy: "never",
+        sandboxPolicy: expect.objectContaining({ type: "dangerFullAccess" }),
+        collaborationMode: expect.objectContaining({ mode: "plan" }),
+      });
+      expect(session.describePersistence()?.metadata).toMatchObject({
+        modeId: "plan",
+        permissionModeId: "full-access",
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("selecting a permission mode turns plan off and applies that permission", async () => {
+    const { session, appServer } = await createConnectedSession({ modeId: "full-access" });
+    try {
+      await session.setMode("plan");
+      await session.setMode("auto");
+      await expect(session.getCurrentMode()).resolves.toBe("auto");
+      await session.startTurn("hello");
+      await expect(appServer.waitForTurnStart()).resolves.toMatchObject({
+        approvalPolicy: "on-request",
+        collaborationMode: expect.objectContaining({ mode: "code" }),
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("legacy setFeature plan_mode maps to the Plan mode", async () => {
+    const { session, appServer } = await createConnectedSession({ modeId: "full-access" });
+    try {
+      await session.setFeature?.("plan_mode", true);
+      await expect(session.getCurrentMode()).resolves.toBe("plan");
+      await session.setFeature?.("plan_mode", false);
+      await expect(session.getCurrentMode()).resolves.toBe("full-access");
+      await session.startTurn("hello");
+      await expect(appServer.waitForTurnStart()).resolves.toMatchObject({
+        approvalPolicy: "never",
+        collaborationMode: expect.objectContaining({ mode: "code" }),
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("a session saved with featureValues.plan_mode restores as mode plan", async () => {
+    const { session, appServer } = await createConnectedSession({
+      modeId: "full-access",
+      featureValues: { plan_mode: true },
+    });
+    try {
+      await expect(session.getCurrentMode()).resolves.toBe("plan");
+      expect(session.features.map((feature) => feature.id)).toEqual(["service_tier"]);
+      await session.startTurn("hello");
+      await expect(appServer.waitForTurnStart()).resolves.toMatchObject({
+        approvalPolicy: "never",
+        collaborationMode: expect.objectContaining({ mode: "plan" }),
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("a session saved in Plan restores Plan over its remembered permission", async () => {
+    const { session, appServer } = await createConnectedSession(
+      { modeId: "plan" },
+      { resumeMetadata: { modeId: "plan", permissionModeId: "full-access" } },
+    );
+    try {
+      await expect(session.getCurrentMode()).resolves.toBe("plan");
+      await session.setMode("full-access");
+      await session.startTurn("hello");
+      await expect(appServer.waitForTurnStart()).resolves.toMatchObject({
+        approvalPolicy: "never",
+        collaborationMode: expect.objectContaining({ mode: "code" }),
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("a stale plan_mode flag does not override a mode saved by this daemon", async () => {
+    const { session } = await createConnectedSession(
+      { modeId: "auto", featureValues: { plan_mode: true } },
+      { resumeMetadata: { modeId: "auto", permissionModeId: "auto" } },
+    );
+    try {
+      await expect(session.getCurrentMode()).resolves.toBe("auto");
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("picks the plan collaboration mode by its mode value before its name", async () => {
+    const { session, appServer } = await createConnectedSession(
+      {},
+      {
+        collaborationModes: [
+          { name: "Read-heavy review", mode: "code", developer_instructions: "review" },
+          { name: "Architect", mode: "plan", developer_instructions: "architect" },
+        ],
+      },
+    );
+    try {
+      await session.setMode("plan");
+      await session.startTurn("hello");
+      await expect(appServer.waitForTurnStart()).resolves.toMatchObject({
+        collaborationMode: {
+          mode: "plan",
+          settings: expect.objectContaining({ developer_instructions: "architect" }),
+        },
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("falls back to the name match when Codex returns no mode values", async () => {
+    const { session, appServer } = await createConnectedSession(
+      {},
+      { collaborationModes: [{ name: "Code" }, { name: "Plan" }] },
+    );
+    try {
+      expect((await session.getAvailableModes()).map((mode) => mode.id)).toContain("plan");
+      await session.setMode("plan");
+      await session.startTurn("hello");
+      await expect(appServer.waitForTurnStart()).resolves.toMatchObject({
+        collaborationMode: expect.objectContaining({ mode: "plan" }),
+      });
+    } finally {
+      await session.close();
+    }
   });
 
   test("startTurn switches collaboration mode when plan mode is enabled", async () => {

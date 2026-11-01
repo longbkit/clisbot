@@ -1,5 +1,12 @@
 import { expect, type Page } from "@playwright/test";
 import { escapeRegex } from "./regex";
+import {
+  closeComposerPicker,
+  composerPickerPanel,
+  openComposerPicker,
+  searchComposerPicker,
+  selectComposerMode,
+} from "./composer-picker";
 
 export const gotoAppShell = async (page: Page) => {
   await page.goto("/");
@@ -318,97 +325,30 @@ export const selectProvider = async (page: Page, provider: string) => {
   await option.click();
 };
 
+/** Picks a model by id or label in the composer's options panel, then closes the panel. */
 export const selectModel = async (page: Page, model: string) => {
   const normalizedModel = model.trim();
   if (!normalizedModel) {
     throw new Error("Model must be a non-empty string.");
   }
-
-  const modelTrigger = page
-    .locator(
-      '[data-testid="agent-model-selector"]:visible, [data-testid="draft-model-select"]:visible',
-    )
-    .first();
-  if (
-    await modelTrigger
-      .getByText(new RegExp(`^${escapeRegex(normalizedModel)}$`, "i"))
-      .first()
-      .isVisible()
-      .catch(() => false)
-  ) {
-    return;
-  }
-
-  if (await modelTrigger.isVisible().catch(() => false)) {
-    await modelTrigger.click();
-  } else {
-    const modelButton = page
-      .getByRole("button", { name: /Select model/i })
-      .filter({ visible: true })
-      .first();
-    if (await modelButton.isVisible().catch(() => false)) {
-      await modelButton.click();
-    } else {
-      const modelLabel = page.getByText("MODEL", { exact: true }).first();
-      await expect(modelLabel).toBeVisible();
-      await modelLabel.click();
-    }
-  }
-
-  // Wait for the model dropdown to open
-  const searchInput = page.getByRole("textbox", { name: /search model/i });
-  await expect(searchInput).toBeVisible({ timeout: 10000 });
-
-  // Type to search/filter models
-  await searchInput.fill(normalizedModel);
-
-  const dialog = page.getByRole("dialog");
-  const exactOption = dialog
-    .getByText(new RegExp(`^${escapeRegex(normalizedModel)}$`, "i"))
-    .first();
-  // Model IDs and display labels differ. Wait for the requested row rather than
-  // confirming the previous search result before the filtered list has rendered.
-  const modelOption = dialog
-    .getByTestId(new RegExp(`^model-row-.+-${escapeRegex(normalizedModel)}$`))
-    .or(exactOption)
-    .first();
-  await expect(modelOption).toBeVisible();
-  const selectedLabel = (await modelOption.innerText()).split("\n")[0].trim();
-  await modelOption.click();
-  await expect(searchInput).not.toBeVisible({ timeout: 5000 });
-  await expect(
-    page.getByTestId("combined-model-selector").filter({ visible: true }).first(),
-  ).toHaveAccessibleName(new RegExp(escapeRegex(selectedLabel)));
+  await openComposerPicker(page);
+  await searchComposerPicker(page, normalizedModel);
+  const panel = composerPickerPanel(page);
+  const byId = panel.locator(
+    `[data-testid$=":${normalizedModel}"][data-testid^="composer-picker-model-"]`,
+  );
+  const byLabel = panel
+    .locator('[data-testid^="composer-picker-model-"]')
+    .filter({ hasText: new RegExp(`^${escapeRegex(normalizedModel)}`, "i") });
+  const row = byId.or(byLabel).first();
+  await expect(row).toBeVisible();
+  await row.click();
+  await closeComposerPicker(page);
 };
 
+/** Picks a mode from the composer's Mode dropdown. */
 export const selectMode = async (page: Page, mode: string) => {
-  const modeTrigger = page
-    .locator(
-      '[data-testid="agent-mode-selector"]:visible, [data-testid="draft-mode-select"]:visible',
-    )
-    .first();
-  if (await modeTrigger.isVisible().catch(() => false)) {
-    await modeTrigger.click();
-  } else {
-    const modeLabel = page.getByText("MODE", { exact: true }).first();
-    await expect(modeLabel).toBeVisible();
-    await modeLabel.click();
-  }
-
-  // Wait for the mode dropdown to open
-  const searchInput = page.getByRole("textbox", { name: /search mode/i });
-  await expect(searchInput).toBeVisible({ timeout: 10000 });
-
-  // Type to filter modes
-  await searchInput.fill(mode);
-
-  const dialog = page.getByRole("dialog");
-  const option = dialog.getByText(new RegExp(`^${escapeRegex(mode)}$`, "i")).first();
-  await expect(option).toBeVisible();
-  await option.click({ force: true });
-
-  // Wait for dropdown to close
-  await expect(searchInput).not.toBeVisible({ timeout: 5000 });
+  await selectComposerMode(page, mode);
 };
 
 export const createAgentWithConfig = async (page: Page, config: AgentConfig) => {

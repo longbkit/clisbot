@@ -56,7 +56,7 @@ clisbot run --provider codex "implement OAuth"
 clisbot run --host devbox:6767 "run the test suite"
 clisbot ls
 clisbot send <agent-id> "add tests"
-clisbot schedule create --cron "0 9 * * 1" "audit the codebase"
+clisbot schedule create --provider codex --mode auto-review --cron "0 9 * * 1" "audit the codebase"
 ```
 
 `clisbot run --host` 连接到远程 daemon。`clisbot schedule` 按 cron 运行 Agent。

@@ -1,4 +1,5 @@
 import { AGENT_PROVIDER_DEFINITIONS } from "@clisbot/protocol/provider-manifest";
+import { usesFasterTier } from "@clisbot/protocol/speed-tier";
 import type { AgentConfigurationGrant } from "../access/contract.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import { literalText } from "./command-reply-format.js";
@@ -249,7 +250,7 @@ async function configurationMenu(input: ConfigurationCommandInput, query: string
     for (const profile of await daemon.listAgentProfiles()) {
       const resolved = effectiveLiveConfiguration(input, await profileConfig(input, profile));
       if (
-        (resolved.featureValues?.["fast_mode"] !== true || input.canUseFastMode === true) &&
+        (!usesFasterTier(resolved.featureValues) || input.canUseFastMode === true) &&
         allows(access, resolved.provider, resolved.model, resolved.thinkingOptionId)
       )
         options.push(
@@ -408,8 +409,8 @@ async function validatePermissionAndFeatureAuthority(
   canSuppressApprovals: boolean,
   canUseFastMode: boolean,
 ): Promise<void> {
-  if (config.featureValues?.["fast_mode"] === true && !canUseFastMode)
-    throw new Error("Fast mode requires agent.fast.use access.");
+  if (usesFasterTier(config.featureValues) && !canUseFastMode)
+    throw new Error("A faster tier requires agent.fast.use access.");
   const modes = await daemon.listProviderModes(config.provider, config.cwd);
   const provider = AGENT_PROVIDER_DEFINITIONS.find((entry) => entry.id === config.provider);
   const modeId = config.modeId ?? provider?.defaultModeId;

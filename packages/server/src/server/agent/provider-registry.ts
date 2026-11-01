@@ -56,7 +56,13 @@ import {
   DEV_AGENT_PROVIDER_DEFINITIONS,
   getAgentProviderDefinition,
   type AgentProviderDefinition,
+  type AgentProviderModeDefinition,
 } from "@clisbot/protocol/provider-manifest";
+import {
+  normalizeProviderModes,
+  normalizeProviderModesEvent,
+  staticProviderModes,
+} from "./provider-modes.js";
 
 function isNonEmptyStringArray(value: string[]): value is [string, ...string[]] {
   return value.length > 0;
@@ -456,7 +462,11 @@ function mergeModelAdditions(
 // Every session member must cross this boundary, including optional capabilities.
 type ForwardedAgentSession = { [K in keyof Required<AgentSession>]: AgentSession[K] };
 
-export function wrapSessionProvider(provider: AgentProvider, inner: AgentSession): AgentSession {
+export function wrapSessionProvider(
+  provider: AgentProvider,
+  inner: AgentSession,
+  definitionModes: readonly AgentProviderModeDefinition[] = [],
+): AgentSession {
   return {
     provider,
     get id() {
@@ -475,14 +485,18 @@ export function wrapSessionProvider(provider: AgentProvider, inner: AgentSession
     run: (prompt, options) => inner.run(prompt, options),
     startTurn: (prompt, options) => inner.startTurn(prompt, options),
     steerActiveTurn: inner.steerActiveTurn?.bind(inner),
-    subscribe: (callback) => inner.subscribe((event) => callback(mapStreamEvent(provider, event))),
+    subscribe: (callback) =>
+      inner.subscribe((event) =>
+        callback(normalizeProviderModesEvent(mapStreamEvent(provider, event), definitionModes)),
+      ),
     async *streamHistory() {
       for await (const event of inner.streamHistory()) {
         yield mapStreamEvent(provider, event);
       }
     },
     getRuntimeInfo: async () => mapRuntimeInfo(provider, await inner.getRuntimeInfo()),
-    getAvailableModes: () => inner.getAvailableModes(),
+    getAvailableModes: async () =>
+      normalizeProviderModes(await inner.getAvailableModes(), definitionModes),
     getCurrentMode: () => inner.getCurrentMode(),
     setMode: (modeId) => inner.setMode(modeId),
     getPendingPermissions: () => inner.getPendingPermissions(),
@@ -511,6 +525,7 @@ function wrapClientProvider(
   additionalModels: ProviderProfileModel[],
   profileModelsAreAdditive: boolean,
   providerOptions: ProviderOptions | undefined,
+  definitionModes: readonly AgentProviderModeDefinition[],
 ): AgentClient {
   const listImportableSessions = inner.listImportableSessions?.bind(inner);
   const importSession = inner.importSession?.bind(inner);
@@ -537,6 +552,7 @@ function wrapClientProvider(
           launchContext,
           { ...options, configuredModelIds },
         ),
+        definitionModes,
       ),
     resumeSession: async (handle, overrides, launchContext, options) =>
       wrapSessionProvider(
@@ -554,6 +570,7 @@ function wrapClientProvider(
           launchContext,
           { ...options, configuredModelIds },
         ),
+        definitionModes,
       ),
     fetchCatalog: async (options, context) => {
       const catalog = await inner.fetchCatalog({ ...options, providerOptions }, context);
@@ -614,7 +631,7 @@ function wrapClientProvider(
           }
           return {
             ...imported,
-            session: wrapSessionProvider(provider, imported.session),
+            session: wrapSessionProvider(provider, imported.session, definitionModes),
             config: {
               ...imported.config,
               provider,
@@ -654,15 +671,7 @@ function createRegistryEntry(
     : [];
 
   const decorateModes = (modes: AgentMode[]): AgentMode[] =>
-    modes.map((mode) => {
-      if (mode.icon && mode.colorTier) return mode;
-      const definitionMode = resolved.definition.modes.find((d) => d.id === mode.id);
-      if (!definitionMode) return mode;
-      return Object.assign({}, mode, {
-        icon: mode.icon ?? definitionMode.icon,
-        colorTier: mode.colorTier ?? definitionMode.colorTier,
-      });
-    });
+    normalizeProviderModes(modes, resolved.definition.modes);
 
   const hasStaticModes = resolved.definition.modes.length > 0;
 
@@ -715,7 +724,7 @@ function createRegistryEntry(
           );
           return {
             models,
-            modes: decorateModes(resolved.definition.modes),
+            modes: decorateModes(staticProviderModes(resolved.definition.modes)),
             defaultModeId,
           };
         }
@@ -750,6 +759,7 @@ function createResolvedProviderClient(
     additionalModels,
     resolved.profileModelsAreAdditive,
     resolved.providerOptions,
+    resolved.definition.modes,
   );
 }
 

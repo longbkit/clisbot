@@ -117,6 +117,8 @@ export interface ComboboxProps {
   mobileChildrenScrollEnabled?: boolean;
   /** Let custom desktop children own scrolling, for example a virtualized list. */
   desktopChildrenScrollEnabled?: boolean;
+  /** Custom children without options handle ArrowUp and ArrowDown themselves (Clisbot model picker). */
+  desktopArrowKeysToChildren?: boolean;
   /** Overrides the mobile scroll container spacing for custom child content. */
   mobileChildrenContentContainerStyle?: StyleProp<ViewStyle>;
   presentation?: "push" | "replace";
@@ -245,6 +247,8 @@ export interface ComboboxItemProps {
   accessibilityLabel?: string;
   /** When true, bumps hover/pressed colors up one surface level (for items on elevated backgrounds). */
   elevated?: boolean;
+  /** At least 44px tall for a thumb, as in a phone sheet; desktop rows keep their height. */
+  touch?: boolean;
   onPress: () => void;
   testID?: string;
 }
@@ -261,6 +265,7 @@ export function ComboboxItem({
   disabled,
   accessibilityLabel,
   elevated,
+  touch,
   onPress,
   testID,
 }: ComboboxItemProps): ReactElement {
@@ -286,12 +291,13 @@ export function ComboboxItem({
   const itemPressableStyle = useCallback(
     ({ pressed, hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.comboboxItem,
+      touch && styles.comboboxItemTouch,
       hovered && (elevated ? styles.comboboxItemHoveredElevated : styles.comboboxItemHovered),
       pressed && (elevated ? styles.comboboxItemPressedElevated : styles.comboboxItemPressed),
       active && styles.comboboxItemActive,
       disabled && styles.comboboxItemDisabled,
     ],
-    [elevated, active, disabled],
+    [elevated, active, disabled, touch],
   );
 
   const itemContentStyle = useMemo(
@@ -557,6 +563,7 @@ interface DesktopKeyHandlerInput {
   setActiveIndex: React.Dispatch<React.SetStateAction<number>>;
   handleSelect: (id: string) => void;
   handleClose: () => void;
+  arrowKeysToChildren: boolean;
 }
 
 function handleDesktopArrowKey(input: DesktopKeyHandlerInput, key: "ArrowDown" | "ArrowUp") {
@@ -902,6 +909,8 @@ function dispatchDesktopKey(
   if (!IS_WEB && input.isMobile) return false;
 
   if (key === "ArrowDown" || key === "ArrowUp") {
+    // Opted in: custom children with no options of the Combobox's own take the arrows.
+    if (input.arrowKeysToChildren && input.orderedVisibleOptions.length === 0) return false;
     event?.preventDefault();
     handleDesktopArrowKey(input, key);
     return true;
@@ -1318,6 +1327,7 @@ export function Combobox({
   header,
   mobileChildrenScrollEnabled = true,
   desktopChildrenScrollEnabled = true,
+  desktopArrowKeysToChildren = false,
   mobileChildrenContentContainerStyle,
   presentation,
   open,
@@ -1586,12 +1596,21 @@ export function Combobox({
           setActiveIndex,
           handleSelect,
           handleClose,
+          arrowKeysToChildren: desktopArrowKeysToChildren,
         },
         key,
         event,
       );
     },
-    [activeIndex, handleClose, handleSelect, isMobile, isOpen, orderedVisibleOptions],
+    [
+      activeIndex,
+      desktopArrowKeysToChildren,
+      handleClose,
+      handleSelect,
+      isMobile,
+      isOpen,
+      orderedVisibleOptions,
+    ],
   );
 
   useDismissKeyboardOnOpen(isOpen, isMobile);
@@ -1737,6 +1756,9 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[3],
     color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
+  },
+  comboboxItemTouch: {
+    minHeight: 44,
   },
   comboboxItem: {
     flexDirection: "row",

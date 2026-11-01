@@ -3,6 +3,7 @@ import { Pressable, Text, View, type PressableStateCallbackType } from "react-na
 import type { StyleProp, TextStyle, ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
+  CONTROL_HEIGHTS,
   createControlGeometry,
   segmentedIconSize,
   type SegmentedControlSize,
@@ -42,6 +43,8 @@ interface SegmentedControlProps<T extends string> {
   style?: StyleProp<ViewStyle>;
   /** Names the control as a whole, so its segments and trailing menu read as one control. */
   accessibilityLabel?: string;
+  /** Segments at least 44px tall for a thumb, as in a phone sheet. */
+  touch?: boolean;
   testID?: string;
 }
 
@@ -109,6 +112,7 @@ export function SegmentedControl<T extends string>({
   trailing,
   style,
   accessibilityLabel,
+  touch = false,
   testID,
 }: SegmentedControlProps<T>) {
   const containerSizeStyle = {
@@ -145,6 +149,7 @@ export function SegmentedControl<T extends string>({
             variant={variant}
             currentValue={value}
             onValueChange={onValueChange}
+            touch={touch}
           />
         );
       })}
@@ -162,6 +167,7 @@ function SegmentItem<T extends string>({
   variant,
   currentValue,
   onValueChange,
+  touch,
 }: {
   option: SegmentedControlOption<T>;
   isSelected: boolean;
@@ -171,6 +177,7 @@ function SegmentItem<T extends string>({
   variant: SegmentedControlVariant;
   currentValue: T;
   onValueChange: (value: T) => void;
+  touch: boolean;
 }) {
   const labelStyle = useMemo(
     () => segmentedLabelStyle({ size, selected: isSelected, variant }),
@@ -182,7 +189,7 @@ function SegmentItem<T extends string>({
     }
   }, [option.disabled, option.value, currentValue, onValueChange]);
   const pressableStyle = useCallback(
-    ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) =>
+    ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
       segmentedSegmentStyle({
         size,
         variant,
@@ -191,7 +198,9 @@ function SegmentItem<T extends string>({
         pressed,
         disabled: option.disabled,
       }),
-    [isSelected, option.disabled, size, variant],
+      touch && styles.segmentTouch,
+    ],
+    [isSelected, option.disabled, size, touch, variant],
   );
   const accessibilityState = useMemo(
     () => ({ selected: isSelected, disabled: option.disabled }),
@@ -269,6 +278,9 @@ const styles = StyleSheet.create((theme) => {
     },
     segmentMd: {
       ...geometry.segmentedSegmentMd,
+    },
+    segmentTouch: {
+      minHeight: CONTROL_HEIGHTS.field,
     },
     segmentSelected: {
       backgroundColor: theme.colors.surface3,

@@ -3,6 +3,14 @@ import {
   PendingEventBudgetError,
 } from "./session-storage/pending-event-budget.js";
 import { readConnectorsOff, skillsInOffList } from "@clisbot/protocol/connectors/types";
+import {
+  FULL_AUTO_ACCEPT_RESPONSE,
+  AUTO_ACCEPT_FAILED_METADATA,
+  DAEMON_PERMISSION_METADATA,
+  isFullAutoAcceptMode,
+  resolveFullAutoAcceptProviderMode,
+  isDaemonAutoAccepted,
+} from "./full-auto-accept.js";
 import { CommittedEventOutbox } from "./session-storage/committed-event-outbox.js";
 import { currentSessionOperationIdentity } from "./session-operation-context.js";
 import { isDeepStrictEqual } from "node:util";
@@ -166,7 +174,6 @@ function assertMcpServersSupported(
 }
 
 /** Marks a permission request the daemon raised, so its answer never reaches the provider. */
-const DAEMON_PERMISSION_METADATA = "clisbotDaemonPermission";
 const DAEMON_PERMISSION_TIMEOUT_MS = 15 * 60_000;
 
 /** Runtime-only MCP servers for one launch, and the tools on them that need no prompt. */
@@ -299,6 +306,7 @@ function buildStoredAgentConfig(record: StoredAgentRecord): AgentSessionConfig {
     config.providerOptions = record.config.providerOptions;
   }
   if (record.config.toolPolicy != null) config.toolPolicy = record.config.toolPolicy;
+  if (record.config.fullAutoAccept) config.fullAutoAccept = true;
   if (record.config.systemPrompt != null) {
     config.systemPrompt = record.config.systemPrompt;
   }
@@ -931,6 +939,8 @@ export class AgentManager {
   private readonly appliedSkillsOff = new Map<string, string>();
   private readonly skillsRefreshes = new Map<string, Promise<void>>();
   /** Request id → the agent it is on and what settles the daemon's wait for the person's answer. */
+  /** `agentId:requestId` of automatic approvals in flight, so none is sent twice. */
+  private readonly autoAcceptsInFlight = new Set<string>();
   private readonly daemonPermissionWaiters = new Map<
     string,
     { agentId: string; settle: (response: AgentPermissionResponse) => void }
@@ -2648,15 +2658,25 @@ export class AgentManager {
 
   async setAgentMode(agentId: string, modeId: string): Promise<AgentProviderNotice | null> {
     const agent = this.requireSessionAgent(agentId);
-    const notice = (await agent.session.setMode(modeId)) ?? null;
+    const fullAutoAccept = isFullAutoAcceptMode(modeId);
+    const providerModeId = fullAutoAccept
+      ? resolveFullAutoAcceptProviderMode(agent.availableModes, agent.currentModeId)
+      : modeId;
+    const keepsProviderMode =
+      providerModeId === null || (fullAutoAccept && providerModeId === agent.currentModeId);
+    const notice = keepsProviderMode
+      ? null
+      : ((await agent.session.setMode(providerModeId)) ?? null);
     await this.drainSessionEvents(agentId);
-    const currentMode = (await agent.session.getCurrentMode()) ?? modeId;
+    const currentMode = (await agent.session.getCurrentMode()) ?? providerModeId;
     agent.config.modeId = currentMode ?? undefined;
     agent.currentModeId = currentMode;
     // Update runtimeInfo to reflect the new mode
     if (agent.runtimeInfo) {
       agent.runtimeInfo = { ...agent.runtimeInfo, modeId: currentMode };
     }
+    this.applyFullAutoAccept(agent, fullAutoAccept);
+    this.refreshSessionPersistence(agent);
     this.touchUpdatedAt(agent);
     this.emitState(agent);
     return notice;
@@ -4139,9 +4159,12 @@ export class AgentManager {
     return Array.from(agent.pendingPermissions.values());
   }
 
+  /** The first request waiting for a person; one Full auto-accept answers is not waiting. */
   private peekPendingPermission(agent: ManagedAgent): AgentPermissionRequest | null {
-    const iterator = agent.pendingPermissions.values().next();
-    return iterator.done ? null : iterator.value;
+    for (const request of agent.pendingPermissions.values()) {
+      if (!this.daemonAutoAccepts(agent, request)) return request;
+    }
+    return null;
   }
 
   /**
@@ -4433,6 +4456,9 @@ export class AgentManager {
 
           if (event.type === "agent_stream") {
             if (event.event.type === "permission_requested") {
+              const owner = this.agents.get(agentId);
+              // Full auto-accept answers it; the wait continues to the turn's end.
+              if (owner && this.daemonAutoAccepts(owner, event.event.request)) return;
               finish(event.event.request);
               return;
             }
@@ -5243,6 +5269,10 @@ export class AgentManager {
       agent.pendingPermissions = new Map(
         [...pending, ...daemonCards].map((request) => [request.id, request]),
       );
+      // Requests restored from the provider (a resumed session) are answered too.
+      for (const request of pending) {
+        if (this.daemonAutoAccepts(agent, request)) this.autoAcceptPermission(agent, request);
+      }
     } catch {
       for (const [id, request] of agent.pendingPermissions) {
         if (request.metadata?.[DAEMON_PERMISSION_METADATA] !== true) {
@@ -5719,11 +5749,14 @@ export class AgentManager {
         this.emitState(agent);
         return undefined;
       case "mode_changed":
+        // A provider leaving the mode Full auto-accept runs on ends Full auto-accept too.
+        if (event.currentModeId !== agent.currentModeId) this.applyFullAutoAccept(agent, false);
         this.applyObservedMode(agent, event.currentModeId);
         agent.availableModes = event.availableModes;
         if (agent.runtimeInfo) {
           agent.runtimeInfo = { ...agent.runtimeInfo, modeId: event.currentModeId };
         }
+        this.refreshSessionPersistence(agent);
         flags.shouldDispatchEvent = false;
         this.emitState(agent);
         return undefined;
@@ -6061,10 +6094,69 @@ export class AgentManager {
     }
     agent.pendingPermissions.set(event.request.id, event.request);
     this.refreshSessionPersistence(agent);
-    if (!hadPendingPermissions && !agent.internal) {
+    const autoAccepted = this.daemonAutoAccepts(agent, event.request);
+    if (!hadPendingPermissions && !agent.internal && !autoAccepted) {
       this.broadcastAgentAttention(agent, "permission");
     }
     this.emitState(agent);
+    if (autoAccepted) this.autoAcceptPermission(agent, event.request);
+  }
+
+  /** Whether Full auto-accept answers this request, judged as a snapshot observer judges it. */
+  private daemonAutoAccepts(agent: ManagedAgent, request: AgentPermissionRequest): boolean {
+    const features = ("session" in agent ? agent.session?.features : undefined) ?? agent.features;
+    return isDaemonAutoAccepted({ fullAutoAccept: agent.config.fullAutoAccept, features }, request);
+  }
+
+  private applyFullAutoAccept(agent: ActiveManagedAgent, enabled: boolean): void {
+    if (!enabled) {
+      delete agent.config.fullAutoAccept;
+      return;
+    }
+    agent.config.fullAutoAccept = true;
+    for (const request of agent.pendingPermissions.values()) {
+      if (this.daemonAutoAccepts(agent, request)) this.autoAcceptPermission(agent, request);
+    }
+  }
+
+  /**
+   * Answers for the user, through the same admission path as their own answer, so the answer and
+   * its `full-auto-accept` actor are recorded like a person's. Every approval is logged; when one
+   * fails and the request still waits, the agent asks for attention as it would have.
+   */
+  private autoAcceptPermission(agent: ActiveManagedAgent, request: AgentPermissionRequest): void {
+    const key = `${agent.id}:${request.id}`;
+    if (this.autoAcceptsInFlight.has(key)) return;
+    this.autoAcceptsInFlight.add(key);
+    const context = { agentId: agent.id, requestId: request.id, toolName: request.name };
+    void this.respondToPermission(agent.id, request.id, FULL_AUTO_ACCEPT_RESPONSE, {
+      actor: this.getSystemActor("full-auto-accept", "Full auto-accept"),
+      receivedAt: new Date().toISOString(),
+    })
+      .then(
+        () => this.logger.info(context, "Full auto-accept approved a permission request"),
+        (error: unknown) => {
+          this.logger.warn(
+            { ...context, err: error },
+            "Full auto-accept could not approve a permission request",
+          );
+          const pending = agent.pendingPermissions.get(request.id);
+          if (!pending) return;
+          // It now waits for a person, for waiters and the app alike.
+          pending.metadata = { ...pending.metadata, [AUTO_ACCEPT_FAILED_METADATA]: true };
+          if (!agent.internal) this.broadcastAgentAttention(agent, "permission");
+          this.emitState(agent);
+          // Observers skipped the original event as answered; finish subscriptions and remote
+          // waiters only learn of a person's request from a stream event, so raise it again.
+          this.dispatchStream(agent.id, {
+            type: "permission_requested",
+            provider: agent.provider,
+            request: pending,
+            ...(agent.activeTurnId ? { turnId: agent.activeTurnId } : {}),
+          });
+        },
+      )
+      .finally(() => this.autoAcceptsInFlight.delete(key));
   }
 
   private onStreamPermissionResolved(params: {

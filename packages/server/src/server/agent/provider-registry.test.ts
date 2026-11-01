@@ -1741,6 +1741,26 @@ describe("fetchCatalog", () => {
     expect(catalog.models.map((model) => model.id)).toEqual(["profile-model", "extra-model"]);
   });
 
+  // Replacement models skip the runtime probe, so Codex's Plan, which the running Codex offers
+  // only with a plan collaboration mode, is not listed; the no-prompt mark is.
+  test("replacement models list Codex's modes without an unconfirmed Plan", async () => {
+    const registry = buildProviderRegistry(logger, {
+      providerOverrides: {
+        codex: { models: [{ id: "profile-model", label: "Profile Model" }] },
+      },
+    });
+
+    const catalog = await registry.codex.fetchCatalog({
+      scope: "workspace",
+      cwd: "/tmp/catalog",
+      force: false,
+    });
+
+    expect(catalog.modes.map((mode) => mode.id)).toEqual(["auto", "auto-review", "full-access"]);
+    expect(catalog.modes.find((mode) => mode.id === "full-access")?.isUnattended).toBe(true);
+    expect(catalog.modes.some((mode) => "onlyWhenOffered" in mode)).toBe(false);
+  });
+
   test("replacement models still resolve the provider's capability-aware default mode", async () => {
     const resolveDefaultModeId = vi.fn(async () => "default");
     const injectedClient = {

@@ -2507,6 +2507,8 @@ export class VoiceAssistantWebSocketServer {
         ownedSubscriptions: true,
         agentRequestReceipts: true,
         ...(this.inputQueues.enabled ? { hostInputQueue: true } : {}),
+        // COMPAT(fullAutoAccept): added in v2.2.2, remove the gate after 2027-05-01.
+        fullAutoAccept: true,
         workspaceRequestReceipts: true,
         creationLifecycle: true,
         hubAgentRpc: true,

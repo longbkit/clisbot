@@ -76,7 +76,7 @@ clisbot run --provider codex "implement OAuth"
 clisbot --host ssh://user@devbox run --cwd /srv/app "run the test suite"
 clisbot ls
 clisbot send <agent-id> "add tests"
-clisbot schedule create --cron "0 9 * * 1" "audit the codebase"
+clisbot schedule create --provider codex --mode auto-review --cron "0 9 * * 1" "audit the codebase"
 ```
 
 Orca 的 CLI 可以创建 worktree、驱动它的浏览器并管理自动化。Orca 会安装技能，让 Agent 可以调用同样的命令。

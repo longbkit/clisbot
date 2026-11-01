@@ -5474,6 +5474,65 @@ test("persists live mode, model, and thinking changes without an external snapsh
   expect(persisted?.runtimeInfo?.model).toBe("gpt-5.4");
 });
 
+class ModeMetadataTestAgentSession extends TestAgentSession {
+  private modeId: string | null = null;
+
+  override async setMode(modeId: string): Promise<void> {
+    this.modeId = modeId;
+  }
+
+  reportProviderModeChange(modeId: string): void {
+    this.modeId = modeId;
+    this.pushEvent({
+      type: "mode_changed",
+      provider: "codex",
+      currentModeId: modeId,
+      availableModes: [],
+    });
+  }
+
+  override describePersistence() {
+    return { ...super.describePersistence(), metadata: { modeId: this.modeId } };
+  }
+}
+
+class ModeMetadataTestAgentClient extends TestAgentClient {
+  session: ModeMetadataTestAgentSession | null = null;
+
+  override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+    this.createdConfigs.push(config);
+    this.session = new ModeMetadataTestAgentSession(config);
+    return this.session;
+  }
+}
+
+test("mode changes refresh the provider's persistence metadata", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-mode-persistence-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const client = new ModeMetadataTestAgentClient();
+  const manager = new AgentManager({
+    clients: { codex: client },
+    registry: storage,
+    logger,
+    idFactory: () => "00000000-0000-4000-8000-000000000134",
+  });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+
+  await manager.setAgentMode(snapshot.id, "plan");
+  await manager.flush();
+  expect((await storage.get(snapshot.id))?.persistence?.metadata).toMatchObject({
+    modeId: "plan",
+  });
+
+  client.session?.reportProviderModeChange("auto");
+  await manager.flush();
+  expect((await storage.get(snapshot.id))?.persistence?.metadata).toMatchObject({
+    modeId: "auto",
+  });
+});
+
 test("model changes persist the resolved thinking and fresh provider handle before another turn", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-model-selection-"));
   class ModelSession extends TestAgentSession {

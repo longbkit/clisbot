@@ -136,6 +136,7 @@ import {
   truncateForDiagnostic,
 } from "./diagnostic-utils.js";
 import { withTimeout } from "../../../utils/promise-timeout.js";
+import { PERMISSION_CHOICE_METADATA } from "../full-auto-accept.js";
 
 const ACP_AUTO_ACCEPT_FEATURE_ID = "auto_accept";
 
@@ -4233,9 +4234,8 @@ function mapPermissionRequest(
   snapshot: ACPToolSnapshot,
 ): AgentPermissionRequest {
   const kind: AgentPermissionRequestKind = snapshot.kind === "switch_mode" ? "mode" : "tool";
-  const chooserText = isACPChooserRequest(params.options)
-    ? extractToolText(params.toolCall.content)
-    : undefined;
+  const isChooser = isACPChooserRequest(params.options);
+  const chooserText = isChooser ? extractToolText(params.toolCall.content) : undefined;
   return {
     id: requestId,
     provider,
@@ -4259,6 +4259,7 @@ function mapPermissionRequest(
       toolCallId: params.toolCall.toolCallId,
       rawRequest: params,
       options: params.options,
+      ...(isChooser ? { [PERMISSION_CHOICE_METADATA]: true } : {}),
     },
   };
 }

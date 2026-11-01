@@ -1,3 +1,5 @@
+import { composerLayoutAr as composerLayout } from "./composer-layout";
+import { composerPickerAr as composerPicker } from "./composer-picker";
 import { hostQueueAr as hostQueue } from "./host-queue";
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
@@ -131,6 +133,8 @@ export const ar: TranslationResources = {
   },
   composer: {
     hostQueue,
+    picker: composerPicker,
+    layout: composerLayout,
     placeholders: {
       desktop: "أرسل رسالة إلى الوكيل أو ضع علامة على @files أو استخدم /commands و /skills",
       mobile: "الرسالة، @files ، /commands",
