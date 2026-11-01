@@ -5,6 +5,7 @@ import {
 import { readConnectorsOff, skillsInOffList } from "@clisbot/protocol/connectors/types";
 import {
   FULL_AUTO_ACCEPT_RESPONSE,
+  AUTO_ACCEPT_FAILED_METADATA,
   DAEMON_PERMISSION_METADATA,
   isFullAutoAcceptMode,
   resolveFullAutoAcceptProviderMode,
@@ -938,6 +939,8 @@ export class AgentManager {
   private readonly appliedSkillsOff = new Map<string, string>();
   private readonly skillsRefreshes = new Map<string, Promise<void>>();
   /** Request id → the agent it is on and what settles the daemon's wait for the person's answer. */
+  /** `agentId:requestId` of automatic approvals in flight, so none is sent twice. */
+  private readonly autoAcceptsInFlight = new Set<string>();
   private readonly daemonPermissionWaiters = new Map<
     string,
     { agentId: string; settle: (response: AgentPermissionResponse) => void }
@@ -4156,9 +4159,12 @@ export class AgentManager {
     return Array.from(agent.pendingPermissions.values());
   }
 
+  /** The first request waiting for a person; one Full auto-accept answers is not waiting. */
   private peekPendingPermission(agent: ManagedAgent): AgentPermissionRequest | null {
-    const iterator = agent.pendingPermissions.values().next();
-    return iterator.done ? null : iterator.value;
+    for (const request of agent.pendingPermissions.values()) {
+      if (!shouldDaemonAutoAccept(agent.config, request)) return request;
+    }
+    return null;
   }
 
   /**
@@ -4450,6 +4456,9 @@ export class AgentManager {
 
           if (event.type === "agent_stream") {
             if (event.event.type === "permission_requested") {
+              const owner = this.agents.get(agentId);
+              // Full auto-accept answers it; the wait continues to the turn's end.
+              if (owner && shouldDaemonAutoAccept(owner.config, event.event.request)) return;
               finish(event.event.request);
               return;
             }
@@ -5260,6 +5269,11 @@ export class AgentManager {
       agent.pendingPermissions = new Map(
         [...pending, ...daemonCards].map((request) => [request.id, request]),
       );
+      // Requests restored from the provider (a resumed session) are answered too.
+      for (const request of pending) {
+        if (shouldDaemonAutoAccept(agent.config, request))
+          this.autoAcceptPermission(agent, request);
+      }
     } catch {
       for (const [id, request] of agent.pendingPermissions) {
         if (request.metadata?.[DAEMON_PERMISSION_METADATA] !== true) {
@@ -6100,17 +6114,36 @@ export class AgentManager {
     }
   }
 
-  /** Answers for the user, through the same admission path as their own answer. */
+  /**
+   * Answers for the user, through the same admission path as their own answer, so the answer and
+   * its `full-auto-accept` actor are recorded like a person's. Every approval is logged; when one
+   * fails and the request still waits, the agent asks for attention as it would have.
+   */
   private autoAcceptPermission(agent: ActiveManagedAgent, request: AgentPermissionRequest): void {
+    const key = `${agent.id}:${request.id}`;
+    if (this.autoAcceptsInFlight.has(key)) return;
+    this.autoAcceptsInFlight.add(key);
+    const context = { agentId: agent.id, requestId: request.id, toolName: request.name };
     void this.respondToPermission(agent.id, request.id, FULL_AUTO_ACCEPT_RESPONSE, {
       actor: this.getSystemActor("full-auto-accept", "Full auto-accept"),
       receivedAt: new Date().toISOString(),
-    }).catch((error: unknown) => {
-      this.logger.warn(
-        { err: error, agentId: agent.id, requestId: request.id },
-        "Full auto-accept could not approve a permission request",
-      );
-    });
+    })
+      .then(
+        () => this.logger.info(context, "Full auto-accept approved a permission request"),
+        (error: unknown) => {
+          this.logger.warn(
+            { ...context, err: error },
+            "Full auto-accept could not approve a permission request",
+          );
+          const pending = agent.pendingPermissions.get(request.id);
+          if (!pending) return;
+          // It now waits for a person, for waiters and the app alike.
+          pending.metadata = { ...pending.metadata, [AUTO_ACCEPT_FAILED_METADATA]: true };
+          if (!agent.internal) this.broadcastAgentAttention(agent, "permission");
+          this.emitState(agent);
+        },
+      )
+      .finally(() => this.autoAcceptsInFlight.delete(key));
   }
 
   private onStreamPermissionResolved(params: {

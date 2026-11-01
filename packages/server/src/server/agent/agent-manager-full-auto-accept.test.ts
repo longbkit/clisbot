@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import { AgentManager } from "./agent-manager.js";
+import { ensureAgentLoaded } from "./agent-loading.js";
 import { AgentStorage } from "./agent-storage.js";
 import { toAgentPayload } from "./agent-projections.js";
 import { FULL_AUTO_ACCEPT_MODE_ID } from "./full-auto-accept.js";
@@ -50,6 +51,10 @@ class PermissionSession implements AgentSession {
   readonly id = randomUUID();
   readonly modeCalls: string[] = [];
   readonly answers: Array<{ requestId: string; response: AgentPermissionResponse }> = [];
+  /** Makes every answer fail, as a provider that lost its request would. */
+  failAnswers = false;
+  /** Leaves every answer in flight, so a request stays pending while it is being approved. */
+  holdAnswers = false;
   private readonly pending = new Map<string, AgentPermissionRequest>();
   private readonly subscribers = new Set<(event: AgentStreamEvent) => void>();
 
@@ -63,6 +68,11 @@ class PermissionSession implements AgentSession {
     const full = { ...request, provider: this.provider };
     this.pending.set(full.id, full);
     this.push({ type: "permission_requested", provider: this.provider, request: full });
+  }
+
+  /** A request the provider already holds, as after a resume; no event is pushed. */
+  preload(request: Omit<AgentPermissionRequest, "provider">): void {
+    this.pending.set(request.id, { ...request, provider: this.provider });
   }
 
   reportModeChange(modeId: string): void {
@@ -106,6 +116,8 @@ class PermissionSession implements AgentSession {
     return [...this.pending.values()];
   }
   async respondToPermission(requestId: string, response: AgentPermissionResponse): Promise<void> {
+    if (this.failAnswers) throw new Error("provider lost the request");
+    if (this.holdAnswers) return new Promise<void>(() => undefined);
     this.answers.push({ requestId, response });
     this.pending.delete(requestId);
     this.push({
@@ -125,6 +137,8 @@ class PermissionSession implements AgentSession {
 class PermissionClient implements AgentClient {
   readonly capabilities = CAPABILITIES;
   session: PermissionSession | null = null;
+  /** A request the provider still holds when a session is resumed. */
+  restoredRequest: Omit<AgentPermissionRequest, "provider"> | null = null;
 
   constructor(
     readonly provider: string,
@@ -148,6 +162,7 @@ class PermissionClient implements AgentClient {
   }
   async resumeSession(): Promise<AgentSession> {
     this.session = new PermissionSession(this.provider, this.modes, this.initialMode);
+    if (this.restoredRequest) this.session.preload(this.restoredRequest);
     return this.session;
   }
 }
@@ -303,5 +318,59 @@ describe("Full auto-accept", () => {
     await manager.resolveDaemonPermission(agentId, "connector-connect", { behavior: "deny" });
     await expect(send).resolves.toMatchObject({ behavior: "deny" });
     await expect(connect).resolves.toMatchObject({ behavior: "deny" });
+  });
+
+  test("asks for attention when an automatic approval fails and the request still waits", async () => {
+    const client = claudeClient();
+    const workdir = mkdtempSync(join(tmpdir(), "full-auto-accept-fail-"));
+    cleanups.push(() => rmSync(workdir, { recursive: true, force: true }));
+    const attention: string[] = [];
+    const manager = new AgentManager({
+      clients: { claude: client },
+      logger,
+      onAgentAttention: ({ reason }) => attention.push(reason),
+    });
+    const agent = await manager.createAgent(
+      { provider: "claude", cwd: workdir, modeId: "bypassPermissions", fullAutoAccept: true },
+      undefined,
+      { workspaceId: undefined },
+    );
+    client.session!.failAnswers = true;
+
+    client.session!.ask({ id: "tool-fail", name: "Bash", kind: "tool" });
+
+    await expect.poll(() => attention).toEqual(["permission"]);
+    expect(manager.getAgent(agent.id)?.pendingPermissions.has("tool-fail")).toBe(true);
+    // A waiter now sees it as waiting for a person.
+    await expect(manager.waitForAgentEvent(agent.id)).resolves.toMatchObject({
+      permission: { id: "tool-fail" },
+    });
+  });
+
+  test("a waiter does not see a request Full auto-accept is answering", async () => {
+    const { manager, agentId, session } = await startAgent(claudeClient());
+    await manager.setAgentMode(agentId, FULL_AUTO_ACCEPT_MODE_ID);
+    session.holdAnswers = true;
+
+    session.ask({ id: "tool-held", name: "Bash", kind: "tool" });
+    await expect.poll(() => manager.getAgent(agentId)?.pendingPermissions.size).toBe(1);
+
+    await expect(manager.waitForAgentEvent(agentId)).resolves.toMatchObject({
+      permission: null,
+    });
+  });
+
+  test("answers a request the provider still holds when the session resumes", async () => {
+    const { manager, storage, agentId } = await startAgent(claudeClient());
+    await manager.setAgentMode(agentId, FULL_AUTO_ACCEPT_MODE_ID);
+    await expect.poll(async () => (await storage.get(agentId))?.config?.fullAutoAccept).toBe(true);
+    await manager.closeAgent(agentId);
+
+    const client = claudeClient();
+    client.restoredRequest = { id: "tool-restored", name: "Bash", kind: "tool" };
+    const resumed = new AgentManager({ clients: { claude: client }, registry: storage, logger });
+    await ensureAgentLoaded(agentId, { agentManager: resumed, agentStorage: storage, logger });
+
+    await expect.poll(() => client.session?.answers[0]?.requestId).toBe("tool-restored");
   });
 });

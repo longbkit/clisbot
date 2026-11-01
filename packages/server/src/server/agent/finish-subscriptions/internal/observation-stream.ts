@@ -3,6 +3,7 @@ import type { AgentStreamEvent } from "../../agent-sdk-types.js";
 import type { HostObservation } from "../../host-operations/index.js";
 import type { FinishSubscription, FinishObservationSession } from "../index.js";
 import { createObservationBuffer } from "./observation-buffer.js";
+import { isDaemonAutoAcceptedForSnapshot } from "../../full-auto-accept.js";
 
 interface ObservationScope {
   use<T>(
@@ -34,6 +35,8 @@ function observeState(
   }
   if (event?.type === "turn_started") return;
   if (event?.type === "permission_requested") {
+    // Full auto-accept answers it; a person is not waited on.
+    if (isDaemonAutoAcceptedForSnapshot(snapshot, event.request)) return;
     buffer.push({
       status: "permission",
       final: { ...snapshot, pendingPermissions: [event.request] },

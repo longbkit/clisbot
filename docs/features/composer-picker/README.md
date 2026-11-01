@@ -162,6 +162,12 @@ permission request the agent still raises. Agents sometimes ask under bypass any
   caller: `update_agent`, `set_agent_mode`, `send_agent_prompt`'s `sessionMode`, `create_agent`
   for a child and `update_schedule`. An agent switching it on would approve its own calls, as
   `respond_to_permission` already refuses for Connector cards.
+- **Observers.** A request Full auto-accept is answering is not a wait for a person:
+  `waitForAgentEvent` and finish subscriptions skip it, and it raises no attention. Every
+  approval is logged at info with the agent id, request id and tool name, and recorded with the
+  `full-auto-accept` actor like a person's answer. If an approval fails while the request still
+  waits, the request is marked `clisbotAutoAcceptFailed` and treated as a person's again
+  (attention, waiters). Requests the provider still holds after a resume are answered too.
 - **It ends** when another mode is picked or the provider leaves the mode it runs on.
 - **Wire.** The mode id is `full-auto-accept` (`@clisbot/protocol/full-auto-accept`), accepted
   by `set_agent_mode` and in a create config. The daemon never lists it among a provider's

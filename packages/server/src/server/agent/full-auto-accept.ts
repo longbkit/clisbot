@@ -26,12 +26,16 @@ export const PERMISSION_CHOICE_METADATA = "clisbotChoice";
  */
 export const DAEMON_PERMISSION_METADATA = "clisbotDaemonPermission";
 
+/** Set when the daemon's automatic approval failed: the request now waits for a person. */
+export const AUTO_ACCEPT_FAILED_METADATA = "clisbotAutoAcceptFailed";
+
 /** Requests a person must answer whatever the mode: daemon-owned cards and Connector cards. */
 function isPersonOnlyRequest(request: AgentPermissionRequest): boolean {
   const metadata = request.metadata;
   if (!metadata) return false;
   return (
     metadata[DAEMON_PERMISSION_METADATA] === true ||
+    metadata[AUTO_ACCEPT_FAILED_METADATA] === true ||
     metadata[CONNECTOR_CARD_METADATA] !== undefined ||
     metadata[PERMISSION_CHOICE_METADATA] === true
   );
@@ -61,6 +65,22 @@ export function isAutoAcceptablePermission(request: AgentPermissionRequest): boo
   if (isPersonOnlyRequest(request)) return false;
   const actions = request.actions ?? [];
   return actions.length === 0 || actions.some((action) => action.behavior === "allow");
+}
+
+/**
+ * The same decision from an agent snapshot, for observers that see the payload rather than the
+ * session config (finish subscriptions): a request the daemon answers is not a wait for a person.
+ */
+export function isDaemonAutoAcceptedForSnapshot(
+  snapshot: { fullAutoAccept?: boolean; features?: readonly { id: string; value?: unknown }[] },
+  request: AgentPermissionRequest,
+): boolean {
+  const providerAutoAccept = snapshot.features?.some(
+    (feature) => feature.id === "auto_accept" && feature.value === true,
+  );
+  return (
+    snapshot.fullAutoAccept === true && !providerAutoAccept && isAutoAcceptablePermission(request)
+  );
 }
 
 /**
