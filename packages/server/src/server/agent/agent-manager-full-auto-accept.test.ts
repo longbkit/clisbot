@@ -10,6 +10,9 @@ import { ensureAgentLoaded } from "./agent-loading.js";
 import { AgentStorage } from "./agent-storage.js";
 import { toAgentPayload } from "./agent-projections.js";
 import { FULL_AUTO_ACCEPT_MODE_ID } from "./full-auto-accept.js";
+import { createFinishObservation } from "./finish-subscriptions/internal/observation.js";
+import type { AgentMessageDelivery } from "./agent-messages/index.js";
+import type { ToolHosts } from "./host-operations/index.js";
 import type {
   AgentCapabilityFlags,
   AgentClient,
@@ -345,6 +348,42 @@ describe("Full auto-accept", () => {
     await expect(manager.waitForAgentEvent(agent.id)).resolves.toMatchObject({
       permission: { id: "tool-fail" },
     });
+  });
+
+  test("a parent waiting on notifyOnFinish learns when an automatic approval fails", async () => {
+    const { manager, storage, agentId, session } = await startAgent(claudeClient());
+    await manager.setAgentMode(agentId, FULL_AUTO_ACCEPT_MODE_ID);
+    // The parent's watch on the child, as notifyOnFinish opens it. The child's prompt is still
+    // being admitted, so only the continuous stream can report the request.
+    const observation = await createFinishObservation({
+      serverId: "local",
+      logger,
+      agentManager: manager,
+      agentStorage: storage,
+      messages: () =>
+        ({
+          waitForDispatch: () => new Promise(() => undefined),
+        }) as unknown as AgentMessageDelivery,
+      hosts: () => ({}) as unknown as ToolHosts,
+    }).open(
+      { id: "watch", callerAgentId: "parent", childAgentId: agentId },
+      new AbortController().signal,
+    );
+    try {
+      session.failAnswers = true;
+      session.ask({ id: "tool-fail", name: "Bash", kind: "tool" });
+
+      const next = await Promise.race([
+        observation.next(),
+        new Promise<"no notification">((resolve) => setTimeout(resolve, 2_000, "no notification")),
+      ]);
+      expect(next).toMatchObject({
+        status: "permission",
+        final: { pendingPermissions: [{ id: "tool-fail" }] },
+      });
+    } finally {
+      await observation.close();
+    }
   });
 
   test("a waiter does not see a request Full auto-accept is answering", async () => {

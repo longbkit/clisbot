@@ -6141,6 +6141,14 @@ export class AgentManager {
           pending.metadata = { ...pending.metadata, [AUTO_ACCEPT_FAILED_METADATA]: true };
           if (!agent.internal) this.broadcastAgentAttention(agent, "permission");
           this.emitState(agent);
+          // Observers skipped the original event as answered; finish subscriptions and remote
+          // waiters only learn of a person's request from a stream event, so raise it again.
+          this.dispatchStream(agent.id, {
+            type: "permission_requested",
+            provider: agent.provider,
+            request: pending,
+            ...(agent.activeTurnId ? { turnId: agent.activeTurnId } : {}),
+          });
         },
       )
       .finally(() => this.autoAcceptsInFlight.delete(key));
