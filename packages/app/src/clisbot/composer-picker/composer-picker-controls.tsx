@@ -56,9 +56,13 @@ function findModelLabel(
 
 function useChipLabels(props: ComposerPickerControlsProps) {
   const { t } = useTranslation();
+  // A new draft may have no provider or model yet (Home before the first pick): say so instead
+  // of drawing an empty chip.
   const modelLabel =
     findModelLabel(props.providers, props.provider, props.selectedModelId) ??
-    (props.isModelLoading ? t("composer.picker.loading") : props.selectedModelId);
+    (props.isModelLoading
+      ? t("composer.picker.loading")
+      : props.selectedModelId || t("composer.picker.selectModel"));
   const effort = props.thinkingOptions.find(
     (option) => option.id === props.selectedThinkingOptionId,
   );
