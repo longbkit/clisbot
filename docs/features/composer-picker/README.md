@@ -150,6 +150,14 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
 | Footer    | Speed levels with "Higher cost", then Mode          | Speed, then a full-width Mode row      |
 | More      | Other provider options (Copilot Agent, ACP options) | Same                                   |
 
+- **A new draft is never empty when something can run** (`draft-default.ts`, called from
+  `resolve-agent-form.ts`; only the composer's draft form asks for it, so schedule and Bot forms
+  keep their own rules). With no explicit value and no usable preference it takes the first ready
+  provider on the rail, that provider's default model and its default mode, so Home shows the
+  chip and Mode and the first send works. A remembered provider still loading is waited for
+  ("Loading..."); one that cannot run falls back the same way; a provider whose model list is
+  empty is skipped. The default is not a pick: nothing marks it modified and sending with it
+  saves no preference. With nothing ready the chip says Select model, and only Send complains.
 - **The rail opens on the current model's provider**, so the check is on screen; Favorites is
   one press away. A running agent is one provider's process, so its rail holds Favorites and
   that provider only.

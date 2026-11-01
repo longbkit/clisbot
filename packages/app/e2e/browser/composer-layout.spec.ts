@@ -436,4 +436,22 @@ test.describe("Navigation V2 Home", () => {
     await composerLocator(page).press("Enter");
     await expect(composerLocator(page)).toHaveValue("/10-bms-qc-review-testcase-testdesign-label ");
   });
+
+  test("a fresh install preselects the first ready provider, and remembers nothing", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    // The fixture seeds a remembered model; a fresh install has none.
+    await page.addInitScript(() => localStorage.removeItem("@clisbot:create-agent-preferences"));
+    await gotoAppShell(page);
+    const chip = visible(page, "composer-model-chip");
+    await expect(chip).toHaveAccessibleName(/GPT-6/, { timeout: 30_000 });
+    await expect(visible(page, "mode-control")).toBeVisible();
+    await page.waitForTimeout(500);
+    const stored = await page.evaluate(() =>
+      localStorage.getItem("@clisbot:create-agent-preferences"),
+    );
+    expect(stored ?? "").not.toContain("codex");
+  });
 });

@@ -38,6 +38,8 @@ import {
   type ProviderModelsByProvider,
 } from "@/provider-selection/resolve-agent-form";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
+import { COMPOSER_PICKER_ENABLED } from "@/clisbot/composer-picker/feature";
+import { orderProviderIds, useProviderRailStore } from "@/clisbot/composer-picker/rail-store";
 import type { MaterializedAgentProfile } from "@/agent-profiles";
 
 export type { FormInitialValues } from "@/provider-selection/resolve-agent-form";
@@ -181,11 +183,14 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
     [updatePreferences, preferenceOverlay],
   );
 
-  const [{ form: formState, userModified, resolution }, dispatch] = useReducer(resolveAgentForm, {
-    form: { provider: null, modeId: "", model: "", thinkingOptionId: "" },
-    userModified: INITIAL_USER_MODIFIED,
-    resolution: INITIAL_AGENT_FORM_RESOLUTION,
-  });
+  const [{ form: formState, userModified, resolution, draftDefault }, dispatch] = useReducer(
+    resolveAgentForm,
+    {
+      form: { provider: null, modeId: "", model: "", thinkingOptionId: "" },
+      userModified: INITIAL_USER_MODIFIED,
+      resolution: INITIAL_AGENT_FORM_RESOLUTION,
+    },
+  );
 
   const {
     entries: snapshotEntries,
@@ -258,10 +263,26 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
   const modelSelectorProviders = snapshotModelSelectorProviders;
   const availableModels = snapshotSelectedProviderModels;
   const modeOptions = snapshotSelectedProviderModes;
+  // A fresh draft has no provider of its own to wait for: it waits for the first to be ready.
+  const isAwaitingDraftDefault =
+    COMPOSER_PICKER_ENABLED &&
+    !formState.provider &&
+    !userModified.provider &&
+    allProviderEntries.some((entry) => entry.enabled && entry.status === "loading");
   const isModelSelectionLoading =
     isConnected &&
-    (resolution.status === "pending" || snapshotIsLoading || selectedProviderIsLoading);
+    (resolution.status === "pending" ||
+      snapshotIsLoading ||
+      selectedProviderIsLoading ||
+      isAwaitingDraftDefault);
   const isAllModelsLoading = isModelSelectionLoading;
+
+  const savedRailOrder = useProviderRailStore((state) => state.order);
+  const draftDefaultOrder = useMemo(() => {
+    if (!COMPOSER_PICKER_ENABLED) return null;
+    const ids = allProviderEntries.map((entry) => entry.provider);
+    return orderProviderIds(ids, savedRailOrder) as AgentProvider[];
+  }, [allProviderEntries, savedRailOrder]);
 
   useEffect(() => {
     dispatch({
@@ -275,6 +296,7 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
       preferences,
       providerModelsByProvider: snapshotProviderModelsByProvider,
       allowedProviderMap: snapshotResolvableProviderDefinitionMap,
+      draftDefaultOrder,
     });
   }, [
     serverId,
@@ -286,6 +308,7 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
     preferences,
     snapshotProviderModelsByProvider,
     snapshotResolvableProviderDefinitionMap,
+    draftDefaultOrder,
   ]);
 
   const setProviderAndModelFromUser = useCallback(
@@ -469,13 +492,17 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
     if (!formState.provider) {
       return;
     }
+    // A default nobody picked stays a default: sending with it remembers nothing.
+    if (draftDefault && !userModified.provider && !userModified.model) {
+      return;
+    }
     await persistProviderPreferences({
       provider: formState.provider,
       formState,
       availableModels,
       updatePreferences: updateCurrentPreferences,
     });
-  }, [availableModels, formState, updateCurrentPreferences]);
+  }, [availableModels, draftDefault, formState, updateCurrentPreferences, userModified]);
 
   const agentDefinition = formState.provider
     ? providerDefinitionMap.get(formState.provider)

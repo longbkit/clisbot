@@ -10,6 +10,7 @@ import {
   type FormPreferences,
   type ProviderPreferences,
 } from "@/hooks/use-form-preferences";
+import { pickDraftDefaultProvider } from "@/clisbot/composer-picker/draft-default";
 import { findModelByReference } from "./model-catalog";
 
 export interface FormInitialValues {
@@ -41,6 +42,8 @@ export interface AgentFormReducerState {
   form: FormState;
   userModified: UserModifiedFields;
   resolution: AgentFormResolutionState;
+  /** The form holds a default the person has not picked, so it is not saved as a preference. */
+  draftDefault?: boolean;
   inputs?: {
     serverId: string | null;
     initialValues: FormInitialValues | undefined;
@@ -77,6 +80,8 @@ interface AgentFormInputs {
   preferences: FormPreferences | null;
   providerModelsByProvider: ProviderModelsByProvider;
   allowedProviderMap: Map<AgentProvider, AgentProviderDefinition>;
+  /** Provider ids in rail order: a fresh draft settles on the first ready one. Null: no default. */
+  draftDefaultOrder?: readonly AgentProvider[] | null;
 }
 
 export type AgentFormAction =
@@ -587,6 +592,48 @@ function applyProfile(state: AgentFormReducerState, action: ApplyProfileAction) 
   };
 }
 
+/**
+ * Fills a draft nobody chose for yet (`pickDraftDefaultProvider`). It runs on every input so a
+ * provider that finishes loading after the form resolved still fills it. Nothing here marks
+ * `userModified`, so a remembered preference or a later resolution still replaces it.
+ */
+function applyDraftDefault(
+  state: AgentFormReducerState,
+  action: AgentFormInputs,
+): AgentFormReducerState {
+  if (!action.draftDefaultOrder) return state;
+  const { form, userModified } = state;
+  const { allowedProviderMap, providerModelsByProvider } = action;
+  const provider = pickDraftDefaultProvider({
+    provider: form.provider,
+    model: form.model,
+    userPicked: userModified.provider || userModified.model,
+    hasInitialChoice: Boolean(
+      action.initialValues?.provider || normalizeSelectedModelId(action.initialValues?.model),
+    ),
+    providerOrder: action.draftDefaultOrder,
+    isResolvable: (id) => allowedProviderMap.has(id),
+    modelsOf: (id) => providerModelsByProvider.get(id),
+  });
+  if (!provider) return state;
+  const models = providerModelsByProvider.get(provider) ?? null;
+  const resolved = resolveFormState(
+    { provider },
+    action.preferences,
+    models,
+    userModified,
+    form,
+    allowedProviderMap,
+  );
+  const model = resolved.model || resolveDefaultModelId(models);
+  const thinkingOptionId = resolveThinkingOptionId({
+    availableModels: models,
+    modelId: model,
+    requestedThinkingOptionId: resolved.thinkingOptionId,
+  });
+  return { ...state, draftDefault: true, form: { ...resolved, model, thinkingOptionId } };
+}
+
 function sameInitialValues(left: FormInitialValues = {}, right: FormInitialValues = {}): boolean {
   return (
     left.provider === right.provider &&
@@ -625,7 +672,10 @@ function receiveInputs(
   }
   if (!active || action.isPreferencesLoading || !action.serverId || !action.hasSnapshot)
     return next;
-  return completeResolution(next, { ...action, type: "COMPLETE_RESOLUTION" });
+  return applyDraftDefault(
+    completeResolution(next, { ...action, type: "COMPLETE_RESOLUTION" }),
+    action,
+  );
 }
 
 export function resolveAgentForm(
@@ -640,6 +690,7 @@ export function resolveAgentForm(
         ...state,
         userModified: INITIAL_USER_MODIFIED,
         resolution: PENDING_AGENT_FORM_RESOLUTION,
+        draftDefault: false,
       };
 
     case "COMPLETE_RESOLUTION":
@@ -740,6 +791,7 @@ export function resolveAgentForm(
         ...state,
         userModified: INITIAL_USER_MODIFIED,
         resolution: INITIAL_AGENT_FORM_RESOLUTION,
+        draftDefault: false,
       };
     default:
       throw new Error("unreachable");

@@ -11,6 +11,7 @@ import {
   resolveDefaultModel,
   INITIAL_USER_MODIFIED,
   PENDING_AGENT_FORM_RESOLUTION,
+  type AgentFormAction,
   type AgentFormReducerState,
   type AgentFormResolutionState,
   type ProviderModelsByProvider,
@@ -1329,4 +1330,121 @@ it("clears the previous Host's selection while the next Host loads", () => {
   });
   expect(next.form.provider).toBeNull();
   expect(next.resolution.status).toBe("pending");
+});
+
+describe("a fresh draft's default", () => {
+  const providerModels = makeProviderModelsByProvider([
+    ["claude", null],
+    ["codex", CODEX_MODELS],
+  ]);
+  const OPUS: AgentModelDefinition = { provider: "claude", id: "opus", label: "Opus" };
+  const SONNET: AgentModelDefinition = {
+    provider: "claude",
+    id: "sonnet",
+    label: "Sonnet",
+    isDefault: true,
+  };
+
+  function inputs(overrides: Partial<Extract<AgentFormAction, { type: "INPUTS_CHANGED" }>> = {}) {
+    return {
+      type: "INPUTS_CHANGED" as const,
+      serverId: "host",
+      isVisible: true,
+      isCreateFlow: true,
+      isPreferencesLoading: false,
+      hasSnapshot: true,
+      initialValues: undefined,
+      preferences: null,
+      providerModelsByProvider: providerModels,
+      allowedProviderMap: bothProviderMap,
+      draftDefaultOrder: ["claude", "codex"],
+      ...overrides,
+    };
+  }
+
+  function resolve(overrides?: Parameters<typeof inputs>[0], state = makeState()) {
+    return resolveAgentForm(state, inputs(overrides));
+  }
+
+  it("picks the first ready provider on the rail, its default model and default mode", () => {
+    const { form, userModified, draftDefault } = resolve();
+    expect(form).toEqual({
+      provider: "codex",
+      model: "gpt-5.3-codex",
+      modeId: "auto",
+      thinkingOptionId: "xhigh",
+    });
+    expect(draftDefault).toBe(true);
+    expect(userModified).toEqual(INITIAL_USER_MODIFIED);
+  });
+
+  it("follows the rail's order and the provider's default model", () => {
+    const { form } = resolve({
+      providerModelsByProvider: makeProviderModelsByProvider([
+        ["claude", [OPUS, SONNET]],
+        ["codex", CODEX_MODELS],
+      ]),
+    });
+    expect(form).toMatchObject({ provider: "claude", model: "sonnet", modeId: "default" });
+  });
+
+  it("fills in once a provider that was loading is ready", () => {
+    const loading = makeProviderModelsByProvider([["codex", null]]);
+    const before = resolve({ providerModelsByProvider: loading });
+    expect(before.form.provider).toBeNull();
+    expect(resolve(undefined, before).form.provider).toBe("codex");
+  });
+
+  it("lets a remembered preference win", () => {
+    const { form, draftDefault } = resolve({
+      preferences: {
+        provider: "codex",
+        providerPreferences: { codex: { model: "gpt-5.3-codex", mode: "full-access" } },
+      },
+      draftDefaultOrder: ["claude", "codex"],
+    });
+    expect(form).toMatchObject({ provider: "codex", model: "gpt-5.3-codex" });
+    expect(form.modeId).toBe("full-access");
+    expect(draftDefault).toBeFalsy();
+  });
+
+  it("lets an explicit initial value win", () => {
+    const { form } = resolve({ initialValues: { provider: "claude" } });
+    expect(form.provider).toBe("claude");
+    expect(form.model).toBe("");
+  });
+
+  it("waits for a remembered provider that is still loading", () => {
+    const { form } = resolve({ preferences: { provider: "claude" } });
+    expect(form.provider).toBe("claude");
+    expect(form.model).toBe("");
+  });
+
+  it("falls back the same way when the remembered provider cannot run", () => {
+    const { form } = resolve({
+      preferences: { provider: "claude" },
+      allowedProviderMap: codexProviderMap,
+    });
+    expect(form).toMatchObject({ provider: "codex", model: "gpt-5.3-codex", modeId: "auto" });
+  });
+
+  it("stays empty when no provider is ready", () => {
+    const { form, draftDefault } = resolve({
+      providerModelsByProvider: makeProviderModelsByProvider([
+        ["claude", null],
+        ["codex", []],
+      ]),
+    });
+    expect(form).toEqual({ provider: null, model: "", modeId: "", thinkingOptionId: "" });
+    expect(draftDefault).toBeFalsy();
+  });
+
+  it("leaves a provider the person cleared empty", () => {
+    const cleared = resolveAgentForm(resolve(), { type: "CLEAR_PROVIDER_SELECTION_FROM_USER" });
+    expect(resolve(undefined, cleared).form.provider).toBeNull();
+  });
+
+  it("does nothing without the rail's order, as with the flag off", () => {
+    expect(resolve({ draftDefaultOrder: null }).form.provider).toBeNull();
+  });
 });
