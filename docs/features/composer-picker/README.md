@@ -1,5 +1,7 @@
 # Composer picker
 
+Flag: `EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER` (on unless `0`).
+
 CURRENT — `feat/plan-in-modes`, 2026-11-01. Modelled on T3 Code's picker.
 
 The composer bar shows two agent controls besides attach, tools, the context ring and voice:
@@ -211,7 +213,11 @@ permission request the agent still raises. Agents sometimes ask under bypass any
 `model-picker.tsx` (the panel), `provider-rail.tsx`, `model-list.tsx`, `model-row.tsx`,
 `reasoning-column.tsx`, `speed-segment.tsx`, `more-features.tsx`, `mode-dropdown.tsx`, and the
 pure modules `picker-rows.ts`, `speed.ts`, `mode-options.ts`, `model-name.ts`, `picker-keys.ts`.
-`composer/agent-controls/index.tsx` feeds it the live agent's or the draft's data. Strings live
+`composer/agent-controls/index.tsx` stays the upstream file, model sheet and toolbar included,
+and feeds the live agent's or the draft's data to `picker-agent-controls.tsx` in their place
+while the picker is on. `feature.ts` holds the switch: `EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER=0`
+renders the upstream toolbar, its mode control and model sheet again, without Full auto-accept
+in the Mode list; the daemon side is unchanged. Strings live
 in `i18n/resources/composer-picker.ts` for every app language.
 
 Primitives: `Combobox` (panel and Mode menu), `ComboboxTrigger` (chip), `AgentControlTrigger`

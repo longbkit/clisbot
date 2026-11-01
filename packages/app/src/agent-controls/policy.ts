@@ -1,6 +1,6 @@
 import type { AgentMode } from "@clisbot/protocol/agent-types";
 
-// Plan is always a mode (isPlanningAgentMode), never a feature.
+export const PLAN_MODE_FEATURE_ID = "plan_mode";
 export const FAST_MODE_FEATURE_ID = "fast_mode";
 export const AUTO_ACCEPT_FEATURE_ID = "auto_accept";
 export const SPEED_FEATURE_ID = "service_tier";
