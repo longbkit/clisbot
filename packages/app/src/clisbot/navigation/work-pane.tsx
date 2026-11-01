@@ -32,7 +32,7 @@ import { useHostsReachability } from "./hosts-status";
 import { HostsUnreachableState } from "./hosts-unreachable-state";
 import { OutsideFilterNotice } from "./outside-filter-notice";
 import { EMPTY_SCOPE_COUNTS } from "./ownership";
-import { SectionControls } from "./section-controls";
+import { SectionControls, useSectionBackdrop } from "./section-controls";
 import {
   HeaderMenuIcon,
   HeaderSearchButton,
@@ -167,6 +167,7 @@ function WorkControls() {
   const { allWorkspaceEntriesByKey, workList } = useSidebarModel();
   const query = useWorkQuery();
   const setChip = useNavigationStore((state) => state.setWorkChip);
+  const backdrop = useSectionBackdrop();
   // Once per change of the entries, the sessions or the query; the same items the list shows.
   const countWork = useMemo(createWorkCounter, []);
   const counts = useMemo(
@@ -192,7 +193,7 @@ function WorkControls() {
       chips={chips}
       chip={query.chip}
       onChip={setChip}
-      backdrop="surfaceSidebar"
+      backdrop={backdrop}
       display={displayMenu}
     >
       <SidebarViewBar />
