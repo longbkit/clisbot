@@ -95,7 +95,9 @@ test.describe("Composer control density across tab switches", () => {
   });
 });
 
-test("compact actions paint 36px faces inside separate 48px targets", async ({ page }) => {
+// The Clisbot chat layout (docs/features/composer-picker/README.md, "Layout"): dictation beside
+// the pill, voice inside it on a phone, and Send inside it as a larger circle.
+test("compact actions paint their faces inside separate 48px targets", async ({ page }) => {
   const workspace = await seedWorkspace({ repoPrefix: "composer-touch-target-" });
   try {
     const agent = await seedSettledMockAgent(workspace, "Touch target");
@@ -104,12 +106,17 @@ test("compact actions paint 36px faces inside separate 48px targets", async ({ p
     const input = composerLocator(page);
     const dictation = page.getByRole("button", { name: "Start dictation", exact: true });
     const voice = page.getByRole("button", { name: "Enable Voice mode", exact: true });
-    async function expectGeometry(button: import("@playwright/test").Locator, faceId: string) {
-      await expect.poll(async () => (await button.boundingBox())?.width).toBe(48);
-      await expect.poll(async () => (await button.boundingBox())?.height).toBe(48);
-      const face = button.getByTestId(faceId);
-      await expect.poll(async () => (await face.boundingBox())?.width).toBe(36);
-      await expect.poll(async () => (await face.boundingBox())?.height).toBe(36);
+    async function expectGeometry(
+      button: import("@playwright/test").Locator,
+      faceId: string,
+      target: number,
+      face: number,
+    ) {
+      await expect.poll(async () => (await button.boundingBox())?.width).toBe(target);
+      await expect.poll(async () => (await button.boundingBox())?.height).toBe(target);
+      const painted = button.getByTestId(faceId);
+      await expect.poll(async () => (await painted.boundingBox())?.width).toBe(face);
+      await expect.poll(async () => (await painted.boundingBox())?.height).toBe(face);
     }
     async function expectSeparateAligned(
       a: import("@playwright/test").Locator,
@@ -121,31 +128,26 @@ test("compact actions paint 36px faces inside separate 48px targets", async ({ p
       expect(first.y + first.height / 2).toBe(second.y + second.height / 2);
       expect(second.x + second.width).toBeLessThanOrEqual(page.viewportSize()!.width);
     }
-    await expectGeometry(dictation, "composer-dictation-face");
-    await expectGeometry(voice, "composer-realtime-voice-face");
-    await expectSeparateAligned(dictation, voice);
+    await expectGeometry(dictation, "composer-dictation-face", 48, 36);
+    await expectGeometry(voice, "composer-realtime-voice-face", 48, 36);
+    await expectSeparateAligned(voice, dictation);
     await input.fill("A multiline draft\nwith a larger Send target");
     const send = page.getByRole("button", { name: "Send message", exact: true });
     await expect(send).toBeVisible();
-    await expectGeometry(send, "composer-send-face");
-    await expectSeparateAligned(dictation, send);
+    await expect(dictation).toHaveCount(0);
+    await expectGeometry(send, "composer-send-face", 48, 40);
 
     await page.setViewportSize({ width: 1280, height: 900 });
-    await expect.poll(async () => (await send.boundingBox())?.width).toBe(28);
-    await expect.poll(async () => (await send.boundingBox())?.height).toBe(28);
-    await expect
-      .poll(async () => (await send.getByTestId("composer-send-face").boundingBox())?.width)
-      .toBe(28);
+    await expectGeometry(send, "composer-send-face", 44, 36);
     await page.setViewportSize({ width: 360, height: 740 });
-    await expectGeometry(send, "composer-send-face");
-    await expectSeparateAligned(dictation, send);
+    await expectGeometry(send, "composer-send-face", 48, 40);
     const bounds = (await send.boundingBox())!;
-    // Inside the touch padding, outside the painted 36px face.
-    await page.mouse.click(bounds.x + 4, bounds.y + bounds.height / 2);
+    // Inside the touch padding, outside the painted face.
+    await page.mouse.click(bounds.x + 2, bounds.y + bounds.height / 2);
     await expect(input).toHaveValue("");
     const stop = page.getByRole("button", { name: "Stop agent", exact: true });
     await expect(stop).toBeVisible();
-    await expectGeometry(stop, "composer-stop-face");
+    await expectGeometry(stop, "composer-stop-face", 48, 36);
     const stopBounds = (await stop.boundingBox())!;
     await page.mouse.click(stopBounds.x + 4, stopBounds.y + stopBounds.height / 2);
     await expect(stop).not.toBeVisible({ timeout: 30_000 });

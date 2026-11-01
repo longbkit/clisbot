@@ -66,6 +66,14 @@ import { useComposerKeyboardScope } from "@/composer/keyboard-scope";
 import { RenderProfile } from "@/utils/render-profiler";
 import { useComposerHeight } from "./height";
 import { ComposerInputPresentation } from "./presentation";
+import { COMPOSER_LAYOUT_ENABLED } from "@/clisbot/composer-layout/feature";
+import { ChatComposerPresentation } from "@/clisbot/composer-layout/chat-composer-presentation";
+import { ComposerCommandsButton } from "@/clisbot/composer-layout/commands-button";
+import {
+  CHAT_COMPOSER_WEB_MIN_INPUT_HEIGHT,
+  resolveChatComposerGeometry,
+} from "@/clisbot/composer-layout/geometry";
+import { resolveSlashTriggerEdit } from "@/clisbot/composer-layout/slash-trigger";
 import { resolveComposerInputMode, type ComposerInputMode } from "@/composer/input-mode";
 import type { NativePastedFile } from "@/composer/native-pasted-image";
 import {
@@ -240,14 +248,24 @@ function AttachButtonIcon({
   hovered,
   onAttachButtonRef,
   buttonIconSize,
+  chatLayout,
 }: {
   hovered: boolean;
   onAttachButtonRef: ((node: View | null) => void) | undefined;
   buttonIconSize: number;
+  /** Beside the pill (Clisbot chat layout): the composer's action face, like dictation. */
+  chatLayout: boolean;
 }) {
   const colorMapping = hovered ? iconForegroundMapping : iconForegroundMutedMapping;
+  const faceStyle = chatLayout
+    ? [
+        composerActionGeometry.face,
+        composerActionGeometry.neutral,
+        hovered && composerActionGeometry.hovered,
+      ]
+    : styles.attachButtonAnchor;
   return (
-    <View ref={onAttachButtonRef} collapsable={false} style={styles.attachButtonAnchor}>
+    <View ref={onAttachButtonRef} collapsable={false} style={faceStyle}>
       <ThemedPlus size={buttonIconSize} uniProps={colorMapping} />
     </View>
   );
@@ -783,6 +801,7 @@ function SendButtonTooltip({
   buttonIconSize,
   sendKeys,
   sendTooltipLabel,
+  sendFaceStyle,
 }: {
   shouldShow: boolean;
   canPressLoadingButton: boolean;
@@ -800,6 +819,8 @@ function SendButtonTooltip({
   buttonIconSize: number;
   sendKeys: ShortcutChord | null | undefined;
   sendTooltipLabel: string;
+  /** The Clisbot chat layout's larger Send circle. */
+  sendFaceStyle?: React.ComponentProps<typeof View>["style"];
 }) {
   if (!shouldShow) return null;
   return (
@@ -820,6 +841,7 @@ function SendButtonTooltip({
             style={[
               composerActionGeometry.face,
               composerActionGeometry.primary,
+              sendFaceStyle,
               submitLabel ? styles.sendFaceLabeled : undefined,
             ]}
           >
@@ -1276,8 +1298,11 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     } = resolveMessageInputProps(props);
     const { isPaneFocused } = useComposerKeyboardScope();
     const mode = resolveComposerInputMode(inputMode);
+    // Clisbot: a chat composer takes the Telegram-style layout; a terminal prompt keeps its own.
+    const usesChatLayout = COMPOSER_LAYOUT_ENABLED && inputMode === "chat";
     const { t } = useTranslation();
     const isCompact = useIsCompactFormFactor();
+    const chatGeometry = resolveChatComposerGeometry(isCompact);
     const { height: windowHeight } = useWindowDimensions();
     const editingSession = useComposerEditingSession(inputMode, props.editingSession);
     const isFullscreen = useComposerFullscreen(editingSession);
@@ -1372,7 +1397,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const composerHeight = useComposerHeight({
       getText: getLiveText,
       textareaRef: webTextareaRef,
-      minHeight: MIN_INPUT_HEIGHT,
+      minHeight: usesChatLayout && isWeb ? CHAT_COMPOSER_WEB_MIN_INPUT_HEIGHT : MIN_INPUT_HEIGHT,
       maxHeight: maxInputHeight,
       onRenderedLinesChange: setRenderedLines,
       presentationKey: isFullscreen,
@@ -1875,12 +1900,15 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     );
 
     const attachButtonStyle = useCallback(
-      ({ hovered }: { hovered?: boolean }) => [
-        styles.attachButton,
-        Boolean(hovered) && styles.iconButtonHovered,
-        (!isConnected || disabled) && styles.buttonDisabled,
-      ],
-      [isConnected, disabled],
+      ({ hovered }: { hovered?: boolean }) =>
+        usesChatLayout
+          ? [composerActionGeometry.target, (!isConnected || disabled) && styles.buttonDisabled]
+          : [
+              styles.attachButton,
+              Boolean(hovered) && styles.iconButtonHovered,
+              (!isConnected || disabled) && styles.buttonDisabled,
+            ],
+      [isConnected, disabled, usesChatLayout],
     );
 
     const voiceButtonStyle = useCallback(
@@ -1892,6 +1920,15 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       void handleStopRealtimeVoice();
     }, [handleStopRealtimeVoice]);
 
+    // Clisbot chat layout: the pill draws its own shape; the caller's background still applies.
+    const chatPillStyle = useMemo(
+      () => [
+        isCompact && !isFullscreen && styles.inputWrapperCompact,
+        readOnly && styles.inputWrapperReadOnly,
+        inputWrapperStyle,
+      ],
+      [inputWrapperStyle, isCompact, isFullscreen, readOnly],
+    );
     const inputWrapperCombinedStyle = useMemo(
       () => [
         styles.inputWrapper,
@@ -1912,9 +1949,10 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         styles.textInput,
         mode.isMonospace && styles.textInputMonospace,
         isFullscreen ? styles.fullscreenTextInput : composerHeightStyle,
-        isCompact && !isFullscreen && styles.compactTextInput,
+        // The Clisbot chat layout puts the fullscreen button above Send instead.
+        isCompact && !isFullscreen && !usesChatLayout && styles.compactTextInput,
       ],
-      [composerHeightStyle, mode.isMonospace, isFullscreen, isCompact],
+      [composerHeightStyle, mode.isMonospace, isFullscreen, isCompact, usesChatLayout],
     );
     // Static content has no textarea to mirror, so it grows with its own text
     // instead of the measured input height.
@@ -1933,12 +1971,24 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     });
     const sendButtonCombinedStyle = useMemo(
       () => [
-        composerActionGeometry.target,
-        styles.sendButton,
+        usesChatLayout
+          ? [
+              styles.chatLayoutSendTarget,
+              { width: chatGeometry.pillRowHeight, height: chatGeometry.pillRowHeight },
+            ]
+          : [composerActionGeometry.target, styles.sendButton],
         submitLabel ? styles.sendButtonLabeled : undefined,
         isPresentedSendDisabled && styles.buttonDisabled,
       ],
-      [isPresentedSendDisabled, submitLabel],
+      [chatGeometry.pillRowHeight, isPresentedSendDisabled, submitLabel, usesChatLayout],
+    );
+    // Clisbot chat layout: Send is the pill's one filled circle, larger than the upstream face.
+    const chatLayoutSendFaceStyle = useMemo(
+      () =>
+        usesChatLayout
+          ? { width: chatGeometry.sendFace, height: chatGeometry.sendFace }
+          : undefined,
+      [chatGeometry.sendFace, usesChatLayout],
     );
     const overlayContainerStyle = useMemo(
       () => [styles.overlayContainer, { opacity: surfacePresentation.overlay.opacity }],
@@ -1950,10 +2000,11 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         <AttachButtonIcon
           hovered={Boolean(hovered)}
           onAttachButtonRef={onAttachButtonRef}
-          buttonIconSize={buttonIconSize}
+          buttonIconSize={usesChatLayout && isCompact ? ICON_SIZE.lg : buttonIconSize}
+          chatLayout={usesChatLayout}
         />
       ),
-      [onAttachButtonRef, buttonIconSize],
+      [onAttachButtonRef, buttonIconSize, usesChatLayout, isCompact],
     );
 
     const renderVoiceButtonIcon = useCallback(
@@ -1996,9 +2047,10 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           submitIcon={submitIcon}
           submitLabel={submitLabel}
           submitButtonTestID={submitButtonTestID}
-          buttonIconSize={isCompact ? ICON_SIZE.lg : buttonIconSize}
+          buttonIconSize={isCompact || usesChatLayout ? ICON_SIZE.lg : buttonIconSize}
           sendKeys={DEFAULT_SEND_KEYS}
           sendTooltipLabel={sendTooltipLabel}
+          sendFaceStyle={chatLayoutSendFaceStyle}
         />
       ),
       [
@@ -2019,7 +2071,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         submitButtonTestID,
         buttonIconSize,
         isCompact,
+        usesChatLayout,
         sendTooltipLabel,
+        chatLayoutSendFaceStyle,
       ],
     );
     const textSurface = useMemo(
@@ -2055,7 +2109,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             fullscreen={isFullscreen}
             compact={isCompact}
             onRenderedLinesChange={setRenderedLines}
-            focusHintVisible={!isFullscreen && isWeb && !isInputFocused && !value}
+            focusHintVisible={
+              !isFullscreen && isWeb && !isInputFocused && !value && !(usesChatLayout && isCompact)
+            }
             focusInputKeys={focusInputKeys}
             focusHintLabel={t("composer.input.focusHint", {
               shortcut: focusInputKeys ? formatShortcut(focusInputKeys[0], getShortcutOs()) : "",
@@ -2089,44 +2145,20 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         isInputFocused,
         value,
         focusInputKeys,
+        usesChatLayout,
       ],
     );
-    const toolbar = useMemo(
+    const attachDropdown = useMemo(
       () => (
-        <View style={styles.buttonRow}>
-          {/* Toolbar left: attachment button + agent controls */}
-          <View style={styles.leftButtonGroup}>
-            <AttachmentDropdown
-              visible={showAttachments}
-              isConnected={isConnected}
-              disabled={disabled}
-              attachButtonStyle={attachButtonStyle}
-              renderAttachButtonIcon={renderAttachButtonIcon}
-              attachmentMenuItems={attachmentMenuItems}
-              addAttachmentLabel={t("composer.input.addAttachment")}
-            />
-            {leftContent}
-          </View>
-
-          {/* Right: voice button, contextual button (realtime/send/cancel) */}
-          <View style={styles.rightButtonGroup}>
-            {beforeVoiceContent}
-            <VoiceButtonTooltip
-              visible={mode.showVoice}
-              onVoicePress={handleVoicePress}
-              isDictationStartEnabled={isDictationStartEnabled}
-              voiceButtonAccessibilityLabel={voiceButtonAccessibilityLabel}
-              voiceButtonStyle={voiceButtonStyle}
-              renderVoiceButtonIcon={renderVoiceButtonIcon}
-              voiceTooltipText={voiceTooltipText}
-              isRealtimeVoiceForCurrentAgent={isRealtimeVoiceForCurrentAgent}
-              voiceMuteToggleKeys={voiceMuteToggleKeys}
-              dictationToggleKeys={dictationToggleKeys}
-            />
-            {rightContent}
-            {sendButton}
-          </View>
-        </View>
+        <AttachmentDropdown
+          visible={showAttachments}
+          isConnected={isConnected}
+          disabled={disabled}
+          attachButtonStyle={attachButtonStyle}
+          renderAttachButtonIcon={renderAttachButtonIcon}
+          attachmentMenuItems={attachmentMenuItems}
+          addAttachmentLabel={t("composer.input.addAttachment")}
+        />
       ),
       [
         showAttachments,
@@ -2136,8 +2168,24 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         renderAttachButtonIcon,
         attachmentMenuItems,
         t,
-        leftContent,
-        beforeVoiceContent,
+      ],
+    );
+    const voiceButton = useMemo(
+      () => (
+        <VoiceButtonTooltip
+          visible={mode.showVoice}
+          onVoicePress={handleVoicePress}
+          isDictationStartEnabled={isDictationStartEnabled}
+          voiceButtonAccessibilityLabel={voiceButtonAccessibilityLabel}
+          voiceButtonStyle={voiceButtonStyle}
+          renderVoiceButtonIcon={renderVoiceButtonIcon}
+          voiceTooltipText={voiceTooltipText}
+          isRealtimeVoiceForCurrentAgent={isRealtimeVoiceForCurrentAgent}
+          voiceMuteToggleKeys={voiceMuteToggleKeys}
+          dictationToggleKeys={dictationToggleKeys}
+        />
+      ),
+      [
         mode.showVoice,
         handleVoicePress,
         isDictationStartEnabled,
@@ -2148,8 +2196,74 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         isRealtimeVoiceForCurrentAgent,
         voiceMuteToggleKeys,
         dictationToggleKeys,
+      ],
+    );
+    const toolbar = useMemo(
+      () => (
+        <View style={styles.buttonRow}>
+          {/* Toolbar left: attachment button + agent controls */}
+          <View style={styles.leftButtonGroup}>
+            {attachDropdown}
+            {leftContent}
+          </View>
+
+          {/* Right: voice button, contextual button (realtime/send/cancel) */}
+          <View style={styles.rightButtonGroup}>
+            {beforeVoiceContent}
+            {voiceButton}
+            {rightContent}
+            {sendButton}
+          </View>
+        </View>
+      ),
+      [attachDropdown, leftContent, beforeVoiceContent, voiceButton, rightContent, sendButton],
+    );
+    // Clisbot chat layout: the commands button types `/` for the autocomplete to list commands.
+    const handleCommandsPress = useCallback(() => {
+      const snapshot = getComposerInputSnapshot(
+        textInputRef.current,
+        valueRef.current,
+        selectionRef.current,
+      );
+      const edit = resolveSlashTriggerEdit(snapshot.text, snapshot.selection);
+      replaceText(edit.text, edit.selection);
+      onSelectionChangeCallback?.(edit.selection);
+      textInputRef.current?.focus();
+    }, [onSelectionChangeCallback, replaceText]);
+    const chatSlots = useMemo(
+      () => ({
+        commands:
+          mode.showAutocomplete && !readOnly ? (
+            <ComposerCommandsButton
+              onPress={handleCommandsPress}
+              disabled={Boolean(disabled) || isDictating || isRealtimeVoiceForCurrentAgent}
+              iconSize={isCompact ? ICON_SIZE.lg : buttonIconSize}
+            />
+          ) : null,
+        attach: attachDropdown,
+        dictation: voiceButton,
+        realtimeVoice: rightContent,
+        sendable: primaryActionKind === "send",
+        primary: primaryActionKind === "none" ? null : sendButton,
+        settings: leftContent,
+        settingsEnd: beforeVoiceContent,
+      }),
+      [
+        mode.showAutocomplete,
+        readOnly,
+        handleCommandsPress,
+        disabled,
+        isDictating,
+        isRealtimeVoiceForCurrentAgent,
+        isCompact,
+        buttonIconSize,
+        attachDropdown,
+        voiceButton,
         rightContent,
+        primaryActionKind,
         sendButton,
+        leftContent,
+        beforeVoiceContent,
       ],
     );
     const voiceOverlay = useMemo(
@@ -2197,6 +2311,12 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         handleRealtimeVoiceStop,
       ],
     );
+    const showFullscreenButton = shouldShowFullscreenControl(
+      isCompact,
+      readOnly,
+      showOverlay,
+      renderedLines,
+    );
     return (
       <View
         ref={rootRef}
@@ -2209,27 +2329,45 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           autoFocusKey={autoFocusKey}
           textInputRef={textInputRef}
         />
-        <ComposerInputPresentation
-          fullscreen={isFullscreen}
-          sendIconSize={buttonIconSize}
-          surface={textSurface}
-          toolbar={toolbar}
-          send={sendButton}
-          error={props.submissionError}
-          onExit={exitFullscreen}
-          inputWrapperRef={inputWrapperRef}
-          inputWrapperStyle={inputWrapperCombinedStyle}
-          inputPointerEvents={surfacePresentation.input.pointerEvents}
-          attachmentSlot={attachmentSlot}
-          showFullscreenButton={shouldShowFullscreenControl(
-            isCompact,
-            readOnly,
-            showOverlay,
-            renderedLines,
-          )}
-          onEnter={enterFullscreen}
-          overlay={voiceOverlay}
-        />
+        {usesChatLayout ? (
+          <ChatComposerPresentation
+            fullscreen={isFullscreen}
+            compact={isCompact}
+            multiline={renderedLines > 1}
+            hasAttachments={attachments.length > 0}
+            sendIconSize={ICON_SIZE.lg}
+            surface={textSurface}
+            send={sendButton}
+            error={props.submissionError}
+            onExit={exitFullscreen}
+            inputWrapperRef={inputWrapperRef}
+            pillStyle={chatPillStyle}
+            inputOpacity={surfacePresentation.input.opacity}
+            inputPointerEvents={surfacePresentation.input.pointerEvents}
+            attachmentSlot={attachmentSlot}
+            showFullscreenButton={showFullscreenButton}
+            onEnter={enterFullscreen}
+            overlay={voiceOverlay}
+            slots={chatSlots}
+          />
+        ) : (
+          <ComposerInputPresentation
+            fullscreen={isFullscreen}
+            sendIconSize={buttonIconSize}
+            surface={textSurface}
+            toolbar={toolbar}
+            send={sendButton}
+            error={props.submissionError}
+            onExit={exitFullscreen}
+            inputWrapperRef={inputWrapperRef}
+            inputWrapperStyle={inputWrapperCombinedStyle}
+            inputPointerEvents={surfacePresentation.input.pointerEvents}
+            attachmentSlot={attachmentSlot}
+            showFullscreenButton={showFullscreenButton}
+            onEnter={enterFullscreen}
+            overlay={voiceOverlay}
+          />
+        )}
       </View>
     );
   },
@@ -2375,6 +2513,12 @@ const styles = StyleSheet.create((theme: Theme) => ({
   },
   sendButton: {
     marginLeft: { xs: 0, md: theme.spacing[1] },
+  },
+  chatLayoutSendTarget: {
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    borderRadius: theme.borderRadius.full,
   },
   sendButtonLabeled: {
     width: "auto",

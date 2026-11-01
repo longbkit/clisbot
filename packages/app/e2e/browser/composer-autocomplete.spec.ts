@@ -6,7 +6,7 @@ import {
   type MockAgentWorkspace,
 } from "../support/helpers/mock-agent";
 import { expectWorkspaceTabVisible, openSessions } from "../support/helpers/archive-tab";
-import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
+import { installListCommandsResponse } from "../support/helpers/list-commands-stub";
 import { getServerId } from "../support/helpers/server-id";
 import { switchWorkspaceViaSidebar } from "../support/helpers/workspace-ui";
 import {
@@ -101,48 +101,8 @@ interface PopoverFrameRecorderWindow extends Window {
   __stopComposerAutocompleteFrameRecorder?: () => void;
 }
 
-async function installListCommandsStub(page: Page): Promise<void> {
-  await page.routeWebSocket(daemonWsRoutePattern(), (ws) => {
-    const server = ws.connectToServer();
-
-    ws.onMessage((message) => {
-      server.send(message);
-    });
-
-    server.onMessage((message) => {
-      if (typeof message !== "string") {
-        ws.send(message);
-        return;
-      }
-
-      try {
-        const parsed = JSON.parse(message) as {
-          type?: string;
-          message?: {
-            type?: string;
-            payload?: {
-              commands?: unknown;
-              error?: string | null;
-            };
-          };
-        };
-        if (
-          parsed.type === "session" &&
-          parsed.message?.type === "list_commands_response" &&
-          parsed.message.payload
-        ) {
-          parsed.message.payload.commands = TEST_COMMANDS;
-          parsed.message.payload.error = null;
-          ws.send(JSON.stringify(parsed));
-          return;
-        }
-      } catch {
-        // Forward non-JSON frames unchanged.
-      }
-
-      ws.send(message);
-    });
-  });
+function installListCommandsStub(page: Page): Promise<void> {
+  return installListCommandsResponse(page, TEST_COMMANDS);
 }
 
 async function openAppWideNewWorkspace(page: Page): Promise<void> {

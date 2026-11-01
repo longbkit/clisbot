@@ -1,3 +1,4 @@
+import { COMPOSER_LAYOUT_ENABLED } from "@/clisbot/composer-layout/feature";
 import { resolveQueueCapability } from "./queue-capability";
 import { useClientInputQueue, type ClientInputQueue } from "./client-input-queue";
 import { queueEditRevision } from "./queue-edit-revision";
@@ -241,8 +242,11 @@ function resolveMessagePlaceholder(
   if (inputMode === "terminal") {
     return t("composer.placeholders.terminal");
   }
-  return isDesktopWebBreakpoint
-    ? t("composer.placeholders.desktop")
+  if (isDesktopWebBreakpoint) return t("composer.placeholders.desktop");
+  // Clisbot chat layout: the commands button names /commands, and a phone's pill has room for
+  // one word beside its four buttons.
+  return COMPOSER_LAYOUT_ENABLED
+    ? t("composer.placeholders.fallback")
     : t("composer.placeholders.mobile");
 }
 

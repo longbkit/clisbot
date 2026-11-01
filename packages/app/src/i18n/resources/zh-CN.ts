@@ -1,3 +1,4 @@
+import { composerLayoutZhCN as composerLayout } from "./composer-layout";
 import { composerPickerZhCN as composerPicker } from "./composer-picker";
 import { hostQueueZhCN as hostQueue } from "./host-queue";
 import { en, type TranslationResources } from "./en";
@@ -133,6 +134,7 @@ export const zhCN: TranslationResources = {
   composer: {
     hostQueue,
     picker: composerPicker,
+    layout: composerLayout,
     placeholders: {
       desktop: "给 Agent 发消息，标记 @files，或使用 /commands 和 /skills",
       mobile: "发消息，@files，/commands",
