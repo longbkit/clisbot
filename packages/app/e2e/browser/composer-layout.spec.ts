@@ -140,6 +140,9 @@ async function expectCommandList(page: Page, shot: string) {
     timeout: 30_000,
   });
   await expect(input).toBeFocused();
+  // One list: no card above it repeats the highlighted row.
+  await expect(popover.getByText("/exit", { exact: true })).toHaveCount(1);
+  await expect(popover.getByText("/review", { exact: true })).toHaveCount(1);
   await screenshot(page, `${shot}-command-list`);
   await input.press("h");
   await expect(popover.getByText("/review", { exact: true })).toHaveCount(0);
@@ -151,6 +154,66 @@ async function expectCommandList(page: Page, shot: string) {
   await input.fill("/");
   await visible(page, "composer-commands-button").click();
   await expect(input).toHaveValue("");
+}
+
+async function caret(page: Page): Promise<number> {
+  return composerLocator(page).evaluate((node) => (node as HTMLTextAreaElement).selectionStart);
+}
+
+/** From the third line an expand button sits above Send; expanding keeps the text and caret. */
+async function expectExpand(page: Page, shot: string) {
+  const input = composerLocator(page);
+  const expand = page.getByRole("button", { name: "Fullscreen", exact: true });
+  await input.fill("First line\nSecond line");
+  await expect(send(page)).toBeVisible();
+  await expect(expand).toHaveCount(0);
+  const draft = "First line\nSecond line\nThird line";
+  await input.fill(draft);
+  const glyph = await box(expand);
+  const sendBox = await box(send(page));
+  expect(glyph.y + glyph.height).toBeLessThanOrEqual(sendBox.y + 0.5);
+  // On Send's rail.
+  expect(Math.abs(glyph.x + glyph.width / 2 - (sendBox.x + sendBox.width / 2))).toBeLessThan(1);
+  await expectInside(expand, visible(page, "composer-pill"));
+  await screenshot(page, `${shot}-3-lines`);
+  await input.evaluate((node) => (node as HTMLTextAreaElement).setSelectionRange(5, 5));
+  await expand.click();
+  await expectComposerFullscreenControls(page);
+  await expect(input).toHaveValue(draft);
+  await expect.poll(() => caret(page)).toBe(5);
+  // The same controls in the same order; only the text area grows.
+  const expanded = page.getByTestId("composer-fullscreen");
+  for (const id of ["composer-commands-button", "message-input-attach-button"]) {
+    await expect(expanded.getByTestId(id)).toBeVisible();
+  }
+  await expect(expanded.getByTestId("composer-settings-row")).toBeVisible();
+  await expect(expanded.getByTestId("composer-model-chip")).toBeVisible();
+  const collapse = page.getByRole("button", { name: "Exit fullscreen", exact: true });
+  await expectMinTarget(collapse, 44);
+  // Collapse sits at the text area's top right; the buttons form the pill's bottom bar.
+  const pillBox = await box(visible(page, "composer-pill"));
+  const collapseBox = await box(collapse);
+  expect(collapseBox.y - pillBox.y).toBeLessThan(collapseBox.height);
+  expect(pillBox.x + pillBox.width - (collapseBox.x + collapseBox.width)).toBeLessThan(12);
+  expect(pillBox.height).toBeGreaterThan(300);
+  const barSend = await box(send(page));
+  expect(pillBox.y + pillBox.height - (barSend.y + barSend.height)).toBeLessThan(4);
+  const text = await box(input);
+  expect(text.y + text.height).toBeLessThanOrEqual(barSend.y + 0.5);
+  await screenshot(page, `${shot}-expanded`);
+  await exitComposerFullscreen(page);
+  await expect(input).toHaveValue(draft);
+  await expect.poll(() => caret(page)).toBe(5);
+  await input.fill("");
+}
+
+async function darkShots(page: Page, shot: string) {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await screenshot(page, `${shot}-idle-dark`);
+  await composerLocator(page).fill("Typing in the pill, the Send button sits inside it");
+  await screenshot(page, `${shot}-typing-dark`);
+  await composerLocator(page).fill("");
+  await page.emulateMedia({ colorScheme: "light" });
 }
 
 test("desktop: the pill, Send inside it, commands and the settings row", async ({ page }) => {
@@ -173,6 +236,8 @@ test("desktop: the pill, Send inside it, commands and the settings row", async (
     });
 
     await expectCommandList(page, "desktop");
+    await expectExpand(page, "desktop");
+    await darkShots(page, "desktop");
 
     await visible(page, "message-input-attach-button").click();
     await expect(page.getByTestId("message-input-attachment-menu")).toBeVisible();
@@ -197,7 +262,7 @@ test("desktop: the pill, Send inside it, commands and the settings row", async (
   }
 });
 
-test("phone: 44px buttons beside the pill, Send inside, a collapsed settings row", async ({
+test("phone: Commands and attach inside the pill, voice beside it, a collapsed row", async ({
   page,
 }) => {
   test.setTimeout(180_000);
@@ -205,30 +270,28 @@ test("phone: 44px buttons beside the pill, Send inside, a collapsed settings row
   await installListCommandsResponse(page, COMMANDS);
   const workspace = await openCodexAgent(page, "composer-layout-phone-");
   try {
-    for (const target of [
-      visible(page, "composer-commands-button"),
-      visible(page, "message-input-attach-button"),
-      dictation(page),
-      realtimeVoice(page),
-    ]) {
+    const pill = visible(page, "composer-pill");
+    const commands = visible(page, "composer-commands-button");
+    const attach = visible(page, "message-input-attach-button");
+    for (const target of [commands, attach, dictation(page), realtimeVoice(page)]) {
       await expectMinTarget(target, 44);
     }
+    await expectInside(commands, pill);
+    await expectInside(attach, pill);
+    const pillBox = await box(pill);
+    expect((await box(dictation(page))).x).toBeGreaterThanOrEqual(pillBox.x + pillBox.width);
+    expect((await box(realtimeVoice(page))).x).toBeGreaterThanOrEqual(pillBox.x + pillBox.width);
+    // The inner buttons and the text share the pill's one-line center.
+    const commandsBox = await box(commands);
+    expect(
+      Math.abs(commandsBox.y + commandsBox.height / 2 - (pillBox.y + pillBox.height / 2)),
+    ).toBeLessThan(1);
     await expectSendSwap(page, "phone");
     await composerLocator(page).fill("h");
     await expectMinTarget(send(page), 44);
-    // A grown pill puts the fullscreen button above Send; the text keeps its width.
-    const draft = "First line\nSecond line\nThird line";
-    await composerLocator(page).fill(draft);
-    const fullscreen = page.getByRole("button", { name: "Fullscreen", exact: true });
-    const glyph = await box(fullscreen);
-    expect(glyph.y + glyph.height).toBeLessThanOrEqual((await box(send(page))).y + 0.5);
-    await expectInside(fullscreen, visible(page, "composer-pill"));
-    await screenshot(page, "phone-grown");
-    await fullscreen.click();
-    await expectComposerFullscreenControls(page);
-    await exitComposerFullscreen(page);
-    await expect(composerLocator(page)).toHaveValue(draft);
-    await composerLocator(page).fill("");
+    await expectInside(commands, pill);
+    await expectExpand(page, "phone");
+    await darkShots(page, "phone");
 
     // A phone shows the mode as its icon, named for assistive tech.
     await expect(visible(page, "mode-control")).toHaveText("");

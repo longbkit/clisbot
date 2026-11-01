@@ -406,7 +406,14 @@ export async function expectComposerDraftSelection(
 }
 export async function expectComposerFullscreenControls(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: "Exit fullscreen", exact: true })).toBeVisible();
-  await expect(page.getByTestId("composer-fullscreen").getByRole("button")).toHaveCount(2);
+  const fullscreen = page.getByTestId("composer-fullscreen");
+  // The Clisbot chat layout keeps every composer control in the expanded editor; the upstream
+  // fullscreen shows only exit and Send.
+  if ((await fullscreen.getByTestId("composer-pill").count()) === 0) {
+    await expect(fullscreen.getByRole("button")).toHaveCount(2);
+  } else {
+    await expect(fullscreen.getByTestId("composer-pill-primary")).toBeVisible();
+  }
   await expect(composerInput(page)).toHaveCount(1);
 }
 /** The fullscreen frame and its submit button sit inside the browser's visible viewport. */

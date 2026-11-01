@@ -28,15 +28,18 @@ export function useComposerFullscreenChrome({
   showFullscreenButton,
   onExit,
   onEnter,
-  enterInFlow = false,
+  inFlow = false,
 }: {
   fullscreen: boolean;
   sendIconSize: number;
   showFullscreenButton: boolean;
   onExit: () => void;
   onEnter: () => void;
-  /** The enter button lays out in its parent instead of pinning to the text's top corner. */
-  enterInFlow?: boolean;
+  /**
+   * Both buttons lay out in their parent as 44px targets (the Clisbot chat layout puts them
+   * above Send) instead of pinning to the text's corner and the fullscreen header.
+   */
+  inFlow?: boolean;
 }) {
   const { t } = useTranslation();
   // A retained tab keeps its fullscreen editor mounted while hidden; the global exit
@@ -59,22 +62,21 @@ export function useComposerFullscreenChrome({
   // The toolbar row bleeds 6px past the input padding; the inline glyph sits on that edge.
   const enterStyle = useMemo(() => [styles.enterButton, { right: -6 + railOffset }], [railOffset]);
   const exitStyle = useMemo(() => [styles.iconButton, { marginRight: railOffset }], [railOffset]);
-  const exitButton = fullscreen ? (
-    <View style={styles.exitRow}>
-      <Button
-        variant="ghost"
-        size="xs"
-        accessibilityLabel={t("composer.input.exitFullscreen")}
-        onPointerDown={keepEditorFocused}
-        onPress={onExit}
-        style={exitStyle}
-        leftIcon={minimizeIcon}
-        hitSlop={8}
-      >
-        {null}
-      </Button>
-    </View>
+  const exit = fullscreen ? (
+    <Button
+      variant="ghost"
+      size="xs"
+      accessibilityLabel={t("composer.input.exitFullscreen")}
+      onPointerDown={keepEditorFocused}
+      onPress={onExit}
+      style={inFlow ? styles.inFlowButton : exitStyle}
+      leftIcon={minimizeIcon}
+      hitSlop={8}
+    >
+      {null}
+    </Button>
   ) : null;
+  const exitButton = exit && !inFlow ? <View style={styles.exitRow}>{exit}</View> : exit;
   const enterButton =
     showFullscreenButton && !fullscreen ? (
       <Button
@@ -84,7 +86,7 @@ export function useComposerFullscreenChrome({
         leftIcon={maximizeIcon}
         onPointerDown={keepEditorFocused}
         onPress={onEnter}
-        style={enterInFlow ? styles.iconButton : enterStyle}
+        style={inFlow ? styles.inFlowButton : enterStyle}
         hitSlop={8}
       >
         {null}
@@ -176,6 +178,13 @@ const styles = StyleSheet.create((theme) => ({
   iconButton: {
     width: CONTROL_SIZE,
     height: CONTROL_SIZE,
+    padding: 0,
+    borderWidth: 0,
+    borderRadius: theme.borderRadius.full,
+  },
+  inFlowButton: {
+    width: 44,
+    height: 44,
     padding: 0,
     borderWidth: 0,
     borderRadius: theme.borderRadius.full,

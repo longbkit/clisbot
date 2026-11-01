@@ -78,7 +78,6 @@ function mount(
     hasAttachments: false,
     sendIconSize: 20,
     surface: <Text testID="surface">Message…</Text>,
-    send: <Piece id="send-footer" />,
     error: null,
     onExit: vi.fn(),
     inputWrapperRef: createRef<View>(),
@@ -155,23 +154,39 @@ it("drops the settings row where a surface hides every control", async () => {
   expect(screen.queryByTestId("commands")).toBeNull();
 });
 
-it("shows only the editor and the footer Send in fullscreen", async () => {
-  await page.viewport(1280, 900);
-  mount({ fullscreen: true, slots: slots({ sendable: true, primary: <Piece id="send" /> }) });
+it("keeps every control in the expanded editor; only the text area grows", async () => {
+  await page.viewport(390, 844);
+  mount({ fullscreen: true, compact: true, slots: slots({ primary: <Piece id="send" /> }) });
   expect(screen.getByTestId("composer-fullscreen")).toBeTruthy();
-  expect(screen.queryByTestId("composer-outer-start")).toBeNull();
-  expect(screen.queryByTestId("composer-settings-row")).toBeNull();
-  expect(screen.queryByTestId("composer-pill-primary")).toBeNull();
-  expect(screen.getByTestId("send-footer")).toBeTruthy();
+  expect(within("composer-inner-start", "commands")).toBe(true);
+  expect(within("composer-pill-primary", "send")).toBe(true);
+  expect(within("composer-outer-end", "dictation")).toBe(true);
+  for (const id of ["model", "mode", "ring"]) {
+    expect(within("composer-settings-row", id)).toBe(true);
+  }
+  expect(screen.getByRole("button", { name: "Exit fullscreen" })).toBeTruthy();
+  expect(screen.getByText("Message")).toBeTruthy();
 });
 
-it("keeps voice inside the pill on a phone until Send takes its place", async () => {
+it("puts Commands and attach inside a phone's pill, dictation and voice beside it", async () => {
   await page.viewport(390, 844);
   mount({ compact: true });
-  expect(within("composer-pill-primary", "voice")).toBe(true);
+  expect(screen.queryByTestId("composer-outer-start")).toBeNull();
+  expect(within("composer-inner-start", "commands")).toBe(true);
+  expect(within("composer-inner-start", "attach")).toBe(true);
+  expect(within("composer-pill", "commands")).toBe(true);
   expect(within("composer-outer-end", "dictation")).toBe(true);
-  cleanup();
-  mount({ compact: true, slots: slots({ sendable: true, primary: <Piece id="send" /> }) });
-  expect(screen.queryByTestId("voice")).toBeNull();
-  expect(within("composer-pill-primary", "send")).toBe(true);
+  expect(within("composer-outer-end", "voice")).toBe(true);
+  // The settings row starts on the pill's edge.
+  const pill = screen.getByTestId("composer-pill").getBoundingClientRect();
+  const row = screen.getByTestId("composer-settings-row").getBoundingClientRect();
+  expect(row.left).toBe(pill.left);
+});
+
+it("starts the settings row on the pill's edge beside the outer buttons", async () => {
+  await page.viewport(1280, 900);
+  mount();
+  const pill = screen.getByTestId("composer-pill").getBoundingClientRect();
+  const row = screen.getByTestId("composer-settings-row").getBoundingClientRect();
+  expect(row.left).toBe(pill.left);
 });

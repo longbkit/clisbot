@@ -467,7 +467,9 @@ test.describe("Composer autocomplete", () => {
       const afterDelete = await visiblePopoverBox(page);
 
       expect(Math.abs(afterDelete.bottom - beforeDelete.bottom)).toBeLessThanOrEqual(4);
-      expect(afterDelete.height).toBeGreaterThan(beforeDelete.height);
+      // More matches never shrink the list. Without the Clisbot chat layout's removed command
+      // card both searches can already fill the list's maximum height.
+      expect(afterDelete.height).toBeGreaterThanOrEqual(beforeDelete.height);
     } finally {
       await agent.cleanup();
     }

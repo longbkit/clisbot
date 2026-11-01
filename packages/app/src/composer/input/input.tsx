@@ -71,7 +71,10 @@ import { ChatComposerPresentation } from "@/clisbot/composer-layout/chat-compose
 import { ComposerCommandsButton } from "@/clisbot/composer-layout/commands-button";
 import {
   CHAT_COMPOSER_WEB_MIN_INPUT_HEIGHT,
+  chatComposerInnerAction,
+  resolveChatActionPlacement,
   resolveChatComposerGeometry,
+  type ChatActionPlacement,
 } from "@/clisbot/composer-layout/geometry";
 import { resolveSlashTriggerEdit } from "@/clisbot/composer-layout/slash-trigger";
 import { resolveComposerInputMode, type ComposerInputMode } from "@/composer/input-mode";
@@ -253,17 +256,22 @@ function AttachButtonIcon({
   hovered: boolean;
   onAttachButtonRef: ((node: View | null) => void) | undefined;
   buttonIconSize: number;
-  /** Beside the pill (Clisbot chat layout): the composer's action face, like dictation. */
-  chatLayout: boolean;
+  /**
+   * Clisbot chat layout: beside the pill the composer's action face, like dictation; inside a
+   * phone's pill a face with no fill at rest.
+   */
+  chatLayout: ChatActionPlacement | null;
 }) {
   const colorMapping = hovered ? iconForegroundMapping : iconForegroundMutedMapping;
-  const faceStyle = chatLayout
-    ? [
-        composerActionGeometry.face,
-        composerActionGeometry.neutral,
-        hovered && composerActionGeometry.hovered,
-      ]
-    : styles.attachButtonAnchor;
+  const chatFace =
+    chatLayout === "inner"
+      ? [chatComposerInnerAction.face, hovered && chatComposerInnerAction.hovered]
+      : [
+          composerActionGeometry.face,
+          composerActionGeometry.neutral,
+          hovered && composerActionGeometry.hovered,
+        ];
+  const faceStyle = chatLayout ? chatFace : styles.attachButtonAnchor;
   return (
     <View ref={onAttachButtonRef} collapsable={false} style={faceStyle}>
       <ThemedPlus size={buttonIconSize} uniProps={colorMapping} />
@@ -1903,13 +1911,16 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const attachButtonStyle = useCallback(
       ({ hovered }: { hovered?: boolean }) =>
         usesChatLayout
-          ? [composerActionGeometry.target, (!isConnected || disabled) && styles.buttonDisabled]
+          ? [
+              isCompact ? chatComposerInnerAction.target : composerActionGeometry.target,
+              (!isConnected || disabled) && styles.buttonDisabled,
+            ]
           : [
               styles.attachButton,
               Boolean(hovered) && styles.iconButtonHovered,
               (!isConnected || disabled) && styles.buttonDisabled,
             ],
-      [isConnected, disabled, usesChatLayout],
+      [isConnected, disabled, usesChatLayout, isCompact],
     );
 
     const voiceButtonStyle = useCallback(
@@ -2002,7 +2013,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           hovered={Boolean(hovered)}
           onAttachButtonRef={onAttachButtonRef}
           buttonIconSize={usesChatLayout && isCompact ? ICON_SIZE.lg : buttonIconSize}
-          chatLayout={usesChatLayout}
+          chatLayout={resolveChatActionPlacement(usesChatLayout, isCompact)}
         />
       ),
       [onAttachButtonRef, buttonIconSize, usesChatLayout, isCompact],
@@ -2239,14 +2250,16 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
               onPress={handleCommandsPress}
               disabled={Boolean(disabled) || isDictating || isRealtimeVoiceForCurrentAgent}
               iconSize={isCompact ? ICON_SIZE.lg : buttonIconSize}
+              inner={isCompact}
             />
           ) : null,
-        attach: attachDropdown,
+        attach: showAttachments ? attachDropdown : null,
         dictation: voiceButton,
         realtimeVoice: rightContent,
         // Content, not an always-shown submit such as New workspace's Create, hides the voice.
         sendable: hasSendableContent,
-        primary: primaryActionKind === "none" ? null : sendButton,
+        // The expanded editor always shows Send, disabled while empty, as upstream fullscreen does.
+        primary: primaryActionKind === "none" && !isFullscreen ? null : sendButton,
         settings: leftContent,
         settingsEnd: beforeVoiceContent,
       }),
@@ -2259,11 +2272,13 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         isRealtimeVoiceForCurrentAgent,
         isCompact,
         buttonIconSize,
+        showAttachments,
         attachDropdown,
         voiceButton,
         rightContent,
         hasSendableContent,
         primaryActionKind,
+        isFullscreen,
         sendButton,
         leftContent,
         beforeVoiceContent,
@@ -2314,8 +2329,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         handleRealtimeVoiceStop,
       ],
     );
+    // Clisbot chat layout: the expand button shows from the third line on every width.
     const showFullscreenButton = shouldShowFullscreenControl(
-      isCompact,
+      isCompact || usesChatLayout,
       readOnly,
       showOverlay,
       renderedLines,
@@ -2340,7 +2356,6 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             hasAttachments={attachments.length > 0}
             sendIconSize={ICON_SIZE.lg}
             surface={textSurface}
-            send={sendButton}
             error={props.submissionError}
             onExit={exitFullscreen}
             inputWrapperRef={inputWrapperRef}

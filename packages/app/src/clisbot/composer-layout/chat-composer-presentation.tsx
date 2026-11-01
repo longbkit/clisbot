@@ -1,31 +1,32 @@
-import { useMemo, useRef, type ReactNode, type Ref } from "react";
-import { View, type ViewProps } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
-import { ComposerFullscreenBody, ComposerFullscreenFooter } from "@/composer/dock";
-import {
-  composerFullscreenStyles as fullscreenStyles,
-  useComposerFullscreenChrome,
-} from "@/composer/input/presentation";
-import { isWeb } from "@/constants/platform";
+import { useRef, type ReactNode, type Ref } from "react";
+import { Text, View, type ViewProps } from "react-native";
+import { useTranslation } from "react-i18next";
+import { ComposerFullscreenBody } from "@/composer/dock";
+import { useComposerFullscreenChrome } from "@/composer/input/presentation";
+import { SPACING } from "@/styles/theme";
 import { ComposerFrameProvider } from "./frame-anchor";
 import { resolveChatComposerGeometry } from "./geometry";
+import {
+  chatLayoutStyles as styles,
+  resolveOuterStartWidth,
+  useChatLayoutStyles,
+} from "./layout-styles";
 import { ComposerSettingsRow } from "./settings-row";
 
 /** The pieces `MessageInput` builds, placed by the chat layout. */
 export interface ChatComposerSlots {
-  /** Beside the pill on the left: the commands button, then attach. */
+  /**
+   * Commands, then attach: beside the pill on its left on a wide window, inside it on its left
+   * edge on a phone, where four buttons beside the pill left the text no room.
+   */
   commands: ReactNode;
   attach: ReactNode;
-  /**
-   * Beside the pill on the right while nothing is sendable: dictation, then realtime voice. A
-   * phone has no room for four buttons beside the pill, so voice waits inside it, where Send
-   * appears.
-   */
+  /** Beside the pill on the right while nothing is sendable: dictation, then realtime voice. */
   dictation: ReactNode;
   realtimeVoice: ReactNode;
   /** Something is sendable: Send replaces dictation and voice, inside the pill. */
   sendable: boolean;
-  /** Send, or Stop while the agent runs; inside the pill, at its end. */
+  /** Send, Stop while the agent runs, or an always-shown submit (Create); the pill's end. */
   primary: ReactNode;
   /** Under the pill: Model, Mode and Tools at the start, the context ring at the end. */
   settings: ReactNode;
@@ -41,8 +42,6 @@ export interface ChatComposerPresentationProps {
   hasAttachments: boolean;
   sendIconSize: number;
   surface: ReactNode;
-  /** Send in the fullscreen footer. */
-  send: ReactNode;
   error: ReactNode;
   onExit: () => void;
   inputWrapperRef: Ref<View>;
@@ -57,204 +56,147 @@ export interface ChatComposerPresentationProps {
   slots: ChatComposerSlots;
 }
 
-/** Send or Stop; on a phone with nothing to send, realtime voice. */
-function resolvePillEnd({ fullscreen, compact, slots }: ChatComposerPresentationProps): ReactNode {
-  if (fullscreen) return null;
-  if (slots.primary != null) return slots.primary;
-  return compact && !slots.sendable ? (slots.realtimeVoice ?? null) : null;
-}
+type LayoutStyles = ReturnType<typeof useChatLayoutStyles>;
 
-function useLayoutStyles(props: ChatComposerPresentationProps) {
-  const geometry = resolveChatComposerGeometry(props.compact);
-  const { multiline, hasAttachments, compact, pillStyle, inputOpacity } = props;
-  const hasPrimary = resolvePillEnd(props) !== null;
-  return useMemo(
-    () => ({
-      body: [styles.body, { opacity: inputOpacity }],
-      pill: [
-        styles.pill,
-        compact ? styles.pillCompact : styles.pillRegular,
-        multiline || hasAttachments ? styles.pillBox : styles.pillRound,
-        hasAttachments && styles.pillWithAttachments,
-        hasPrimary && styles.pillWithPrimary,
-        pillStyle,
-      ],
-      pillRow: [styles.pillRow, { minHeight: geometry.pillRowHeight }],
-      textSurface: [styles.textSurface, { minHeight: geometry.pillRowHeight }],
-      primarySlot: [styles.primarySlot, { height: geometry.pillRowHeight }],
-      outer: [styles.outerGroup, { marginBottom: geometry.outerLift }],
-    }),
-    [compact, geometry, hasAttachments, hasPrimary, inputOpacity, multiline, pillStyle],
-  );
+function countPresent(...nodes: ReactNode[]): number {
+  return nodes.filter((node) => node != null).length;
 }
 
 function ChatComposerPill({
   props,
   layout,
-  enterButton,
+  expand,
+  collapse,
 }: {
   props: ChatComposerPresentationProps;
-  layout: ReturnType<typeof useLayoutStyles>;
-  enterButton: ReactNode;
+  layout: LayoutStyles;
+  /** From the third line, above Send. */
+  expand: ReactNode;
+  /** The expanded editor's collapse button, at the text area's top right. */
+  collapse: ReactNode;
 }) {
-  const { fullscreen } = props;
-  const primary = resolvePillEnd(props);
+  const { compact, slots } = props;
+  const innerStart = compact && countPresent(slots.commands, slots.attach) > 0;
+  const end = slots.primary ?? null;
   return (
     <View
       ref={props.inputWrapperRef}
-      style={fullscreen ? fullscreenStyles.fullscreenInputWrapper : layout.pill}
+      style={layout.pill}
       pointerEvents={props.inputPointerEvents}
       testID="composer-pill"
     >
-      {fullscreen ? null : props.attachmentSlot}
-      <View style={fullscreen ? styles.fill : layout.pillRow}>
-        <View style={fullscreen ? fullscreenStyles.fullscreenTextSurface : layout.textSurface}>
-          {props.surface}
-        </View>
-        {primary !== null ? (
-          // A grown pill puts the fullscreen button above Send, so the text keeps its width.
-          <View style={styles.pillEnd}>
-            {enterButton}
-            <View style={layout.primarySlot} testID="composer-pill-primary">
-              {primary}
+      {props.attachmentSlot}
+      <View style={layout.pillRow}>
+        {innerStart ? (
+          <View style={layout.innerStart} testID="composer-inner-start">
+            {slots.commands}
+            {slots.attach}
+          </View>
+        ) : null}
+        <View style={layout.textSurface}>{props.surface}</View>
+        {end !== null ? (
+          <View style={layout.pillEnd}>
+            {expand}
+            <View style={layout.endSlot} testID="composer-pill-primary">
+              {end}
             </View>
           </View>
         ) : null}
+        {collapse ? <View style={styles.collapseSlot}>{collapse}</View> : null}
       </View>
+    </View>
+  );
+}
+
+function useLayout(props: ChatComposerPresentationProps): LayoutStyles {
+  const { compact, slots } = props;
+  const geometry = resolveChatComposerGeometry(compact);
+  const outerStartCount = compact ? 0 : countPresent(slots.commands, slots.attach);
+  return useChatLayoutStyles({
+    compact,
+    fullscreen: props.fullscreen,
+    multiline: props.multiline,
+    hasAttachments: props.hasAttachments,
+    hasInnerStart: compact && countPresent(slots.commands, slots.attach) > 0,
+    hasEnd: slots.primary != null,
+    outerStartWidth: resolveOuterStartWidth(outerStartCount, geometry.outerTarget, SPACING[1]),
+    pillStyle: props.pillStyle,
+    inputOpacity: props.inputOpacity,
+  });
+}
+
+function ExpandedTitle({ style }: { style: ViewProps["style"] }) {
+  const { t } = useTranslation();
+  return (
+    <View style={style}>
+      <Text style={styles.title} accessibilityRole="header">
+        {t("composer.layout.expandedTitle")}
+      </Text>
     </View>
   );
 }
 
 /**
  * The chat composer, Telegram-style (docs/features/composer-picker/README.md, "Layout"): a pill
- * that grows with its text, commands and attach on its left, dictation and voice on its right
- * until something is sendable, Send inside it, and the settings row under it. The editor keeps
- * its place in the tree in both modes, as in `ComposerInputPresentation`, so fullscreen only
- * restyles the wrappers around it.
+ * that grows with its text, Commands and attach on its left (inside it on a phone), dictation
+ * and voice beside it on the right until something is sendable, Send inside it, and the
+ * settings row under it. Expanded, it is the same tree with the text area grown to fill the
+ * surface, so the editor and every control keep their place.
  */
 export function ChatComposerPresentation(props: ChatComposerPresentationProps) {
-  const { fullscreen, slots } = props;
+  const { fullscreen, compact, slots } = props;
   const frameRef = useRef<View>(null);
   const { exitScopeRef, exitButton, enterButton } = useComposerFullscreenChrome({
     ...props,
-    enterInFlow: true,
+    inFlow: true,
   });
-  const layout = useLayoutStyles(props);
-  const inline = !fullscreen;
-  const hasSettings = inline && (slots.settings != null || slots.settingsEnd != null);
+  const layout = useLayout(props);
+  const outerStart = !compact && countPresent(slots.commands, slots.attach) > 0;
+  const hasSettings = slots.settings != null || slots.settingsEnd != null;
   return (
     <View
       ref={exitScopeRef}
-      style={fullscreen ? fullscreenStyles.fullscreen : styles.root}
+      style={layout.root}
       testID={fullscreen ? "composer-fullscreen" : "composer-chat-layout"}
     >
-      {exitButton}
+      {fullscreen ? <ExpandedTitle style={layout.titleRow} /> : null}
       <ComposerFullscreenBody fullscreen={fullscreen}>
-        <View ref={frameRef} collapsable={false} style={fullscreen ? styles.fill : layout.body}>
+        <View ref={frameRef} collapsable={false} style={layout.body}>
           <ComposerFrameProvider frameRef={frameRef}>
-            <View style={fullscreen ? styles.fill : styles.outerRow}>
-              {inline ? (
+            <View style={layout.outerRow}>
+              {outerStart ? (
                 <View style={layout.outer} testID="composer-outer-start">
                   {slots.commands}
                   {slots.attach}
                 </View>
               ) : null}
-              <ChatComposerPill props={props} layout={layout} enterButton={enterButton} />
-              {inline && !slots.sendable ? (
+              <ChatComposerPill
+                props={props}
+                layout={layout}
+                expand={enterButton}
+                collapse={exitButton}
+              />
+              {slots.sendable ? null : (
                 <View style={layout.outer} testID="composer-outer-end">
                   {slots.dictation}
-                  {props.compact ? null : slots.realtimeVoice}
+                  {slots.realtimeVoice}
                 </View>
-              ) : null}
+              )}
             </View>
+            {/* The send error stays with the editor it belongs to; inline it shows above. */}
+            {fullscreen ? props.error : null}
             {hasSettings ? (
               <ComposerSettingsRow
                 start={slots.settings}
                 end={slots.settingsEnd}
-                initialNarrow={props.compact}
+                initialNarrow={compact}
+                style={layout.settingsRow}
               />
             ) : null}
           </ComposerFrameProvider>
         </View>
       </ComposerFullscreenBody>
-      {fullscreen ? (
-        <ComposerFullscreenFooter style={fullscreenStyles.footer}>
-          {props.error}
-          <View style={fullscreenStyles.sendRow}>{props.send}</View>
-        </ComposerFullscreenFooter>
-      ) : null}
       {props.overlay}
     </View>
   );
 }
-
-const styles = StyleSheet.create((theme) => ({
-  root: { flexShrink: 1, position: "relative" },
-  fill: { flex: 1, minHeight: 0 },
-  body: { flexShrink: 1, gap: theme.spacing[1] },
-  outerRow: {
-    flexShrink: 1,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: theme.spacing[1],
-  },
-  // The targets carry their own padding around the painted faces; a gap would only cost the pill
-  // width on a phone, where four of them sit beside it.
-  outerGroup: {
-    flexShrink: 0,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  // The composer is the one input that floats (design.md §5): the same surface, border and
-  // shadow as the upstream box, drawn as a pill.
-  pill: {
-    flex: 1,
-    minWidth: 0,
-    flexShrink: 1,
-    flexDirection: "column",
-    gap: theme.spacing[2],
-    backgroundColor: theme.colors.surfaceComposer,
-    borderWidth: theme.borderWidth[1],
-    borderColor: theme.colors.borderComposer,
-    ...theme.shadow.composer,
-    ...(isWeb
-      ? {
-          transitionProperty: "border-color",
-          transitionDuration: "200ms",
-          transitionTimingFunction: "ease-in-out",
-        }
-      : {}),
-  },
-  pillCompact: { paddingLeft: theme.spacing[3], paddingRight: theme.spacing[3] },
-  pillRegular: { paddingLeft: theme.spacing[4], paddingRight: theme.spacing[4] },
-  // Send sits at the pill's end, a few pixels in from the border.
-  pillWithPrimary: { paddingRight: theme.spacing[1] },
-  pillRound: { borderRadius: theme.borderRadius.full },
-  // A round end on a tall box reads as a capsule; a grown pill keeps the composer's corner.
-  pillBox: { borderRadius: theme.borderRadius["2xl"] },
-  pillWithAttachments: { paddingTop: theme.spacing[2] },
-  pillRow: {
-    flexShrink: 1,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: theme.spacing[1],
-  },
-  textSurface: {
-    flex: 1,
-    minWidth: 0,
-    flexShrink: 1,
-    justifyContent: "center",
-    position: "relative",
-    paddingVertical: theme.spacing[2],
-  },
-  pillEnd: {
-    alignSelf: "stretch",
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
-  primarySlot: {
-    flexShrink: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-}));

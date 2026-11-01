@@ -6,6 +6,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { composerActionGeometry } from "@/composer/action-geometry";
 import type { Theme } from "@/styles/theme";
+import { chatComposerInnerAction } from "./geometry";
 
 const ThemedMenu = withUnistyles(Menu);
 const mutedIcon = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
@@ -20,31 +21,41 @@ export function ComposerCommandsButton({
   onPress,
   disabled,
   iconSize,
+  inner,
 }: {
   onPress: () => void;
   disabled: boolean;
   iconSize: number;
+  /** Inside a phone's pill: no fill at rest, a 44px target as tall as the pill's row. */
+  inner: boolean;
 }) {
   const { t } = useTranslation();
   const label = t("composer.layout.commands");
   const style = useCallback(
-    () => [composerActionGeometry.target, disabled && styles.disabled],
-    [disabled],
+    () => [
+      inner ? chatComposerInnerAction.target : composerActionGeometry.target,
+      disabled && styles.disabled,
+    ],
+    [disabled, inner],
   );
   const renderFace = useCallback(
     ({ hovered }: PressableStateCallbackType & { hovered?: boolean }) => (
       <View
         testID="composer-commands-face"
-        style={[
-          composerActionGeometry.face,
-          composerActionGeometry.neutral,
-          hovered && composerActionGeometry.hovered,
-        ]}
+        style={
+          inner
+            ? [chatComposerInnerAction.face, hovered && chatComposerInnerAction.hovered]
+            : [
+                composerActionGeometry.face,
+                composerActionGeometry.neutral,
+                hovered && composerActionGeometry.hovered,
+              ]
+        }
       >
         <ThemedMenu size={iconSize} uniProps={hovered ? foregroundIcon : mutedIcon} />
       </View>
     ),
-    [iconSize],
+    [iconSize, inner],
   );
   return (
     <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>

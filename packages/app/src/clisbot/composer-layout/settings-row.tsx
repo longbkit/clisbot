@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { View, type LayoutChangeEvent } from "react-native";
+import { View, type LayoutChangeEvent, type ViewProps } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { readMeasuredWidth } from "@/hooks/use-container-width";
 
@@ -51,10 +51,13 @@ export function ComposerSettingsRow({
   start,
   end,
   initialNarrow,
+  style,
 }: {
   start: ReactNode;
   end: ReactNode;
   initialNarrow: boolean;
+  /** Where the row starts: the pill's left edge (`layout-styles.ts`). */
+  style?: ViewProps["style"];
 }) {
   const [narrow, setNarrow] = useState(initialNarrow);
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
@@ -63,9 +66,10 @@ export function ComposerSettingsRow({
     setNarrow((was) => resolveSettingsRowNarrow(width, was));
   }, []);
   const value = useMemo(() => ({ inRow: true, narrow }), [narrow]);
+  const rowStyle = useMemo(() => [styles.row, style], [style]);
   return (
     <SettingsRowContext.Provider value={value}>
-      <View style={styles.row} onLayout={handleLayout} testID="composer-settings-row">
+      <View style={rowStyle} onLayout={handleLayout} testID="composer-settings-row">
         <View style={styles.start}>{start}</View>
         {end ? <View style={styles.end}>{end}</View> : null}
       </View>

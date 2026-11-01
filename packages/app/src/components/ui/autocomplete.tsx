@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { File, Folder } from "lucide-react-native";
 import type { Theme } from "@/styles/theme";
 import { getScrollOffsetToRevealItem } from "./scroll-reveal";
+import { COMPOSER_LAYOUT_ENABLED } from "@/clisbot/composer-layout/feature";
 
 export interface AutocompleteOption {
   id: string;
@@ -106,6 +107,10 @@ function AutocompleteRow({
       ) : (
         <View style={styles.itemMainRow}>
           <Text style={styles.itemLabel}>{optionLabel}</Text>
+          {/* Clisbot chat layout: the row names its arguments; no card repeats the row. */}
+          {COMPOSER_LAYOUT_ENABLED && removeBoltGlyphs(option.detail) ? (
+            <Text style={styles.itemDetail}>{removeBoltGlyphs(option.detail)}</Text>
+          ) : null}
           {optionDescription ? (
             <Text style={styles.itemDescriptionInline} numberOfLines={1}>
               {optionDescription}
@@ -245,7 +250,9 @@ export function Autocomplete({
 
   return (
     <View style={styles.outerWrapper}>
-      {selectedOption?.kind === "command" && selectedOption.description ? (
+      {!COMPOSER_LAYOUT_ENABLED &&
+      selectedOption?.kind === "command" &&
+      selectedOption.description ? (
         <View style={styles.detailCard}>
           <Text style={styles.detailLabel}>
             {removeBoltGlyphs(selectedOption.label) ?? selectedOption.label}

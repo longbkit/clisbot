@@ -95,8 +95,8 @@ test.describe("Composer control density across tab switches", () => {
   });
 });
 
-// The Clisbot chat layout (docs/features/composer-picker/README.md, "Layout"): dictation beside
-// the pill, voice inside it on a phone, and Send inside it as a larger circle.
+// The Clisbot chat layout (docs/features/composer-picker/README.md, "Layout"): dictation and
+// voice beside the pill, and Send inside it as a larger circle.
 test("compact actions paint their faces inside separate 48px targets", async ({ page }) => {
   const workspace = await seedWorkspace({ repoPrefix: "composer-touch-target-" });
   try {
@@ -130,7 +130,7 @@ test("compact actions paint their faces inside separate 48px targets", async ({ 
     }
     await expectGeometry(dictation, "composer-dictation-face", 48, 36);
     await expectGeometry(voice, "composer-realtime-voice-face", 48, 36);
-    await expectSeparateAligned(voice, dictation);
+    await expectSeparateAligned(dictation, voice);
     await input.fill("A multiline draft\nwith a larger Send target");
     const send = page.getByRole("button", { name: "Send message", exact: true });
     await expect(send).toBeVisible();
@@ -138,7 +138,7 @@ test("compact actions paint their faces inside separate 48px targets", async ({ 
     await expectGeometry(send, "composer-send-face", 48, 40);
 
     await page.setViewportSize({ width: 1280, height: 900 });
-    await expectGeometry(send, "composer-send-face", 44, 36);
+    await expectGeometry(send, "composer-send-face", 48, 40);
     await page.setViewportSize({ width: 360, height: 740 });
     await expectGeometry(send, "composer-send-face", 48, 40);
     const bounds = (await send.boundingBox())!;
