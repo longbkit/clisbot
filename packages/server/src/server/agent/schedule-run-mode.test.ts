@@ -76,3 +76,43 @@ describe("a schedule run with no mode (B-1, current behavior pinned)", () => {
     }).toEqual(expected);
   });
 });
+
+// An agent's schedule must name a mode that asks (R-a). A run is still an unattended create, so
+// the ACP and OpenCode providers turn their own auto_accept on whatever the mode: pinned for the
+// same owner decision.
+describe("a schedule run with a mode that asks (B-1, current behavior pinned)", () => {
+  test.each<[provider: string, modes: readonly string[], mode: string, expected: ScheduleRunStart]>(
+    [
+      [
+        "claude",
+        ["default", "bypassPermissions"],
+        "default",
+        { modeId: "default", autoAccept: undefined },
+      ],
+      ["codex", ["auto", "full-access"], "auto", { modeId: "auto", autoAccept: undefined }],
+      [
+        "copilot",
+        [COPILOT_AGENT, "allow-all"],
+        COPILOT_AGENT,
+        { modeId: COPILOT_AGENT, autoAccept: true },
+      ],
+      [GENERIC_ACP, ["default", "yolo"], "default", { modeId: "default", autoAccept: true }],
+      ["opencode", ["build", "plan"], "build", { modeId: "build", autoAccept: true }],
+      ["omp", ["full", "ask"], "ask", { modeId: "ask", autoAccept: undefined }],
+    ],
+  )("%s with %j", (provider, modes, mode, expected) => {
+    const definition = registry[provider];
+    if (!definition) throw new Error(`No ${provider} provider`);
+    const resolved = definition.resolveCreateConfig({
+      provider,
+      requestedMode: mode,
+      featureValues: undefined,
+      parent: null,
+      unattended: true,
+      availableModes: runtimeModes(provider, modes),
+    });
+    expect({ modeId: resolved.modeId, autoAccept: resolved.featureValues?.auto_accept }).toEqual(
+      expected,
+    );
+  });
+});
