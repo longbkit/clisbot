@@ -28,13 +28,16 @@ export function useReasoningPreview(input: {
   const { enabled, rows, highlight, selectedKey, reasoning, onPickWithEffort } = input;
   // The latest of pointer and keyboard wins: moving the highlight ends a hover preview.
   useEffect(() => setHoveredKey(null), [highlight]);
+  // The column only changes content, never appears or leaves, so a row never moves under the
+  // pointer: with the selected model showing no efforts there is no column to preview in.
+  const hasColumn = reasoning.options.length > 0;
   const preview = useMemo(() => {
-    if (!enabled) return null;
+    if (!enabled || !hasColumn) return null;
     const row = rows.find((entry) => entry.favoriteKey === hoveredKey) ?? rows[highlight];
     // A row without efforts data (a fallback list) cannot preview.
     if (!row || row.favoriteKey === selectedKey || row.thinkingOptions === undefined) return null;
     return row;
-  }, [enabled, highlight, hoveredKey, rows, selectedKey]);
+  }, [enabled, hasColumn, highlight, hoveredKey, rows, selectedKey]);
   const previewed = useMemo<ReasoningProps>(() => {
     if (!preview) return reasoning;
     const { options } = normalizeReasoning(preview);

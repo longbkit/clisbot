@@ -93,6 +93,8 @@ interface HarnessExtras {
   providers?: ProviderSelectorProvider[];
   onEditProfiles?: () => void;
   onEditProfile?: (profileId: string) => void;
+  /** The selected model's efforts; the default three when absent. */
+  reasoningOptions?: typeof EFFORTS;
 }
 
 function Harness({
@@ -135,11 +137,11 @@ function Harness({
   const reasoning = useMemo(
     () => ({
       modelName: selected.model,
-      options: EFFORTS,
+      options: extras.reasoningOptions ?? EFFORTS,
       selectedId: "medium",
       onSelect: (id: string) => calls.efforts.push(id),
     }),
-    [calls, selected.model],
+    [calls, extras.reasoningOptions, selected.model],
   );
   return (
     <>
@@ -296,6 +298,20 @@ it("previews a hovered model's reasoning and restores the selected one's on leav
   await userEvent.hover(screen.getByTestId("composer-picker-rail-favorites"));
   await expect.poll(reasoningText).toContain("GPT-6-Astra");
   expect(screen.getByTestId("composer-picker-effort-high")).toBeTruthy();
+});
+
+it("does not preview when the selected model shows no reasoning column", async () => {
+  const providers = [
+    withEfforts(PROVIDERS[1]!, {
+      "GPT-6-Astra": [],
+      "GPT-6.1-Sol": ["minimal", "max"],
+      "GPT-5.4-mini": [],
+    }),
+  ];
+  mount(undefined, { providers, reasoningOptions: [] });
+  await userEvent.hover(await modelRow("codex:GPT-6.1-Sol"));
+  // A column appearing would move the rows under the pointer.
+  expect(screen.queryByTestId("composer-picker-reasoning")).toBeNull();
 });
 
 it("previews the keyboard-highlighted model's reasoning", async () => {

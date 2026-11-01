@@ -79,8 +79,10 @@ open; Escape, a click outside, or the sheet's close and drag-down close it.
   without changing the selection; leaving the list (the column itself keeps the preview) brings
   the selected model's back. Picking an effort while previewing selects that model with that
   effort; the effort is written once the composer reports the new model
-  (`use-reasoning-preview.ts`, `composer-picker-controls.tsx`). Touch has no hover, so the
-  column follows the selected model.
+  (`use-reasoning-preview.ts`, `composer-picker-controls.tsx`). The preview only changes the
+  column's content: with the selected model showing no column there is nothing to preview, so a
+  column never appears under the pointer and moves the rows. Touch has no hover, so the column
+  follows the selected model.
 - **Speed** normalizes three provider features, Claude's and OMP's `fast_mode` toggle, Codex's
   `service_tier` select and Cursor's `fast` select, into at most three levels by what each tier
   means (`speed.ts`): Standard (the default tier), Fast (`fast_mode` on, Codex `fast` or
