@@ -68,9 +68,17 @@ export function resolvePlacement(slots: ChatComposerSlots): Placement {
   return { circle, end };
 }
 
-function Group({ nodes, testID }: { nodes: ReactNode[]; testID: string }) {
+function Group({
+  nodes,
+  style,
+  testID,
+}: {
+  nodes: ReactNode[];
+  style: ViewProps["style"];
+  testID: string;
+}) {
   return (
-    <View style={styles.innerGroup} testID={testID}>
+    <View style={style} testID={testID}>
       {Children.toArray(nodes)}
     </View>
   );
@@ -98,12 +106,14 @@ function ChatComposerContainer({
     >
       {props.attachmentSlot}
       <View style={layout.containerRow}>
-        {commands != null ? <Group nodes={[commands]} testID="composer-inner-start" /> : null}
+        {commands != null ? (
+          <Group nodes={[commands]} style={layout.startGroup} testID="composer-inner-start" />
+        ) : null}
         <View style={layout.textSurface}>{props.surface}</View>
         {placement.end.length > 0 ? (
-          <Group nodes={placement.end} testID="composer-inner-end" />
+          <Group nodes={placement.end} style={layout.endGroup} testID="composer-inner-end" />
         ) : null}
-        <View style={styles.circleColumn} testID="composer-circle">
+        <View style={layout.circleColumn} testID="composer-circle">
           {expand}
           {placement.circle}
         </View>

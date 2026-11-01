@@ -233,6 +233,11 @@ async function expectExpand(page: Page, shot: string) {
   const row = await box(expanded.getByTestId("composer-settings-row"));
   const containerBox = await box(container);
   expect(row.y).toBeGreaterThanOrEqual(containerBox.y + containerBox.height - 0.5);
+  // The text starts at the container's own inset, not after ☰, and ends above the bottom row.
+  const textBox = await box(input);
+  const chipBox = await box(expanded.getByTestId("composer-commands-button"));
+  expect(textBox.x).toBeLessThan(chipBox.x + chipBox.width / 2);
+  expect(textBox.y + textBox.height).toBeLessThanOrEqual(chipBox.y + 0.5);
   // ☰ and Send stay on the container's bottom row.
   const sendBox2 = await box(send(page));
   expect(containerBox.y + containerBox.height - (sendBox2.y + sendBox2.height)).toBeLessThan(6);

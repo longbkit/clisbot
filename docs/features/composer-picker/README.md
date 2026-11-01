@@ -12,28 +12,33 @@ The chat composer follows Telegram's input (Android, 2026-11) with the Claude ap
 under it, on every width:
 
 ```
-( [☰]  Message...                    📎  ≋ )  (🎤)      idle
-( [☰]  Fix the flaky test                  )  (➤)       typing: Send takes the mic's place
+( [☰]  Message...                  📎  ≋  (🎤) )      idle
+( [☰]  Fix the flaky test                 (➤) )      typing: Send takes the mic's circle
   6.1 Sol Medium   🔒 Default permissions      Tools off  ◯
 ```
 
 **Telegram's anatomy, and ours.**
 
-| Telegram                                                    | Clisbot                                                                          |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| One container: Menu chip, emoji, text, 📎 at its right edge | One container: Commands chip (☰), text, 📎 and realtime voice at its right edge |
-| One circle beside it, as tall as the container: the mic     | Same: dictation                                                                  |
-| Typing: 📎 and the mic hide, the circle becomes Send        | Same: 📎, voice and the mic hide; Send takes the circle, same place and size     |
-| Menu ↔ ✕ Menu; the command list docks above the bar         | ☰ ↔ ✕; the slash list docks above the bar, as wide, with a handle               |
-| Rows: description left, `/command` right and muted          | Same, the command's arguments after it                                           |
-| Expanded: back top left, toolbar and Send at the bottom     | Same, the settings row above the toolbar; no undo or redo                        |
+| Telegram                                                            | Clisbot                                                                     |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| One container: Menu chip, emoji, text, 📎, the mic circle           | One container: Commands chip (☰), text, 📎, realtime voice, the mic circle |
+| Typing: 📎 hides, the circle becomes Send in place                  | Same: 📎, voice hide; Send takes the circle, same place and size            |
+| Menu ↔ ✕ Menu; the command list docks above the bar                 | ☰ ↔ ✕; the slash list docks above the bar, as wide, with a handle          |
+| Rows: description left, `/command` right and muted                  | Same, the command's arguments after it                                      |
+| Expanded: back top left, the text above, the controls at the bottom | Same controls in the same places, the text grown; no undo or redo           |
 
-**Where we differ, on purpose.** Two voice modes: dictation is the circle, realtime voice sits in
-the container beside 📎. The settings row (Model, Mode, Tools, context ring) has no Telegram
-counterpart; agent sessions need it in reach. The Commands chip is filled with the secondary
-button's fill (`surface3`), not the accent: accent is Send's, one per surface (design.md §3), and
-"Commands" does not fit as a label at 320px, so the chip is icon-only. No emoji button. Desktop
-uses the same anatomy: it reads as well wide, and one rule is easier to keep than two.
+**Where we differ, on purpose.**
+
+- **Two voice modes.** Dictation is the circle; realtime voice sits beside 📎.
+- **The settings row** (Model, Mode, Tools, context ring) has no Telegram counterpart; agent
+  sessions need it in reach. It stays under the container, expanded too.
+- **Fills.** Telegram fills the Menu chip and the mic with its accent. Here accent marks the one
+  primary action on the surface (design.md §3), and sending exists only once there is something
+  to send: Send is the accent circle, the idle mic a neutral one, same shape and size. The ☰ chip
+  rests on `surface2` and turns `surface3` on hover and while the list is open (design.md §4:
+  resting fills inside an input are `surface2`). "Commands" does not fit as a label at 320px, so
+  the chip is icon-only. No emoji button.
+- **Desktop** uses the same anatomy: it reads as well wide, and one rule is easier to keep.
 
 **Rules.**
 
@@ -43,29 +48,29 @@ uses the same anatomy: it reads as well wide, and one rule is easier to keep tha
   draft with text it types ` /` at the caret, which lists skills, as typing it there does. With
   the flag on the autocomplete draws Telegram's rows (`command-row.tsx`) under a handle and no
   longer repeats the highlighted command in a card above the list.
-- **The circle** holds, in order of claim: Send once something is sendable (text, pasted text or
-  an attachment), Stop while the agent runs, an always-shown submit such as New workspace's
-  Create, else dictation. When Stop or Create holds it, dictation sits inside the container's
-  right edge instead. Realtime voice keeps its overlay with mute and stop. The idle mic is a
-  neutral filled circle (`surface2`) and Send the accent one: Telegram fills both with its accent,
-  but here accent marks the one primary action on the surface (design.md §3), and sending exists
-  only once there is something to send. Shape and size never change, only the fill.
+- **The circle** sits inside the container's right end. It holds, in order of claim: Send once
+  something is sendable (text, pasted text or an attachment), Stop while the agent runs, an
+  always-shown submit such as New workspace's Create, else dictation. When Stop or Create holds
+  it, dictation sits before it with attach and voice. Realtime voice keeps its overlay with mute
+  and stop.
 - **Typing hides attach, voice and the mic**; attachments alone keep them, so another file or a
-  spoken message can join them. Expanded, the toolbar keeps ☰, 📎, voice and the mic.
-- **Sizes.** The container's row is 48px on every width, so the chip, 📎, voice and one line of
-  text share one vertical center, and the last of several lines stays on it; the container is
-  50px with its border, and the circle is 50px across. Inner buttons are 44px wide and 48px tall
-  with 36px faces and 20px glyphs; the container is inset `spacing[1]` on both sides. Send, Stop
-  and the mic circle are 50px targets, so nothing moves when they swap. The container keeps the
-  composer's surface, border and shadow (design.md §5); one line is a capsule, two lines or
-  attachment chips the composer's `2xl` box.
-- **Expand** shows from the third line, above the circle, a 44px target; below three lines it is
-  hidden. It opens the same editor (`useComposerFullscreen`), the same tree with the text grown:
-  text, caret, attachments and draft stay; a round filled 44px collapse button sits top left; at the bottom
-  the settings row, then a toolbar with ☰, 📎 and voice, and Send as the circle at the bottom
-  right. The editor paints `surfaceComposer`. The bottom sits in the fullscreen body, which
-  reserves the keyboard's height on native and follows the visible viewport on the web, and the
-  native dock adds the safe areas. A send error shows above the settings row.
+  spoken message can join them.
+- **Sizes.** The container's row is the circle plus its inset: a 40px circle in a 48px target, so
+  ☰ (36px face in a 44px target), 📎, voice and one line of text share one vertical center, and
+  ☰ and the circle stay on the bottom row as the text grows. The container is inset `spacing[1]`
+  on both ends, so ☰ and the circle sit the same distance from its border. Glyphs are 20px.
+  Mic, Send and Stop share the circle's target, so nothing moves when they swap. The container
+  keeps the composer's surface, border and shadow (design.md §5); one line is a capsule, two
+  lines or attachment chips the composer's `2xl` box.
+- **Expand** shows from the third line, above the circle inside the container, a 44px target;
+  below three lines it is hidden. It opens the same editor (`useComposerFullscreen`): the same
+  layout with the container grown, so ☰, 📎, voice and the circle keep their places on its
+  bottom row, the text runs the container's full width above them, and the settings row stays
+  under it. Text, caret, attachments and draft stay. A round filled 44px collapse button sits
+  top left; Escape and the hardware back button collapse too. The editor paints
+  `surfaceComposer`; its controls sit in the fullscreen body, which reserves the keyboard's
+  height on native and follows the visible viewport on the web, and the native dock adds the
+  safe areas. A send error shows above the container.
 - **The settings row** starts on the container's left edge, inset `spacing[2]`, so with its chips'
   own padding its first glyph sits on the Commands glyph's rail. When short of room it collapses
   in this order: the effort leaves the Model chip, Mode keeps its icon (a phone always shows the
@@ -73,7 +78,8 @@ uses the same anatomy: it reads as well wide, and one rule is easier to keep tha
   Accessible names keep the full labels.
 - **Panels open above the composer.** The Model panel anchors to the whole composer
   (`frame-anchor.tsx`), so it never covers the text. Mode and Tools keep their own anchors.
-- The phone placeholder is "Message...": Commands already names `/commands`.
+- The phone placeholder is "Message...": Commands already names `/commands`. The composer's
+  placeholder uses the `placeholder` token (design.md §3).
 
 One component still serves every chat surface (`MessageInput`): session and workspace chats,
 Home's new session, Bot and group chats, drafts, queue edits, attachments, slash and `@`
@@ -313,7 +319,7 @@ permission request the agent still raises. Agents sometimes ask under bypass any
 ## Code
 
 `packages/app/src/clisbot/composer-layout/`: `chat-composer-presentation.tsx` (the container,
-the circle, the settings row and the expanded editor in one tree, so the editor never
+its circle, the settings row and the expanded editor in one tree, so the editor never
 remounts), `layout-styles.ts`, `commands-button.tsx`, `command-row.tsx`, `slash-trigger.ts`,
 `input-facts.ts`, `settings-row.tsx`, `frame-anchor.tsx`, `geometry.ts` and `feature.ts`.
 `composer/input/input.tsx` builds the same pieces as before and hands them to `ChatComposerPresentation` instead of the upstream toolbar while the flag is on and

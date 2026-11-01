@@ -31,11 +31,14 @@ export function useChatLayoutStyles(input: ChatLayoutStyleInput) {
         pillStyle,
       ],
       containerRow: [styles.containerRow, fullscreen && styles.grow],
-      textSurface: [
-        styles.textSurface,
-        hasStart ? styles.textAfterChip : styles.textInsetStart,
-        fullscreen && styles.textExpanded,
-      ],
+      textSurface: fullscreen
+        ? [styles.textSurface, styles.textExpanded]
+        : [styles.textSurface, hasStart ? styles.textAfterChip : styles.textInsetStart],
+      // Expanded, the buttons keep the bottom row's places and the text runs the full width
+      // above them.
+      startGroup: [chatLayoutStyles.innerGroup, fullscreen && styles.barStart],
+      endGroup: [chatLayoutStyles.innerGroup, fullscreen && styles.barEnd],
+      circleColumn: [chatLayoutStyles.circleColumn, fullscreen && styles.barCircle],
     }),
     [fullscreen, hasAttachments, hasStart, inputOpacity, multiline, pillStyle],
   );
@@ -106,6 +109,16 @@ const styles = StyleSheet.create((theme) => ({
   textInsetStart: { paddingLeft: theme.spacing[3] },
   // The chip's target already spaces it; one step more keeps the text off its fill.
   textAfterChip: { paddingLeft: theme.spacing[1] },
-  // Expanded, the text runs from the container's top; the buttons stay on its bottom row.
-  textExpanded: { alignSelf: "stretch", justifyContent: "flex-start", minHeight: 0 },
+  // Expanded, the text runs from the container's top, at the container's own inset, clear of
+  // the bottom row.
+  textExpanded: {
+    alignSelf: "stretch",
+    justifyContent: "flex-start",
+    minHeight: 0,
+    paddingHorizontal: theme.spacing[3],
+    paddingBottom: CHAT_CONTAINER_ROW,
+  },
+  barStart: { position: "absolute", left: 0, bottom: 0 },
+  barEnd: { position: "absolute", right: CHAT_CONTAINER_ROW, bottom: 0 },
+  barCircle: { position: "absolute", right: 0, bottom: 0 },
 }));
