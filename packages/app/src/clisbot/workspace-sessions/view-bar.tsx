@@ -58,7 +58,10 @@ export function SidebarViewBar(): ReactElement | null {
   const { visible } = useSidebarWorkspaceSessions();
   if (!visible) return null;
   return (
-    <View style={styles.bar} testID="sidebar-view-bar">
+    <View
+      style={[styles.bar, NAVIGATION_V2_ENABLED && styles.sectionInset]}
+      testID="sidebar-view-bar"
+    >
       <GroupingTabs />
       {/* Navigation V2 orders by last update, so its quick control is the Bots chip instead. */}
       {NAVIGATION_V2_ENABLED ? <WorkBotsChip /> : <ActiveOnlyTag />}
@@ -273,6 +276,8 @@ const styles = StyleSheet.create((theme) => {
       paddingHorizontal: theme.spacing[2],
       paddingBottom: theme.spacing[2],
     },
+    // Navigation V2 draws the bar inside the Work section's controls, on their inset.
+    sectionInset: { paddingHorizontal: theme.spacing[3] },
     tabs: {
       flex: 1,
       minWidth: 0,
