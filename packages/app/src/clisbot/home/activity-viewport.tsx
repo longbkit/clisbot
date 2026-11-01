@@ -33,6 +33,14 @@ export function ActivityViewportProvider({ children }: { children: ReactNode }) 
 
 export function ActivityScrollView(props: ScrollViewProps) {
   const { scroll, viewport, onScroll, onUserScroll } = useActivityViewport();
+  const { onScroll: onScrollProp } = props;
+  const handleScroll = useCallback<NonNullable<ScrollViewProps["onScroll"]>>(
+    (event) => {
+      onScroll(event);
+      onScrollProp?.(event);
+    },
+    [onScroll, onScrollProp],
+  );
   const webHandlers = isWeb ? { onWheel: onUserScroll, onKeyDown: onUserScroll } : {};
   // A drag means the touch that pressed a row in was a scroll, not a tap.
   const beginDrag = useCallback(() => {
@@ -46,7 +54,7 @@ export function ActivityScrollView(props: ScrollViewProps) {
         {...webHandlers}
         style={[styles.scroll, props.style]}
         ref={scroll}
-        onScroll={onScroll}
+        onScroll={handleScroll}
         onTouchStart={onUserScroll}
         onPointerDown={onUserScroll}
         onScrollBeginDrag={beginDrag}

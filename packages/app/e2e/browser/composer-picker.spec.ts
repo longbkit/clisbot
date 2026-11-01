@@ -29,6 +29,7 @@ test.use({
 });
 
 const SCREENSHOTS = path.resolve(process.cwd(), "../../.debug/composer-picker");
+const SEARCH_SCREENSHOTS = path.resolve(process.cwd(), "../../.debug/composer-picker-search");
 
 async function screenshot(page: Page, name: string) {
   await mkdir(SCREENSHOTS, { recursive: true });
@@ -156,7 +157,17 @@ test("desktop: one chip opens every option and stays open while you pick", async
 
     await page.getByTestId("composer-picker-search").fill("codex");
     await expect(page.locator('[data-testid^="composer-picker-model-"]')).toHaveCount(2);
+    // Words in any order, separators optional; the rail counts and narrows the matches.
+    await page.getByTestId("composer-picker-search").fill("gpt6");
+    await expect(page.locator('[data-testid^="composer-picker-model-"]')).toHaveCount(2);
+    await page.getByTestId("composer-picker-search").fill("sol 6");
+    await expect(page.locator('[data-testid^="composer-picker-model-"]')).toHaveCount(2);
+    await page.getByTestId("composer-picker-rail-provider:codex").click();
+    await expect(page.getByTestId("composer-picker-narrow-chip")).toContainText("in Codex");
+    await mkdir(SEARCH_SCREENSHOTS, { recursive: true });
+    await page.screenshot({ path: path.join(SEARCH_SCREENSHOTS, "e2e-desktop-narrowed.png") });
     await page.getByTestId("composer-picker-search").fill("");
+    await expect(page.getByTestId("composer-picker-narrow-chip")).toHaveCount(0);
     await screenshot(page, "desktop-panel-fast");
 
     await page.getByTestId("composer-picker-mode").click();

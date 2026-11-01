@@ -25,7 +25,8 @@ const patchedPackages = [
     cwd: "packages/app",
   },
   // Remove after react-native-unistyles ships
-  // https://github.com/jpudysz/react-native-unistyles/pull/1203.
+  // https://github.com/jpudysz/react-native-unistyles/pull/1203, and web `withUnistyles` stops
+  // forwarding `uniProps` to the wrapped component (a lucide icon puts it on its <svg>).
   {
     nodeModulesPath: "node_modules/react-native-unistyles",
     patchPrefix: "react-native-unistyles+",

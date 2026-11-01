@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { PanelLeftClose, PanelLeftOpen, Star, UserRound } from "lucide-react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ModelProviderGlyph } from "@/components/model-browser";
@@ -13,7 +13,10 @@ import { scopeKey, type PickerRailItem, type PickerScope } from "./picker-rows";
 
 interface ProviderRailProps {
   items: readonly PickerRailItem[];
-  scope: PickerScope;
+  /** The selected entry; none while a query lists every provider's matches. */
+  scope: PickerScope | null;
+  /** Matches per entry while searching: a count on each, and the entries without one dimmed. */
+  counts: ReadonlyMap<string, number> | null;
   serverId: string | null;
   onSelect: (scope: PickerScope) => void;
   /**
@@ -27,15 +30,51 @@ interface ProviderRailProps {
 
 export type RailLayout = "collapsed" | "expanded" | "horizontal";
 
+/** A collapsed rail entry's press target: the 44px touch size, so a thumb or a mouse finds it. */
+const RAIL_TARGET_SIZE = 44;
+
+// The rail is a column of large, friendly targets: 20px glyphs in 44px buttons.
+const RAIL_GLYPH_SIZE = ICON_SIZE.lg;
+
 function RailGlyph({ item, serverId }: { item: PickerRailItem; serverId: string | null }) {
   if (item.scope.kind === "favorites") {
-    return <Star size={ICON_SIZE.md} color={styles.glyph.color} />;
+    return <Star size={RAIL_GLYPH_SIZE} color={styles.glyph.color} />;
   }
   if (item.scope.kind === "profiles") {
-    return <UserRound size={ICON_SIZE.md} color={styles.glyph.color} />;
+    return <UserRound size={RAIL_GLYPH_SIZE} color={styles.glyph.color} />;
   }
   return (
-    <ModelProviderGlyph provider={item.scope.providerId} serverId={serverId} size={ICON_SIZE.md} />
+    <ModelProviderGlyph
+      provider={item.scope.providerId}
+      serverId={serverId}
+      size={RAIL_GLYPH_SIZE}
+    />
+  );
+}
+
+/**
+ * While searching: the entry's match count, or null when it has none and is dimmed. Profiles is
+ * not searched, so it has no count and stays pressable.
+ */
+interface RailCount {
+  count: number | undefined;
+  dimmed: boolean;
+}
+
+function resolveRailCount(
+  item: PickerRailItem,
+  counts: ReadonlyMap<string, number> | null,
+): RailCount {
+  if (!counts || item.scope.kind === "profiles") return { count: undefined, dimmed: false };
+  const count = counts.get(item.key) ?? 0;
+  return { count, dimmed: count === 0 };
+}
+
+function CountText({ count }: { count: number }) {
+  return (
+    <Text style={styles.count} testID="composer-picker-rail-count">
+      {String(count)}
+    </Text>
   );
 }
 
@@ -57,22 +96,30 @@ function RailButton(props: {
   selected: boolean;
   serverId: string | null;
   layout: RailLayout;
+  railCount: RailCount;
   onSelect: (scope: PickerScope) => void;
 }) {
-  const { item, onSelect } = props;
+  const { item, onSelect, railCount } = props;
   const press = useCallback(() => onSelect(item.scope), [item.scope, onSelect]);
   const glyph = useMemo(
     () => <RailGlyph item={item} serverId={props.serverId} />,
     [item, props.serverId],
   );
   const testID = `composer-picker-rail-${item.key}`;
+  const { count, dimmed } = railCount;
+  const trailing = useMemo(
+    () => (count === undefined ? undefined : <CountText count={count} />),
+    [count],
+  );
   if (props.layout === "horizontal") {
     return (
       <ChipButton
         role="tab"
         label={props.label}
         leading={glyph}
+        count={count}
         selected={props.selected}
+        disabled={dimmed}
         touch
         onPress={press}
         testID={testID}
@@ -86,19 +133,34 @@ function RailButton(props: {
         <ComboboxItem
           label={props.label}
           leadingSlot={glyph}
+          trailingSlot={trailing}
           active={props.selected}
+          disabled={dimmed}
+          touch
           onPress={press}
           testID={testID}
         />
       ) : (
         <ToolbarButton
-          label={props.label}
+          label={count === undefined ? props.label : `${props.label} (${count})`}
           selected={props.selected}
+          disabled={dimmed}
           tooltipSide="right"
+          style={styles.railButton}
           onPress={press}
           testID={testID}
         >
-          {glyph}
+          {count === undefined || dimmed ? (
+            glyph
+          ) : (
+            // The count sits under the glyph, inside the same 44px target.
+            <View style={styles.glyphWithCount}>
+              {glyph}
+              <Text style={styles.underCount} testID="composer-picker-rail-count">
+                {String(count)}
+              </Text>
+            </View>
+          )}
         </ToolbarButton>
       )}
     </View>
@@ -113,10 +175,11 @@ function ExpandToggle(props: { expanded: boolean; onToggle: () => void }) {
       <ToolbarButton
         label={t(props.expanded ? "composer.picker.collapseRail" : "composer.picker.expandRail")}
         tooltipSide="right"
+        style={styles.railButton}
         onPress={props.onToggle}
         testID="composer-picker-rail-toggle"
       >
-        <Icon size={ICON_SIZE.md} color={styles.glyph.color} />
+        <Icon size={RAIL_GLYPH_SIZE} color={styles.glyph.color} />
       </ToolbarButton>
     </View>
   );
@@ -125,7 +188,7 @@ function ExpandToggle(props: { expanded: boolean; onToggle: () => void }) {
 /** Favorites, each provider in the user's order, then the Host's Agent profiles. */
 export function ProviderRail(props: ProviderRailProps) {
   const labelOf = useRailLabel();
-  const current = scopeKey(props.scope);
+  const current = props.scope ? scopeKey(props.scope) : null;
   const buttons = props.items.map((item) => (
     <RailButton
       key={item.key}
@@ -134,6 +197,7 @@ export function ProviderRail(props: ProviderRailProps) {
       selected={item.key === current}
       serverId={props.serverId}
       layout={props.layout}
+      railCount={resolveRailCount(item, props.counts)}
       onSelect={props.onSelect}
     />
   ));
@@ -179,7 +243,7 @@ const styles = StyleSheet.create((theme) => ({
     borderRightColor: theme.colors.borderSubtle,
   },
   columnExpanded: {
-    width: 176,
+    width: 200,
     justifyContent: "space-between",
     paddingVertical: theme.spacing[2],
     borderRightWidth: 1,
@@ -192,6 +256,11 @@ const styles = StyleSheet.create((theme) => ({
   rows: {
     alignItems: "center",
     gap: theme.spacing[1],
+  },
+  railButton: {
+    width: RAIL_TARGET_SIZE,
+    height: RAIL_TARGET_SIZE,
+    borderRadius: theme.borderRadius.lg,
   },
   rowsExpanded: {
     gap: 0,
@@ -226,5 +295,19 @@ const styles = StyleSheet.create((theme) => ({
   },
   glyph: {
     color: theme.colors.foregroundMuted,
+  },
+  count: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    fontVariant: ["tabular-nums"],
+  },
+  glyphWithCount: {
+    alignItems: "center",
+  },
+  underCount: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    lineHeight: theme.fontSize.sm,
+    fontVariant: ["tabular-nums"],
   },
 }));

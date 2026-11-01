@@ -22,6 +22,7 @@ import {
   type PressableStateCallbackType,
 } from "react-native";
 import { NestableScrollContainer } from "react-native-draggable-flatlist";
+import { useScrollEdgeProps } from "@/clisbot/navigation/scroll-edge";
 import type { GestureType } from "react-native-gesture-handler";
 import {
   useSidebarWorkspaceSessions,
@@ -171,6 +172,8 @@ export function SidebarStatusWorkspaceList({
   dragGestureHostActive,
 }: StatusWorkspaceListProps) {
   const { t } = useTranslation();
+  const scrollEdgeProps = useScrollEdgeProps("scroll");
+  const scrollEdgeDragProps = useScrollEdgeProps("drag");
   const collapsedWorkspaceGroupKeys = useSidebarCollapsedSectionsStore(
     (state) => state.collapsedWorkspaceGroupKeys,
   );
@@ -285,6 +288,7 @@ export function SidebarStatusWorkspaceList({
     <View style={styles.container}>
       {platformIsNative ? (
         <NestableScrollContainer
+          {...scrollEdgeDragProps}
           style={styles.list}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -294,6 +298,7 @@ export function SidebarStatusWorkspaceList({
         </NestableScrollContainer>
       ) : (
         <ScrollView
+          {...scrollEdgeProps}
           style={styles.list}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}

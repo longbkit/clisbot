@@ -69,6 +69,7 @@ import {
   Trash2,
 } from "lucide-react-native";
 import { NestableScrollContainer } from "react-native-draggable-flatlist";
+import { useScrollEdgeProps } from "@/clisbot/navigation/scroll-edge";
 import { DraggableList, type DraggableRenderItemInfo } from "./draggable-list";
 import type { DraggableListDragHandleProps } from "./draggable-list.types";
 import {
@@ -2571,6 +2572,8 @@ function ProjectModeList({
     canToggle: canTogglePinnedChats,
     toggleExpanded: togglePinnedChatsExpanded,
   } = useLimitedSidebarGroup(pinnedChats);
+  const scrollEdgeProps = useScrollEdgeProps("scroll");
+  const scrollEdgeDragProps = useScrollEdgeProps("drag");
   const nativeScrollGestureProps = useMemo(
     () =>
       parentGestureRef
@@ -2915,6 +2918,7 @@ function ProjectModeList({
       {platformIsNative ? (
         <NestableScrollContainer
           {...nativeScrollGestureProps}
+          {...scrollEdgeDragProps}
           style={styles.list}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -2924,6 +2928,7 @@ function ProjectModeList({
         </NestableScrollContainer>
       ) : (
         <ScrollView
+          {...scrollEdgeProps}
           style={styles.list}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}

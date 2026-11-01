@@ -32,6 +32,7 @@ import { useHostsReachability } from "./hosts-status";
 import { HostsUnreachableState } from "./hosts-unreachable-state";
 import { OutsideFilterNotice } from "./outside-filter-notice";
 import { EMPTY_SCOPE_COUNTS } from "./ownership";
+import { ScrollEdgeLine, ScrollEdgeProvider, useScrollEdge } from "./scroll-edge";
 import { SectionControls, useSectionBackdrop } from "./section-controls";
 import {
   HeaderMenuIcon,
@@ -84,6 +85,7 @@ function WorkPaneContent({ onBeforeNavigate, parentGestureRef, active }: WorkPan
   }, [model]);
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
   const workState = useWorkListState(model, hasActiveHostFilter);
+  const edge = useScrollEdge();
   const headerActions = useMemo(
     () => (
       <>
@@ -106,28 +108,31 @@ function WorkPaneContent({ onBeforeNavigate, parentGestureRef, active }: WorkPan
         <SidebarMetadataNotice />
         {workState === "offline" ? <HostsUnreachableState testID="work-offline" /> : null}
         {workState === "loading" ? <SidebarAgentListSkeleton /> : null}
+        <ScrollEdgeLine edge={edge} />
         {workState === "list" ? (
-          <SidebarWorkspaceList
-            pinPresentation="float"
-            collapsedProjectKeys={model.collapsedProjectKeys}
-            onToggleProjectCollapsed={model.toggleProjectCollapsed}
-            shortcutIndexByWorkspaceKey={model.shortcutModel.shortcutIndexByWorkspaceKey}
-            groupMode={model.groupMode}
-            workspaceGroups={model.workspaceGroups}
-            projectIconTargets={model.projectIconTargets}
-            pinnedGroups={model.pinnedGroups}
-            projects={model.projects}
-            hasProjectsBeforeFilter={model.hasProjectsBeforeFilter}
-            hasActiveProjectFilter={model.resolvedProjectFilters.length > 0}
-            workspaceEntriesByKey={model.workspaceEntriesByKey}
-            isRefreshing={refreshing}
-            onRefresh={refresh}
-            onWorkspacePress={onBeforeNavigate}
-            onAddProject={openAddProject}
-            onImportSession={importSession.open}
-            parentGestureRef={parentGestureRef}
-            dragGestureHostActive={active}
-          />
+          <ScrollEdgeProvider edge={edge}>
+            <SidebarWorkspaceList
+              pinPresentation="float"
+              collapsedProjectKeys={model.collapsedProjectKeys}
+              onToggleProjectCollapsed={model.toggleProjectCollapsed}
+              shortcutIndexByWorkspaceKey={model.shortcutModel.shortcutIndexByWorkspaceKey}
+              groupMode={model.groupMode}
+              workspaceGroups={model.workspaceGroups}
+              projectIconTargets={model.projectIconTargets}
+              pinnedGroups={model.pinnedGroups}
+              projects={model.projects}
+              hasProjectsBeforeFilter={model.hasProjectsBeforeFilter}
+              hasActiveProjectFilter={model.resolvedProjectFilters.length > 0}
+              workspaceEntriesByKey={model.workspaceEntriesByKey}
+              isRefreshing={refreshing}
+              onRefresh={refresh}
+              onWorkspacePress={onBeforeNavigate}
+              onAddProject={openAddProject}
+              onImportSession={importSession.open}
+              parentGestureRef={parentGestureRef}
+              dragGestureHostActive={active}
+            />
+          </ScrollEdgeProvider>
         ) : null}
         {importSession.sheet}
       </View>

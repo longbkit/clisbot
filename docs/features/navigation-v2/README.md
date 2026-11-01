@@ -52,6 +52,11 @@ The primary navigation says where you are; each section owns its header, filters
   Chats · Work · Lịch · More in one retained tab navigator ([phone tabs][phone-tabs]). Chats and
   Work render their lists as the tab screen (`PhoneListTab`); details push above the tabs and Back
   pops to them ([route topology][phone-tab-routes]). More is the `/more` tab.
+- **The scroll edge.** A section's fixed header block has no line at rest; a thin `borderSubtle`
+  line shows where it ends once the list has scrolled under it, as on iOS and Material, on phone
+  and desktop (`scroll-edge.tsx`). It sits outside React state and flips only when the list
+  crosses its top, so scrolling re-renders nothing. On native, Work's `NestableScrollContainer`
+  keeps `onScroll`, so its line follows the drags instead.
 - **One component per job** across Home, Chats and Workspace: `SectionHeader`, `SectionControls` (For
   me / Others / All, chips, then the Display row, on one inset), `DisplayMenuTrigger`
   ("Display ▾", with a dot while a filter is in force), `HostsDisplayItems`, `ChipRow` /

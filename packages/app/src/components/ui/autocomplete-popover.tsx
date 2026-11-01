@@ -13,11 +13,24 @@ import Animated, { useAnimatedReaction, useAnimatedStyle } from "react-native-re
 import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Autocomplete, type AutocompleteOption } from "@/components/ui/autocomplete";
+import type { AutocompleteOptionsPosition } from "@/components/ui/autocomplete-utils";
+import {
+  resolveCommandListMaxHeight,
+  resolveCommandListPlacement,
+} from "@/clisbot/composer-layout/command-list-placement";
+import { COMPOSER_LAYOUT_ENABLED } from "@/clisbot/composer-layout/feature";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import {
   measureFloatingPanelPortalHost,
   useFloatingPanelPortalHostName,
 } from "@/components/ui/floating-panel-portal";
-import { KeyboardTranslateView, useKeyboardAnchor, useKeyboardShift } from "@/keyboard/shift";
+import {
+  KeyboardTranslateView,
+  resolveKeyboardLift,
+  useKeyboardAnchor,
+  useKeyboardShift,
+  useSettledKeyboardShift,
+} from "@/keyboard/shift";
 import { SPACING } from "@/styles/theme";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 
@@ -27,6 +40,7 @@ interface RelativeAnchorRect {
   x: number;
   y: number;
   width: number;
+  height: number;
   hostHeight: number;
 }
 
@@ -40,6 +54,32 @@ interface AutocompletePopoverProps {
   errorMessage?: string;
   loadingText?: string;
   emptyText?: string;
+  /**
+   * Clisbot chat layout: the list opens on the anchor's side with more room, and the caller
+   * orders its options for that side (the best match next to the composer).
+   */
+  onPositionChange?: (position: AutocompleteOptionsPosition) => void;
+}
+
+/** The chat layout's list opens where there is more room; upstream's always above. */
+function useListPosition(
+  rect: RelativeAnchorRect | null,
+  translation: { enabled: boolean; bottomClearance: number },
+): AutocompleteOptionsPosition | null {
+  const safeAreaInsets = useSafeAreaInsets();
+  const keyboard = useSettledKeyboardShift();
+  if (!COMPOSER_LAYOUT_ENABLED) return "above-input";
+  // Unmeasured: the caller keeps the side it was last told.
+  if (!rect) return null;
+  return resolveCommandListPlacement({
+    anchorTop: rect.y,
+    anchorBottom: rect.y + rect.height,
+    hostHeight: rect.hostHeight,
+    lift: resolveKeyboardLift({ shift: keyboard, ...translation }),
+    keyboard,
+    safeTop: safeAreaInsets.top,
+    safeBottom: safeAreaInsets.bottom,
+  });
 }
 
 export function AutocompletePopover({
@@ -52,6 +92,7 @@ export function AutocompletePopover({
   errorMessage,
   loadingText,
   emptyText,
+  onPositionChange,
 }: AutocompletePopoverProps): ReactElement | null {
   "use no memo";
   // React Compiler memoizes effect captures by reading SharedValue.value during render.
@@ -59,7 +100,8 @@ export function AutocompletePopover({
   const windowDimensions = useWindowDimensions();
   const safeAreaInsets = useSafeAreaInsets();
   const portalHostName = useFloatingPanelPortalHostName();
-  const { isMoving } = useKeyboardShift();
+  const { isMoving, layoutShift } = useKeyboardShift();
+  const isCompact = useIsCompactFormFactor();
   const anchor = useKeyboardAnchor();
   const { measureAtRest } = anchor;
   const measurementGeneration = useRef(0);
@@ -81,6 +123,7 @@ export function AutocompletePopover({
         x: anchorRect.x - hostRect.x,
         y: anchorRect.y - hostRect.y,
         width: anchorRect.width,
+        height: anchorRect.height,
         hostHeight: hostRect.height,
       });
       return undefined;
@@ -113,29 +156,49 @@ export function AutocompletePopover({
     [isMoving, remeasure],
   );
 
+  const measuredPosition = useListPosition(relativeAnchorRect, anchor.translation);
+  useEffect(() => {
+    if (measuredPosition) onPositionChange?.(measuredPosition);
+  }, [onPositionChange, measuredPosition]);
+  const position = measuredPosition ?? "above-input";
+  const below = position === "below-input";
+
   // Lay out at the anchor's resting position; the KeyboardTranslateView below lifts
   // it with the anchor. Height changes only at keyboard boundaries.
   const baseStyle = useMemo(() => {
     if (!relativeAnchorRect) return null;
-    return inlineUnistylesStyle({
-      position: "absolute" as const,
-      left: relativeAnchorRect.x,
-      width: relativeAnchorRect.width,
-      bottom: relativeAnchorRect.hostHeight - relativeAnchorRect.y + OFFSET_FROM_ANCHOR,
-    });
-  }, [relativeAnchorRect]);
+    const { x, y, width, height, hostHeight } = relativeAnchorRect;
+    const edge = below
+      ? { top: y + height + OFFSET_FROM_ANCHOR }
+      : { bottom: hostHeight - y + OFFSET_FROM_ANCHOR };
+    return inlineUnistylesStyle({ position: "absolute" as const, left: x, width, ...edge });
+  }, [below, relativeAnchorRect]);
 
   const anchorY = relativeAnchorRect?.y ?? 0;
+  const anchorBottom = anchorY + (relativeAnchorRect?.height ?? 0);
+  const hostHeight = relativeAnchorRect?.hostHeight ?? 0;
   const reservedLift = anchor.reservedLift;
+  const safeTop = safeAreaInsets.top;
+  const safeBottom = safeAreaInsets.bottom;
   const heightStyle = useAnimatedStyle(
     () => ({
       maxHeight: Math.max(
         0,
-        anchorY - reservedLift.value - safeAreaInsets.top - OFFSET_FROM_ANCHOR * 2,
+        below
+          ? hostHeight -
+              (anchorBottom - reservedLift.value) -
+              layoutShift.value -
+              safeBottom -
+              OFFSET_FROM_ANCHOR * 2
+          : anchorY - reservedLift.value - safeTop - OFFSET_FROM_ANCHOR * 2,
       ),
     }),
-    [anchorY, reservedLift, safeAreaInsets.top],
+    [below, anchorY, anchorBottom, hostHeight, layoutShift, reservedLift, safeTop, safeBottom],
   );
+  // The chat layout's list may take most of a phone screen; upstream keeps its own height.
+  const listMaxHeight = COMPOSER_LAYOUT_ENABLED
+    ? resolveCommandListMaxHeight({ compact: isCompact, windowHeight: windowDimensions.height })
+    : undefined;
 
   if (!visible || !relativeAnchorRect || !baseStyle) return null;
   if (options.length > 0 && selectedIndex < 0) return null;
@@ -147,6 +210,8 @@ export function AutocompletePopover({
         <Animated.View testID="composer-autocomplete-popover" style={heightStyle}>
           <Autocomplete
             options={options}
+            optionsPosition={position}
+            maxHeight={listMaxHeight}
             selectedIndex={selectedIndex}
             onSelect={onSelect}
             isLoading={isLoading}

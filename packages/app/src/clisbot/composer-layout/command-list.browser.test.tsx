@@ -3,6 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, expect, it, vi } from "vitest";
 import { Autocomplete, type AutocompleteOption } from "@/components/ui/autocomplete";
 import { i18n } from "@/i18n/i18next";
+import { ChatCommandRow } from "./command-row";
 
 vi.mock("react-native-unistyles", async () => {
   const { lightTheme } = await import("@/styles/theme");
@@ -55,4 +56,25 @@ it("reads description first, then the command and its arguments", () => {
   const description = screen.getByText("Prepare a handoff note").getBoundingClientRect();
   const command = screen.getByText("/handoff [agent]").getBoundingClientRect();
   expect(command.left).toBeGreaterThan(description.right);
+});
+
+const PHONE_LIST = { width: 358 } as const;
+
+it("stacks the command over its description on a phone", () => {
+  render(
+    <div style={PHONE_LIST}>
+      <ChatCommandRow
+        label="/13-bms-qc-review-testcase-testdesign-label"
+        detail={undefined}
+        description="Create a full BMS QC review package for a Jira task in one workflow"
+        stacked
+      />
+    </div>,
+  );
+  const command = screen.getByTestId("composer-command-name").getBoundingClientRect();
+  const description = screen
+    .getByText("Create a full BMS QC review package for a Jira task in one workflow")
+    .getBoundingClientRect();
+  expect(description.top).toBeGreaterThanOrEqual(command.bottom - 1);
+  expect(Math.abs(description.left - command.left)).toBeLessThan(1);
 });

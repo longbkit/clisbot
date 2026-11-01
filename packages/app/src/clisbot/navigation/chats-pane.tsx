@@ -9,6 +9,7 @@ import {
 import equal from "fast-deep-equal";
 import { Text, View } from "react-native";
 import { FlatList } from "@/components/ui/scroll-view";
+import { ScrollEdgeLine, useScrollEdge } from "./scroll-edge";
 import { openPreloads } from "@/open-preload/live";
 import { rememberChatOpenPreview } from "@/clisbot/bots/chat/open-preview";
 import { useResourcePrincipalScope } from "@/clisbot/bots/data/resource-principal-scope";
@@ -141,6 +142,7 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
     [catalog, entries.length],
   );
   const backdrop = useSectionBackdrop();
+  const edge = useScrollEdge();
   const headerActions = useMemo(
     () => (
       <>
@@ -175,8 +177,10 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
           display={displayMenu}
         />
         <OutsideFilterNotice list="chats" />
+        <ScrollEdgeLine edge={edge} />
         <FlatList
           {...handlers}
+          {...edge.scrollProps}
           onScrollBeginDrag={beginDrag}
           data={items}
           keyExtractor={itemKey}

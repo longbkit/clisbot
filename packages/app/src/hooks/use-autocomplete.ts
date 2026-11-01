@@ -33,6 +33,7 @@ export function useAutocomplete<
 >(input: UseAutocompleteInput<TOption, TKeyPressEvent>): UseAutocompleteResult<TKeyPressEvent> {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const previousQueryRef = useRef("");
+  const previousPositionRef = useRef(input.optionsPosition);
 
   useEffect(() => {
     if (!input.isVisible) {
@@ -41,8 +42,12 @@ export function useAutocomplete<
       return;
     }
 
-    const queryChanged = previousQueryRef.current !== input.query;
+    // A list that moved to the input's other side starts again on the match next to the input.
+    const queryChanged =
+      previousQueryRef.current !== input.query ||
+      previousPositionRef.current !== input.optionsPosition;
     previousQueryRef.current = input.query;
+    previousPositionRef.current = input.optionsPosition;
 
     setSelectedIndex((current) => {
       if (input.options.length === 0) {

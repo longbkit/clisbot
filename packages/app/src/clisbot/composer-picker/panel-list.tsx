@@ -45,6 +45,8 @@ export function PanelList(props: PanelProps) {
     );
   }
   const emptyKey = state.scope.kind === "favorites" && !query ? "noFavorites" : "noMatches";
+  // Favorites mix providers; grouped search results name theirs in headers instead.
+  const listScope = query ? state.narrow : state.scope;
   return (
     <View>
       {actions.provider && !query ? (
@@ -63,7 +65,9 @@ export function PanelList(props: PanelProps) {
         hiddenCount={state.hiddenCount}
         status={state.status}
         emptyText={t(`composer.picker.${emptyKey}`)}
-        showProvider={query.length > 0 || state.scope.kind === "favorites"}
+        showProvider={listScope?.kind === "favorites"}
+        grouped={state.grouped}
+        highlights={state.highlights}
         selectedKey={state.selectedKey}
         highlightIndex={state.highlight}
         favorites={state.favorites}

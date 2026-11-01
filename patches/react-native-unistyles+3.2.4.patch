@@ -329,3 +329,44 @@ index 195954b..c4ac28c 100644
      namespace "com.unistyles"
  
      defaultConfig {
+diff --git a/node_modules/react-native-unistyles/lib/commonjs/core/withUnistyles/withUnistyles.js b/node_modules/react-native-unistyles/lib/commonjs/core/withUnistyles/withUnistyles.js
+index 5a0d049..9cff470 100644
+--- a/node_modules/react-native-unistyles/lib/commonjs/core/withUnistyles/withUnistyles.js
++++ b/node_modules/react-native-unistyles/lib/commonjs/core/withUnistyles/withUnistyles.js
+@@ -44,6 +44,9 @@
+       } : {})
+     };
+ 
++    // uniProps is consumed above; forwarded, it reaches the DOM as an unknown attribute.
++    delete combinedProps.uniProps;
++
+     // @ts-ignore
+     // prettier-ignore
+     (0, _warn.maybeWarnAboutMultipleUnistyles)(narrowedProps.style, `withUnistyles(${Component.displayName ?? Component.name ?? 'Unknown'})`);
+diff --git a/node_modules/react-native-unistyles/lib/module/core/withUnistyles/withUnistyles.js b/node_modules/react-native-unistyles/lib/module/core/withUnistyles/withUnistyles.js
+index 5904a73..024be7c 100644
+--- a/node_modules/react-native-unistyles/lib/module/core/withUnistyles/withUnistyles.js
++++ b/node_modules/react-native-unistyles/lib/module/core/withUnistyles/withUnistyles.js
+@@ -39,6 +39,9 @@
+       } : {})
+     };
+ 
++    // uniProps is consumed above; forwarded, it reaches the DOM as an unknown attribute.
++    delete combinedProps.uniProps;
++
+     // @ts-ignore
+     // prettier-ignore
+     maybeWarnAboutMultipleUnistyles(narrowedProps.style, `withUnistyles(${Component.displayName ?? Component.name ?? 'Unknown'})`);
+diff --git a/node_modules/react-native-unistyles/src/core/withUnistyles/withUnistyles.tsx b/node_modules/react-native-unistyles/src/core/withUnistyles/withUnistyles.tsx
+index e347b7a..0288d35 100644
+--- a/node_modules/react-native-unistyles/src/core/withUnistyles/withUnistyles.tsx
++++ b/node_modules/react-native-unistyles/src/core/withUnistyles/withUnistyles.tsx
+@@ -59,6 +59,8 @@
+                   }
+                 : {}),
+         } as any
++        // uniProps is consumed above; forwarded, it reaches the DOM as an unknown attribute.
++        delete combinedProps.uniProps
+ 
+         // @ts-ignore
+         // prettier-ignore

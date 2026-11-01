@@ -223,14 +223,89 @@ it("stays open after picking a model and closes on Escape", async () => {
 it("searches every provider and matches provider names", async () => {
   mount();
   await search("so");
-  // Matches mix providers, so each row names its own.
-  expect((await modelRow("claude:Claude Sonnet 5")).textContent).toContain("Claude Sonnet 5Claude");
-  expect((await modelRow("codex:GPT-6.1-Sol")).textContent).toContain("GPT-6.1-SolCodex");
+  // Matches are grouped under a header per provider, so the rows do not repeat it.
+  expect(await screen.findByTestId("composer-picker-group-claude")).toBeTruthy();
+  expect(screen.getByTestId("composer-picker-group-codex")).toBeTruthy();
+  expect((await modelRow("claude:Claude Sonnet 5")).textContent).not.toContain("5Claude");
   expect(await modelRow("codex:GPT-6.1-Sol")).toBeTruthy();
   expect(screen.queryByTestId("composer-picker-model-codex:GPT-6-Astra")).toBeNull();
   await search("claude");
   expect(await modelRow("claude:Claude Haiku 5")).toBeTruthy();
   expect(screen.queryByTestId("composer-picker-model-codex:GPT-6.1-Sol")).toBeNull();
+});
+
+function matchedText(row: HTMLElement): string[] {
+  return [...row.querySelectorAll('[data-testid="composer-picker-match"]')].map(
+    (node) => node.textContent ?? "",
+  );
+}
+
+it("finds GPT-6 by gpt 6 or gpt6 and bolds what matched", async () => {
+  mount();
+  for (const query of ["gpt 6", "gpt6", "GPT-6"]) {
+    await search(query);
+    await expect
+      .poll(() => document.querySelectorAll('[data-testid^="composer-picker-model-"]').length)
+      .toBe(2);
+    expect(matchedText(await modelRow("codex:GPT-6.1-Sol"))).toEqual(["GPT", "6"]);
+  }
+});
+
+it("picks the first match with Enter, without a trailing space", async () => {
+  const calls = mount();
+  await search("sonn");
+  await expect
+    .poll(() => screen.queryByTestId("composer-picker-model-claude:Claude Sonnet 5"))
+    .not.toBeNull();
+  await userEvent.keyboard("{Enter}");
+  expect(calls.picks).toEqual([["claude", "Claude Sonnet 5"]]);
+});
+
+it("dims providers without matches and narrows the results to a pressed provider", async () => {
+  mount();
+  await search("5");
+  const claude = await screen.findByTestId("composer-picker-rail-provider:claude");
+  const codex = screen.getByTestId("composer-picker-rail-provider:codex");
+  expect(claude.getAttribute("aria-disabled")).not.toBe("true");
+  await search("gpt");
+  await expect.poll(() => claude.getAttribute("aria-disabled")).toBe("true");
+  expect(codex.textContent).toContain("3");
+  await search("5");
+  await userEvent.click(screen.getByTestId("composer-picker-rail-provider:codex"));
+  await expect
+    .poll(() => document.querySelectorAll('[data-testid^="composer-picker-model-"]').length)
+    .toBe(1);
+  expect(await modelRow("codex:GPT-5.4-mini")).toBeTruthy();
+  const chip = await screen.findByTestId("composer-picker-narrow-chip");
+  expect(chip.textContent).toContain("in Codex");
+  // The chip's ✕ widens the results to every provider again.
+  await userEvent.click(chip);
+  await expect.poll(() => screen.queryByTestId("composer-picker-narrow-chip")).toBeNull();
+  expect(await modelRow("claude:Claude Opus 5.5")).toBeTruthy();
+});
+
+it("narrows a query to Favorites, and clearing the query returns to the rail's scope", async () => {
+  useModelFavoritesStore.setState({ keys: ["claude:Claude Sonnet 5"] });
+  mount();
+  await search("5");
+  await userEvent.click(await screen.findByTestId("composer-picker-rail-favorites"));
+  await expect
+    .poll(() => document.querySelectorAll('[data-testid^="composer-picker-model-"]').length)
+    .toBe(1);
+  expect(await modelRow("claude:Claude Sonnet 5")).toBeTruthy();
+  await search("");
+  // The rail keeps Favorites, now without a query.
+  await expect.poll(() => screen.queryByTestId("composer-picker-narrow-chip")).toBeNull();
+  expect(await modelRow("claude:Claude Sonnet 5")).toBeTruthy();
+  expect(screen.queryByTestId("composer-picker-model-claude:Claude Opus 5.5")).toBeNull();
+});
+
+it("gives the collapsed rail 44px targets", async () => {
+  mount();
+  const entry = await screen.findByTestId("composer-picker-rail-provider:codex");
+  const rect = entry.getBoundingClientRect();
+  expect(Math.round(rect.width)).toBeGreaterThanOrEqual(44);
+  expect(Math.round(rect.height)).toBeGreaterThanOrEqual(44);
 });
 
 it("collapses a broad query's matches behind Show more", async () => {

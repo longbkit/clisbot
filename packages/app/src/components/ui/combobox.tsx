@@ -236,6 +236,8 @@ export function SearchInput({
 
 export interface ComboboxItemProps {
   label: string;
+  /** Rich text in place of `label`'s, such as a search match in bold; `label` stays its name. */
+  labelContent?: ReactNode;
   description?: string;
   descriptionLayout?: "inline" | "stacked";
   kind?: "directory" | "file";
@@ -255,6 +257,7 @@ export interface ComboboxItemProps {
 
 export function ComboboxItem({
   label,
+  labelContent,
   description,
   descriptionLayout = "inline",
   kind,
@@ -323,7 +326,7 @@ export function ComboboxItem({
       {leadingContent}
       <View style={itemContentStyle}>
         <Text numberOfLines={1} style={styles.comboboxItemLabel}>
-          {label}
+          {labelContent ?? label}
         </Text>
         {description ? (
           <Text

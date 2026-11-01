@@ -105,6 +105,7 @@ import { Shortcut } from "@/components/ui/shortcut";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { AutocompletePopover } from "@/components/ui/autocomplete-popover";
 import type { AutocompleteOption } from "@/components/ui/autocomplete";
+import type { AutocompleteOptionsPosition } from "@/components/ui/autocomplete-utils";
 import { useAgentAutocomplete } from "@/hooks/use-agent-autocomplete";
 import { usePluginClientSlashCommands } from "@/plugins/client-slash-commands";
 import {
@@ -132,6 +133,7 @@ import type { KeyboardActionDefinition } from "@/keyboard/keyboard-action-dispat
 import type { MessageInputKeyboardActionKind } from "@/keyboard/actions";
 import { submitOneOffInput, submitAgentInput } from "@/composer/submit";
 import { createMessageSubmissionWriter } from "@/composer/submission/writer";
+import { useSendErrorDraftReset, type SentDraft } from "@/composer/use-send-error-draft-reset";
 import { ComposerKeyboardScopeProvider, useComposerKeyboardScope } from "@/composer/keyboard-scope";
 import { useAppSettings } from "@/hooks/use-settings";
 import { RenderProfile } from "@/utils/render-profiler";
@@ -1019,8 +1021,12 @@ function ComposerAutocompleteBinding({
 }) {
   const userInput = useSyncExternalStore(text.subscribe, text.getSnapshot, text.getSnapshot);
   const cursorIndex = useStore(cursor);
+  // The popover reports which side of the composer it opened on; the options follow it.
+  const [optionsPosition, setOptionsPosition] =
+    useState<AutocompleteOptionsPosition>("above-input");
   const autocomplete = useAgentAutocomplete({
     ...configuration,
+    optionsPosition,
     userInput,
     cursorIndex: Math.min(cursorIndex, userInput.length),
     onAutocompleteApplied: () => inputRef.current?.focus(),
@@ -1046,6 +1052,7 @@ function ComposerAutocompleteBinding({
       errorMessage={autocomplete.errorMessage}
       loadingText={autocomplete.loadingText}
       emptyText={autocomplete.emptyText}
+      onPositionChange={setOptionsPosition}
     />
   );
 }
@@ -1472,6 +1479,15 @@ function ComposerContentImpl({
   }, [editingSession, queueEdit, queueTargetKey, textSource, attachments]);
   const isFullscreen = useComposerFullscreen(editingSession);
   const [sendError, setSendError] = useState<string | null>(null);
+  const clearSendError = useCallback(() => setSendError(null), []);
+  const sentDraft = useRef<SentDraft | null>(null);
+  useSendErrorDraftReset({
+    sendError,
+    clearSendError,
+    attachmentCount: selectedAttachments.length,
+    textSource,
+    sentDraft,
+  });
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false);
   const [isGithubPickerOpen, setIsGithubPickerOpen] = useState(false);
   const [githubSearchQuery, setGithubSearchQuery] = useState("");
@@ -1878,6 +1894,11 @@ function ComposerContentImpl({
       forceSend?: boolean,
       behavior?: "steer" | "interrupt",
     ) => {
+      sentDraft.current = {
+        text: outgoingMessage.trim(),
+        attachmentCount:
+          composerWorkspaceAttachment.userAttachmentsOnly(outgoingAttachments).length,
+      };
       const result = await submitAgentInput({
         message: outgoingMessage,
         attachments: outgoingAttachments,

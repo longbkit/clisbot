@@ -14,8 +14,10 @@ import { useTranslation } from "react-i18next";
 import { File, Folder } from "lucide-react-native";
 import type { Theme } from "@/styles/theme";
 import { getScrollOffsetToRevealItem } from "./scroll-reveal";
+import type { AutocompleteOptionsPosition } from "./autocomplete-utils";
 import { COMPOSER_LAYOUT_ENABLED } from "@/clisbot/composer-layout/feature";
 import { ChatCommandListHandle, ChatCommandRow } from "@/clisbot/composer-layout/command-row";
+import { useIsCompactFormFactor } from "@/constants/layout";
 
 export interface AutocompleteOption {
   id: string;
@@ -34,6 +36,8 @@ interface AutocompleteProps {
   loadingText?: string;
   emptyText?: string;
   maxHeight?: number;
+  /** Above the input the best match is the last row, pinned at the bottom; below, the first. */
+  optionsPosition?: AutocompleteOptionsPosition;
 }
 
 const BOLT_GLYPH_PATTERN = /\u26A1|\uFE0F/gu;
@@ -51,6 +55,8 @@ interface AutocompleteRowProps {
   option: AutocompleteOption;
   isSelected: boolean;
   mutedColor: string;
+  /** Clisbot chat layout on a phone: the command over its description. */
+  stacked: boolean;
   onSelect: (option: AutocompleteOption) => void;
   onRowLayout: (index: number, event: LayoutChangeEvent) => void;
 }
@@ -60,6 +66,7 @@ function AutocompleteRow({
   option,
   isSelected,
   mutedColor,
+  stacked,
   onSelect,
   onRowLayout,
 }: AutocompleteRowProps) {
@@ -86,6 +93,7 @@ function AutocompleteRow({
       label={optionLabel}
       detail={removeBoltGlyphs(option.detail)}
       description={optionDescription}
+      stacked={stacked}
     />
   ) : (
     <View style={styles.itemMainRow}>
@@ -139,9 +147,12 @@ export function Autocomplete({
   loadingText,
   emptyText,
   maxHeight = 220,
+  optionsPosition = "above-input",
 }: AutocompleteProps) {
   const { t } = useTranslation();
   const { theme } = useUnistyles();
+  const isCompact = useIsCompactFormFactor();
+  const stackedRows = COMPOSER_LAYOUT_ENABLED && isCompact;
   const resolvedLoadingText = loadingText ?? t("common.states.loading");
   const resolvedEmptyText = emptyText ?? t("common.empty.noResults");
   const scrollRef = useRef<ScrollView>(null);
@@ -175,11 +186,15 @@ export function Autocomplete({
   }, [selectedIndex]);
 
   const pinToBottom = useCallback(() => {
+    if (optionsPosition === "below-input") {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      return;
+    }
     scrollRef.current?.scrollToEnd({ animated: false });
     requestAnimationFrame(() => {
       scrollRef.current?.scrollToEnd({ animated: false });
     });
-  }, []);
+  }, [optionsPosition]);
 
   useEffect(() => {
     rowLayoutsRef.current.clear();
@@ -292,6 +307,7 @@ export function Autocomplete({
               option={option}
               isSelected={index === selectedIndex}
               mutedColor={theme.colors.foregroundMuted}
+              stacked={stackedRows}
               onSelect={onSelect}
               onRowLayout={handleRowLayout}
             />

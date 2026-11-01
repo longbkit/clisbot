@@ -358,6 +358,10 @@ export to `src`, but browser and Electron Metro resolve its `browser` export to
 `lib/module`; CommonJS consumers use `lib/commonjs`. A source-only patch leaves
 Electron running the old code.
 
+The current patch also stops web `withUnistyles` forwarding `uniProps` to the wrapped
+component: a lucide icon spread it onto its `<svg>`, and React warned that it does not
+recognize the prop.
+
 Register every dependency patch in `scripts/postinstall-patches.mjs`. A file in
 `patches/` is inert unless that script knows which installed package activates
 it.

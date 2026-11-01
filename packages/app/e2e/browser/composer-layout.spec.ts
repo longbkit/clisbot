@@ -11,6 +11,7 @@ import {
   expectComposerFullscreenControls,
 } from "../support/helpers/composer";
 import { installListCommandsResponse } from "../support/helpers/list-commands-stub";
+import { gotoAppShell } from "../support/helpers/app";
 
 // The chat composer layout (docs/features/composer-picker/README.md, "Layout"): the pill, the
 // buttons beside it, Send inside it and the settings row under it. The fixture Codex gives the
@@ -181,7 +182,12 @@ async function expectCommandList(page: Page, shot: string) {
   expect(Math.abs(listBox.width - composerBox.width)).toBeLessThan(2);
   const description = await box(popover.getByText("Review the current changes", { exact: true }));
   const command = await box(popover.getByText("/review", { exact: true }));
-  expect(command.x).toBeGreaterThan(description.x + description.width);
+  if (shot === "phone") {
+    // A phone stacks the row: the command, then its description under it.
+    expect(description.y).toBeGreaterThanOrEqual(command.y + command.height - 1);
+  } else {
+    expect(command.x).toBeGreaterThan(description.x + description.width);
+  }
   await screenshot(page, `${shot}-command-list`);
   await input.press("h");
   await expect(popover.getByText("/review", { exact: true })).toHaveCount(0);
@@ -380,4 +386,72 @@ test("narrow: the settings row keeps the ring and collapses its labels", async (
   } finally {
     await workspace.cleanup();
   }
+});
+
+const MANY_COMMANDS = Array.from({ length: 12 }, (_, index) => ({
+  name: `${String(index + 10)}-bms-qc-review-testcase-testdesign-label`,
+  description: "Create a full BMS QC review package for a Jira task in one workflow",
+  argumentHint: "",
+}));
+
+test.describe("Navigation V2 Home", () => {
+  // Home puts its composer near the top of the screen.
+  test.use({ navigationV2: true });
+
+  test("phone: the command list opens below the composer, five rows in view", async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await installListCommandsResponse(page, MANY_COMMANDS);
+    await gotoAppShell(page);
+    const chip = visible(page, "composer-commands-button");
+    await expect(chip).toBeVisible({ timeout: 30_000 });
+    await expect(visible(page, "composer-model-chip")).not.toHaveText("Select model", {
+      timeout: 30_000,
+    });
+    await chip.click();
+    const popover = page.getByTestId("composer-autocomplete-popover");
+    const names = popover.getByTestId("composer-command-name");
+    await expect(names.first()).toBeVisible({ timeout: 30_000 });
+    const listBox = await box(popover);
+    const composerBox = await box(visible(page, "composer-pill"));
+    // Home's composer sits near the top, so the list opens under it, inside the screen.
+    expect(listBox.y).toBeGreaterThan(composerBox.y + composerBox.height);
+    expect(listBox.y + listBox.height).toBeLessThanOrEqual(844);
+    let fullyVisible = 0;
+    for (const name of await names.all()) {
+      const rect = await name.boundingBox();
+      if (rect && rect.y >= listBox.y && rect.y + rect.height <= listBox.y + listBox.height) {
+        fullyVisible += 1;
+      }
+    }
+    expect(fullyVisible).toBeGreaterThanOrEqual(5);
+    // The first command, nearest the composer, is the one Enter picks; the command reads whole.
+    await expect(names.first()).toHaveText("/10-bms-qc-review-testcase-testdesign-label");
+    await page.screenshot({
+      path: path.resolve(
+        process.cwd(),
+        "../../.debug/composer-picker-search/e2e-home-phone-commands.png",
+      ),
+    });
+    await composerLocator(page).press("Enter");
+    await expect(composerLocator(page)).toHaveValue("/10-bms-qc-review-testcase-testdesign-label ");
+  });
+
+  test("a fresh install preselects the first ready provider, and remembers nothing", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    // The fixture seeds a remembered model; a fresh install has none.
+    await page.addInitScript(() => localStorage.removeItem("@clisbot:create-agent-preferences"));
+    await gotoAppShell(page);
+    const chip = visible(page, "composer-model-chip");
+    await expect(chip).toHaveAccessibleName(/GPT-6/, { timeout: 30_000 });
+    await expect(visible(page, "mode-control")).toBeVisible();
+    await page.waitForTimeout(500);
+    const stored = await page.evaluate(() =>
+      localStorage.getItem("@clisbot:create-agent-preferences"),
+    );
+    expect(stored ?? "").not.toContain("codex");
+  });
 });

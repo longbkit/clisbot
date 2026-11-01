@@ -9,6 +9,7 @@ import {
   shouldClearProviderAutoAccept,
   resolveModeLabelKey,
   resolveModeProvider,
+  resolveAgentModes,
 } from "./mode-options";
 
 const CLAUDE: AgentMode[] = [
@@ -119,5 +120,20 @@ describe("mode concepts", () => {
     expect(resolveModeLabelKey("codex", "auto")).toBe("codexDefault");
     expect(resolveModeLabelKey("opencode", "plan")).toBe("plan");
     expect(resolveModeLabelKey("acme", "x")).toBeNull();
+  });
+});
+
+describe("resolveAgentModes", () => {
+  it("keeps the session's own modes", () => {
+    expect(resolveAgentModes(CLAUDE.slice(0, 1), CLAUDE)).toEqual(CLAUDE.slice(0, 1));
+  });
+
+  it("falls back to the provider's list on a session the daemon has not loaded", () => {
+    expect(resolveAgentModes([], CLAUDE)).toEqual(CLAUDE);
+  });
+
+  it("offers nothing when neither has modes", () => {
+    expect(resolveAgentModes([], undefined)).toEqual([]);
+    expect(resolveAgentModes([], [])).toEqual([]);
   });
 });
