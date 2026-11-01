@@ -40,3 +40,16 @@ it("uses the existing native encoder with matching format, bounded dimensions an
   expect(native.context.release).toHaveBeenCalledTimes(2);
   expect(native.image.release).toHaveBeenCalledTimes(2);
 });
+it("a failed WebP save rejects and releases only that attempt, so JPEG can follow on the same encoder", async () => {
+  const encoder = await createSendImageEncoder({ data: "original", mimeType: "image/png" });
+  native.image.saveAsync.mockRejectedValueOnce(new Error("WebP encoder unavailable"));
+  await expect(
+    encoder.encode({ maxDimension: 1600, format: "webp", quality: 0.8 }),
+  ).rejects.toThrow("WebP encoder unavailable");
+  native.image.saveAsync.mockResolvedValueOnce({ uri: "file:///cache/p.jpg", base64: "jpeg" });
+  expect(await encoder.encode({ maxDimension: 1600, format: "jpeg", quality: 0.8 })).toEqual({
+    data: "jpeg",
+    mimeType: "image/jpeg",
+  });
+  encoder.dispose();
+});

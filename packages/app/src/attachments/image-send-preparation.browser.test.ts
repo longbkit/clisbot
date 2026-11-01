@@ -1,8 +1,8 @@
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { createIndexedDbAttachmentStore } from "./web/indexeddb-attachment-store";
 import { __setAttachmentStoreForTests } from "./store";
 import { encodeAttachmentsForSend } from "./service";
-import { MAX_PREPARED_IMAGE_CHARACTERS } from "./image-send-preparation";
+import { MAX_PREPARED_IMAGE_CHARACTERS, prepareImagesForSend } from "./image-send-preparation";
 
 function screenshot(seed: number): Blob {
   const canvas = document.createElement("canvas");
@@ -101,3 +101,36 @@ it("preserves transparent text pixels when preparing WebP and reports the actual
     encoder.dispose();
   }
 });
+
+it("a canvas that answers WebP with PNG, as Safari's does, yields a decodable JPEG within budget", async () => {
+  const { createSendImageEncoder } = await import("./image-send-encoder.web");
+  const data = await screenshot(9)
+    .arrayBuffer()
+    .then((bytes) =>
+      btoa(Array.from(new Uint8Array(bytes), (b) => String.fromCharCode(b)).join("")),
+    );
+  const toDataURL = HTMLCanvasElement.prototype.toDataURL;
+  const asSafari = vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockImplementation(function (
+    this: HTMLCanvasElement,
+    type?: string,
+    quality?: number,
+  ) {
+    return toDataURL.call(this, type === "image/webp" ? "image/png" : type, quality);
+  });
+  try {
+    const budget = 1024 * 1024;
+    const [prepared] = await prepareImagesForSend(
+      [{ data, mimeType: "image/png" }],
+      createSendImageEncoder,
+      budget,
+    );
+    expect(prepared.mimeType).toBe("image/jpeg");
+    expect(prepared.data.length).toBeLessThanOrEqual(budget);
+    const decoded = new Image();
+    decoded.src = `data:${prepared.mimeType};base64,${prepared.data}`;
+    await decoded.decode();
+    expect(decoded.naturalWidth).toBeGreaterThan(0);
+  } finally {
+    asSafari.mockRestore();
+  }
+}, 30000);
