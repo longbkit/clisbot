@@ -195,6 +195,11 @@ permission request the agent still raises. Agents sometimes ask under bypass any
   ([permissions](../../permissions.md#approval-leaves)). The app cannot tell in advance for a
   provider with no unattended mode (OpenCode); there the daemon refuses and the app shows the
   error.
+- **The daemon's unattended marks changed Managed Access.** Normalizing runtime modes made
+  Claude Bypass, Codex Full access and Copilot Allow all count as unattended where they did not
+  before; [permissions](../../permissions.md#approval-leaves) lists every check this reaches.
+- **Children.** A child of a Full auto-accept parent starts in its provider's no-prompt mode but
+  without the Full auto-accept flag, so its requests that still ask wait for a person.
 - **The mode-cycle shortcut skips it**; it is chosen on purpose. For the same reason it is never
   remembered as a provider's default mode for the next draft: picking it does not write the
   `mode` preference, and a stored `full-auto-accept` preference resolves to the provider's

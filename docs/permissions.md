@@ -201,6 +201,21 @@ unattended modes, Full auto-accept, `toolPolicy.preapproved`, and auto-accept de
 operator re-saves it — re-selecting its access level is enough. Nothing warns
 about this, so check assignments that relied on unattended execution.
 
+Which modes are unattended comes from the provider manifest's `isUnattended` marks:
+Claude Bypass (`bypassPermissions`), Codex Full access (`full-access`), Copilot Allow all
+(`allow-all`) and OMP Full access (`full`). The daemon copies those marks onto the bare modes a
+running provider reports (`provider-modes.ts`); before it did, Managed Access read Claude, Codex
+and Copilot sessions' runtime modes unmarked, so their no-prompt modes slipped through as
+attended. With the marks, a member without every approval leaf is refused, everywhere Managed
+Access judges a configuration: selecting one of those modes, changing any other setting of a
+session already running in one, `resume_agent_request` for such a session, Chat delivery to a
+Bot whose session runs in one, and a schedule launch. A Codex Plan over Full access counts as
+Full access. Three consequences outside Managed Access follow from the same marks: a schedule
+with no mode, and a child agent created for another provider than its unattended parent, start
+in that provider's no-prompt mode; a child of a Full auto-accept parent gets the no-prompt mode
+but not the Full auto-accept flag. `provider-modes.test.ts` checks the classification against the
+real provider registry.
+
 A daemon drops a Project privilege it does not know, so a ticket from a newer Hub
 grants it less, never more. Daemons that send the `x-clisbot-project-privileges`
 header also never receive one they lack: the Hub leaves it out, with any session
