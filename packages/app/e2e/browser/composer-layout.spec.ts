@@ -150,7 +150,8 @@ async function expectCircleSwap(page: Page, shot: string) {
   expect(Math.round(sendBox.width)).toBe(Math.round(mic.width));
   await expect(dictation(page)).toHaveCount(0);
   await expect(realtimeVoice(page)).toHaveCount(0);
-  await expect(visible(page, "message-input-attach-button")).toHaveCount(0);
+  // Attach stays while typing (a screenshot often follows the text); voice and the mic hide.
+  await expect(visible(page, "message-input-attach-button")).toHaveCount(1);
   expect(Math.round((await box(container)).height)).toBe(Math.round(containerBox.height));
   await input.fill("Typing in the pill, Send takes the mic's place");
   await screenshot(page, `${shot}-typing`);

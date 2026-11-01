@@ -13,7 +13,7 @@ under it, on every width:
 
 ```
 ( [☰]  Message...                  📎  ≋  (🎤) )      idle
-( [☰]  Fix the flaky test                 (➤) )      typing: Send takes the mic's circle
+( [☰]  Fix the flaky test             📎  (➤) )      typing: Send takes the mic's circle
   6.1 Sol Medium   🔒 Default permissions      Tools off  ◯
 ```
 
@@ -22,7 +22,7 @@ under it, on every width:
 | Telegram                                                            | Clisbot                                                                     |
 | ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | One container: Menu chip, emoji, text, 📎, the mic circle           | One container: Commands chip (☰), text, 📎, realtime voice, the mic circle |
-| Typing: 📎 hides, the circle becomes Send in place                  | Same: 📎, voice hide; Send takes the circle, same place and size            |
+| Typing: 📎 hides, the circle becomes Send in place                  | Voice hides, 📎 stays; Send takes the circle, same place and size           |
 | Menu ↔ ✕ Menu; the command list docks above the bar                 | ☰ ↔ ✕; the slash list docks above the bar, as wide, with a handle          |
 | Rows: description left, `/command` right and muted                  | Same, the command's arguments after it                                      |
 | Expanded: back top left, the text above, the controls at the bottom | Same controls in the same places, the text grown; no undo or redo           |
@@ -53,8 +53,11 @@ under it, on every width:
   always-shown submit such as New workspace's Create, else dictation. When Stop or Create holds
   it, dictation sits before it with attach and voice. Realtime voice keeps its overlay with mute
   and stop.
-- **Typing hides attach, voice and the mic**; attachments alone keep them, so another file or a
-  spoken message can join them.
+- **Typing hides voice and the mic; attach stays.** Telegram hides its paperclip too, but here a
+  screenshot often joins a message after its text, and hiding 📎 left no way to add it. Attachments
+  alone keep all three, so another file or a spoken message can join them.
+- **A refused send in the expanded editor** shows right under the container, next to Send, not at
+  the top of the screen.
 - **Sizes.** The container's row is the circle plus its inset: a 40px circle in a 48px target, so
   ☰ (36px face in a 44px target), 📎, voice and one line of text share one vertical center, and
   ☰ and the circle stay on the bottom row as the text grows. The container is inset `spacing[1]`

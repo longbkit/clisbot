@@ -10,7 +10,7 @@ import { ComposerSettingsRow } from "./settings-row";
 export interface ChatComposerSlots {
   /** The Commands chip at the container's left end. */
   commands: ReactNode;
-  /** Attach and realtime voice before the circle, until text is typed. */
+  /** Attach (always) and realtime voice (until text is typed) before the circle. */
   attach: ReactNode;
   realtimeVoice: ReactNode;
   /** Dictation: the circle at the container's right end, or beside it when the circle is taken. */
@@ -18,8 +18,8 @@ export interface ChatComposerSlots {
   /** Something is sendable: the circle becomes Send. */
   sendable: boolean;
   /**
-   * Text is typed: attach, voice and dictation hide, as Telegram's. Attachments alone keep them,
-   * so another file or a spoken message can join them.
+   * Text is typed: voice and dictation hide, as Telegram's. Attach stays, unlike Telegram's: a
+   * screenshot often joins a message after its text. Attachments alone keep all three.
    */
   typing: boolean;
   /** Send, Stop while the agent runs, or an always-shown submit (Create): the circle. */
@@ -55,14 +55,14 @@ export interface ChatComposerPresentationProps {
 
 interface Placement {
   circle: ReactNode;
-  /** Attach, voice and a displaced dictation; empty once text is typed. */
+  /** Attach, voice and a displaced dictation; only attach once text is typed. */
   end: ReactNode[];
 }
 
 /** Where dictation goes: the circle unless Send, Stop or Create holds it. */
 export function resolvePlacement(slots: ChatComposerSlots): Placement {
   const circle = slots.primary ?? slots.dictation;
-  if (slots.typing) return { circle, end: [] };
+  if (slots.typing) return { circle, end: slots.attach != null ? [slots.attach] : [] };
   const displacedMic = slots.primary != null ? slots.dictation : null;
   const end = [slots.attach, slots.realtimeVoice, displacedMic].filter((node) => node != null);
   return { circle, end };
@@ -156,13 +156,14 @@ export function ChatComposerPresentation(props: ChatComposerPresentationProps) {
       <ComposerFullscreenBody fullscreen={fullscreen}>
         <View ref={frameRef} collapsable={false} style={layout.body}>
           <ComposerFrameProvider frameRef={frameRef}>
-            {fullscreen ? props.error : null}
             <ChatComposerContainer
               props={props}
               layout={layout}
               placement={placement}
               expand={enterButton}
             />
+            {/* Expanded, a refused send reads right under Send, where the eye already is. */}
+            {fullscreen ? props.error : null}
             {hasSettings ? (
               <ComposerSettingsRow
                 start={slots.settings}

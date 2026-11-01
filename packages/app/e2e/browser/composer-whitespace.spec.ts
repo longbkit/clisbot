@@ -188,6 +188,11 @@ async function expectFullscreenErrorAboveSend(page: Page): Promise<void> {
   const sendBox = (await page
     .getByRole("button", { name: "Send message", exact: true })
     .boundingBox())!;
+  if (CHAT_LAYOUT) {
+    // The chat layout keeps Send inside the container, so the error sits right under it.
+    expect(alertBox.y).toBeGreaterThanOrEqual(sendBox.y + sendBox.height);
+    return;
+  }
   const editorBox = (await composerLocator(page).boundingBox())!;
   expect(alertBox.y).toBeGreaterThanOrEqual(editorBox.y + editorBox.height);
   expect(alertBox.y + alertBox.height).toBeLessThanOrEqual(sendBox.y);
