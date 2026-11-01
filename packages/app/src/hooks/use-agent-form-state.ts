@@ -1,3 +1,4 @@
+import { FULL_AUTO_ACCEPT_MODE_ID } from "@clisbot/protocol/full-auto-accept";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { AgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
 import type {
@@ -387,7 +388,8 @@ export function useAgentFormState(options: UseAgentFormStateOptions): UseAgentFo
     (modeId: string) => {
       dispatch({ type: "SET_MODE_FROM_USER", modeId });
       const provider = formState.provider;
-      if (provider) {
+      // Full auto-accept is chosen for one agent, never remembered as the provider's default.
+      if (provider && modeId !== FULL_AUTO_ACCEPT_MODE_ID) {
         void updateCurrentPreferences((current) =>
           mergeSelectedComposerPreferences({
             preferences: current,

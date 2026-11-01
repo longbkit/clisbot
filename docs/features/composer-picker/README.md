@@ -186,7 +186,10 @@ permission request the agent still raises. Agents sometimes ask under bypass any
   ([permissions](../../permissions.md#approval-leaves)). The app cannot tell in advance for a
   provider with no unattended mode (OpenCode); there the daemon refuses and the app shows the
   error.
-- **The mode-cycle shortcut skips it**; it is chosen on purpose.
+- **The mode-cycle shortcut skips it**; it is chosen on purpose. For the same reason it is never
+  remembered as a provider's default mode for the next draft: picking it does not write the
+  `mode` preference, and a stored `full-auto-accept` preference resolves to the provider's
+  default.
 
 ## Code
 

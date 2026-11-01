@@ -1,3 +1,4 @@
+import { FULL_AUTO_ACCEPT_MODE_ID } from "@clisbot/protocol/full-auto-accept";
 import type { AgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
 import type {
   AgentModelDefinition,
@@ -200,7 +201,8 @@ function resolvePreferredModeId(input: {
   if (initialModeId) return initialModeId;
 
   const preferredModeId = normalizeSelectedModeId(input.preferredModeId);
-  if (preferredModeId) return preferredModeId;
+  // Full auto-accept is chosen for one agent and never remembered as a provider's default.
+  if (preferredModeId && preferredModeId !== FULL_AUTO_ACCEPT_MODE_ID) return preferredModeId;
 
   const defaultModeId = input.providerDef?.defaultModeId;
   const modes = input.providerDef?.modes ?? [];

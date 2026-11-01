@@ -132,6 +132,21 @@ describe("resolveDefaultModel", () => {
   });
 });
 
+describe("remembered mode", () => {
+  // Full auto-accept is chosen on purpose for one agent, never carried into the next draft.
+  it("does not start a new draft in a remembered Full auto-accept", () => {
+    const resolved = resolveFormState(
+      undefined,
+      { provider: "codex", providerPreferences: { codex: { mode: "full-auto-accept" } } },
+      ALIASED_CODEX_MODELS,
+      INITIAL_USER_MODIFIED,
+      makeState().form,
+      codexProviderMap,
+    );
+    expect(resolved.modeId).toBe("auto");
+  });
+});
+
 describe("model aliases", () => {
   it("canonicalizes a retired preferred model and restores thinking from its alias key", () => {
     const resolved = resolveFormState(

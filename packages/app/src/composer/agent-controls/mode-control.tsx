@@ -9,6 +9,7 @@ import { useToast } from "@/contexts/toast-context";
 import { toErrorMessage } from "@/utils/error-messages";
 import { showProviderNoticeToast } from "@/utils/provider-notice-toast";
 import type { AgentMode } from "@clisbot/protocol/agent-types";
+import { FULL_AUTO_ACCEPT_MODE_ID } from "@clisbot/protocol/full-auto-accept";
 import type { AgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
 import { useHostFeature } from "@/runtime/host-features";
 import {
@@ -78,15 +79,18 @@ export function useLiveAgentModeControl(
           .setAgentFeature(agentId, PROVIDER_AUTO_ACCEPT_FEATURE_ID, false)
           .catch((error) => toast.error(toErrorMessage(error)));
       }
-      void updatePreferences((current) =>
-        mergeProviderPreferences({
-          preferences: current,
-          provider: slice.provider,
-          updates: { mode: modeId || undefined },
-        }),
-      ).catch((error) => {
-        console.warn("[AgentModeControl] persist mode preference failed", error);
-      });
+      // Full auto-accept is chosen for this agent, never remembered as the provider's default.
+      if (modeId !== FULL_AUTO_ACCEPT_MODE_ID) {
+        void updatePreferences((current) =>
+          mergeProviderPreferences({
+            preferences: current,
+            provider: slice.provider,
+            updates: { mode: modeId || undefined },
+          }),
+        ).catch((error) => {
+          console.warn("[AgentModeControl] persist mode preference failed", error);
+        });
+      }
       void client
         .setAgentMode(agentId, modeId)
         .then((notice) => showProviderNoticeToast(toast, notice))
