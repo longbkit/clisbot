@@ -906,6 +906,8 @@ function dispatchDesktopKey(
   if (!IS_WEB && input.isMobile) return false;
 
   if (key === "ArrowDown" || key === "ArrowUp") {
+    // A Combobox drawn with custom children and no options leaves the arrows to them.
+    if (input.orderedVisibleOptions.length === 0) return false;
     event?.preventDefault();
     handleDesktopArrowKey(input, key);
     return true;
