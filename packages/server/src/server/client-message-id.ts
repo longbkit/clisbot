@@ -14,3 +14,14 @@ export function resolveClientMessageId(
 ): string {
   return normalizeClientMessageId(clientMessageId) ?? generateId();
 }
+
+/** A retried message ID whose content or sender differs from the message it already names. */
+export class ClientMessageIdConflict extends Error {
+  constructor(
+    message: string,
+    readonly field: "content" | "sender",
+  ) {
+    super(message);
+    this.name = "ClientMessageIdConflict";
+  }
+}

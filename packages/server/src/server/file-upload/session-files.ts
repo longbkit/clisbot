@@ -1,5 +1,6 @@
 import { appendRetainedForkFiles, type RetainedForkFiles } from "./retained-fork-files.js";
 import { queuedAttachmentIds } from "../input-queue/file-storage.js";
+import { ClientMessageIdConflict } from "../client-message-id.js";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, promises as fs } from "node:fs";
 import path from "node:path";
@@ -346,7 +347,10 @@ export async function attachSessionFiles(input: {
           JSON.stringify(existing.imageDigests) !== JSON.stringify(digests) ||
           JSON.stringify(existing.forkSources ?? []) !== JSON.stringify(forkSources)
         )
-          throw new Error("Message attachment retry conflicts with the accepted files");
+          throw new ClientMessageIdConflict(
+            "Message attachment retry conflicts with the accepted files",
+            "content",
+          );
         const byId = new Map(existing.files.map((file) => [file.id, file]));
         return {
           attachments: rewriteForkText(input.attachments, existing)?.map((item) =>

@@ -27,6 +27,14 @@ const ENCODING_STEPS: readonly ImageEncodingOptions[] = [
   { maxDimension: 256, format: "jpeg", quality: 0.6 },
 ];
 
+/** No encoding step fits this image into its share; fewer images per message would. */
+export class ImageBudgetExceeded extends Error {
+  constructor() {
+    super("These images do not fit in one message.");
+    this.name = "ImageBudgetExceeded";
+  }
+}
+
 /** Prepare a send copy only. Persisted originals and draft identity are untouched. */
 export async function prepareImagesForSend(
   images: SendImage[],
@@ -48,26 +56,36 @@ export async function prepareImagesForSend(
     const allowance = Math.floor((image.data.length / largeTotal) * remaining);
     const encoder = await createEncoder(image);
     try {
-      let candidate: SendImage | undefined;
-      for (const options of ENCODING_STEPS) {
-        const encoded = await encoder.encode({
-          ...options,
-          format:
-            options.format === "jpeg" && image.mimeType !== "image/jpeg" ? "webp" : options.format,
-        });
-        if (encoded.data.length <= allowance) {
-          candidate = encoded;
-          break;
-        }
-      }
-      if (!candidate)
-        throw new Error(
-          "This image could not be prepared for sending. Your draft is kept; try choosing the image again.",
-        );
-      prepared.push(candidate);
+      prepared.push(await encodeWithin(encoder, image, allowance));
     } finally {
       encoder.dispose();
     }
   }
   return prepared;
+}
+
+/**
+ * The first step that fits. Images other than JPEG keep their transparency as WebP; where the
+ * platform cannot write WebP (it throws, or returns another format as Safari's canvas does),
+ * JPEG takes over for this and every smaller step.
+ */
+async function encodeWithin(
+  encoder: SendImageEncoder,
+  image: SendImage,
+  allowance: number,
+): Promise<SendImage> {
+  let lossy: "webp" | "jpeg" = image.mimeType === "image/jpeg" ? "jpeg" : "webp";
+  for (const step of ENCODING_STEPS) {
+    let encoded: SendImage | null = null;
+    if (step.format === "jpeg" && lossy === "webp") {
+      encoded = await encoder.encode({ ...step, format: "webp" }).catch(() => null);
+      if (encoded?.mimeType !== "image/webp") {
+        lossy = "jpeg";
+        encoded = null;
+      }
+    }
+    encoded ??= await encoder.encode(step);
+    if (encoded.data.length <= allowance) return encoded;
+  }
+  throw new ImageBudgetExceeded();
 }

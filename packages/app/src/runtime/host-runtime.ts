@@ -110,7 +110,7 @@ import { schedulesQueryBaseKey } from "@/schedules/aggregated-schedules";
 import { dispatchComposerAgentMessage, sendQueuedComposerMessageNow } from "@/composer/actions";
 import { createMessageSubmissionWriter } from "@/composer/submission/writer";
 import { resolveComposerAttachmentSubmitFormat } from "@/composer/attachments/submit";
-import { encodeImages } from "@/utils/encode-images";
+import { encodeImageMessagesForSend } from "@/attachments/service";
 import { DirectorySync, type RefreshAgentDirectoryResult } from "@/runtime/directory-sync";
 import { createDirectoryFrameClock, type FrameClock } from "@/runtime/directory-sync/live-batch";
 import { diagnosticStack, recordHostDiagnostic } from "@/runtime/host-diagnostics";
@@ -3445,7 +3445,7 @@ export class HostRuntimeStore {
           attachmentSubmitFormat: resolveComposerAttachmentSubmitFormat({
             supportsForgeAttachments,
           }),
-          encodeImages,
+          encodeImageMessages: encodeImageMessagesForSend,
           submission: createMessageSubmissionWriter(serverId),
           // The queue drains when the agent goes idle, but the agent can start a turn of its own
           // in that same moment (a wake-up after background work). Steering folds the message

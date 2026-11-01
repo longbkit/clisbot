@@ -11,15 +11,18 @@ import type { ChatMessageFiles } from "../chats/chat-engine.js";
 import type { attachSessionFiles } from "../file-upload/session-files.js";
 import { queueFileStorage } from "./file-storage.js";
 import {
+  ALREADY_ACCEPTED,
   InputQueueStore,
   QueueConflict,
   QueueSnapshotSchema,
+  SENDER_CONFLICT,
   type QueueSnapshot,
   type QueueStorage,
   type QueueItem,
 } from "./input-queue-store.js";
 import { hydrateQueueContent, prepareQueueFiles, readQueueFileChunk } from "./files.js";
 import { StoredQueueContentSchema, type StoredQueueContent } from "./content.js";
+import { ClientMessageIdConflict } from "../client-message-id.js";
 
 interface QueueContentInput extends ChatMessageFiles {
   text: string;
@@ -146,7 +149,7 @@ export class InputQueueRuntime {
       return {
         queue: await this.view(state.target, error.snapshot),
         error: error.message,
-        errorCode: "queue_conflict",
+        errorCode: error.code,
       };
     }
   }
@@ -215,31 +218,30 @@ export class InputQueueRuntime {
     const senderId = sessionActorKey(identity.actor ?? LOCAL_OWNER);
     const matches = (item: QueueItem) =>
       StoredQueueContentSchema.parse(item.payload).fingerprint === fingerprint;
-    const existing = (await queue.read()).items.find((item) => item.id === command.id);
-    if (existing) {
-      if (!matches(existing) || existing.senderId !== senderId)
-        throw new QueueConflict("Queue ID conflicts with accepted content", await queue.read());
-      return queue.read();
+    try {
+      return await queue.enqueue(
+        { id: command.id, senderId, createdAt: new Date().toISOString(), payload: undefined },
+        {
+          delivered: () => target.delivered(command.id, command),
+          matches,
+          prepare: (snapshot) =>
+            prepareQueueFiles({
+              directory: target.directory,
+              text: command.text,
+              files: command,
+              ...authority,
+              identity,
+              fingerprint,
+              retainedFiles: snapshot.items.flatMap(
+                (queued) => StoredQueueContentSchema.parse(queued.payload).files,
+              ),
+            }),
+        },
+      );
+    } catch (error) {
+      if (error instanceof ClientMessageIdConflict) throw await idConflict(queue, error);
+      throw error;
     }
-    return queue.enqueue(
-      { id: command.id, senderId, createdAt: new Date().toISOString(), payload: undefined },
-      {
-        delivered: () => target.delivered(command.id, command),
-        matches,
-        prepare: (snapshot) =>
-          prepareQueueFiles({
-            directory: target.directory,
-            text: command.text,
-            files: command,
-            ...authority,
-            identity,
-            fingerprint,
-            retainedFiles: snapshot.items.flatMap(
-              (queued) => StoredQueueContentSchema.parse(queued.payload).files,
-            ),
-          }),
-      },
-    );
   }
 
   private prepareEdit(
@@ -351,6 +353,13 @@ export class InputQueueRuntime {
       ...[...this.targets.values()].flatMap((state) => [state.recovering, state.draining]),
     ]);
   }
+}
+/** Prepared images may differ in bytes between attempts at one draft, so content is not a conflict. */
+async function idConflict(queue: InputQueueStore, error: ClientMessageIdConflict) {
+  const snapshot = await queue.read();
+  return error.field === "sender"
+    ? new QueueConflict(SENDER_CONFLICT, snapshot)
+    : new QueueConflict(ALREADY_ACCEPTED, snapshot, "already_accepted");
 }
 function digest(command: InputQueueCommand): string {
   const { action: _action, ...content } = command;

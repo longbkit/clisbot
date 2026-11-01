@@ -1,6 +1,10 @@
 import type { AttachmentMetadata, ComposerAttachment } from "@/attachments/types";
+import type { AgentAttachment } from "@clisbot/protocol/agent-attachments";
+import type { MessagePart } from "./message-parts";
 
 export type ImageAttachment = AttachmentMetadata;
+
+export type QueueMessageParts = (parts: MessagePart<AgentAttachment>[]) => Promise<void>;
 
 export interface MessagePayload {
   text: string;
@@ -8,6 +12,8 @@ export interface MessagePayload {
   cwd: string;
   forceSend?: boolean;
   activeTurnBehavior?: "steer" | "interrupt";
+  /** Takes a draft over one message's limits as ordered Host queue items, where the Host has one. */
+  queueParts?: QueueMessageParts;
 }
 
 /**

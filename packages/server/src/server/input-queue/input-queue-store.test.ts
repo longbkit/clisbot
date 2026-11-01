@@ -112,9 +112,13 @@ describe("Host queue snapshots", () => {
     const queue = new InputQueueStore(new MemoryStorage());
     await queue.enqueue(item("a"));
     expect((await queue.enqueue(item("a"))).revision).toBe(1);
-    await expect(queue.enqueue({ ...item("a"), payload: "different" })).rejects.toThrow(
-      "conflicts",
-    );
+    await expect(queue.enqueue({ ...item("a"), payload: "different" })).rejects.toMatchObject({
+      code: "already_accepted",
+    });
+    await expect(queue.enqueue({ ...item("a"), senderId: "stranger" })).rejects.toMatchObject({
+      code: "queue_conflict",
+    });
+    expect((await queue.read()).items).toHaveLength(1);
   });
   it("refuses overload and corrupted snapshots without evicting accepted input", async () => {
     const disk = new MemoryStorage();

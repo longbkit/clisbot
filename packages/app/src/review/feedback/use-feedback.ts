@@ -79,7 +79,7 @@ export function useReviewFeedback(input: {
             agentId: recipient.agentId,
             text: i18n.t("review.feedback.prompt"),
             attachments: [attachment],
-            encodeImages: async () => [],
+            encodeImageMessages: async () => [],
             submission: createMessageSubmissionWriter(serverId),
             activeTurnBehavior,
             activeTurnId:

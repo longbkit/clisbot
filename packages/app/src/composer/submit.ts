@@ -46,6 +46,7 @@ export async function submitAgentInput<TAttachment extends ComposerAttachment>(
   }
 
   if (input.isAgentRunning && !input.forceSend) {
+    input.setSendError(null);
     input.setIsProcessing(true);
     try {
       await input.queueMessage({ message: trimmedMessage, attachments });

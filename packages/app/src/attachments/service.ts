@@ -1,4 +1,10 @@
-import { prepareImagesForSend, MAX_PREPARED_IMAGE_CHARACTERS } from "./image-send-preparation";
+import {
+  ImageBudgetExceeded,
+  MAX_PREPARED_IMAGE_CHARACTERS,
+  prepareImagesForSend,
+  type SendImage,
+  type SendImageEncoder,
+} from "./image-send-preparation";
 import { collectRetainedAttachmentIds } from "@/attachments/gc-retention";
 import { getAttachmentStore } from "@/attachments/store";
 import type { AttachmentMetadata, SaveAttachmentInput } from "@/attachments/types";
@@ -96,20 +102,87 @@ export async function persistAttachmentFromFileUri(input: {
   });
 }
 
+type CreateSendImageEncoder = (image: SendImage) => Promise<SendImageEncoder>;
+
+async function platformEncoder(image: SendImage): Promise<SendImageEncoder> {
+  const { createSendImageEncoder } = await import("./image-send-encoder");
+  return createSendImageEncoder(image);
+}
+
+/** For callers that send exactly one message, such as creating an agent. */
 export async function encodeAttachmentsForSend(
   attachments: readonly AttachmentMetadata[] | undefined,
-): Promise<Array<{ data: string; mimeType: string }> | undefined> {
-  if (!attachments || attachments.length === 0) {
-    return undefined;
-  }
+): Promise<SendImage[] | undefined> {
+  if (attachments && attachments.length > MAX_SEND_ATTACHMENT_COUNT) throw tooManyForOneMessage();
+  const messages = await encodeImageMessagesForSend(attachments);
+  if (messages.length > 1) throw tooManyForOneMessage();
+  return messages[0];
+}
 
-  if (attachments.length > MAX_SEND_ATTACHMENT_COUNT) {
-    throw new Error(`Too many attachments (maximum ${MAX_SEND_ATTACHMENT_COUNT}).`);
+function tooManyForOneMessage(): Error {
+  return new Error(
+    `One message carries at most ${MAX_SEND_ATTACHMENT_COUNT} images. Your draft is kept: remove some images and send the rest in a second message.`,
+  );
+}
+
+/**
+ * Send copies of the images, in order, split into as many messages as one message's limits
+ * need: at most MAX_SEND_ATTACHMENT_COUNT images and MAX_PREPARED_IMAGE_CHARACTERS each.
+ * Originals are only read; a failure leaves the draft as it was.
+ */
+export async function encodeImageMessagesForSend(
+  attachments: readonly AttachmentMetadata[] | undefined,
+  createEncoder: CreateSendImageEncoder = platformEncoder,
+): Promise<SendImage[][]> {
+  if (!attachments || attachments.length === 0) return [];
+  const messages: SendImage[][] = [];
+  for (const group of evenGroups(attachments, MAX_SEND_ATTACHMENT_COUNT))
+    messages.push(...(await encodeGroup(group, createEncoder)));
+  return messages;
+}
+
+function evenGroups<T>(items: readonly T[], maxSize: number): T[][] {
+  const count = Math.ceil(items.length / maxSize);
+  const groups: T[][] = [];
+  let start = 0;
+  for (let index = 0; index < count; index++) {
+    const size = Math.floor(items.length / count) + (index < items.length % count ? 1 : 0);
+    groups.push(items.slice(start, start + size));
+    start += size;
   }
+  return groups;
+}
+
+/** Halves a group until every half fits; a single image that cannot fit is a real failure. */
+async function encodeGroup(
+  group: readonly AttachmentMetadata[],
+  createEncoder: CreateSendImageEncoder,
+): Promise<SendImage[][]> {
+  try {
+    return [await encodeOneMessage(group, createEncoder)];
+  } catch (error) {
+    if (!(error instanceof ImageBudgetExceeded)) throw error;
+    if (group.length === 1)
+      throw new Error(
+        `Image ${imageName(group[0])} cannot be made small enough to send. Your draft is kept: remove that image, or attach it as a file.`,
+        { cause: error },
+      );
+    const half = Math.ceil(group.length / 2);
+    return [
+      ...(await encodeGroup(group.slice(0, half), createEncoder)),
+      ...(await encodeGroup(group.slice(half), createEncoder)),
+    ];
+  }
+}
+
+async function encodeOneMessage(
+  attachments: readonly AttachmentMetadata[],
+  createEncoder: CreateSendImageEncoder,
+): Promise<SendImage[]> {
   // Store metadata rejects known oversized originals before loading. The actual
   // encoded size below also bounds inputs with missing/understated metadata.
   const store = await getAttachmentStore();
-  const prepared: Array<{ data: string; mimeType: string }> = [];
+  const prepared: SendImage[] = [];
   let remaining = MAX_PREPARED_IMAGE_CHARACTERS;
   for (let index = 0; index < attachments.length; index++) {
     const attachment = attachments[index];
@@ -117,46 +190,51 @@ export async function encodeAttachmentsForSend(
       typeof attachment.byteSize === "number" &&
       attachment.byteSize > MAX_SEND_ATTACHMENT_BYTES
     ) {
-      throw new Error(
-        "This image is too large to prepare. Your draft is kept; choose an image under 32 MiB.",
-      );
+      throw originalTooLarge(attachment);
     }
     let data: string;
     try {
       data = await store.encodeBase64({ attachment });
     } catch (error) {
       throw new Error(
-        `Unable to read image ${attachment.fileName ?? attachment.id}. Your draft is kept; try choosing it again.`,
+        `Could not read image ${imageName(attachment)}. Your draft is kept: send again, or remove that image.`,
         { cause: error },
       );
     }
-    if (data.length > Math.ceil(MAX_SEND_ATTACHMENT_BYTES / 3) * 4) {
-      throw new Error(
-        "This image is too large to prepare. Your draft is kept; choose an image under 32 MiB.",
-      );
-    }
+    if (data.length > Math.ceil(MAX_SEND_ATTACHMENT_BYTES / 3) * 4)
+      throw originalTooLarge(attachment);
     // Equal shares avoid starving an image when stored metadata is stale.
     // Unused space from earlier small images remains available to later ones.
     const allowance = Math.floor(remaining / (attachments.length - index));
-    try {
-      const image = { data, mimeType: attachment.mimeType };
-      if (data.length <= allowance) {
-        prepared.push(image);
-      } else {
-        const { createSendImageEncoder } = await import("./image-send-encoder");
-        const [copy] = await prepareImagesForSend([image], createSendImageEncoder, allowance);
-        prepared.push(copy);
-      }
-      remaining -= prepared[index].data.length;
-    } catch (error) {
-      throw new Error(
-        "Could not prepare these images. Your draft is kept; try choosing the images again.",
-        { cause: error },
+    const image = { data, mimeType: attachment.mimeType };
+    if (data.length <= allowance) {
+      prepared.push(image);
+    } else {
+      const [copy] = await prepareImagesForSend([image], createEncoder, allowance).catch(
+        (error: unknown) => {
+          if (error instanceof ImageBudgetExceeded) throw error;
+          throw new Error(
+            `Could not prepare image ${imageName(attachment)}. Your draft is kept: send again, or remove that image.`,
+            { cause: error },
+          );
+        },
       );
+      prepared.push(copy);
     }
+    remaining -= prepared[index].data.length;
     // Only bounded send copies survive this iteration, never all originals.
   }
   return prepared;
+}
+
+function imageName(attachment: AttachmentMetadata): string {
+  return attachment.fileName ?? attachment.id;
+}
+
+function originalTooLarge(attachment: AttachmentMetadata): Error {
+  return new Error(
+    `Image ${imageName(attachment)} is over 32 MiB. Your draft is kept: remove that image, or attach it as a file.`,
+  );
 }
 
 export async function resolveAttachmentPreviewUrl(attachment: AttachmentMetadata): Promise<string> {

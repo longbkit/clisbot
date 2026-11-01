@@ -7,7 +7,7 @@ import { daemonWsRoutePattern } from "../support/helpers/daemon-port";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 import { getServerId } from "../support/helpers/server-id";
-import { attachImageFromMenu } from "../support/helpers/composer";
+import { attachImageFromMenu, openAttachmentMenu } from "../support/helpers/composer";
 
 test.use({ e2eDaemonConfig: { version: 1, agents: { providers: disabledQueueProviders } } });
 
@@ -162,7 +162,9 @@ test("failed image preparation keeps text and original attachments without sendi
     });
     await input.fill("Keep my text and original image");
     await page.getByTestId("composer-send-button").last().click();
-    await expect(page.getByText("Could not prepare these images.", { exact: false })).toBeVisible();
+    await expect(
+      page.getByText("Could not prepare image unreadable.png.", { exact: false }),
+    ).toBeVisible();
     await expect(input).toHaveValue("Keep my text and original image");
     await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(1);
     expect(sends).toBe(0);
@@ -323,5 +325,87 @@ test("busy session prepares large image Queue and Steer submissions through the 
   } finally {
     await workspace.cleanup();
     await client.close();
+  }
+});
+
+test("more images than one message carries queue as ordered parts while a turn runs them", async ({
+  page,
+}, info) => {
+  test.setTimeout(120_000);
+  const enqueues: Array<{ id: string; text: string; images?: unknown[] }> = [];
+  const sends: string[] = [];
+  await page.routeWebSocket(daemonWsRoutePattern(), (browser) => {
+    const server = browser.connectToServer();
+    browser.onMessage((raw) => {
+      if (typeof raw === "string" && raw.startsWith("{")) {
+        const envelope = JSON.parse(raw);
+        const message = envelope.type === "session" ? envelope.message : envelope;
+        if (message.type === "agent.queue.execute.request" && message.command.action === "enqueue")
+          enqueues.push(message.command);
+        if (message.type === "send_agent_message_request") sends.push(message.text);
+      }
+      server.send(raw);
+    });
+    server.onMessage((raw) => browser.send(raw));
+  });
+  // The first part's turn outlives the test, as a real provider's does: a later part must not
+  // depend on that turn being over.
+  const workspace = await seedMockAgentWorkspace({
+    repoPrefix: "image-parts-",
+    title: "Image parts",
+    model: "thirty-minute-stream",
+  });
+  const client = await connectDaemonClient<DaemonClient>({ clientIdPrefix: "image-parts" });
+  const files = await Promise.all(
+    Array.from({ length: 33 }, async (_, index) => ({
+      name: `reference-${index + 1}.png`,
+      mimeType: "image/png",
+      buffer: await sharp({
+        create: { width: 8, height: 8, channels: 3, background: { r: index, g: 0, b: 0 } },
+      })
+        .png()
+        .toBuffer(),
+    })),
+  );
+  try {
+    await openAgentRoute(page, workspace);
+    const input = page.getByTestId("message-input-root").getByRole("textbox").last();
+    await expect(input).toBeEditable();
+    const chooser = page.waitForEvent("filechooser", { timeout: 10_000 });
+    await openAttachmentMenu(page);
+    await page.getByTestId("message-input-attachment-menu-item-image").click();
+    await (await chooser).setFiles(files);
+    await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(33);
+    await input.fill("Compare every reference");
+    await page.getByTestId("composer-send-button").last().click();
+    await expect.poll(() => enqueues.length, { timeout: 30_000 }).toBe(2);
+    expect(enqueues.map((command) => [command.text, command.images?.length])).toEqual([
+      [
+        "[Images 1–17 of 33. The message continues in the next part; wait for it before you answer.]",
+        17,
+      ],
+      ["Compare every reference", 16],
+    ]);
+    expect(sends).toEqual([]);
+    await expect(input).toHaveValue("");
+    await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(0);
+    await expect(page.getByText("Active turn identity is unavailable")).toHaveCount(0);
+    // The first part's turn holds the second in the queue, in order.
+    await expect(page.getByTestId(`host-queue-${enqueues[1].id}`)).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(async () => {
+        const result = await client.executeAgentQueueCommand({
+          agentId: workspace.agentId,
+          command: { action: "fetch" },
+        });
+        return result.queue?.items.map((item) => item.text);
+      })
+      .toEqual(["Compare every reference"]);
+    await expect(page.getByTestId("turn-working-indicator").first()).toBeVisible();
+    await page.screenshot({ path: info.outputPath("image-parts-queued.png") });
+  } finally {
+    await client.cancelAgent(workspace.agentId).catch(() => {});
+    await client.close();
+    await workspace.cleanup();
   }
 });

@@ -6,9 +6,12 @@ import { i18n } from "@/i18n/i18next";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { useChatSend } from "./use-chat-send";
-vi.mock("@/utils/encode-images", () => ({
-  encodeImages: async (images: unknown[]) =>
-    images.length ? [{ data: "AA==", mimeType: "image/png" }] : undefined,
+vi.mock("@/attachments/service", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/attachments/service")>()),
+  encodeImageMessagesForSend: async (images: Array<{ mimeType: string }>) =>
+    images.length === 0
+      ? []
+      : [images.map((image) => ({ data: "AA==", mimeType: image.mimeType }))],
 }));
 vi.mock("../data/runtime", () => ({ refreshBotsAndChats: vi.fn() }));
 // The copy under test is the English UI text.

@@ -134,3 +134,83 @@ test("stale editor admits once while acknowledgement is held and retries the sam
     await workspace.cleanup();
   }
 });
+
+test("a queued draft whose answer was lost retries under the same ID and clears the error", async ({
+  page,
+}, info) => {
+  const admissions: string[] = [];
+  let loseNextAnswer = true;
+  const lostRequests = new Set<string>();
+  await page.routeWebSocket(daemonWsRoutePattern(), (browser) => {
+    const server = browser.connectToServer();
+    browser.onMessage((raw) => {
+      const envelope = JSON.parse(String(raw));
+      const request = envelope.type === "session" ? envelope.message : envelope;
+      if (request.type === "agent.queue.execute.request" && request.command?.action === "enqueue") {
+        admissions.push(request.command.id);
+        if (loseNextAnswer) lostRequests.add(request.requestId);
+        loseNextAnswer = false;
+      }
+      server.send(raw);
+    });
+    server.onMessage((raw) => {
+      const envelope = JSON.parse(String(raw));
+      const response = envelope.type === "session" ? envelope.message : envelope;
+      const requestId = response.payload?.requestId;
+      if (response.type !== "agent.queue.execute.response" || !lostRequests.has(requestId)) {
+        browser.send(raw);
+        return;
+      }
+      // The Host accepted the item; the app only hears that the outcome is unknown.
+      browser.send(
+        JSON.stringify({
+          type: "session",
+          message: {
+            type: "rpc_error",
+            payload: {
+              requestId,
+              requestType: "agent.queue.execute.request",
+              error: "Queue answer lost on the way back",
+              code: "handler_error",
+            },
+          },
+        }),
+      );
+    });
+  });
+  const workspace = await seedMockAgentWorkspace({
+    repoPrefix: "queue-lost-answer-",
+    title: "Queue lost answer",
+    model: "one-minute-stream",
+    initialPrompt: "Hold fixture work",
+  });
+  const client = await connectDaemonClient<DaemonClient>({ clientIdPrefix: "queue-lost-answer" });
+  try {
+    await openAgentRoute(page, { workspaceId: workspace.workspaceId, agentId: workspace.agentId });
+    const input = page.getByRole("textbox").last();
+    await expect(page.getByTestId("turn-working-indicator").first()).toBeVisible();
+    await input.fill("Queued after a lost answer");
+    await input.press("Control+Enter");
+    const error = page.getByRole("alert").filter({ hasText: "Queue answer lost on the way back" });
+    await expect(error).toBeVisible();
+    await expect(input).toHaveValue("Queued after a lost answer");
+    await page.screenshot({ path: info.outputPath("lost-answer-error.png") });
+    await input.press("Control+Enter");
+    await expect(input).toHaveValue("");
+    await expect(error).toHaveCount(0);
+    expect(admissions).toHaveLength(2);
+    expect(admissions[1]).toBe(admissions[0]);
+    const queued = await client.executeAgentQueueCommand({
+      agentId: workspace.agentId,
+      command: { action: "fetch" },
+    });
+    expect(queued.queue!.items.map((item) => [item.id, item.text])).toEqual([
+      [admissions[0], "Queued after a lost answer"],
+    ]);
+    await page.screenshot({ path: info.outputPath("lost-answer-recovered.png") });
+  } finally {
+    await client.cancelAgent(workspace.agentId).catch(() => {});
+    await client.close();
+    await workspace.cleanup();
+  }
+});
