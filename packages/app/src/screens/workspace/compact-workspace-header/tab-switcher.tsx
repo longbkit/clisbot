@@ -160,7 +160,22 @@ interface MobileWorkspaceTabSwitcherProps {
   onCloseOtherTabs: (tabId: string) => Promise<void> | void;
 }
 
-function MobileWorkspaceTabOption({
+/** What a tab row's own menu does; the tabs section of a phone session's sheet passes these too. */
+export type MobileWorkspaceTabRowActions = Pick<
+  MobileWorkspaceTabSwitcherProps,
+  | "onCopyResumeCommand"
+  | "onCopyAgentId"
+  | "onCopyTerminalId"
+  | "onCopyFilePath"
+  | "onReloadAgent"
+  | "onRenameTab"
+  | "onCloseTab"
+  | "onCloseTabsAbove"
+  | "onCloseTabsBelow"
+  | "onCloseOtherTabs"
+>;
+
+export function MobileWorkspaceTabOption({
   tab,
   tabIndex,
   tabCount,

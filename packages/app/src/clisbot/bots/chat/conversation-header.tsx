@@ -11,6 +11,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { useHosts } from "@/runtime/host-runtime";
 import { ConversationHeading } from "./conversation-heading";
 import { Combobox } from "@/components/ui/combobox";
+import { IconButtonChromeProvider } from "@/components/ui/icon-button-chrome";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { WorkspaceActions } from "@/git/workspace-actions";
 import { ChatHeaderAction } from "./header-action";
@@ -91,18 +92,23 @@ export function ConversationHeader({
   }, [avatar, title, group, memberCount, hostName, tabCount, renderHeading]);
   const renderTitle = useCallback(() => heading, [heading]);
   const navigationContent = useMemo(() => <HomeHeaderNavigation />, []);
+  // The section headers' 44px targets, not the compact header's 48px scope.
+  const compactActions = useMemo(
+    () => (
+      <IconButtonChromeProvider value="default">
+        {headingActions}
+        {right}
+      </IconButtonChromeProvider>
+    ),
+    [headingActions, right],
+  );
   if (compact)
     return (
       <CompactHeader
         navigation="menu"
         navigationContent={navigationContent}
         renderTitle={renderTitle}
-        actions={
-          <>
-            {headingActions}
-            {right}
-          </>
-        }
+        actions={compactActions}
       />
     );
   const left = (

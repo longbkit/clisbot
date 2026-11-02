@@ -1,7 +1,11 @@
 import { HomeHeaderNavigation } from "@/clisbot/home/header-navigation";
+import { PanelRight } from "lucide-react-native";
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { ChatHeaderAction } from "@/clisbot/bots/chat/header-action";
+import { PHONE_SESSION_MENU_ENABLED } from "@/clisbot/session-menu/feature";
 import { CompactHeader } from "@/components/headers/compact-header";
+import { IconButtonChromeProvider } from "@/components/ui/icon-button-chrome";
 import {
   EXPLORER_TOGGLE_KEYS,
   WorkspaceExplorerToggle,
@@ -50,7 +54,22 @@ export function CompactWorkspaceHeader({
     ),
     [subtitle, isSubtitleDistinct, serverId],
   );
-  const actions = (
+  const phoneActions = (
+    // The section headers' 44px targets, not the compact header's 48px scope.
+    <IconButtonChromeProvider value="default">
+      {children}
+      <ChatHeaderAction
+        label={explorerToggleLabel}
+        icon={PanelRight}
+        onPress={onToggleExplorer}
+        accessibilityState={explorerToggleAccessibilityState}
+        testID="workspace-explorer-toggle"
+      />
+    </IconButtonChromeProvider>
+  );
+  const actions = PHONE_SESSION_MENU_ENABLED ? (
+    phoneActions
+  ) : (
     <>
       {children}
       <WorkspaceExplorerToggle

@@ -84,8 +84,22 @@ export function ConversationWorkspace({
   );
   const surface = { serverId, focused, state, actions, header };
   const tabContext = useMemo(
-    () => ({ tabs: state.mainTabs, activeId: state.active?.tabId, selectTab: actions.selectTab }),
-    [state.mainTabs, state.active?.tabId, actions.selectTab],
+    () => ({
+      tabs: state.mainTabs,
+      activeId: state.active?.tabId,
+      activeKey: state.active?.key ?? "",
+      selectTab: actions.selectTab,
+      closeTab: actions.closeTab,
+      bulkClose: actions.bulkClose,
+    }),
+    [
+      state.mainTabs,
+      state.active?.tabId,
+      state.active?.key,
+      actions.selectTab,
+      actions.closeTab,
+      actions.bulkClose,
+    ],
   );
   return (
     <RetainedPanelActivity active={focused}>

@@ -1,3 +1,9 @@
+import {
+  PhoneSessionMenuTabs,
+  PhoneSessionMenuTrigger,
+  dismissKeyboardOnOpen,
+  type PhoneSessionMenu,
+} from "@/clisbot/session-menu/workspace-session-menu";
 import React, { useCallback, useMemo } from "react";
 import { View } from "react-native";
 import { usePathname, useRouter, type Href } from "expo-router";
@@ -269,6 +275,8 @@ export interface WorkspaceHeaderMenuMobileProps extends WorkspaceHeaderWorkspace
   createTerminalDisabled: boolean;
   onCreateTerminalWithProfile: (profile: TerminalProfile) => void;
   onCreateBrowser: () => void;
+  /** Clisbot: the title opens this menu, and it ends with the session's tabs. */
+  phoneSession?: PhoneSessionMenu;
 }
 
 /**
@@ -288,6 +296,7 @@ export function WorkspaceHeaderMenuMobile({
   createTerminalDisabled,
   onCreateTerminalWithProfile,
   onCreateBrowser,
+  phoneSession,
   ...workspaceActions
 }: WorkspaceHeaderMenuMobileProps) {
   const { t } = useTranslation();
@@ -309,25 +318,35 @@ export function WorkspaceHeaderMenuMobile({
     [scriptsMenu.pages, pluginMenu.pages],
   );
 
+  const triggerLabel = scriptsMenu.needsAttention
+    ? t("workspace.header.actions.workspaceActionsUnhealthy")
+    : t("workspace.header.actions.workspaceActions");
   return (
-    <DropdownMenu compactMode="sheet">
-      <DropdownMenuTrigger
-        testID="workspace-header-menu-trigger"
-        style={triggerStyle}
-        hitSlop={COMPACT_HEADER_BUTTON_HIT_SLOP}
-        accessibilityRole="button"
-        accessibilityLabel={
-          scriptsMenu.needsAttention
-            ? t("workspace.header.actions.workspaceActionsUnhealthy")
-            : t("workspace.header.actions.workspaceActions")
-        }
-      >
-        {scriptsMenu.needsAttention ? (
-          <WorkspaceHeaderMenuAttentionTriggerIcon />
-        ) : (
-          <WorkspaceHeaderMenuTriggerIcon />
-        )}
-      </DropdownMenuTrigger>
+    <DropdownMenu
+      compactMode="sheet"
+      onOpenChange={phoneSession ? dismissKeyboardOnOpen : undefined}
+    >
+      {phoneSession ? (
+        <PhoneSessionMenuTrigger
+          menu={phoneSession}
+          label={triggerLabel}
+          attention={scriptsMenu.needsAttention}
+        />
+      ) : (
+        <DropdownMenuTrigger
+          testID="workspace-header-menu-trigger"
+          style={triggerStyle}
+          hitSlop={COMPACT_HEADER_BUTTON_HIT_SLOP}
+          accessibilityRole="button"
+          accessibilityLabel={triggerLabel}
+        >
+          {scriptsMenu.needsAttention ? (
+            <WorkspaceHeaderMenuAttentionTriggerIcon />
+          ) : (
+            <WorkspaceHeaderMenuTriggerIcon />
+          )}
+        </DropdownMenuTrigger>
+      )}
       <DropdownMenuContent
         align="start"
         width={220}
@@ -378,6 +397,13 @@ export function WorkspaceHeaderMenuMobile({
               {t("workspace.tabs.actions.editTerminalProfiles")}
             </DropdownMenuItem>
           </>
+        ) : null}
+        {phoneSession ? (
+          <PhoneSessionMenuTabs
+            menu={phoneSession}
+            canCreateTerminal={terminalAccess.shell}
+            createTerminalDisabled={createTerminalDisabled}
+          />
         ) : null}
       </DropdownMenuContent>
     </DropdownMenu>

@@ -1,11 +1,14 @@
 import { useCallback, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Keyboard, Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { i18n } from "@/i18n/i18next";
 import { useChatOptionsState } from "./chat-options-context";
 import { ChatToolActivityHeaderLine } from "./chat-tool-activity-header";
 import { useChatToolActivityHeader } from "./tool-activity-context";
+import { PHONE_SESSION_MENU_ENABLED } from "@/clisbot/session-menu/feature";
+import { SessionTitleChevron } from "@/clisbot/session-menu/title-chevron";
+import { useIsCompactFormFactor } from "@/constants/layout";
 
 export function conversationHeaderSummary(
   group: boolean,
@@ -42,7 +45,12 @@ export function ConversationHeading({
 }) {
   const { t } = useTranslation();
   const { visible, setVisible } = useChatOptionsState();
-  const openOptions = useCallback(() => setVisible(true), [setVisible]);
+  const openOptions = useCallback(() => {
+    Keyboard.dismiss();
+    setVisible(true);
+  }, [setVisible]);
+  const compact = useIsCompactFormFactor();
+  const showChevron = compact && PHONE_SESSION_MENU_ENABLED;
   const open = onPress ?? openOptions;
   const isExpanded = expanded ?? visible;
   const toolActivity = useChatToolActivityHeader();
@@ -59,6 +67,7 @@ export function ConversationHeading({
         accessibilityLabel={accessibilityLabel}
         expanded={isExpanded}
         open={open}
+        showChevron={showChevron}
       >
         <ChatToolActivityHeaderLine header={toolActivity} context={summary.context} />
       </HeadingWithToolActivity>
@@ -84,6 +93,7 @@ export function ConversationHeading({
           <Text style={styles.tabCount}> · {summary.tabs}</Text>
         </View>
       </View>
+      {showChevron ? <SessionTitleChevron /> : null}
     </Pressable>
   );
 }
@@ -98,6 +108,7 @@ function HeadingWithToolActivity({
   accessibilityLabel,
   expanded,
   open,
+  showChevron,
   children,
 }: {
   avatar: ReactNode;
@@ -105,6 +116,7 @@ function HeadingWithToolActivity({
   accessibilityLabel: string;
   expanded: boolean;
   open: () => void;
+  showChevron: boolean;
   children: ReactNode;
 }) {
   return (
@@ -126,6 +138,7 @@ function HeadingWithToolActivity({
         </Pressable>
         {children}
       </View>
+      {showChevron ? <SessionTitleChevron /> : null}
     </View>
   );
 }

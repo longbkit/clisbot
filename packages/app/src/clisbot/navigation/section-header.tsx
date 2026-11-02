@@ -10,6 +10,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { ICON_SIZE, ICON_STROKE_WIDTH, type Theme } from "@/styles/theme";
 import { DISPLAY_MENU_WIDTH } from "@/components/sidebar/display-preferences/menu";
+import { PHONE_HEADER_TARGET_SIZE, PhoneHeaderIcon } from "./phone-header-icon";
 
 /**
  * A section's header (brief C5): its title, then its own actions as icons. Search and New belong
@@ -85,16 +86,6 @@ const ThemedIcon = withUnistyles(
   (theme: Theme) => ({ color: theme.colors.foregroundMuted }),
 );
 
-const PhoneIcon = withUnistyles(
-  ({ Icon, color }: { Icon: LucideIcon; color?: string }) => (
-    <Icon size={PHONE_HEADER_ICON_SIZE} color={color} strokeWidth={ICON_STROKE_WIDTH} />
-  ),
-  (theme: Theme) => ({ color: theme.colors.foreground }),
-);
-
-/** A phone's title row is the thumb's: Telegram-sized icons in 44px targets. */
-const PHONE_HEADER_ICON_SIZE = 24;
-
 export function HeaderIconButton({
   Icon,
   label,
@@ -118,7 +109,7 @@ export function HeaderIconButton({
       shortcut={shortcut ?? undefined}
       style={compact ? styles.phoneTarget : undefined}
     >
-      {compact ? <PhoneIcon Icon={Icon} /> : <ThemedIcon Icon={Icon} />}
+      {compact ? <PhoneHeaderIcon Icon={Icon} /> : <ThemedIcon Icon={Icon} />}
     </ToolbarButton>
   );
 }
@@ -141,7 +132,7 @@ export function HeaderMenuButton({
       testID={testID}
       style={compact ? styles.phoneTarget : undefined}
     >
-      {compact ? <PhoneIcon Icon={Icon} /> : <ThemedIcon Icon={Icon} />}
+      {compact ? <PhoneHeaderIcon Icon={Icon} /> : <ThemedIcon Icon={Icon} />}
     </ToolbarButton>
   );
 }
@@ -173,7 +164,12 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,
   },
-  phoneTarget: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  phoneTarget: {
+    width: PHONE_HEADER_TARGET_SIZE,
+    height: PHONE_HEADER_TARGET_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   left: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: theme.spacing[3] },
   center: { flexShrink: 1, minWidth: 0 },
   frame: { position: "relative" },
