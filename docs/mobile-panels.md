@@ -106,9 +106,14 @@ Before any of this, a native phone's deck entry shows the session shell for one 
 press's frame does not wait for the workspace screen's mount
 ([offline cache](features/offline/offline-cache.md#the-open-shell)). A chat route does the same.
 Native compact workspace entry keeps its existing header/Back surface separate from first pane
-materialization. The body waits for the existing outgoing Chat presentation boundary, then React
-prepares it at deferred render priority. Losing focus before that first body commits abandons the
-view preparation; it does not cancel an agent turn. Once committed, panes keep the existing
+materialization. The body waits for the existing outgoing Chat presentation boundary, then renders
+in the next JS task as one ordinary render. Never prepare it at deferred render priority
+(`useDeferredValue`): a transition render is thrown away by every store update that lands while it
+runs, and while Hosts connect those come every few frames. On 2026-11-02 a session opened after a
+cold start on the S23 showed its spinner 1.9–6.4 s from shell to body, 0.4–1.4 s since
+(`workspace-entry-content.test.tsx` holds the body to one render under a stream of updates).
+Losing focus before that task runs abandons the view
+preparation; it does not cancel an agent turn. Once committed, panes keep the existing
 retention/draft/scroll policy across Back and reconnect. This does not defer authoritative store
 updates or guarantee that an individual native Fabric commit is interruptible. Web and desktop
 keep immediate materialization.

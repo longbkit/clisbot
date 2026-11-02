@@ -50,7 +50,7 @@ export function WorkspaceEntryContent({
  * render. A transition render is interruptible: every store update that lands while it runs
  * throws its progress away. Opening a session while Hosts connect delivers updates every few
  * frames, so the body restarted until React's 5 s transition expiry and the session showed the
- * placeholder spinner for seconds (docs/features/offline/offline-cache.md#the-open-shell).
+ * placeholder spinner for seconds (docs/mobile-panels.md, native compact workspace entry).
  */
 function NativeWorkspaceEntryContent({
   focused,
