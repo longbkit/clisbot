@@ -501,9 +501,10 @@ test.describe("Navigation V2 Chats error and row rails (D2: V5, V3)", () => {
           body: JSON.stringify(heights),
           contentType: "application/json",
         });
-        // V3: one row height across Chats, Workspace and the Home feed.
-        const all = Object.values(heights).flat();
-        expect(new Set(all).size, JSON.stringify(heights)).toBe(1);
+        // V3: one row height across Chats, Workspace and the Home feed. A phone's Work rows take
+        // the mobile list standard (docs/features/navigation-v2/README.md), one height per list.
+        const lists = compact ? Object.values(heights) : [Object.values(heights).flat()];
+        for (const list of lists) expect(new Set(list).size, JSON.stringify(heights)).toBe(1);
 
         // The flat lists share one title rail, with the mark column at the controls' inset:
         // Chats, Home, and Workspace's Session and Workspace grouping. Project grouping keeps one

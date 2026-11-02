@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Text } from "react-native";
 import { router } from "expo-router";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { PHONE_HEADER_TARGET_SIZE, PhoneHeaderIcon } from "@/clisbot/navigation/phone-header-icon";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { ChevronRight, Clock, Pause, Play, Plus } from "lucide-react-native";
 import {
   DropdownMenu,
@@ -94,9 +96,10 @@ export function HeartbeatsMenu({
   const handleOpenChange = useCallback((open: boolean) => open && refetch(), [refetch]);
   const closeDetail = useCallback(() => setDetailId(null), []);
   const closeCreate = useCallback(() => setCreateFor(null), []);
+  const compact = useIsCompactFormFactor();
   const triggerStyle = useIconButtonChromeStyle({
     size: "large",
-    style: count > 0 ? styles.withCount : undefined,
+    style: [compact && styles.phoneTarget, count > 0 && styles.withCount],
   });
   if (!canManage) return null;
   return (
@@ -108,10 +111,14 @@ export function HeartbeatsMenu({
           accessibilityLabel={t("heartbeats.button")}
           style={triggerStyle}
         >
-          <ThemedClock
-            size={iconButtonChromeGlyphSize("large")}
-            uniProps={extraMutedIconColorMapping}
-          />
+          {compact ? (
+            <PhoneHeaderIcon Icon={Clock} />
+          ) : (
+            <ThemedClock
+              size={iconButtonChromeGlyphSize("large")}
+              uniProps={extraMutedIconColorMapping}
+            />
+          )}
           {count > 0 ? <Text style={styles.count}>{count}</Text> : null}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" width={300} testID={`${testID}-content`}>
@@ -348,6 +355,7 @@ export function useToggleHeartbeat(serverId: string, scheduleId: string | null, 
 }
 
 const styles = StyleSheet.create((theme) => ({
+  phoneTarget: { width: PHONE_HEADER_TARGET_SIZE, height: PHONE_HEADER_TARGET_SIZE },
   withCount: {
     width: "auto",
     flexDirection: "row",

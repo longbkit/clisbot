@@ -49,3 +49,36 @@ export function renderConversationPrompt(prompt: ConversationPrompt): string {
   if (prompt.context.length === 0) return lines.join("\n");
   return [CONTEXT_HEADER, ...prompt.context.map(lineOf), MESSAGE_HEADER, ...lines].join("\n");
 }
+
+// The identity families a sender line can carry: Chats (`user:`, `bot:`) and the channels. Listing
+// them keeps text that merely looks similar, such as `http://host: down`, out.
+const SENDER_IDENTITY =
+  "(?:user|bot|slack|telegram|discord|googlechat|feishu|zalo|zalouser|whatsapp):[^\\s,()]+?";
+const SENDER_LINE = new RegExp(
+  `^(?:(${SENDER_IDENTITY})|.+? \\((${SENDER_IDENTITY})(?:, @[^)]*)?\\)): `,
+);
+
+function deliveredLines(prompt: string): string[] {
+  const lines = prompt.split("\n");
+  if (lines[0] !== CONTEXT_HEADER) return lines;
+  const message = lines.indexOf(MESSAGE_HEADER);
+  return message < 0 ? lines : lines.slice(message + 1);
+}
+
+/**
+ * What a person wrote, from the prompt an agent's history stores: without the quoted context and
+ * the sender line, which are for the agent. Several senders in one prompt keep their lines, since
+ * who said what is then part of the message. Any other text comes back unchanged.
+ */
+export function conversationMessageText(prompt: string): string {
+  const lines = deliveredLines(prompt);
+  const senders = new Set<string>();
+  const stripped = lines.map((line) => {
+    const match = SENDER_LINE.exec(line);
+    if (!match) return line;
+    senders.add(match[1] ?? match[2] ?? "");
+    return line.slice(match[0].length);
+  });
+  if (senders.size === 0) return prompt;
+  return senders.size === 1 ? stripped.join("\n") : lines.join("\n");
+}

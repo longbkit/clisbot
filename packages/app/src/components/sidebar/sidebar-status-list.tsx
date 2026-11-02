@@ -1278,15 +1278,15 @@ const styles = StyleSheet.create((theme) => ({
   },
   // Matches `projectBlockExpanded` in sidebar-workspace-list.tsx. See the note there.
   statusGroupBlockExpanded: {
-    paddingBottom: theme.spacing[3],
+    paddingBottom: density.listGroupGap,
   },
   statusWorkspaceListContainer: {},
   statusGroupRow: {
-    minHeight: density.rowHeight,
+    minHeight: density.listRowHeight,
     paddingVertical: theme.spacing[2],
     paddingHorizontal: theme.spacing[2],
     borderRadius: theme.borderRadius.lg,
-    marginBottom: theme.spacing[2],
+    marginBottom: { xs: 0, md: theme.spacing[2] },
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1332,9 +1332,9 @@ const styles = StyleSheet.create((theme) => ({
     position: "relative",
   },
   workspaceRow: {
-    minHeight: density.rowHeight,
-    marginBottom: theme.spacing[0.5],
-    paddingVertical: theme.spacing[2],
+    minHeight: density.listRowHeight,
+    marginBottom: { xs: 0, md: theme.spacing[0.5] },
+    paddingVertical: density.listRowPadding,
     paddingLeft: theme.spacing[2],
     paddingRight: theme.spacing[3],
     borderRadius: theme.borderRadius.lg,

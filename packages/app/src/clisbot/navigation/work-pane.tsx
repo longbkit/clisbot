@@ -19,12 +19,12 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import type { FilterChip } from "@/components/ui/filter-chips";
-import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import { Shortcut } from "@/components/ui/shortcut";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { useOpenNewWorkspace } from "@/hooks/use-open-new-workspace";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import { RenderProfile } from "@/utils/render-profiler";
@@ -33,8 +33,9 @@ import { HostsUnreachableState } from "./hosts-unreachable-state";
 import { OutsideFilterNotice } from "./outside-filter-notice";
 import { EMPTY_SCOPE_COUNTS } from "./ownership";
 import { ScrollEdgeLine, ScrollEdgeProvider, useScrollEdge } from "./scroll-edge";
-import { SectionControls, useSectionBackdrop } from "./section-controls";
+import { SectionControls, SectionPinnedChips, useSectionBackdrop } from "./section-controls";
 import {
+  HeaderMenuButton,
   HeaderMenuIcon,
   HeaderSearchButton,
   SECTION_MENU_WIDTH,
@@ -86,6 +87,20 @@ function WorkPaneContent({ onBeforeNavigate, parentGestureRef, active }: WorkPan
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
   const workState = useWorkListState(model, hasActiveHostFilter);
   const edge = useScrollEdge();
+  // A phone's list keeps the screen: only the title stays, the controls scroll away with the rows.
+  const compact = useIsCompactFormFactor();
+  const controlsScroll = compact && workState === "list";
+  const controls = useWorkControls();
+  const controlsBlock = useMemo(
+    () => (
+      <>
+        <WorkControls state={controls} chipsPinned={compact} />
+        <OutsideFilterNotice list="work" />
+        <SidebarMetadataNotice />
+      </>
+    ),
+    [compact, controls],
+  );
   const headerActions = useMemo(
     () => (
       <>
@@ -103,15 +118,24 @@ function WorkPaneContent({ onBeforeNavigate, parentGestureRef, active }: WorkPan
     <RenderProfile id="NavWork">
       <View style={styles.pane} testID="work-pane">
         <SectionHeader title={t("navigation.sections.work")} actions={headerActions} />
-        <WorkControls />
-        <OutsideFilterNotice list="work" />
-        <SidebarMetadataNotice />
+        {compact ? (
+          <SectionPinnedChips
+            section="work"
+            chips={controls.chips}
+            chip={controls.chip}
+            onChip={controls.setChip}
+            backdrop={controls.backdrop}
+            display={displayMenu}
+          />
+        ) : null}
+        {controlsScroll ? null : controlsBlock}
         {workState === "offline" ? <HostsUnreachableState testID="work-offline" /> : null}
         {workState === "loading" ? <SidebarAgentListSkeleton /> : null}
-        <ScrollEdgeLine edge={edge} />
+        <ScrollEdgeLine edge={edge} onPhones />
         {workState === "list" ? (
           <ScrollEdgeProvider edge={edge}>
             <SidebarWorkspaceList
+              listTopComponent={controlsScroll ? controlsBlock : null}
               pinPresentation="float"
               collapsedProjectKeys={model.collapsedProjectKeys}
               onToggleProjectCollapsed={model.toggleProjectCollapsed}
@@ -167,7 +191,7 @@ const EMPTY_COUNTS = {
   scopes: EMPTY_SCOPE_COUNTS,
 };
 
-function WorkControls() {
+function useWorkControls() {
   const { t } = useTranslation();
   const { allWorkspaceEntriesByKey, workList } = useSidebarModel();
   const query = useWorkQuery();
@@ -191,15 +215,22 @@ function WorkControls() {
       })),
     [counts, t],
   );
+  return { chips, chip: query.chip, setChip, backdrop, scopeCounts: counts.scopes };
+}
+
+type WorkControlsState = ReturnType<typeof useWorkControls>;
+
+function WorkControls({ state, chipsPinned }: { state: WorkControlsState; chipsPinned: boolean }) {
   return (
     <SectionControls
       section="work"
-      scopeCounts={counts.scopes}
-      chips={chips}
-      chip={query.chip}
-      onChip={setChip}
-      backdrop={backdrop}
+      scopeCounts={state.scopeCounts}
+      chips={state.chips}
+      chip={state.chip}
+      onChip={state.setChip}
+      backdrop={state.backdrop}
       display={displayMenu}
+      chipsPinned={chipsPinned}
     >
       <SidebarViewBar />
       <SidebarActiveFilters />
@@ -234,9 +265,7 @@ function NewWorkMenu({
   );
   return (
     <DropdownMenu>
-      <ToolbarButton kind="menu" label={t("navigation.actions.new")} testID="work-new">
-        <HeaderMenuIcon Icon={Plus} />
-      </ToolbarButton>
+      <HeaderMenuButton Icon={Plus} label={t("navigation.actions.new")} testID="work-new" />
       <DropdownMenuContent
         align="end"
         width={SECTION_MENU_WIDTH}

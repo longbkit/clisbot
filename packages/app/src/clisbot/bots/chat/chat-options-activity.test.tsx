@@ -46,6 +46,7 @@ vi.mock("@/components/ui/icon-button-chrome", () => ({
   mutedIconColorMapping: {},
 }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
+vi.mock("@/clisbot/session-menu/session-tabs-section", () => ({ SessionTabsSection: () => null }));
 vi.mock("expo-router", () => ({
   useRouter: () => ({ setParams: vi.fn() }),
   usePathname: () => "/",

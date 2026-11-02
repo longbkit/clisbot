@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { CircleHelp } from "lucide-react-native";
@@ -15,6 +15,13 @@ const HelpIcon = withUnistyles(CircleHelp, (theme: Theme) => ({
   color: theme.colors.foregroundMuted,
 }));
 
+/** Counts stay short: 6949 is 6.9k, 12400 is 12k. */
+function shortCount(count: number): string {
+  if (count < 1000) return String(count);
+  if (count >= 10_000) return `${Math.round(count / 1000)}k`;
+  return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+}
+
 /** For me / Others / All above a section's chips (brief C12); counts come from the section. */
 export function ScopeTabs({ section, counts }: { section: ScopedSection; counts: ScopeCounts }) {
   const { t } = useTranslation();
@@ -29,21 +36,31 @@ export function ScopeTabs({ section, counts }: { section: ScopedSection; counts:
     () =>
       SCOPES.map((scope) => ({
         value: scope,
-        label: `${t(`navigation.scope.${scope}`)} ${counts[scope]}`,
+        label: `${t(`navigation.scope.${scope}`)} ${shortCount(counts[scope])}`,
         testID: `${section}-scope-${scope}`,
       })),
     [counts, section, t],
   );
+  const tabs = (
+    <SegmentedControl
+      size={compact ? "md" : "xs"}
+      variant="track"
+      options={options}
+      value={value}
+      onValueChange={change}
+      testID={`${section}-scope`}
+    />
+  );
   return (
     <View style={styles.row}>
-      <SegmentedControl
-        size={compact ? "md" : "xs"}
-        variant="track"
-        options={options}
-        value={value}
-        onValueChange={change}
-        testID={`${section}-scope`}
-      />
+      {/* One line on a phone, as Telegram's folder tabs: long labels scroll, Help keeps its place. */}
+      {compact ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
+          {tabs}
+        </ScrollView>
+      ) : (
+        tabs
+      )}
       {inScope(value, "unknown") ? (
         <Tooltip enabledOnMobile>
           <TooltipTrigger
@@ -68,11 +85,11 @@ export function ScopeTabs({ section, counts }: { section: ScopedSection; counts:
 const styles = StyleSheet.create((theme) => ({
   row: {
     flexDirection: "row",
-    flexWrap: "wrap",
     alignItems: "center",
     gap: theme.spacing[1],
     paddingHorizontal: theme.spacing[3],
   },
+  tabsScroll: { flexGrow: 0, flexShrink: 1, minWidth: 0 },
   help: { minWidth: 28, minHeight: 28, alignItems: "center", justifyContent: "center" },
   hint: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm, maxWidth: 260 },
 }));

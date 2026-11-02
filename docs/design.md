@@ -92,7 +92,8 @@ the sidebar. Apply it as `backgroundColor`; setting `opacity` on the control als
 
 Compact headers use the shared `CompactHeader` flat `surface0` row, including the top safe area,
 with one bottom border. Back and each useful action have separate 48px minimum touch targets;
-do not wrap them in additional padded islands. Workspace transcripts occupy the viewport below
+do not wrap them in additional padded islands. A phone session's right-side icons match the
+section headers instead: 24px foreground glyphs in 44px targets (`phone-header-icon.tsx`). Workspace transcripts occupy the viewport below
 that row on web and native. An inverted list's first-item padding cannot protect scrolled text
 from an overlay header, so the compact workspace header stays in flow when streaming or using
 the keyboard. Session identity opens the existing tab-list sheet; it replaces the separate numbered switcher

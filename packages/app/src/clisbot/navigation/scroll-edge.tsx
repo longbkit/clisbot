@@ -8,6 +8,7 @@ import {
 } from "react";
 import { View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useIsCompactFormFactor } from "@/constants/layout";
 
 type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 
@@ -84,8 +85,18 @@ export function useScrollEdgeProps(kind: "scroll" | "drag"): ScrollEdgeProps | u
  * The thin line where a section's fixed header ends and its list begins, shown only once the list
  * has scrolled under it, as on iOS and Material. It takes no height, so nothing moves.
  */
-export const ScrollEdgeLine = memo(function ScrollEdgeLine({ edge }: { edge: ScrollEdge }) {
+export const ScrollEdgeLine = memo(function ScrollEdgeLine({
+  edge,
+  onPhones = false,
+}: {
+  edge: ScrollEdge;
+  /** A row is pinned under a phone's title, so the title's own line does not separate the list. */
+  onPhones?: boolean;
+}) {
   const scrolled = useSyncExternalStore(edge.subscribe, edge.isScrolled, edge.isScrolled);
+  // A phone's controls scroll with the list and its title keeps its own line.
+  const compact = useIsCompactFormFactor();
+  if (compact && !onPhones) return null;
   return (
     <View style={styles.anchor} pointerEvents="none">
       {scrolled ? <View style={styles.line} testID="section-scroll-edge" /> : null}

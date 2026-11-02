@@ -1,3 +1,9 @@
+import {
+  PhoneSessionMenuTabs,
+  PhoneSessionMenuTrigger,
+  dismissKeyboardOnOpen,
+  type PhoneSessionMenu,
+} from "@/clisbot/session-menu/workspace-session-menu";
 import React, { useCallback, useMemo } from "react";
 import { View } from "react-native";
 import { usePathname, useRouter, type Href } from "expo-router";
@@ -11,6 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -269,6 +276,8 @@ export interface WorkspaceHeaderMenuMobileProps extends WorkspaceHeaderWorkspace
   createTerminalDisabled: boolean;
   onCreateTerminalWithProfile: (profile: TerminalProfile) => void;
   onCreateBrowser: () => void;
+  /** Clisbot: the title opens this menu, and it ends with the session's tabs. */
+  phoneSession?: PhoneSessionMenu;
 }
 
 /**
@@ -288,6 +297,7 @@ export function WorkspaceHeaderMenuMobile({
   createTerminalDisabled,
   onCreateTerminalWithProfile,
   onCreateBrowser,
+  phoneSession,
   ...workspaceActions
 }: WorkspaceHeaderMenuMobileProps) {
   const { t } = useTranslation();
@@ -309,30 +319,82 @@ export function WorkspaceHeaderMenuMobile({
     [scriptsMenu.pages, pluginMenu.pages],
   );
 
+  const profileRows = (
+    <>
+      {profiles.map((profile) => (
+        <HeaderMenuProfileItem
+          key={profile.id}
+          profile={profile}
+          disabled={createTerminalDisabled}
+          onCreateTerminalWithProfile={onCreateTerminalWithProfile}
+        />
+      ))}
+      {terminalAccess.canManageProfiles ? (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            testID="workspace-header-edit-terminal-profiles"
+            onSelect={handleEditProfiles}
+          >
+            {t("workspace.tabs.actions.editTerminalProfiles")}
+          </DropdownMenuItem>
+        </>
+      ) : null}
+    </>
+  );
+  const terminalProfileItems = (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel>{t("workspace.tabs.actions.terminalProfilesMenu")}</DropdownMenuLabel>
+      {profileRows}
+    </>
+  );
+  // A phone's sheet keeps its tabs close: Terminal profiles folds into one row.
+  const menuPages = phoneSession
+    ? [
+        ...pages,
+        {
+          id: "terminal-profiles",
+          title: t("workspace.tabs.actions.terminalProfilesMenu"),
+          hoverIntent: false,
+          content: profileRows,
+        },
+      ]
+    : pages;
+  const triggerLabel = scriptsMenu.needsAttention
+    ? t("workspace.header.actions.workspaceActionsUnhealthy")
+    : t("workspace.header.actions.workspaceActions");
   return (
-    <DropdownMenu compactMode="sheet">
-      <DropdownMenuTrigger
-        testID="workspace-header-menu-trigger"
-        style={triggerStyle}
-        hitSlop={COMPACT_HEADER_BUTTON_HIT_SLOP}
-        accessibilityRole="button"
-        accessibilityLabel={
-          scriptsMenu.needsAttention
-            ? t("workspace.header.actions.workspaceActionsUnhealthy")
-            : t("workspace.header.actions.workspaceActions")
-        }
-      >
-        {scriptsMenu.needsAttention ? (
-          <WorkspaceHeaderMenuAttentionTriggerIcon />
-        ) : (
-          <WorkspaceHeaderMenuTriggerIcon />
-        )}
-      </DropdownMenuTrigger>
+    <DropdownMenu
+      compactMode="sheet"
+      onOpenChange={phoneSession ? dismissKeyboardOnOpen : undefined}
+    >
+      {phoneSession ? (
+        <PhoneSessionMenuTrigger
+          menu={phoneSession}
+          label={triggerLabel}
+          attention={scriptsMenu.needsAttention}
+        />
+      ) : (
+        <DropdownMenuTrigger
+          testID="workspace-header-menu-trigger"
+          style={triggerStyle}
+          hitSlop={COMPACT_HEADER_BUTTON_HIT_SLOP}
+          accessibilityRole="button"
+          accessibilityLabel={triggerLabel}
+        >
+          {scriptsMenu.needsAttention ? (
+            <WorkspaceHeaderMenuAttentionTriggerIcon />
+          ) : (
+            <WorkspaceHeaderMenuTriggerIcon />
+          )}
+        </DropdownMenuTrigger>
+      )}
       <DropdownMenuContent
         align="start"
         width={220}
         testID="workspace-header-menu"
-        pages={pages}
+        pages={menuPages}
         sheetTitle={t("workspace.header.actions.workspaceActions")}
       >
         {scriptsMenu.trigger}
@@ -358,26 +420,22 @@ export function WorkspaceHeaderMenuMobile({
           {...workspaceActions}
           workspaceDirectory={workspaceDirectory}
         />
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>{t("workspace.tabs.actions.terminalProfilesMenu")}</DropdownMenuLabel>
-        {profiles.map((profile) => (
-          <HeaderMenuProfileItem
-            key={profile.id}
-            profile={profile}
-            disabled={createTerminalDisabled}
-            onCreateTerminalWithProfile={onCreateTerminalWithProfile}
-          />
-        ))}
-        {terminalAccess.canManageProfiles ? (
+        {phoneSession ? (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              testID="workspace-header-edit-terminal-profiles"
-              onSelect={handleEditProfiles}
-            >
-              {t("workspace.tabs.actions.editTerminalProfiles")}
-            </DropdownMenuItem>
+            <DropdownMenuSubTrigger id="terminal-profiles">
+              {t("workspace.tabs.actions.terminalProfilesMenu")}
+            </DropdownMenuSubTrigger>
           </>
+        ) : (
+          terminalProfileItems
+        )}
+        {phoneSession ? (
+          <PhoneSessionMenuTabs
+            menu={phoneSession}
+            canCreateTerminal={terminalAccess.shell}
+            createTerminalDisabled={createTerminalDisabled}
+          />
         ) : null}
       </DropdownMenuContent>
     </DropdownMenu>

@@ -86,6 +86,9 @@ under it, on every width:
   Enter and the arrows read the same. On a phone it may take 60% of the screen and scrolls
   inside, and each row stacks: the command whole in medium weight, then its description muted on
   up to two lines. Desktop keeps the one-line row and its 220px height.
+- **Notices stack inside the composer.** A history refresh failure, a send error and the queue all
+  sit in `inputAreaContent`, so they share its rails and one `spacing[3]` gap above the pill, in
+  sessions and Bot chats. A new notice goes through Composer's `notice` slot, not over the dock.
 - **A send error belongs to the draft that was sent.** Removing or adding an attachment or
   editing the text clears it (`composer/use-send-error-draft-reset.ts`).
 - **Panels open above the composer.** The Model panel anchors to the whole composer

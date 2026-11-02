@@ -22,10 +22,18 @@ function byLayout<T>(compact: T, desktop: T) {
 export const density = {
   /** A list row such as a sidebar entry. */
   rowHeight: byLayout(44, 36),
+  /**
+   * A row of a project or session list: 48 tall on a phone, as Material and iOS lists are, and
+   * about 64 with a second line (`listRowPadding`, 20 + 4 + 16). Rows touch inside a group.
+   */
+  listRowHeight: byLayout(48, 36),
+  listRowPadding: byLayout(12, 8),
   /** A row in a tight group, such as the sidebar's navigation rows. */
   tightRowHeight: byLayout(36, 28),
   /** A square icon-only button that sits in a row or toolbar. */
   iconButton: byLayout(44, 28),
+  /** The space under a group of list rows: a phone's 8 between groups. */
+  listGroupGap: byLayout(8, 12),
   /** The space between two blocks of rich text, such as Markdown paragraphs, code and images. */
   blockGap: byLayout(12, 16),
 };

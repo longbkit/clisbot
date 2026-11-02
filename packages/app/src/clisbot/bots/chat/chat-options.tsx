@@ -2,7 +2,7 @@ import { useChatOptionsState } from "./chat-options-context";
 import { Ellipsis } from "lucide-react-native";
 import { ParticipantActions } from "./participant-actions";
 import { useRetainedPanelActive } from "@/components/retained-panel";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
@@ -34,7 +34,14 @@ import {
   useIconButtonChromeStyle,
   extraMutedIconColorMapping,
 } from "@/components/ui/icon-button-chrome";
+import { PHONE_SESSION_MENU_ENABLED } from "@/clisbot/session-menu/feature";
+import { SessionTabsSection } from "@/clisbot/session-menu/session-tabs-section";
 import { useConversationProjectContext } from "./conversation-project-context";
+import {
+  buildConversationCloseActions,
+  conversationClipboardActions,
+} from "./conversation-tab-actions";
+import { useConversationTabsContext } from "./conversation-tabs-context";
 
 const ThemedEllipsis = withUnistyles(Ellipsis);
 
@@ -82,6 +89,7 @@ export function ChatOptions({
   const renderCompactMenu = useCallback(
     (onOpenCowork: () => void) => (
       <ChatOptionsMenu
+        serverId={serverId}
         group={group}
         actions={actions}
         onAction={runAction}
@@ -90,7 +98,7 @@ export function ChatOptions({
         archiveDisabled={busy}
       />
     ),
-    [group, actions, runAction, openProject, busy],
+    [serverId, group, actions, runAction, openProject, busy],
   );
   return (
     <>
@@ -105,6 +113,7 @@ export function ChatOptions({
         />
       ) : (
         <ChatOptionsMenu
+          serverId={serverId}
           group={group}
           actions={actions}
           onAction={runAction}
@@ -133,6 +142,7 @@ export function ChatOptions({
  * a fresh session, Pin and Archive, as the sidebar row's menu ends.
  */
 function ChatOptionsMenu({
+  serverId,
   group,
   actions,
   onAction,
@@ -140,6 +150,7 @@ function ChatOptionsMenu({
   archiveDisabled,
   onOpenCowork,
 }: {
+  serverId: string;
   group: boolean;
   actions: readonly ChatResourceAction[];
   onAction: (id: ChatResourceActionId) => void;
@@ -159,33 +170,41 @@ function ChatOptionsMenu({
   const archiveAction = actions.find((action) => action.id === "archive");
   const pinAction = actions.find((action) => action.id === "pin");
   const middle = actions.filter((action) => action.id !== "archive" && action.id !== "pin");
+  // A phone's title opens this menu (`ConversationHeading`) and its tabs close it.
+  const phoneSession = compact && PHONE_SESSION_MENU_ENABLED;
   return (
     <DropdownMenu compactMode="sheet" open={visible} onOpenChange={setVisible}>
-      <DropdownMenuTrigger
-        accessibilityLabel={t("bots.chat.options.title")}
-        testID="chat-options-trigger"
-        style={triggerStyle}
-      >
-        <ThemedEllipsis
-          size={iconButtonChromeGlyphSize("large")}
-          uniProps={extraMutedIconColorMapping}
-        />
-      </DropdownMenuTrigger>
+      {phoneSession ? null : (
+        <DropdownMenuTrigger
+          accessibilityLabel={t("bots.chat.options.title")}
+          testID="chat-options-trigger"
+          style={triggerStyle}
+        >
+          <ThemedEllipsis
+            size={iconButtonChromeGlyphSize("large")}
+            uniProps={extraMutedIconColorMapping}
+          />
+        </DropdownMenuTrigger>
+      )}
       <DropdownMenuContent
         sheetTitle={t("bots.chat.options.title")}
         align="start"
         width={280}
         pages={pages}
       >
-        <DropdownMenuSubTrigger
-          id="tabs"
-          disabled={!tabCount}
-          value={String(tabCount)}
-          leading={SWITCH_TAB_ICON}
-        >
-          {t("bots.chat.options.switchTab")}
-        </DropdownMenuSubTrigger>
-        <DropdownMenuSeparator />
+        {phoneSession ? null : (
+          <>
+            <DropdownMenuSubTrigger
+              id="tabs"
+              disabled={!tabCount}
+              value={String(tabCount)}
+              leading={SWITCH_TAB_ICON}
+            >
+              {t("bots.chat.options.switchTab")}
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSeparator />
+          </>
+        )}
         {onOpenCowork ? (
           <DropdownMenuItem onSelect={onOpenCowork} leading={SWITCH_TAB_ICON}>
             {t("bots.chat.common.openInCowork")}
@@ -211,8 +230,36 @@ function ChatOptionsMenu({
             disabled={archiveDisabled}
           />
         ) : null}
+        {phoneSession ? <ChatSessionTabs serverId={serverId} /> : null}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/** The sheet's end on a phone: every tab, with the switcher's tab actions. */
+function ChatSessionTabs({ serverId }: { serverId: string }) {
+  const tabs = useConversationTabsContext();
+  const rowActions = useMemo(
+    () =>
+      tabs
+        ? {
+            ...conversationClipboardActions,
+            ...buildConversationCloseActions(tabs.tabs, tabs.bulkClose),
+            onCloseTab: tabs.closeTab,
+          }
+        : null,
+    [tabs],
+  );
+  if (!tabs || !rowActions) return null;
+  return (
+    <SessionTabsSection
+      tabs={tabs.tabs}
+      activeTabKey={tabs.activeKey}
+      onSelectTab={tabs.selectTab}
+      normalizedServerId={serverId}
+      normalizedWorkspaceId=""
+      rowActions={rowActions}
+    />
   );
 }
 

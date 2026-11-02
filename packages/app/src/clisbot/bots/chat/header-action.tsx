@@ -8,6 +8,7 @@ import {
   useIconButtonChromeStyle,
 } from "@/components/ui/icon-button-chrome";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { PHONE_HEADER_TARGET_SIZE, PhoneHeaderIcon } from "@/clisbot/navigation/phone-header-icon";
 import type { Theme } from "@/styles/theme";
 const iconColor = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const ThemedIcon = withUnistyles(function ActionIcon({
@@ -23,8 +24,9 @@ const ThemedIcon = withUnistyles(function ActionIcon({
 });
 /**
  * A chat header control, drawn like the sidebar and Explorer toggles: the shared chrome, a 16pt
- * glyph at stroke 1.5, muted. `trailingEdge` puts the last control's glyph on the header's right
- * rail, mirroring the sidebar toggle's pull onto the left one.
+ * glyph at stroke 1.5, muted; on a phone the section headers' icon and target. `trailingEdge` puts
+ * the last control's glyph on the header's right rail, mirroring the sidebar toggle's pull onto
+ * the left one.
  */
 export function ChatHeaderAction({
   label,
@@ -34,6 +36,8 @@ export function ChatHeaderAction({
   onPress,
   disabled = false,
   trailingEdge = false,
+  accessibilityState,
+  testID,
 }: {
   label: string;
   text?: string;
@@ -42,6 +46,8 @@ export function ChatHeaderAction({
   onPress: () => void;
   disabled?: boolean;
   trailingEdge?: boolean;
+  accessibilityState?: { expanded: boolean };
+  testID?: string;
 }) {
   const compact = useIsCompactFormFactor();
   const showText = Boolean(text) && !compact;
@@ -61,11 +67,17 @@ export function ChatHeaderAction({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={label}
+            accessibilityState={accessibilityState}
             disabled={disabled}
             onPress={onPress}
             style={buttonStyle}
+            testID={testID}
           >
-            <ThemedIcon icon={icon} size={iconSize} uniProps={iconColor} />
+            {compact ? (
+              <PhoneHeaderIcon Icon={icon} />
+            ) : (
+              <ThemedIcon icon={icon} size={iconSize} uniProps={iconColor} />
+            )}
             {showText ? <Text style={styles.text}>{text}</Text> : null}
           </Pressable>
         </View>
@@ -77,7 +89,7 @@ export function ChatHeaderAction({
   );
 }
 const styles = StyleSheet.create((theme) => ({
-  touchTarget: { width: 44, height: 44 },
+  touchTarget: { width: PHONE_HEADER_TARGET_SIZE, height: PHONE_HEADER_TARGET_SIZE },
   withText: {
     width: "auto",
     flexDirection: "row",

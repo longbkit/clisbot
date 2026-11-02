@@ -9,12 +9,63 @@ import type { ScopedSection } from "./store";
 
 export type SectionBackdrop = "surface0" | "surfaceSidebar";
 
+interface SectionControlsProps<T extends string> {
+  section: ScopedSection;
+  scopeCounts: ScopeCounts;
+  chips: readonly FilterChip<T>[];
+  chip: T;
+  onChip(value: T): void;
+  /** The surface the chip row's fade dissolves into. */
+  backdrop: SectionBackdrop;
+  /** The Display menu, alone on its row. */
+  display?: ReactNode;
+  /** A row above the scope tabs for a wider choice (Home's Host filter); it brings its inset. */
+  leading?: ReactNode;
+  /** Rows that belong to this section only (Work's grouping tabs); each brings its inset. */
+  children?: ReactNode;
+  /** The chips and Display live in a `SectionPinnedChips` above, so this block leaves them out. */
+  chipsPinned?: boolean;
+}
+
 /**
  * The surface a list section sits on: a phone tab is a page on white, as Home is (docs/design.md:
  * content sits on white); the desktop list is the sidebar column.
  */
 export function useSectionBackdrop(): SectionBackdrop {
   return useIsCompactFormFactor() ? "surface0" : "surfaceSidebar";
+}
+
+/**
+ * A phone's Work keeps this one row pinned under the title while the rest scrolls away: the chips,
+ * then Display as a compact control at the row's end.
+ */
+export function SectionPinnedChips<T extends string>({
+  section,
+  chips,
+  chip,
+  onChip,
+  backdrop,
+  display,
+}: Pick<
+  SectionControlsProps<T>,
+  "section" | "chips" | "chip" | "onChip" | "backdrop" | "display"
+>) {
+  return (
+    <View style={styles.pinnedRow} testID={`${section}-pinned-chips`}>
+      <View style={styles.pinnedChips}>
+        <FilterChips
+          chips={chips}
+          value={chip}
+          onChange={onChip}
+          scroll
+          backdrop={backdrop}
+          contentStyle={styles.inset}
+          testID={`${section}-chip`}
+        />
+      </View>
+      {display ? <View style={styles.pinnedDisplay}>{display}</View> : null}
+    </View>
+  );
 }
 
 /**
@@ -32,35 +83,26 @@ export function SectionControls<T extends string>({
   display,
   leading,
   children,
-}: {
-  section: ScopedSection;
-  scopeCounts: ScopeCounts;
-  chips: readonly FilterChip<T>[];
-  chip: T;
-  onChip(value: T): void;
-  /** The surface the chip row's fade dissolves into. */
-  backdrop: SectionBackdrop;
-  /** The Display menu, alone on its row. */
-  display?: ReactNode;
-  /** A row above the scope tabs for a wider choice (Home's Host filter); it brings its inset. */
-  leading?: ReactNode;
-  /** Rows that belong to this section only (Work's grouping tabs); each brings its inset. */
-  children?: ReactNode;
-}) {
+  chipsPinned = false,
+}: SectionControlsProps<T>) {
   return (
     <View style={[styles.controls, !leading && styles.pageTop]} testID={`${section}-controls`}>
       {leading}
       <ScopeTabs section={section} counts={scopeCounts} />
-      <FilterChips
-        chips={chips}
-        value={chip}
-        onChange={onChip}
-        scroll
-        backdrop={backdrop}
-        contentStyle={styles.inset}
-        testID={`${section}-chip`}
-      />
-      {display ? <View style={[styles.inset, styles.display]}>{display}</View> : null}
+      {chipsPinned ? null : (
+        <FilterChips
+          chips={chips}
+          value={chip}
+          onChange={onChip}
+          scroll
+          backdrop={backdrop}
+          contentStyle={styles.inset}
+          testID={`${section}-chip`}
+        />
+      )}
+      {display && !chipsPinned ? (
+        <View style={[styles.inset, styles.display]}>{display}</View>
+      ) : null}
       {children}
     </View>
   );
@@ -73,4 +115,11 @@ const styles = StyleSheet.create((theme) => ({
   pageTop: { paddingTop: theme.spacing[2] },
   inset: { paddingHorizontal: theme.spacing[3] },
   display: { flexDirection: "row", alignItems: "center" },
+  pinnedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: theme.spacing[2],
+  },
+  pinnedChips: { flex: 1, minWidth: 0 },
+  pinnedDisplay: { flexShrink: 0, paddingRight: theme.spacing[3] },
 }));

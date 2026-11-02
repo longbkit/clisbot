@@ -1,3 +1,4 @@
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Animated, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -108,6 +109,24 @@ export function ActorResponseRow({
   alignRight,
 }: ActorResponseRowProps) {
   const named = opensGroup && (loading || Boolean(name));
+  const compact = useIsCompactFormFactor();
+  // A phone can't spare the gutter's 40px: the face goes beside the name, the text takes the width.
+  if (compact) {
+    return (
+      <View style={alignRight ? styles.stackedRight : styles.stacked} testID="actor-response-row">
+        {opensGroup ? (
+          <View
+            style={[styles.stackedHeader, alignRight ? styles.rowRight : null]}
+            testID="actor-response-gutter"
+          >
+            <ActorFaceCell face={face} loading={loading} visible />
+            <ActorNameCell name={name} loading={loading} visible={named} />
+          </View>
+        ) : null}
+        {children}
+      </View>
+    );
+  }
   return (
     <View style={[styles.row, alignRight ? styles.rowRight : null]} testID="actor-response-row">
       <View
@@ -136,6 +155,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   // Reversed row: main-start is the right edge, so flex-start pins the pair right.
   rowRight: { justifyContent: "flex-start", flexDirection: "row-reverse", alignSelf: "stretch" },
+  stacked: { flex: 1, width: "100%", gap: theme.spacing[1] },
+  stackedRight: { flex: 1, width: "100%", gap: theme.spacing[1], alignItems: "flex-end" },
+  stackedHeader: { flexDirection: "row", alignItems: "center", gap: ACTOR_GUTTER_GAP },
   gutter: {
     width: ACTOR_AVATAR_SIZE,
     flexShrink: 0,
@@ -195,6 +217,7 @@ export function ActorGutterInset({
   enabled: boolean;
   children: ReactNode;
 }): ReactNode {
-  if (!enabled) return children;
+  const compact = useIsCompactFormFactor();
+  if (!enabled || compact) return children;
   return <View style={styles.gutterInset}>{children}</View>;
 }

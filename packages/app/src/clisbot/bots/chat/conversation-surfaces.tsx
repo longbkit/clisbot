@@ -7,7 +7,6 @@ import {
   type ReactNode,
 } from "react";
 import { View, useWindowDimensions } from "react-native";
-import * as Clipboard from "expo-clipboard";
 import { useTranslation } from "react-i18next";
 import { SplitContainer } from "@/components/split-container";
 import {
@@ -22,6 +21,11 @@ import type { useConversationTabs } from "./use-conversation-tabs";
 import type { useConversationProject } from "./use-conversation-project";
 import type { ConversationHeadingRenderer } from "./conversation-header";
 import { ConversationHeading } from "./conversation-heading";
+import {
+  buildConversationCloseActions,
+  conversationClipboardActions,
+} from "./conversation-tab-actions";
+import { PHONE_SESSION_MENU_ENABLED } from "@/clisbot/session-menu/feature";
 import { SheetTabs } from "@/screens/workspace/sheet-tabs";
 import type { ContextBridge } from "@/components/ui/isolated-bottom-sheet-modal";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
@@ -41,9 +45,6 @@ import { useConversationSourceLabelsBridge } from "./conversation-source-labels"
 const noop = () => {};
 const EMPTY_CLOSING = new Set<string>();
 const fill = { flex: 1, minHeight: 0, minWidth: 0 } as const;
-const copy = async (value: string) => {
-  await Clipboard.setStringAsync(value);
-};
 type TabState = ReturnType<typeof useConversationLayout>;
 type TabActions = ReturnType<typeof useConversationTabs>;
 interface SurfaceProps {
@@ -53,14 +54,7 @@ interface SurfaceProps {
   actions: TabActions;
   header: (renderHeading?: ConversationHeadingRenderer) => ReactNode;
 }
-const clipboardActions = {
-  onCopyResumeCommand: noop,
-  onCopyAgentId: copy,
-  onCopyTerminalId: copy,
-  onCopyFilePath: copy,
-  onReloadAgent: noop,
-  onRenameTab: noop,
-};
+const clipboardActions = conversationClipboardActions;
 export function DesktopConversationSurface({
   serverId,
   focused,
@@ -106,24 +100,8 @@ function ConversationSwitcher({
   const { t } = useTranslation();
   const { mainTabs, active } = state;
   const closeActions = useMemo(
-    () => ({
-      onCloseTabsAbove: (id: string) =>
-        actions.bulkClose(
-          mainTabs
-            .slice(
-              0,
-              mainTabs.findIndex((tab) => tab.tabId === id),
-            )
-            .map((tab) => tab.tabId),
-        ),
-      onCloseTabsBelow: (id: string) =>
-        actions.bulkClose(
-          mainTabs.slice(mainTabs.findIndex((tab) => tab.tabId === id) + 1).map((tab) => tab.tabId),
-        ),
-      onCloseOtherTabs: (id: string) =>
-        actions.bulkClose(mainTabs.filter((tab) => tab.tabId !== id).map((tab) => tab.tabId)),
-    }),
-    [actions, mainTabs],
+    () => buildConversationCloseActions(mainTabs, actions.bulkClose),
+    [actions.bulkClose, mainTabs],
   );
   return (
     <MobileWorkspaceTabSwitcher
@@ -206,7 +184,7 @@ export function MobileConversationSurface({
   return (
     <View style={[fill, { flexDirection: "row" }]}>
       <View style={fill}>
-        {header(compact ? renderHeading : undefined)}
+        {header(compact && !PHONE_SESSION_MENU_ENABLED ? renderHeading : undefined)}
         {!compact ? (
           <ConversationSwitcher serverId={serverId} state={state} actions={actions} />
         ) : null}

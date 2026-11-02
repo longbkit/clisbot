@@ -139,21 +139,108 @@ test.describe("Navigation V2", () => {
     }
   });
 
-  test("the line under Home's header shows only once the list has scrolled", async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 420 });
+  for (const width of [360, 390]) {
+    test(`phone ${width}: Work's controls scroll away, the title and chips stay`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000);
+      await page.setViewportSize({ width, height: 300 });
+      const seeded = await seedNavigationFixtures();
+      try {
+        await gotoAppShell(page);
+        await page.getByTestId("home-tab-work").click();
+        const list = page
+          .getByTestId(/sidebar-(project-workspace|status)-list-scroll/)
+          .filter({ visible: true })
+          .first();
+        const controls = page.getByTestId("work-controls").filter({ visible: true });
+        await expect(list).toBeVisible({ timeout: 30_000 });
+        await expect(controls).toBeVisible();
+        await markRetained(page, "work-controls");
+        const topOf = () => controls.evaluate((node) => node.getBoundingClientRect().top);
+        const atTop = await topOf();
+        await list.evaluate((node) => {
+          node.scrollTop = node.scrollHeight;
+        });
+        await expect(page.getByTestId("work-search")).toBeInViewport();
+        await expect.poll(topOf).toBeLessThan(atTop - 60);
+        // The chips and Display stay pinned, with a line under them while the list is scrolled.
+        const pinned = page.getByTestId("work-pinned-chips").filter({ visible: true });
+        await expect(pinned).toBeInViewport();
+        await expect(pinned.getByText("Display", { exact: true })).toBeVisible();
+        await expect(page.getByTestId("section-scroll-edge").filter({ visible: true })).toHaveCount(
+          1,
+        );
+        await list.evaluate((node) => {
+          node.scrollTop = 0;
+        });
+        await expect.poll(topOf).toBe(atTop);
+        await expect(page.getByTestId("section-scroll-edge").filter({ visible: true })).toHaveCount(
+          0,
+        );
+        // Scrolling did not remount it, so the chips keep their state.
+        await expect(retained(page, "work-controls")).toBeVisible();
+      } finally {
+        await seeded.cleanup();
+      }
+    });
+  }
+
+  test("phone: filters that match nothing keep Work's and Chats' controls", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await gotoAppShell(page);
-    const scroller = page.getByTestId("home-scroll").filter({ visible: true }).first();
-    await expect(scroller).toBeVisible({ timeout: 30_000 });
-    const line = page.getByTestId("section-scroll-edge");
-    await expect(line).toHaveCount(0);
-    await scroller.evaluate((node) => {
-      node.scrollTop = 120;
+    await page.getByTestId("home-tab-work").click();
+    await expect(page.getByTestId("work-controls").filter({ visible: true })).toBeVisible({
+      timeout: 30_000,
     });
-    await expect(line).toHaveCount(1);
-    await scroller.evaluate((node) => {
-      node.scrollTop = 0;
-    });
-    await expect(line).toHaveCount(0);
+    await page.getByTestId("home-tab-chat").click();
+    await expect(page.getByTestId("chats-controls").filter({ visible: true })).toBeVisible();
+  });
+
+  test("phone: the title opens one sheet with the options and every tab; desktop keeps ⋯", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const seeded = await seedNavigationFixtures();
+    try {
+      await page.goto(buildHostWorkspaceRoute(getServerId(), seeded.workspace.workspaceId));
+      const title = page.getByTestId("workspace-tab-switcher-trigger").filter({ visible: true });
+      await expect(title).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId("workspace-header-menu-trigger")).toHaveCount(0);
+      await expect(
+        page.getByTestId("session-title-chevron").filter({ visible: true }),
+      ).toBeVisible();
+      for (const target of [
+        page.getByTestId("workspace-explorer-toggle").filter({ visible: true }),
+        page.getByTestId("workspace-heartbeats").filter({ visible: true }),
+      ]) {
+        const box = await target.boundingBox();
+        expect(Math.round(box?.width ?? 0)).toBe(44);
+        expect(Math.round(box?.height ?? 0)).toBe(44);
+      }
+      await title.click();
+      const tabsLabel = page.getByText("Workspace tabs", { exact: true }).filter({ visible: true });
+      await expect(tabsLabel).toBeVisible();
+      const rows = page.locator('[data-testid^="workspace-tab-option-"]').filter({ visible: true });
+      await expect(rows).toHaveCount(2);
+      // Terminal profiles is one row; its list and Edit profiles are a page of their own.
+      await expect(page.getByTestId("workspace-header-edit-terminal-profiles")).toHaveCount(0);
+      await expect(
+        page.getByText("Terminal profiles", { exact: true }).filter({ visible: true }),
+      ).toBeVisible();
+      await page
+        .locator('[data-testid^="workspace-tab-option-"][aria-selected="false"]:visible')
+        .first()
+        .click();
+      await expect(tabsLabel).toBeHidden();
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await expect(
+        page.getByTestId("workspace-header-menu-trigger").filter({ visible: true }),
+      ).toBeVisible({ timeout: 30_000 });
+    } finally {
+      await seeded.cleanup();
+    }
   });
 
   test("phone tabs, Chats, Work, More and a conversation's Back", async ({ page }) => {

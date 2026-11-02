@@ -3,6 +3,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { page } from "vitest/browser";
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { AssistantMessage, UserMessage } from "@/components/message";
 import { AssistantFileLinkResolverProvider } from "@/assistant-file-links/provider";
@@ -128,7 +129,9 @@ function signedInHub() {
   };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  // The gutter layout; a phone stacks the face over the text (`actor-row.tsx`).
+  await page.viewport(1280, 900);
   boundary.hub = signedInHub();
 });
 afterEach(() => {

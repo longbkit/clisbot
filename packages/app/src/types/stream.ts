@@ -1,3 +1,4 @@
+import { conversationMessageText } from "@clisbot/protocol/conversation-prompt";
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import type { AgentMessage } from "@clisbot/protocol/agent-message";
 import type {
@@ -135,7 +136,8 @@ export function createUserMessage(input: UserMessageInput): UserMessageItem {
     ...(input.messageId ? { messageId: input.messageId } : {}),
     ...(input.turnId ? { turnId: input.turnId } : {}),
     ...(input.timelineCursor ? { timelineCursor: input.timelineCursor } : {}),
-    text: input.text,
+    // A Chat or channel prompt carries a sender line for the agent; the person wrote the rest.
+    text: conversationMessageText(input.text),
     timestamp: input.timestamp,
     ...(input.images && input.images.length > 0 ? { images: input.images } : {}),
     ...(input.attachments && input.attachments.length > 0
