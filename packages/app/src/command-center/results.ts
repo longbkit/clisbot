@@ -207,6 +207,34 @@ export function scoreSearchFields(
   return match ? { fieldRank: KEYWORD_FIELD_RANK, match } : null;
 }
 
+const rowScores = new WeakMap<
+  object,
+  WeakMap<object, { query: string; score: CommandCenterScore | null }>
+>();
+
+/**
+ * `scoreSearchFields` for a built-in row, reusing the score this row object got for the same query.
+ * Built rows never change in place, and an unchanged workspace or session keeps its object
+ * (`useBuiltInRows`), so a directory update scores only the rows it replaced. With thousands of
+ * sessions, scoring every row again took about half a second on a phone.
+ */
+export function scoreBuiltInRow<Row extends object>(
+  query: string,
+  row: Row,
+  fieldsOf: (row: Row) => CommandCenterSearchFields,
+): CommandCenterScore | null {
+  let byRow = rowScores.get(fieldsOf);
+  if (!byRow) {
+    byRow = new WeakMap();
+    rowScores.set(fieldsOf, byRow);
+  }
+  const cached = byRow.get(row);
+  if (cached?.query === query) return cached.score;
+  const score = scoreSearchFields(query, fieldsOf(row));
+  byRow.set(row, { query, score });
+  return score;
+}
+
 /** Join non-empty subtitle parts with " · ", dropping null/undefined/empty. */
 export function joinSubtitleParts(parts: readonly (string | null | undefined)[]): string {
   return parts.filter((part): part is string => Boolean(part)).join(" · ");
@@ -299,7 +327,7 @@ export function filterAndRankBuiltInResults<Row extends CommandCenterRecentRow>(
 
   const scored: { row: Row; score: CommandCenterScore }[] = [];
   for (const row of rows) {
-    const score = scoreSearchFields(query, fieldsOf(row));
+    const score = scoreBuiltInRow(query, row, fieldsOf);
     if (score) scored.push({ row, score });
   }
   scored.sort(

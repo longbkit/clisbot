@@ -506,6 +506,31 @@ describe("filterAndRankBuiltInResults", () => {
     ]);
   });
 
+  it("scores a row object once per query, so a directory update scores only the rows it replaced", () => {
+    const fieldsRead: string[] = [];
+    const fields = (row: CommandCenterWorkspaceResult) => {
+      fieldsRead.push(row.id);
+      return { visible: [row.title, row.subtitle], hidden: [] };
+    };
+    const rows = [
+      workspace("a", "Deploy relay"),
+      workspace("b", "Docs"),
+      workspace("c", "Deploy web"),
+    ];
+    expect(filterAndRankBuiltInResults(rows, "deploy", fields).map((row) => row.id)).toEqual([
+      "a",
+      "c",
+    ]);
+
+    const replaced = workspace("b", "Deploy docs");
+    const updated = [rows[0]!, replaced, rows[2]!];
+    expect(filterAndRankBuiltInResults(updated, "deploy", fields)).toContain(replaced);
+    expect(fieldsRead).toEqual(["a", "b", "c", "b"]);
+
+    filterAndRankBuiltInResults(updated, "deploy w", fields);
+    expect(fieldsRead.slice(4)).toEqual(["a", "b", "c"]);
+  });
+
   it("puts the best match first even when it sorts last alphabetically", () => {
     const rows = [
       workspace("a", "Zebra design system"),

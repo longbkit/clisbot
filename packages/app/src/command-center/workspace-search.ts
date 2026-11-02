@@ -2,7 +2,7 @@ import {
   compareBuiltInScores,
   compareByRecency,
   filterAndRankBuiltInResults,
-  scoreSearchFields,
+  scoreBuiltInRow,
   type CommandCenterScore,
   type CommandCenterWorkspaceResult,
 } from "./results";
@@ -54,7 +54,7 @@ export function filterAndRankWorkspaces(
   const changeRequestNumber = parseChangeRequestQuery(query);
   const matches: ScoredWorkspace[] = [];
   for (const workspace of workspaces) {
-    const score = scoreSearchFields(query, searchFields(workspace));
+    const score = scoreBuiltInRow(query, workspace, searchFields);
     const changeRequestHit =
       changeRequestNumber !== null && workspace.changeRequestNumber === changeRequestNumber;
     if (score || changeRequestHit) matches.push({ workspace, score, changeRequestHit });

@@ -14,6 +14,30 @@ const fleet = vi.hoisted(() => ({ value: null as ReturnType<typeof buildFleet> |
 const flag = vi.hoisted(() => ({ enabled: true }));
 /** Every `useProjects({ enabled })` the Command Center makes: `true` means it built its rows. */
 const projectsDemand = vi.hoisted(() => ({ calls: [] as boolean[] }));
+/** How many times the workspace rows were matched against the query. */
+const workspaceMatching = vi.hoisted(() => ({ calls: 0 }));
+/** A Host's live connection status, as the runtime reports it while it retries. */
+const runtimeStatus = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  let version = 0;
+  return {
+    overrides: new Map<string, { status: string; lastError: string | null }>(),
+    set(serverId: string, status: string, lastError: string | null) {
+      this.overrides.set(serverId, { status, lastError });
+      version += 1;
+      for (const listener of listeners) listener();
+    },
+    reset() {
+      this.overrides.clear();
+      version += 1;
+    },
+    version: () => version,
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+});
 const stable = vi.hoisted(() => ({
   hubAccounts: [
     {
@@ -62,17 +86,28 @@ vi.mock("@/device-access/hub-profiles", () => ({
 }));
 vi.mock("@/hooks/use-is-local-daemon", () => ({ useLocalDaemonServerId: () => "local" }));
 // Not `importOriginal`: the runtime imports modules that import it back, which deadlocks the mocker.
-vi.mock("@/runtime/host-runtime", () => {
-  const snapshot = (serverId: string) => ({
-    connectionStatus: fleet.value!.offline.has(serverId) ? "offline" : "online",
-    lastError: null,
-    lastOnlineAt: "2026-10-25T10:42:00.000Z",
-  });
-  const store = { getSnapshot: snapshot, subscribe: () => () => {}, subscribeAll: () => () => {} };
+vi.mock("@/runtime/host-runtime", async () => {
+  const { useSyncExternalStore } = await import("react");
+  const snapshot = (serverId: string) => {
+    const override = runtimeStatus.overrides.get(serverId);
+    return {
+      connectionStatus:
+        override?.status ?? (fleet.value!.offline.has(serverId) ? "offline" : "online"),
+      lastError: override?.lastError ?? null,
+      lastOnlineAt: "2026-10-25T10:42:00.000Z",
+    };
+  };
+  const store = {
+    getSnapshot: snapshot,
+    subscribe: () => () => {},
+    subscribeAll: runtimeStatus.subscribe,
+  };
   return {
     useHosts: () => fleet.value!.hosts,
-    useHostRuntimeConnectionStatuses: (ids: readonly string[]) =>
-      new Map(ids.map((id) => [id, snapshot(id).connectionStatus])),
+    useHostRuntimeConnectionStatuses: (ids: readonly string[]) => {
+      useSyncExternalStore(runtimeStatus.subscribe, runtimeStatus.version);
+      return new Map(ids.map((id) => [id, snapshot(id).connectionStatus]));
+    },
     getHostRuntimeStore: () => store,
     getHostRuntimeConnectionStatusSince: () => null,
     useHostRuntimeClient: () => null,
@@ -99,6 +134,16 @@ vi.mock("@/agent-presentation", () => ({
   resolveAgentLabel: (title: string | null) => title,
 }));
 vi.mock("@/workspace-status", () => ({ useWorkspaceStatus: () => "done" }));
+vi.mock("@/command-center/workspace-search", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/command-center/workspace-search")>();
+  return {
+    ...original,
+    filterAndRankWorkspaces: (...args: Parameters<typeof original.filterAndRankWorkspaces>) => {
+      workspaceMatching.calls += 1;
+      return original.filterAndRankWorkspaces(...args);
+    },
+  };
+});
 vi.mock("@/command-center/workspace-file-search", () => ({
   useWorkspaceFileSearch: () => stable.fileSearch,
 }));
@@ -202,6 +247,7 @@ async function measureAll(): Promise<number[]> {
 }
 
 afterEach(async () => {
+  runtimeStatus.reset();
   const store = await import("@/stores/keyboard-shortcuts-store");
   await act(async () => store.useKeyboardShortcutsStore.getState().setCommandCenterOpen(false));
   await act(async () => root?.unmount());
@@ -232,6 +278,30 @@ describe("opening the Command Center over 2,000 sessions", () => {
     // The input's layout lets the rows follow.
     await waitFor(() => document.querySelector('[data-testid^="command-center-agent-"]'));
     expect(projectsDemand.calls).toContain(true);
+  });
+});
+
+describe("Hosts that keep retrying while the Command Center is open", () => {
+  beforeEach(() => {
+    fleet.value ??= buildFleet({ hosts: 100, sessions: 2000 });
+    flag.enabled = true;
+  });
+
+  // A phone's offline Hosts retry every few seconds. Each retry used to rebuild the scope catalog
+  // and match every workspace and session again; with thousands of them the JS thread never went
+  // idle and a pressed row never ran.
+  it("does not match the rows again when a Host's status changes", async () => {
+    await mountCommandCenter();
+    await typeAndMeasure("clisbot");
+    await waitFor(() => testId("command-center-scope-project-clisbot"));
+    const matchedBefore = workspaceMatching.calls;
+    // A Host retrying (still offline to search), then one going offline (its rows gain a note).
+    for (const status of ["connecting", "error", "connecting", "error"]) {
+      await act(async () => runtimeStatus.set("sb9", status, "connect ECONNREFUSED"));
+    }
+    await act(async () => runtimeStatus.set("sb3", "offline", null));
+    await nextPaint();
+    expect(workspaceMatching.calls).toBe(matchedBefore);
   });
 });
 

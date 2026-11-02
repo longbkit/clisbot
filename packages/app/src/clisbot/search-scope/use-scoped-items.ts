@@ -54,15 +54,16 @@ function annotationKey(annotation: ItemAnnotation): string {
 }
 
 /**
- * Notes and the reveal signal, once per directory or filter change — never per keystroke. An
- * unchanged row keeps its object, so the list's memoized rows do not re-render (upstream's
- * "live updates render only the changed row" contract).
+ * Notes and the reveal signal for the rows the query kept. An unchanged row keeps its object, so
+ * the list's memoized rows do not re-render (upstream's "live updates render only the changed row"
+ * contract).
  */
 function useAnnotatedRows<Row extends ScopedItemRow>(
   input: ScopedItemsInput<Row>,
+  rows: readonly Row[],
 ): Annotated<Row>[] {
   const cache = useRef(new WeakMap<Row, { key: string; row: Row }>());
-  const { rows, catalog, view, t, formatTime, itemKind, placementOf } = input;
+  const { catalog, view, t, formatTime, itemKind, placementOf } = input;
   return useMemo(() => {
     if (!catalog) return rows.map((row) => ({ row, placement: UNPLACED }));
     return rows.map((row) => {
@@ -86,12 +87,29 @@ function useAnnotatedRows<Row extends ScopedItemRow>(
   }, [catalog, formatTime, itemKind, placementOf, rows, t, view]);
 }
 
+/**
+ * The rows the query keeps, in the matcher's order. Matching reads only the row's own text, so it
+ * reruns when the query or a row changes, not when a Host's status or the view filter does. A phone
+ * with ~7,000 sessions and Hosts that keep retrying matched and annotated every row on each status
+ * change; the JS thread never went idle and a pressed row did not run.
+ */
+function useMatchedRows<Row extends ScopedItemRow>(
+  input: ScopedItemsInput<Row>,
+  everyRow: boolean,
+): readonly Row[] {
+  const { rows, query, rank } = input;
+  return useMemo(() => (everyRow ? rows : rank(rows, query)), [everyRow, query, rank, rows]);
+}
+
 /** Item rows inside the chips' scope, matched, in-filter first (R1, R5, R6). */
 export function useScopedItems<Row extends ScopedItemRow>(
   input: ScopedItemsInput<Row> & { active: boolean },
 ): Row[] {
-  const annotated = useAnnotatedRows(input);
-  const { scope, active, query, view, rank, attentionOf } = input;
+  const { scope, active, query, view, attentionOf } = input;
+  // An empty query inside a scope lists the scope's rows by attention, so it needs every row.
+  const byAttention = active && isScoped(scope) && !query.trim();
+  const matched = useMatchedRows(input, byAttention);
+  const annotated = useAnnotatedRows(input, matched);
   const inScope = useMemo(() => {
     const kept = active
       ? filterItemsToScope(annotated, scope, (entry) => entry.placement)
@@ -102,13 +120,12 @@ export function useScopedItems<Row extends ScopedItemRow>(
     };
   }, [active, annotated, scope]);
   return useMemo(() => {
-    if (!active) return rank(inScope.rows, query);
-    if (isScoped(scope) && !query.trim()) {
+    if (!active) return inScope.rows;
+    if (byAttention) {
       return [...inScope.rows]
         .sort((left, right) => compareByAttention(attentionOf(left), attentionOf(right)))
         .slice(0, SCOPED_EMPTY_QUERY_LIMIT);
     }
-    const ranked = rank(inScope.rows, query);
-    return rankItemsByView(ranked, view, (row) => inScope.placement.get(row)!);
-  }, [active, attentionOf, inScope, query, rank, scope, view]);
+    return rankItemsByView(inScope.rows, view, (row) => inScope.placement.get(row)!);
+  }, [active, attentionOf, byAttention, inScope, view]);
 }

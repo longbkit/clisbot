@@ -68,6 +68,8 @@ shared CI runners upstream search alone measures about 100 ms at p95, so an abso
 on runner speed rather than on a regression.
 
 What keeps it flat: the catalog (Hosts, Hubs, projects, workspace → project index) is rebuilt
-only when the directory or a Host's status changes; per keystroke the work is scoring ~130 Host,
-Hub and project candidates plus two `Set` lookups per item row; annotated item rows keep their
-object identity, so the list's memoized rows do not re-render for unchanged rows.
+only when the directory or a Host's search status changes; item rows are matched only when the
+query or a row changes, and only matched rows are placed and annotated; annotated item rows keep
+their object identity, so the list's memoized rows do not re-render for unchanged rows. The
+browser test also flips Host statuses with the Command Center open and checks no row is matched
+again.
