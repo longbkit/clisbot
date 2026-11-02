@@ -140,7 +140,9 @@ test.describe("Navigation V2", () => {
   });
 
   for (const width of [360, 390]) {
-    test(`phone ${width}: Work's controls scroll away, the title stays`, async ({ page }) => {
+    test(`phone ${width}: Work's controls scroll away, the title and chips stay`, async ({
+      page,
+    }) => {
       test.setTimeout(120_000);
       await page.setViewportSize({ width, height: 300 });
       const seeded = await seedNavigationFixtures();
@@ -162,11 +164,20 @@ test.describe("Navigation V2", () => {
         });
         await expect(page.getByTestId("work-search")).toBeInViewport();
         await expect.poll(topOf).toBeLessThan(atTop - 60);
-        await expect(page.getByTestId("section-scroll-edge")).toHaveCount(0);
+        // The chips and Display stay pinned, with a line under them while the list is scrolled.
+        const pinned = page.getByTestId("work-pinned-chips").filter({ visible: true });
+        await expect(pinned).toBeInViewport();
+        await expect(pinned.getByText("Display", { exact: true })).toBeVisible();
+        await expect(page.getByTestId("section-scroll-edge").filter({ visible: true })).toHaveCount(
+          1,
+        );
         await list.evaluate((node) => {
           node.scrollTop = 0;
         });
         await expect.poll(topOf).toBe(atTop);
+        await expect(page.getByTestId("section-scroll-edge").filter({ visible: true })).toHaveCount(
+          0,
+        );
         // Scrolling did not remount it, so the chips keep their state.
         await expect(retained(page, "work-controls")).toBeVisible();
       } finally {
@@ -213,6 +224,11 @@ test.describe("Navigation V2", () => {
       await expect(tabsLabel).toBeVisible();
       const rows = page.locator('[data-testid^="workspace-tab-option-"]').filter({ visible: true });
       await expect(rows).toHaveCount(2);
+      // Terminal profiles is one row; its list and Edit profiles are a page of their own.
+      await expect(page.getByTestId("workspace-header-edit-terminal-profiles")).toHaveCount(0);
+      await expect(
+        page.getByText("Terminal profiles", { exact: true }).filter({ visible: true }),
+      ).toBeVisible();
       await page
         .locator('[data-testid^="workspace-tab-option-"][aria-selected="false"]:visible')
         .first()
