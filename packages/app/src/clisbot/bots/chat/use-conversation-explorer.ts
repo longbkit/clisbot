@@ -85,6 +85,15 @@ export function useConversationExplorer(input: {
     );
     return () => handler.remove();
   }, [compact, focused, explorerOpen, source, cwd, layoutKey]);
+  const openable = focused && singlePanel && Boolean(source && cwd);
+  useEffect(() => {
+    if (!openable) return;
+    useConversationExplorerOwner.getState().setOpenable(layoutKey);
+    return () => {
+      const owner = useConversationExplorerOwner.getState();
+      if (owner.openable === layoutKey) owner.setOpenable(null);
+    };
+  }, [layoutKey, openable]);
   useEffect(() => {
     if (!focused || !singlePanel) return;
     const owner = useConversationExplorerOwner.getState();

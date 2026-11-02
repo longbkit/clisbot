@@ -6,6 +6,8 @@ import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspac
 import { useWorkspace } from "@/stores/session-store-hooks";
 import { showExplorerSidebar } from "@/workspace-tabs/explorer-sidebar";
 import { isWeb } from "@/constants/platform";
+import { useConversationExplorerOwner } from "@/clisbot/bots/chat/explorer-owner";
+import { usePanelStore } from "@/stores/panel-store";
 
 interface CompactExplorerOpenGestureSurfaceProps {
   children: ReactNode;
@@ -41,16 +43,22 @@ export function WorkspaceExplorerOpenGesture({
 }) {
   const selection = useActiveWorkspaceSelection();
   const workspace = useWorkspace(selection?.serverId ?? null, selection?.workspaceId ?? null);
+  // A Bot chat is not a workspace route; it owns its Explorer overlay while it can open.
+  const conversationOpenable = useConversationExplorerOwner((state) => state.openable !== null);
   const handleOpen = useCallback(() => {
-    if (!selection || !workspace) return;
-    showExplorerSidebar({
-      isCompact: true,
-      workspaceKey: `${selection.serverId}:${selection.workspaceId}`,
-    });
+    if (selection && workspace) {
+      showExplorerSidebar({
+        isCompact: true,
+        workspaceKey: `${selection.serverId}:${selection.workspaceId}`,
+      });
+      return;
+    }
+    if (useConversationExplorerOwner.getState().openable !== null)
+      usePanelStore.getState().showMobileFileExplorer();
   }, [selection, workspace]);
   return (
     <CompactExplorerOpenGestureSurface
-      enabled={enabled && Boolean(workspace)}
+      enabled={enabled && (Boolean(workspace) || conversationOpenable)}
       onOpenExplorer={handleOpen}
     >
       {children}

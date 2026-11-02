@@ -36,6 +36,7 @@ beforeEach(async () => {
   await usePanelStore.persist.rehydrate();
   usePanelStore.setState(initialPanels, true);
   useConversationExplorerOwner.getState().setOwner(null);
+  useConversationExplorerOwner.getState().setOpenable(null);
   native.back.mockReset().mockReturnValue({ remove: native.remove });
 });
 function mount(input: Input = ready) {
@@ -153,4 +154,18 @@ it("desktop Files toggles the existing dock without closing Chat", () => {
     useWorkspaceLayoutStore.getState().explorerSidebarPaneIdByWorkspace[ready.layoutKey],
   ).toBeTruthy();
   expect(usePanelStore.getState().mobilePanel).toBe(selection);
+});
+it("offers the swipe to Files only while the focused phone chat has a project folder", () => {
+  const view = mount();
+  expect(useConversationExplorerOwner.getState().openable).toBe(ready.layoutKey);
+  view.rerender({ ...ready, source: null, cwd: null });
+  expect(useConversationExplorerOwner.getState().openable).toBeNull();
+  view.rerender(ready);
+  expect(useConversationExplorerOwner.getState().openable).toBe(ready.layoutKey);
+  view.rerender({ ...ready, singlePanel: false });
+  expect(useConversationExplorerOwner.getState().openable).toBeNull();
+  view.rerender(ready);
+  mount({ ...ready, layoutKey: "conversation-b" });
+  view.unmount();
+  expect(useConversationExplorerOwner.getState().openable).toBe("conversation-b");
 });
