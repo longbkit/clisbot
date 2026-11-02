@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.2.2 - 2026-11-03
+
+### Added
+
+- Added instant send: a message appears the moment you press Send, the composer clears at once, and you can type the next one while the Host is still answering
+- Added Retry and Delete on a message that could not be sent; a message waiting for its Host sends itself when the Host is back, and a restart keeps it
+- Added a new chat composer in the style of Telegram: the mic and Send sit inside the box, commands and attach sit in the box on phones, and it grows from the third line
+- Added a model and options panel to the composer, with provider rails, model search that works like autocomplete, Speed (Standard, Fast, Ultra fast) and Reasoning previews
+- Added Full auto-accept as a mode on the Host, and Codex Plan as a mode when the running Codex offers it
+- Added a back swipe that follows your finger in a session or chat on Android phones, with the list you came from underneath
+- Added the Files swipe from right to left to Bot chats on phones, as in sessions
+
+### Changed
+
+- Changed Chats search on phones to open in the header, focused, with the keyboard up
+- Changed a phone session's title to open one sheet with its options and tabs, and phone headers to read like Telegram's
+- Changed phone Chats and Work: the list controls scroll with the list, Work keeps its chips and Display pinned, and rows follow the phone row height
+- Changed new drafts to preselect the first ready provider, and an unpicked model chip to say Select model
+- Changed schedules: a new-agent schedule names its mode when it is created, and one with no mode runs in the provider's asking default
+
+### Improved
+
+- Improved opening a session on phones: its saved history shows at once instead of a spinner while Hosts connect
+- Improved Home on phones: changing mode or model no longer lags while unreachable Hosts retry
+- Improved Work search: the search panel shows its input before it builds its rows, and stays responsive with many Hosts retrying
+- Improved sending many images: they go as ordered messages, and JPEG replaces WebP where WebP fails
+
+### Fixed
+
+- Fixed Work search results not opening on phones with many unreachable Hosts
+- Fixed a message sent while the agent was finishing a turn being lost, or stuck as Sending
+- Fixed the composer staying stuck after a send, queue or steer error
+- Fixed a queue retry of the same draft being reported as an error
+- Fixed an agent's own tools being able to turn on Full auto-accept or other unattended settings
+
 ## 2.2.1 - 2026-11-01
 
 ### Added
