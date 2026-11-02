@@ -278,26 +278,8 @@ async function submitMessageThatWillBeRejected(page: Page, prompt: string): Prom
   await composer.press("Enter");
 }
 
-async function expectRejectedSubmissionRestored(
-  page: Page,
-  input: { prompt: string; errorMessage: string; preservesActiveTurn?: boolean },
-): Promise<void> {
-  await expect(page.getByRole("alert").filter({ hasText: input.errorMessage })).toBeVisible({
-    timeout: 30_000,
-  });
-  await expectComposerDraft(page, input.prompt);
-  await expectComposerEditable(page);
-  await expectAttachmentPill(page, "composer-image-attachment-pill");
-  if (input.preservesActiveTurn) {
-    await expect(page.getByTestId("turn-working-indicator")).toBeVisible();
-    return;
-  }
-  await expect(page.getByRole("button", { name: "Send message" })).toBeEnabled();
-  await expect(page.getByTestId("turn-working-indicator")).toHaveCount(0);
-}
-
-async function retryRestoredSubmission(page: Page, prompt: string): Promise<void> {
-  await page.getByRole("textbox", { name: "Message agent..." }).first().press("Enter");
+async function sendNextAfterRejection(page: Page, prompt: string): Promise<void> {
+  await submitMessageThatWillBeRejected(page, prompt);
   const attempts = page.getByTestId("user-message").filter({ hasText: prompt });
   await expect(attempts).toHaveCount(2);
   const userMessage = attempts.last();
@@ -401,12 +383,6 @@ async function replaySteeredSleepTurnInBrowser(
     gate.restore();
     await agent.cleanup();
   }
-}
-
-async function expectFailedSubmissionRestored(page: Page, prompt: string): Promise<void> {
-  await expectComposerDraft(page, prompt);
-  await expectComposerEditable(page);
-  await expect(page.getByTestId("user-message").filter({ hasText: prompt })).toHaveCount(0);
 }
 
 async function expectInterruptedTurnOrderAfterReconnect(
@@ -846,7 +822,8 @@ async function expectOldHostSubmissionBehavior(
         ),
       prompt,
     );
-    expect(nextFrame).toEqual({ rowPresent: true, ariaBusy: "false", workingPresent: false });
+    // The row shows at once as sending; an old Host never makes the agent look busy for it.
+    expect(nextFrame).toEqual({ rowPresent: true, ariaBusy: "true", workingPresent: false });
 
     await gate.waitForHeldClientRequest();
     gate.releaseHeldClientRequest();
@@ -1223,18 +1200,21 @@ test.describe("Agent message submission", () => {
     await toasts.expectNeverShown("agent-updating-toast");
   });
 
-  test("retains a rejected submission before its error and accepts its retry", async ({
+  test("keeps a prompt the provider rejected once, before its error, and sends the next one", async ({
     page,
     rejectionScenario,
   }) => {
-    const prompt = "Restore this rejected submission.";
+    const prompt = "Keep this rejected submission.";
     await submitMessageThatWillBeRejected(page, prompt);
-    await expectRejectedSubmissionRestored(page, { prompt, ...rejectionScenario });
     await expectRejectedPromptBeforeError(page, prompt, rejectionScenario.errorMessage);
-    await retryRestoredSubmission(page, prompt);
+    // The Host recorded the prompt, so nothing is unsent and the composer stays free.
+    await expect(page.getByTestId("message-delivery-failed")).toHaveCount(0);
+    await expectComposerDraft(page, "");
+    await expectComposerEditable(page);
+    await sendNextAfterRejection(page, prompt);
   });
 
-  test("restores an ambiguous Steer failure without retrying or interrupting", async ({
+  test("keeps an ambiguous Steer failure in place without retrying or interrupting", async ({
     page,
   }, testInfo) => {
     test.setTimeout(120_000);
@@ -1255,12 +1235,13 @@ test.describe("Agent message submission", () => {
       const cancelsBefore = gate.getClientRequestCount("cancel_agent_request");
 
       await submitMessageThatWillBeRejected(page, prompt);
-      await expectRejectedSubmissionRestored(page, {
-        prompt,
-        errorMessage: "Requested mock steer transport failure",
-        preservesActiveTurn: true,
-      });
-      await expect(page.getByTestId("user-message").filter({ hasText: prompt })).toHaveCount(0);
+      const row = page.getByTestId("user-message").filter({ hasText: prompt });
+      await expect(row.getByTestId("message-delivery-failed")).toContainText(
+        "Requested mock steer transport failure",
+      );
+      await expect(row).toHaveCount(1);
+      await expectComposerDraft(page, "");
+      await expect(page.getByTestId("turn-working-indicator")).toBeVisible();
 
       expect(gate.getClientRequestCount("send_agent_message_request")).toBe(sendsBefore + 1);
       expect(gate.getClientRequestCount("cancel_agent_request")).toBe(cancelsBefore);
@@ -1349,7 +1330,7 @@ test.describe("Agent message submission", () => {
     page,
     unrelatedRunningScenario,
   }) => {
-    const prompt = "Restore this unsent prompt.";
+    const prompt = "Keep this unsent prompt.";
     await submitMessageThatWillBeRejected(page, prompt);
     await unrelatedRunningScenario.gate.waitForRequest();
     await unrelatedRunningScenario.agent.client.sendAgentMessage(
@@ -1360,7 +1341,10 @@ test.describe("Agent message submission", () => {
       page.getByTestId("user-message").filter({ hasText: "Start an unrelated turn." }),
     ).toBeVisible();
     await unrelatedRunningScenario.gate.disconnect();
-    await expectFailedSubmissionRestored(page, prompt);
+    // The unrelated turn never settles this prompt: it stays unsent, once, under its own id.
+    const row = page.getByTestId("user-message").filter({ hasText: prompt });
+    await expect(row).toHaveCount(1);
+    await expect(row.getByTestId("user-message-delivery-row")).toBeAttached();
   });
 
   test("keeps a submitted prompt before its response when canonical history arrives", async ({
