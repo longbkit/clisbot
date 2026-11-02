@@ -12,6 +12,8 @@ import { buildFleet, FLEET_HUB_ORIGIN } from "./fleet-fixture";
 
 const fleet = vi.hoisted(() => ({ value: null as ReturnType<typeof buildFleet> | null }));
 const flag = vi.hoisted(() => ({ enabled: true }));
+/** Every `useProjects({ enabled })` the Command Center makes: `true` means it built its rows. */
+const projectsDemand = vi.hoisted(() => ({ calls: [] as boolean[] }));
 const stable = vi.hoisted(() => ({
   hubAccounts: [
     {
@@ -43,7 +45,10 @@ vi.mock("@/hooks/use-aggregated-agents", () => ({
   useAggregatedAgents: () => ({ agents: fleet.value!.agents }),
 }));
 vi.mock("@/hooks/use-projects", () => ({
-  useProjects: () => ({ projects: fleet.value!.projects }),
+  useProjects: (options?: { enabled?: boolean }) => {
+    projectsDemand.calls.push(options?.enabled ?? true);
+    return { projects: fleet.value!.projects };
+  },
 }));
 vi.mock("@/clisbot/hub/host-inventory", () => ({
   useAvailableHosts: () => fleet.value!.hosts,
@@ -104,7 +109,7 @@ let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 const TOAST_API = { show: () => () => {}, copied: () => {}, error: () => {} };
 
-async function mountCommandCenter() {
+async function mountCommandCenter({ open = true } = {}) {
   const [{ CommandCenter }, { CommandCenterProvider }, dispatcher, toast, store] =
     await Promise.all([
       import("@/command-center/command-center"),
@@ -127,6 +132,7 @@ async function mountCommandCenter() {
       </dispatcher.KeyboardActionDispatcherProvider>,
     );
   });
+  if (!open) return;
   await act(async () => store.useKeyboardShortcutsStore.getState().setCommandCenterOpen(true));
   await waitFor(() => input());
 }
@@ -207,6 +213,26 @@ const results: Record<string, { p50: number; p95: number; max: number; n: number
 afterAll(() => {
   // Read by the verification doc; printed so CI logs carry the numbers.
   console.log(`[search-scope-latency] ${JSON.stringify(results)}`);
+});
+
+describe("opening the Command Center over 2,000 sessions", () => {
+  beforeEach(() => {
+    fleet.value ??= buildFleet({ hosts: 100, sessions: 2000 });
+    flag.enabled = true;
+  });
+
+  it("shows its focused input before it builds the rows", async () => {
+    await mountCommandCenter({ open: false });
+    projectsDemand.calls = [];
+    const store = await import("@/stores/keyboard-shortcuts-store");
+    // The press's own commit: the panel and its input, and no row built yet.
+    await act(async () => store.useKeyboardShortcutsStore.getState().setCommandCenterOpen(true));
+    expect(input()).not.toBeNull();
+    expect(projectsDemand.calls).not.toContain(true);
+    // The input's layout lets the rows follow.
+    await waitFor(() => document.querySelector('[data-testid^="command-center-agent-"]'));
+    expect(projectsDemand.calls).toContain(true);
+  });
 });
 
 describe("global search over 100 Hosts and 2,000 sessions", () => {
