@@ -7,7 +7,11 @@ import { ChatOptionsProvider, useChatOptionsState } from "./chat-options-context
 import { ChatToolActivityHeaderContext } from "./tool-activity-context";
 import type { BotToolActivity } from "./tool-activity";
 
+vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => false }));
+vi.mock("@/clisbot/session-menu/feature", () => ({ PHONE_SESSION_MENU_ENABLED: true }));
+vi.mock("@/clisbot/session-menu/title-chevron", () => ({ SessionTitleChevron: () => null }));
 vi.mock("react-native", () => ({
+  Keyboard: { dismiss: () => undefined },
   View: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   Text: ({ children }: { children: ReactNode }) => <span>{children}</span>,
   Pressable: ({

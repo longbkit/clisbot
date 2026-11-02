@@ -52,11 +52,23 @@ The primary navigation says where you are; each section owns its header, filters
   Chats · Work · Lịch · More in one retained tab navigator ([phone tabs][phone-tabs]). Chats and
   Work render their lists as the tab screen (`PhoneListTab`); details push above the tabs and Back
   pops to them ([route topology][phone-tab-routes]). More is the `/more` tab.
-- **The scroll edge.** A section's fixed header block has no line at rest; a thin `borderSubtle`
-  line shows where it ends once the list has scrolled under it, as on iOS and Material, on phone
-  and desktop (`scroll-edge.tsx`). It sits outside React state and flips only when the list
-  crosses its top, so scrolling re-renders nothing. On native, Work's `NestableScrollContainer`
-  keeps `onScroll`, so its line follows the drags instead.
+- **A phone's list keeps the screen.** On Work and Chats only the title row stays fixed: the
+  scope tabs, chips, Display and Work's Project/Session bar are the list's first rows
+  (`listTopComponent`, `ListHeaderComponent`) and scroll away with it, as Home's do. They stay
+  in place while the list is loading or offline, and in the list when filters match nothing, so
+  a person can clear them. Desktop keeps them fixed.
+- **The scroll edge.** On desktop, Chats' and Work's fixed block has no line at rest; a thin
+  `borderSubtle` line shows where it ends once the list has scrolled under it (`scroll-edge.tsx`).
+  It sits outside React state and flips only when the list crosses its top, so scrolling
+  re-renders nothing. A phone has no such line: its title keeps its own.
+- **A phone session's title is its menu** (`clisbot/session-menu/`, behind this feature's flag).
+  There is no ⋯: pressing the title, marked with a small chevron, opens one sheet with every
+  option ⋯ held, then the session's tabs in full. New agent and New terminal sit above the tabs, so
+  a long list cannot push them away; each tab row keeps its own ⋯ (rename, close…); pressing a tab
+  switches and closes the sheet. A Bot chat's sheet is its Chat options with the same tabs section
+  in place of Switch tab, whose search it drops: the whole list is on the sheet. Heartbeats and
+  Files and changes use the section headers' icon and target (`phone-header-icon.tsx`). Desktop
+  keeps ⋯.
 - **One component per job** across Home, Chats and Workspace: `SectionHeader`, `SectionControls` (For
   me / Others / All, chips, then the Display row, on one inset), `DisplayMenuTrigger`
   ("Display ▾", with a dot while a filter is in force), `HostsDisplayItems`, `ChipRow` /

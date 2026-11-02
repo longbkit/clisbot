@@ -59,6 +59,7 @@ vi.mock("@/utils/render-profiler", () => ({
     return <div>{children}</div>;
   },
 }));
+vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
 vi.mock("react-native", () => ({
   StyleSheet: {
     compose: (base: object, extra: object) => [base, extra],
