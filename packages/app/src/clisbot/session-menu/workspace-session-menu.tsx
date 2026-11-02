@@ -4,7 +4,10 @@ import { useTranslation } from "react-i18next";
 import { SquarePen, SquareTerminal } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { mutedIconColorMapping, useIconButtonChromeStyle } from "@/components/ui/icon-button-chrome";
+import {
+  mutedIconColorMapping,
+  useIconButtonChromeStyle,
+} from "@/components/ui/icon-button-chrome";
 import { ICON_SIZE } from "@/styles/theme";
 import { SessionTabsSection, type SessionTabsProps } from "./session-tabs-section";
 import { SessionTitleChevron } from "./title-chevron";
@@ -95,7 +98,16 @@ export function PhoneSessionMenuTabs({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  trigger: { width: "auto", alignItems: "stretch", justifyContent: "center" },
+  // The padding reaches left of the title's rail, so the text stays where it was and the pressed
+  // fill has even room on both sides.
+  trigger: {
+    width: "auto",
+    alignItems: "stretch",
+    justifyContent: "center",
+    paddingHorizontal: theme.spacing[2],
+    marginLeft: -theme.spacing[2],
+    borderRadius: theme.borderRadius.lg,
+  },
   row: { flexDirection: "row", alignItems: "center", gap: theme.spacing[1], minWidth: 0 },
   identity: { flexShrink: 1, minWidth: 0 },
 }));

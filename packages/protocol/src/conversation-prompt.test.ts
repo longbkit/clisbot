@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   CONTEXT_HEADER,
   MESSAGE_HEADER,
+  conversationMessageText,
   renderConversationPrompt,
   senderLabel,
   type ConversationLine,
@@ -64,5 +65,45 @@ describe("renderConversationPrompt", () => {
       "Researcher (bot:researcher)",
     );
     expect(senderLabel({ senderIdentity: "system" })).toBe("system");
+  });
+});
+
+describe("conversationMessageText", () => {
+  test.each([
+    ["user:owner: hi", "hi"],
+    ["An Nguyễn (slack:U0000000001, @an.example): Create a CS card", "Create a CS card"],
+    ["Long (user:owner): line one\nline two", "line one\nline two"],
+    ["bot:cfo: check the numbers", "check the numbers"],
+  ])("takes the sender line off %j", (prompt, text) => {
+    expect(conversationMessageText(prompt)).toBe(text);
+  });
+
+  test("drops the quoted context", () => {
+    const prompt = renderConversationPrompt({
+      context: [line({ text: "code is HH-HT" })],
+      messages: [line({ text: "create the card" })],
+    });
+    expect(conversationMessageText(prompt)).toBe("create the card");
+  });
+
+  test("keeps the lines of several senders, who said what is part of the message", () => {
+    const prompt = renderConversationPrompt({
+      context: [],
+      messages: [
+        line({ text: "one" }),
+        line({ senderIdentity: "slack:U02ABC", senderName: "Lan", text: "two" }),
+      ],
+    });
+    expect(conversationMessageText(prompt)).toBe(prompt);
+  });
+
+  test.each([
+    "hi",
+    "http://localhost:8081: refused",
+    "Note: read this",
+    "src/app.ts (line 4): fails",
+    "user: hi",
+  ])("leaves %j alone", (text) => {
+    expect(conversationMessageText(text)).toBe(text);
   });
 });

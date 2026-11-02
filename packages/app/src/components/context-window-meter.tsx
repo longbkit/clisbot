@@ -90,6 +90,14 @@ function getMeterGeometry(showPercentage: boolean, glyphSize?: number) {
 }
 
 // Wrap the whole SVG: withUnistyles adds a div on web, which cannot sit inside an SVG.
+// Native props; on the web react-native-svg puts them on the DOM <svg>, where React rejects them.
+const HIDDEN_FROM_ACCESSIBILITY = isNative
+  ? ({
+      accessibilityElementsHidden: true,
+      importantForAccessibility: "no-hide-descendants",
+    } as const)
+  : ({ "aria-hidden": true } as const);
+
 const ContextWindowRing = withUnistyles(function ContextWindowRing({
   size,
   radius,
@@ -108,13 +116,7 @@ const ContextWindowRing = withUnistyles(function ContextWindowRing({
   const center = size / 2;
   const circumference = 2 * Math.PI * radius;
   return (
-    <Svg
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-    >
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} {...HIDDEN_FROM_ACCESSIBILITY}>
       <Circle
         cx={center}
         cy={center}
