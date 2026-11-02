@@ -133,7 +133,7 @@ import type { KeyboardActionDefinition } from "@/keyboard/keyboard-action-dispat
 import type { MessageInputKeyboardActionKind } from "@/keyboard/actions";
 import { submitOneOffInput, submitAgentInput } from "@/composer/submit";
 import { discardAgentSend, startAgentSend } from "@/outbox/agent-delivery";
-import { handOffDelivery } from "@/outbox/handoff";
+import { deliverOrReturn, handOffDelivery } from "@/outbox/handoff";
 import { useSendErrorDraftReset, type SentDraft } from "@/composer/use-send-error-draft-reset";
 import { ComposerKeyboardScopeProvider, useComposerKeyboardScope } from "@/composer/keyboard-scope";
 import { useAppSettings } from "@/hooks/use-settings";
@@ -1592,6 +1592,7 @@ function ComposerContentImpl({
         text: string,
         attachments: ComposerAttachment[],
         activeTurnBehavior: "interrupt" | "steer",
+        owner: "composer" | "queue",
       ) => Promise<void>)
     | null
   >(null);
@@ -1667,6 +1668,7 @@ function ComposerContentImpl({
       text: string,
       submitAttachments: ComposerAttachment[],
       behavior?: "steer" | "interrupt",
+      owner: "composer" | "queue" = "composer",
     ) => {
       const draftAttachments = submitAttachments;
       onMessageSent?.();
@@ -1694,6 +1696,7 @@ function ComposerContentImpl({
         text,
         submitAttachments,
         behavior ?? (appSettings.sendBehavior === "steer" ? "steer" : "interrupt"),
+        owner,
       );
     },
     [
@@ -1718,6 +1721,7 @@ function ComposerContentImpl({
       text: string,
       sendAttachments: ComposerAttachment[],
       activeTurnBehavior: "interrupt" | "steer",
+      owner: "composer" | "queue",
     ) => {
       const { clientMessageId, delivery } = startAgentSend({
         serverId,
@@ -1728,7 +1732,10 @@ function ComposerContentImpl({
         queueParts: queuePartsOf(text, sendAttachments),
       });
       onAttentionPromptSend?.();
-      await handOffDelivery(delivery, () => discardAgentSend(clientMessageId));
+      const discard = () => discardAgentSend(clientMessageId);
+      // A queued message that fails goes back to its queue, which owns it until it is sent.
+      if (owner === "queue") await deliverOrReturn(delivery, discard);
+      else await handOffDelivery(delivery, discard);
     };
   }, [onAttentionPromptSend, queuePartsOf, serverId]);
 
@@ -2291,7 +2298,7 @@ function ComposerContentImpl({
           messageId: id,
           queue: clientQueue.writer,
           submitMessage: ({ text, attachments: queuedAttachments }) =>
-            submitMessage(text, queuedAttachments, "interrupt"),
+            submitMessage(text, queuedAttachments, "interrupt", "queue"),
         });
         if (result.status === "failed") setSendError(result.errorMessage);
         return;
@@ -2323,7 +2330,7 @@ function ComposerContentImpl({
           messageId: id,
           queue: clientQueue.writer,
           submitMessage: ({ text, attachments: queuedAttachments }) =>
-            submitMessage(text, queuedAttachments, "steer"),
+            submitMessage(text, queuedAttachments, "steer", "queue"),
         });
         if (result.status === "failed") setSendError(result.errorMessage);
         return;

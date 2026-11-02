@@ -251,7 +251,13 @@ as sent: re-encoded images can differ in bytes after a restart, and the Host alr
 The earlier parts of a draft split by image limits use derived ids (`<id>-part-N`), so a retry
 deduplicates them too.
 
-A failed row stays where it was sent with Retry and Delete (`outbox/delivery-status.tsx`). Its
+A message someone else owns until it is sent goes back to that owner on failure instead
+(`deliverOrReturn` in `outbox/handoff.ts`): a client-queue item sent by the drain, Send now or Steer
+returns to the head of its queue, and review feedback keeps its comments. On a Host without the
+durable queue that is the queue contract: a refused Steer stays local and drains at the next idle.
+
+A failed row stays where it was sent with Retry and Delete (`outbox/delivery-status.tsx`); its
+label is announced as an alert, as the composer's send error was. Its
 submission record keeps the row through canonical replacement but does not make the agent look busy;
 a canonical row with its id retires the record and the outbox entry. Chat lines render from the
 outbox after the transcript until a transcript line with the same id replaces them

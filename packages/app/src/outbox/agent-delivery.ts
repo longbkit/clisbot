@@ -173,9 +173,11 @@ function settleAgentEntry(entry: AgentEntry, outcome: AttemptOutcome): DeliveryO
   const { serverId, agentId } = entry.target;
   const writer = createMessageSubmissionWriter(serverId);
   const id = entry.clientMessageId;
-  // Deleted by the user, or its canonical row already arrived: nothing left to report.
+  // Deleted by the user, or its canonical row already arrived: the row has nothing left to show.
+  // A refusal is still reported, so an owner that waits (a queue, review feedback) keeps its copy.
   if (!getOutboxEntry(id)) {
-    if (outcome.kind !== "failed") writer.accept(agentId, id);
+    if (outcome.kind === "failed") return outcome;
+    writer.accept(agentId, id);
     return { kind: "sent" };
   }
   if (outcome.kind === "queued") {

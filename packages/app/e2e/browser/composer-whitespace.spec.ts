@@ -182,22 +182,6 @@ async function pausePageClock(page: Page): Promise<void> {
 }
 
 /** The send error shares the footer with Send, so whatever keeps Send visible keeps it visible. */
-async function expectFullscreenErrorAboveSend(page: Page): Promise<void> {
-  const frame = page.getByTestId("composer-fullscreen");
-  const alertBox = (await frame.getByRole("alert").boundingBox())!;
-  const sendBox = (await page
-    .getByRole("button", { name: "Send message", exact: true })
-    .boundingBox())!;
-  if (CHAT_LAYOUT) {
-    // The chat layout keeps Send inside the container, so the error sits right under it.
-    expect(alertBox.y).toBeGreaterThanOrEqual(sendBox.y + sendBox.height);
-    return;
-  }
-  const editorBox = (await composerLocator(page).boundingBox())!;
-  expect(alertBox.y).toBeGreaterThanOrEqual(editorBox.y + editorBox.height);
-  expect(alertBox.y + alertBox.height).toBeLessThanOrEqual(sendBox.y);
-}
-
 async function writeCompactDraft(page: Page, text: string): Promise<void> {
   await composerLocator(page).fill(text);
   await expect(composerLocator(page)).toHaveValue(text);
@@ -341,7 +325,7 @@ test("a caret inside an unpublished edit survives a breakpoint remount", async (
   }
 });
 
-test("fullscreen submit rejection retains the editable draft and supports retry", async ({
+test("fullscreen submit rejection leaves the composer free and the prompt with its error", async ({
   page,
 }) => {
   const agent = await seedMockAgentWorkspace({
@@ -358,15 +342,21 @@ test("fullscreen submit rejection retains the editable draft and supports retry"
     await enterComposerFullscreen(page);
     await sendComposerWithButton(page);
     await expectWorkspaceHeaderVisible(page);
-    await expect(page.getByRole("alert")).toHaveText("Requested mock prompt rejection");
-    await enterComposerFullscreen(page);
-    await expectFullscreenErrorAboveSend(page);
-    await expect(composerLocator(page)).toHaveValue(draft);
+    // The Host recorded the prompt before the provider refused it: the prompt stays in the
+    // transcript with the error after it, and the composer is free for the next message.
+    const prompt = page.getByTestId("user-message").filter({ hasText: "Third line" });
+    await expect(prompt).toHaveCount(1);
+    await expect(
+      page.getByTestId("assistant-message").filter({ hasText: "Requested mock prompt rejection" }),
+    ).toBeVisible();
+    await expect(composerLocator(page)).toHaveValue("");
     await expect(composerLocator(page)).toBeEditable();
-    await expect(page.getByRole("button", { name: "Send message", exact: true })).toBeEnabled();
+    await writeCompactDraft(page, draft);
+    await enterComposerFullscreen(page);
     await sendComposerWithButton(page);
     await expect(composerLocator(page)).toHaveValue("");
     await expectWorkspaceHeaderVisible(page);
+    await expect(prompt).toHaveCount(2);
   } finally {
     await agent.cleanup();
   }

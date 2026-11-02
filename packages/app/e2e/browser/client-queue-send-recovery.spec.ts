@@ -16,7 +16,7 @@ test.use({
   },
 });
 
-test("keeps overlapping queued sends in the transcript, once each, when their connection fails", async ({
+test("restores overlapping queued sends when their connection fails", async ({
   page,
 }, testInfo) => {
   test.setTimeout(120_000);
@@ -46,11 +46,10 @@ test("keeps overlapping queued sends in the transcript, once each, when their co
       activeTurnBehavior: "steer",
     });
     await gate.disconnect();
-    // A sent message never goes back to the queue: it stays in the transcript under its id and
-    // is sent again, deduplicated by the Host, when the connection returns.
-    await expect(actions).toHaveCount(0);
+    await expect(actions).toHaveCount(prompts.length);
     for (const prompt of prompts) {
-      await expect(page.getByTestId("user-message").filter({ hasText: prompt })).toHaveCount(1);
+      await expect(page.getByTestId("user-message").filter({ hasText: prompt })).toHaveCount(0);
+      await expect(page.getByText(prompt, { exact: true })).toBeVisible();
     }
   } finally {
     await agent.cleanup();

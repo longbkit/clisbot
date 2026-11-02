@@ -52,7 +52,8 @@ function FailedActions({ entry }: { entry: OutboxEntry }) {
   return (
     <View style={styles.row} testID="message-delivery-failed">
       <ThemedAlert size={14} uniProps={errorColor} />
-      <Text style={styles.error} numberOfLines={1}>
+      {/* Announced like the composer's send error it replaces. */}
+      <Text style={styles.error} numberOfLines={1} accessibilityRole="alert">
         {label}
       </Text>
       <Button variant="ghost" size="xs" onPress={retry} testID="message-delivery-retry">

@@ -10,6 +10,7 @@ import { deriveWorkspaceTabModel } from "@/screens/workspace/workspace-tab-model
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useAppSettings } from "@/hooks/use-settings";
 import { discardAgentSend, startAgentSend } from "@/outbox/agent-delivery";
+import { deliverOrReturn } from "@/outbox/handoff";
 import { FLOATING_ACTION_BUTTON_CLEARANCE } from "@/components/ui/floating-action-button";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { buttonControlHeight } from "@/components/ui/control-geometry";
@@ -80,11 +81,7 @@ export function useReviewFeedback(input: {
             activeTurnBehavior,
           });
           // Feedback keeps its comments until sent, so a failed send leaves no row behind.
-          const outcome = await delivery;
-          if (outcome.kind === "failed") {
-            discardAgentSend(clientMessageId);
-            throw new Error(outcome.failure.message);
-          }
+          await deliverOrReturn(delivery, () => discardAgentSend(clientMessageId));
           live.current.toast.show(
             createElement(FeedbackSentMessage, {
               recipient,
