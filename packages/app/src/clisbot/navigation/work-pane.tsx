@@ -33,7 +33,7 @@ import { HostsUnreachableState } from "./hosts-unreachable-state";
 import { OutsideFilterNotice } from "./outside-filter-notice";
 import { EMPTY_SCOPE_COUNTS } from "./ownership";
 import { ScrollEdgeLine, ScrollEdgeProvider, useScrollEdge } from "./scroll-edge";
-import { SectionControls, useSectionBackdrop } from "./section-controls";
+import { SectionControls, SectionPinnedChips, useSectionBackdrop } from "./section-controls";
 import {
   HeaderMenuButton,
   HeaderMenuIcon,
@@ -90,6 +90,17 @@ function WorkPaneContent({ onBeforeNavigate, parentGestureRef, active }: WorkPan
   // A phone's list keeps the screen: only the title stays, the controls scroll away with the rows.
   const compact = useIsCompactFormFactor();
   const controlsScroll = compact && workState === "list";
+  const controls = useWorkControls();
+  const controlsBlock = useMemo(
+    () => (
+      <>
+        <WorkControls state={controls} chipsPinned={compact} />
+        <OutsideFilterNotice list="work" />
+        <SidebarMetadataNotice />
+      </>
+    ),
+    [compact, controls],
+  );
   const headerActions = useMemo(
     () => (
       <>
@@ -107,10 +118,20 @@ function WorkPaneContent({ onBeforeNavigate, parentGestureRef, active }: WorkPan
     <RenderProfile id="NavWork">
       <View style={styles.pane} testID="work-pane">
         <SectionHeader title={t("navigation.sections.work")} actions={headerActions} />
+        {compact ? (
+          <SectionPinnedChips
+            section="work"
+            chips={controls.chips}
+            chip={controls.chip}
+            onChip={controls.setChip}
+            backdrop={controls.backdrop}
+            display={displayMenu}
+          />
+        ) : null}
         {controlsScroll ? null : controlsBlock}
         {workState === "offline" ? <HostsUnreachableState testID="work-offline" /> : null}
         {workState === "loading" ? <SidebarAgentListSkeleton /> : null}
-        <ScrollEdgeLine edge={edge} />
+        <ScrollEdgeLine edge={edge} onPhones />
         {workState === "list" ? (
           <ScrollEdgeProvider edge={edge}>
             <SidebarWorkspaceList
@@ -143,14 +164,6 @@ function WorkPaneContent({ onBeforeNavigate, parentGestureRef, active }: WorkPan
   );
 }
 
-const controlsBlock = (
-  <>
-    <WorkControls />
-    <OutsideFilterNotice list="work" />
-    <SidebarMetadataNotice />
-  </>
-);
-
 /**
  * What Work shows in place of its list: the skeleton while the first Host connects or its
  * directory loads, a word when no Host can be reached, otherwise the list itself.
@@ -178,7 +191,7 @@ const EMPTY_COUNTS = {
   scopes: EMPTY_SCOPE_COUNTS,
 };
 
-function WorkControls() {
+function useWorkControls() {
   const { t } = useTranslation();
   const { allWorkspaceEntriesByKey, workList } = useSidebarModel();
   const query = useWorkQuery();
@@ -202,15 +215,22 @@ function WorkControls() {
       })),
     [counts, t],
   );
+  return { chips, chip: query.chip, setChip, backdrop, scopeCounts: counts.scopes };
+}
+
+type WorkControlsState = ReturnType<typeof useWorkControls>;
+
+function WorkControls({ state, chipsPinned }: { state: WorkControlsState; chipsPinned: boolean }) {
   return (
     <SectionControls
       section="work"
-      scopeCounts={counts.scopes}
-      chips={chips}
-      chip={query.chip}
-      onChip={setChip}
-      backdrop={backdrop}
+      scopeCounts={state.scopeCounts}
+      chips={state.chips}
+      chip={state.chip}
+      onChip={state.setChip}
+      backdrop={state.backdrop}
       display={displayMenu}
+      chipsPinned={chipsPinned}
     >
       <SidebarViewBar />
       <SidebarActiveFilters />

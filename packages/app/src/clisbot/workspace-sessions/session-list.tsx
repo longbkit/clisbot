@@ -1,3 +1,4 @@
+import { density } from "@/styles/density";
 import { FLAT_ROW_FILL_INSET, sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
 import { PinnedRowProvider } from "@/components/ui/pin-mark";
@@ -415,8 +416,8 @@ const styles = StyleSheet.create((theme) => ({
   // leading status column, and the gap after it. Every session sits under its workspace's
   // title, reading as a child without spending a tree line on it.
   row: {
-    minHeight: 26,
-    marginBottom: theme.spacing[0.5],
+    minHeight: { xs: density.listRowHeight.xs, md: 26 },
+    marginBottom: { xs: 0, md: theme.spacing[0.5] },
     paddingVertical: theme.spacing[1],
     paddingLeft: theme.spacing[2] + sidebarLeadingColumnWidth(theme) + theme.spacing[2],
     paddingRight: theme.spacing[3],
