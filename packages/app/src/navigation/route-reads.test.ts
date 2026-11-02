@@ -23,6 +23,10 @@ const ALLOWED_ROUTE_READS: Record<string, { reads: number; reason: string }> = {
     reason: "MobileHomeTabs' Back handler renders nothing on phone tabs; V1 panel bar; detail Back",
   },
   "clisbot/navigation/list-panel.tsx": { reads: 1, reason: "desktop list pane" },
+  "clisbot/home/detail-back-swipe.tsx": {
+    reads: 1,
+    reason: "useNavigationState selects one boolean: Back from the host route lands on the tabs",
+  },
   "clisbot/hub/sidebar-account.tsx": { reads: 1, reason: "V1 sidebar" },
   "clisbot/hub/automation-sidebar-item.tsx": { reads: 1, reason: "V1 sidebar" },
   "clisbot/hub/sidebar-nav-group.tsx": { reads: 1, reason: "V1 sidebar" },

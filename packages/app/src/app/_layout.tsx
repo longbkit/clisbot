@@ -55,6 +55,7 @@ import { SidebarModelProvider } from "@/components/sidebar/sidebar-model";
 import { WorkspacePinShortcutHandler } from "@/components/workspace-pin-shortcut-handler";
 import { WorkspaceRenameHost } from "@/components/workspace-rename-host";
 import { WorkspaceExplorerOpenGesture } from "@/mobile-panels/explorer-open-gesture";
+import { DETAIL_BACK_SWIPE_SUPPORTED } from "@/clisbot/home/detail-back-swipe";
 import { ProviderSettingsHost } from "@/components/provider-settings-host";
 import { WorkspaceSetupDialog } from "@/components/workspace-setup-dialog";
 import { WorkspaceShortcutTargetsSubscriber } from "@/components/workspace-shortcut-targets-subscriber";
@@ -853,6 +854,13 @@ const ROOT_STACK_SCREEN_OPTIONS = {
   animation: "none" as const,
 };
 const ROOT_STACK_NESTED_NAVIGATOR_SCREENS = ["h/[serverId]", "(tabs)"] as const;
+/**
+ * Where the back swipe runs, the host route is a transparent modal: the tabs underneath stay
+ * attached, so the swipe shows them. Its own screens paint the background.
+ */
+const HOST_ROUTE_OPTIONS = DETAIL_BACK_SWIPE_SUPPORTED
+  ? { presentation: "transparentModal" as const, contentStyle: { backgroundColor: "transparent" } }
+  : undefined;
 
 function RootStack() {
   const storeReady = useStoreReady();
@@ -878,7 +886,7 @@ function RootStack() {
         <Stack.Screen name="connectors" />
         <Stack.Screen name="pair-scan" />
       </Stack.Protected>
-      <Stack.Screen name="h/[serverId]" />
+      <Stack.Screen name="h/[serverId]" options={HOST_ROUTE_OPTIONS} />
       <Stack.Screen name="settings/hosts/[serverId]/index" />
       <Stack.Screen name="settings/hosts/[serverId]/[hostSection]" />
       <Stack.Screen name="settings/hosts/[serverId]/plugins/[pluginId]/[screenId]" />

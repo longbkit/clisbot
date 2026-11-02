@@ -296,6 +296,23 @@ export function MobileTabBar({
   );
 }
 /**
+ * A detail's Back: the header Back and the phone's back swipe (`detail-back-swipe.tsx`) share it,
+ * so both return to the surface the detail opened from. `readPath` is only traced.
+ */
+export function useDetailBack(readPath: () => string) {
+  const target = useReturn((s) => s.path);
+  const returnFromDetail = useReturnFromDetail(target);
+  return useCallback(() => {
+    const trace = (step: string) =>
+      traceBackNavigation(step, readPath(), target, usePanelStore.getState().mobilePanel);
+    trace("mobileEnter");
+    usePanelStore.getState().showMobileAgent();
+    trace("panelChanged");
+    returnFromDetail();
+    trace("dispatchReturned");
+  }, [readPath, returnFromDetail, target]);
+}
+/**
  * Home V2 phones have no sidebar to open: a tab page has no leading button, and every other page
  * (conversation detail, or New workspace, Connectors and Bot settings opened from Chat) goes Back.
  */
@@ -303,34 +320,13 @@ export function MobileBack() {
   const path = usePathname();
   const compact = useIsCompactFormFactor();
   const target = useReturn((s) => s.path);
-  const returnFromDetail = useReturnFromDetail(target);
   const committedPath = useRef(path);
   useLayoutEffect(() => {
     committedPath.current = path;
     traceBackNavigation("mobileCommit", path, target, usePanelStore.getState().mobilePanel);
   }, [path, target]);
-  const back = useCallback(() => {
-    traceBackNavigation(
-      "mobileEnter",
-      committedPath.current,
-      target,
-      usePanelStore.getState().mobilePanel,
-    );
-    usePanelStore.getState().showMobileAgent();
-    traceBackNavigation(
-      "panelChanged",
-      committedPath.current,
-      target,
-      usePanelStore.getState().mobilePanel,
-    );
-    returnFromDetail();
-    traceBackNavigation(
-      "dispatchReturned",
-      committedPath.current,
-      target,
-      usePanelStore.getState().mobilePanel,
-    );
-  }, [returnFromDetail, target]);
+  const readPath = useCallback(() => committedPath.current, []);
+  const back = useDetailBack(readPath);
   if (!HOME_V2_ENABLED || !compact || isHomeTabPath(path)) return null;
   return <HeaderBackButton onBack={back} testID="chat-back" />;
 }

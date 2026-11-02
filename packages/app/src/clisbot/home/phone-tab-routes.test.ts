@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   PHONE_TABS_ROUTE,
+  holdsRoute,
+  isDetailOnPhoneTabs,
   phoneTabPath,
   phoneTabRouteName,
   phoneTabsRemountAction,
@@ -82,5 +84,33 @@ describe("phone tab routes", () => {
       target: "root",
       count: 1,
     });
+  });
+
+  it("lets a detail swipe back only onto the tabs Back returns to", () => {
+    const leaf = (name: string) => ({ name, key: `${name}-1` });
+    const hostWith = (...names: string[]) => ({
+      ...host,
+      state: { key: "host-stack", index: names.length - 1, routes: names.map(leaf) },
+    });
+    expect(isDetailOnPhoneTabs(root([tabs(), host]), "host-1")).toBe(true);
+    expect(isDetailOnPhoneTabs(root([tabs(), hostWith("workspace")]), "host-1")).toBe(true);
+    // A second host screen goes Back to the first, not to the tabs.
+    expect(isDetailOnPhoneTabs(root([tabs(), hostWith("workspace", "settings")]), "host-1")).toBe(
+      false,
+    );
+    // Covered, cold-linked, or above another detail: Back does not reveal the tabs.
+    expect(isDetailOnPhoneTabs(root([tabs(), host, settings]), "host-1")).toBe(false);
+    expect(isDetailOnPhoneTabs(root([host]), "host-1")).toBe(false);
+    expect(isDetailOnPhoneTabs(root([tabs(), settings, host]), "host-1")).toBe(false);
+    expect(isDetailOnPhoneTabs(undefined, "host-1")).toBe(false);
+  });
+
+  it("finds a route at any depth until it is popped", () => {
+    const app = root([tabs(), host]);
+    const expoRoot = { key: "expo", index: 0, routes: [{ name: "__root", key: "r", state: app }] };
+    expect(holdsRoute(expoRoot, "host-1")).toBe(true);
+    expect(holdsRoute(expoRoot, "chat-1")).toBe(true);
+    expect(holdsRoute(root([tabs()]), "host-1")).toBe(false);
+    expect(holdsRoute(undefined, "host-1")).toBe(false);
   });
 });

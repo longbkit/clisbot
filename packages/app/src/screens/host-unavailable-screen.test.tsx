@@ -71,6 +71,9 @@ vi.mock("@/app/_layout", () => ({
 vi.mock("@/clisbot/home/use-chat-list-navigation", () => ({
   useChatListScreenListeners: () => ({}),
 }));
+vi.mock("@/clisbot/home/detail-back-swipe", () => ({
+  DetailBackSwipe: ({ children }: { children: React.ReactNode }) => children,
+}));
 vi.mock("@/components/appearance-style-boundary", () => ({
   AppearanceStyleBoundary: ({ children }: { children: React.ReactNode }) => children,
 }));
