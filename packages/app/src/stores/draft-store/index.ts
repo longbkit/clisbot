@@ -10,6 +10,7 @@ import {
   persistAttachmentFromFileUri,
 } from "@/attachments/service";
 import { collectRetainedAttachmentIds } from "@/attachments/gc-retention";
+import { collectOutboxAttachmentIds, whenOutboxHydrated } from "@/outbox/store";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
 import { useSessionStore, type SessionState } from "@/stores/session-store";
 import { useWorkspaceAttachmentsStore } from "@/attachments/workspace-attachments-store";
@@ -149,6 +150,11 @@ async function runAttachmentGc(): Promise<void> {
     referencedIds.add(id);
   }
   for (const id of collectRetainedAttachmentIds()) {
+    referencedIds.add(id);
+  }
+  // Unsent messages keep their images across restarts, before their retention is re-taken.
+  await whenOutboxHydrated();
+  for (const id of collectOutboxAttachmentIds()) {
     referencedIds.add(id);
   }
 

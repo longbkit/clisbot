@@ -22,6 +22,9 @@ import { RewindMenu, type RewindMode } from "@/components/rewind/rewind-menu";
 import { useRewindAgentMutation } from "@/components/rewind/use-rewind-agent-mutation";
 import { TaskListRow } from "@/components/task-list-row";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { MessageDeliveryStatus } from "@/outbox/delivery-status";
+import { useMessageDelivery } from "@/outbox/use-message-delivery";
+import type { OutboxEntry } from "@/outbox/model";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative, isWeb } from "@/constants/platform";
 import { useRevealedText, type MarkdownPhase } from "@/hooks/use-revealed-text";
@@ -116,6 +119,8 @@ interface UserMessageProps {
   /** The daemon has confirmed this message (it holds a timeline position). */
   isConfirmed?: boolean;
   disableOuterSpacing?: boolean;
+  /** The id the message was sent under, so an unsent message shows its state and Retry. */
+  clientMessageId?: string;
 }
 
 const MessageOuterSpacingContext = createContext(false);
@@ -431,6 +436,8 @@ interface UserMessageBodyProps {
   rewindIsPending: boolean;
   onRewind: (input: { mode: RewindMode; rewoundText: string }) => Promise<void>;
   onOpenImage: (image: UserMessageImageAttachment) => void;
+  /** Present until the Host accepts the message: its state replaces the timestamp. */
+  delivery?: OutboxEntry | null;
 }
 
 function UserMessageBody({
@@ -446,6 +453,7 @@ function UserMessageBody({
   rewindIsPending,
   onRewind,
   onOpenImage,
+  delivery,
 }: UserMessageBodyProps) {
   const { t } = useTranslation();
   const getContent = useCallback(() => message, [message]);
@@ -523,7 +531,15 @@ function UserMessageBody({
           </Text>
         ) : null}
       </View>
-      {hasText ? (
+      {delivery ? (
+        <View
+          style={[trailingRowStyle, userMessageStylesheet.trailingRowVisible]}
+          testID="user-message-delivery-row"
+        >
+          <MessageDeliveryStatus entry={delivery} />
+        </View>
+      ) : null}
+      {!delivery && hasText ? (
         <View
           style={trailingRowStyle}
           pointerEvents={showTrailingRow ? "auto" : "none"}
@@ -568,7 +584,9 @@ export const UserMessage = memo(function UserMessage({
   isPending = false,
   isConfirmed = false,
   disableOuterSpacing,
+  clientMessageId,
 }: UserMessageProps) {
+  const delivery = useMessageDelivery(clientMessageId);
   const isCompact = useIsCompactFormFactor();
   const [isHovered, setIsHovered] = useState(false);
   const [lightboxMetadata, setLightboxMetadata] = useState<UserMessageImageAttachment | null>(null);
@@ -637,6 +655,7 @@ export const UserMessage = memo(function UserMessage({
       rewindIsPending={rewindMutation.isPending}
       onRewind={handleRewind}
       onOpenImage={setLightboxMetadata}
+      delivery={delivery}
     />
   );
   const contentStyle = alignRight
@@ -644,7 +663,11 @@ export const UserMessage = memo(function UserMessage({
     : [userMessageStylesheet.content, userMessageStylesheet.contentLeft];
 
   return (
-    <View style={containerStyle} testID="user-message" aria-busy={isPending}>
+    <View
+      style={containerStyle}
+      testID="user-message"
+      aria-busy={isPending || delivery?.status === "sending"}
+    >
       <ActorResponseRow
         face={face}
         name={senderName}

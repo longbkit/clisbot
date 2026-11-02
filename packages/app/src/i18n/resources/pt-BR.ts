@@ -6,6 +6,7 @@ import { pluginSettings } from "./plugin-settings";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
+import { messageDelivery } from "./message-delivery";
 import { navigation } from "./navigation";
 import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
@@ -3114,4 +3115,5 @@ export const ptBR: TranslationResources = {
   navigation: navigation["pt-BR"],
   productAnalytics: productAnalytics["pt-BR"],
   home: home["pt-BR"],
+  messageDelivery: messageDelivery["pt-BR"],
 };

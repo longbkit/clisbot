@@ -2,6 +2,7 @@ import type { SessionAuthorship } from "@clisbot/protocol/session-authorship";
 import equal from "fast-deep-equal";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
+import { settleDeliveredOutboxEntries } from "@/outbox/store";
 import { createStoreBatching, type StoreInitializer } from "./store-batching";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { ViewedTimelineOwner } from "@/timeline/viewed-timeline-sync";
@@ -458,6 +459,13 @@ export interface SessionState {
   >;
 }
 
+/** A session's stream rows and submission records for one agent, as one unit of change. */
+export interface AgentSubmissionState {
+  tail: StreamItem[];
+  head: StreamItem[];
+  submissions: MessageSubmissionRecord[];
+}
+
 // Global store state
 interface SessionStoreState {
   sessions: Record<string, SessionState>;
@@ -530,6 +538,12 @@ interface SessionStoreActions {
     agentId: string,
     message: UserMessageItem,
   ) => boolean;
+  /** One transition of a submitted row and its record: fail, retry, discard or restore. */
+  updateAgentMessageSubmission: (
+    serverId: string,
+    agentId: string,
+    update: (current: AgentSubmissionState) => AgentSubmissionState,
+  ) => void;
   clearAgentStreamHead: (serverId: string, agentId: string) => void;
   setAgentTimelineCursor: (
     serverId: string,
@@ -1056,6 +1070,9 @@ export const useSessionStore = create<SessionStore>()(
       },
 
       setAgentStreamState: (serverId, agentId, state) => {
+        // The Host shows these messages, so nothing is left to send for them.
+        if (state.acknowledgedClientMessageIds?.length)
+          settleDeliveredOutboxEntries(state.acknowledgedClientMessageIds);
         set((prev) => {
           const session = prev.sessions[serverId];
           if (!session) {
@@ -1240,6 +1257,47 @@ export const useSessionStore = create<SessionStore>()(
           };
         });
         return outcome;
+      },
+
+      updateAgentMessageSubmission: (serverId, agentId, update) => {
+        set((prev) => {
+          const session = prev.sessions[serverId];
+          if (!session) return prev;
+          const current: AgentSubmissionState = {
+            tail: session.agentStreamTail.get(agentId) ?? [],
+            head: session.agentStreamHead.get(agentId) ?? [],
+            submissions: session.messageSubmissions.get(agentId) ?? [],
+          };
+          const next = update(current);
+          if (
+            next.tail === current.tail &&
+            next.head === current.head &&
+            next.submissions === current.submissions
+          ) {
+            return prev;
+          }
+          const messageSubmissions = new Map(session.messageSubmissions);
+          if (next.submissions.length > 0) messageSubmissions.set(agentId, next.submissions);
+          else messageSubmissions.delete(agentId);
+          return {
+            ...prev,
+            sessions: {
+              ...prev.sessions,
+              [serverId]: {
+                ...session,
+                agentStreamTail:
+                  next.tail === current.tail
+                    ? session.agentStreamTail
+                    : new Map(session.agentStreamTail).set(agentId, next.tail),
+                agentStreamHead:
+                  next.head === current.head
+                    ? session.agentStreamHead
+                    : new Map(session.agentStreamHead).set(agentId, next.head),
+                messageSubmissions,
+              },
+            },
+          };
+        });
       },
 
       handoffCreatedAgentUserMessage: (serverId, agentId, message) => {
@@ -1464,6 +1522,8 @@ export const useSessionStore = create<SessionStore>()(
       },
 
       applyAgentTimelineResponseState: (serverId, agentId, state) => {
+        if (state.acknowledgedClientMessageIds.length > 0)
+          settleDeliveredOutboxEntries(state.acknowledgedClientMessageIds);
         set((prev) => {
           const session = prev.sessions[serverId];
           if (!session) return prev;

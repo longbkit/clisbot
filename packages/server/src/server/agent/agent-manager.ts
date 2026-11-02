@@ -3301,7 +3301,7 @@ export class AgentManager {
   }
 
   /** A prompt the provider provably never received frees its logical message for a retry. */
-  private async withdrawUndeliveredSubmission(
+  async withdrawUndeliveredSubmission(
     agentId: string,
     options: AgentRunOptions | undefined,
     error: unknown,
@@ -3608,7 +3608,7 @@ export class AgentManager {
     const agent = this.requireReadySessionAgent(agentId);
     const expectedTurnId = agent.activeForegroundTurnId ?? agent.activeTurnId;
     if (options?.expectedTurnId && options.expectedTurnId !== expectedTurnId)
-      throw new Error("Active turn changed before steering could be delivered");
+      throw new PromptNotDeliveredError("Active turn changed before steering could be delivered");
     if (!expectedTurnId || !agent.session.steerActiveTurn) {
       return { status: "unavailable" };
     }
@@ -3633,7 +3633,7 @@ export class AgentManager {
     // An unavailable answer is only safe to fall back from while this admission
     // still owns the active turn. Never let an A admission replace a later B.
     if (result.status === "unavailable" && agent.activeTurnId !== expectedTurnId) {
-      throw new Error("Active turn changed before steering could be delivered");
+      throw new PromptNotDeliveredError("Active turn changed before steering could be delivered");
     }
     return result;
   }
@@ -3694,7 +3694,7 @@ export class AgentManager {
 
   private assertSteerAdmissionOwnsTurn(agent: ActiveManagedAgent, expectedTurnId: string): void {
     if (agent.activeTurnId !== expectedTurnId) {
-      throw new Error("Active turn changed before steering could be delivered");
+      throw new PromptNotDeliveredError("Active turn changed before steering could be delivered");
     }
   }
 

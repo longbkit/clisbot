@@ -6,6 +6,7 @@ import { pluginSettings } from "./plugin-settings";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
+import { messageDelivery } from "./message-delivery";
 import { navigation } from "./navigation";
 import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
@@ -3143,4 +3144,5 @@ export const fr: TranslationResources = {
   navigation: navigation.fr,
   productAnalytics: productAnalytics.fr,
   home: home.fr,
+  messageDelivery: messageDelivery.fr,
 };

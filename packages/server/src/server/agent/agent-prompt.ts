@@ -5,6 +5,7 @@ import type { AgentPromptInput, AgentRunOptions } from "./agent-sdk-types.js";
 import type { AgentManager, ManagedAgent } from "./agent-manager.js";
 import type { AgentStorage } from "./agent-storage.js";
 import { ensureAgentLoaded } from "./agent-loading.js";
+import { PromptNotDeliveredError } from "./prompt-not-delivered-error.js";
 import { isStaleProviderSessionError } from "./stale-provider-session-error.js";
 import type { ActiveTurnBehavior } from "@clisbot/protocol/messages";
 
@@ -20,7 +21,13 @@ export type AgentRunController = Pick<
   | "streamAgent"
 > &
   Partial<
-    Pick<AgentManager, "admitMessageSubmission" | "reloadIfClisbotToolsSwitched" | "steerAgentRun">
+    Pick<
+      AgentManager,
+      | "admitMessageSubmission"
+      | "reloadIfClisbotToolsSwitched"
+      | "steerAgentRun"
+      | "withdrawUndeliveredSubmission"
+    >
   > & {
     reloadAgentSession(agentId: string): Promise<unknown>;
   };
@@ -58,19 +65,26 @@ async function steerOrReplaceActiveRun(
   const steerOptions = options.clearPendingPermissions
     ? { ...options.runOptions, clearPendingPermissions: true }
     : options.runOptions;
+  // Every refusal below happens before the provider sees the prompt: PromptNotDeliveredError frees
+  // the message receipt, so the same message id can be sent again.
   if (options?.expectedTurnId) {
-    if (!agentManager.steerAgentRun) throw new Error("Exact turn steering is unavailable");
+    if (!agentManager.steerAgentRun)
+      throw new PromptNotDeliveredError("Exact turn steering is unavailable");
     const result = await agentManager.steerAgentRun(agentId, prompt, {
       ...steerOptions,
       expectedTurnId: options.expectedTurnId,
     });
     if (result.status !== "accepted")
-      throw new Error("This provider cannot steer this active turn; choose Queue or Interrupt");
+      throw new PromptNotDeliveredError(
+        "This provider cannot steer this active turn; choose Queue or Interrupt",
+      );
     return { disposition: "steered" };
   }
   if (options.strictSteer) {
     if (agentManager.hasInFlightRun(agentId))
-      throw new Error("Active turn identity is unavailable; wait or choose Queue");
+      throw new PromptNotDeliveredError(
+        "Active turn identity is unavailable; wait or choose Queue",
+      );
     return null;
   }
   const result = await agentManager.steerOrReplaceActiveTurn(agentId, prompt, steerOptions);
@@ -125,7 +139,13 @@ export async function startAgentRun(
   );
   if (admission?.duplicate) return { disposition: "out_of_band" };
   if (admission) options = { ...options, runOptions: admission.options };
-  return startAdmittedAgentRun(agentManager, agentId, prompt, logger, options);
+  try {
+    return await startAdmittedAgentRun(agentManager, agentId, prompt, logger, options);
+  } catch (error) {
+    // A refused Steer never reached the provider: free the admitted message so it can be sent again.
+    await agentManager.withdrawUndeliveredSubmission?.(agentId, options?.runOptions, error);
+    throw error;
+  }
 }
 
 async function startAdmittedAgentRun(

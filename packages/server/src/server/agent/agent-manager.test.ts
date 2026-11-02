@@ -1387,6 +1387,8 @@ test("does not replace a newer foreground turn after unavailable steer fallback 
     const rejected = expect(send).rejects.toThrow(
       "Active turn changed before steering could be delivered",
     );
+    // Never delivered: the message receipt frees its id, so the same message may be sent again.
+    const notDelivered = expect(send).rejects.toBeInstanceOf(PromptNotDeliveredError);
     await entered.promise;
     session.pushEvent({ type: "turn_completed", provider: "codex", turnId: "active-turn-1" });
     await consumeA;
@@ -1398,6 +1400,7 @@ test("does not replace a newer foreground turn after unavailable steer fallback 
     await manager.waitForAgentRunStart(agent.id);
     release.resolve();
     await rejected;
+    await notDelivered;
     expect(manager.getAgent(agent.id)?.activeForegroundTurnId).toBe("active-turn-2");
     expect(session.interruptCount).toBe(0);
     expect(session.startPrompts).not.toContain("hello");

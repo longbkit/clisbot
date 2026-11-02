@@ -107,10 +107,9 @@ import {
 } from "@/data/push-router";
 import { mountBrowserAutomationDaemonClientHandler } from "@/desktop/browser/automation/handler";
 import { schedulesQueryBaseKey } from "@/schedules/aggregated-schedules";
-import { dispatchComposerAgentMessage, sendQueuedComposerMessageNow } from "@/composer/actions";
-import { createMessageSubmissionWriter } from "@/composer/submission/writer";
-import { resolveComposerAttachmentSubmitFormat } from "@/composer/attachments/submit";
-import { encodeImageMessagesForSend } from "@/attachments/service";
+import { sendQueuedComposerMessageNow } from "@/composer/actions";
+import { discardAgentSend, startAgentSend } from "@/outbox/agent-delivery";
+import { deliverOrReturn } from "@/outbox/handoff";
 import { DirectorySync, type RefreshAgentDirectoryResult } from "@/runtime/directory-sync";
 import { createDirectoryFrameClock, type FrameClock } from "@/runtime/directory-sync/live-batch";
 import { diagnosticStack, recordHostDiagnostic } from "@/runtime/host-diagnostics";
@@ -3435,24 +3434,18 @@ export class HostRuntimeStore {
         write: (update) => useSessionStore.getState().setQueuedMessages(serverId, update),
       },
       submitMessage: async ({ text, attachments }) => {
-        const supportsForgeAttachments =
-          useSessionStore.getState().sessions[serverId]?.serverInfo?.features?.forgeSearch === true;
-        await dispatchComposerAgentMessage({
-          client,
+        // The queue drains when the agent goes idle, but the agent can start a turn of its own
+        // in that same moment (a wake-up after background work). Steering folds the message
+        // into that turn instead of interrupting it; with no turn running, the daemon starts
+        // a normal one. A refused send goes back to the head of the queue, which keeps it.
+        const { clientMessageId, delivery } = startAgentSend({
+          serverId,
           agentId,
           text,
           attachments,
-          attachmentSubmitFormat: resolveComposerAttachmentSubmitFormat({
-            supportsForgeAttachments,
-          }),
-          encodeImageMessages: encodeImageMessagesForSend,
-          submission: createMessageSubmissionWriter(serverId),
-          // The queue drains when the agent goes idle, but the agent can start a turn of its own
-          // in that same moment (a wake-up after background work). Steering folds the message
-          // into that turn instead of interrupting it; with no turn running, the daemon starts
-          // a normal one.
           activeTurnBehavior: "steer",
         });
+        await deliverOrReturn(delivery, () => discardAgentSend(clientMessageId));
       },
     })
       .then((result) => {

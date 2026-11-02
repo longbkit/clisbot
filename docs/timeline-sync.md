@@ -222,11 +222,48 @@ remaining page through the existing stream reducer. It must not append full proj
 live prefix. Explicitly different provider message IDs stay separate, even when their text is
 identical or one is a prefix of the other; text matching must never override known identity.
 
+## Submitted prompts
+
 Every path that sends a message to an agent — composer send, dictation accept-and-send, queued
-send-now, and the host runtime's automatic queue drain — goes through
-`dispatchComposerAgentMessage` with a submission writer. There is no second transport for the same
-product action: calling `client.sendAgentMessage` directly skips the submitted row and the pending
-footer, and permanently drops attachments because the daemon does not echo them back.
+send-now, review feedback, and the host runtime's automatic queue drain — goes through
+`startAgentSend` (`packages/app/src/outbox/agent-delivery.ts`). There is no second transport for the
+same product action: calling `client.sendAgentMessage` directly skips the submitted row and the
+pending footer, and permanently drops attachments because the daemon does not echo them back.
+Bot chats send through `startChatSend` (`outbox/chat-delivery.ts`) the same way.
+
+### Instant send
+
+The press adds the row and returns: nothing between the press and the row is awaited, the upload
+and image encoding included, so the row and the cleared composer land in the same commit and the
+composer takes the next message while the Host still answers the first. The daemon answers a send
+only after the turn has started (below), which can take seconds; the composer used to spin for that
+long. Set `EXPO_PUBLIC_CLISBOT_INSTANT_SEND=0` to make the composer wait again and get the draft back
+on failure (`outbox/feature.ts`).
+
+Every pressed message is an outbox entry (`outbox/store.ts`, AsyncStorage key `clisbot-outbox:v1`)
+until its Host accepts it or the user deletes it. The entry carries the client message id chosen at
+the press; every retry — the row's Retry, a reconnect, a restart — sends that id, and the Host
+deduplicates it (`MessageReceipts` for agents, `ChatEngine.send` for chats, `already_accepted` for the
+Host queue). A message whose outcome is unknown (connection lost, request timed out, app killed) is
+sent again when its Host reconnects (`outbox/resend.ts`); a refusal waits for the user. A retry the Host
+answers with an id conflict (`agent_request_key_conflict`, a content conflict on the same id) counts
+as sent: re-encoded images can differ in bytes after a restart, and the Host already holds that id.
+The earlier parts of a draft split by image limits use derived ids (`<id>-part-N`), so a retry
+deduplicates them too.
+
+A message someone else owns until it is sent goes back to that owner on failure instead
+(`deliverOrReturn` in `outbox/handoff.ts`): a client-queue item sent by the drain, Send now or Steer
+returns to the head of its queue, and review feedback keeps its comments. On a Host without the
+durable queue that is the queue contract: a refused Steer stays local and drains at the next idle.
+
+A failed row stays where it was sent with Retry and Delete (`outbox/delivery-status.tsx`); its
+label is announced as an alert, as the composer's send error was. Its
+submission record keeps the row through canonical replacement but does not make the agent look busy;
+a canonical row with its id retires the record and the outbox entry. Chat lines render from the
+outbox after the transcript until a transcript line with the same id replaces them
+(`outbox/chat-lines.ts`). Not covered yet: the explicit Queue action still waits for Host queue
+admission before it clears the composer, and a first message from Home waits for the Bot chat or
+workspace to be created.
 
 A submitted prompt is one `UserMessageItem` row. That row is the authoritative local presentation:
 its stable identity, text, timestamp, images, and attachments do not change when the provider
@@ -249,8 +286,10 @@ Daemons advertising `server_info.features.canonicalSubmittedPrompts` guarantee t
 human prompt carrying a client message id is recorded and streamed as a canonical `user_message` with that
 same id. This includes daemon-handled commands that do not allocate a foreground turn; their submitted
 row is recorded before handler output. The app tracks submission transactions only for hosts with this
-capability. Older hosts keep the shipped untracked optimistic-row behavior and roll that row back on RPC
-rejection.
+capability. Older hosts keep an untracked optimistic row; a failed send still keeps it, marked
+unsent.
+
+## Turn activity
 
 Turn activity has one client-side replica. Lifecycle events can attach `turnId`, and agent snapshots can
 expose `activeTurn: { turnId, startedAt } | null`. An identified terminal cannot close a different
@@ -320,6 +359,7 @@ canonical assistant prefix, it stays in the head lane. No row may be returned in
 - App sync planning: `packages/app/src/timeline/timeline-sync-plan.ts`
 - App viewed-agent synchronization: `packages/app/src/timeline/viewed-timeline-sync.ts`
 - App stream/timeline reducer: `packages/app/src/timeline/session-stream-reducers.ts`
+- App send path and outbox: `packages/app/src/outbox/`
 - Session wiring: `packages/app/src/contexts/session-context.tsx`
 
 ## Optional source-range projected pages

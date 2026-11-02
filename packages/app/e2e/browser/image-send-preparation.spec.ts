@@ -134,7 +134,7 @@ for (const kind of ["session", "direct", "group"] as const) {
   });
 }
 
-test("failed image preparation keeps text and original attachments without sending", async ({
+test("failed image preparation keeps the message in place, unsent, with its reason", async ({
   page,
 }, info) => {
   const workspace = await seedMockAgentWorkspace({
@@ -162,11 +162,12 @@ test("failed image preparation keeps text and original attachments without sendi
     });
     await input.fill("Keep my text and original image");
     await page.getByTestId("composer-send-button").last().click();
-    await expect(
-      page.getByText("Could not prepare image unreadable.png.", { exact: false }),
-    ).toBeVisible();
-    await expect(input).toHaveValue("Keep my text and original image");
-    await expect(page.getByTestId("composer-image-attachment-pill")).toHaveCount(1);
+    const row = page.getByTestId("user-message").filter({ hasText: "Keep my text" });
+    await expect(row.getByTestId("message-delivery-failed")).toContainText(
+      "Could not prepare image unreadable.png.",
+    );
+    await expect(row.getByRole("button", { name: "Open image attachment" })).toBeVisible();
+    await expect(input).toHaveValue("");
     expect(sends).toBe(0);
     await page.screenshot({ path: info.outputPath("failure-draft-retained.png") });
   } finally {

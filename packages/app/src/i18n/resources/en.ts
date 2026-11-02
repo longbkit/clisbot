@@ -4,6 +4,7 @@ import { hostQueue } from "./host-queue";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
+import { messageDelivery } from "./message-delivery";
 import { navigation } from "./navigation";
 import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
@@ -3210,6 +3211,7 @@ export const en = {
   navigation: navigation.en,
   productAnalytics: productAnalytics.en,
   home: home.en,
+  messageDelivery: messageDelivery.en,
 } as const;
 
 type WidenStringLeaves<T> = {

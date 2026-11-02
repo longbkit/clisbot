@@ -1,5 +1,7 @@
 import { displayMentions, type MentionMember } from "./member-mentions";
 import { useChatMessageImages } from "./use-chat-message-images";
+import { useMessageDelivery } from "@/outbox/use-message-delivery";
+import { outboxLocalImages } from "@/outbox/chat-lines";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { memo, useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
@@ -54,7 +56,13 @@ export const ChatUserRow = memo(function ChatUserRow({
   /** Participants, so `@slug` reads as the bot's name. */
   members?: readonly MentionMember[];
 }) {
-  const images = useChatMessageImages(serverId, row.line);
+  const hostImages = useChatMessageImages(serverId, row.line);
+  // An unsent line shows the images from this device until the Host's line replaces it.
+  const delivery = useMessageDelivery(row.line.id);
+  const images = useMemo(
+    () => (delivery ? outboxLocalImages(delivery) : hostImages),
+    [delivery, hostImages],
+  );
   const message = useMemo(
     () => displayMentions(row.line.text, members, { markdown: false }),
     [members, row.line.text],
@@ -70,6 +78,7 @@ export const ChatUserRow = memo(function ChatUserRow({
       isFirstInGroup={row.opensGroup}
       isLastInGroup={closesGroup}
       isConfirmed
+      clientMessageId={row.line.id}
     />
   );
 });

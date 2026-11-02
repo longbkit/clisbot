@@ -88,7 +88,6 @@ import { splitIntoMessageParts } from "./message-parts";
 import { focusWithRetries } from "@/utils/web-focus";
 import {
   cancelComposerAgent,
-  dispatchComposerAgentMessage,
   sendQueuedComposerMessageNow,
   findForgeItemByOption,
   isAttachmentSelectedForForgeItem,
@@ -133,7 +132,8 @@ import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
 import type { KeyboardActionDefinition } from "@/keyboard/keyboard-action-dispatcher";
 import type { MessageInputKeyboardActionKind } from "@/keyboard/actions";
 import { submitOneOffInput, submitAgentInput } from "@/composer/submit";
-import { createMessageSubmissionWriter } from "@/composer/submission/writer";
+import { discardAgentSend, startAgentSend } from "@/outbox/agent-delivery";
+import { deliverOrReturn, handOffDelivery } from "@/outbox/handoff";
 import { useSendErrorDraftReset, type SentDraft } from "@/composer/use-send-error-draft-reset";
 import { ComposerKeyboardScopeProvider, useComposerKeyboardScope } from "@/composer/keyboard-scope";
 import { useAppSettings } from "@/hooks/use-settings";
@@ -149,7 +149,6 @@ import type {
   WorkspaceComposerAttachment,
 } from "@/attachments/types";
 import type { SelectedFile } from "@/attachments/selected-file";
-import { resolveComposerAttachmentSubmitFormat } from "@/composer/attachments/submit";
 import { composerWorkspaceAttachment } from "@/composer/attachments/workspace";
 import { useWorkspaceAttachmentsForScopes } from "@/attachments/workspace-attachments-store";
 import { droppedItemsToSelectedFiles } from "@/composer/attachments/drop";
@@ -1356,7 +1355,6 @@ function ComposerContentImpl({
     connected: isConnected,
     serverInfo: queueServerInfo,
   });
-  const hostQueueSupported = queueServerInfo?.features?.hostInputQueue === true;
   const queueSupported = hasQueueTarget && queueCapability === "host";
   const sessionClientQueue = useClientInputQueue(serverId, agentId, submissionTarget === "agent");
   const clientQueue: ClientInputQueue = clientInputQueue ?? sessionClientQueue;
@@ -1594,6 +1592,7 @@ function ComposerContentImpl({
         text: string,
         attachments: ComposerAttachment[],
         activeTurnBehavior: "interrupt" | "steer",
+        owner: "composer" | "queue",
       ) => Promise<void>)
     | null
   >(null);
@@ -1669,11 +1668,14 @@ function ComposerContentImpl({
       text: string,
       submitAttachments: ComposerAttachment[],
       behavior?: "steer" | "interrupt",
+      owner: "composer" | "queue" = "composer",
     ) => {
       const draftAttachments = submitAttachments;
-      submitAttachments = await uploadLocalQueueCopies(client, submitAttachments);
       onMessageSent?.();
       if (onSubmitMessageRef.current) {
+        // A Chat send and an agent send upload in delivery, after the row shows.
+        if (submissionTarget !== "conversation")
+          submitAttachments = await uploadLocalQueueCopies(client, submitAttachments);
         await onSubmitMessageRef.current({
           text,
           attachments: submitAttachments,
@@ -1694,9 +1696,19 @@ function ComposerContentImpl({
         text,
         submitAttachments,
         behavior ?? (appSettings.sendBehavior === "steer" ? "steer" : "interrupt"),
+        owner,
       );
     },
-    [appSettings.sendBehavior, client, cwd, legacyChat, onMessageSent, queuePartsOf, t],
+    [
+      appSettings.sendBehavior,
+      client,
+      cwd,
+      legacyChat,
+      onMessageSent,
+      queuePartsOf,
+      submissionTarget,
+      t,
+    ],
   );
 
   useEffect(() => {
@@ -1709,42 +1721,23 @@ function ComposerContentImpl({
       text: string,
       sendAttachments: ComposerAttachment[],
       activeTurnBehavior: "interrupt" | "steer",
+      owner: "composer" | "queue",
     ) => {
-      if (!client) {
-        throw new Error(t("workspace.terminal.hostDisconnected"));
-      }
-      await dispatchComposerAgentMessage({
-        client,
+      const { clientMessageId, delivery } = startAgentSend({
+        serverId,
         agentId: targetAgentId,
         text,
         attachments: sendAttachments,
-        attachmentSubmitFormat: resolveComposerAttachmentSubmitFormat({
-          supportsForgeAttachments: supportsForgeSearch,
-        }),
-        encodeImageMessages: encodeImageMessagesForSend,
-        submission: createMessageSubmissionWriter(serverId),
-        queueParts: queuePartsOf(text, sendAttachments),
         activeTurnBehavior,
-        activeTurnId:
-          activeTurnBehavior === "steer" && hostQueueSupported
-            ? (selectAgentTurnPresentation(
-                useSessionStore.getState().sessions[serverId],
-                targetAgentId,
-              ).turnId ?? undefined)
-            : undefined,
+        queueParts: queuePartsOf(text, sendAttachments),
       });
       onAttentionPromptSend?.();
+      const discard = () => discardAgentSend(clientMessageId);
+      // A queued message that fails goes back to its queue, which owns it until it is sent.
+      if (owner === "queue") await deliverOrReturn(delivery, discard);
+      else await handOffDelivery(delivery, discard);
     };
-  }, [
-    appSettings.sendBehavior,
-    client,
-    hostQueueSupported,
-    onAttentionPromptSend,
-    queuePartsOf,
-    serverId,
-    supportsForgeSearch,
-    t,
-  ]);
+  }, [onAttentionPromptSend, queuePartsOf, serverId]);
 
   useEffect(() => {
     onSubmitMessageRef.current = onSubmitMessage;
@@ -2305,7 +2298,7 @@ function ComposerContentImpl({
           messageId: id,
           queue: clientQueue.writer,
           submitMessage: ({ text, attachments: queuedAttachments }) =>
-            submitMessage(text, queuedAttachments, "interrupt"),
+            submitMessage(text, queuedAttachments, "interrupt", "queue"),
         });
         if (result.status === "failed") setSendError(result.errorMessage);
         return;
@@ -2337,7 +2330,7 @@ function ComposerContentImpl({
           messageId: id,
           queue: clientQueue.writer,
           submitMessage: ({ text, attachments: queuedAttachments }) =>
-            submitMessage(text, queuedAttachments, "steer"),
+            submitMessage(text, queuedAttachments, "steer", "queue"),
         });
         if (result.status === "failed") setSendError(result.errorMessage);
         return;
