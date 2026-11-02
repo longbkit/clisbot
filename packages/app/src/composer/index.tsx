@@ -242,6 +242,12 @@ function resolveMessagePlaceholder(
   // A terminal placeholder names what it launches ("Prompt Codex", "Run a
   // command"), which depends on the selected profile. Only the caller knows
   // that, so it wins when supplied.
+  // Clisbot chat layout: the commands button names /commands, and a phone's pill has room for
+  // one word beside its four buttons. That holds for a caller's text too ("Message <Bot name>"):
+  // a native placeholder wraps, so a long one grew the empty composer to two lines on open, and
+  // the screen's header already names who you are talking to.
+  const compactChat = COMPOSER_LAYOUT_ENABLED && inputMode === "chat" && !isDesktopWebBreakpoint;
+  if (compactChat) return t("composer.placeholders.fallback");
   if (override !== undefined) {
     return override;
   }
@@ -249,11 +255,7 @@ function resolveMessagePlaceholder(
     return t("composer.placeholders.terminal");
   }
   if (isDesktopWebBreakpoint) return t("composer.placeholders.desktop");
-  // Clisbot chat layout: the commands button names /commands, and a phone's pill has room for
-  // one word beside its four buttons.
-  return COMPOSER_LAYOUT_ENABLED
-    ? t("composer.placeholders.fallback")
-    : t("composer.placeholders.mobile");
+  return t("composer.placeholders.mobile");
 }
 
 function resolveGithubSearchEnabled(
