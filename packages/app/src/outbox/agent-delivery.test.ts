@@ -62,6 +62,22 @@ function startSession(client: DaemonClient | null): void {
   });
 }
 
+/** A Host with the input queue, running the turn a Steer names. */
+function openTurn(turnId: string): void {
+  useSessionStore.getState().updateSessionServerInfo(SERVER, {
+    serverId: SERVER,
+    hostname: null,
+    version: "2.2.1",
+    features: { canonicalSubmittedPrompts: true, hostInputQueue: true },
+  });
+  useSessionStore.setState((state) => {
+    const session = state.sessions[SERVER]!;
+    const turn = { phase: "open", turnId, startedAt: null, cancellationRequestId: null };
+    const agentDetails = new Map(session.agentDetails).set(AGENT, { turn } as never);
+    return { sessions: { ...state.sessions, [SERVER]: { ...session, agentDetails } } };
+  });
+}
+
 function rows(): UserMessageItem[] {
   const session = useSessionStore.getState().sessions[SERVER];
   const items: StreamItem[] = [
@@ -212,6 +228,54 @@ describe("instant agent send", () => {
     discardAgentSend(clientMessageId);
     expect(rows()).toEqual([]);
     expect(useOutboxStore.getState().entries[clientMessageId]).toBeUndefined();
+  });
+
+  it("sends a Steer whose turn ended first as a plain message, under the same id", async () => {
+    const { client, calls } = fakeClient(async (call) => {
+      if ((call.options as { expectedTurnId?: string }).expectedTurnId) {
+        throw new Error("Active turn changed before steering could be delivered");
+      }
+    });
+    startSession(client);
+    openTurn("turn-a");
+
+    const { clientMessageId, delivery } = startAgentSend({
+      serverId: SERVER,
+      agentId: AGENT,
+      text: "late steer",
+      attachments: [],
+      activeTurnBehavior: "steer",
+    });
+
+    await expect(delivery).resolves.toEqual({ kind: "sent" });
+    expect(
+      calls.map((call) => (call.options as { expectedTurnId?: string }).expectedTurnId),
+    ).toEqual(["turn-a", undefined]);
+    expect(calls.map((call) => call.options.messageId)).toEqual([clientMessageId, clientMessageId]);
+    expect(useOutboxStore.getState().entries[clientMessageId]).toBeUndefined();
+  });
+
+  it("keeps a late Steer unsent when an older Host still holds the refused attempt's id", async () => {
+    const { client } = fakeClient(async (call) => {
+      if ((call.options as { expectedTurnId?: string }).expectedTurnId) {
+        throw new Error("Active turn changed before steering could be delivered");
+      }
+      throw new Error("agent_request_key_conflict");
+    });
+    startSession(client);
+    openTurn("turn-a");
+
+    const { clientMessageId, delivery } = startAgentSend({
+      serverId: SERVER,
+      agentId: AGENT,
+      text: "late steer",
+      attachments: [],
+      activeTurnBehavior: "steer",
+    });
+
+    const outcome = await delivery;
+    expect(outcome.kind).toBe("failed");
+    expect(useOutboxStore.getState().entries[clientMessageId]?.status).toBe("failed");
   });
 
   it("gives the earlier parts of a split message derived ids, so a retry dedupes them too", async () => {

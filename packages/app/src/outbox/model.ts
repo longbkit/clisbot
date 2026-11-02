@@ -63,6 +63,16 @@ export function isIdAlreadyHeldError(error: unknown): boolean {
   return ID_ALREADY_HELD.some((marker) => message.includes(marker));
 }
 
+/**
+ * The Host refused a Steer because the turn it named ended first. A message pressed while a turn
+ * ran can reach the Host after that turn finished; nothing was recorded, so it may be sent again.
+ * The daemon throws a plain Error, so its text is the only signal (agent-manager.ts steerAgentRun).
+ */
+export function isSteerTurnEndedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("Active turn changed before steering could be delivered");
+}
+
 /** The request may or may not have reached the Host: the connection dropped or timed out. */
 export function isUnknownOutcomeError(error: unknown): boolean {
   if (error instanceof HostUnreachableError) return true;

@@ -15,6 +15,8 @@ import { releaseOutboxAttachments, retainOutboxAttachments } from "./attachment-
 import {
   classifyDeliveryError,
   HostUnreachableError,
+  isIdAlreadyHeldError,
+  isSteerTurnEndedError,
   type DeliveryOutcome,
   type OutboxEntry,
 } from "./model";
@@ -153,14 +155,27 @@ async function sendAgentParts(
   for (const [index, part] of parts.entries()) {
     // Derived ids keep the earlier parts of a retried message deduplicated by the Host. The
     // row shows the text, so its own id goes to the part that carries the text.
-    await client.sendAgentMessage(entry.target.agentId, part.text, {
-      messageId:
-        index === last ? entry.clientMessageId : `${entry.clientMessageId}-part-${index + 1}`,
-      ...(entry.activeTurnBehavior ? { activeTurnBehavior: entry.activeTurnBehavior } : {}),
-      ...(expectedTurnId ? { expectedTurnId } : {}),
-      images: part.images,
-      attachments: part.attachments,
-    });
+    const send = (turnId: string | undefined) =>
+      client.sendAgentMessage(entry.target.agentId, part.text, {
+        messageId:
+          index === last ? entry.clientMessageId : `${entry.clientMessageId}-part-${index + 1}`,
+        ...(entry.activeTurnBehavior ? { activeTurnBehavior: entry.activeTurnBehavior } : {}),
+        ...(turnId ? { expectedTurnId: turnId } : {}),
+        images: part.images,
+        attachments: part.attachments,
+      });
+    try {
+      await send(expectedTurnId);
+    } catch (error) {
+      // The turn this Steer named ended before it arrived. Without a named turn the Host starts a
+      // turn when the agent is idle, and refuses (strict steer) rather than interrupt a new one.
+      if (!expectedTurnId || !isSteerTurnEndedError(error)) throw error;
+      await send(undefined).catch((retryError: unknown) => {
+        // A Host from before 2.2.2 keeps the refused attempt's receipt, so it answers the same id
+        // with a key conflict: the message was not delivered, never count that as sent.
+        throw isIdAlreadyHeldError(retryError) ? error : retryError;
+      });
+    }
   }
 }
 
