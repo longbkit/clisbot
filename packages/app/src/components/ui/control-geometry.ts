@@ -193,6 +193,17 @@ export function createControlGeometry(theme: Theme) {
   const controlBorderWidth = theme.borderWidth[1];
   const fieldTextSmLineHeight = fieldLineHeight(theme.fontSize.base);
   const fieldTextMdLineHeight = fieldLineHeight(theme.fontSize.base);
+  // A field in thin chrome, such as a desktop section header beside `xs` controls.
+  const fieldControlXs = {
+    minHeight: CONTROL_HEIGHTS.tight,
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: fieldVerticalPadding(
+      CONTROL_HEIGHTS.tight,
+      fieldTextSmLineHeight,
+      controlBorderWidth,
+    ),
+    borderRadius: theme.borderRadius.md,
+  };
   const fieldControlSm = {
     minHeight: CONTROL_HEIGHTS.compact,
     paddingHorizontal: theme.spacing[3],
@@ -267,6 +278,7 @@ export function createControlGeometry(theme: Theme) {
       ...fieldControlMd,
       ...fieldTextMd,
     },
+    fieldControlXs,
     fieldControlSm,
     fieldControlMd,
     fieldTextSm,

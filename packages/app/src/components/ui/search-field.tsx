@@ -3,6 +3,7 @@ import { Pressable, View } from "react-native";
 import { Search, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { Theme } from "@/styles/theme";
+import { createControlGeometry, type FieldControlSize } from "@/components/ui/control-geometry";
 import {
   EditingTextInput as TextInput,
   type EditingTextInputHandle,
@@ -27,6 +28,14 @@ export interface SearchFieldProps {
   clearAccessibilityLabel: string;
   testID?: string;
   clearTestID?: string;
+  /** Focus the field as it mounts: a search a press opens takes the keyboard at once. */
+  autoFocus?: boolean;
+  /**
+   * A control tier (docs/design.md §4) for a field that sits in chrome built from the tiers, such
+   * as a section header: `xs` (28) in a desktop header, `md` (44) in a phone's, the sizes Home's
+   * mode switch takes there. Unset keeps the filter-rail chrome that matches the host filter pill.
+   */
+  size?: "xs" | FieldControlSize;
 }
 
 /**
@@ -44,6 +53,8 @@ export function SearchField({
   clearAccessibilityLabel,
   testID,
   clearTestID,
+  autoFocus,
+  size,
 }: SearchFieldProps): ReactElement {
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<EditingTextInputHandle>(null);
@@ -55,7 +66,15 @@ export function SearchField({
   }, [onChangeText]);
 
   return (
-    <View style={[styles.field, isFocused && styles.fieldFocused]}>
+    <View
+      style={[
+        styles.field,
+        size === "xs" && styles.fieldXs,
+        size === "sm" && styles.fieldSm,
+        size === "md" && styles.fieldMd,
+        isFocused && styles.fieldFocused,
+      ]}
+    >
       <ThemedSearch size={14} uniProps={mutedColorMapping} />
       <ThemedTextInput
         testID={testID}
@@ -69,6 +88,7 @@ export function SearchField({
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
+        autoFocus={autoFocus}
         style={styles.input}
       />
       {value.length > 0 ? (
@@ -88,35 +108,41 @@ export function SearchField({
 
 const SEARCH_FIELD_MAX_WIDTH = 420;
 
-const styles = StyleSheet.create((theme) => ({
-  field: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[2],
-    flex: 1,
-    minWidth: 0,
-    maxWidth: SEARCH_FIELD_MAX_WIDTH,
-    paddingVertical: theme.spacing[1.5],
-    paddingHorizontal: theme.spacing[3],
-    borderRadius: theme.borderRadius.md,
-    // The composer's surface: an input you type into reads the same wherever it sits.
-    backgroundColor: theme.colors.surfaceComposer,
-    borderWidth: theme.borderWidth[1],
-    borderColor: theme.colors.border,
-  },
-  fieldFocused: {
-    borderColor: theme.colors.borderAccent,
-  },
-  input: {
-    flex: 1,
-    minWidth: 0,
-    padding: 0,
-    height: 20,
-    // The browser's focus ring would sit inside the field's own focus border.
-    // `outlineWidth` is typed on ViewStyle since RN 0.81 and is a no-op on
-    // native, so this needs neither a cast nor a platform branch.
-    outlineWidth: 0,
-    color: theme.colors.foreground,
-    fontSize: theme.fontSize.base,
-  },
-}));
+const styles = StyleSheet.create((theme) => {
+  const geometry = createControlGeometry(theme);
+  return {
+    field: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.spacing[2],
+      flex: 1,
+      minWidth: 0,
+      maxWidth: SEARCH_FIELD_MAX_WIDTH,
+      paddingVertical: theme.spacing[1.5],
+      paddingHorizontal: theme.spacing[3],
+      borderRadius: theme.borderRadius.md,
+      // The composer's surface: an input you type into reads the same wherever it sits.
+      backgroundColor: theme.colors.surfaceComposer,
+      borderWidth: theme.borderWidth[1],
+      borderColor: theme.colors.border,
+    },
+    fieldXs: geometry.fieldControlXs,
+    fieldSm: geometry.fieldControlSm,
+    fieldMd: geometry.fieldControlMd,
+    fieldFocused: {
+      borderColor: theme.colors.borderAccent,
+    },
+    input: {
+      flex: 1,
+      minWidth: 0,
+      padding: 0,
+      height: 20,
+      // The browser's focus ring would sit inside the field's own focus border.
+      // `outlineWidth` is typed on ViewStyle since RN 0.81 and is a no-op on
+      // native, so this needs neither a cast nor a platform branch.
+      outlineWidth: 0,
+      color: theme.colors.foreground,
+      fontSize: theme.fontSize.base,
+    },
+  };
+});

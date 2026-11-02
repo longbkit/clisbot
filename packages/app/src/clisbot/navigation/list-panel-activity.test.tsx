@@ -87,15 +87,15 @@ vi.mock("./chats-pane", async () => {
     chats: string[];
     search: string;
     setSearch: (value: string) => void;
-    searchOpen: boolean;
-    setSearchOpen: (value: boolean) => void;
   }
   const ChatsBody = memo(function ChatsBody(props: ChatsBodyProps) {
     state.bodyRenders.chats += 1;
     const scope = useNavigationStore((value) => value.scopes.chats);
     const chip = useNavigationStore((value) => value.chatsChip);
     const lastList = useNavigationStore((value) => value.lastList);
-    const { setSearchOpen, setSearch } = props;
+    const { setSearch } = props;
+    const searchOpen = useNavigationStore((value) => value.chatsSearchOpen);
+    const setSearchOpen = useNavigationStore((value) => value.setChatsSearchOpen);
     const openSearch = useCallback(() => setSearchOpen(true), [setSearchOpen]);
     const changeSearch = useCallback(
       (event: React.ChangeEvent<HTMLInputElement>) => setSearch(event.target.value),
@@ -107,7 +107,7 @@ vi.mock("./chats-pane", async () => {
         <button type="button" onClick={openSearch}>
           Search
         </button>
-        {props.searchOpen ? (
+        {searchOpen ? (
           <input aria-label="Chat search" value={props.search} onChange={changeSearch} />
         ) : null}
         {props.chats.map((chat) => (
@@ -187,6 +187,7 @@ afterEach(() => {
     scopes: { home: "mine", chats: "mine", work: "mine" },
     workChip: "all",
     chatsChip: "all",
+    chatsSearchOpen: false,
     lastList: "work",
   });
 });

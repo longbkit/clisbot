@@ -83,7 +83,6 @@ export function ListContent({
   onBeforeNavigate?: ChatListAdmission;
   active: boolean;
 }) {
-  const [chatSearchOpen, setChatSearchOpen] = useState(false);
   const [chatSearch, setChatSearch] = useState("");
   const [visited, setVisited] = useState<ReadonlySet<ListSection>>(() =>
     active ? new Set([section]) : new Set(),
@@ -95,8 +94,6 @@ export function ListContent({
         <RetainedPanel active={section === "chats"} style={styles.content}>
           <ChatsPane
             onBeforeNavigate={onBeforeNavigate}
-            searchOpen={chatSearchOpen}
-            setSearchOpen={setChatSearchOpen}
             search={chatSearch}
             setSearch={setChatSearch}
           />
@@ -128,16 +125,8 @@ export const PhoneListTab = memo(function PhoneListTab({ section }: { section: L
 });
 
 function PhoneChats() {
-  const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
-  return (
-    <ChatsPane
-      searchOpen={searchOpen}
-      setSearchOpen={setSearchOpen}
-      search={search}
-      setSearch={setSearch}
-    />
-  );
+  return <ChatsPane search={search} setSearch={setSearch} />;
 }
 
 /**
