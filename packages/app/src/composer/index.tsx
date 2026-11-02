@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { COMPOSER_LAYOUT_ENABLED } from "@/clisbot/composer-layout/feature";
 import { chatComposerActions, chatInnerFace } from "@/clisbot/composer-layout/geometry";
 import { resolveQueueCapability } from "./queue-capability";
@@ -908,6 +909,8 @@ function GithubPickerOption({
 }
 
 interface ComposerProps {
+  /** A notice stacked above the pill with the composer's own: same rails, same gap. */
+  notice?: ReactNode;
   /** Conversation submits must never enter the ordinary agent queue. */
   submissionTarget?: "agent" | "conversation";
   queueChatId?: string;
@@ -1270,6 +1273,7 @@ const ComposerContent = memo(ComposerContentImpl);
 
 // oxlint-disable-next-line complexity
 function ComposerContentImpl({
+  notice,
   submissionTarget = "agent",
   queueChatId,
   clientInputQueue,
@@ -2980,6 +2984,7 @@ function ComposerContentImpl({
         {/* Input area */}
         <View style={inputAreaContainerStyle}>
           <View style={inputAreaContentStyle}>
+            {isFullscreen ? null : notice}
             {isFullscreen ? null : queueList}
             {!isFullscreen && sendErrorNode}
             {pendingSessionReason ? (

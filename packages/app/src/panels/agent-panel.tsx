@@ -1160,6 +1160,13 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
       composerState,
     ],
   );
+  const historySyncNotice = useMemo(
+    () =>
+      showHistorySyncError ? (
+        <TimelineSyncErrorCallout isRetrying={isRetryingHistorySync} onRetry={retryTimelineSync} />
+      ) : null,
+    [showHistorySyncError, isRetryingHistorySync, retryTimelineSync],
+  );
   const composerSection = showsComposer ? (
     <RenderProfile id={`AgentComposerSection:${agentId}`}>
       <AgentComposerSection
@@ -1176,6 +1183,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
         onAttentionPromptSend={onAttentionPromptSend}
         onComposerHeightChange={handleComposerHeightChange}
         onMessageSent={handleMessageSent}
+        notice={historySyncNotice}
       />
     </RenderProfile>
   ) : null;
@@ -1216,10 +1224,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
   const dockContent = (
     <View style={styles.contentContainer}>
       {streamContent}
-
-      {showHistorySyncError ? (
-        <TimelineSyncErrorCallout isRetrying={isRetryingHistorySync} onRetry={retryTimelineSync} />
-      ) : null}
+      {hasActiveComposer ? null : <View style={styles.syncNoticeRail}>{historySyncNotice}</View>}
     </View>
   );
 
@@ -1279,23 +1284,19 @@ function TimelineSyncErrorCallout({
 }) {
   const { t } = useTranslation();
   return (
-    <View style={styles.timelineSyncCalloutRail}>
-      <View style={styles.timelineSyncCalloutContent}>
-        <View style={styles.timelineSyncCallout} testID="agent-timeline-sync-error">
-          <Text style={styles.timelineSyncCalloutText}>
-            {t("agentPanel.states.timelineSyncFailed")}
-          </Text>
-          <Button
-            size="sm"
-            variant="secondary"
-            onPress={onRetry}
-            disabled={isRetrying}
-            testID="agent-timeline-sync-retry"
-          >
-            {isRetrying ? t("agentPanel.states.timelineSyncRetrying") : t("common.actions.retry")}
-          </Button>
-        </View>
-      </View>
+    <View style={styles.timelineSyncCallout} testID="agent-timeline-sync-error">
+      <Text style={styles.timelineSyncCalloutText}>
+        {t("agentPanel.states.timelineSyncFailed")}
+      </Text>
+      <Button
+        size="sm"
+        variant="secondary"
+        onPress={onRetry}
+        disabled={isRetrying}
+        testID="agent-timeline-sync-retry"
+      >
+        {isRetrying ? t("agentPanel.states.timelineSyncRetrying") : t("common.actions.retry")}
+      </Button>
     </View>
   );
 }
@@ -1424,6 +1425,7 @@ const AgentComposerSection = memo(function AgentComposerSection({
   onAttentionPromptSend,
   onComposerHeightChange,
   onMessageSent,
+  notice,
 }: {
   agentId?: string;
   serverId: string;
@@ -1438,6 +1440,7 @@ const AgentComposerSection = memo(function AgentComposerSection({
   onAttentionPromptSend: () => void;
   onComposerHeightChange: (height: number) => void;
   onMessageSent: () => void;
+  notice: ReactNode;
 }) {
   if (!agentId) {
     return null;
@@ -1462,6 +1465,7 @@ const AgentComposerSection = memo(function AgentComposerSection({
       onAttentionPromptSend={onAttentionPromptSend}
       onComposerHeightChange={onComposerHeightChange}
       onMessageSent={onMessageSent}
+      notice={notice}
     />
   );
 });
@@ -1478,6 +1482,7 @@ function ActiveAgentComposer({
   onAttentionPromptSend,
   onComposerHeightChange,
   onMessageSent,
+  notice,
 }: {
   agentId: string;
   serverId: string;
@@ -1490,6 +1495,7 @@ function ActiveAgentComposer({
   onAttentionPromptSend: () => void;
   onComposerHeightChange: (height: number) => void;
   onMessageSent: () => void;
+  notice: ReactNode;
 }) {
   const isCompactFormFactor = useIsCompactFormFactor();
   const { onLayout: onInputAreaLayout, isBelow: isCompactComposerLayout } = useContainerWidthBelow(
@@ -1591,6 +1597,7 @@ function ActiveAgentComposer({
         onMessageSent={onMessageSent}
         onClientSlashCommand={handleClientSlashCommand}
         isCompactLayout={isCompactComposerLayout}
+        notice={notice}
       />
     </View>
   );
@@ -1693,15 +1700,9 @@ const styles = StyleSheet.create((theme) => ({
     overflow: "hidden",
     ...(isWeb ? { userSelect: "none" as const } : {}),
   },
-  timelineSyncCalloutRail: {
-    width: "100%",
-    alignItems: "center",
+  syncNoticeRail: {
     paddingHorizontal: theme.spacing[4],
     paddingTop: theme.spacing[2],
-  },
-  timelineSyncCalloutContent: {
-    width: "100%",
-    maxWidth: theme.contentMaxWidth,
   },
   timelineSyncCallout: {
     flexDirection: "row",
@@ -1710,7 +1711,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[3],
     backgroundColor: theme.colors.surface1,
     borderWidth: theme.borderWidth[1],
-    borderColor: theme.colors.statusDanger,
+    borderColor: theme.colors.border,
     borderRadius: theme.borderRadius["2xl"],
     paddingVertical: theme.spacing[2],
     paddingHorizontal: theme.spacing[4],

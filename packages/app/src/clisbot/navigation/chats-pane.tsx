@@ -10,6 +10,7 @@ import equal from "fast-deep-equal";
 import { Text, View } from "react-native";
 import { FlatList } from "@/components/ui/scroll-view";
 import { ScrollEdgeLine, useScrollEdge } from "./scroll-edge";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { openPreloads } from "@/open-preload/live";
 import { rememberChatOpenPreview } from "@/clisbot/bots/chat/open-preview";
 import { useResourcePrincipalScope } from "@/clisbot/bots/data/resource-principal-scope";
@@ -143,6 +144,34 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
   );
   const backdrop = useSectionBackdrop();
   const edge = useScrollEdge();
+  // A phone's list keeps the screen: only the title stays, the controls scroll away with the rows.
+  const compact = useIsCompactFormFactor();
+  const scopeCounts = chatScopeCounts(entries);
+  const controls = (
+    <>
+      {searchOpen ? (
+        <View style={styles.search}>
+          <SearchField
+            value={search}
+            onChangeText={setSearch}
+            placeholder={t("navigation.lists.searchChats")}
+            clearAccessibilityLabel={t("navigation.actions.closeSearch")}
+            testID="chats-search-input"
+          />
+        </View>
+      ) : null}
+      <SectionControls
+        section="chats"
+        scopeCounts={scopeCounts}
+        chips={chips}
+        chip={chip}
+        onChip={setChip}
+        backdrop={backdrop}
+        display={displayMenu}
+      />
+      <OutsideFilterNotice list="chats" />
+    </>
+  );
   const headerActions = useMemo(
     () => (
       <>
@@ -156,27 +185,7 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
     <RenderProfile id="NavChats">
       <View style={styles.pane} testID="chats-pane">
         <SectionHeader title={t("navigation.sections.chats")} actions={headerActions} />
-        {searchOpen ? (
-          <View style={styles.search}>
-            <SearchField
-              value={search}
-              onChangeText={setSearch}
-              placeholder={t("navigation.lists.searchChats")}
-              clearAccessibilityLabel={t("navigation.actions.closeSearch")}
-              testID="chats-search-input"
-            />
-          </View>
-        ) : null}
-        <SectionControls
-          section="chats"
-          scopeCounts={chatScopeCounts(entries)}
-          chips={chips}
-          chip={chip}
-          onChip={setChip}
-          backdrop={backdrop}
-          display={displayMenu}
-        />
-        <OutsideFilterNotice list="chats" />
+        {compact ? null : controls}
         <ScrollEdgeLine edge={edge} />
         <FlatList
           {...handlers}
@@ -187,6 +196,7 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
           renderItem={actions.renderItem}
           extraData={actions.selection}
           contentContainerStyle={LIST_CONTENT}
+          ListHeaderComponent={compact ? controls : null}
           ListEmptyComponent={emptyView}
           testID="chats-list"
         />

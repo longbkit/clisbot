@@ -262,6 +262,8 @@ interface SidebarWorkspaceListProps {
   onWorkspacePress?: (destination?: string) => void;
   onAddProject?: () => void;
   onImportSession?: () => void;
+  /** Clisbot Navigation V2 on a phone: Work's controls, which scroll away with the list. */
+  listTopComponent?: ReactElement | null;
   listLeadingComponent?: ReactElement | null;
   listFooterComponent?: ReactElement | null;
   // Rendered inside the scroll area, below the Pinned section and above the workspace
@@ -2233,6 +2235,7 @@ export function SidebarWorkspaceList({
   onWorkspacePress,
   onAddProject,
   onImportSession,
+  listTopComponent,
   listLeadingComponent,
   listFooterComponent,
   listHeaderComponent,
@@ -2322,6 +2325,7 @@ export function SidebarWorkspaceList({
   );
   const leading = (
     <>
+      {listTopComponent}
       {fusion ? (
         <FusionPinnedSection
           onBeforeNavigate={onWorkspacePress}

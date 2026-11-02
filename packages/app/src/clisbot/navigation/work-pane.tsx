@@ -24,6 +24,7 @@ import { useImportSession } from "@/hooks/use-import-session";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { useOpenNewWorkspace } from "@/hooks/use-open-new-workspace";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { useSidebarViewStore } from "@/stores/sidebar-view-store";
 import { RenderProfile } from "@/utils/render-profiler";
@@ -86,6 +87,9 @@ function WorkPaneContent({ onBeforeNavigate, parentGestureRef, active }: WorkPan
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
   const workState = useWorkListState(model, hasActiveHostFilter);
   const edge = useScrollEdge();
+  // A phone's list keeps the screen: only the title stays, the controls scroll away with the rows.
+  const compact = useIsCompactFormFactor();
+  const controlsScroll = compact && workState === "list";
   const headerActions = useMemo(
     () => (
       <>
@@ -103,15 +107,14 @@ function WorkPaneContent({ onBeforeNavigate, parentGestureRef, active }: WorkPan
     <RenderProfile id="NavWork">
       <View style={styles.pane} testID="work-pane">
         <SectionHeader title={t("navigation.sections.work")} actions={headerActions} />
-        <WorkControls />
-        <OutsideFilterNotice list="work" />
-        <SidebarMetadataNotice />
+        {controlsScroll ? null : controlsBlock}
         {workState === "offline" ? <HostsUnreachableState testID="work-offline" /> : null}
         {workState === "loading" ? <SidebarAgentListSkeleton /> : null}
         <ScrollEdgeLine edge={edge} />
         {workState === "list" ? (
           <ScrollEdgeProvider edge={edge}>
             <SidebarWorkspaceList
+              listTopComponent={controlsScroll ? controlsBlock : null}
               pinPresentation="float"
               collapsedProjectKeys={model.collapsedProjectKeys}
               onToggleProjectCollapsed={model.toggleProjectCollapsed}
@@ -139,6 +142,14 @@ function WorkPaneContent({ onBeforeNavigate, parentGestureRef, active }: WorkPan
     </RenderProfile>
   );
 }
+
+const controlsBlock = (
+  <>
+    <WorkControls />
+    <OutsideFilterNotice list="work" />
+    <SidebarMetadataNotice />
+  </>
+);
 
 /**
  * What Work shows in place of its list: the skeleton while the first Host connects or its

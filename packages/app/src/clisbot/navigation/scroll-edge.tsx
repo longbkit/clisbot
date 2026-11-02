@@ -8,6 +8,7 @@ import {
 } from "react";
 import { View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { useIsCompactFormFactor } from "@/constants/layout";
 
 type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 
@@ -86,6 +87,9 @@ export function useScrollEdgeProps(kind: "scroll" | "drag"): ScrollEdgeProps | u
  */
 export const ScrollEdgeLine = memo(function ScrollEdgeLine({ edge }: { edge: ScrollEdge }) {
   const scrolled = useSyncExternalStore(edge.subscribe, edge.isScrolled, edge.isScrolled);
+  // A phone's controls scroll with the list and its title keeps its own line.
+  const compact = useIsCompactFormFactor();
+  if (compact) return null;
   return (
     <View style={styles.anchor} pointerEvents="none">
       {scrolled ? <View style={styles.line} testID="section-scroll-edge" /> : null}
