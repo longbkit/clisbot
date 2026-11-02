@@ -53,6 +53,29 @@ export function resolvePhoneTabReturn(container: StateLike | undefined): PhoneTa
   return { kind: "replace" };
 }
 
+/**
+ * True when Back from the route `routeKey` of `stack` lands on the phone tabs right below it: the
+ * route is focused, sits directly on `(tabs)`, and shows its own first screen. Only then is the
+ * screen a back swipe reveals the one Back returns to (docs/mobile-panels.md#detail-back-swipe).
+ */
+export function isDetailOnPhoneTabs(stack: StateLike | undefined, routeKey: string): boolean {
+  if (!stack) return false;
+  const index = stack.routes.findIndex((route) => route.key === routeKey);
+  if (index < 1 || index !== stack.index) return false;
+  if (stack.routes[index - 1]?.name !== PHONE_TABS_ROUTE) return false;
+  const leaves = stack.routes[index]?.state as Partial<StateLike> | undefined;
+  if (!leaves?.routes) return true;
+  return (leaves.index ?? leaves.routes.length - 1) === 0;
+}
+
+/** True while any navigator in `state` still holds the route `routeKey`. */
+export function holdsRoute(state: StateLike | undefined, routeKey: string): boolean {
+  if (!state?.routes) return false;
+  return state.routes.some(
+    (route) => route.key === routeKey || holdsRoute(route.state as StateLike | undefined, routeKey),
+  );
+}
+
 /** True while the phone tab navigator is on screen; desktop's `(tabs)` group is a stack. */
 export function arePhoneTabsFocused(container: StateLike | undefined): boolean {
   const found = findFocusedTabsRoute(container);

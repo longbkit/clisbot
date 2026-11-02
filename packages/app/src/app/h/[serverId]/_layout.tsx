@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Redirect, Stack, useLocalSearchParams } from "expo-router";
 import { useHostRuntimeBootstrapState } from "@/app/_layout";
+import { DetailBackSwipe } from "@/clisbot/home/detail-back-swipe";
 import { HostRouteProvider } from "@/navigation/host-route-context";
 import { resolveStartupRoute } from "@/navigation/host-runtime-bootstrap";
 import { ThemedStack } from "@/navigation/themed-stack";
@@ -49,23 +50,26 @@ function KnownHostRoute() {
     return <Redirect href={startupRoute.href} />;
   }
 
+  // Android phones: the host's details swipe back onto the tabs (docs/mobile-panels.md).
   const stack = (
-    <ThemedStack
-      screenOptions={HOST_STACK_SCREEN_OPTIONS}
-      screenOwnedAppearance={SCREEN_OWNED_APPEARANCE}
-      screenContentFallback={unavailableContent}
-    >
-      <Stack.Screen name="index" />
-      <Stack.Screen name="workspace/[workspaceId]/index" />
-      <Stack.Screen name="agent/[agentId]" options={AGENT_SCREEN_OPTIONS} />
-      <Stack.Screen name="bot/[botId]" />
-      <Stack.Screen name="chat/[chatId]" />
-      <Stack.Screen name="sessions" />
-      <Stack.Screen name="open-project" />
-      <Stack.Screen name="settings" />
-      <Stack.Screen name="plugin/[pluginId]/[surfaceId]" />
-      <Stack.Screen name="plugin/[pluginId]/[contributionKind]/[contributionId]" />
-    </ThemedStack>
+    <DetailBackSwipe>
+      <ThemedStack
+        screenOptions={HOST_STACK_SCREEN_OPTIONS}
+        screenOwnedAppearance={SCREEN_OWNED_APPEARANCE}
+        screenContentFallback={unavailableContent}
+      >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="workspace/[workspaceId]/index" />
+        <Stack.Screen name="agent/[agentId]" options={AGENT_SCREEN_OPTIONS} />
+        <Stack.Screen name="bot/[botId]" />
+        <Stack.Screen name="chat/[chatId]" />
+        <Stack.Screen name="sessions" />
+        <Stack.Screen name="open-project" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="plugin/[pluginId]/[surfaceId]" />
+        <Stack.Screen name="plugin/[pluginId]/[contributionKind]/[contributionId]" />
+      </ThemedStack>
+    </DetailBackSwipe>
   );
 
   if (!routeServerId) {
