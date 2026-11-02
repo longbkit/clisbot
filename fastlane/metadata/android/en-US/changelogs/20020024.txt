@@ -1,0 +1,5 @@
+Added
+- Added instant send: a message appears the moment you press Send, the composer clears at once, and you can type the next one while the Host is still answering
+- Added Retry and Delete on a message that could not be sent; a message waiting for its Host sends itself when the Host is back, and a restart keeps it
+
+Full notes: https://clisbot.com/changelog
