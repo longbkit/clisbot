@@ -67,9 +67,9 @@ import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-l
 import { resolveLaunchTarget, type LaunchTarget } from "@/new-workspace-launch/target";
 import { useTerminalComposerState } from "@/new-workspace-launch/composer-state";
 import { runCreateTerminalWorkspace } from "./new-workspace-terminal";
+import { useHostChoiceStatuses } from "./new-workspace/host-choice-statuses";
 import {
   useHostRuntimeClient,
-  useHostRuntimeConnectionStatuses,
   useHostRuntimeIsConnected,
   type HostRuntimeConnectionStatus,
 } from "@/runtime/host-runtime";
@@ -862,7 +862,7 @@ function useNewWorkspaceInitialContext({
   );
   const rememberedProject = useHomeStartProject(homeStart.start, projects);
   const lastActiveProject = rememberStarts ? rememberedProject : lastWorkspaceProject;
-  const hostConnectionStatusByServerId = useHostRuntimeConnectionStatuses(allServerIds);
+  const hostConnectionStatusByServerId = useHostChoiceStatuses(allServerIds);
   const workspaceMultiplicityByServerId = useHostFeatureMap(allServerIds, "workspaceMultiplicity");
   const {
     selectedServerId,
