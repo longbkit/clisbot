@@ -120,6 +120,10 @@ import {
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { useForkAgent } from "@/hooks/use-fork-agent";
+import {
+  ForkModelSourceProvider,
+  useForkModelSourceOf,
+} from "@/clisbot/fork-with-model/source-context";
 import { isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
 import { recordRenderProfileReasons } from "@/utils/render-profiler";
@@ -604,13 +608,14 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     });
 
     const handleForkAssistantTurn: AssistantTurnForkHandler = useStableEvent(
-      async ({ target, boundary }) => {
+      async ({ target, boundary, model }) => {
         await forkAgent({
           agentId,
           agent: context,
           workspaceId: context.workspaceId,
           target,
           boundary,
+          model,
         });
       },
     );
@@ -619,14 +624,17 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     // projects the whole timeline when neither boundary field is given, so the
     // fork carries everything up to now, including the response still streaming
     // in front of the user.
-    const handleForkInFlightTurn: InFlightTurnForkHandler = useStableEvent(async (target) => {
-      await forkAgent({
-        agentId,
-        agent: context,
-        workspaceId: context.workspaceId,
-        target,
-      });
-    });
+    const handleForkInFlightTurn: InFlightTurnForkHandler = useStableEvent(
+      async (target, model) => {
+        await forkAgent({
+          agentId,
+          agent: context,
+          workspaceId: context.workspaceId,
+          target,
+          model,
+        });
+      },
+    );
 
     // History arrays follow store eviction even in hidden tabs. Keeping an old
     // array in a ref would retain payloads after the shared budget released them.
@@ -1344,6 +1352,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       () => [...effectiveStreamItems, ...(effectiveStreamHead ?? [])],
       [effectiveStreamItems, effectiveStreamHead],
     );
+    const forkModelSource = useForkModelSourceOf(resolvedServerId, context);
     return (
       <PermissionActivityProvider
         records={[]}
@@ -1362,31 +1371,33 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           <ToolCallSheetProvider>
             <AssistantSelectionCopySurface style={stylesheet.container}>
               <ReadingAnchorStatus anchor={readingAnchor} />
-              <MessageOuterSpacingProvider disableOuterSpacing>
-                {streamRenderStrategy.render({
-                  agentId,
-                  segments: renderModel.segments,
-                  historyRowRevision,
-                  liveHeadRowRevision: expandedToolCallGroupIds,
-                  boundary,
-                  renderers,
-                  listEmptyComponent,
-                  viewportRef,
-                  routeBottomAnchorRequest,
-                  isAuthoritativeHistoryReady,
-                  onNearBottomChange: setIsNearBottom,
-                  onReadingPositionChange: handleReadingPositionChange,
-                  onNearHistoryStart: loadOlder,
-                  isLoadingOlderHistory: isLoadingOlder,
-                  hasOlderHistory: hasOlder,
-                  olderHistoryProgressKey: progressKey,
-                  scrollEnabled: streamScrollEnabled,
-                  listStyle: stylesheet.list,
-                  baseListContentContainerStyle: stylesheet.listContentContainer,
-                  forwardListContentContainerStyle: stylesheet.forwardListContentContainer,
-                  contentMaxWidth,
-                })}
-              </MessageOuterSpacingProvider>
+              <ForkModelSourceProvider value={forkModelSource}>
+                <MessageOuterSpacingProvider disableOuterSpacing>
+                  {streamRenderStrategy.render({
+                    agentId,
+                    segments: renderModel.segments,
+                    historyRowRevision,
+                    liveHeadRowRevision: expandedToolCallGroupIds,
+                    boundary,
+                    renderers,
+                    listEmptyComponent,
+                    viewportRef,
+                    routeBottomAnchorRequest,
+                    isAuthoritativeHistoryReady,
+                    onNearBottomChange: setIsNearBottom,
+                    onReadingPositionChange: handleReadingPositionChange,
+                    onNearHistoryStart: loadOlder,
+                    isLoadingOlderHistory: isLoadingOlder,
+                    hasOlderHistory: hasOlder,
+                    olderHistoryProgressKey: progressKey,
+                    scrollEnabled: streamScrollEnabled,
+                    listStyle: stylesheet.list,
+                    baseListContentContainerStyle: stylesheet.listContentContainer,
+                    forwardListContentContainerStyle: stylesheet.forwardListContentContainer,
+                    contentMaxWidth,
+                  })}
+                </MessageOuterSpacingProvider>
+              </ForkModelSourceProvider>
               <ChatOutlineRail
                 prompts={chatOutline.prompts}
                 activePrompt={chatOutline.activePrompt}

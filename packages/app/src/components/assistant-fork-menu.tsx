@@ -1,8 +1,11 @@
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { Split } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { FORK_WITH_MODEL_ENABLED, type ForkModelChoice } from "@/clisbot/fork-with-model/feature";
+import { ForkModelPicker } from "@/clisbot/fork-with-model/fork-model-picker";
+import { useForkModelSource } from "@/clisbot/fork-with-model/source-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,9 +16,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 
 export type AssistantForkTarget = "tab" | "workspace";
+/** `model` is set when the fork starts on another model than the source agent's. */
+export type AssistantForkHandler = (
+  target: AssistantForkTarget,
+  model?: ForkModelChoice,
+) => Promise<void> | void;
 
 interface AssistantForkMenuProps {
-  onFork: (target: AssistantForkTarget) => Promise<void> | void;
+  onFork: AssistantForkHandler;
   testID?: string;
 }
 
@@ -32,6 +40,9 @@ export const AssistantForkMenu = memo(function AssistantForkMenu({
   const [isOpen, setIsOpen] = useState(false);
   const [pendingTarget, setPendingTarget] = useState<AssistantForkTarget | null>(null);
   const isLocked = pendingTarget !== null;
+  const modelSource = useForkModelSource();
+  const [isPickingModel, setIsPickingModel] = useState(false);
+  const slotRef = useRef<View>(null);
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -53,6 +64,21 @@ export const AssistantForkMenu = memo(function AssistantForkMenu({
       }
     },
     [isLocked, onFork],
+  );
+
+  const openModelPicker = useCallback(() => setIsPickingModel(true), []);
+  const closeModelPicker = useCallback(() => setIsPickingModel(false), []);
+  const handlePickModel = useCallback(
+    async (model: ForkModelChoice) => {
+      setIsPickingModel(false);
+      setPendingTarget("tab");
+      try {
+        await onFork("tab", model);
+      } finally {
+        setPendingTarget(null);
+      }
+    },
+    [onFork],
   );
 
   const triggerStyle = useCallback(
@@ -78,7 +104,7 @@ export const AssistantForkMenu = memo(function AssistantForkMenu({
     <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
       <Tooltip delayDuration={250} enabledOnDesktop enabledOnMobile={false}>
         <TooltipTrigger asChild>
-          <View style={styles.triggerSlot} collapsable={false}>
+          <View ref={slotRef} style={styles.triggerSlot} collapsable={false}>
             <DropdownMenuTrigger
               accessibilityLabel={t("message.actions.forkMenu")}
               accessibilityRole="button"
@@ -118,7 +144,25 @@ export const AssistantForkMenu = memo(function AssistantForkMenu({
         >
           {t("message.actions.forkInNewWorkspace")}
         </DropdownMenuItem>
+        {FORK_WITH_MODEL_ENABLED && modelSource ? (
+          <DropdownMenuItem
+            disabled={isLocked}
+            leading={forkIcon}
+            onSelect={openModelPicker}
+            testID={`${testID}-with-model`}
+          >
+            {t("message.actions.forkWithModel")}
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
+      {isPickingModel && modelSource ? (
+        <ForkModelPicker
+          source={modelSource}
+          anchorRef={slotRef}
+          onPick={handlePickModel}
+          onClose={closeModelPicker}
+        />
+      ) : null}
     </DropdownMenu>
   );
 });
