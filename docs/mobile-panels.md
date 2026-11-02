@@ -61,6 +61,35 @@ view, not the bottom-tabs view:
 
 Route topology, Back and deep links are in [Expo Router](expo-router.md#phone-tabs).
 
+## Detail back swipe
+
+On an Android phone a session or chat opened from a tab goes Back with a swipe from left to right
+anywhere on the page, the way Telegram does: the page follows the finger with the tab it came from
+underneath, then slides off and goes Back, or slides home (`clisbot/home/detail-back-swipe.tsx`).
+A swipe from right to left anywhere opens Files and Changes, in a session or a Bot chat. A swipe
+that starts on a screen edge belongs to Android: One UI and Pixel gesture navigation send Back
+from both edges, and the app sets no gesture exclusion.
+
+- The root stack presents the host route (`h/[serverId]`) as a transparent modal on Android
+  (`DETAIL_BACK_SWIPE_SUPPORTED`), so `react-native-screens` keeps `(tabs)` attached under it;
+  with a plain push the tabs' native views are detached and the swipe would show an empty stack.
+  The host's own screens paint the background. iOS and web keep the plain stack.
+- The swipe wraps the whole host navigator and translates it on the UI thread. It runs only while
+  Back lands on the tabs right underneath (`isDetailOnPhoneTabs`): a second host screen goes Back
+  to the first, and the swipe would show the wrong page.
+- It uses the panels' horizontal arbitration (`resolveMobilePanelGestureIntent`, pointed right) and
+  waits while Files is open or moving, while a terminal blocks open gestures, and while a
+  horizontal scroller sits off its start. With Files open, left to right closes Files.
+- Release rules are the panels': past a third of the width or a 500 px/s fling goes Back
+  (`detail-back-swipe-motion.ts`). The settle takes at most 250 ms. Back runs after the page is
+  off screen, through the header Back's own path (`useDetailBack`), so the pop's render is hidden.
+- A chat offers its Files to the swipe through `useConversationExplorerOwner().openable` while it is
+  focused on a phone and has a project folder; a chat is not a workspace route.
+
+On 2026-11-03, on an overloaded emulator, the edge Back changed nothing on screen during the drag
+and swapped the page 1.1–1.3 s after release; the swipe moved the page with the finger and showed
+the settled tab 0.25–0.55 s after release.
+
 ## Home navigation
 
 This section is the Home V2 layout, which `EXPO_PUBLIC_CLISBOT_NAVIGATION_V2=0` restores.
@@ -268,5 +297,6 @@ a sequence there whenever ownership or ordering changes.
 `clisbot/home/phone-tab-navigator.browser.test.tsx` runs the phone tab navigator in a real
 `NavigationContainer`: tabs pre-mount hidden one idle slot at a time, no tab unmounts, the press's
 commit shows and activates the target, and hidden tabs render zero times on store updates. `home-tab-navigation.test.ts` runs the root stack
-reducer for detail Back and cold deep links; `e2e/browser/navigation-v2.spec.ts` checks at 390px
+reducer for detail Back and cold deep links; `phone-tab-routes.test.ts` holds when the back swipe
+may run and `detail-back-swipe-motion.test.ts` its release rules; `e2e/browser/navigation-v2.spec.ts` checks at 390px
 that switches and Back keep the same tab nodes.

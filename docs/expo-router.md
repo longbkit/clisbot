@@ -192,6 +192,8 @@ or more on a production Android build.
 - **Details push above the tabs.** A workspace, chat or settings page goes on the root stack over
   `(tabs)`. Back, the header Back and Android Back pop the root stack to `(tabs)`
   (`returnToPhoneTabs`), which still shows the tab the detail came from, at its scroll position.
+  On Android the host route is a transparent modal, so the tabs stay attached under a detail for
+  the [back swipe](mobile-panels.md#detail-back-swipe).
   Never `navigate` back to a tab from a detail: the root stack pushes a second `(tabs)` and remounts
   every tab. Never `dismissTo` a route that is not in the stack either: POP_TO then replaces the
   current route, which is `(tabs)`. `navigateToHostWorkspaceRoute` pushes while the phone tabs are
