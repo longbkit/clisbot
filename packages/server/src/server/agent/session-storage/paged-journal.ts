@@ -19,6 +19,14 @@ export const SESSION_STORAGE_LIMITS = {
   readPageBytes: 8 * 1024 * 1024,
 } as const;
 
+/** A read over `readPageBytes`; the caller asks again for fewer rows. */
+export class SessionPageBudgetError extends Error {
+  constructor() {
+    super("Session page exceeds byte budget; request a smaller page");
+    this.name = "SessionPageBudgetError";
+  }
+}
+
 /** Private journal envelope metadata; canonical timeline rows and wire items stay unchanged. */
 export interface JournalOperation extends SessionOperationIdentity {
   order: number;
@@ -555,8 +563,7 @@ export class PagedJournal<T> {
       }
       const pointer = validPointer(page?.entries[seq]);
       totalBytes += pointer.length;
-      if (totalBytes > SESSION_STORAGE_LIMITS.readPageBytes)
-        throw new Error("Session page exceeds byte budget; request a smaller page");
+      if (totalBytes > SESSION_STORAGE_LIMITS.readPageBytes) throw new SessionPageBudgetError();
       const buffer = await this.readPointer(pointer);
       const entry = JSON.parse(
         new TextDecoder("utf-8", { fatal: true }).decode(buffer),

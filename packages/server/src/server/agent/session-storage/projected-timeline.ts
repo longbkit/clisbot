@@ -16,7 +16,7 @@ import {
 } from "../timeline-projection.js";
 import { selectSourceRanges } from "./source-range-selection.js";
 import { ToolRowProjection, projectionRowBytes } from "./tool-row-projection.js";
-import { SESSION_STORAGE_LIMITS } from "./paged-journal.js";
+import { SESSION_STORAGE_LIMITS, SessionPageBudgetError } from "./paged-journal.js";
 import type { SessionEventState, SessionEventStream } from "./session-event-log.js";
 
 export type ProjectedTimelineFetchResult = AgentTimelineFetchResult &
@@ -277,12 +277,7 @@ export class ProjectedTimeline {
         const page = (await this.source.read(start, endSeq)).map((entry) => entry.value);
         return { page, endSeq };
       } catch (error) {
-        if (
-          endSeq === start ||
-          !(error instanceof Error) ||
-          error.message !== "Session page exceeds byte budget; request a smaller page"
-        )
-          throw error;
+        if (endSeq === start || !(error instanceof SessionPageBudgetError)) throw error;
         endSeq = start + Math.floor((endSeq - start) / 2);
       }
     }
