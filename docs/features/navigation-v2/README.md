@@ -452,8 +452,13 @@ occurrence was seen.
 ## Decisions within the brief
 
 - **Search**: Home 🔍 swaps the feed for Inbox's history (search, Host/Type/Date, Load more), so
-  history beyond the loaded directory stays reachable. Chats 🔍 filters the list by title. Workspace 🔍
-  opens the Command Center, the cross-Host search ⌘K opens everywhere.
+  history beyond the loaded directory stays reachable. Chats 🔍 puts a focused search field in place
+  of the header's title, as Telegram does, and ✕ closes it; it filters the list by title. The field
+  lives in the header so it opens in view however far the list is scrolled, and the press renders
+  the header alone; the field takes the header's control size (`xs` on desktop, `md` on a phone).
+  Workspace 🔍 opens the Command Center, the cross-Host search ⌘K opens everywhere. Its panel and
+  focused input show first; the rows, built from every workspace and session, wait until the input
+  has been laid out (`command-center.tsx`, `showPanel`).
 - **Bot sessions in Workspace**: shown by default; the Bots chip hides them
   ([Workspace list](#workspace-list)). The Home V2 sidebar's own Bot projects switch is untouched.
 - **Chats display**: one `Display ▾` for the mixed list: sort (recent activity or name), an opt-in

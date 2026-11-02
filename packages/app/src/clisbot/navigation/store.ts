@@ -45,6 +45,11 @@ interface NavigationState {
   toggleWorkShowBots: () => void;
   /** Home's 🔍 swaps the feed for Inbox's full history and search. */
   homeSearchOpen: boolean;
+  /**
+   * Chats' 🔍 puts a search field in the header's title. Here, not in the pane, so the press
+   * re-renders the header alone; the list follows only once a query is typed.
+   */
+  chatsSearchOpen: boolean;
   /** Whether Home's collapsed Seen issues group is open. */
   seenIssuesOpen: boolean;
   setHomeMode: (mode: HomeMode) => void;
@@ -54,6 +59,7 @@ interface NavigationState {
   setChatsChip: (chip: ChatsChip) => void;
   setWorkChip: (chip: WorkChip) => void;
   setHomeSearchOpen: (open: boolean) => void;
+  setChatsSearchOpen: (open: boolean) => void;
   setSeenIssuesOpen: (open: boolean) => void;
 }
 
@@ -73,6 +79,7 @@ export const useNavigationStore = create<NavigationState>()(
       toggleChatsSplit: () => set((state) => ({ chatsSplit: !state.chatsSplit })),
       toggleWorkShowBots: () => set((state) => ({ workShowBots: !state.workShowBots })),
       homeSearchOpen: false,
+      chatsSearchOpen: false,
       seenIssuesOpen: false,
       setHomeMode: (homeMode) => set({ homeMode }),
       setScope: (section, scope) =>
@@ -82,6 +89,7 @@ export const useNavigationStore = create<NavigationState>()(
       setChatsChip: (chatsChip) => set({ chatsChip }),
       setWorkChip: (workChip) => set({ workChip }),
       setHomeSearchOpen: (homeSearchOpen) => set({ homeSearchOpen }),
+      setChatsSearchOpen: (chatsSearchOpen) => set({ chatsSearchOpen }),
       setSeenIssuesOpen: (seenIssuesOpen) => set({ seenIssuesOpen }),
     }),
     {

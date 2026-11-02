@@ -16,7 +16,7 @@ import { rememberChatOpenPreview } from "@/clisbot/bots/chat/open-preview";
 import { useResourcePrincipalScope } from "@/clisbot/bots/data/resource-principal-scope";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
-import { Bot, Hash, SquarePen } from "lucide-react-native";
+import { Bot, Hash, SquarePen, X } from "lucide-react-native";
 import { useRoutePath } from "@/navigation/route-source";
 import { BotRow, type BotsSidebarBot } from "@/clisbot/bots/sidebar/bots-section";
 import { BotsSidebarRowSkeleton } from "@/clisbot/bots/sidebar/row";
@@ -56,6 +56,7 @@ import { useHeldOrder } from "./held-order";
 import { inScope, type OwnershipScope } from "./ownership";
 import { SectionControls, useSectionBackdrop } from "./section-controls";
 import {
+  HeaderIconButton,
   HeaderMenuButton,
   HeaderMenuIcon,
   HeaderSearchButton,
@@ -77,8 +78,6 @@ const CHIP_LABELS: Record<ChatsChip, string> = {
 
 interface ChatsPaneProps {
   onBeforeNavigate?: ChatListAdmission;
-  searchOpen: boolean;
-  setSearchOpen: Dispatch<SetStateAction<boolean>>;
   search: string;
   setSearch: Dispatch<SetStateAction<string>>;
 }
@@ -98,8 +97,6 @@ type ChatEntries = ReturnType<typeof useChatEntries>;
 
 const ChatsPaneContent = memo(function ChatsPaneContent({
   onBeforeNavigate,
-  searchOpen,
-  setSearchOpen,
   search,
   setSearch,
   entries,
@@ -109,10 +106,6 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
   const scope = useNavigationStore((state) => state.scopes.chats);
   const chip = useNavigationStore((state) => state.chatsChip);
   const setChip = useNavigationStore((state) => state.setChatsChip);
-  const toggleSearch = useCallback(() => {
-    setSearchOpen((open) => !open);
-    setSearch("");
-  }, [setSearch, setSearchOpen]);
   const sort = useNavigationStore((state) => state.chatsSort);
   const split = useNavigationStore((state) => state.chatsSplit);
   const serverIds = useHostFilterIds();
@@ -149,17 +142,6 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
   const scopeCounts = chatScopeCounts(entries);
   const controls = (
     <>
-      {searchOpen ? (
-        <View style={styles.search}>
-          <SearchField
-            value={search}
-            onChangeText={setSearch}
-            placeholder={t("navigation.lists.searchChats")}
-            clearAccessibilityLabel={t("navigation.actions.closeSearch")}
-            testID="chats-search-input"
-          />
-        </View>
-      ) : null}
       <SectionControls
         section="chats"
         scopeCounts={scopeCounts}
@@ -172,19 +154,10 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
       <OutsideFilterNotice list="chats" />
     </>
   );
-  const headerActions = useMemo(
-    () => (
-      <>
-        <HeaderSearchButton onPress={toggleSearch} testID="chats-search" />
-        <NewChatMenu />
-      </>
-    ),
-    [toggleSearch],
-  );
   return (
     <RenderProfile id="NavChats">
       <View style={styles.pane} testID="chats-pane">
-        <SectionHeader title={t("navigation.sections.chats")} actions={headerActions} />
+        <ChatsHeader search={search} setSearch={setSearch} />
         {compact ? null : controls}
         <ScrollEdgeLine edge={edge} />
         <FlatList
@@ -207,6 +180,66 @@ const ChatsPaneContent = memo(function ChatsPaneContent({
 });
 
 const displayMenu = <ChatsDisplayMenu />;
+
+/**
+ * Chats' header. 🔍 puts the search field in place of the title, focused, with ✕ to close it, as
+ * Telegram does: it opens in view however far the list is scrolled, and the press re-renders this
+ * header only (`chatsSearchOpen` is read here, not by the pane), so the rows wait for a query.
+ */
+const ChatsHeader = memo(function ChatsHeader({
+  search,
+  setSearch,
+}: Pick<ChatsPaneProps, "search" | "setSearch">) {
+  const { t } = useTranslation();
+  const compact = useIsCompactFormFactor();
+  const open = useNavigationStore((state) => state.chatsSearchOpen);
+  const setOpen = useNavigationStore((state) => state.setChatsSearchOpen);
+  const openSearch = useCallback(() => setOpen(true), [setOpen]);
+  const closeSearch = useCallback(() => {
+    setOpen(false);
+    setSearch("");
+  }, [setOpen, setSearch]);
+  const searchPlaceholder = t("navigation.lists.searchChats");
+  const clearLabel = t("navigation.actions.clearSearch");
+  const sectionTitle = t("navigation.sections.chats");
+  const title = useMemo(
+    () =>
+      open ? (
+        <SearchField
+          value={search}
+          onChangeText={setSearch}
+          placeholder={searchPlaceholder}
+          clearAccessibilityLabel={clearLabel}
+          autoFocus
+          size={compact ? "md" : "xs"}
+          testID="chats-search-input"
+          clearTestID="chats-search-clear"
+        />
+      ) : (
+        sectionTitle
+      ),
+    [clearLabel, compact, open, search, searchPlaceholder, sectionTitle, setSearch],
+  );
+  const closeLabel = t("navigation.actions.closeSearch");
+  const actions = useMemo(
+    () =>
+      open ? (
+        <HeaderIconButton
+          Icon={X}
+          label={closeLabel}
+          onPress={closeSearch}
+          testID="chats-search-close"
+        />
+      ) : (
+        <>
+          <HeaderSearchButton onPress={openSearch} testID="chats-search" />
+          <NewChatMenu />
+        </>
+      ),
+    [closeLabel, closeSearch, open, openSearch],
+  );
+  return <SectionHeader title={title} actions={actions} />;
+});
 
 function chatsChips(
   entries: readonly ChatsEntry[],
@@ -426,7 +459,6 @@ function NewChatMenu() {
 
 const styles = StyleSheet.create((theme) => ({
   pane: { flex: 1, minHeight: 0 },
-  search: { paddingHorizontal: theme.spacing[3], paddingBottom: theme.spacing[2] },
   heading: {
     color: theme.colors.foregroundExtraMuted,
     fontSize: theme.fontSize.sm,

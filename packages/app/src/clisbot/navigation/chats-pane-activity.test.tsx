@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React, { useSyncExternalStore } from "react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@react-native-async-storage/async-storage", () => ({
@@ -81,6 +81,7 @@ vi.mock("lucide-react-native", () => ({
   Bot: () => null,
   Hash: () => null,
   SquarePen: () => null,
+  X: () => null,
 }));
 vi.mock("expo-router", () => ({ usePathname: () => "/chat" }));
 vi.mock("@/components/ui/scroll-view", () => ({
@@ -88,12 +89,17 @@ vi.mock("@/components/ui/scroll-view", () => ({
     data,
     keyExtractor,
     renderItem,
+    ListHeaderComponent,
+    testID,
   }: {
     data: T[];
     keyExtractor: (item: T) => string;
     renderItem: (info: { item: T }) => React.ReactNode;
+    ListHeaderComponent?: React.ReactNode;
+    testID?: string;
   }) => (
-    <div>
+    <div data-testid={testID}>
+      {ListHeaderComponent}
       {data.map((item) => (
         <React.Fragment key={keyExtractor(item)}>{renderItem({ item })}</React.Fragment>
       ))}
@@ -135,7 +141,12 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenuItem: () => null,
 }));
 vi.mock("@/components/ui/pane-content-toolbar", () => ({ ToolbarButton: () => null }));
-vi.mock("@/components/ui/search-field", () => ({ SearchField: () => null }));
+vi.mock("@/components/ui/search-field", () => ({
+  SearchField: ({ testID, autoFocus }: { testID: string; autoFocus?: boolean }) => (
+    // biome-ignore lint/a11y/noAutofocus: the stand-in mirrors the field's own autoFocus.
+    <input data-testid={testID} autoFocus={autoFocus} />
+  ),
+}));
 vi.mock("@/styles/theme", () => ({ SPACING: { 2: 8, 4: 16 } }));
 vi.mock("./chats-display-menu", () => ({ ChatsDisplayMenu: () => null }));
 vi.mock("./hosts-status", () => ({ useHostsReachability: () => "online" }));
@@ -147,21 +158,33 @@ vi.mock("./section-controls", () => ({
   SectionControls: () => null,
   useSectionBackdrop: () => "surfaceSidebar",
 }));
-vi.mock("./section-header", () => ({
-  HeaderMenuIcon: () => null,
-  HeaderSearchButton: () => null,
-  SECTION_MENU_WIDTH: 240,
-  SectionHeader: () => null,
-}));
+vi.mock("./section-header", () => {
+  const Button = ({ onPress, testID }: { onPress: () => void; testID: string }) => (
+    <button type="button" data-testid={testID} onClick={onPress} />
+  );
+  return {
+    HeaderIconButton: Button,
+    HeaderMenuButton: () => null,
+    HeaderMenuIcon: () => null,
+    HeaderSearchButton: Button,
+    SECTION_MENU_WIDTH: 240,
+    SectionHeader: ({ title, actions }: { title: React.ReactNode; actions: React.ReactNode }) => (
+      <div data-testid="chats-header">
+        {title}
+        {actions}
+      </div>
+    ),
+  };
+});
 vi.mock("./host-filter", () => ({ useHostFilterIds: () => [] }));
 
 import { RetainedPanelActivity } from "@/components/retained-panel";
 import { ChatsPane } from "./chats-pane";
+import { useNavigationStore } from "./store";
 import { RouteSourceProvider } from "@/navigation/route-source";
 import { createReadRouteSource } from "@/test/route-source";
 
 const setSearch = vi.fn();
-const setSearchOpen = vi.fn();
 
 const routes = createReadRouteSource(() => "/chat");
 
@@ -169,12 +192,7 @@ function Chats({ shown }: { shown: boolean }) {
   return (
     <RouteSourceProvider source={routes}>
       <RetainedPanelActivity active={shown}>
-        <ChatsPane
-          searchOpen={false}
-          setSearchOpen={setSearchOpen}
-          search=""
-          setSearch={setSearch}
-        />
+        <ChatsPane search="" setSearch={setSearch} />
       </RetainedPanelActivity>
     </RouteSourceProvider>
   );
@@ -193,6 +211,8 @@ afterEach(() => {
   state.listeners.clear();
   state.titles = ["first"];
   state.profiles.clear();
+  setSearch.mockClear();
+  useNavigationStore.setState({ chatsSearchOpen: false });
 });
 
 describe("ChatsPane while its retained panel is hidden", () => {
@@ -222,5 +242,32 @@ describe("ChatsPane while its retained panel is hidden", () => {
     view.rerender(<Chats shown />);
     expect(bodyRenders()).toBe(1);
     expect(rows()).toEqual(["first", "second", "third"]);
+  });
+});
+
+describe("Chats search", () => {
+  it("opens in the header, focused, and renders neither the list nor a row", () => {
+    state.titles = ["first", "second", "third"];
+    render(<Chats shown />);
+    state.profiles.clear();
+    fireEvent.click(screen.getByTestId("chats-search"));
+    const field = screen.getByTestId("chats-search-input");
+    // In the header, so it opens in view however far the list is scrolled, and takes the keyboard.
+    expect(within(screen.getByTestId("chats-header")).getByTestId("chats-search-input")).toBe(
+      field,
+    );
+    expect(within(screen.getByTestId("chats-list")).queryByTestId("chats-search-input")).toBe(null);
+    expect(document.activeElement).toBe(field);
+    expect(bodyRenders()).toBe(0);
+    expect([...state.profiles.keys()].filter((id) => id.startsWith("ChatsRow:"))).toEqual([]);
+  });
+
+  it("closes with ✕ and clears the query", () => {
+    render(<Chats shown />);
+    fireEvent.click(screen.getByTestId("chats-search"));
+    fireEvent.click(screen.getByTestId("chats-search-close"));
+    expect(screen.queryByTestId("chats-search-input")).toBe(null);
+    expect(screen.getByTestId("chats-search")).toBeTruthy();
+    expect(setSearch).toHaveBeenCalledWith("");
   });
 });

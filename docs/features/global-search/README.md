@@ -134,4 +134,8 @@ ownership, suggest })`: Workspace's Host and Project filters (the sidebar's, whi
 
 Catalog (Hosts, Hubs, Projects, agent→project index) is built once per open and per directory
 change, never per keystroke. Per keystroke: Hosts + Hubs + merged projects are scored, item rows
-are filtered by two `Set` lookups. Numbers and method: [verification.md](verification.md).
+are matched, and only the matched rows are placed and annotated. A Host's status change never
+re-matches item rows: it re-annotates the matched ones, and a retrying Host that search still
+reads as Offline changes nothing. On a phone with 14 offline Hosts and ~7,000 sessions, rebuilding
+on every retry kept the JS thread at 100% while the Command Center was open, and a pressed row
+never ran. Numbers and method: [verification.md](verification.md).

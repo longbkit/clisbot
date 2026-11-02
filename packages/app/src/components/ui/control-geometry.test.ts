@@ -95,6 +95,14 @@ describe("control geometry", () => {
     const geometry = createControlGeometry(theme);
     const borderWidth = theme.borderWidth[1];
 
+    expect(geometry.fieldControlXs.minHeight).toBe(28);
+    expect(geometry.fieldControlXs.paddingVertical).toBe(3);
+    expect(
+      geometry.fieldTextSm.lineHeight +
+        geometry.fieldControlXs.paddingVertical * 2 +
+        borderWidth * 2,
+    ).toBe(geometry.fieldControlXs.minHeight);
+
     expect(geometry.fieldControlSm.minHeight).toBe(32);
     expect(geometry.fieldControlSm.paddingVertical).toBe(5);
     expect(

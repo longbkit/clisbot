@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import equal from "fast-deep-equal";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
 import { useHubAccounts } from "@/clisbot/hub/account-provider";
 import { effectiveHostStatus } from "@/clisbot/home/hosts-strip-model";
@@ -90,9 +91,12 @@ function useScopeHosts(enabled: boolean): ScopeHostInput[] {
   const serverIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
   const statuses = useHostRuntimeConnectionStatuses(serverIds);
   const now = useStallClock(statuses, enabled);
+  // The stall clock and a retrying Host's raw status change often without changing what search
+  // shows. Keep the previous list then, so the catalog and every row built from it stay put.
+  const previous = useRef<ScopeHostInput[]>([]);
   return useMemo(() => {
     const store = getHostRuntimeStore();
-    return hosts.map((host) => {
+    const next = hosts.map((host) => {
       const origin = host.management?.hubOrigin ?? null;
       return {
         serverId: host.serverId,
@@ -105,6 +109,9 @@ function useScopeHosts(enabled: boolean): ScopeHostInput[] {
         lastOnlineAt: store.getSnapshot(host.serverId)?.lastOnlineAt ?? null,
       };
     });
+    if (equal(previous.current, next)) return previous.current;
+    previous.current = next;
+    return next;
   }, [hosts, hubs, localServerId, now, statuses]);
 }
 

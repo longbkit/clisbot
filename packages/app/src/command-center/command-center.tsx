@@ -296,6 +296,10 @@ function useBuiltInSections(
 
 interface CommandCenterState {
   open: boolean;
+  /** The rows have been built for this open; until then the list shows nothing, not "No matches". */
+  rowsReady: boolean;
+  /** The input's `onLayout`: the panel is on screen, so the rows may be built. */
+  showPanel(): void;
   scope: CommandCenterScope;
   clearScope(): void;
   query: string;
@@ -342,6 +346,13 @@ function useCommandCenterState(
   const keyboardActionDispatcher = useKeyboardActionDispatcher();
   const { t } = useTranslation();
   const open = useKeyboardShortcutsStore((state) => state.commandCenterOpen);
+  // The rows are built from every workspace and session on every Host: hundreds of ms with
+  // thousands of sessions. They wait until the panel's input has been laid out, so the panel is on
+  // screen and its input has asked for the keyboard first.
+  const [panelShown, setPanelShown] = useState(false);
+  if (!open && panelShown) setPanelShown(false);
+  const rowsOpen = open && panelShown;
+  const showPanel = useCallback(() => setPanelShown(true), []);
   const scope = useKeyboardShortcutsStore((state) => state.commandCenterScope);
   const setOpen = useKeyboardShortcutsStore((state) => state.setCommandCenterOpen);
   const setScope = useKeyboardShortcutsStore((state) => state.setCommandCenterScope);
@@ -350,7 +361,7 @@ function useCommandCenterState(
   const previousOpenRef = useRef(open);
   const { query, activeId } = useSyncExternalStore(interaction.subscribe, interaction.getSnapshot);
   const { sections: builtInSections, searchScope } = useBuiltInSections(
-    open,
+    rowsOpen,
     query,
     scope === "files",
     isCompact,
@@ -363,7 +374,7 @@ function useCommandCenterState(
     openFile,
   } = useWorkspaceFileSearch({
     // Scope chips hide file rows (they do not live on a Host or Project), so do not fetch them.
-    enabled: open && (scope === "files" || (!scoped && Boolean(query.trim()))),
+    enabled: rowsOpen && (scope === "files" || (!scoped && Boolean(query.trim()))),
     query,
   });
   const fileSections = useMemo<CommandCenterResultSection[]>(() => {
@@ -505,6 +516,8 @@ function useCommandCenterState(
 
   return {
     open,
+    rowsReady: rowsOpen,
+    showPanel,
     scope,
     clearScope: () => setScope(null),
     query,
@@ -996,10 +1009,10 @@ export function CommandCenter() {
   const keyExtractor = useCallback((row: CommandCenterListRow) => row.key, []);
   const empty = useMemo(
     () =>
-      state.fileSearchError || state.fileSearchLoading ? null : (
+      !state.rowsReady || state.fileSearchError || state.fileSearchLoading ? null : (
         <Text style={styles.emptyText}>{t("shell.commandCenter.noMatches")}</Text>
       ),
-    [state.fileSearchError, state.fileSearchLoading, t],
+    [state.fileSearchError, state.fileSearchLoading, state.rowsReady, t],
   );
   const fileSearchError = useMemo(
     () =>
@@ -1087,6 +1100,7 @@ export function CommandCenter() {
             ref={bottomSheetInputRef}
             initialValue={state.query}
             variant="bottom-sheet"
+            onLayout={state.showPanel}
             onChangeText={state.setQuery}
             onKeyPress={keyPress}
             onSubmitEditing={submit}
@@ -1128,6 +1142,7 @@ export function CommandCenter() {
               <ThemedTextInput
                 testID="command-center-input"
                 ref={state.inputRef}
+                onLayout={state.showPanel}
                 initialValue={state.query}
                 onChangeText={state.setQuery}
                 placeholder={

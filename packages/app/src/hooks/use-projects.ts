@@ -178,10 +178,17 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjectsResult
   );
   const replicas = useStoreWithEqualityFn(useSessionStore, replicaSelector, equal);
   const runtimeStates = useProjectHostRuntimeStates(serverIds, enabled);
-  const derived = useMemo(
-    () => deriveProjectsFromReplica({ replicas, runtimeStates }),
-    [replicas, runtimeStates],
-  );
+  const previousProjectsRef = useRef<ProjectSummary[]>([]);
+  const derived = useMemo(() => {
+    const next = deriveProjectsFromReplica({ replicas, runtimeStates });
+    // An unreachable Host flips its loading and error state on every retry without changing a
+    // project. Keep the list then, so nothing built from it is rebuilt.
+    if (equal(previousProjectsRef.current, next.projects)) {
+      return { ...next, projects: previousProjectsRef.current };
+    }
+    previousProjectsRef.current = next.projects;
+    return next;
+  }, [replicas, runtimeStates]);
   const refetch = useCallback(() => {
     if (!enabled) return;
     for (const serverId of serverIds) void runtime.refreshDirectories(serverId);
