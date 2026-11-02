@@ -19,7 +19,6 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import type { FilterChip } from "@/components/ui/filter-chips";
-import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import { Shortcut } from "@/components/ui/shortcut";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
@@ -35,6 +34,7 @@ import { EMPTY_SCOPE_COUNTS } from "./ownership";
 import { ScrollEdgeLine, ScrollEdgeProvider, useScrollEdge } from "./scroll-edge";
 import { SectionControls, useSectionBackdrop } from "./section-controls";
 import {
+  HeaderMenuButton,
   HeaderMenuIcon,
   HeaderSearchButton,
   SECTION_MENU_WIDTH,
@@ -234,9 +234,7 @@ function NewWorkMenu({
   );
   return (
     <DropdownMenu>
-      <ToolbarButton kind="menu" label={t("navigation.actions.new")} testID="work-new">
-        <HeaderMenuIcon Icon={Plus} />
-      </ToolbarButton>
+      <HeaderMenuButton Icon={Plus} label={t("navigation.actions.new")} testID="work-new" />
       <DropdownMenuContent
         align="end"
         width={SECTION_MENU_WIDTH}

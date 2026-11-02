@@ -180,7 +180,7 @@ const styles = StyleSheet.create((theme) => ({
     width: "100%",
     maxWidth: theme.contentMaxWidth,
     alignSelf: "center",
-    paddingHorizontal: theme.spacing[2],
+    paddingHorizontal: { xs: 0, md: theme.spacing[2] },
   },
   content: {
     paddingHorizontal: { xs: theme.spacing[3], md: theme.spacing[4] },

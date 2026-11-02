@@ -6,7 +6,6 @@ import { ActivityPlaceholder } from "@/clisbot/home/activity-placeholder";
 import { RenderProfile } from "@/utils/render-profiler";
 import { HoldReadingPosition } from "./hold-reading-position";
 import { ActivityScrollView, ActivityViewportProvider } from "@/clisbot/home/activity-viewport";
-import { ScrollEdgeLine, useScrollEdge } from "./scroll-edge";
 import { StartStatus } from "@/clisbot/home/start-surface";
 import { ComposerPickerPlacementProvider } from "@/composer/picker-placement";
 import { InboxHistory } from "@/screens/sessions-screen";
@@ -35,7 +34,6 @@ interface HomeLayoutProps {
  */
 export function NavigationHomeLayout(props: HomeLayoutProps) {
   const feedReady = useAfterFirstFrame();
-  const edge = useScrollEdge();
   const { rows } = useNavigationActivity();
   const scope = useNavigationStore((state) => state.scopes.home);
   const mode = useNavigationStore((state) => state.homeMode);
@@ -54,9 +52,7 @@ export function NavigationHomeLayout(props: HomeLayoutProps) {
     <RenderProfile id="NavHome">
       <ActivityViewportProvider>
         <HomeActivityProvider agents={feed.agents} bucketOf={feed.bucketOf}>
-          <ScrollEdgeLine edge={edge} />
           <ActivityScrollView
-            onScroll={edge.scrollProps.onScroll}
             testID="home-scroll"
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.scroll}

@@ -31,7 +31,6 @@ import { selectedDirectBotKey } from "@/clisbot/bots/sidebar/sidebar-model";
 import type { ChatListAdmission } from "@/clisbot/home/use-chat-list-navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { FilterChip } from "@/components/ui/filter-chips";
-import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import { SearchField } from "@/components/ui/search-field";
 import {
   CHATS_CHIPS,
@@ -56,6 +55,7 @@ import { useHeldOrder } from "./held-order";
 import { inScope, type OwnershipScope } from "./ownership";
 import { SectionControls, useSectionBackdrop } from "./section-controls";
 import {
+  HeaderMenuButton,
   HeaderMenuIcon,
   HeaderSearchButton,
   SECTION_MENU_WIDTH,
@@ -383,9 +383,11 @@ function NewChatMenu() {
   const newGroup = useCallback(() => ask("group"), [ask]);
   return (
     <DropdownMenu>
-      <ToolbarButton kind="menu" label={t("navigation.actions.newChat")} testID="chats-new">
-        <HeaderMenuIcon Icon={SquarePen} />
-      </ToolbarButton>
+      <HeaderMenuButton
+        Icon={SquarePen}
+        label={t("navigation.actions.newChat")}
+        testID="chats-new"
+      />
       <DropdownMenuContent
         align="end"
         width={SECTION_MENU_WIDTH}

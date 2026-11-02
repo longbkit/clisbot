@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Search, type LucideIcon } from "lucide-react-native";
@@ -41,7 +41,7 @@ export function SectionHeader({
   const left = useMemo(
     () => (
       <View style={styles.left}>
-        {typeof title === "string" ? <ScreenTitle>{title}</ScreenTitle> : title}
+        <SectionTitle title={title} compact={compact} />
         {center && !middle && (!compact || centerInline) ? (
           <View style={styles.center}>{center}</View>
         ) : null}
@@ -53,8 +53,9 @@ export function SectionHeader({
   return (
     <View testID={testID} style={styles.frame}>
       {/* A section header sits on its pane's surface (the sidebar's gray on desktop, the page's
-          white on a phone); ScreenHeader's own white drew a strip across the gray column. */}
-      <ScreenHeader borderless transparent left={left} right={right} />
+          white on a phone); ScreenHeader's own white drew a strip across the gray column. Its
+          bottom line is always on: it separates the title from the controls under it. */}
+      <ScreenHeader transparent left={left} right={right} />
       {middle ? (
         <View style={styles.middle} pointerEvents="box-none">
           {center}
@@ -67,12 +68,32 @@ export function SectionHeader({
   );
 }
 
+function SectionTitle({ title, compact }: { title: ReactNode; compact: boolean }) {
+  if (typeof title !== "string") return title;
+  if (!compact) return <ScreenTitle>{title}</ScreenTitle>;
+  return (
+    <Text style={styles.phoneTitle} numberOfLines={1}>
+      {title}
+    </Text>
+  );
+}
+
 const ThemedIcon = withUnistyles(
-  ({ Icon, color }: { Icon: LucideIcon; color?: string }) => (
-    <Icon size={ICON_SIZE.md} color={color} strokeWidth={ICON_STROKE_WIDTH} />
+  ({ Icon, color, size }: { Icon: LucideIcon; color?: string; size?: number }) => (
+    <Icon size={size ?? ICON_SIZE.md} color={color} strokeWidth={ICON_STROKE_WIDTH} />
   ),
   (theme: Theme) => ({ color: theme.colors.foregroundMuted }),
 );
+
+const PhoneIcon = withUnistyles(
+  ({ Icon, color }: { Icon: LucideIcon; color?: string }) => (
+    <Icon size={PHONE_HEADER_ICON_SIZE} color={color} strokeWidth={ICON_STROKE_WIDTH} />
+  ),
+  (theme: Theme) => ({ color: theme.colors.foreground }),
+);
+
+/** A phone's title row is the thumb's: Telegram-sized icons in 44px targets. */
+const PHONE_HEADER_ICON_SIZE = 24;
 
 export function HeaderIconButton({
   Icon,
@@ -88,9 +109,39 @@ export function HeaderIconButton({
   shortcutAction?: string;
 }) {
   const shortcut = useShortcutKeys(shortcutAction ?? null);
+  const compact = useIsCompactFormFactor();
   return (
-    <ToolbarButton label={label} onPress={onPress} testID={testID} shortcut={shortcut ?? undefined}>
-      <ThemedIcon Icon={Icon} />
+    <ToolbarButton
+      label={label}
+      onPress={onPress}
+      testID={testID}
+      shortcut={shortcut ?? undefined}
+      style={compact ? styles.phoneTarget : undefined}
+    >
+      {compact ? <PhoneIcon Icon={Icon} /> : <ThemedIcon Icon={Icon} />}
+    </ToolbarButton>
+  );
+}
+
+/** A section header's menu trigger (New), the same size as its other buttons. */
+export function HeaderMenuButton({
+  Icon,
+  label,
+  testID,
+}: {
+  Icon: LucideIcon;
+  label: string;
+  testID: string;
+}) {
+  const compact = useIsCompactFormFactor();
+  return (
+    <ToolbarButton
+      kind="menu"
+      label={label}
+      testID={testID}
+      style={compact ? styles.phoneTarget : undefined}
+    >
+      {compact ? <PhoneIcon Icon={Icon} /> : <ThemedIcon Icon={Icon} />}
     </ToolbarButton>
   );
 }
@@ -117,6 +168,12 @@ export function HeaderMenuIcon({ Icon }: { Icon: LucideIcon }) {
 }
 
 const styles = StyleSheet.create((theme) => ({
+  phoneTitle: {
+    fontSize: theme.fontSize.xl,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.foreground,
+  },
+  phoneTarget: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   left: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: theme.spacing[3] },
   center: { flexShrink: 1, minWidth: 0 },
   frame: { position: "relative" },
