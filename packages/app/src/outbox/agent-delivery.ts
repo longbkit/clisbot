@@ -217,11 +217,14 @@ async function sendAgentParts(
     try {
       await send(expectedTurnId);
     } catch (error) {
-      // The Host refused the Steer before the agent saw it: the turn it named ended, or a turn
-      // started that it could not name yet. Name the turn running now, or none if the agent is
-      // idle, so the Host starts a turn; a strict Host refuses rather than interrupt a new one.
+      // The Host refused the Steer before the agent saw it: the turn it named ended, or a turn ran
+      // that it could not name. Once the agent is idle, send it naming no turn, so the Host starts
+      // one. Never steer a different turn instead: a refused Steer stays this message's to keep,
+      // and a queue owner puts it back (queue-compatibility "a rejected steer must remain local").
       if (!isSteerTargetRefusal(error)) throw error;
-      await send(await steerTurnIdWhenKnown(entry, expectedTurnId)).catch((retryError: unknown) => {
+      await steerTurnIdWhenKnown(entry, expectedTurnId);
+      if (openTurnId(entry).open) throw error;
+      await send(undefined).catch((retryError: unknown) => {
         // A Host from before 2.2.2 keeps the refused attempt's receipt, so it answers the same id
         // with a key conflict: the message was not delivered, never count that as sent.
         throw isIdAlreadyHeldError(retryError) ? error : retryError;
