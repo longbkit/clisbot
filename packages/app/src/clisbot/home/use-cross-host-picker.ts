@@ -6,7 +6,7 @@ import type { QuickStartDestination } from "@/clisbot/quick-starts/model";
 import { botsRuntime } from "@/clisbot/bots/data/runtime";
 import { useBotsQuery } from "@/clisbot/bots/data/use-bots";
 import { useHostFeatureMap } from "@/runtime/host-features";
-import { useHostRuntimeConnectionStatuses } from "@/runtime/host-runtime";
+import { useHostRuntimeConnectedServerIds } from "@/runtime/host-runtime";
 import {
   buildOtherHostDestinations,
   parseOtherHostOption,
@@ -49,11 +49,8 @@ export function useCrossHostPicker(input: {
     () => (enabled ? hosts.map((h) => h.serverId).filter((id) => id !== selectedServerId) : []),
     [enabled, hosts, selectedServerId],
   );
-  const statuses = useHostRuntimeConnectionStatuses(otherIds);
-  const online = useMemo(
-    () => otherIds.filter((id) => statuses.get(id) === "online"),
-    [otherIds, statuses],
-  );
+  // Only who is online: a retrying Host's connecting/error flips must not re-render Home.
+  const online = useHostRuntimeConnectedServerIds(otherIds);
   const multiplicity = useHostFeatureMap(online, "workspaceMultiplicity");
   const botsFeature = useHostFeatureMap(online, "bots");
   const botHosts = useMemo(

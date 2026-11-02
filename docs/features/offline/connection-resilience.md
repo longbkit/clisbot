@@ -25,6 +25,13 @@ tail cache and Settings → Storage, is [offline cache](offline-cache.md).
 - An online Host's latency comes from its 10 s heartbeat RTT. A reading within max(20 ms, 25%) of
   the published one keeps it (`holdLatencyJitter`): publishing every reading rewrote each Host's
   snapshot every 10 s and re-rendered every Host reader.
+- Each retry of an unreachable Host turns it `connecting`, then `error` again. Readers that only
+  ask whether a Host is online or known unreachable must not see those flips: on 2026-11-02 a
+  dozen retrying Hosts re-rendered Home about twice a second, ~30 ms each on the S23, and Mode and
+  model picks waited behind them. Home's Host choice reads `useHostChoiceStatuses`
+  (`screens/new-workspace/host-choice-statuses.ts`), which keeps a retrying Host unreachable until
+  it is online, and its cross-Host picker reads `useHostRuntimeConnectedServerIds`. Home's render
+  time on idle fell from ~570 to ~90 ms per 10 s.
 - A reconnect sweep runs when there is reason to think Hosts can connect again: the window
   `online` event (web and Electron, `runtime/network-reachability.web.ts`), the app returning to
   the foreground, and a Host that had failed connecting again. Online Hosts verify their socket
