@@ -9,9 +9,7 @@ import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import { deriveWorkspaceTabModel } from "@/screens/workspace/workspace-tab-model";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useAppSettings } from "@/hooks/use-settings";
-import { dispatchComposerAgentMessage } from "@/composer/actions";
-import { createMessageSubmissionWriter } from "@/composer/submission/writer";
-import { useSessionStore, selectAgentTurnPresentation } from "@/stores/session-store";
+import { discardAgentSend, startAgentSend } from "@/outbox/agent-delivery";
 import { FLOATING_ACTION_BUTTON_CLEARANCE } from "@/components/ui/floating-action-button";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { buttonControlHeight } from "@/components/ui/control-geometry";
@@ -74,22 +72,19 @@ export function useReviewFeedback(input: {
           const { client: targetClient, sendBehavior } = live.current;
           if (!targetClient) throw new Error(i18n.t("workspace.terminal.hostDisconnected"));
           const activeTurnBehavior = sendBehavior === "steer" ? "steer" : "interrupt";
-          await dispatchComposerAgentMessage({
-            client: targetClient,
+          const { clientMessageId, delivery } = startAgentSend({
+            serverId,
             agentId: recipient.agentId,
             text: i18n.t("review.feedback.prompt"),
             attachments: [attachment],
-            encodeImageMessages: async () => [],
-            submission: createMessageSubmissionWriter(serverId),
             activeTurnBehavior,
-            activeTurnId:
-              activeTurnBehavior === "steer"
-                ? (selectAgentTurnPresentation(
-                    useSessionStore.getState().sessions[serverId],
-                    recipient.agentId,
-                  ).turnId ?? undefined)
-                : undefined,
           });
+          // Feedback keeps its comments until sent, so a failed send leaves no row behind.
+          const outcome = await delivery;
+          if (outcome.kind === "failed") {
+            discardAgentSend(clientMessageId);
+            throw new Error(outcome.failure.message);
+          }
           live.current.toast.show(
             createElement(FeedbackSentMessage, {
               recipient,

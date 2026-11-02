@@ -17,6 +17,12 @@ import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import type { AgentPermissionRequest } from "@clisbot/protocol/agent-types";
 import type { HostConnection, HostProfile, HubHostManagement } from "@/types/host-connection";
 import { defaultHostAppearance } from "@/hosts/appearance";
+import { useOutboxStore } from "@/outbox/store";
+import type { OutboxEntry } from "@/outbox/model";
+
+function describeUnsent(entry: OutboxEntry): [string, string] {
+  return [entry.text, entry.status];
+}
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
 import { isAgentArchiving, setAgentArchiving } from "@/hooks/use-archive-agent";
@@ -4086,7 +4092,7 @@ describe("HostRuntimeStore", () => {
     useSessionStore.getState().clearSession(host.serverId);
   });
 
-  it("restores an automatically drained message when sending fails", async () => {
+  it("keeps a drained message that failed in the transcript with Retry, not back in the queue", async () => {
     const host = makeHost({ serverId: "srv_failed_queue_drain" });
     const fakeClient = new FakeDaemonClient();
     fakeClient.sendAgentMessageFailures.push(new Error("connection lost"));
@@ -4122,11 +4128,11 @@ describe("HostRuntimeStore", () => {
       expect(fakeClient.sentAgentMessages).toHaveLength(1);
       expect(
         useSessionStore.getState().sessions[host.serverId]?.queuedMessages.get("agent"),
-      ).toEqual([
-        { id: "first", text: "retry me", attachments: [] },
-        { id: "second", text: "keep me behind", attachments: [] },
-      ]);
+      ).toEqual([{ id: "second", text: "keep me behind", attachments: [] }]);
+      const unsent = Object.values(useOutboxStore.getState().entries);
+      expect(unsent.map(describeUnsent)).toEqual([["retry me", "failed"]]);
     });
+    useOutboxStore.setState({ entries: {}, accepted: {} });
 
     useSessionStore.getState().clearSession(host.serverId);
   });

@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   acceptMessageSubmission,
   beginMessageSubmission,
+  failMessageSubmission,
   getActiveMessageSubmissions,
   getSendingClientMessageIds,
   hasActiveMessageSubmission,
   observeMessageSubmissionCanonical,
   rejectMessageSubmission,
+  retryMessageSubmission,
 } from "./model";
 
 describe("message submission transactions", () => {
@@ -116,5 +118,25 @@ describe("message submission transactions", () => {
     expect(() => beginMessageSubmission(sending, { clientMessageId: "client-1" })).toThrow(
       "Message submission already exists",
     );
+  });
+});
+
+describe("failed submissions", () => {
+  const failure = { reason: "refused" as const, message: "No", autoRetry: false };
+
+  it("keeps a failed row through canonical replacement without making the agent look busy", () => {
+    const failed = failMessageSubmission(
+      beginMessageSubmission([], { clientMessageId: "m1" }),
+      "m1",
+      failure,
+    );
+    expect(hasActiveMessageSubmission(failed)).toBe(false);
+    expect(getSendingClientMessageIds(failed)).toEqual(["m1"]);
+    expect(hasActiveMessageSubmission(retryMessageSubmission(failed, "m1"))).toBe(true);
+  });
+
+  it("drops a failed record once the Host shows the message", () => {
+    const failed = failMessageSubmission([], "m1", failure);
+    expect(observeMessageSubmissionCanonical(failed, ["m1"])).toEqual([]);
   });
 });

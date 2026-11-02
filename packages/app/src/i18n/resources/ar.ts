@@ -6,6 +6,7 @@ import { pluginSettings } from "./plugin-settings";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
+import { messageDelivery } from "./message-delivery";
 import { navigation } from "./navigation";
 import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
@@ -3107,4 +3108,5 @@ export const ar: TranslationResources = {
   navigation: navigation.ar,
   productAnalytics: productAnalytics.ar,
   home: home.ar,
+  messageDelivery: messageDelivery.ar,
 };

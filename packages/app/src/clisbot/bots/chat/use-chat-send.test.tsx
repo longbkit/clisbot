@@ -6,6 +6,9 @@ import { i18n } from "@/i18n/i18next";
 import type { ChatPayload } from "@clisbot/protocol/chats/types";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { useChatSend } from "./use-chat-send";
+import { retryChatSend } from "@/outbox/chat-delivery";
+import { useOutboxStore } from "@/outbox/store";
+import { useSessionStore } from "@/stores/session-store";
 vi.mock("@/attachments/service", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/attachments/service")>()),
   encodeImageMessagesForSend: async (images: Array<{ mimeType: string }>) =>
@@ -22,14 +25,14 @@ function mount(client: DaemonClient, attachmentsSupported = true) {
     const [chat, setChat] = useState<ChatPayload | null>(initial);
     const [error, setError] = useState<string | null>(null);
     return {
-      ...useChatSend(client, true, "chat-a", chat, setChat, setError, attachmentsSupported),
+      ...useChatSend(client, true, "chat-a", chat, setChat, setError, attachmentsSupported, "host"),
       chat,
       setChat,
       error,
     };
   });
 }
-it("retries a lost ACK after a route remount using the original receipt", async () => {
+it("keeps a failed send in the outbox and retries it under its original id", async () => {
   const sendChatMessage = vi
     .fn()
     .mockRejectedValueOnce(new Error("Connection closed"))
@@ -38,27 +41,30 @@ it("retries a lost ACK after a route remount using the original receipt", async 
     sendChatMessage,
     listChats: async () => ({ chats: [initial] }),
   } as unknown as DaemonClient;
+  useSessionStore.getState().initializeSession("host", client);
   const first = mount(client);
   await act(async () => {
-    await expect(
-      first.result.current.send({ text: "hello", attachments: [], cwd: "/project" }),
-    ).rejects.toThrow("Connection closed");
+    // The press returns at once: the line owns the outcome, not the composer.
+    await first.result.current.send({ text: "hello", attachments: [], cwd: "/project" });
   });
+  await vi.waitFor(() => expect(sendChatMessage).toHaveBeenCalledTimes(1));
+  const id = sendChatMessage.mock.calls[0][0].messageId as string;
+  await vi.waitFor(() => expect(useOutboxStore.getState().entries[id]?.status).toBe("failed"));
   first.unmount();
+  await act(async () => {
+    await retryChatSend(id, initial);
+  });
+  expect(sendChatMessage.mock.calls[1][0].messageId).toBe(id);
+  expect(useOutboxStore.getState().entries[id]).toBeUndefined();
   const second = mount(client);
   await act(async () => {
     await second.result.current.send({ text: "hello", attachments: [], cwd: "/project" });
   });
-  expect(sendChatMessage.mock.calls[1][0].messageId).toBe(
-    sendChatMessage.mock.calls[0][0].messageId,
-  );
-  await act(async () => {
-    await second.result.current.send({ text: "hello", attachments: [], cwd: "/project" });
-  });
-  expect(sendChatMessage.mock.calls[2][0].messageId).not.toBe(
-    sendChatMessage.mock.calls[0][0].messageId,
-  );
+  await vi.waitFor(() => expect(sendChatMessage).toHaveBeenCalledTimes(3));
+  // Pressing Send again is a new message, even with the same text.
+  expect(sendChatMessage.mock.calls[2][0].messageId).not.toBe(id);
   second.unmount();
+  useSessionStore.getState().clearSession("host");
 });
 it("does not replace a pushed session binding with a stale post-send refresh", async () => {
   let resolve!: (value: { chats: ChatPayload[] }) => void;
@@ -101,7 +107,7 @@ it("sends attachment-only content through chat and changes receipt when attachme
     ],
   };
   await act(async () => {
-    await expect(hook.result.current.send(payload)).rejects.toThrow("timeout");
+    await hook.result.current.send(payload);
   });
   await act(async () => {
     await hook.result.current.send({
@@ -109,6 +115,7 @@ it("sends attachment-only content through chat and changes receipt when attachme
       attachments: [{ ...payload.attachments[0], path: "/project/OTHER.md" }],
     });
   });
+  await vi.waitFor(() => expect(sendChatMessage).toHaveBeenCalledTimes(2));
   expect(sendChatMessage.mock.calls[0][0]).toMatchObject({
     chatId: "chat-a",
     text: "",

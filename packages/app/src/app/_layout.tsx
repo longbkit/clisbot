@@ -1,3 +1,4 @@
+import { startOutboxResend } from "@/outbox/resend";
 import { ClientChatQueuePrincipalBinding } from "@/clisbot/bots/chat/client-queue/use-client-chat-queue";
 import { InboxActivityProvider } from "@/clisbot/home/inbox-activity";
 import { NAVIGATION_V2_ENABLED } from "@/clisbot/navigation/feature";
@@ -272,6 +273,9 @@ function HostRuntimeBootstrapProvider({ children }: { children: ReactNode }) {
     const store = getHostRuntimeStore();
     return bindHostRuntimeAppState(store, AppState);
   }, []);
+
+  // Clisbot instant send: unsent messages go out again when their Host is back.
+  useEffect(() => startOutboxResend(getHostRuntimeStore()), []);
 
   useEffect(() => {
     const store = getHostRuntimeStore();

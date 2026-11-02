@@ -5,6 +5,7 @@ import type { TranslationResources } from "./en";
 import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
+import { messageDelivery } from "./message-delivery";
 import { navigation } from "./navigation";
 import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
@@ -3101,6 +3102,7 @@ export const vi: TranslationResources = {
   navigation: navigation.vi,
   productAnalytics: productAnalytics.vi,
   home: home.vi,
+  messageDelivery: messageDelivery.vi,
 
   providerUsage: {
     options: "Cài đặt",

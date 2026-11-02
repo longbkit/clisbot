@@ -1,7 +1,3 @@
-import { uploadLocalQueueCopies } from "./host-queue-content";
-import { splitIntoMessageParts } from "./message-parts";
-import type { SendImage } from "@/attachments/image-send-preparation";
-import type { QueueMessageParts } from "./types";
 import type { SelectedFile } from "@/attachments/selected-file";
 import { FILE_UPLOAD_MAX_BYTES } from "@/attachments/upload-limit";
 import type { ForgeSearchItem } from "@clisbot/protocol/messages";
@@ -15,12 +11,10 @@ import {
   isWorkspaceAttachment,
   userAttachmentsOnly,
 } from "@/attachments/workspace-attachment-utils";
-import {
-  splitComposerAttachmentsForSubmit,
-  type ComposerAttachmentSubmitFormat,
-} from "@/composer/attachments/submit";
-import { createUserMessage, generateMessageId, type UserMessageItem } from "@/types/stream";
+import { splitComposerAttachmentsForSubmit } from "@/composer/attachments/submit";
+import { generateMessageId, type UserMessageItem } from "@/types/stream";
 import type { MessageSubmissionRejectionOutcome } from "@/composer/submission/model";
+import type { OutboxFailure } from "@/outbox/model";
 import type { PickedImageAttachmentInput } from "@/hooks/image-attachment-picker";
 import { i18n } from "@/i18n/i18next";
 
@@ -90,6 +84,13 @@ export interface MessageSubmissionWriter {
   begin: (agentId: string, message: UserMessageItem) => void;
   accept: (agentId: string, clientMessageId: string) => void;
   reject: (agentId: string, clientMessageId: string) => MessageSubmissionRejectionOutcome;
+  /** The row stays where it was sent, marked unsent. */
+  fail: (agentId: string, clientMessageId: string, failure: OutboxFailure) => void;
+  retry: (agentId: string, clientMessageId: string) => void;
+  /** Removes an unsent row the user deleted. */
+  discard: (agentId: string, clientMessageId: string) => void;
+  /** Puts an unsent row back after a restart, unless the stream already holds it. */
+  restore: (agentId: string, message: UserMessageItem, failure?: OutboxFailure) => void;
 }
 
 export interface QueueWriter {
@@ -200,71 +201,6 @@ export function cancelComposerAgent(input: CancelComposerAgentInput): Promise<vo
     return Promise.resolve(input.client.cancelAgent(input.agentId));
   } catch (error) {
     return Promise.reject(error);
-  }
-}
-
-export interface DispatchComposerAgentMessageInput {
-  client: ComposerSendClient;
-  agentId: string;
-  text: string;
-  attachments: ComposerAttachment[];
-  attachmentSubmitFormat?: ComposerAttachmentSubmitFormat;
-  /** Send copies split into one image list per message; see encodeImageMessagesForSend. */
-  encodeImageMessages: (images: AttachmentMetadata[]) => Promise<SendImage[][]>;
-  submission: MessageSubmissionWriter;
-  activeTurnBehavior?: ActiveTurnBehavior;
-  activeTurnId?: string;
-  queueParts?: QueueMessageParts;
-}
-
-export async function dispatchComposerAgentMessage(
-  input: DispatchComposerAgentMessageInput,
-): Promise<void> {
-  const retained = await uploadLocalQueueCopies(input.client, input.attachments);
-  const wirePayload = splitComposerAttachmentsForSubmit(retained, {
-    format: input.attachmentSubmitFormat,
-  });
-  const clientMessageId = generateMessageId();
-  const userMessage = createUserMessage({
-    clientMessageId,
-    text: input.text,
-    timestamp: new Date(),
-    images: wirePayload.images,
-    attachments: wirePayload.attachments,
-    ...(input.activeTurnBehavior === "steer" && input.activeTurnId
-      ? { turnId: input.activeTurnId }
-      : {}),
-  });
-  input.submission.begin(input.agentId, userMessage);
-  try {
-    const parts = splitIntoMessageParts({
-      text: input.text,
-      attachments: wirePayload.attachments,
-      imageMessages: await input.encodeImageMessages(wirePayload.images),
-    });
-    // A Host with a queue refuses a Steer without the turn the first part just started, so
-    // parts go through the queue, which delivers them in order; the queue row replaces this one.
-    if (parts.length > 1 && input.queueParts) {
-      await input.queueParts(parts);
-      input.submission.reject(input.agentId, clientMessageId);
-      return;
-    }
-    // The optimistic row shows the text, so its ID goes to the part that carries the text.
-    for (const [index, part] of parts.entries()) {
-      await input.client.sendAgentMessage(input.agentId, part.text, {
-        messageId: index === parts.length - 1 ? clientMessageId : generateMessageId(),
-        ...(input.activeTurnBehavior ? { activeTurnBehavior: input.activeTurnBehavior } : {}),
-        ...(input.activeTurnBehavior === "steer" && input.activeTurnId
-          ? { expectedTurnId: input.activeTurnId }
-          : {}),
-        images: part.images,
-        attachments: part.attachments,
-      });
-    }
-    input.submission.accept(input.agentId, clientMessageId);
-  } catch (error) {
-    input.submission.reject(input.agentId, clientMessageId);
-    throw error;
   }
 }
 

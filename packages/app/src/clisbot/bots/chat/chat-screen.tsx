@@ -13,6 +13,7 @@ import { mentionMembersOf } from "./member-mentions";
 import { ChatList } from "./chat-list";
 import type { ChatBotIdentity } from "./chat-rows";
 import { buildChatRenderModel, type ChatLiveHead } from "./render-model";
+import { useChatLinesWithOutbox } from "@/outbox/chat-lines";
 import type { ChatToolDisplay } from "@clisbot/protocol/chats/tool-display";
 
 export interface ChatScreenProps {
@@ -58,9 +59,10 @@ export function ChatScreen({
   toolDisplay,
 }: ChatScreenProps) {
   const { t } = useTranslation();
+  const lines = useChatLinesWithOutbox(serverId, chatId, transcript);
   const model = useMemo(
-    () => buildChatRenderModel(transcript, liveHeads, { group }),
-    [group, liveHeads, transcript],
+    () => buildChatRenderModel(lines, liveHeads, { group }),
+    [group, liveHeads, lines],
   );
   const botsById = useMemo(() => new Map(bots.map((bot) => [bot.botId, bot] as const)), [bots]);
   const members = useMemo(() => mentionMembersOf(bots), [bots]);
