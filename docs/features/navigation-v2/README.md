@@ -60,7 +60,8 @@ The primary navigation says where you are; each section owns its header, filters
   and when filters match nothing, so a person can clear them. Desktop keeps them fixed.
 - **Phone list density.** Project and session rows follow Material and iOS lists: 48 tall, about
   64 with a second line, touching inside a group, 8 between groups (`density.listRowHeight`,
-  `listRowPadding`, `listGroupGap`). Desktop rows are unchanged.
+  `listRowPadding`, `listGroupGap`). This parts from V3's one height across lists on a phone: a
+  two-line Work row is 60 next to 52 in Chats and Home. Desktop rows are unchanged.
 - **The scroll edge.** A fixed block over a list has no line at rest; a thin `borderSubtle` line
   shows where it ends once the list has scrolled under it (`scroll-edge.tsx`): Chats and Work on
   desktop, Work's pinned row on a phone. It sits outside React state and flips only when the list
