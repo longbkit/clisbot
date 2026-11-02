@@ -63,16 +63,24 @@ function startSession(client: DaemonClient | null): void {
 }
 
 /** A Host with the input queue, running the turn a Steer names. */
-function openTurn(turnId: string): void {
+function openTurn(turnId: string | null): void {
   useSessionStore.getState().updateSessionServerInfo(SERVER, {
     serverId: SERVER,
     hostname: null,
     version: "2.2.1",
     features: { canonicalSubmittedPrompts: true, hostInputQueue: true },
   });
+  setTurn({ phase: "open", turnId, startedAt: null, cancellationRequestId: null });
+}
+
+/** The turn ended, as the Host reports it. */
+function closeTurn(): void {
+  setTurn({ phase: "idle", cancellationRequestId: null });
+}
+
+function setTurn(turn: unknown): void {
   useSessionStore.setState((state) => {
     const session = state.sessions[SERVER]!;
-    const turn = { phase: "open", turnId, startedAt: null, cancellationRequestId: null };
     const agentDetails = new Map(session.agentDetails).set(AGENT, { turn } as never);
     return { sessions: { ...state.sessions, [SERVER]: { ...session, agentDetails } } };
   });
@@ -233,6 +241,7 @@ describe("instant agent send", () => {
   it("sends a Steer whose turn ended first as a plain message, under the same id", async () => {
     const { client, calls } = fakeClient(async (call) => {
       if ((call.options as { expectedTurnId?: string }).expectedTurnId) {
+        closeTurn();
         throw new Error("Active turn changed before steering could be delivered");
       }
     });
@@ -258,6 +267,7 @@ describe("instant agent send", () => {
   it("keeps a late Steer unsent when an older Host still holds the refused attempt's id", async () => {
     const { client } = fakeClient(async (call) => {
       if ((call.options as { expectedTurnId?: string }).expectedTurnId) {
+        closeTurn();
         throw new Error("Active turn changed before steering could be delivered");
       }
       throw new Error("agent_request_key_conflict");
@@ -276,6 +286,28 @@ describe("instant agent send", () => {
     const outcome = await delivery;
     expect(outcome.kind).toBe("failed");
     expect(useOutboxStore.getState().entries[clientMessageId]?.status).toBe("failed");
+  });
+
+  it("waits for the id of a turn that started, rather than steer a turn it cannot name", async () => {
+    const { client, calls } = fakeClient();
+    startSession(client);
+    openTurn(null);
+
+    const { delivery } = startAgentSend({
+      serverId: SERVER,
+      agentId: AGENT,
+      text: "quick follow-up",
+      attachments: [],
+      activeTurnBehavior: "steer",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(calls).toHaveLength(0);
+    openTurn("turn-b");
+
+    await expect(delivery).resolves.toEqual({ kind: "sent" });
+    expect(
+      calls.map((call) => (call.options as { expectedTurnId?: string }).expectedTurnId),
+    ).toEqual(["turn-b"]);
   });
 
   it("gives the earlier parts of a split message derived ids, so a retry dedupes them too", async () => {

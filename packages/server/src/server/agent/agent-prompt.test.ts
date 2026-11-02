@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createTestLogger } from "../../test-utils/test-logger.js";
+import { PromptNotDeliveredError } from "./prompt-not-delivered-error.js";
 import { AgentManager } from "./agent-manager.js";
 import {
   startAgentRun,
@@ -443,4 +444,31 @@ test("a rejected out-of-band decision cannot acknowledge dispatch or start a nor
   await rejected;
   expect(onDispatch).not.toHaveBeenCalled();
   expect(calls).toEqual([]);
+});
+
+test("a Steer refused before delivery withdraws its admitted message, so it can be sent again", async () => {
+  const { controller } = clisbotToolsRunController(async () => undefined);
+  const submission = { id: "msg-1" };
+  controller.admitMessageSubmission = async (_agentId, _prompt, options) => ({
+    options: { ...options, sessionSubmission: submission } as never,
+    duplicate: false,
+  });
+  controller.steerAgentRun = async () => {
+    throw new PromptNotDeliveredError("Active turn changed before steering could be delivered");
+  };
+  const withdraw = vi.fn(async () => undefined);
+  controller.withdrawUndeliveredSubmission = withdraw;
+
+  await expect(
+    startAgentRun(controller, "agent-1", "late steer", createTestLogger(), {
+      activeTurnBehavior: "steer",
+      expectedTurnId: "turn-a",
+      runOptions: { clientMessageId: "msg-1" },
+    }),
+  ).rejects.toBeInstanceOf(PromptNotDeliveredError);
+  expect(withdraw).toHaveBeenCalledWith(
+    "agent-1",
+    expect.objectContaining({ sessionSubmission: submission }),
+    expect.any(PromptNotDeliveredError),
+  );
 });

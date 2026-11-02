@@ -64,13 +64,19 @@ export function isIdAlreadyHeldError(error: unknown): boolean {
 }
 
 /**
- * The Host refused a Steer because the turn it named ended first. A message pressed while a turn
- * ran can reach the Host after that turn finished; nothing was recorded, so it may be sent again.
- * The daemon throws a plain Error, so its text is the only signal (agent-manager.ts steerAgentRun).
+ * The Host refused a Steer before the agent saw it, because of which turn it named: that turn
+ * ended first, or a turn ran that the Steer could not name yet. Hosts from 2.2.2 free the id for
+ * these (PromptNotDeliveredError), so the same message may be sent again. The daemon sends a plain
+ * message, so its text is the only signal (agent-manager.ts steerAgentRun, agent-prompt.ts).
  */
-export function isSteerTurnEndedError(error: unknown): boolean {
+const STEER_TARGET_REFUSALS = [
+  "Active turn changed before steering could be delivered",
+  "Active turn identity is unavailable",
+];
+
+export function isSteerTargetRefusal(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes("Active turn changed before steering could be delivered");
+  return STEER_TARGET_REFUSALS.some((marker) => message.includes(marker));
 }
 
 /** The request may or may not have reached the Host: the connection dropped or timed out. */

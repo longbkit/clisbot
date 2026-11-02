@@ -16,7 +16,7 @@ import {
   classifyDeliveryError,
   HostUnreachableError,
   isIdAlreadyHeldError,
-  isSteerTurnEndedError,
+  isSteerTargetRefusal,
   type DeliveryOutcome,
   type OutboxEntry,
 } from "./model";
@@ -49,6 +49,56 @@ function steerTurnId(entry: AgentEntry): string | undefined {
   const current = session(entry.target.serverId);
   if (current?.serverInfo?.features?.hostInputQueue !== true) return undefined;
   return selectAgentTurnPresentation(current, entry.target.agentId).turnId ?? undefined;
+}
+
+/** How long a Steer waits to learn the turn it targets before the Host decides alone. */
+const STEER_TURN_WAIT_MS = 3_000;
+
+/** The Host's own turn, not the one this app's pending message implies. */
+function openTurnId(entry: AgentEntry): { open: boolean; turnId: string | undefined } {
+  const current = session(entry.target.serverId);
+  const { agentId } = entry.target;
+  const liveness =
+    current?.agents.get(agentId)?.turn ?? current?.agentDetails.get(agentId)?.turn ?? null;
+  if (liveness?.phase !== "open") return { open: false, turnId: undefined };
+  return { open: true, turnId: liveness.turnId ?? undefined };
+}
+
+/**
+ * The turn a Steer should name. A message pressed right after another can reach this point
+ * before the turn that message started has an id here, and a Host with the queue refuses a Steer
+ * that names no turn while one runs. So it waits for the id, or for the agent to go idle, in which
+ * case it names none and the Host starts a turn. `stale` is a turn the Host already said ended.
+ */
+async function steerTurnIdWhenKnown(
+  entry: AgentEntry,
+  stale?: string,
+): Promise<string | undefined> {
+  if (entry.activeTurnBehavior !== "steer") return undefined;
+  if (session(entry.target.serverId)?.serverInfo?.features?.hostInputQueue !== true)
+    return undefined;
+  const read = () => {
+    const turn = openTurnId(entry);
+    if (!turn.open) return { done: true, turnId: undefined };
+    if (turn.turnId && turn.turnId !== stale) return { done: true, turnId: turn.turnId };
+    return { done: false, turnId: undefined };
+  };
+  const now = read();
+  if (now.done) return now.turnId;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let unsubscribe = () => {};
+  try {
+    return await new Promise<string | undefined>((resolve) => {
+      timer = setTimeout(resolve, STEER_TURN_WAIT_MS, undefined);
+      unsubscribe = useSessionStore.subscribe(() => {
+        const next = read();
+        if (next.done) resolve(next.turnId);
+      });
+    });
+  } finally {
+    clearTimeout(timer);
+    unsubscribe();
+  }
 }
 
 export function outboxAgentRow(entry: AgentEntry, turnId?: string): UserMessageItem {
@@ -150,7 +200,6 @@ async function sendAgentParts(
   entry: AgentEntry,
   parts: Awaited<ReturnType<typeof prepareAgentParts>>,
 ): Promise<void> {
-  const expectedTurnId = steerTurnId(entry);
   const last = parts.length - 1;
   for (const [index, part] of parts.entries()) {
     // Derived ids keep the earlier parts of a retried message deduplicated by the Host. The
@@ -164,13 +213,15 @@ async function sendAgentParts(
         images: part.images,
         attachments: part.attachments,
       });
+    const expectedTurnId = await steerTurnIdWhenKnown(entry);
     try {
       await send(expectedTurnId);
     } catch (error) {
-      // The turn this Steer named ended before it arrived. Without a named turn the Host starts a
-      // turn when the agent is idle, and refuses (strict steer) rather than interrupt a new one.
-      if (!expectedTurnId || !isSteerTurnEndedError(error)) throw error;
-      await send(undefined).catch((retryError: unknown) => {
+      // The Host refused the Steer before the agent saw it: the turn it named ended, or a turn
+      // started that it could not name yet. Name the turn running now, or none if the agent is
+      // idle, so the Host starts a turn; a strict Host refuses rather than interrupt a new one.
+      if (!isSteerTargetRefusal(error)) throw error;
+      await send(await steerTurnIdWhenKnown(entry, expectedTurnId)).catch((retryError: unknown) => {
         // A Host from before 2.2.2 keeps the refused attempt's receipt, so it answers the same id
         // with a key conflict: the message was not delivered, never count that as sent.
         throw isIdAlreadyHeldError(retryError) ? error : retryError;

@@ -3301,7 +3301,7 @@ export class AgentManager {
   }
 
   /** A prompt the provider provably never received frees its logical message for a retry. */
-  private async withdrawUndeliveredSubmission(
+  async withdrawUndeliveredSubmission(
     agentId: string,
     options: AgentRunOptions | undefined,
     error: unknown,
