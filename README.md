@@ -28,6 +28,13 @@
 <p align="center">Work and chat with AI natively in Clisbot and across your communication channels.</p>
 
 <p align="center">
+  <a href="https://clisbot.com/download"><b>Desktop</b></a> ·
+  <a href="https://testflight.apple.com/join/XuZu2j9w"><b>iPhone &amp; iPad beta (TestFlight)</b></a> ·
+  <a href="#join-the-mobile-beta"><b>Android beta</b></a> ·
+  <a href="https://github.com/longbkit/clisbot/releases/latest"><b>Android APK</b></a>
+</p>
+
+<p align="center">
   <img src="https://clisbot.com/hero-mockup.png" alt="Clisbot app screenshot" width="100%">
 </p>
 
@@ -116,6 +123,17 @@ You need at least one agent CLI installed and configured with your credentials:
 Download it from [clisbot.com/download](https://clisbot.com/download) or the [GitHub releases page](https://github.com/longbkit/clisbot/releases). Open the app and the daemon starts automatically. Nothing else to install.
 
 To connect from your phone, open **Settings → your host → Pair Device**.
+
+### Join the mobile beta
+
+The phone apps are in beta. Join from a link; no invite needed.
+
+- **iPhone and iPad:** open the [TestFlight link](https://testflight.apple.com/join/XuZu2j9w) on your device. It installs TestFlight, then Clisbot.
+- **Android:** in this order, signed in with the Google account you use on Google Play:
+  1. Join the [Clisbot Android Testers](https://groups.google.com/g/clisbot-android-testers) group.
+  2. Open the [Android testing page](https://play.google.com/apps/testing/com.clisbot.app), tap **Become a tester**, then install Clisbot from Google Play.
+
+You can also install the Android APK from the [latest release](https://github.com/longbkit/clisbot/releases/latest) without Google Play.
 
 ### Server
 
