@@ -1984,6 +1984,67 @@ test("managed push registration carries Project and lease authority", async () =
   });
 });
 
+test("managed push registration records the Hub reader and the scope they choose", async () => {
+  const actor = {
+    kind: "user" as const,
+    id: "user-alice",
+    memberId: "alice",
+    organizationId: "org-1",
+    hubOrigin: "https://hub.example",
+  };
+  const renewals: Array<{ token: string; actor: unknown; scope: unknown }> = [];
+  const messages: SessionOutboundMessage[] = [];
+  const session = createSessionForTest({
+    messages,
+    accountActor: actor,
+    permissions: ["workspace.read"],
+    resourceAuthorization: {
+      resourceMode: "projects",
+      projects: new Map([
+        ["project-a", { privileges: new Set(["project.use"] as const), agentConfigurations: [] }],
+      ]),
+      leaseId: "lease-a",
+      leaseExpiresAt: Date.now() + 15 * 60 * 1000,
+    },
+    pushNotifications: asPushNotifications({
+      renew: (token: string, authorization?: PushTokenAuthorization, scope?: unknown) =>
+        renewals.push({ token, actor: authorization?.actor, scope }),
+    }),
+  });
+
+  expect(session.notificationReader()).toEqual({ actor, daemonWide: false, scope: "mine" });
+  await session.handleMessage({ type: "register_push_token", token: "phone" });
+  await session.handleMessage({
+    type: "notifications.set_scope.request",
+    scope: "all",
+    requestId: "scope-1",
+  });
+
+  expect(renewals).toEqual([
+    { token: "phone", actor, scope: undefined },
+    { token: "phone", actor, scope: "all" },
+  ]);
+  expect(session.notificationReader()).toEqual({ actor, daemonWide: false, scope: "all" });
+  expect(messages).toContainEqual({
+    type: "notifications.set_scope.response",
+    payload: { requestId: "scope-1", scope: "all" },
+  });
+});
+
+test("a managed lease without a Hub account is not a notification reader", () => {
+  const session = createSessionForTest({
+    permissions: ["workspace.read"],
+    resourceAuthorization: {
+      resourceMode: "projects",
+      projects: new Map(),
+      leaseId: "lease-a",
+      leaseExpiresAt: Date.now() + 15 * 60 * 1000,
+    },
+  });
+
+  expect(session.notificationReader()).toBeNull();
+});
+
 test("push token revocation only acknowledges durable removal", async () => {
   const renewed: string[] = [];
   const messages: SessionOutboundMessage[] = [];

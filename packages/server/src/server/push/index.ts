@@ -1,6 +1,7 @@
 import type pino from "pino";
 
 import { PushService, type PushPayload } from "./push-service.js";
+import type { NotificationScope } from "@clisbot/protocol/notification-audience";
 import {
   PushTokenStore,
   type PushNotificationTarget,
@@ -13,7 +14,7 @@ export type { PushNotificationTarget, PushTokenAuthorization } from "./token-sto
 const PUSH_TOKEN_LEASE_MS = 48 * 60 * 60 * 1000;
 
 export interface PushNotifications {
-  renew(token: string, authorization?: PushTokenAuthorization): void;
+  renew(token: string, authorization?: PushTokenAuthorization, scope?: NotificationScope): void;
   revoke(token: string): void;
   revokeLease(leaseId: string): void;
   send(payload: PushPayload, target?: PushNotificationTarget): Promise<void>;
@@ -35,8 +36,8 @@ export function createPushNotifications(options: {
     ((tokens: string[], payload: PushPayload) => service.sendPush(tokens, payload));
 
   return {
-    renew(token, authorization) {
-      store.renewToken(token, authorization);
+    renew(token, authorization, scope) {
+      store.renewToken(token, authorization, scope);
     },
     revoke(token) {
       store.revokeToken(token);

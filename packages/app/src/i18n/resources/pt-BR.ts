@@ -7,6 +7,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { messageDelivery } from "./message-delivery";
+import { notificationScope } from "./notification-scope";
 import { navigation } from "./navigation";
 import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
@@ -3116,4 +3117,5 @@ export const ptBR: TranslationResources = {
   productAnalytics: productAnalytics["pt-BR"],
   home: home["pt-BR"],
   messageDelivery: messageDelivery["pt-BR"],
+  notificationScope: notificationScope["pt-BR"],
 };

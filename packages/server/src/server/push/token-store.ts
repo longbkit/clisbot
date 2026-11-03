@@ -2,6 +2,13 @@ import type pino from "pino";
 import { existsSync, readFileSync } from "node:fs";
 
 import { ensurePrivateFile, writePrivateFileAtomicSync } from "../private-files.js";
+import {
+  DEFAULT_NOTIFICATION_SCOPE,
+  NotificationScopeSchema,
+  type NotificationReader,
+  type NotificationScope,
+} from "@clisbot/protocol/notification-audience";
+import { SessionActorSchema, type SessionActor } from "@clisbot/protocol/session-authorship";
 
 /**
  * Store for Expo push tokens.
@@ -31,12 +38,18 @@ export class PushTokenStore {
     this.loadFromDisk();
   }
 
-  renewToken(token: string, authorization?: PushTokenAuthorization): void {
+  /** `scope` undefined keeps the token's saved choice; a new token starts with For me. */
+  renewToken(
+    token: string,
+    authorization?: PushTokenAuthorization,
+    scope?: NotificationScope,
+  ): void {
     const normalized = token.trim();
     if (!normalized) return;
     const now = this.now();
     const expiry = Math.min(now + this.leaseMs, authorization?.leaseExpiresAt ?? Infinity);
     if (expiry <= now) return;
+    const current = this.subscriptions.get(normalized);
     const candidate: PushTokenSubscription = {
       expiresAt: expiry,
       leaseId: authorization?.leaseId ?? null,
@@ -44,8 +57,9 @@ export class PushTokenStore {
         authorization === undefined || authorization.projectIds === null
           ? null
           : [...new Set(authorization.projectIds)].sort(),
+      actor: authorization?.actor ?? null,
+      scope: scope ?? current?.scope ?? DEFAULT_NOTIFICATION_SCOPE,
     };
-    const current = this.subscriptions.get(normalized);
     if (
       current !== undefined &&
       sameAuthorization(current, candidate) &&
@@ -103,6 +117,7 @@ export class PushTokenStore {
     }
     return Array.from(active)
       .filter(([, subscription]) => allowsTarget(subscription, target))
+      .filter(([, subscription]) => allowsRecipient(subscription, target))
       .map(([token]) => token);
   }
 
@@ -117,34 +132,8 @@ export class PushTokenStore {
       const loaded = new Map<string, PushTokenSubscription>();
       const subscriptions = Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [];
       for (const value of subscriptions) {
-        if (!value || typeof value !== "object") continue;
-        const candidate = value as {
-          token?: unknown;
-          expiresAt?: unknown;
-          leaseId?: unknown;
-          projectIds?: unknown;
-        };
-        if (typeof candidate.token !== "string" || typeof candidate.expiresAt !== "string")
-          continue;
-        const token = candidate.token.trim();
-        const expiresAt = Date.parse(candidate.expiresAt);
-        const leaseId =
-          typeof candidate.leaseId === "string" && candidate.leaseId.trim()
-            ? candidate.leaseId.trim()
-            : null;
-        const projectIds = Array.isArray(candidate.projectIds)
-          ? candidate.projectIds.filter(
-              (projectId): projectId is string =>
-                typeof projectId === "string" && projectId.trim().length > 0,
-            )
-          : null;
-        if (token && Number.isFinite(expiresAt)) {
-          loaded.set(token, {
-            expiresAt,
-            leaseId,
-            projectIds: projectIds === null ? null : [...new Set(projectIds)].sort(),
-          });
-        }
+        const stored = parseStoredSubscription(value);
+        if (stored) loaded.set(stored.token, stored.subscription);
       }
       this.subscriptions = loaded;
 
@@ -157,7 +146,13 @@ export class PushTokenStore {
         for (const token of legacyTokens) {
           const normalized = token.trim();
           if (normalized) {
-            migrated.set(normalized, { expiresAt, leaseId: null, projectIds: null });
+            migrated.set(normalized, {
+              expiresAt,
+              leaseId: null,
+              projectIds: null,
+              actor: null,
+              scope: DEFAULT_NOTIFICATION_SCOPE,
+            });
           }
         }
         this.persist(migrated);
@@ -180,6 +175,8 @@ export class PushTokenStore {
               expiresAt: new Date(subscription.expiresAt).toISOString(),
               ...(subscription.leaseId === null ? {} : { leaseId: subscription.leaseId }),
               ...(subscription.projectIds === null ? {} : { projectIds: subscription.projectIds }),
+              ...(subscription.actor === null ? {} : { actor: subscription.actor }),
+              scope: subscription.scope,
             })),
           },
           null,
@@ -199,23 +196,100 @@ export interface PushTokenAuthorization {
   leaseExpiresAt: number;
   /** Null means daemon-wide authority; an array is the complete Project audience. */
   projectIds: readonly string[] | null;
+  /** The Hub account the lease was issued to. */
+  actor?: SessionActor;
 }
 
 export interface PushNotificationTarget {
   projectId?: string;
+  /** Which readers this notification is for; absent sends to every authorized token. */
+  recipients?: (reader: NotificationReader) => boolean;
 }
 
 interface PushTokenSubscription {
   expiresAt: number;
   leaseId: string | null;
   projectIds: readonly string[] | null;
+  actor: SessionActor | null;
+  scope: NotificationScope;
+}
+
+/** One persisted subscription, permissively; absent reader fields read as written before them. */
+function parseStoredSubscription(
+  value: unknown,
+): { token: string; subscription: PushTokenSubscription } | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as {
+    token?: unknown;
+    expiresAt?: unknown;
+    leaseId?: unknown;
+    projectIds?: unknown;
+    actor?: unknown;
+    scope?: unknown;
+  };
+  if (typeof candidate.token !== "string" || typeof candidate.expiresAt !== "string") return null;
+  const token = candidate.token.trim();
+  const expiresAt = Date.parse(candidate.expiresAt);
+  if (!token || !Number.isFinite(expiresAt)) return null;
+  const leaseId =
+    typeof candidate.leaseId === "string" && candidate.leaseId.trim()
+      ? candidate.leaseId.trim()
+      : null;
+  const projectIds = Array.isArray(candidate.projectIds)
+    ? candidate.projectIds.filter(
+        (projectId): projectId is string =>
+          typeof projectId === "string" && projectId.trim().length > 0,
+      )
+    : null;
+  const actor = SessionActorSchema.safeParse(candidate.actor);
+  const scope = NotificationScopeSchema.safeParse(candidate.scope);
+  return {
+    token,
+    subscription: {
+      expiresAt,
+      leaseId,
+      projectIds: projectIds === null ? null : [...new Set(projectIds)].sort(),
+      actor: actor.success ? actor.data : null,
+      scope: scope.success ? scope.data : DEFAULT_NOTIFICATION_SCOPE,
+    },
+  };
 }
 
 function sameAuthorization(left: PushTokenSubscription, right: PushTokenSubscription): boolean {
   return (
     left.leaseId === right.leaseId &&
-    JSON.stringify(left.projectIds) === JSON.stringify(right.projectIds)
+    left.scope === right.scope &&
+    JSON.stringify(left.projectIds) === JSON.stringify(right.projectIds) &&
+    JSON.stringify(left.actor) === JSON.stringify(right.actor)
   );
+}
+
+/**
+ * The reader a token belongs to. A managed lease names its Hub account; a lease
+ * token saved without one (written before readers were recorded) is nobody we
+ * can attribute, so it receives nothing until its device renews it.
+ */
+export function pushTokenReader(subscription: {
+  leaseId: string | null;
+  projectIds: readonly string[] | null;
+  actor: SessionActor | null;
+  scope: NotificationScope;
+}): NotificationReader | null {
+  if (subscription.leaseId !== null && subscription.actor === null) return null;
+  return {
+    actor: subscription.actor,
+    daemonWide: subscription.projectIds === null,
+    scope: subscription.scope,
+  };
+}
+
+function allowsRecipient(
+  subscription: PushTokenSubscription,
+  target: PushNotificationTarget | undefined,
+): boolean {
+  if (!target?.recipients) return true;
+  const reader = pushTokenReader(subscription);
+  return reader !== null && target.recipients(reader);
 }
 
 function allowsTarget(

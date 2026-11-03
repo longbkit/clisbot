@@ -11,7 +11,14 @@ import type { ScheduleService } from "./schedule/service.js";
 import type { CheckoutDiffManager } from "./checkout-diff-manager.js";
 import { asInternals, createStub } from "./test-utils/class-mocks.js";
 import { createProviderSnapshotManagerStub } from "./test-utils/session-stubs.js";
-import type { PushNotificationSender, PushPayload } from "./push/index.js";
+import type { PushNotificationSender, PushNotificationTarget, PushPayload } from "./push/index.js";
+import type { NotificationReader } from "@clisbot/protocol/notification-audience";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
+import { createPushNotifications } from "./push/index.js";
+import { forgetTerminalLaunch, recordTerminalLaunch } from "./managed-access/terminal-launches.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { WorkspaceAutoName } from "./workspace-auto-name.js";
 
 const WORKSPACE_ID = "workspace-1";
@@ -79,20 +86,27 @@ function createWorkspaceAutoNameStub(): WorkspaceAutoName {
   });
 }
 
+/** The Host owner's own paired phone: no Hub identity, every Project. */
+const HOST_OWNER_READER: NotificationReader = { actor: null, daemonWide: true, scope: "mine" };
+
+/** Records what reaches the Host owner's phone, the token these tests have always modelled. */
 class RecordingPushNotificationSender implements PushNotificationSender {
   readonly sent: PushPayload[] = [];
 
-  async send(payload: PushPayload): Promise<void> {
+  async send(payload: PushPayload, target?: PushNotificationTarget): Promise<void> {
+    if (target?.recipients && !target.recipients(HOST_OWNER_READER)) return;
     this.sent.push(payload);
   }
 }
 
-function createServer(agentManagerOverrides?: Record<string, unknown>) {
-  const pushNotifications = new RecordingPushNotificationSender();
+function createServer(
+  agentManagerOverrides?: Record<string, unknown>,
+  pushNotifications: PushNotificationSender = new RecordingPushNotificationSender(),
+) {
   const agentManager = {
     subscribe: vi.fn(() => () => {}),
     setAgentAttentionCallback: vi.fn(),
-    getAgent: vi.fn(() => ({ workspaceId: WORKSPACE_ID, pendingPermissions: new Map() })),
+    getAgent: vi.fn((): unknown => ({ workspaceId: WORKSPACE_ID, pendingPermissions: new Map() })),
     getLastAssistantMessage: vi.fn(async () => null),
     getMetricsSnapshot: vi.fn(() => ({
       total: 0,
@@ -116,7 +130,7 @@ function createServer(agentManagerOverrides?: Record<string, unknown>) {
     createStub<pino.Logger>(createLogger()),
     "srv-test",
     createStub<AgentManager>(agentManager),
-    createStub<AgentStorage>({}),
+    createStub<AgentStorage>({ get: vi.fn(async () => null) }),
     createStub<DownloadTokenStore>({}),
     "/tmp/clisbot-test",
     createStub<DaemonConfigStore>(daemonConfigStore),
@@ -156,7 +170,11 @@ function createServer(agentManagerOverrides?: Record<string, unknown>) {
     createProviderSnapshotManagerStub().manager,
   );
 
-  return { server, agentManager, pushNotifications };
+  return {
+    server,
+    agentManager,
+    pushNotifications: pushNotifications as RecordingPushNotificationSender,
+  };
 }
 
 function createOpenSocket() {
@@ -196,7 +214,11 @@ function connectClient(
     appVisible: boolean;
     appVisibilityChangedAt?: Date;
   } | null,
-  options: { subscribed?: boolean } = {},
+  options: {
+    subscribed?: boolean;
+    reader?: NotificationReader | null;
+    allowsResource?: boolean;
+  } = {},
 ) {
   const ws = createOpenSocket();
   const delivery = new SessionDelivery(() => {});
@@ -207,6 +229,8 @@ function connectClient(
       ...createSessionWithActivity(activity, options.subscribed ?? true),
       delivery,
       wantsSourceNotification: () => true,
+      notificationReader: () => (options.reader === undefined ? HOST_OWNER_READER : options.reader),
+      allowsNotificationAbout: () => options.allowsResource ?? true,
     },
     clientId: "client-test",
     appVersion: null,
@@ -368,5 +392,275 @@ describe("VoiceAssistantWebSocketServer notification payloads", () => {
 
     expect(readAttentionRequiredMessage(ws).shouldNotify).toBe(false);
     expect(pushNotifications.sent).toEqual([]);
+  });
+});
+
+const HUB = "https://hub.example";
+const PROJECT_ID = "project-a";
+
+function member(memberId: string): SessionActor {
+  return {
+    kind: "user",
+    id: `user-${memberId}`,
+    memberId,
+    organizationId: "org-1",
+    hubOrigin: HUB,
+    hubIdentity: "hub-1",
+  };
+}
+
+const ALICE = member("alice");
+const BOB = member("bob");
+
+function memberReader(
+  actor: SessionActor,
+  scope: NotificationReader["scope"] = "mine",
+): NotificationReader {
+  return { actor, daemonWide: false, scope };
+}
+
+/** A real token store on a scratch file; delivery is captured, nothing leaves the process. */
+function createTokenAudience() {
+  const delivered: Array<{ tokens: string[]; payload: PushPayload }> = [];
+  const dir = mkdtempSync(join(tmpdir(), "clisbot-push-audience-"));
+  const push = createPushNotifications({
+    logger: createStub<pino.Logger>(createLogger()),
+    filePath: join(dir, "push-tokens.json"),
+    deliver: async (tokens, payload) => {
+      delivered.push({ tokens: [...tokens].sort(), payload });
+    },
+  });
+  const registerMember = (
+    token: string,
+    actor: SessionActor,
+    options: { scope?: NotificationReader["scope"]; projectIds?: string[] | null } = {},
+  ) =>
+    push.renew(
+      token,
+      {
+        leaseId: `lease-${token}`,
+        leaseExpiresAt: Date.now() + 60 * 60 * 1000,
+        projectIds: options.projectIds === undefined ? [PROJECT_ID] : options.projectIds,
+        actor,
+      },
+      options.scope,
+    );
+  return { push, delivered, registerMember, cleanup: () => rmSync(dir, { recursive: true }) };
+}
+
+function createAudienceServer(agent: Record<string, unknown>, extraAgents = new Map()) {
+  const audience = createTokenAudience();
+  const { server } = createServer(
+    {
+      getAgent: vi.fn((agentId: string) =>
+        agentId === "agent-1"
+          ? { workspaceId: WORKSPACE_ID, pendingPermissions: new Map(), ...agent }
+          : extraAgents.get(agentId),
+      ),
+    },
+    audience.push,
+  );
+  asInternals<{ projectIdForWorkspace: () => Promise<string> }>(server).projectIdForWorkspace =
+    async () => PROJECT_ID;
+  return { server, ...audience };
+}
+
+async function finish(server: VoiceAssistantWebSocketServer) {
+  await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
+    agentId: "agent-1",
+    provider: "claude",
+    reason: "finished",
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+}
+
+describe("VoiceAssistantWebSocketServer notification audience", () => {
+  const cleanups: Array<() => void> = [];
+  afterEach(() => {
+    for (const cleanup of cleanups.splice(0)) cleanup();
+  });
+
+  function setup(agent: Record<string, unknown>, extraAgents?: Map<string, unknown>) {
+    const result = createAudienceServer(agent, extraAgents);
+    cleanups.push(result.cleanup);
+    return result;
+  }
+
+  it("pushes a teammate's finished session to its author only, not every Project Member", async () => {
+    const { server, delivered, registerMember } = setup({ createdBy: BOB });
+    registerMember("alice-phone", ALICE);
+    registerMember("bob-phone", BOB);
+
+    await finish(server);
+
+    expect(delivered.map((entry) => entry.tokens)).toEqual([["bob-phone"]]);
+  });
+
+  it("a session someone else joined notifies the participant as For me", async () => {
+    const { server, delivered, registerMember } = setup({
+      createdBy: BOB,
+      lastMessageBy: ALICE,
+    });
+    registerMember("alice-phone", ALICE);
+    registerMember("bob-phone", BOB);
+
+    await finish(server);
+
+    expect(delivered.map((entry) => entry.tokens)).toEqual([["alice-phone", "bob-phone"]]);
+  });
+
+  it("a teammate's open app neither takes the author's notification nor suppresses their push", async () => {
+    const { server, delivered, registerMember } = setup({ createdBy: BOB });
+    registerMember("bob-phone", BOB);
+    const aliceDesktop = connectClient(
+      server,
+      { deviceType: "web", appVisible: true, focusedAgentId: null, lastActivityAt: new Date() },
+      { reader: memberReader(ALICE) },
+    );
+
+    await finish(server);
+
+    expect(readAttentionRequiredMessage(aliceDesktop).shouldNotify).toBe(false);
+    expect(delivered.map((entry) => entry.tokens)).toEqual([["bob-phone"]]);
+  });
+
+  it("the author's own present desktop takes the notification instead of their phone", async () => {
+    const { server, delivered, registerMember } = setup({ createdBy: BOB });
+    registerMember("bob-phone", BOB);
+    const bobDesktop = connectClient(
+      server,
+      { deviceType: "web", appVisible: false, focusedAgentId: null, lastActivityAt: new Date() },
+      { reader: memberReader(BOB) },
+    );
+
+    await finish(server);
+
+    expect(readAttentionRequiredMessage(bobDesktop).shouldNotify).toBe(true);
+    expect(delivered).toEqual([]);
+  });
+
+  it("the Host owner's present direct desktop covers their Hub phone but not a Project Member", async () => {
+    const { server, delivered, registerMember } = setup({});
+    registerMember("owner-hub-phone", BOB, { projectIds: null, scope: "all" });
+    registerMember("member-phone", ALICE, { scope: "all" });
+    const ownerDesktop = connectClient(server, {
+      deviceType: "web",
+      appVisible: false,
+      focusedAgentId: null,
+      lastActivityAt: new Date(),
+    });
+
+    await finish(server);
+
+    expect(readAttentionRequiredMessage(ownerDesktop).shouldNotify).toBe(true);
+    expect(delivered.map((entry) => entry.tokens)).toEqual([["member-phone"]]);
+  });
+
+  it("honours each token's scope: All includes teammates, Others excludes own work, Off is silent", async () => {
+    const { server, delivered, registerMember } = setup({ createdBy: BOB });
+    registerMember("alice-all", ALICE, { scope: "all" });
+    registerMember("alice-others", member("alice2"), { scope: "others" });
+    registerMember("bob-others", BOB, { scope: "others" });
+    registerMember("bob-off", member("bob2"), { scope: "off" });
+
+    await finish(server);
+
+    expect(delivered.map((entry) => entry.tokens)).toEqual([["alice-all", "alice-others"]]);
+  });
+
+  it("unattributed work pages the Host owner and daemon-wide readers, not Project Members", async () => {
+    const { server, delivered, registerMember, push } = setup({});
+    registerMember("member-phone", ALICE);
+    registerMember("admin-phone", BOB, { projectIds: null });
+    push.renew("owner-phone");
+
+    await finish(server);
+
+    expect(delivered.map((entry) => entry.tokens)).toEqual([["admin-phone", "owner-phone"]]);
+  });
+
+  it("a subagent belongs to whoever owns its parent", async () => {
+    const parent = { createdBy: ALICE, labels: {} };
+    const { server, delivered, registerMember } = setup(
+      { labels: { "clisbot.parent-agent-id": "parent-1" } },
+      new Map([["parent-1", parent]]),
+    );
+    registerMember("alice-phone", ALICE);
+    registerMember("bob-phone", BOB);
+
+    await finish(server);
+
+    expect(delivered.map((entry) => entry.tokens)).toEqual([["alice-phone"]]);
+  });
+
+  it("a scheduled run belongs to the verified owner of its schedule", async () => {
+    const { server, delivered, registerMember } = setup({
+      createdBy: { kind: "automation", id: "schedule-1" },
+      ownerActor: ALICE,
+    });
+    registerMember("alice-phone", ALICE);
+    registerMember("bob-phone", BOB);
+
+    await finish(server);
+
+    expect(delivered.map((entry) => entry.tokens)).toEqual([["alice-phone"]]);
+  });
+
+  it("a channel sender matches a reader only through a verified Member link", async () => {
+    const slack = (memberId?: string): SessionActor => ({
+      kind: "user",
+      id: "slack:U123",
+      connectionId: "slack-connection",
+      organizationId: "org-1",
+      hubOrigin: HUB,
+      ...(memberId ? { memberId } : {}),
+    });
+    const linked = setup({ createdBy: slack("alice") });
+    linked.registerMember("alice-phone", ALICE);
+    linked.registerMember("bob-phone", BOB);
+    await finish(linked.server);
+
+    const unlinked = setup({ createdBy: slack() });
+    unlinked.registerMember("alice-phone", { ...ALICE, id: "slack:U123" });
+    await finish(unlinked.server);
+
+    expect(linked.delivered.map((entry) => entry.tokens)).toEqual([["alice-phone"]]);
+    expect(unlinked.delivered).toEqual([]);
+  });
+
+  it("a terminal notifies whoever launched it; an untracked terminal pages no Project Member", async () => {
+    const { server, delivered, registerMember } = setup({});
+    registerMember("alice-phone", ALICE);
+    registerMember("bob-phone", BOB);
+    recordTerminalLaunch("terminal-bob", { createdBy: BOB.id });
+    const internals = asInternals<{
+      broadcastTerminalAttention(params: Record<string, string>): Promise<void>;
+    }>(server);
+
+    for (const terminalId of ["terminal-bob", "terminal-untracked"])
+      await internals.broadcastTerminalAttention({
+        terminalId,
+        cwd: "/tmp/worktree",
+        workspaceId: WORKSPACE_ID,
+        terminalName: "shell",
+        reason: "finished",
+      });
+    await new Promise((resolve) => setImmediate(resolve));
+    forgetTerminalLaunch("terminal-bob");
+
+    expect(delivered.map((entry) => entry.tokens)).toEqual([["bob-phone"]]);
+  });
+
+  it("a connection that may not see the session gets no attention message or preview", async () => {
+    const { server } = setup({ createdBy: BOB });
+    const outsider = connectClient(
+      server,
+      { deviceType: "web", appVisible: false, focusedAgentId: null, lastActivityAt: new Date() },
+      { reader: memberReader(BOB, "all"), allowsResource: false },
+    );
+
+    await finish(server);
+
+    expect(outsider.send).not.toHaveBeenCalled();
   });
 });

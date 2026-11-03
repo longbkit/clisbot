@@ -230,6 +230,11 @@ import type { HubExecutionAgents } from "./hub/daemon-executions.js";
 import { DownloadTokenStore } from "./file-download/token-store.js";
 import type { PushNotifications, PushTokenAuthorization } from "./push/index.js";
 import {
+  DEFAULT_NOTIFICATION_SCOPE,
+  type NotificationReader,
+  type NotificationScope,
+} from "@clisbot/protocol/notification-audience";
+import {
   archivePersistedWorkspaceRecord,
   archiveWorkspaceContents,
 } from "./workspace-archive-service.js";
@@ -859,6 +864,8 @@ export class Session {
   >();
   private readonly clientCapabilitiesBySource = new Map<object, ReadonlySet<ClientCapability>>();
   private registeredPushToken: string | null = null;
+  /** Undefined until the client chooses; a token then keeps its saved scope. */
+  private notificationScope: NotificationScope | undefined;
   private readonly clientSources = new Map<
     object,
     {
@@ -2637,7 +2644,11 @@ export class Session {
   public extendManagedLease(leaseId: string, leaseExpiresAt: number): boolean {
     const extended = this.authorization.extendLease(leaseId, leaseExpiresAt);
     if (extended && this.registeredPushToken) {
-      this.pushNotifications.renew(this.registeredPushToken, this.pushTokenAuthorization());
+      this.pushNotifications.renew(
+        this.registeredPushToken,
+        this.pushTokenAuthorization(),
+        this.notificationScope,
+      );
     }
     return extended;
   }
@@ -2654,7 +2665,11 @@ export class Session {
       this.accountActor = admission.actor;
     }
     if (this.registeredPushToken) {
-      this.pushNotifications.renew(this.registeredPushToken, this.pushTokenAuthorization());
+      this.pushNotifications.renew(
+        this.registeredPushToken,
+        this.pushTokenAuthorization(),
+        this.notificationScope,
+      );
     }
   }
 
@@ -3764,6 +3779,9 @@ export class Session {
         return;
       case "register_push_token":
         this.handleRegisterPushToken(msg.token);
+        return;
+      case "notifications.set_scope.request":
+        this.handleSetNotificationScope(msg.scope, msg.requestId);
         return;
       case "push.unregister.request":
         if (
@@ -5653,7 +5671,11 @@ export class Session {
       void this.clearFocusedTerminalAttention(focusedTerminalId);
     }
     if (metadata.pushToken) {
-      this.pushNotifications.renew(metadata.pushToken, this.pushTokenAuthorization());
+      this.pushNotifications.renew(
+        metadata.pushToken,
+        this.pushTokenAuthorization(),
+        this.notificationScope,
+      );
     }
   }
 
@@ -5675,8 +5697,38 @@ export class Session {
   private handleRegisterPushToken(token: string): void {
     this.registeredPushToken = token;
     this.currentClientMetadata().pushToken = token;
-    this.pushNotifications.renew(token, this.pushTokenAuthorization());
+    this.pushNotifications.renew(token, this.pushTokenAuthorization(), this.notificationScope);
     this.sessionLogger.info("Registered push token");
+  }
+
+  private handleSetNotificationScope(scope: NotificationScope, requestId: string): void {
+    this.notificationScope = scope;
+    if (this.registeredPushToken) {
+      this.pushNotifications.renew(this.registeredPushToken, this.pushTokenAuthorization(), scope);
+    }
+    this.emit({ type: "notifications.set_scope.response", payload: { requestId, scope } });
+  }
+
+  /**
+   * Who this connection's notifications are for. A managed lease without a Hub
+   * account cannot be attributed to anyone, so it is not notified.
+   */
+  public notificationReader(): NotificationReader | null {
+    const managed = this.authorization.leaseId() !== null;
+    if (managed && !this.accountActor) return null;
+    return {
+      actor: managed ? (this.accountActor ?? null) : null,
+      daemonWide: this.authorization.authorizedProjectIds() === null,
+      scope: this.notificationScope ?? DEFAULT_NOTIFICATION_SCOPE,
+    };
+  }
+
+  /** Whether this connection may see the session or terminal a notification is about. */
+  public allowsNotificationAbout(resource: { workspaceId?: string | null; cwd?: string }): boolean {
+    if (resource.workspaceId)
+      return this.resourceAuthorizer.allowsWorkspaceSync(resource.workspaceId);
+    if (resource.cwd) return this.resourceAuthorizer.allowsCwdSync(resource.cwd);
+    return !this.resourceAuthorizer.isRestricted();
   }
 
   private pushTokenAuthorization(): PushTokenAuthorization | undefined {
@@ -5687,6 +5739,7 @@ export class Session {
       leaseId,
       leaseExpiresAt,
       projectIds: this.authorization.authorizedProjectIds(),
+      ...(this.accountActor ? { actor: this.accountActor } : {}),
     };
   }
 

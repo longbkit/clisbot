@@ -46,6 +46,7 @@ import {
 } from "@/utils/agent-initialization";
 import { derivePendingPermissionKey } from "@/utils/agent-snapshots";
 import { useToast } from "@/contexts/toast-context";
+import { useAppSettings } from "@/hooks/use-settings";
 import { toErrorMessage } from "@/utils/error-messages";
 import { showProviderNoticeToast } from "@/utils/provider-notice-toast";
 import { applyCheckoutStatusUpdateFromEvent } from "@/git/checkout-status-cache";
@@ -253,6 +254,8 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
     focusedTerminalId,
   });
   useEffect(() => startPushNotifications({ client, serverId }), [client, serverId]);
+  const notificationScope = useAppSettings().settings.notificationScope;
+  useEffect(() => client.setNotificationScope(notificationScope), [client, notificationScope]);
 
   const notifyAgentAttention = useCallback(
     (params: {

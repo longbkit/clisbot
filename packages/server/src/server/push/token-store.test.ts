@@ -7,6 +7,8 @@ import { describe, expect, test } from "vitest";
 import { PRIVATE_FILE_MODE } from "../private-files.js";
 import { createPushNotifications } from "./index.js";
 import { PushTokenStore } from "./token-store.js";
+import type { SessionActor } from "@clisbot/protocol/session-authorship";
+import type { NotificationReader } from "@clisbot/protocol/notification-audience";
 
 const MODE_MASK = 0o777;
 const PERMISSIVE_FILE_MODE = 0o644;
@@ -92,6 +94,7 @@ describe("PushTokenStore persistence", () => {
         {
           token: "ExponentPushToken[test]",
           expiresAt: "2026-08-12T00:00:00.000Z",
+          scope: "mine",
         },
       ],
     });
@@ -100,5 +103,78 @@ describe("PushTokenStore persistence", () => {
     store.revokeToken("ExponentPushToken[test]");
     expect(store.getActiveTokens()).toEqual([]);
     expect(JSON.parse(persisted)).toEqual({ subscriptions: [] });
+  });
+});
+
+describe("PushTokenStore readers", () => {
+  const ALICE: SessionActor = {
+    kind: "user",
+    id: "user-alice",
+    memberId: "alice",
+    organizationId: "org-1",
+    hubOrigin: "https://hub.example",
+  };
+  const NOW = Date.parse("2026-11-03T00:00:00.000Z");
+  const LEASE = { leaseId: "lease-a", leaseExpiresAt: NOW + 60 * 60 * 1000, projectIds: ["p"] };
+
+  function withHome(run: (tokenPath: string) => void) {
+    const home = mkdtempSync(path.join(tmpdir(), "clisbot-push-readers-"));
+    try {
+      run(path.join(home, "push-tokens.json"));
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  }
+
+  function readersOf(store: PushTokenStore): NotificationReader[] {
+    const readers: NotificationReader[] = [];
+    store.getActiveTokens({ projectId: "p", recipients: (reader) => !!readers.push(reader) });
+    return readers;
+  }
+
+  test("a reader and their chosen scope survive a restart; renewing without a scope keeps it", () => {
+    withHome((tokenPath) => {
+      const first = new PushTokenStore(createLogger(), tokenPath, () => NOW, 48 * 60 * 60 * 1000);
+      first.renewToken("phone", { ...LEASE, actor: ALICE }, "all");
+      first.renewToken("phone", { ...LEASE, actor: ALICE });
+
+      const restarted = new PushTokenStore(
+        createLogger(),
+        tokenPath,
+        () => NOW,
+        48 * 60 * 60 * 1000,
+      );
+
+      expect(readersOf(restarted)).toEqual([{ actor: ALICE, daemonWide: false, scope: "all" }]);
+    });
+  });
+
+  test("a lease token saved before readers were recorded is silent until its device renews it", () => {
+    withHome((tokenPath) => {
+      writeFileSync(
+        tokenPath,
+        JSON.stringify({
+          subscriptions: [
+            {
+              token: "member-phone",
+              expiresAt: new Date(NOW + 60_000).toISOString(),
+              leaseId: "lease-a",
+              projectIds: ["p"],
+            },
+            { token: "owner-phone", expiresAt: new Date(NOW + 60_000).toISOString() },
+          ],
+        }),
+      );
+      const store = new PushTokenStore(createLogger(), tokenPath, () => NOW, 48 * 60 * 60 * 1000);
+
+      expect(store.getActiveTokens({ projectId: "p", recipients: () => true })).toEqual([
+        "owner-phone",
+      ]);
+      store.renewToken("member-phone", { ...LEASE, actor: ALICE });
+      expect(store.getActiveTokens({ projectId: "p", recipients: () => true }).sort()).toEqual([
+        "member-phone",
+        "owner-phone",
+      ]);
+    });
   });
 });

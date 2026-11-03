@@ -7,6 +7,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { messageDelivery } from "./message-delivery";
+import { notificationScope } from "./notification-scope";
 import { navigation } from "./navigation";
 import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
@@ -3129,4 +3130,5 @@ export const ru: TranslationResources = {
   productAnalytics: productAnalytics.ru,
   home: home.ru,
   messageDelivery: messageDelivery.ru,
+  notificationScope: notificationScope.ru,
 };
