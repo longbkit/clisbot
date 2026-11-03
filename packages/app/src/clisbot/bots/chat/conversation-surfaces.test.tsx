@@ -37,6 +37,7 @@ vi.mock("@/screens/workspace/compact-workspace-header", () => ({
   MobileWorkspaceTabSwitcher: () => null,
 }));
 vi.mock("./conversation-heading", () => ({ ConversationHeading: () => null }));
+vi.mock("./conversation-explorer-dock", () => ({ ConversationExplorerDock: () => null }));
 vi.mock("@/stores/session-store", () => ({
   useSessionStore: { getState: () => ({ sessions: {} }) },
 }));
