@@ -1054,6 +1054,93 @@ describe("channel_ingress_queue", () => {
  * The `/agent` and `/model` choice. One row per conversation, and two commands
  * in the same conversation land on it at once.
  */
+describe("channel_steer_targets", () => {
+  it("keeps the first turn recorded for a message, across store instances", async () => {
+    const replica = new ChannelStore(bundle.runtime).steerTargets.forOrganization(ORGANIZATION_ID);
+    const targets = store.steerTargets.forOrganization(ORGANIZATION_ID);
+    assert.equal(await targets.find("agent-1", "steer-first"), undefined);
+    await targets.claim("agent-1", "steer-first", "turn-a");
+    await replica.claim("agent-1", "steer-first", "turn-b");
+    assert.equal(await replica.find("agent-1", "steer-first"), "turn-a");
+    await targets.claim("agent-1", "steer-idle", null);
+    await replica.claim("agent-1", "steer-idle", "turn-b");
+    assert.equal(await replica.find("agent-1", "steer-idle"), null);
+    assert.equal(await replica.find("agent-2", "steer-first"), undefined);
+    assert.equal(await replica.begin("agent-2", "steer-first"), undefined);
+  });
+
+  it("forgets a turn only once every attempt that began is known undelivered, under concurrency", async () => {
+    const targets = store.steerTargets.forOrganization(ORGANIZATION_ID);
+    const replica = new ChannelStore(bundle.runtime).steerTargets.forOrganization(ORGANIZATION_ID);
+    await targets.claim("agent-1", "steer-counted", "turn-a");
+    assert.deepEqual(
+      await Promise.all([
+        targets.begin("agent-1", "steer-counted"),
+        replica.begin("agent-1", "steer-counted"),
+        targets.begin("agent-1", "steer-counted"),
+      ]),
+      ["turn-a", "turn-a", "turn-a"],
+    );
+    await Promise.all([
+      targets.undelivered("agent-1", "steer-counted", "turn-a"),
+      replica.undelivered("agent-1", "steer-counted", "turn-a"),
+    ]);
+    assert.equal(await targets.find("agent-1", "steer-counted"), "turn-a", "one may be delivered");
+    await targets.undelivered("agent-1", "steer-counted", "turn-other");
+    assert.equal(
+      await targets.find("agent-1", "steer-counted"),
+      "turn-a",
+      "a stale turn counts nothing",
+    );
+    await replica.undelivered("agent-1", "steer-counted", "turn-a");
+    assert.equal(await targets.find("agent-1", "steer-counted"), undefined);
+    await targets.claim("agent-1", "steer-idle-counted", null);
+    await targets.begin("agent-1", "steer-idle-counted");
+    await targets.undelivered("agent-1", "steer-idle-counted", null);
+    assert.equal(await targets.find("agent-1", "steer-idle-counted"), undefined);
+  });
+
+  it("keeps a turn an attempt began with after the others were counted", async () => {
+    const targets = store.steerTargets.forOrganization(ORGANIZATION_ID);
+    await targets.claim("agent-1", "steer-late", "turn-a");
+    await targets.begin("agent-1", "steer-late");
+    // A second attempt begins before the first is counted: the count can no longer match.
+    await targets.begin("agent-1", "steer-late");
+    await targets.undelivered("agent-1", "steer-late", "turn-a");
+    assert.equal(await targets.find("agent-1", "steer-late"), "turn-a");
+  });
+
+  it("is pruned with the ingress rows, never while a row still carries its message", async () => {
+    const targets = store.steerTargets.forOrganization(ORGANIZATION_ID);
+    await targets.claim("agent-1", "steer-carried", "turn-a");
+    await targets.claim("agent-1", "steer-loose", "turn-a");
+    const { record } = await store.enqueueChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: SLACK_ACCOUNT,
+      externalEventId: "steer-carried-event",
+      externalMessageId: "steer-carried-event",
+      externalConversationId: SLACK_CONVERSATION,
+      externalThreadId: SLACK_THREAD,
+      laneKey: "slack/work/steer",
+      payload: { text: "carried" },
+    });
+    const scope = {
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: SLACK_ACCOUNT,
+      bindingKey: "steer-binding",
+    };
+    await store.inbox.markSent(scope, [record.id], "steer-carried");
+    await store.pruneChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      completedOlderThan: new Date(Date.now() + 60_000),
+    });
+    assert.equal(await targets.find("agent-1", "steer-carried"), "turn-a");
+    assert.equal(await targets.find("agent-1", "steer-loose"), undefined);
+  });
+});
+
 describe("channel_conversation_selections", () => {
   const CONVERSATION = "C0SELECT";
   const key = (channel: "slack" | "telegram") => ({

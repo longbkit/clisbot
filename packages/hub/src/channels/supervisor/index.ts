@@ -1743,6 +1743,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     compiled: CompiledChannelAccount,
     snapshot: ChannelControlPlaneSnapshot,
   ): Promise<DaemonConnection> {
+    const steerTargets = this.store.steerTargets.forOrganization(snapshot.organizationId);
     const host = await this.resolveEnrolledHost(compiled, snapshot);
     if (host !== undefined) {
       this.logger.info?.("channel drives its Host over the Host's own connection", {
@@ -1754,6 +1755,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         permissions: host.sessions.channel(host.id)?.permissions ?? [],
       });
       return connectEnrolledChannelDaemon({
+        steerTargets,
         hostLabel: host.label,
         hostId: host.id,
         resolveChannel: () => host.sessions.channel(host.id),
@@ -1781,7 +1783,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     }
     this.applyChannelAdmissionTicket(daemonOptions, handle, compiled, snapshot);
     await this.applyDaemonTarget(daemonOptions, handle, compiled, snapshot);
-    return connectChannelDaemon(daemonOptions);
+    return connectChannelDaemon({ ...daemonOptions, steerTargets });
   }
 
   /** This Hub reaches Hosts over their own connections, and was not told to dial one. */
