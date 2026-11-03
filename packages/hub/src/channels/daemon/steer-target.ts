@@ -10,9 +10,12 @@
  * turn its first attempt recorded, from any Hub process: a delivered message
  * replayed after a restart, a lost acknowledgement or on another replica is
  * answered as delivered, not as `agent_request_key_conflict`. The record is kept
- * after success for exactly that replay, and dropped only when the Host never
- * saw the attempt or refused the Steer before the agent saw it. A Host from
- * 2.2.2 frees the receipt then, so the next attempt reads the turn again.
+ * after success for exactly that replay. It is dropped only once every attempt
+ * that began sending is known not to have reached the agent: the Host never saw
+ * it, or refused the Steer before the agent saw it. One attempt with an unknown
+ * outcome, in flight or lost, keeps the turn for good. A Host from 2.2.2 frees a
+ * refused attempt's receipt, so after the drop the next attempt reads the turn
+ * again.
  *
  * A Host before 2.2.2 keeps a refused attempt's receipt. A turn that ends
  * between the read and the send is refused there, and the message dead-letters:
@@ -24,14 +27,16 @@ import { HostNotReachedError } from "./enrolled-client.js";
 /** No turn: the agent was idle, so the Steer starts one. */
 export type SteerTurn = string | null;
 
-/** Durable in the Hub (`db/channel-steer-targets.ts`); first writer wins. */
+/** Durable in the Hub (`db/channel-steer-targets.ts`); each method is atomic. */
 export interface SteerTargetStore {
   /** `undefined` when nothing is recorded for the message. */
   find(agentId: string, messageId: string): Promise<SteerTurn | undefined>;
-  /** Record `turn` unless one is recorded; return the recorded turn. */
-  claim(agentId: string, messageId: string, turn: SteerTurn): Promise<SteerTurn>;
-  /** Forget the record while it still names `turn`. */
-  release(agentId: string, messageId: string, turn: SteerTurn): Promise<void>;
+  /** Record `turn` unless one is recorded (first writer wins). */
+  claim(agentId: string, messageId: string, turn: SteerTurn): Promise<void>;
+  /** Count an attempt about to send; the recorded turn, `undefined` when none. */
+  begin(agentId: string, messageId: string): Promise<SteerTurn | undefined>;
+  /** Count a begun attempt naming `turn` as undelivered; forget the record once all are. */
+  undelivered(agentId: string, messageId: string, turn: SteerTurn): Promise<void>;
 }
 
 /** Refusals the Host gives before the provider sees the prompt (`agent-prompt.ts`, `agent-manager.ts`). */
@@ -75,10 +80,31 @@ export async function resolveSteerTurn(
   if (messageId === undefined) return read();
   const recorded = await store.find(agentId, messageId);
   if (recorded !== undefined) return recorded;
-  return store.claim(agentId, messageId, await read());
+  await store.claim(agentId, messageId, await read());
+  const claimed = await store.find(agentId, messageId);
+  if (claimed === undefined) throw new Error("The Steer target changed; this message is retried.");
+  return claimed;
 }
 
-/** After a failed send: forget the turn only when this attempt provably reached no agent. */
+/**
+ * Count this attempt right before it sends. A record forgotten or replaced since
+ * the turn was resolved means another attempt settled it: send nothing now.
+ */
+export async function beginSteerTurn(
+  store: SteerTargetStore,
+  agentId: string,
+  messageId: string | undefined,
+  turn: SteerTurn,
+): Promise<void> {
+  if (messageId === undefined) return;
+  const recorded = await store.begin(agentId, messageId);
+  if (recorded === turn) return;
+  // Counted but not sent: say so, or the record could never be forgotten.
+  if (recorded !== undefined) await store.undelivered(agentId, messageId, recorded);
+  throw new Error("The Steer target changed; this message is retried.");
+}
+
+/** After a begun send failed: count it undelivered only when it provably reached no agent. */
 export async function settleSteerTurn(
   store: SteerTargetStore,
   agentId: string,
@@ -88,7 +114,25 @@ export async function settleSteerTurn(
 ): Promise<void> {
   if (messageId === undefined) return;
   if (error instanceof HostNotReachedError || isSteerRefusal(error))
-    await store.release(agentId, messageId, turn);
+    await store.undelivered(agentId, messageId, turn);
+}
+
+/** Count the attempt, send it, and count a failure that provably reached no agent. */
+export async function sendNamingSteerTurn(
+  store: SteerTargetStore,
+  agentId: string,
+  messageId: string | undefined,
+  turn: SteerTurn,
+  send: () => Promise<void>,
+): Promise<void> {
+  await beginSteerTurn(store, agentId, messageId, turn);
+  try {
+    await send();
+  } catch (error) {
+    // Left uncounted, the record only keeps its turn, which is the safe side.
+    await settleSteerTurn(store, agentId, messageId, turn, error).catch(() => undefined);
+    throw error;
+  }
 }
 
 /**
@@ -96,21 +140,28 @@ export async function settleSteerTurn(
  * restart nor another process. The supervisor passes the durable store.
  */
 export function createMemorySteerTargets(): SteerTargetStore {
-  const turns = new Map<string, SteerTurn>();
+  const records = new Map<string, { turn: SteerTurn; dispatches: number; undelivered: number }>();
   const key = (agentId: string, messageId: string) => JSON.stringify([agentId, messageId]);
   return {
-    find: async (agentId, messageId) => turns.get(key(agentId, messageId)),
+    find: async (agentId, messageId) => records.get(key(agentId, messageId))?.turn,
     claim: async (agentId, messageId, turn) => {
       const k = key(agentId, messageId);
-      if (!turns.has(k)) {
-        turns.set(k, turn);
-        if (turns.size > REMEMBERED_LIMIT) turns.delete(turns.keys().next().value!);
-      }
-      return turns.get(k)!;
+      if (records.has(k)) return;
+      records.set(k, { turn, dispatches: 0, undelivered: 0 });
+      if (records.size > REMEMBERED_LIMIT) records.delete(records.keys().next().value!);
     },
-    release: async (agentId, messageId, turn) => {
+    begin: async (agentId, messageId) => {
+      const record = records.get(key(agentId, messageId));
+      if (record === undefined) return undefined;
+      record.dispatches += 1;
+      return record.turn;
+    },
+    undelivered: async (agentId, messageId, turn) => {
       const k = key(agentId, messageId);
-      if (turns.has(k) && turns.get(k) === turn) turns.delete(k);
+      const record = records.get(k);
+      if (record === undefined || record.turn !== turn) return;
+      record.undelivered += 1;
+      if (record.undelivered >= record.dispatches) records.delete(k);
     },
   };
 }

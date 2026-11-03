@@ -17,6 +17,7 @@ import type {
   EffectiveDefaults,
 } from "../config/compile.js";
 import { connectEnrolledChannelDaemon, type DaemonConnection } from "../daemon/client.js";
+import { HostNotReachedError } from "../daemon/enrolled-client.js";
 import { createMemorySteerTargets, type SteerTargetStore } from "../daemon/steer-target.js";
 import { AgentRequestRefusedError } from "../daemon/agent-request-refusal.js";
 import { configurationDaemonStub } from "../daemon/test-support.js";
@@ -944,6 +945,14 @@ describe("a Host that goes away mid-turn", () => {
   });
 });
 
+async function waitFor(condition: () => boolean): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error("timed out waiting for the Host");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -961,6 +970,10 @@ class StrictHost {
   beforeSend: (() => void) | undefined;
   /** Commit the next send, then drop the socket before answering it. */
   loseNextAnswer = false;
+  /** Commit the next send and leave it unanswered until `dropConnections`. */
+  holdNextAnswer = false;
+  /** Every connection finds the Host away: calls fail before anything is written. */
+  away = false;
   readonly delivered: { messageId: string; turn: string | null }[] = [];
   /** Every send that reached the Host, delivered or not. */
   readonly attempts: string[] = [];
@@ -973,6 +986,11 @@ class StrictHost {
     this.turnSeq += 1;
     this.turn = `turn-${this.turnSeq}`;
     return this.turn;
+  }
+
+  /** The Host's socket drops: what is in flight on it gets no answer. */
+  dropConnections(): void {
+    for (const disconnect of this.disconnects) disconnect();
   }
 
   deliveriesOf(messageId: string) {
@@ -991,7 +1009,7 @@ class StrictHost {
     return connectEnrolledChannelDaemon({
       hostLabel: "strict-host",
       hostId: "strict-host",
-      resolveChannel: () => channel,
+      resolveChannel: () => (this.away ? undefined : channel),
       subscribe: (handler) => {
         this.handlers.add(handler);
         return () => this.handlers.delete(handler);
@@ -1063,7 +1081,11 @@ class StrictHost {
     this.receipts.set(key, { fingerprint, completed: true });
     if (this.loseNextAnswer) {
       this.loseNextAnswer = false;
-      for (const disconnect of this.disconnects) disconnect();
+      this.dropConnections();
+      return;
+    }
+    if (this.holdNextAnswer) {
+      this.holdNextAnswer = false;
       return;
     }
     reply();
@@ -1094,7 +1116,19 @@ describe("a follow-up Steer on a Host with the input queue", () => {
     return { ...flow, redeliver, stop };
   }
 
-  const durable = () => store.steerTargets.forOrganization(ORGANIZATION_ID);
+  const durable = (): SteerTargetStore => store.steerTargets.forOrganization(ORGANIZATION_ID);
+  /** The durable store, with the Host leaving right after an attempt counted itself. */
+  const hostLeavesAfterCount = (host: StrictHost): SteerTargetStore => {
+    const targets = durable();
+    return {
+      ...targets,
+      begin: async (agentId, messageId) => {
+        const turn = await targets.begin(agentId, messageId);
+        host.away = true;
+        return turn;
+      },
+    };
+  };
   const messageIdOf = (message: InboundMessage) => channelMessageId(message);
 
   /** The same durable row the drain claims again after a failed or unacknowledged attempt. */
@@ -1171,6 +1205,63 @@ describe("a follow-up Steer on a Host with the input queue", () => {
     } finally {
       await first.stop();
       await second.stop();
+    }
+  });
+
+  it("keeps the turn an unknown attempt named when a later attempt never reaches the Host", async () => {
+    const say = conversation();
+    const host = new StrictHost();
+    const flow = await hubProcess(host, durable());
+    try {
+      await flow.send(say("start the build"));
+      const firstTurn = host.turn;
+      const followUp = say("also check the logs");
+      // Attempt 1: the Host takes it, the answer is lost.
+      host.loseNextAnswer = true;
+      assert.ok((await flow.send(followUp).catch((error: unknown) => error)) instanceof Error);
+      const record = await rowOfMessage(followUp);
+      // Attempt 2 counts itself, then the Host is gone: refused before anything is written.
+      const leaving = await hubProcess(host, hostLeavesAfterCount(host));
+      await assert.rejects(leaving.redeliver(followUp, record.id), HostNotReachedError);
+      await leaving.stop();
+      host.away = false;
+      host.startTurn();
+      // Attempt 3 names the turn attempt 1 may have been delivered into.
+      await flow.redeliver(followUp, record.id);
+      const id = messageIdOf(followUp);
+      assert.equal(host.attempts.filter((sent) => sent === id).length, 2);
+      assert.deepEqual(host.deliveriesOf(id), [{ messageId: id, turn: firstTurn }]);
+    } finally {
+      await flow.stop();
+    }
+  });
+
+  it("keeps the turn while one replica's attempt is in flight and another's never reaches the Host", async () => {
+    const say = conversation();
+    const host = new StrictHost();
+    const first = await hubProcess(host, durable());
+    const second = await hubProcess(host, hostLeavesAfterCount(host));
+    const third = await hubProcess(host, durable());
+    try {
+      await first.send(say("start the build"));
+      const firstTurn = host.turn;
+      const followUp = say("and the tests");
+      const id = messageIdOf(followUp);
+      host.holdNextAnswer = true;
+      const inFlight = first.send(followUp).catch((error: unknown) => error);
+      await waitFor(() => host.attempts.includes(id));
+      const record = await rowOfMessage(followUp);
+      await assert.rejects(second.redeliver(followUp, record.id), HostNotReachedError);
+      host.away = false;
+      host.dropConnections();
+      assert.ok((await inFlight) instanceof Error, "the in-flight outcome is unknown");
+      host.startTurn();
+      await third.redeliver(followUp, record.id);
+      assert.deepEqual(host.deliveriesOf(id), [{ messageId: id, turn: firstTurn }]);
+    } finally {
+      await first.stop();
+      await second.stop();
+      await third.stop();
     }
   });
 

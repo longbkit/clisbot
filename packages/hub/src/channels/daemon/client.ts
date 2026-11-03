@@ -15,7 +15,7 @@ import {
   createMemorySteerTargets,
   resolveSteerTurn,
   runningTurnOf,
-  settleSteerTurn,
+  sendNamingSteerTurn,
   type SteerTargetStore,
 } from "./steer-target.js";
 import type { DaemonSessionChannel } from "../../daemons/protocol.js";
@@ -533,36 +533,30 @@ function createFacade(
             readRunningTurn(socket, agentId),
           )
         : null;
-      try {
-        const payload = await socket.call(
-          "send_agent_message_request",
-          await identify(
-            "send_agent_message_request",
-            {
-              agentId,
-              text,
-              ...(messageId === undefined ? {} : { messageId }),
-              ...(options?.attachments === undefined ? {} : { attachments: options.attachments }),
-              activeTurnBehavior: steer ? "steer" : "interrupt",
-              ...(expectedTurnId === null ? {} : { expectedTurnId }),
-            },
-            options?.source,
-          ),
-          PROVIDER_START_RPC_TIMEOUT_MS,
+      const request = await identify(
+        "send_agent_message_request",
+        {
+          agentId,
+          text,
+          ...(messageId === undefined ? {} : { messageId }),
+          ...(options?.attachments === undefined ? {} : { attachments: options.attachments }),
+          activeTurnBehavior: steer ? "steer" : "interrupt",
+          ...(expectedTurnId === null ? {} : { expectedTurnId }),
+        },
+        options?.source,
+      );
+      const deliver = async () => {
+        const result = asRecord(
+          await socket.call("send_agent_message_request", request, PROVIDER_START_RPC_TIMEOUT_MS),
         );
-        const result = asRecord(payload);
         if (result?.["accepted"] === false) {
           const error = result["error"];
           throw agentMessageRejection(typeof error === "string" ? error : undefined);
         }
-      } catch (error) {
-        // A record left behind names a turn the Host refuses again before delivery, which retries this.
-        if (namesTurn)
-          await settleSteerTurn(steerTargets, agentId, messageId, expectedTurnId, error).catch(
-            () => undefined,
-          );
-        throw error;
-      }
+      };
+      if (namesTurn)
+        await sendNamingSteerTurn(steerTargets, agentId, messageId, expectedTurnId, deliver);
+      else await deliver();
     },
     cancelAgent: (agentId) =>
       socket.call("cancel_agent_request", { agentId }).then((payload) => {

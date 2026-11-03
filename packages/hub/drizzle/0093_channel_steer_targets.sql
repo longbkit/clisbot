@@ -3,6 +3,8 @@ CREATE TABLE "channel_steer_targets" (
 	"agent_id" text NOT NULL,
 	"message_id" text NOT NULL,
 	"turn_id" text,
+	"dispatches" integer DEFAULT 0 NOT NULL,
+	"undelivered" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "channel_steer_targets_pk" PRIMARY KEY("organization_id","agent_id","message_id")
 );

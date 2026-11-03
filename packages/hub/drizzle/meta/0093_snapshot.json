@@ -1,5 +1,5 @@
 {
-  "id": "fe37ed02-037f-4a35-a86b-837e53fe751d",
+  "id": "f0b56c9e-7ec9-4ed2-84cc-ec4b6f271312",
   "prevId": "16c64a18-6ad4-4494-9e9a-d144471cc8fc",
   "version": "7",
   "dialect": "postgresql",
@@ -3113,6 +3113,20 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "dispatches": {
+          "name": "dispatches",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "undelivered": {
+          "name": "undelivered",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "created_at": {
           "name": "created_at",
