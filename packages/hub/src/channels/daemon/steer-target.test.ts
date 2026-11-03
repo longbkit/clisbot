@@ -1,18 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { HostNotReachedError } from "./enrolled-client.js";
-import { runningTurnOf, SteerTargets } from "./steer-target.js";
+import {
+  createMemorySteerTargets,
+  resolveSteerTurn,
+  runningTurnOf,
+  settleSteerTurn,
+} from "./steer-target.js";
 
-describe("SteerTargets", () => {
-  async function remembered(targets: SteerTargets, key: string): Promise<string | null> {
-    return targets.resolve(key, async () => "read-again");
-  }
+describe("the turn a Steer names", () => {
+  const readAgain = async () => "read-again";
 
-  it("keeps the first attempt's turn after an outcome the Hub cannot know", async () => {
-    const targets = new SteerTargets();
-    await targets.resolve("m", async () => "turn-a");
-    targets.settle("m", new Error("dispatch timed out"));
-    assert.equal(await remembered(targets, "m"), "turn-a");
+  it("names the recorded turn on every attempt, whatever the Host runs now", async () => {
+    const store = createMemorySteerTargets();
+    assert.equal(await resolveSteerTurn(store, "a", "m", async () => "turn-a"), "turn-a");
+    await settleSteerTurn(store, "a", "m", "turn-a", new Error("dispatch timed out"));
+    assert.equal(await resolveSteerTurn(store, "a", "m", readAgain), "turn-a");
+    assert.equal(await resolveSteerTurn(store, "a", "idle", async () => null), null);
+    assert.equal(await resolveSteerTurn(store, "a", "idle", readAgain), null);
   });
 
   it("reads the turn again once the Host never saw the attempt or refused it before delivery", async () => {
@@ -21,20 +26,17 @@ describe("SteerTargets", () => {
       new Error("Active turn changed before steering could be delivered"),
       new Error("This provider cannot steer this active turn; choose Queue or Interrupt"),
     ]) {
-      const targets = new SteerTargets();
-      await targets.resolve("m", async () => "turn-a");
-      targets.settle("m", error);
-      assert.equal(await remembered(targets, "m"), "read-again", error.message);
+      const store = createMemorySteerTargets();
+      await resolveSteerTurn(store, "a", "m", async () => "turn-a");
+      await settleSteerTurn(store, "a", "m", "turn-a", error);
+      assert.equal(await resolveSteerTurn(store, "a", "m", readAgain), "read-again", error.message);
     }
   });
 
-  it("forgets a delivered message and reads every time without a message id", async () => {
-    const targets = new SteerTargets();
-    await targets.resolve("m", async () => "turn-a");
-    targets.settle("m");
-    assert.equal(await remembered(targets, "m"), "read-again");
-    assert.equal(await targets.resolve(undefined, async () => "turn-b"), "turn-b");
-    assert.equal(await targets.resolve(undefined, async () => null), null);
+  it("reads every time without a message id, which the daemon keeps no receipt for", async () => {
+    const store = createMemorySteerTargets();
+    assert.equal(await resolveSteerTurn(store, "a", undefined, async () => "turn-b"), "turn-b");
+    assert.equal(await resolveSteerTurn(store, "a", undefined, async () => null), null);
   });
 });
 

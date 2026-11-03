@@ -16,7 +16,8 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
-import type { DaemonConnection } from "../daemon/client.js";
+import { connectEnrolledChannelDaemon, type DaemonConnection } from "../daemon/client.js";
+import { createMemorySteerTargets, type SteerTargetStore } from "../daemon/steer-target.js";
 import { AgentRequestRefusedError } from "../daemon/agent-request-refusal.js";
 import { configurationDaemonStub } from "../daemon/test-support.js";
 import { channelMessageId } from "../daemon/session-operation.js";
@@ -940,5 +941,280 @@ describe("a Host that goes away mid-turn", () => {
     await flow.plane.stop();
     await flow.plane.onHostLost();
     assert.deepEqual(flow.posted, []);
+  });
+});
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/**
+ * A Host with the input queue, as the daemon behaves: a strict Steer names the
+ * running turn or none while idle, and each message id keeps one receipt whose
+ * fingerprint includes the turn (`server/message-receipts`). From 2.2.2 a Steer
+ * refused before delivery frees its receipt; `beforeV222` keeps it.
+ */
+class StrictHost {
+  beforeV222 = false;
+  turn: string | null = null;
+  /** Runs between the Hub reading the turn and its send arriving. */
+  beforeSend: (() => void) | undefined;
+  /** Commit the next send, then drop the socket before answering it. */
+  loseNextAnswer = false;
+  readonly delivered: { messageId: string; turn: string | null }[] = [];
+  /** Every send that reached the Host, delivered or not. */
+  readonly attempts: string[] = [];
+  private readonly receipts = new Map<string, { fingerprint: string; completed: boolean }>();
+  private readonly handlers = new Set<(message: Record<string, unknown>) => void>();
+  private readonly disconnects = new Set<() => void>();
+  private turnSeq = 0;
+
+  startTurn(): string {
+    this.turnSeq += 1;
+    this.turn = `turn-${this.turnSeq}`;
+    return this.turn;
+  }
+
+  deliveriesOf(messageId: string) {
+    return this.delivered.filter((entry) => entry.messageId === messageId);
+  }
+
+  connect(steerTargets: SteerTargetStore): DaemonConnection {
+    const channel = {
+      serverInfo: { features: { hostInputQueue: true } },
+      permissions: [],
+      write: async (frame: string) => {
+        const envelope: unknown = JSON.parse(frame);
+        if (isRecord(envelope) && isRecord(envelope["message"])) this.receive(envelope["message"]);
+      },
+    };
+    return connectEnrolledChannelDaemon({
+      hostLabel: "strict-host",
+      hostId: "strict-host",
+      resolveChannel: () => channel,
+      subscribe: (handler) => {
+        this.handlers.add(handler);
+        return () => this.handlers.delete(handler);
+      },
+      onHostDisconnected: (handler) => {
+        this.disconnects.add(handler);
+        return () => this.disconnects.delete(handler);
+      },
+      steerTargets,
+    });
+  }
+
+  private answer(type: string, requestId: unknown, payload: Record<string, unknown>) {
+    queueMicrotask(() => {
+      for (const handler of this.handlers) handler({ type, payload: { ...payload, requestId } });
+    });
+  }
+
+  /** Why a strict Steer naming `expected` is refused before delivery, if it is. */
+  private strictRefusal(expected: string | null): string | undefined {
+    if (expected === null)
+      return this.turn === null
+        ? undefined
+        : "Active turn identity is unavailable; wait or choose Queue";
+    return expected === this.turn
+      ? undefined
+      : "Active turn changed before steering could be delivered";
+  }
+
+  private receive(message: Record<string, unknown>) {
+    const requestId = message["requestId"];
+    if (message["type"] === "fetch_agent_request") {
+      const agent = {
+        id: message["agentId"],
+        status: this.turn === null ? "idle" : "running",
+        activeTurn: this.turn === null ? null : { turnId: this.turn },
+      };
+      this.answer("fetch_agent_response", requestId, { agent, project: null, error: null });
+      return;
+    }
+    if (message["type"] !== "send_agent_message_request") return;
+    this.beforeSend?.();
+    this.beforeSend = undefined;
+    const reply = (error?: string) =>
+      this.answer("send_agent_message_response", requestId, {
+        agentId: message["agentId"],
+        accepted: error === undefined,
+        ...(error === undefined ? {} : { error }),
+      });
+    const messageId = String(message["messageId"]);
+    this.attempts.push(messageId);
+    const expected =
+      typeof message["expectedTurnId"] === "string" ? message["expectedTurnId"] : null;
+    const key = `${String(message["agentId"])}/${messageId}`;
+    const fingerprint = JSON.stringify([message["text"], message["activeTurnBehavior"], expected]);
+    const held = this.receipts.get(key);
+    if (held !== undefined) {
+      if (held.fingerprint !== fingerprint) return reply("agent_request_key_conflict");
+      return reply(held.completed ? undefined : "agent_request_outcome_unknown");
+    }
+    this.receipts.set(key, { fingerprint, completed: false });
+    const refusal = this.strictRefusal(expected);
+    if (refusal !== undefined) {
+      if (!this.beforeV222) this.receipts.delete(key);
+      return reply(refusal);
+    }
+    this.delivered.push({ messageId, turn: expected });
+    if (expected === null) this.startTurn();
+    this.receipts.set(key, { fingerprint, completed: true });
+    if (this.loseNextAnswer) {
+      this.loseNextAnswer = false;
+      for (const disconnect of this.disconnects) disconnect();
+      return;
+    }
+    reply();
+  }
+}
+
+describe("a follow-up Steer on a Host with the input queue", () => {
+  /** A Hub process: its own plane and daemon connection over the shared database. */
+  async function hubProcess(host: StrictHost, steerTargets: SteerTargetStore) {
+    const daemon = makeDaemon();
+    const connection = host.connect(steerTargets);
+    daemon.daemon.sendAgentMessage = (agentId, text, options) =>
+      connection.sendAgentMessage(agentId, text, options);
+    const flow = makePlane(makeRoute({ followUp: { mode: "auto", ttlMinutes: 60 } }), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    /** The drain handing an admitted row to this process again. */
+    const redeliver = (message: InboundMessage, recordId: string) =>
+      flow.plane.onInbound(
+        claimedInbound(
+          { channel: "slack", accountId: ACCOUNT_ID, ctxPayload: { Message: message } },
+          recordId,
+        ),
+      );
+    const stop = async () => {
+      await flow.plane.stop();
+      connection.stop();
+    };
+    return { ...flow, redeliver, stop };
+  }
+
+  const durable = () => store.steerTargets.forOrganization(ORGANIZATION_ID);
+  const messageIdOf = (message: InboundMessage) => channelMessageId(message);
+
+  /** The same durable row the drain claims again after a failed or unacknowledged attempt. */
+  async function rowOfMessage(message: InboundMessage) {
+    const { record, created } = await store.enqueueChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      externalEventId: message.externalMessageId!,
+      externalMessageId: message.externalMessageId!,
+      externalConversationId: message.conversation.rootConversationId,
+      externalThreadId: message.conversation.threadId,
+      laneKey: `lane:${String(message.conversation.threadId)}`,
+      payload: { channel: "slack", accountId: ACCOUNT_ID, ctxPayload: { Message: message } },
+    });
+    assert.equal(created, false, "the retry is the row the first attempt was admitted as");
+    return record;
+  }
+
+  it("answers a follow-up the Host took before a Hub restart as delivered, though the turn changed", async () => {
+    const say = conversation();
+    const host = new StrictHost();
+    const before = await hubProcess(host, durable());
+    await before.send(say("start the build"));
+    const firstTurn = host.turn;
+    assert.ok(firstTurn !== null, "the first prompt started a turn");
+    const followUp = say("also check the logs");
+    // The Host takes the Steer; its answer is lost and the Hub process ends unacknowledged.
+    host.loseNextAnswer = true;
+    assert.ok((await before.send(followUp).catch((error: unknown) => error)) instanceof Error);
+    await before.stop();
+    host.startTurn();
+
+    const after = await hubProcess(host, durable());
+    try {
+      await after.redeliver(followUp, (await rowOfMessage(followUp)).id);
+      const id = messageIdOf(followUp);
+      assert.equal(host.attempts.filter((attempt) => attempt === id).length, 2);
+      assert.deepEqual(host.deliveriesOf(id), [{ messageId: id, turn: firstTurn }]);
+
+      // Control: a Hub that lost the record names the new turn, and the Host refuses it for good.
+      const forgetful = host.connect(createMemorySteerTargets());
+      await assert.rejects(
+        forgetful.sendAgentMessage("agent-0", "also check the logs", {
+          source: followUp,
+          messageId: id,
+        }),
+        AgentRequestRefusedError,
+      );
+      forgetful.stop();
+    } finally {
+      await after.stop();
+    }
+  });
+
+  it("names the turn the first replica recorded when another replica retries a lost answer", async () => {
+    const say = conversation();
+    const host = new StrictHost();
+    const first = await hubProcess(host, durable());
+    const second = await hubProcess(host, durable());
+    try {
+      await first.send(say("start the build"));
+      const runningTurn = host.turn;
+      const followUp = say("and the tests");
+      host.loseNextAnswer = true;
+      const attempt = await first.send(followUp).catch((error: unknown) => error);
+      assert.ok(attempt instanceof Error, "the answer was lost, so the outcome is unknown");
+      host.startTurn();
+      const record = await rowOfMessage(followUp);
+      await second.redeliver(followUp, record.id);
+      assert.deepEqual(host.deliveriesOf(messageIdOf(followUp)), [
+        { messageId: messageIdOf(followUp), turn: runningTurn },
+      ]);
+    } finally {
+      await first.stop();
+      await second.stop();
+    }
+  });
+
+  it("recovers a Steer whose turn ended before it arrived, from Host 2.2.2", async () => {
+    const say = conversation();
+    const host = new StrictHost();
+    const flow = await hubProcess(host, durable());
+    try {
+      await flow.send(say("start the build"));
+      const followUp = say("one more thing");
+      host.beforeSend = () => {
+        host.turn = null;
+      };
+      const refused = await flow.send(followUp).catch((error: unknown) => error);
+      assert.match(String(refused), /Active turn changed/);
+      const record = await rowOfMessage(followUp);
+      await flow.redeliver(followUp, record.id);
+      assert.deepEqual(host.deliveriesOf(messageIdOf(followUp)), [
+        { messageId: messageIdOf(followUp), turn: null },
+      ]);
+    } finally {
+      await flow.stop();
+    }
+  });
+
+  it("dead-letters, never duplicates, a Steer whose turn ended before it arrived on an older Host", async () => {
+    const say = conversation();
+    const host = new StrictHost();
+    host.beforeV222 = true;
+    const flow = await hubProcess(host, durable());
+    try {
+      await flow.send(say("start the build"));
+      const followUp = say("one more thing");
+      host.beforeSend = () => {
+        host.turn = null;
+      };
+      await flow.send(followUp).catch(() => undefined);
+      const record = await rowOfMessage(followUp);
+      // The refused attempt keeps its receipt there: the retry is refused for good, so the
+      // drain dead-letters it at once and tells the sender. No Hub-side order avoids this.
+      await assert.rejects(flow.redeliver(followUp, record.id), AgentRequestRefusedError);
+      assert.deepEqual(host.deliveriesOf(messageIdOf(followUp)), []);
+    } finally {
+      await flow.stop();
+    }
   });
 });

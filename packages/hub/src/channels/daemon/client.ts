@@ -11,7 +11,13 @@ import { TrustedDaemonClient } from "./ws-client.js";
 import { EnrolledDaemonClient } from "./enrolled-client.js";
 import { hostHasCreateSlot, withHostCreateSlot } from "./create-gate.js";
 import { agentMessageRejection } from "./agent-request-refusal.js";
-import { runningTurnOf, SteerTargets } from "./steer-target.js";
+import {
+  createMemorySteerTargets,
+  resolveSteerTurn,
+  runningTurnOf,
+  settleSteerTurn,
+  type SteerTargetStore,
+} from "./steer-target.js";
 import type { DaemonSessionChannel } from "../../daemons/protocol.js";
 import { discoverLocalDaemon, type DaemonDiscoveryResult } from "./discovery.js";
 import type {
@@ -60,6 +66,8 @@ export interface ChannelDaemonClientOptions {
   password?: string;
   clientId?: string;
   resolveSessionOperationTicket?: ChannelOperationTicketResolver;
+  /** Where a Steer's turn is recorded per message (`steer-target.ts`); in memory when absent. */
+  steerTargets?: SteerTargetStore;
   /** Mint the managed-access `accessTicket` for this account's `hello`, called
    * per (re)connect. Returns `undefined` when the daemon is not in `external`
    * mode (trusted session, as today). Built by
@@ -170,6 +178,8 @@ export interface DaemonConnection {
 }
 
 export interface EnrolledChannelDaemonOptions {
+  /** Where a Steer's turn is recorded per message (`steer-target.ts`); in memory when absent. */
+  steerTargets?: SteerTargetStore;
   /** This Host's live session channel, or `undefined` while it is away. */
   resolveChannel: () => DaemonSessionChannel | undefined;
   /** Session frames from this Host, across its reconnects. */
@@ -237,6 +247,7 @@ export function connectEnrolledChannelDaemon(
     { url: options.hostLabel, source: "enrolled" },
     options.resolveSessionOperationTicket,
     options.hostId,
+    options.steerTargets,
   );
 }
 
@@ -301,7 +312,13 @@ export function connectChannelDaemon(options: ChannelDaemonClientOptions = {}): 
     ...(options.onStateChange !== undefined ? { onStateChange: options.onStateChange } : {}),
   });
   socket.connect();
-  return createFacade(socket, discovery, options.resolveSessionOperationTicket);
+  return createFacade(
+    socket,
+    discovery,
+    options.resolveSessionOperationTicket,
+    undefined,
+    options.steerTargets,
+  );
 }
 
 const AGENT_PAGE_LIMIT = 200;
@@ -344,6 +361,7 @@ function createFacade(
   resolveIdentity?: ChannelOperationTicketResolver,
   /** Which Host's create gate this connection counts against. */
   hostKey: string = discovery.url,
+  steerTargets: SteerTargetStore = createMemorySteerTargets(),
 ): DaemonConnection {
   const identify = async (
     type: string,
@@ -361,7 +379,6 @@ function createFacade(
       sessionOperationTicket: await resolveIdentity({ type, ...payload }, source),
     };
   };
-  const steerTargets = new SteerTargets();
   return {
     discovery,
     ...createProjectGitClient(socket, identify),
@@ -509,11 +526,13 @@ function createFacade(
       const messageId = options?.source
         ? (options.messageId ?? channelMessageId(options.source))
         : undefined;
-      const key = messageId === undefined ? undefined : `${agentId}\u0000${messageId}`;
-      const expectedTurnId =
-        steer && asRecord(socket.serverInfo?.["features"])?.["hostInputQueue"] === true
-          ? await steerTargets.resolve(key, () => readRunningTurn(socket, agentId))
-          : null;
+      const namesTurn =
+        steer && asRecord(socket.serverInfo?.["features"])?.["hostInputQueue"] === true;
+      const expectedTurnId = namesTurn
+        ? await resolveSteerTurn(steerTargets, agentId, messageId, () =>
+            readRunningTurn(socket, agentId),
+          )
+        : null;
       try {
         const payload = await socket.call(
           "send_agent_message_request",
@@ -537,10 +556,13 @@ function createFacade(
           throw agentMessageRejection(typeof error === "string" ? error : undefined);
         }
       } catch (error) {
-        steerTargets.settle(key, error);
+        // A record left behind names a turn the Host refuses again before delivery, which retries this.
+        if (namesTurn)
+          await settleSteerTurn(steerTargets, agentId, messageId, expectedTurnId, error).catch(
+            () => undefined,
+          );
         throw error;
       }
-      steerTargets.settle(key);
     },
     cancelAgent: (agentId) =>
       socket.call("cancel_agent_request", { agentId }).then((payload) => {

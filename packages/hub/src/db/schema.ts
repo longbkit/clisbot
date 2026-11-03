@@ -2767,6 +2767,33 @@ export const channelIngressQueue = pgTable(
   ],
 );
 
+/**
+ * The turn a channel Steer named for one daemon message id
+ * (`channels/daemon/steer-target.ts`). The daemon's receipt fingerprints the
+ * request with that turn, so every attempt of the message, from any Hub process,
+ * names the turn the first attempt recorded. `turn_id` null means the agent was
+ * idle and the Steer named none. Pruned with the ingress rows.
+ */
+export const channelSteerTargets = pgTable(
+  "channel_steer_targets",
+  {
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    agentId: text("agent_id").notNull(),
+    messageId: text("message_id").notNull(),
+    turnId: text("turn_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.organizationId, table.agentId, table.messageId],
+      name: "channel_steer_targets_pk",
+    }),
+    index("channel_steer_targets_created_idx").on(table.organizationId, table.createdAt),
+  ],
+);
+
 export const organizationBillingCustomers = pgTable("organization_billing_customers", {
   organizationId: text("organization_id")
     .primaryKey()

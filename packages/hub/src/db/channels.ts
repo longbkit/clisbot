@@ -9,6 +9,7 @@ import * as schema from "./schema.js";
 import { ChannelAccessStore } from "./channel-access.js";
 import { ChannelDeliveryRetryStore } from "./channel-delivery-retries.js";
 import { ChannelInboxStore } from "./channel-inbox.js";
+import { ChannelSteerTargetStore } from "./channel-steer-targets.js";
 import { toChannelIngress } from "./channel-ingress-record.js";
 import type { SupportedChannelName } from "../channels/catalog.js";
 import type { DatabaseRuntime, DrizzleHandle } from "./runtime/index.js";
@@ -105,11 +106,14 @@ export class ChannelStore {
   readonly deliveryRetries: ChannelDeliveryRetryStore;
   /** Each binding's inbox over the ingress rows (`channel-inbox.ts`). */
   readonly inbox: ChannelInboxStore;
+  /** The turn each channel Steer named (`channel-steer-targets.ts`). */
+  readonly steerTargets: ChannelSteerTargetStore;
 
   constructor(private readonly runtime: DatabaseRuntime) {
     this.database = runtime.drizzle();
     this.access = new ChannelAccessStore(this.database);
     this.inbox = new ChannelInboxStore(this.database);
+    this.steerTargets = new ChannelSteerTargetStore(this.database);
     this.deliveryRetries = new ChannelDeliveryRetryStore(runtime);
   }
 
@@ -1123,6 +1127,15 @@ export class ChannelStore {
         ),
       );
       deleted += result.rowCount;
+    }
+    const cutoffs = [
+      input.completedOlderThan,
+      input.deadLetteredOlderThan,
+      input.pendingOlderThan,
+    ].filter((cutoff) => cutoff !== undefined);
+    if (cutoffs.length > 0) {
+      const oldest = new Date(Math.min(...cutoffs.map((cutoff) => cutoff.getTime())));
+      await this.steerTargets.prune(input.organizationId, oldest);
     }
     return deleted;
   }
