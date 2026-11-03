@@ -2007,8 +2007,11 @@ test("managed push registration records the Hub reader and the scope they choose
       leaseExpiresAt: Date.now() + 15 * 60 * 1000,
     },
     pushNotifications: asPushNotifications({
-      renew: (token: string, authorization?: PushTokenAuthorization, scope?: unknown) =>
-        renewals.push({ token, actor: authorization?.actor, scope }),
+      renew: (
+        token: string,
+        _authorization?: PushTokenAuthorization,
+        reader?: { actor?: unknown; scope?: unknown },
+      ) => renewals.push({ token, actor: reader?.actor, scope: reader?.scope }),
     }),
   });
 
@@ -2028,6 +2031,27 @@ test("managed push registration records the Hub reader and the scope they choose
   expect(messages).toContainEqual({
     type: "notifications.set_scope.response",
     payload: { requestId: "scope-1", scope: "all" },
+  });
+});
+
+test("a Hub-identified connection without a lease is judged as that account, not the Host owner", () => {
+  const actor = {
+    kind: "user" as const,
+    id: "user-carol",
+    memberId: "carol",
+    organizationId: "org-1",
+    hubOrigin: "https://hub.example",
+  };
+
+  expect(createSessionForTest({ accountActor: actor }).notificationReader()).toEqual({
+    actor,
+    daemonWide: true,
+    scope: "mine",
+  });
+  expect(createSessionForTest({}).notificationReader()).toEqual({
+    actor: null,
+    daemonWide: true,
+    scope: "mine",
   });
 });
 

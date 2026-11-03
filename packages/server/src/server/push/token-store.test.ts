@@ -135,8 +135,8 @@ describe("PushTokenStore readers", () => {
   test("a reader and their chosen scope survive a restart; renewing without a scope keeps it", () => {
     withHome((tokenPath) => {
       const first = new PushTokenStore(createLogger(), tokenPath, () => NOW, 48 * 60 * 60 * 1000);
-      first.renewToken("phone", { ...LEASE, actor: ALICE }, "all");
-      first.renewToken("phone", { ...LEASE, actor: ALICE });
+      first.renewToken("phone", LEASE, { actor: ALICE, scope: "all" });
+      first.renewToken("phone", LEASE, { actor: ALICE });
 
       const restarted = new PushTokenStore(
         createLogger(),
@@ -170,7 +170,7 @@ describe("PushTokenStore readers", () => {
       expect(store.getActiveTokens({ projectId: "p", recipients: () => true })).toEqual([
         "owner-phone",
       ]);
-      store.renewToken("member-phone", { ...LEASE, actor: ALICE });
+      store.renewToken("member-phone", LEASE, { actor: ALICE });
       expect(store.getActiveTokens({ projectId: "p", recipients: () => true }).sort()).toEqual([
         "member-phone",
         "owner-phone",

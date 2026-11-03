@@ -441,9 +441,8 @@ function createTokenAudience() {
         leaseId: `lease-${token}`,
         leaseExpiresAt: Date.now() + 60 * 60 * 1000,
         projectIds: options.projectIds === undefined ? [PROJECT_ID] : options.projectIds,
-        actor,
       },
-      options.scope,
+      { actor, scope: options.scope },
     );
   return { push, delivered, registerMember, cleanup: () => rmSync(dir, { recursive: true }) };
 }
@@ -539,9 +538,9 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
     expect(delivered).toEqual([]);
   });
 
-  it("the Host owner's present direct desktop covers their Hub phone but not a Project Member", async () => {
+  it("the Host owner's present direct desktop never suppresses a daemon-wide admin's push", async () => {
     const { server, delivered, registerMember } = setup({});
-    registerMember("owner-hub-phone", BOB, { projectIds: null, scope: "all" });
+    registerMember("admin-phone", BOB, { projectIds: null });
     registerMember("member-phone", ALICE, { scope: "all" });
     const ownerDesktop = connectClient(server, {
       deviceType: "web",
@@ -553,7 +552,7 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
     await finish(server);
 
     expect(readAttentionRequiredMessage(ownerDesktop).shouldNotify).toBe(true);
-    expect(delivered.map((entry) => entry.tokens)).toEqual([["member-phone"]]);
+    expect(delivered.map((entry) => entry.tokens)).toEqual([["admin-phone", "member-phone"]]);
   });
 
   it("honours each token's scope: All includes teammates, Others excludes own work, Off is silent", async () => {

@@ -38,9 +38,8 @@ export interface AttentionAudiencePlan<Client> {
  * neither receives this reader's notification nor suppresses their push.
  *
  * The Host owner's direct devices carry no Hub identity, so the daemon cannot
- * tell them from the same person's Hub-admitted phone. Their presence also
- * counts for daemon-wide readers, which keeps the owner from being notified
- * twice; Project Members are never covered by it.
+ * tell them from the same person's Hub-admitted phone. They are planned as
+ * separate readers: the owner may be notified on both, never on neither.
  */
 export function planAttentionAudience<Client>(input: {
   clients: readonly AttentionClient<Client>[];
@@ -68,14 +67,12 @@ export function planAttentionAudience<Client>(input: {
       inAppRecipients.add(entries[plan.inAppRecipientIndex]!.client);
     if (!plan.shouldPush) reached.add(key);
   }
-  const hostReached = reached.has(notificationReaderKey(null));
   return {
     inAppRecipients,
     pushRecipients: (reader) =>
       input.pushEligible &&
       input.allows(reader) &&
-      !reached.has(notificationReaderKey(reader.actor)) &&
-      !(hostReached && reader.daemonWide),
+      !reached.has(notificationReaderKey(reader.actor)),
   };
 }
 

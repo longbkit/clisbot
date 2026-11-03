@@ -25,8 +25,9 @@ connect; the daemon stores it with that device's push token.
 
 The daemon judges every reader separately, for both pushes and in-app notifications:
 
-- The reader is the Hub account of the connection's managed lease. The Host owner's own paired
-  devices have no Hub identity and own everything on their Host.
+- The reader is the connection's Hub account, with or without a managed lease. A lease without one
+  is not notified. A connection with neither is the Host owner's own device, which owns everything
+  on its Host.
 - A session is For me when its verified creator, its schedule's verified owner, or a verified
   sender is the reader. A channel sender matches only through its linked Member. A session that
   names no verified person, such as a subagent, is its nearest parent's.
@@ -34,8 +35,8 @@ The daemon judges every reader separately, for both pushes and in-app notificati
   session list still shows it under For me; a Project Member is not paged for it.
 - Presence is per reader. One person's open app takes their own notification instead of a push
   to their phone, and never suppresses or receives a teammate's.
-- The Host owner's direct devices have no Hub identity, so their presence also covers
-  daemon-wide readers; otherwise the owner's desktop and Hub-admitted phone would both notify.
+- The daemon cannot tell the Host owner's direct devices from the same person's Hub account, so
+  they are separate readers: the owner can be notified on both, never on neither.
 - A connection only learns about sessions and terminals it may see.
 
 Pushes are plain alerts with no Notification Service Extension, so iOS shows them before app code

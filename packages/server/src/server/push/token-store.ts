@@ -38,11 +38,11 @@ export class PushTokenStore {
     this.loadFromDisk();
   }
 
-  /** `scope` undefined keeps the token's saved choice; a new token starts with For me. */
+  /** An undefined `reader.scope` keeps the token's saved choice; a new token starts with For me. */
   renewToken(
     token: string,
     authorization?: PushTokenAuthorization,
-    scope?: NotificationScope,
+    reader: PushTokenReaderUpdate = {},
   ): void {
     const normalized = token.trim();
     if (!normalized) return;
@@ -57,8 +57,8 @@ export class PushTokenStore {
         authorization === undefined || authorization.projectIds === null
           ? null
           : [...new Set(authorization.projectIds)].sort(),
-      actor: authorization?.actor ?? null,
-      scope: scope ?? current?.scope ?? DEFAULT_NOTIFICATION_SCOPE,
+      actor: reader.actor ?? null,
+      scope: reader.scope ?? current?.scope ?? DEFAULT_NOTIFICATION_SCOPE,
     };
     if (
       current !== undefined &&
@@ -196,8 +196,14 @@ export interface PushTokenAuthorization {
   leaseExpiresAt: number;
   /** Null means daemon-wide authority; an array is the complete Project audience. */
   projectIds: readonly string[] | null;
-  /** The Hub account the lease was issued to. */
+}
+
+/** Who the token's device belongs to and which sessions they want to hear about. */
+export interface PushTokenReaderUpdate {
+  /** The connection's Hub account; absent for the Host owner's own devices. */
   actor?: SessionActor;
+  /** Absent keeps the saved choice. */
+  scope?: NotificationScope;
 }
 
 export interface PushNotificationTarget {
@@ -265,7 +271,7 @@ function sameAuthorization(left: PushTokenSubscription, right: PushTokenSubscrip
 }
 
 /**
- * The reader a token belongs to. A managed lease names its Hub account; a lease
+ * The reader a token belongs to: the Hub account it was registered with. A lease
  * token saved without one (written before readers were recorded) is nobody we
  * can attribute, so it receives nothing until its device renews it.
  */

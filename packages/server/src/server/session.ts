@@ -2644,11 +2644,7 @@ export class Session {
   public extendManagedLease(leaseId: string, leaseExpiresAt: number): boolean {
     const extended = this.authorization.extendLease(leaseId, leaseExpiresAt);
     if (extended && this.registeredPushToken) {
-      this.pushNotifications.renew(
-        this.registeredPushToken,
-        this.pushTokenAuthorization(),
-        this.notificationScope,
-      );
+      this.renewPushToken(this.registeredPushToken);
     }
     return extended;
   }
@@ -2665,11 +2661,7 @@ export class Session {
       this.accountActor = admission.actor;
     }
     if (this.registeredPushToken) {
-      this.pushNotifications.renew(
-        this.registeredPushToken,
-        this.pushTokenAuthorization(),
-        this.notificationScope,
-      );
+      this.renewPushToken(this.registeredPushToken);
     }
   }
 
@@ -5671,11 +5663,7 @@ export class Session {
       void this.clearFocusedTerminalAttention(focusedTerminalId);
     }
     if (metadata.pushToken) {
-      this.pushNotifications.renew(
-        metadata.pushToken,
-        this.pushTokenAuthorization(),
-        this.notificationScope,
-      );
+      this.renewPushToken(metadata.pushToken);
     }
   }
 
@@ -5697,30 +5685,38 @@ export class Session {
   private handleRegisterPushToken(token: string): void {
     this.registeredPushToken = token;
     this.currentClientMetadata().pushToken = token;
-    this.pushNotifications.renew(token, this.pushTokenAuthorization(), this.notificationScope);
+    this.renewPushToken(token);
     this.sessionLogger.info("Registered push token");
   }
 
   private handleSetNotificationScope(scope: NotificationScope, requestId: string): void {
     this.notificationScope = scope;
     if (this.registeredPushToken) {
-      this.pushNotifications.renew(this.registeredPushToken, this.pushTokenAuthorization(), scope);
+      this.renewPushToken(this.registeredPushToken);
     }
     this.emit({ type: "notifications.set_scope.response", payload: { requestId, scope } });
   }
 
   /**
-   * Who this connection's notifications are for. A managed lease without a Hub
-   * account cannot be attributed to anyone, so it is not notified.
+   * Who this connection's notifications are for: its Hub account, with or without a
+   * managed lease. A managed lease without one cannot be attributed to anyone, so it
+   * is not notified; a connection with neither is the Host owner's own device.
    */
   public notificationReader(): NotificationReader | null {
-    const managed = this.authorization.leaseId() !== null;
-    if (managed && !this.accountActor) return null;
+    const actor = this.accountActor ?? null;
+    if (actor === null && this.authorization.leaseId() !== null) return null;
     return {
-      actor: managed ? (this.accountActor ?? null) : null,
+      actor,
       daemonWide: this.authorization.authorizedProjectIds() === null,
       scope: this.notificationScope ?? DEFAULT_NOTIFICATION_SCOPE,
     };
+  }
+
+  private renewPushToken(token: string): void {
+    this.pushNotifications.renew(token, this.pushTokenAuthorization(), {
+      actor: this.accountActor,
+      scope: this.notificationScope,
+    });
   }
 
   /** Whether this connection may see the session or terminal a notification is about. */
@@ -5739,7 +5735,6 @@ export class Session {
       leaseId,
       leaseExpiresAt,
       projectIds: this.authorization.authorizedProjectIds(),
-      ...(this.accountActor ? { actor: this.accountActor } : {}),
     };
   }
 
