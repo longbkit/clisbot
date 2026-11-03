@@ -472,3 +472,50 @@ test("a Steer refused before delivery withdraws its admitted message, so it can 
     expect.any(PromptNotDeliveredError),
   );
 });
+
+// The channel Hub relies on this strict-Steer contract (`hub/src/channels/daemon/steer-target.ts`).
+test("a strict Steer naming no turn mid-turn is refused before delivery and frees its message", async () => {
+  const { controller, calls } = clisbotToolsRunController(async () => undefined);
+  controller.hasInFlightRun = () => true;
+  const withdraw = vi.fn(async () => undefined);
+  controller.withdrawUndeliveredSubmission = withdraw;
+
+  await expect(
+    startAgentRun(controller, "agent-1", "follow-up", createTestLogger(), {
+      activeTurnBehavior: "steer",
+      strictSteer: true,
+      replaceRunning: true,
+      runOptions: { clientMessageId: "msg-1" },
+    }),
+  ).rejects.toThrow(PromptNotDeliveredError);
+  expect(withdraw).toHaveBeenCalledWith(
+    "agent-1",
+    expect.anything(),
+    expect.any(PromptNotDeliveredError),
+  );
+  expect(controller.replaceAgentRun).not.toHaveBeenCalled();
+  expect(calls).toEqual(["reload"]);
+});
+
+test("a strict Steer naming the running turn steers it without replacing it", async () => {
+  const { controller, calls } = clisbotToolsRunController(async () => undefined);
+  controller.hasInFlightRun = () => true;
+  const steer = vi.fn(async () => ({ status: "accepted" as const }));
+  controller.steerAgentRun = steer;
+
+  await expect(
+    startAgentRun(controller, "agent-1", "follow-up", createTestLogger(), {
+      activeTurnBehavior: "steer",
+      strictSteer: true,
+      replaceRunning: true,
+      expectedTurnId: "turn-a",
+    }),
+  ).resolves.toEqual({ disposition: "steered" });
+  expect(steer).toHaveBeenCalledWith(
+    "agent-1",
+    "follow-up",
+    expect.objectContaining({ expectedTurnId: "turn-a" }),
+  );
+  expect(controller.replaceAgentRun).not.toHaveBeenCalled();
+  expect(calls).toEqual(["reload"]);
+});

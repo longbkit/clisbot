@@ -123,6 +123,12 @@ class FakeDaemon {
   port = 0;
   channelFileRead = true;
   agentProjectId: string | null = "project-channel";
+  /** Advertise the Host input queue, whose strict Steer needs the running turn named. */
+  hostInputQueue = false;
+  /** Merged into the `fetch_agent_request` snapshot. */
+  agentState: Record<string, unknown> = {};
+  /** Refusals answered to the next sends, in order; an exhausted list accepts. */
+  sendRefusals: string[] = [];
 
   constructor() {
     this.wss = new WebSocketServer({ noServer: true });
@@ -183,6 +189,7 @@ class FakeDaemon {
                 branchSuggestionPaging: true,
                 agentConfigApply: true,
                 channelFileRead: this.channelFileRead,
+                ...(this.hostInputQueue ? { hostInputQueue: true } : {}),
               },
             },
           },
@@ -200,10 +207,19 @@ class FakeDaemon {
     this.respond(client, message);
   }
 
+  /** The error a send is declined with; `undefined` accepts it. */
+  private sendRefusal(message: RecordedMessage): string | undefined {
+    const queued = this.sendRefusals.shift();
+    if (queued !== undefined) return queued;
+    const text = String(message["text"]);
+    if (text === "decline-me") return "agent message rejected";
+    return text.startsWith("agent_request_") ? text : undefined;
+  }
+
   private respond(client: import("ws").WebSocket, message: RecordedMessage): void {
     const catalog: Record<string, Record<string, unknown>> = {
       fetch_agent_request: {
-        agent: { id: "agent-1", workspaceId: "workspace-channel" },
+        agent: { id: "agent-1", workspaceId: "workspace-channel", ...this.agentState },
         project: { projectKey: this.agentProjectId },
         error: null,
       },
@@ -315,9 +331,8 @@ class FakeDaemon {
           );
           return;
         }
-        const declined =
-          message["text"] === "decline-me" || String(message["text"]).startsWith("agent_request_");
-        if (declined) {
+        const refusal = this.sendRefusal(message);
+        if (refusal !== undefined) {
           client.send(
             JSON.stringify({
               type: "session",
@@ -327,8 +342,7 @@ class FakeDaemon {
                   requestId: message["requestId"],
                   agentId: "agent-1",
                   accepted: false,
-                  error:
-                    message["text"] === "decline-me" ? "agent message rejected" : message["text"],
+                  error: refusal,
                 },
               },
             }),
@@ -502,6 +516,119 @@ async function waitForCount(items: readonly unknown[], count: number): Promise<v
   }
 }
 
+/** Only its presence matters here: it makes the send carry its message id. */
+const channelSource = {} as InboundMessage;
+
+describe("a channel Steer on a Host with the input queue", () => {
+  let daemon: FakeDaemon;
+  let client: DaemonConnection;
+  const source = channelSource;
+
+  beforeAll(async () => {
+    daemon = new FakeDaemon();
+    daemon.hostInputQueue = true;
+    await daemon.listen(0);
+    client = connectChannelDaemon({ host: `127.0.0.1:${daemon.port}`, rpcTimeoutMs: 5000 });
+    await client.waitForConnected(5000);
+  });
+
+  afterAll(async () => {
+    client.stop();
+    await daemon.close();
+  });
+
+  function sends(): RecordedMessage[] {
+    return daemon.messages.filter((message) => message.type === "send_agent_message_request");
+  }
+
+  function running(turnId: string | null): void {
+    daemon.agentState = {
+      status: "running",
+      activeTurn: turnId === null ? null : { turnId, startedAt: null },
+    };
+  }
+
+  it("names the running turn, so a follow-up steers it instead of being refused", async () => {
+    running("turn-a");
+    await client.sendAgentMessage("agent-1", "also check the logs", {
+      steer: true,
+      source,
+      messageId: "msg-running",
+    });
+    assert.equal(sends().at(-1)?.["expectedTurnId"], "turn-a");
+    assert.equal(sends().at(-1)?.["activeTurnBehavior"], "steer");
+  });
+
+  it("names no turn when the agent is idle, so the Steer starts one", async () => {
+    daemon.agentState = { status: "idle", activeTurn: null };
+    await client.sendAgentMessage("agent-1", "start here", { source, messageId: "msg-idle" });
+    assert.equal("expectedTurnId" in sends().at(-1)!, false);
+  });
+
+  it("does not send while the running turn has no id yet, leaving the retry to the ingress", async () => {
+    running(null);
+    const before = sends().length;
+    await assert.rejects(
+      client.sendAgentMessage("agent-1", "too early", { source, messageId: "msg-early" }),
+      /cannot be named yet/,
+    );
+    assert.equal(sends().length, before, "a refused attempt would hold the receipt on old Hosts");
+  });
+
+  it("retries with the turn the first attempt named, so a delivered message replays as delivered", async () => {
+    running("turn-a");
+    daemon.sendRefusals = ["agent_request_outcome_unknown"];
+    await assert.rejects(
+      client.sendAgentMessage("agent-1", "same message", { source, messageId: "msg-lost" }),
+      AgentRequestRefusedError,
+    );
+    running("turn-b");
+    await client.sendAgentMessage("agent-1", "same message", { source, messageId: "msg-lost" });
+    assert.deepEqual(
+      sends()
+        .slice(-2)
+        .map((frame) => frame["expectedTurnId"]),
+      ["turn-a", "turn-a"],
+    );
+  });
+
+  it("keeps naming no turn on retry when the first attempt started the turn now running", async () => {
+    daemon.agentState = { status: "idle", activeTurn: null };
+    daemon.sendRefusals = ["dispatch timed out"];
+    await assert.rejects(
+      client.sendAgentMessage("agent-1", "first prompt", { source, messageId: "msg-started" }),
+      /dispatch timed out/,
+    );
+    running("turn-started-by-it");
+    await client.sendAgentMessage("agent-1", "first prompt", { source, messageId: "msg-started" });
+    assert.equal("expectedTurnId" in sends().at(-1)!, false);
+  });
+
+  it("reads the turn again after the Host refused the Steer before the agent saw it", async () => {
+    running("turn-a");
+    daemon.sendRefusals = ["Active turn changed before steering could be delivered"];
+    await assert.rejects(
+      client.sendAgentMessage("agent-1", "late", { source, messageId: "msg-ended" }),
+      /Active turn changed/,
+    );
+    daemon.agentState = { status: "idle", activeTurn: null };
+    await client.sendAgentMessage("agent-1", "late", { source, messageId: "msg-ended" });
+    assert.equal(sends().at(-2)?.["expectedTurnId"], "turn-a");
+    assert.equal("expectedTurnId" in sends().at(-1)!, false);
+  });
+
+  it("names no turn for an interrupt", async () => {
+    running("turn-a");
+    await client.sendAgentMessage("agent-1", "stop", {
+      steer: false,
+      source,
+      messageId: "msg-int",
+    });
+    assert.equal(sends().at(-1)?.["activeTurnBehavior"], "interrupt");
+    assert.equal("expectedTurnId" in sends().at(-1)!, false);
+  });
+});
+
 describe("an account with no Route", () => {
   it("dials nothing and fails every call at once as a Host that is away", async () => {
     const daemon = connectNoHostChannelDaemon();
@@ -618,6 +745,23 @@ describe("channel trusted-client daemon connection", () => {
     assert.equal(frame["agentId"], "agent-1");
     assert.equal(frame["text"], "continue with step two");
     assert.equal(frame["activeTurnBehavior"], "steer");
+  });
+
+  it("names no turn and reads no snapshot on a Host without the input queue", async () => {
+    daemon.agentState = { status: "running", activeTurn: { turnId: "turn-a", startedAt: null } };
+    const fetches = daemon.messages.filter((m) => m.type === "fetch_agent_request").length;
+    try {
+      await client.sendAgentMessage("agent-1", "mid-turn on an older Host", {
+        source: channelSource,
+        messageId: "msg-old-host",
+      });
+    } finally {
+      daemon.agentState = {};
+    }
+    const frame = daemon.messages.findLast((m) => m.type === "send_agent_message_request");
+    assert.equal(frame?.["activeTurnBehavior"], "steer");
+    assert.equal(frame !== undefined && "expectedTurnId" in frame, false);
+    assert.equal(daemon.messages.filter((m) => m.type === "fetch_agent_request").length, fetches);
   });
 
   it("interrupts when steering is disabled", async () => {

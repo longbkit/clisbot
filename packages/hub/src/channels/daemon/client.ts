@@ -11,6 +11,7 @@ import { TrustedDaemonClient } from "./ws-client.js";
 import { EnrolledDaemonClient } from "./enrolled-client.js";
 import { hostHasCreateSlot, withHostCreateSlot } from "./create-gate.js";
 import { agentMessageRejection } from "./agent-request-refusal.js";
+import { runningTurnOf, SteerTargets } from "./steer-target.js";
 import type { DaemonSessionChannel } from "../../daemons/protocol.js";
 import { discoverLocalDaemon, type DaemonDiscoveryResult } from "./discovery.js";
 import type {
@@ -360,6 +361,7 @@ function createFacade(
       sessionOperationTicket: await resolveIdentity({ type, ...payload }, source),
     };
   };
+  const steerTargets = new SteerTargets();
   return {
     discovery,
     ...createProjectGitClient(socket, identify),
@@ -503,28 +505,42 @@ function createFacade(
         ),
       ),
     sendAgentMessage: async (agentId, text, options) => {
-      const payload = await socket.call(
-        "send_agent_message_request",
-        await identify(
+      const steer = options?.steer !== false;
+      const messageId = options?.source
+        ? (options.messageId ?? channelMessageId(options.source))
+        : undefined;
+      const key = messageId === undefined ? undefined : `${agentId}\u0000${messageId}`;
+      const expectedTurnId =
+        steer && asRecord(socket.serverInfo?.["features"])?.["hostInputQueue"] === true
+          ? await steerTargets.resolve(key, () => readRunningTurn(socket, agentId))
+          : null;
+      try {
+        const payload = await socket.call(
           "send_agent_message_request",
-          {
-            agentId,
-            text,
-            ...(options?.source
-              ? { messageId: options.messageId ?? channelMessageId(options.source) }
-              : {}),
-            ...(options?.attachments === undefined ? {} : { attachments: options.attachments }),
-            activeTurnBehavior: options?.steer === false ? "interrupt" : "steer",
-          },
-          options?.source,
-        ),
-        PROVIDER_START_RPC_TIMEOUT_MS,
-      );
-      const result = asRecord(payload);
-      if (result?.["accepted"] === false) {
-        const error = result["error"];
-        throw agentMessageRejection(typeof error === "string" ? error : undefined);
+          await identify(
+            "send_agent_message_request",
+            {
+              agentId,
+              text,
+              ...(messageId === undefined ? {} : { messageId }),
+              ...(options?.attachments === undefined ? {} : { attachments: options.attachments }),
+              activeTurnBehavior: steer ? "steer" : "interrupt",
+              ...(expectedTurnId === null ? {} : { expectedTurnId }),
+            },
+            options?.source,
+          ),
+          PROVIDER_START_RPC_TIMEOUT_MS,
+        );
+        const result = asRecord(payload);
+        if (result?.["accepted"] === false) {
+          const error = result["error"];
+          throw agentMessageRejection(typeof error === "string" ? error : undefined);
+        }
+      } catch (error) {
+        steerTargets.settle(key, error);
+        throw error;
       }
+      steerTargets.settle(key);
     },
     cancelAgent: (agentId) =>
       socket.call("cancel_agent_request", { agentId }).then((payload) => {
@@ -760,6 +776,12 @@ async function isAgentInProject(
     cursors.add(next);
     cursor = next;
   }
+}
+
+/** The turn a Steer names on a Host with the input queue (`steer-target.ts`). */
+async function readRunningTurn(socket: ChannelDaemonSocket, agentId: string) {
+  const payload = asRecord(await socket.call("fetch_agent_request", { agentId }));
+  return runningTurnOf(asRecord(payload?.["agent"]));
 }
 
 function checkedPayload(value: unknown): Record<string, unknown> {
