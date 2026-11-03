@@ -6,7 +6,7 @@ import {
   type ComponentProps,
   type ReactNode,
 } from "react";
-import { View, useWindowDimensions } from "react-native";
+import { View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
 import { useTranslation } from "react-i18next";
 import { SplitContainer } from "@/components/split-container";
 import {
@@ -21,6 +21,7 @@ import type { useConversationTabs } from "./use-conversation-tabs";
 import type { useConversationProject } from "./use-conversation-project";
 import type { ConversationHeadingRenderer } from "./conversation-header";
 import { ConversationHeading } from "./conversation-heading";
+import { ConversationExplorerDock } from "./conversation-explorer-dock";
 import {
   buildConversationCloseActions,
   conversationClipboardActions,
@@ -45,6 +46,7 @@ import { useConversationSourceLabelsBridge } from "./conversation-source-labels"
 const noop = () => {};
 const EMPTY_CLOSING = new Set<string>();
 const fill = { flex: 1, minHeight: 0, minWidth: 0 } as const;
+const desktopRow = { ...fill, flexDirection: "row" } as const;
 type TabState = ReturnType<typeof useConversationLayout>;
 type TabActions = ReturnType<typeof useConversationTabs>;
 interface SurfaceProps {
@@ -64,29 +66,44 @@ export function DesktopConversationSurface({
   openExplorer,
 }: SurfaceProps & { openExplorer: () => void }) {
   const [hovered, setHovered] = useState<string | null>(null);
+  const [width, setWidth] = useState(0);
+  const measure = useCallback(
+    (event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width),
+    [],
+  );
   const splitActions = useDesktopActions(state.layoutKey, actions.bulkClose);
   if (!state.layout) return null;
   const { layoutKey, layout, tabs } = state;
   return (
-    <SplitContainer
-      {...clipboardActions}
-      {...splitActions}
-      layout={layout}
-      workspaceKey={layoutKey}
-      normalizedServerId={serverId}
-      normalizedWorkspaceId=""
-      isWorkspaceFocused={focused}
-      uiTabs={tabs}
-      renderMainHeader={header}
-      hoveredCloseTabKey={hovered}
-      setHoveredCloseTabKey={setHovered}
-      closingTabIds={EMPTY_CLOSING}
-      onNavigateTab={actions.selectTab}
-      onCloseTab={actions.closeTab}
-      onCreateNewTab={openExplorer}
-      buildPaneContentModel={actions.buildContent}
-      onExitFocusMode={noop}
-    />
+    <View style={desktopRow} onLayout={measure}>
+      <View style={fill}>
+        <SplitContainer
+          {...clipboardActions}
+          {...splitActions}
+          layout={layout}
+          workspaceKey={layoutKey}
+          normalizedServerId={serverId}
+          normalizedWorkspaceId=""
+          isWorkspaceFocused={focused}
+          uiTabs={tabs}
+          renderMainHeader={header}
+          hoveredCloseTabKey={hovered}
+          setHoveredCloseTabKey={setHovered}
+          closingTabIds={EMPTY_CLOSING}
+          onNavigateTab={actions.selectTab}
+          onCloseTab={actions.closeTab}
+          onCreateNewTab={openExplorer}
+          buildPaneContentModel={actions.buildContent}
+          onExitFocusMode={noop}
+        />
+      </View>
+      <ConversationExplorerDock
+        {...{ serverId, focused, layoutKey, layout, tabs, actions, hovered, setHovered }}
+        closeActions={splitActions}
+        containerWidth={width}
+        openExplorer={openExplorer}
+      />
+    </View>
   );
 }
 function ConversationSwitcher({
