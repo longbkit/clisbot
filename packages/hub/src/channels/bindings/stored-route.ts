@@ -231,6 +231,9 @@ export function rootMessagesOpenThreads(message: InboundMessage, route: Compiled
  * top-level channel message has no thread id and falls to the conversation
  * level, matching every channel's native "no thread = channel session" rule).
  * `channel` / `dm`: the whole conversation is one session; threads collapse.
+ * A Route that names a thread or topic and not its room serves only that
+ * thread, so the thread is its whole conversation: it never collapses into
+ * the room's session (#42).
  *
  * One exception — the minted-thread key: under `reply.anchor: thread` a
  * root-level Slack marker mints its reply thread on the marker message itself
@@ -242,7 +245,10 @@ export function rootMessagesOpenThreads(message: InboundMessage, route: Compiled
  */
 export function deriveBindingKey(message: InboundMessage, route: CompiledRoute): ThreadKey {
   const conversation = message.conversation;
-  let externalThreadId = route.defaults.bindingKey === "thread" ? conversation.threadId : null;
+  let externalThreadId =
+    route.defaults.bindingKey === "thread" || servesOnlyThread(route, conversation)
+      ? conversation.threadId
+      : null;
   if (
     externalThreadId === null &&
     rootMessagesOpenThreads(message, route) &&
@@ -255,4 +261,14 @@ export function deriveBindingKey(message: InboundMessage, route: CompiledRoute):
     externalConversationId: conversation.rootConversationId,
     externalThreadId,
   };
+}
+
+function servesOnlyThread(route: CompiledRoute, conversation: InboundMessage["conversation"]) {
+  const { conversations, groups } = route.where;
+  return (
+    conversation.threadId !== null &&
+    conversations.includes(conversation.id) &&
+    !conversations.includes(conversation.rootConversationId) &&
+    groups.length === 0
+  );
 }

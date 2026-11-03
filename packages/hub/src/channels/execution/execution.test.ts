@@ -1413,6 +1413,7 @@ describe("a thread or topic inside a bound room", () => {
   const GROUP = "-1003879623490";
   const TOPIC = "239";
   const TELEGRAM_SENDER = "telegram:77";
+  const OTHER_SENDER = "telegram:88";
   const groupRoot: InboundMessage["conversation"] = {
     kind: "group",
     id: GROUP,
@@ -1450,8 +1451,16 @@ describe("a thread or topic inside a bound room", () => {
       account,
       controlPlane: {
         ...controlPlane,
-        users: { ...controlPlane.users, telegram: { name: null, identities: [TELEGRAM_SENDER] } },
-        identityOwners: { ...controlPlane.identityOwners, [TELEGRAM_SENDER]: "telegram" },
+        users: {
+          ...controlPlane.users,
+          telegram: { name: null, identities: [TELEGRAM_SENDER] },
+          other: { name: null, identities: [OTHER_SENDER] },
+        },
+        identityOwners: {
+          ...controlPlane.identityOwners,
+          [TELEGRAM_SENDER]: "telegram",
+          [OTHER_SENDER]: "other",
+        },
       },
     });
   }
@@ -1460,10 +1469,11 @@ describe("a thread or topic inside a bound room", () => {
     harness: FacadeHarness,
     conversation: InboundMessage["conversation"],
     text: string,
+    sender = TELEGRAM_SENDER,
   ) {
     harness.next.message = message({
       channel: "telegram",
-      senderIdentity: TELEGRAM_SENDER,
+      senderIdentity: sender,
       text,
       conversation,
     });
@@ -1522,6 +1532,82 @@ describe("a thread or topic inside a bound room", () => {
     assert.deepEqual(harness.fake.cancelled, [], "the group's session keeps running");
     const rootRow = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, GROUP, null);
     assert.equal(rootRow?.status, "bound");
+    await harness.plane.stop();
+  });
+
+  it("keeps a channel-keyed topic Route's session apart from the group's", async () => {
+    await wipeGroup();
+    const harness = telegramHarness([
+      routeFor(
+        TOPIC,
+        { kind: "agent", agent: "homeassistant", environment: "repo", template: null },
+        { bindingKey: "channel" },
+      ),
+      routeFor(GROUP, { kind: "agent", agent: "default", environment: "repo", template: null }),
+    ]);
+    await harness.plane.start(harness.fake.daemon, store);
+
+    const root = await sendTelegram(harness, groupRoot, "hello group");
+    const inTopic = await sendTelegram(harness, topic, "turn on the lights");
+    const rootAgain = await sendTelegram(harness, groupRoot, "and the group again");
+
+    assert.equal(inTopic.outcome?.kind, "bound");
+    assert.equal(rootAgain.outcome?.kind, "steered");
+    assert.equal(
+      rootAgain.outcome?.kind === "steered" ? rootAgain.outcome.agentId : "",
+      root.outcome?.kind === "bound" ? root.outcome.agentId : "",
+    );
+    assert.deepEqual(harness.fake.cancelled, [], "neither session retires the other");
+    const topicRow = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, GROUP, TOPIC);
+    assert.equal(parseStoredRouteSelection(topicRow?.route)?.position, 0);
+    await harness.plane.stop();
+  });
+
+  it("checks the topic Route's audience for every sender once it owns the topic", async () => {
+    await wipeGroup();
+    const harness = telegramHarness([
+      {
+        ...routeFor(TOPIC, {
+          kind: "agent",
+          agent: "homeassistant",
+          environment: "repo",
+          template: null,
+        }),
+        defaultRoles: [],
+        assignments: [{ identities: [OTHER_SENDER], roles: ["interactor"] }],
+      },
+      routeFor(GROUP, { kind: "agent", agent: "default", environment: "repo", template: null }),
+    ]);
+    await harness.plane.start(harness.fake.daemon, store);
+
+    await sendTelegram(harness, groupRoot, "hello group");
+    const admitted = await sendTelegram(harness, topic, "turn on the lights", OTHER_SENDER);
+    const refused = await sendTelegram(harness, topic, "and me");
+
+    assert.equal(admitted.outcome?.kind, "bound");
+    assert.equal(refused.outcome?.kind, "ignored", "never handed to the group's Agent");
+    assert.equal(harness.fake.created.length, 2);
+    await harness.plane.stop();
+  });
+
+  it("gives a topic to the group Route when that Route is listed first", async () => {
+    await wipeGroup();
+    const harness = telegramHarness([
+      routeFor(GROUP, { kind: "agent", agent: "default", environment: "repo", template: null }),
+      routeFor(TOPIC, {
+        kind: "agent",
+        agent: "homeassistant",
+        environment: "repo",
+        template: null,
+      }),
+    ]);
+    await harness.plane.start(harness.fake.daemon, store);
+
+    await sendTelegram(harness, groupRoot, "hello group");
+    await sendTelegram(harness, topic, "turn on the lights");
+
+    const topicRow = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, GROUP, TOPIC);
+    assert.equal(parseStoredRouteSelection(topicRow?.route)?.position, 0, "Routes are ordered");
     await harness.plane.stop();
   });
 
