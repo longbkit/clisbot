@@ -35,6 +35,7 @@ import type {
   ChannelPlaneDeps,
   InboundMessage,
   PlaneLogger,
+  SupportedChannelName,
   TypingParams,
 } from "../plane/types.js";
 import { planeInboundDeferral } from "../plane/types.js";
@@ -356,7 +357,7 @@ function makeHarness(
   const plane = createChannelPlane({
     organizationId: ORGANIZATION_ID,
     ...(opts.channelRevisionId === undefined ? {} : { channelRevisionId: opts.channelRevisionId }),
-    accountScope: { channel: "slack", accountId: ACCOUNT_ID },
+    accountScope: { channel: account.channel as SupportedChannelName, accountId: ACCOUNT_ID },
     dispatchWorkflow: async (input) => {
       workflowDispatches.push(input);
     },
@@ -1405,6 +1406,197 @@ describe("selected-conversation audience", () => {
     await harness.plane.stop({ cancelActive: true });
 
     assert.deepEqual(harness.fake.cancelled, ["agent-0"]);
+  });
+});
+
+describe("a thread or topic inside a bound room", () => {
+  const GROUP = "-1003879623490";
+  const TOPIC = "239";
+  const TELEGRAM_SENDER = "telegram:77";
+  const groupRoot: InboundMessage["conversation"] = {
+    kind: "group",
+    id: GROUP,
+    rootConversationId: GROUP,
+    threadId: null,
+  };
+  const topic: InboundMessage["conversation"] = {
+    kind: "topic",
+    id: TOPIC,
+    rootConversationId: GROUP,
+    threadId: TOPIC,
+  };
+
+  function routeFor(
+    conversationId: string,
+    target: CompiledRoute["target"],
+    defaults: Partial<EffectiveDefaults> = {},
+  ): CompiledRoute {
+    return {
+      ...makeRoute(),
+      where: { dm: false, groups: [], conversations: [conversationId] },
+      target,
+      defaults: { ...DEFAULTS, ...defaults },
+    };
+  }
+
+  function telegramHarness(routes: CompiledRoute[]) {
+    const account: CompiledChannelAccount = {
+      ...makeAccount(routes[0]!),
+      channel: "telegram",
+      routes,
+    };
+    const controlPlane = makeControlPlane(account);
+    return makeHarness({
+      account,
+      controlPlane: {
+        ...controlPlane,
+        users: { ...controlPlane.users, telegram: { name: null, identities: [TELEGRAM_SENDER] } },
+        identityOwners: { ...controlPlane.identityOwners, [TELEGRAM_SENDER]: "telegram" },
+      },
+    });
+  }
+
+  async function sendTelegram(
+    harness: FacadeHarness,
+    conversation: InboundMessage["conversation"],
+    text: string,
+  ) {
+    harness.next.message = message({
+      channel: "telegram",
+      senderIdentity: TELEGRAM_SENDER,
+      text,
+      conversation,
+    });
+    return harness.plane.onInbound({ channel: "telegram", accountId: ACCOUNT_ID, ctxPayload: {} });
+  }
+
+  async function wipeGroup() {
+    await bundle.runtime.query(
+      `delete from thread_bindings where organization_id = $1 and external_conversation_id = $2`,
+      [ORGANIZATION_ID, GROUP],
+    );
+  }
+
+  // #42: the group's root row must not own a topic its own Route names.
+  it("binds a topic to the Route that names it, after the group root was bound", async () => {
+    await wipeGroup();
+    const harness = telegramHarness([
+      routeFor(TOPIC, {
+        kind: "agent",
+        agent: "homeassistant",
+        environment: "repo",
+        template: null,
+      }),
+      routeFor(GROUP, { kind: "agent", agent: "default", environment: "repo", template: null }),
+    ]);
+    await harness.plane.start(harness.fake.daemon, store);
+
+    const root = await sendTelegram(harness, groupRoot, "hello group");
+    assert.equal(root.outcome?.kind, "bound", JSON.stringify(root.outcome));
+    const inTopic = await sendTelegram(harness, topic, "turn on the lights");
+
+    assert.equal(inTopic.outcome?.kind, "bound", "the topic gets a session of its own");
+    const topicRow = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, GROUP, TOPIC);
+    assert.equal(
+      parseStoredRouteSelection(topicRow?.route)?.position,
+      0,
+      "the topic Route owns it",
+    );
+    const rootRow = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, GROUP, null);
+    assert.equal(parseStoredRouteSelection(rootRow?.route)?.position, 1);
+    await harness.plane.stop();
+  });
+
+  it("sends a topic to the Workflow that names it without retiring the group's session", async () => {
+    await wipeGroup();
+    const harness = telegramHarness([
+      routeFor(TOPIC, { kind: "workflow", workflow: "home-automation" }),
+      routeFor(GROUP, { kind: "agent", agent: "default", environment: "repo", template: null }),
+    ]);
+    await harness.plane.start(harness.fake.daemon, store);
+
+    assert.equal((await sendTelegram(harness, groupRoot, "hello group")).outcome?.kind, "bound");
+    const inTopic = await sendTelegram(harness, topic, "run the evening scene");
+
+    assert.equal(inTopic.outcome?.kind, "workflow");
+    assert.deepEqual(harness.fake.cancelled, [], "the group's session keeps running");
+    const rootRow = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, GROUP, null);
+    assert.equal(rootRow?.status, "bound");
+    await harness.plane.stop();
+  });
+
+  it("still collapses an unnamed topic into a channel-keyed group session", async () => {
+    await wipeGroup();
+    const harness = telegramHarness([
+      routeFor(
+        GROUP,
+        { kind: "agent", agent: "default", environment: "repo", template: null },
+        { bindingKey: "channel" },
+      ),
+    ]);
+    await harness.plane.start(harness.fake.daemon, store);
+
+    const root = await sendTelegram(harness, groupRoot, "hello group");
+    const inTopic = await sendTelegram(harness, topic, "and here");
+
+    assert.equal(root.outcome?.kind, "bound");
+    const agentId = root.outcome?.kind === "bound" ? root.outcome.agentId : "";
+    assert.equal(inTopic.outcome?.kind, "steered");
+    assert.equal(inTopic.outcome?.kind === "steered" ? inTopic.outcome.agentId : "", agentId);
+    assert.equal(harness.fake.created.length, 1);
+    await harness.plane.stop();
+  });
+
+  it("keeps a Slack thread on the Route its room was bound to", async () => {
+    const room = "C0THREADROOM";
+    const ops: CompiledRoute = {
+      ...routeFor(
+        room,
+        { kind: "agent", agent: "ops", environment: "repo", template: null },
+        {
+          replyAnchor: "default",
+        },
+      ),
+      audienceRules: [{ ...TRIAGE_RULE, trigger: { contains: "#ops" } }],
+      where: { dm: false, groups: ["all"], conversations: [] },
+    };
+    const fallback = routeFor(
+      room,
+      { kind: "agent", agent: "worker", environment: "repo", template: null },
+      { replyAnchor: "default" },
+    );
+    const harness = makeHarness({ account: { ...makeAccount(ops), routes: [ops, fallback] } });
+    await harness.plane.start(harness.fake.daemon, store);
+    const rootConversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: room,
+      rootConversationId: room,
+      threadId: null,
+    };
+    const thread = "1712000000.000777";
+
+    harness.next.message = message({ text: "#ops deploy", conversation: rootConversation });
+    const root = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    harness.next.message = message({
+      text: "how is it going",
+      externalMessageId: "1712000000.000778",
+      conversation: { kind: "thread", id: thread, rootConversationId: room, threadId: thread },
+    });
+    const reply = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+
+    assert.equal(root.outcome?.kind, "bound");
+    assert.equal(reply.outcome?.kind, "bound");
+    const threadRow = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, room, thread);
+    assert.equal(parseStoredRouteSelection(threadRow?.route)?.position, 0, "the room's Route");
+    await harness.plane.stop();
   });
 });
 
