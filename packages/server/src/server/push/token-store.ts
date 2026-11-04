@@ -9,7 +9,6 @@ import {
   type NotificationScope,
 } from "@clisbot/protocol/notification-audience";
 import { SessionActorSchema, type SessionActor } from "@clisbot/protocol/session-authorship";
-import type { PushPayload } from "./push-service.js";
 
 /**
  * Store for Expo push tokens.
@@ -60,6 +59,7 @@ export class PushTokenStore {
           : [...new Set(authorization.projectIds)].sort(),
       actor: reader.actor ?? null,
       scope: reader.scope ?? current?.scope ?? DEFAULT_NOTIFICATION_SCOPE,
+      unconfirmed: false,
     };
     if (
       current !== undefined &&
@@ -88,6 +88,24 @@ export class PushTokenStore {
     this.logger.debug({ total: this.subscriptions.size }, "Revoked token");
   }
 
+  /**
+   * The Hub revoked this lease, often only to reissue it (a team or role change revokes a whole
+   * organization). Its tokens stay, but until their device renews them they receive only a
+   * notification that identifies nothing, and they still expire with the lease.
+   */
+  markLeaseUnconfirmed(leaseId: string): void {
+    const next = new Map(this.subscriptions);
+    let changed = false;
+    for (const [token, subscription] of this.subscriptions) {
+      if (subscription.leaseId !== leaseId || subscription.unconfirmed) continue;
+      next.set(token, { ...subscription, unconfirmed: true });
+      changed = true;
+    }
+    if (!changed) return;
+    this.persist(next);
+    this.subscriptions = next;
+  }
+
   revokeLease(leaseId: string): void {
     const next = new Map(this.subscriptions);
     for (const [token, subscription] of this.subscriptions) {
@@ -104,7 +122,9 @@ export class PushTokenStore {
   }
 
   /** Active tokens for `target`, with whether each one depends on a managed lease. */
-  getActiveSubscriptions(target?: PushNotificationTarget): { token: string; leased: boolean }[] {
+  getActiveSubscriptions(
+    target?: PushNotificationTarget,
+  ): { token: string; leased: boolean; unconfirmed: boolean }[] {
     const now = this.now();
     const active = new Map(this.subscriptions);
     for (const [token, subscription] of this.subscriptions) {
@@ -124,7 +144,11 @@ export class PushTokenStore {
     return Array.from(active)
       .filter(([, subscription]) => allowsTarget(subscription, target))
       .filter(([, subscription]) => allowsRecipient(subscription, target))
-      .map(([token, subscription]) => ({ token, leased: subscription.leaseId !== null }));
+      .map(([token, subscription]) => ({
+        token,
+        leased: subscription.leaseId !== null,
+        unconfirmed: subscription.unconfirmed,
+      }));
   }
 
   private loadFromDisk(): void {
@@ -158,6 +182,7 @@ export class PushTokenStore {
               projectIds: null,
               actor: null,
               scope: DEFAULT_NOTIFICATION_SCOPE,
+              unconfirmed: false,
             });
           }
         }
@@ -183,6 +208,7 @@ export class PushTokenStore {
               ...(subscription.projectIds === null ? {} : { projectIds: subscription.projectIds }),
               ...(subscription.actor === null ? {} : { actor: subscription.actor }),
               scope: subscription.scope,
+              ...(subscription.unconfirmed ? { unconfirmed: true } : {}),
             })),
           },
           null,
@@ -217,10 +243,10 @@ export interface PushNotificationTarget {
   /** Which readers this notification is for; absent sends to every authorized token. */
   recipients?: (reader: NotificationReader) => boolean;
   /**
-   * What tokens bound to a managed lease receive instead of the payload, when the sender
-   * cannot rely on a revocation of that lease having reached it. Identifies nothing.
+   * The sender cannot rely on a revocation of any lease having reached it (its Hub link is
+   * down), so every lease-bound token gets the notification that identifies nothing.
    */
-  leasePayload?: PushPayload;
+  leasesUnconfirmed?: boolean;
 }
 
 interface PushTokenSubscription {
@@ -229,6 +255,8 @@ interface PushTokenSubscription {
   projectIds: readonly string[] | null;
   actor: SessionActor | null;
   scope: NotificationScope;
+  /** Its lease was revoked by the Hub and the device has not renewed it since. */
+  unconfirmed: boolean;
 }
 
 /** One persisted subscription, permissively; absent reader fields read as written before them. */
@@ -243,6 +271,7 @@ function parseStoredSubscription(
     projectIds?: unknown;
     actor?: unknown;
     scope?: unknown;
+    unconfirmed?: unknown;
   };
   if (typeof candidate.token !== "string" || typeof candidate.expiresAt !== "string") return null;
   const token = candidate.token.trim();
@@ -268,6 +297,7 @@ function parseStoredSubscription(
       projectIds: projectIds === null ? null : [...new Set(projectIds)].sort(),
       actor: actor.success ? actor.data : null,
       scope: scope.success ? scope.data : DEFAULT_NOTIFICATION_SCOPE,
+      unconfirmed: candidate.unconfirmed === true,
     },
   };
 }
@@ -276,6 +306,7 @@ function sameAuthorization(left: PushTokenSubscription, right: PushTokenSubscrip
   return (
     left.leaseId === right.leaseId &&
     left.scope === right.scope &&
+    left.unconfirmed === right.unconfirmed &&
     JSON.stringify(left.projectIds) === JSON.stringify(right.projectIds) &&
     JSON.stringify(left.actor) === JSON.stringify(right.actor)
   );

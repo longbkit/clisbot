@@ -87,10 +87,8 @@ import type { WorkspaceAutoName } from "./workspace-auto-name.js";
 import { deriveProjectSlug } from "./workspace-git-metadata.js";
 import {
   createPushNotifications,
-  UNIDENTIFIED_PUSH_PAYLOAD,
   type PushNotifications,
   type PushNotificationSender,
-  type PushPayload,
 } from "./push/index.js";
 import type { ScriptHealthState } from "./script-health-monitor.js";
 import type { ServiceProxySubsystem } from "./service-proxy.js";
@@ -2964,12 +2962,12 @@ export class VoiceAssistantWebSocketServer {
   public revokeManagedLeases(leaseIds: readonly string[]): number {
     const requested = new Set(leaseIds);
     // A device that is offline has no connection left to close, but its push token still
-    // carries the lease: revoke it here or the token keeps receiving until the lease expires.
+    // carries the lease. Until it renews, it gets only notifications that identify nothing.
     for (const leaseId of requested) {
       try {
-        this.pushNotifications.revokeLease(leaseId);
+        this.pushNotifications.markLeaseUnconfirmed(leaseId);
       } catch (error) {
-        this.logger.warn({ err: error, leaseId }, "Failed to revoke managed push subscription");
+        this.logger.warn({ err: error, leaseId }, "Failed to withhold a revoked push subscription");
       }
     }
     const connections = new Set<SessionConnection>([
@@ -3832,10 +3830,8 @@ export class VoiceAssistantWebSocketServer {
    * link a Member's lease cannot be trusted to still hold, so their devices get a payload that
    * identifies nothing; opening the app re-checks access over their own connection.
    */
-  private leasePushPayload(): { leasePayload?: PushPayload } {
-    return this.hubRelationships?.status().state === "connected"
-      ? {}
-      : { leasePayload: UNIDENTIFIED_PUSH_PAYLOAD };
+  private leasePushPayload(): { leasesUnconfirmed?: boolean } {
+    return this.hubRelationships?.status().state === "connected" ? {} : { leasesUnconfirmed: true };
   }
 
   private async projectIdForWorkspace(

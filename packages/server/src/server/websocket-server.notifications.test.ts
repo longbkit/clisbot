@@ -657,14 +657,62 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
     expect(unlinked.delivered).toEqual([]);
   });
 
-  it("a Hub revocation for an offline device's lease removes its push token at once", async () => {
-    const { server, delivered, registerMember } = setup({ createdBy: BOB });
+  it("a Hub revocation for an offline device's lease withholds everything identifying until it renews", async () => {
+    const { server, delivered, registerMember, push } = setup({ createdBy: BOB });
     registerMember("bob-phone", BOB);
+    push.renew("owner-phone");
 
     expect(server.revokeManagedLeases(["lease-bob-phone"])).toBe(0);
     await finish(server);
+    const revoked: Record<string, PushPayload> = {};
+    for (const entry of delivered) for (const token of entry.tokens) revoked[token] = entry.payload;
+    delivered.length = 0;
+    registerMember("bob-phone", BOB);
+    await finish(server);
 
-    expect(delivered).toEqual([]);
+    expect(revoked["bob-phone"]).toStrictEqual({
+      title: "Clisbot",
+      body: "Open Clisbot to see what changed.",
+    });
+    expect(revoked["owner-phone"]?.data).toMatchObject({ agentId: "agent-1" });
+    expect(delivered.flatMap((entry) => entry.tokens).sort()).toEqual(["bob-phone", "owner-phone"]);
+    expect(delivered.every((entry) => entry.payload.data !== undefined)).toBe(true);
+  });
+
+  it("one person's devices with different scopes are planned per device, not by the first one", async () => {
+    const { server, delivered, registerMember } = setup({ createdBy: BOB });
+    registerMember("bob-phone-needs", BOB, { scope: "needs" });
+    // Bob's desktop is connected on For me but idle, so nobody saw the failure in the app.
+    connectClient(
+      server,
+      {
+        deviceType: "web",
+        appVisible: false,
+        focusedAgentId: null,
+        lastActivityAt: new Date(Date.now() - 10 * 60_000),
+      },
+      { reader: memberReader(BOB, "mine") },
+    );
+
+    await finish(server, "error");
+
+    expect(delivered.flatMap((entry) => entry.tokens)).toEqual(["bob-phone-needs"]);
+  });
+
+  it("a request from a session nobody can attribute reaches only the Host owner", async () => {
+    const { server, delivered, registerMember, push } = setup({});
+    registerMember("admin-daemon-wide", BOB, { projectIds: null });
+    registerMember("admin-needs", member("admin2"), { projectIds: null, scope: "needs" });
+    push.renew("owner-phone");
+
+    const tokensFor = async (reason: "finished" | "permission") => {
+      delivered.length = 0;
+      await finish(server, reason);
+      return delivered.flatMap((entry) => entry.tokens).sort();
+    };
+
+    expect(await tokensFor("finished")).toEqual(["admin-daemon-wide", "owner-phone"]);
+    expect(await tokensFor("permission")).toEqual(["owner-phone"]);
   });
 
   it("without a live Hub link, lease devices get a payload that identifies nothing, until it reconnects", async () => {

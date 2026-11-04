@@ -1,7 +1,10 @@
 import type pino from "pino";
-import { existsSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync } from "node:fs";
 
 import { ensurePrivateFile, writePrivateFileAtomicSync } from "../private-files.js";
+
+/** A reader follows at most this many sessions on one Host; more is refused, not dropped. */
+export const MAX_FOLLOWS_PER_READER = 500;
 
 /**
  * Sessions each reader follows on this Host, keyed by `notificationReaderKey`.
@@ -30,10 +33,14 @@ export class NotificationFollowStore {
     return [...(this.follows.get(readerKey) ?? [])].sort();
   }
 
-  /** Persists before it applies, so a failed write leaves the previous choice in effect. */
-  set(readerKey: string, agentId: string, followed: boolean): void {
+  /**
+   * Persists before it applies, so a failed write leaves the previous choice in effect.
+   * Returns false when the reader already follows the maximum number of sessions.
+   */
+  set(readerKey: string, agentId: string, followed: boolean): boolean {
     const current = new Set(this.follows.get(readerKey));
-    if (current.has(agentId) === followed) return;
+    if (current.has(agentId) === followed) return true;
+    if (followed && current.size >= MAX_FOLLOWS_PER_READER) return false;
     if (followed) current.add(agentId);
     else current.delete(agentId);
     const next = new Map(this.follows);
@@ -41,6 +48,7 @@ export class NotificationFollowStore {
     else next.delete(readerKey);
     this.persist(next);
     this.follows = next;
+    return true;
   }
 
   private load(): void {
@@ -58,7 +66,14 @@ export class NotificationFollowStore {
         if (ids.length > 0) this.follows.set(readerKey, new Set(ids));
       }
     } catch (error) {
-      this.logger.warn({ err: error }, "Failed to load notification follows");
+      // Keep the unreadable file beside the new one instead of overwriting it on the next write.
+      const backup = `${this.filePath}.unreadable-${Date.now()}`;
+      try {
+        copyFileSync(this.filePath, backup);
+      } catch {
+        // The warning below still records that follows were not loaded.
+      }
+      this.logger.warn({ err: error, backup }, "Failed to load notification follows");
     }
   }
 

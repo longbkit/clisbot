@@ -53,9 +53,13 @@ The daemon judges every reader separately, for both pushes and in-app notificati
   lease-bound tokens get one generic payload that identifies nothing: no title or preview from the
   session and no Host, Project, workspace, path, agent or terminal id. Tapping it opens the app
   without navigating, and the app reads only what the Host authorizes after it connects. The
-  Host owner's own devices keep full notifications. Tradeoff: during a Hub outage Members lose
-  the deep link and the preview. The remaining window is a Hub link that reads as connected while
-  a revocation is still in flight.
+  Host owner's own devices keep full notifications. A Hub revocation does not delete a lease's
+  tokens: the Hub revokes a whole organization's leases on team and role changes, so they get only
+  that generic payload until the device renews them or the lease expires (at most 60 minutes).
+  Tradeoff: during a Hub outage or after a revocation, Members lose the deep link and the preview.
+  Remaining window: a Hub link that reads as connected while a revocation is still in flight,
+  including the gap after a reconnect before the Hub replays stored revocations, and a socket that
+  died but has not failed its heartbeat yet; it is bounded by the lease.
 
 Pushes are plain alerts with no Notification Service Extension, so iOS shows them before app code
 runs: filtering has to happen on the daemon. A Host without `features.notificationScope` keeps the

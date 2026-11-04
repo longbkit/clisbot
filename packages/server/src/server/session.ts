@@ -3787,7 +3787,7 @@ export class Session {
         this.handleSetNotificationScope(msg.scope, msg.requestId);
         return;
       case "notifications.set_follow.request":
-        this.handleSetNotificationFollow(msg.agentId, msg.followed, msg.requestId);
+        await this.handleSetNotificationFollow(msg.agentId, msg.followed, msg.requestId);
         return;
       case "notifications.list_follows.request":
         this.emit({
@@ -5721,13 +5721,13 @@ export class Session {
    * Follows the session for this connection's reader. Only a session the reader may read
    * now can be followed, and a follow grants nothing: sends check access again.
    */
-  private handleSetNotificationFollow(agentId: string, followed: boolean, requestId: string): void {
+  private async handleSetNotificationFollow(
+    agentId: string,
+    followed: boolean,
+    requestId: string,
+  ): Promise<void> {
     const reader = this.notificationReader();
-    if (
-      !this.notificationFollows ||
-      reader === null ||
-      (followed && !this.allowsNotificationAbout({ agentId }))
-    ) {
+    const refuse = () =>
       this.emit({
         type: "rpc_error",
         payload: {
@@ -5737,9 +5737,21 @@ export class Session {
           code: "resource_not_found",
         },
       });
-      return;
+    if (!this.notificationFollows || reader === null) return refuse();
+    // Following needs an existing session the reader may read now; unfollowing always works.
+    if (followed) {
+      const exists =
+        agentId.length <= 200 &&
+        Boolean(this.agentManager.getAgent(agentId) ?? (await this.agentStorage.get(agentId)));
+      if (!exists || !this.allowsNotificationAbout({ agentId })) return refuse();
     }
-    this.notificationFollows.set(notificationReaderKey(reader.actor), agentId, followed);
+    let saved: boolean;
+    try {
+      saved = this.notificationFollows.set(notificationReaderKey(reader.actor), agentId, followed);
+    } catch {
+      saved = false;
+    }
+    if (!saved) return refuse();
     this.emit({
       type: "notifications.set_follow.response",
       payload: { requestId, agentId, followed },

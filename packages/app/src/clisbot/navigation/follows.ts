@@ -41,7 +41,9 @@ export function useTabFollow(serverId: string): WorkspaceTabFollow | undefined {
         void client
           .setNotificationFollow(agentId, followed)
           .then(() => {
-            const next = new Set(followedAgentIds ?? []);
+            // The store's set now, not the one this menu was built from: toggles can overlap.
+            const current = useSessionStore.getState().sessions[serverId]?.followedAgentIds;
+            const next = new Set(current ?? []);
             if (followed) next.add(agentId);
             else next.delete(agentId);
             useSessionStore.getState().setFollowedAgents(serverId, next);

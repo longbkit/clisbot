@@ -34,6 +34,7 @@ export interface PushNotifications {
   ): void;
   revoke(token: string): void;
   revokeLease(leaseId: string): void;
+  markLeaseUnconfirmed(leaseId: string): void;
   send(payload: PushPayload, target?: PushNotificationTarget): Promise<void>;
 }
 
@@ -62,13 +63,17 @@ export function createPushNotifications(options: {
     revokeLease(leaseId) {
       store.revokeLease(leaseId);
     },
+    markLeaseUnconfirmed(leaseId) {
+      store.markLeaseUnconfirmed(leaseId);
+    },
     async send(payload, target) {
       const subscriptions = store.getActiveSubscriptions(target);
-      const leasePayload = target?.leasePayload;
-      const full = subscriptions.filter((entry) => !leasePayload || !entry.leased);
-      const contentFree = leasePayload ? subscriptions.filter((entry) => entry.leased) : [];
+      const unidentified = (entry: { leased: boolean; unconfirmed: boolean }) =>
+        entry.leased && (entry.unconfirmed || target?.leasesUnconfirmed === true);
+      const full = subscriptions.filter((entry) => !unidentified(entry));
+      const withheld = subscriptions.filter(unidentified);
       options.logger.info(
-        { tokenCount: full.length, contentFreeTokenCount: contentFree.length },
+        { tokenCount: full.length, unidentifiedTokenCount: withheld.length },
         "Sending push notification",
       );
       if (full.length > 0)
@@ -76,10 +81,10 @@ export function createPushNotifications(options: {
           full.map((entry) => entry.token),
           payload,
         );
-      if (leasePayload && contentFree.length > 0)
+      if (withheld.length > 0)
         await deliver(
-          contentFree.map((entry) => entry.token),
-          leasePayload,
+          withheld.map((entry) => entry.token),
+          UNIDENTIFIED_PUSH_PAYLOAD,
         );
     },
   };

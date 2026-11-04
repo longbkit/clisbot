@@ -59,10 +59,12 @@ export function planAttentionAudience<Client>(input: {
   const inAppRecipients = new Set<Client>();
   const reached = new Set<string>();
   for (const [key, entries] of groups) {
+    // Whether this person was reached in the app or is looking at it; whether each of their
+    // tokens may then be pushed is decided per token, as their devices can differ in scope.
     const plan = computeNotificationPlan({
       allStates: entries.map((entry) => entry.state),
       focusTarget: input.focusTarget,
-      pushEligible: input.pushEligible(entries[0]!.reader!),
+      pushEligible: true,
       nowMs: input.nowMs,
     });
     if (plan.inAppRecipientIndex !== null)

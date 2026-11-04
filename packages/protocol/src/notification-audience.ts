@@ -116,8 +116,8 @@ export function notificationOwnership(
  * Whether a session with `ownership` may notify `reader`.
  *
  * The Host owner's own devices (no Hub identity) own everything on their Host.
- * Unknown ownership notifies For me only for a reader with daemon-wide access:
- * a Project Member is not paged for work nobody can attribute to them.
+ * Unknown ownership notifies For me only for a reader with daemon-wide access, and a request
+ * or failure from it only the Host owner: nobody is paged with someone else's request.
  */
 export function notificationAllowed(
   reader: NotificationReader,
@@ -126,8 +126,11 @@ export function notificationAllowed(
 ): boolean {
   if (reader.scope === "off") return false;
   if (reader.scope === "all") return true;
+  // Unattributed work is provisionally a daemon-wide reader's, as in the session list, but a
+  // request or failure from it, which can quote tool input, goes only to the Host owner.
+  const unknownIsMine = kind === "needs" ? reader.actor === null : reader.daemonWide;
   const mine =
-    reader.actor === null || ownership === "mine" || (ownership === "unknown" && reader.daemonWide);
+    reader.actor === null || ownership === "mine" || (ownership === "unknown" && unknownIsMine);
   if (reader.scope === "needs") return mine && kind === "needs";
   return reader.scope === "mine" ? mine : !mine;
 }
