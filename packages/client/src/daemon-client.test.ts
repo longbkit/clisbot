@@ -2096,6 +2096,43 @@ test("waits for the daemon to acknowledge push token revocation", async () => {
   await revocation;
 });
 
+test("sends the notification scope only to a Host that supports it, and again on connect", async () => {
+  const sentScopes = (mock: ReturnType<typeof createMockTransport>) =>
+    mock.sent
+      .map((frame) => parseSentFrame(frame))
+      .filter((message) => message?.type === "notifications.set_scope.request")
+      .map((message) => message.scope);
+  const supported = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_notification_scope",
+    reconnect: { enabled: false },
+    transportFactory: () => supported.transport,
+  });
+  clients.push(client);
+  client.setNotificationScope("all");
+  const connectPromise = client.connect();
+  supported.triggerOpen({ features: { notificationScope: true } });
+  await connectPromise;
+  client.setNotificationScope("off");
+
+  const old = createMockTransport();
+  const oldHostClient = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_notification_scope_old",
+    reconnect: { enabled: false },
+    transportFactory: () => old.transport,
+  });
+  clients.push(oldHostClient);
+  oldHostClient.setNotificationScope("all");
+  const oldConnect = oldHostClient.connect();
+  old.triggerOpen();
+  await oldConnect;
+
+  expect(sentScopes(supported)).toEqual(["all", "off"]);
+  expect(sentScopes(old)).toEqual([]);
+});
+
 test("bounds the wait for push token revocation", async () => {
   useHeartbeatClock();
   const mock = createMockTransport();

@@ -262,6 +262,20 @@ describe("ManagedResourceAuthorizer", () => {
     ).resolves.toBe(false);
   });
 
+  it("re-checks a notification tap: the opened agent's timeline is read only within the Project", async () => {
+    const authorizer = createHarness(["project.use"]);
+    const timeline = (agentId: string) =>
+      authorizer.allowsInbound({
+        type: "fetch_agent_timeline_request",
+        requestId: `timeline-${agentId}`,
+        agentId,
+        direction: "tail",
+      });
+
+    await expect(timeline("agent-a")).resolves.toBe(true);
+    await expect(timeline("agent-b")).resolves.toBe(false);
+  });
+
   it("judges an agent record in hand by its own workspace, with no cache lookup", async () => {
     const authorizer = createHarness(["project.use"]);
     await authorizer.allowsInbound({

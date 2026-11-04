@@ -224,6 +224,9 @@ scope tabs' help icon about unknown ownership shows on the tabs that list it (Fo
 persist for legacy sessions without identity evidence; a temporarily missing reader can resolve
 later using the remembered account below.
 
+Notifications follow this rule with one difference: unknown work pages For me only for the Host owner
+and daemon-wide readers, never a Project Member ([audience](../../notifications.md#audience)).
+
 **Why unknown moved to For me.** Sessions the desktop app starts on its own Host carry no creator
 and no participant, because the local connection has no Hub account. Under the 2026-10-29 rule
 about 700 of the owner's own Mac sessions were listed under Others. Evidence that cannot place an

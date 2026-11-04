@@ -119,6 +119,70 @@ class SubscriptionPeer {
   }
 }
 
+test("a daemon advertises the notification scope and accepts a reader's choice", async () => {
+  const daemon = await createTestClisbotDaemon({ mcpEnabled: false });
+  const socket = new WebSocket(`ws://127.0.0.1:${daemon.port}/ws`);
+  const frames: WSOutboundMessage[] = [];
+  socket.on("message", (data, binary) => {
+    if (!binary) frames.push(JSON.parse(data.toString()));
+  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      socket.once("open", resolve);
+      socket.once("error", reject);
+    });
+    socket.send(
+      JSON.stringify({
+        type: "hello",
+        clientType: "mobile",
+        clientId: "notification-scope",
+        protocolVersion: 1,
+        appVersion: "2.2.3",
+        capabilities: { owned_subscriptions: true },
+      }),
+    );
+    const serverInfo = () =>
+      frames.find(
+        (frame) =>
+          frame.type === "session" &&
+          frame.message.type === "status" &&
+          frame.message.payload.status === "server_info",
+      );
+    await expect.poll(() => serverInfo() !== undefined).toBe(true);
+    const info = serverInfo();
+    expect(
+      info?.type === "session" && info.message.type === "status"
+        ? (info.message.payload as { features?: Record<string, unknown> }).features
+            ?.notificationScope
+        : undefined,
+    ).toBe(true);
+
+    socket.send(
+      JSON.stringify({
+        type: "session",
+        message: SessionInboundMessageSchema.parse({
+          type: "notifications.set_scope.request",
+          scope: "all",
+          requestId: "scope-all",
+        }),
+      }),
+    );
+    await expect
+      .poll(() =>
+        frames.find(
+          (frame) =>
+            frame.type === "session" && frame.message.type === "notifications.set_scope.response",
+        ),
+      )
+      .toMatchObject({
+        message: { payload: { requestId: "scope-all", scope: "all" } },
+      });
+  } finally {
+    socket.terminate();
+    await daemon.close();
+  }
+});
+
 test("a pure list reply belongs only to its source socket in a shared logical session", async () => {
   const daemon = await createTestClisbotDaemon({ mcpEnabled: false });
   const peers: SubscriptionPeer[] = [];

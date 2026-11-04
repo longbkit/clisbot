@@ -58,6 +58,7 @@ import { TerminalSection } from "@/screens/settings/terminal/terminal-section";
 import { ChatSection } from "@/screens/settings/chat/chat-section";
 import { SidebarNavSection } from "@/screens/settings/sidebar/sidebar-nav-section";
 import { SendingSection } from "@/screens/settings/general/sending-section";
+import { NotificationsSection } from "@/screens/settings/general/notifications-section";
 import { StorageSection } from "@/clisbot/offline-storage/storage-section";
 import { OFFLINE_CACHE_ENABLED } from "@/runtime/replica-cache/offline-flag";
 import { HubPicker } from "@/device-access/hub-picker";
@@ -1489,6 +1490,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
               <>
                 <GeneralSection settings={settings} handleLanguageChange={handleLanguageChange} />
                 <SendingSection />
+                <NotificationsSection />
                 {OFFLINE_CACHE_ENABLED ? <StorageSection /> : null}
                 <ProductAnalyticsSettings />
                 {isDesktopApp ? <OpenLocationSection /> : null}

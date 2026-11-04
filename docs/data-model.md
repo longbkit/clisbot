@@ -571,11 +571,30 @@ than treating it as valid.
 
 ```json
 {
-  "tokens": ["ExponentPushToken[...]", ...]
+  "subscriptions": [
+    {
+      "token": "ExponentPushToken[...]",
+      "expiresAt": "2026-11-05T00:00:00.000Z",
+      "leaseId": "lease-…",
+      "projectIds": ["project-…"],
+      "actor": { "kind": "user", "id": "…", "memberId": "…", "hubOrigin": "https://…" },
+      "scope": "mine"
+    }
+  ]
 }
 ```
 
-Simple set of Expo push notification tokens. Loaded with permissive parsing (filters non-string entries). Persisted with atomic temp-file rename.
+One subscription per Expo push token, written privately with an atomic temp-file rename.
+
+- `expiresAt`: 48 hours after the last renewal, never past the managed lease's expiry.
+- `leaseId` and `projectIds`: the managed lease that registered it. Both are absent for the Host
+  owner's own devices, which are daemon-wide.
+- `actor`: the Hub account of the connection that registered it, the reader its notifications are judged for
+  ([audience](notifications.md#audience)). A lease subscription without one receives nothing until
+  its device renews it.
+- `scope`: the reader's notification scope, `mine` when never chosen.
+
+The legacy `{ "tokens": [...] }` form is still read and migrated to daemon-wide subscriptions.
 
 ---
 
