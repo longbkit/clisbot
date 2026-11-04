@@ -896,6 +896,9 @@ export async function handleSlackAction(
           ...(threadId ? { threadId } : {}),
           messages,
           hasMore: result.hasMore,
+          ...(result.threadRootUnavailable === undefined
+            ? {}
+            : { threadRootUnavailable: result.threadRootUnavailable }),
         });
       }
       case "downloadFile": {

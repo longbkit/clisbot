@@ -46,7 +46,7 @@ describe("Slack read actions", () => {
     expect(client.conversations.info).toHaveBeenNthCalledWith(2, { channel: "C1" });
   });
 
-  it("uses conversations.replies and drops the parent message", async () => {
+  it("uses conversations.replies and leads with the parent message (D-046)", async () => {
     const client = createClient();
     client.conversations.replies.mockResolvedValueOnce({
       messages: [{ ts: "171234.567" }, { ts: "171234.890" }, { ts: "171235.000" }],
@@ -67,19 +67,38 @@ describe("Slack read actions", () => {
       oldest: "171234.567",
     });
     expect(client.conversations.history).not.toHaveBeenCalled();
-    expect(result.messages.map((message) => message.ts)).toEqual(["171234.890", "171235.000"]);
+    expect(client.conversations.replies).toHaveBeenCalledTimes(1);
+    expect(result.messages.map((message) => message.ts)).toEqual([
+      "171234.567",
+      "171234.890",
+      "171235.000",
+    ]);
   });
 
-  it("excludes the parent before applying the thread page limit", async () => {
+  it("keeps the parent outside the thread page limit", async () => {
     const client = createClient();
     const threadMessages = [
       { ts: "171234.567", text: "parent" },
       { ts: "171234.890", text: "first reply" },
       { ts: "171235.000", text: "second reply" },
     ];
-    client.conversations.replies.mockImplementationOnce(
-      ({ oldest, limit }: { oldest?: string; limit?: number }) => {
-        const eligible = threadMessages.filter((message) => !oldest || message.ts > oldest);
+    client.conversations.replies.mockImplementation(
+      ({
+        oldest,
+        latest,
+        inclusive,
+        limit,
+      }: {
+        oldest?: string;
+        latest?: string;
+        inclusive?: boolean;
+        limit?: number;
+      }) => {
+        const eligible = threadMessages.filter(
+          (message) =>
+            (!oldest || (inclusive ? message.ts >= oldest : message.ts > oldest)) &&
+            (!latest || (inclusive ? message.ts <= latest : message.ts < latest)),
+        );
         return {
           messages: eligible.slice(0, limit),
           has_more: limit !== undefined && eligible.length > limit,
@@ -95,7 +114,10 @@ describe("Slack read actions", () => {
         token: "xoxb-test",
       }),
     ).resolves.toEqual({
-      messages: [{ ts: "171234.890", text: "first reply" }],
+      messages: [
+        { ts: "171234.567", text: "parent" },
+        { ts: "171234.890", text: "first reply" },
+      ],
       hasMore: true,
     });
   });
@@ -256,6 +278,7 @@ describe("Slack read actions", () => {
     });
 
     expect(result.messages.map((message) => message.text)).toEqual([
+      "parent",
       "Thread data\nName\nExample A",
     ]);
   });
