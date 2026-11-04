@@ -281,6 +281,26 @@ describe("file uploads", () => {
     });
     expect(readFileSync(path, "utf8")).toBe("hello world");
   });
+
+  it("keeps an unsent draft linkable while other uploads fill the store", async () => {
+    const clisbotHome = makeClisbotHome();
+    const uploads = new FileUploadStore({ clisbotHome });
+    // New workspace drafts send the upload made when the file was chosen.
+    const draft = await uploadNamed(uploads, "draft.pdf");
+    for (let index = 1; index < 256; index++) await uploadNamed(uploads, `other-${index}.pdf`);
+
+    expect(() =>
+      uploads.beginUpload({
+        type: "file.upload.request",
+        fileName: "one-more.pdf",
+        mimeType: "text/plain",
+        size: 11,
+        modifiedAt: "2026-05-02T00:00:00.000Z",
+        requestId: "req-over-cap",
+      }),
+    ).toThrow("Upload storage overloaded: too many unfinished drafts");
+    expect(draft && uploads.ownsUploadedFile(draft)).toBe(true);
+  });
 });
 
 let uploadCount = 0;

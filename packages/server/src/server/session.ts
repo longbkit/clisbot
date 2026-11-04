@@ -499,6 +499,8 @@ export interface SessionOptions {
   clientId: string;
   permissions: readonly DaemonPermission[];
   resourceAuthorization?: SessionResourceAuthorization;
+  /** Tests shorten how long an upload request may wait for authorization. */
+  heldUploadTimeoutMs?: number;
   appVersion?: string | null;
   clientCapabilities?: Record<string, unknown> | null;
   onMessage: (msg: SessionOutboundMessage) => void;
@@ -1051,6 +1053,7 @@ export class Session {
       clisbotHome,
       logger: this.sessionLogger,
       sessionStorageEnabled: () => this.agentManager.sessionStorageEnabled,
+      heldUploadTimeoutMs: options.heldUploadTimeoutMs,
       resolveForkSource: async (source) => {
         if (!(await this.resourceAuthorizer.allowsAgent(source.agentId, "project.use")))
           throw new Error("Fork source not found");
@@ -1545,6 +1548,7 @@ export class Session {
   }
 
   clearAgentTimelineSubscription(source: object): void {
+    this.workspaceFilesSession.releaseSource(source);
     this.clientCapabilitiesBySource.delete(source);
     void this.delivery
       .detach(source)
@@ -2504,8 +2508,25 @@ export class Session {
     );
   }
 
+  /** A timed-out upload request already has its answer; a late outcome must not add another. */
+  private uploadRequestAnswered(msg: SessionInboundMessage, source?: object): boolean {
+    return (
+      msg.type === "file.upload.request" &&
+      this.workspaceFilesSession.uploadRequestAnswered(msg.requestId, source)
+    );
+  }
+
   public async handleMessage(msg: SessionInboundMessage, source?: object): Promise<void> {
-    return this.delivery.request(source, msg, () => this.handleRequest(msg, source));
+    // Registered before the first await: the upload's binary frames may already be next.
+    const releaseUploadFrames =
+      msg.type === "file.upload.request"
+        ? this.workspaceFilesSession.holdUploadFrames(msg, source)
+        : undefined;
+    try {
+      return await this.delivery.request(source, msg, () => this.handleRequest(msg, source));
+    } finally {
+      releaseUploadFrames?.();
+    }
   }
 
   private async handleRequest(msg: SessionInboundMessage, source?: object): Promise<void> {
@@ -2530,7 +2551,7 @@ export class Session {
           : true;
       if (!operationAllowed || !resourceAllowed) {
         const requestId = sessionRequestId(msg);
-        if (requestId) {
+        if (requestId && !this.uploadRequestAnswered(msg, source)) {
           const code = resourceAllowed
             ? "access_denied"
             : await this.resourceAuthorizer.denialCode(msg);
@@ -2560,7 +2581,7 @@ export class Session {
 
         const requestId =
           "requestId" in msg && typeof msg.requestId === "string" ? msg.requestId : undefined;
-        if (typeof requestId === "string") {
+        if (typeof requestId === "string" && !this.uploadRequestAnswered(msg, source)) {
           try {
             this.emit({
               type: "rpc_error",
@@ -3848,16 +3869,22 @@ export class Session {
       this.connectedHostSession?.binary(binaryFrame.frame, source);
       return;
     }
+    if (binaryFrame.kind === "file_transfer") {
+      await this.workspaceFilesSession.handleFileTransferFrame(
+        binaryFrame.frame,
+        source,
+        () =>
+          this.authorization.isLeaseActive() &&
+          this.authorization.allowsPermission("workspace.write") &&
+          this.resourceAuthorizer.allowsAnyProject(),
+      );
+      return;
+    }
     if (
       !this.authorization.isLeaseActive() ||
       !this.authorization.allowsPermission("workspace.write")
     )
       return;
-    if (binaryFrame.kind === "file_transfer") {
-      if (!this.resourceAuthorizer.allowsAnyProject()) return;
-      await this.workspaceFilesSession.handleFileTransferFrame(binaryFrame.frame, source);
-      return;
-    }
     this.terminalController.handleBinaryFrame(binaryFrame.frame, source);
   }
 
