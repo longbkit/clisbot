@@ -888,7 +888,7 @@ describe("second review regressions", () => {
 });
 
 const REPLY_UNCONFIRMED_NOTICE =
-  "The connection to the machine that runs this bot was interrupted during this turn, so the reply here may be incomplete. Check the session for the full result. Nothing was sent again.";
+  "This bot could not confirm that the complete reply reached this thread. Check the session for the full result. Nothing was sent again automatically.";
 
 const HOST_LOST_NOTICE =
   "The machine that runs this bot went away while it was working on this message, so an answer may never come. Send it again if you do not get one.";
@@ -1076,6 +1076,28 @@ describe("a Host that goes away mid-turn", () => {
 
     await flow.plane.onHostLost();
     assert.deepEqual(flow.posted, [HOST_LOST_NOTICE]);
+    await flow.plane.stop();
+  });
+
+  it("tells a stale turn on a socket that never dropped, naming no connection cause", async () => {
+    // The 2026-11-03 case: another account replaced the timeline set, the
+    // socket stayed connected, and the turn's end never reached the plane.
+    const say = conversation();
+    const daemon = makeDaemon();
+    const host = readsOf(daemon.daemon);
+    const flow = makePlane(makeRoute({}), daemon, { turnReconcileMs: 10 });
+    await flow.plane.start(daemon.daemon, store);
+    host.answer = async () => [runningSnapshot("agent-0")];
+    await flow.send(say("check the refresh logic"));
+    host.answer = async () => [];
+    const before = host.reads;
+    await waitFor(() => host.reads > before);
+    await pause(30);
+
+    assert.deepEqual(flow.posted, [REPLY_UNCONFIRMED_NOTICE]);
+    assert.doesNotMatch(flow.posted[0]!, /connection|interrupted|went away/iu);
+    await pause(40);
+    assert.equal(flow.posted.length, 1, "said once");
     await flow.plane.stop();
   });
 

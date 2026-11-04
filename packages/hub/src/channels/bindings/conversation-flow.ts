@@ -141,6 +141,7 @@ export class ConversationFlow {
    * turn the app or another account started never passes through `deliver`. */
   private readonly streamSeenAt = new Map<string, number>();
   private reconciling = false;
+  private stopped = false;
   private readonly reconcileTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(private readonly deps: ConversationFlowDeps) {
@@ -221,7 +222,9 @@ export class ConversationFlow {
    */
   async reconcileTurns(): Promise<void> {
     const read = this.deps.readRunningAgentIds;
-    if (read === undefined || this.reconciling || this.runningTurns.size === 0) return;
+    if (read === undefined || this.stopped || this.reconciling || this.runningTurns.size === 0) {
+      return;
+    }
     this.reconciling = true;
     try {
       const readFrom = this.sequence;
@@ -233,29 +236,40 @@ export class ConversationFlow {
       }
       // A snapshot: ending a turn awaits, and the map can change meanwhile.
       for (const [agentId, at] of Array.from(this.runningTurns)) {
+        if (this.stopped) return;
         if (running.has(agentId)) continue;
         // Re-checked per agent: ending one awaits, and a send may start meanwhile.
-        const quiet =
-          this.runningTurns.get(agentId) === at &&
-          at.sentAt <= readFrom &&
-          this.sendsInFlight === 0 &&
-          this.unnamedSendReturnedAt <= readFrom &&
-          (this.sendReturnedAt.get(agentId) ?? 0) <= readFrom &&
-          (this.streamSeenAt.get(agentId) ?? 0) <= readFrom;
-        if (!quiet) continue;
+        if (!this.quietSince(readFrom, agentId, at)) continue;
         this.deps.logger.warn("channel turn ended without its terminal event", { agentId });
         // Ended first (its synchronous part), so nothing can re-check it meanwhile.
         const ended = this.turnEnded(agentId);
         await this.unconfirmed(at);
         await ended;
       }
-      for (const marks of [this.sendReturnedAt, this.streamSeenAt]) {
-        for (const [agentId, at] of marks) {
-          if (at <= readFrom && !this.runningTurns.has(agentId)) marks.delete(agentId);
-        }
-      }
+      this.forgetMarksBefore(readFrom);
     } finally {
       this.reconciling = false;
+    }
+  }
+
+  /** Nothing since `readFrom` could have started a newer turn on this agent. */
+  private quietSince(readFrom: number, agentId: string, at: TurnAddress): boolean {
+    return (
+      this.runningTurns.get(agentId) === at &&
+      at.sentAt <= readFrom &&
+      this.sendsInFlight === 0 &&
+      this.unnamedSendReturnedAt <= readFrom &&
+      (this.sendReturnedAt.get(agentId) ?? 0) <= readFrom &&
+      (this.streamSeenAt.get(agentId) ?? 0) <= readFrom
+    );
+  }
+
+  /** Marks older than a completed read matter only for turns still counted. */
+  private forgetMarksBefore(readFrom: number): void {
+    for (const marks of [this.sendReturnedAt, this.streamSeenAt]) {
+      for (const [agentId, at] of marks) {
+        if (at <= readFrom && !this.runningTurns.has(agentId)) marks.delete(agentId);
+      }
     }
   }
 
@@ -435,6 +449,7 @@ export class ConversationFlow {
   }
 
   stop(): void {
+    this.stopped = true;
     if (this.reconcileTimer !== undefined) clearInterval(this.reconcileTimer);
     this.scheduler.stop();
     this.runningTurns.clear();
