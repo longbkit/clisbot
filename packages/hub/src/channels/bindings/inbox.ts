@@ -8,7 +8,13 @@ import type { ChannelIngressQueueRecord } from "../../db/types.js";
 import type { CompiledRoute } from "../config/compile.js";
 import { conversationSettings } from "../config/conversation.js";
 import type { InboundMessage } from "../plane/types.js";
-import { deliveryMessageId, renderConversationPrompt } from "./prompt.js";
+import type { ChannelThreadContext, ChannelThreadContextMessage } from "@clisbot/channels-shared";
+import {
+  deliveryMessageId,
+  renderConversationPrompt,
+  type ConversationLine,
+  type ConversationNote,
+} from "./prompt.js";
 import { deriveBindingKey, type ThreadKey } from "./stored-route.js";
 import { ingressAttempt } from "../ingress/attempt.js";
 
@@ -67,6 +73,61 @@ function ingressIds(messages: readonly InboundMessage[]): string[] {
   );
 }
 
+/**
+ * The thread block of a prompt, from the snapshot the vertical stored on
+ * `carrier`'s ingress row (`ThreadContext`). Whether a prompt carries it at all
+ * is `BindingInbox.threadCarrier`'s durable decision. A message the prompt
+ * already carries as context or as a message is not repeated.
+ */
+export function threadLines(
+  carrier: InboundMessage | undefined,
+  messages: readonly InboundMessage[],
+  context: readonly InboundMessage[],
+): (ConversationLine | ConversationNote)[] {
+  const thread = carrier?.threadContext;
+  if (carrier === undefined || thread === undefined) return [];
+  const carried = new Set(
+    [...context, ...messages].flatMap((message) =>
+      message.externalMessageId === undefined ? [] : [message.externalMessageId],
+    ),
+  );
+  const line = (message: ChannelThreadContextMessage): ConversationLine[] =>
+    carried.has(message.messageId)
+      ? []
+      : [
+          {
+            senderIdentity: `${carrier.channel}:${message.senderId}`,
+            ...(message.senderName === undefined ? {} : { senderName: message.senderName }),
+            text: message.text,
+          },
+        ];
+  const lines: (ConversationLine | ConversationNote)[] = [];
+  if (thread.unavailable !== undefined) {
+    lines.push({
+      note: `(${unreadPart(thread)} could not be read: ${thread.unavailable}. The message tool's read action can try again.)`,
+    });
+  }
+  if (thread.root !== undefined) lines.push(...line(thread.root));
+  if (thread.omitted === "unknown") {
+    lines.push({
+      note: "(The replies are not shown: the thread is longer than one read covers. The message tool's read action has them.)",
+    });
+  } else if (thread.omitted !== undefined) {
+    lines.push({
+      note: `(${thread.omitted} earlier ${thread.omitted === 1 ? "reply is" : "replies are"} not shown; the message tool's read action has them.)`,
+    });
+  }
+  for (const message of thread.recent) lines.push(...line(message));
+  return lines.some((entry) => !("note" in entry)) || thread.unavailable !== undefined ? lines : [];
+}
+
+/** What part of the thread a snapshot with `unavailable` is missing. */
+function unreadPart(thread: ChannelThreadContext): string {
+  if (thread.root !== undefined) return "The thread's replies";
+  if (thread.recent.length > 0) return "The thread's root post";
+  return "The thread's earlier messages";
+}
+
 export class BindingInbox {
   constructor(private readonly deps: BindingInboxDeps) {}
 
@@ -86,33 +147,93 @@ export class BindingInbox {
    * prompt carried (`sent_in`), so it renders the same request for the
    * daemon's receipt. A message the queue never held has no inbox.
    */
-  async prepare(delivery: Delivery, route: CompiledRoute): Promise<PreparedDelivery> {
+  async prepare(
+    delivery: Delivery,
+    route: CompiledRoute,
+    agentId?: string,
+  ): Promise<PreparedDelivery> {
     const messages = messagesOf(delivery);
     const messageId = deliveryMessageId(messages);
     const through = messages.at(-1)?.ingressId;
-    const prompt = (context: readonly InboundMessage[]) =>
-      renderConversationPrompt({ context, messages });
     if (through === undefined) {
       const none = async () => undefined;
-      return { prompt: prompt([]), messageId, markSent: none, settle: none };
+      const prompt = renderConversationPrompt({ context: [], messages });
+      return { prompt, messageId, markSent: none, settle: none };
     }
     const scope = this.scopeOf(delivery.message, route);
     const own = ingressIds(messages);
     const context = await this.contextFor(scope, messageId, own, through, route);
+    const carrier = await this.threadCarrier(scope, messages, messageId, route, agentId);
     // Settled are the rows read here: the ones rendered, and the older ones
     // past the cap that no later prompt repeats. A row filed after this read
     // waits for the next prompt.
     const older = await this.deps.store.listIds(scope, { state: "context", before: through });
     const carried = [...own, ...context.map((row) => row.id)];
+    const read = this.read(context);
     return {
-      prompt: prompt(this.read(context)),
+      prompt: renderConversationPrompt({
+        thread: threadLines(carrier, messages, read),
+        context: read,
+        messages,
+      }),
       messageId,
-      markSent: () => {
+      markSent: async () => {
         ingressAttempt.getStore()?.throwIfAborted();
+        if (carrier?.ingressId !== undefined && agentId !== undefined) {
+          await this.deps.store.markThreadContextSent(scope, carrier.ingressId, {
+            agentId,
+            deliveryId: messageId,
+          });
+        }
         return this.deps.store.markSent(scope, carried, messageId);
       },
-      settle: () => this.deps.store.file(scope, [...carried, ...older], "delivered"),
+      settle: async () => {
+        if (carrier?.ingressId !== undefined && agentId !== undefined) {
+          await this.deps.store.confirmThreadContextSent(scope, carrier.ingressId, messageId);
+        }
+        await this.deps.store.file(scope, [...carried, ...older], "delivered");
+      },
     };
+  }
+
+  /**
+   * The message whose thread snapshot this prompt carries, or undefined. The
+   * decision is durable, per session and native thread. The prompt carrying a
+   * snapshot writes a marker on its row with its sent mark, before the send
+   * (`markThreadContextSent`), and confirms it once the daemon took the prompt
+   * (`settle`). A replay of that prompt finds its own marker, confirmed or not,
+   * and carries the thread again, so it is the same request. A later prompt to
+   * the same Agent leaves the thread out only after an earlier confirmed
+   * marker: a prompt refused before delivery, or one whose outcome stayed
+   * unknown, does not count, so the thread is sent again (a possible duplicate,
+   * never a loss). A new session (`/new`, a new binding) is another Agent, and
+   * rows written before this existed carry no marker.
+   */
+  private async threadCarrier(
+    scope: ChannelInboxScope,
+    messages: readonly InboundMessage[],
+    deliveryId: string,
+    route: CompiledRoute,
+    agentId: string | undefined,
+  ): Promise<InboundMessage | undefined> {
+    if (agentId === undefined) return undefined;
+    if (conversationSettings(route.defaults).context.unmentioned === "none") return undefined;
+    const carrier = messages.find(
+      (message) => message.threadContext !== undefined && message.ingressId !== undefined,
+    );
+    const threadId = carrier?.conversation.threadId;
+    if (carrier?.ingressId === undefined || threadId == null) return undefined;
+    const marker = await this.deps.store.threadContextMarkerOf(scope, carrier.ingressId);
+    if (marker !== undefined) {
+      return marker.agentId === agentId && marker.deliveryId === deliveryId ? carrier : undefined;
+    }
+    const sent = await this.deps.store.threadContextSentTo(
+      scope,
+      agentId,
+      threadId,
+      carrier.ingressId,
+    );
+    return sent ? undefined : carrier;
   }
 
   /** The context rows a delivery carries: the ones its first prompt carried, or fresh ones. */

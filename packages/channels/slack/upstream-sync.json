@@ -198,6 +198,10 @@
       "status": "fusion-owned"
     },
     {
+      "local": "src/fusion/slack-read.ts",
+      "status": "fusion-owned"
+    },
+    {
       "local": "src/fusion/question-gateway.ts",
       "status": "fusion-owned"
     },
@@ -351,7 +355,7 @@
       "local": "src/monitor/provider.ts",
       "upstream": "extensions/slack/src/monitor/provider.ts",
       "status": "adapted",
-      "deviation": ["D-038", "D-042"]
+      "deviation": ["D-038", "D-042", "D-047"]
     },
     {
       "local": "src/monitor/reconnect-policy.ts",
@@ -885,6 +889,12 @@
         "src/actions.read-thread-root.test.ts",
         "src/action-runtime.test.ts"
       ]
+    },
+    {
+      "id": "D-047",
+      "file": "src/monitor/provider.ts",
+      "reason": "A mention that replies in a thread carries a snapshot of the thread (`ChannelInboundEvent.threadContext`, ctxPayload `ThreadContext`). Upstream seeds a thread session from its inbound pipeline (ThreadStarterBody plus thread history, `monitor/message-handler`, omitted here); Fusion's Hub stops the vertical at the inbound event and renders the prompt itself, and must render the same request on every attempt of a delivery, so the vertical reads the thread once at admission and the snapshot is stored on the ingress row. `transport/thread-context.ts` reads the root and the newest 15 replies before the mention (attachment text included; per-message and total caps; at most three pages of 200), runs beside sender naming under a 1.5 s budget because admission holds the Socket Mode ack, keeps only the root when the read stops early (page cap, `has_more` without a cursor, budget after the first page), and turns a failure into `unavailable`. Every thread-reply mention is read, once for the `message`/`app_mention` twins; whether a prompt carries the snapshot is the Hub's durable per-session decision (`bindings/inbox.ts`, a marker on the ingress row).",
+      "tests": ["src/transport/thread-context.test.ts", "src/monitor/provider.test.ts"]
     }
   ]
 }

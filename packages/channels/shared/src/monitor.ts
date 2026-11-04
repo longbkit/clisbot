@@ -120,6 +120,36 @@ export interface ChannelInboundFacts {
   topic?: ChannelInboundTopicFacts;
 }
 
+/** One message of a thread as the vertical read it when the bot was mentioned. */
+export interface ChannelThreadContextMessage {
+  /** The channel-native message id (Slack ts). */
+  messageId: string;
+  /** The sender's native id (Slack `U…`, or the app's `B…` for an app post). */
+  senderId: string;
+  /** The app or bot name when the post carries one (an Alertmanager webhook). */
+  senderName?: string;
+  /** The message as text, attachment fallback included, already capped. */
+  text: string;
+}
+
+/**
+ * The thread a mention arrived in, read once at admission and stored on the
+ * ingress row (`ThreadContext`), so every attempt of the delivery renders the
+ * same prompt. Absent when the mention is not a thread reply, or the bot has
+ * already posted in the thread (its session has seen it).
+ */
+export interface ChannelThreadContext {
+  /** The thread's first message. */
+  root?: ChannelThreadContextMessage;
+  /** The newest replies before the mention, oldest first. */
+  recent: ChannelThreadContextMessage[];
+  /** Replies between the root and `recent` that are left out; `unknown` when
+   * the read stopped before the thread's end. */
+  omitted?: number | "unknown";
+  /** Why the thread could not be read (a Slack error, `timeout`). */
+  unavailable?: string;
+}
+
 /** The native facts one inbound channel event carries, normalized by the L2
  * transport from its raw event (a Telegram `update.message`, a Slack
  * `message` event payload). Ids are the channel-native ones — no prefixing,
@@ -163,6 +193,8 @@ export interface ChannelInboundEvent {
   kind?: ChannelInboundKind;
   /** The structured facts for `kind`; absent = `body` is all there is. */
   facts?: ChannelInboundFacts;
+  /** The thread the mention arrived in, read at admission. */
+  threadContext?: ChannelThreadContext;
 }
 
 /** The flat ctxPayload the Hub plane's normalizer reads
@@ -199,6 +231,7 @@ export function buildInboundCtxPayload(
   // other routing fact; the per-kind facts ride in ONE nested key rather than a
   // dozen flat ones, because the Hub reads them as a unit after it has branched
   // on the kind (`plane/inbound-kinds.ts`).
+  if (event.threadContext !== undefined) payload["ThreadContext"] = event.threadContext;
   payload["EventKind"] = event.kind ?? "message";
   if (event.facts !== undefined && Object.keys(event.facts).length > 0) {
     payload["EventFacts"] = event.facts;

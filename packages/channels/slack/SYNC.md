@@ -93,6 +93,7 @@ Upstream `openclaw-private` at `5d8067a4483`. Roots: `extensions/slack/src` → 
 | `src/fusion/fetch.types.ts`                       | —                                                                   | fusion-owned  | —                                 |
 | `src/fusion/media-runtime.ts`                     | —                                                                   | fusion-owned  | —                                 |
 | `src/fusion/plugin-config.ts`                     | —                                                                   | fusion-owned  | —                                 |
+| `src/fusion/slack-read.ts`                        | —                                                                   | fusion-owned  | —                                 |
 | `src/fusion/question-gateway.ts`                  | —                                                                   | fusion-owned  | —                                 |
 | `src/fusion/runtime-env.ts`                       | —                                                                   | fusion-owned  | —                                 |
 | `src/fusion/runtime.ts`                           | —                                                                   | fusion-owned  | —                                 |
@@ -123,7 +124,7 @@ Upstream `openclaw-private` at `5d8067a4483`. Roots: `extensions/slack/src` → 
 | `src/monitor/mrkdwn.ts`                           | `extensions/slack/src/monitor/mrkdwn.ts`                            | verbatim      | —                                 |
 | `src/monitor/policy.ts`                           | `extensions/slack/src/monitor/policy.ts`                            | verbatim      | —                                 |
 | `src/monitor/provider-support.ts`                 | `extensions/slack/src/monitor/provider-support.ts`                  | verbatim      | —                                 |
-| `src/monitor/provider.ts`                         | `extensions/slack/src/monitor/provider.ts`                          | adapted       | D-038                             |
+| `src/monitor/provider.ts`                         | `extensions/slack/src/monitor/provider.ts`                          | adapted       | D-038, D-042, D-047               |
 | `src/monitor/reconnect-policy.ts`                 | `extensions/slack/src/monitor/reconnect-policy.ts`                  | verbatim      | —                                 |
 | `src/monitor/slack-client-kind.ts`                | `extensions/slack/src/monitor/slack-client-kind.ts`                 | verbatim      | —                                 |
 | `src/monitor/thread.runtime.ts`                   | `extensions/slack/src/monitor/thread.runtime.ts`                    | verbatim      | —                                 |

@@ -87,8 +87,9 @@ function makeProvider(overrides: Partial<SlackBoltProviderOptions> = {}) {
       admitted.push(event);
     },
     abortSignal: controller.signal,
-    // No Slack to ask for names in these tests.
+    // No Slack to ask for names or threads in these tests.
     senders: { name: async (_client, event) => event },
+    readThreadContext: async () => undefined,
     interop: {
       App,
       HTTPReceiver,
@@ -251,6 +252,69 @@ describe("slack bolt provider: message families", () => {
       senderId: "U_HUMAN",
       wasMentioned: true,
     });
+    await harness.shutdown();
+  });
+
+  it("stores the thread a mention replies in on the admitted event, read once for both twins", async () => {
+    const snapshot = {
+      root: { messageId: "1700.000100", senderId: "B_ALERT", senderName: "Alertmanager", text: "[FIRING:2] DiskUtilization" },
+      recent: [],
+    };
+    const readThreadContext = vi.fn(async () => snapshot);
+    const harness = makeProvider({ readThreadContext });
+    const receiver = await harness.ready();
+    const mention = {
+      channel: "C1",
+      channel_type: "channel",
+      user: "U_HUMAN",
+      text: "<@U_BOT> check the disk",
+      ts: "1700.000500",
+      event_ts: "1700.000500",
+      thread_ts: "1700.000100",
+    };
+    await receiver.deliver(eventEnvelope({ type: "message", ...mention }));
+    await receiver.deliver(eventEnvelope({ type: "app_mention", ...mention }));
+    expect(readThreadContext).toHaveBeenCalledTimes(1);
+    expect(readThreadContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channelId: "C1",
+        threadTs: "1700.000100",
+        messageTs: "1700.000500",
+      }),
+    );
+    expect(harness.admitted.map((event) => event.threadContext)).toEqual([snapshot, snapshot]);
+    await harness.shutdown();
+  });
+
+  it("reads no thread for a root-level mention or an unmentioned reply", async () => {
+    const readThreadContext = vi.fn(async () => ({ recent: [] }));
+    const harness = makeProvider({ readThreadContext });
+    const receiver = await harness.ready();
+    await receiver.deliver(
+      eventEnvelope({
+        type: "app_mention",
+        channel: "C1",
+        channel_type: "channel",
+        user: "U_HUMAN",
+        text: "<@U_BOT> hi",
+        ts: "1700.000600",
+        event_ts: "1700.000600",
+      }),
+    );
+    await receiver.deliver(
+      eventEnvelope({
+        type: "message",
+        channel: "C1",
+        channel_type: "channel",
+        user: "U_HUMAN",
+        text: "just talking",
+        ts: "1700.000700",
+        event_ts: "1700.000700",
+        thread_ts: "1700.000100",
+      }),
+    );
+    expect(readThreadContext).not.toHaveBeenCalled();
+    expect(harness.admitted.map((event) => event.threadContext)).toEqual([undefined, undefined]);
     await harness.shutdown();
   });
 

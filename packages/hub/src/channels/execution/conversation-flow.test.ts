@@ -17,14 +17,19 @@ import type {
   EffectiveDefaults,
 } from "../config/compile.js";
 import { connectEnrolledChannelDaemon, type DaemonConnection } from "../daemon/client.js";
-import { HostNotReachedError } from "../daemon/enrolled-client.js";
 import { createMemorySteerTargets, type SteerTargetStore } from "../daemon/steer-target.js";
 import { AgentRequestRefusedError } from "../daemon/agent-request-refusal.js";
 import { configurationDaemonStub } from "../daemon/test-support.js";
 import { channelMessageId } from "../daemon/session-operation.js";
 import type { HeldFlushAdmission } from "../bindings/held-flush.js";
-import { CONTEXT_HEADER, MESSAGE_HEADER, deliveryMessageId } from "../bindings/prompt.js";
+import {
+  CONTEXT_HEADER,
+  MESSAGE_HEADER,
+  THREAD_HEADER,
+  deliveryMessageId,
+} from "../bindings/prompt.js";
 import { claimedInbound } from "../ingress/claimed-inbound.js";
+import { HostNotReachedError } from "../daemon/enrolled-client.js";
 import type { InboundReplyParams } from "../loader/host.js";
 import { ManualClock } from "../plane/clock.js";
 import type { InboundMessage, PlaneLogger } from "../plane/types.js";
@@ -99,17 +104,29 @@ function makeControlPlane(routes: CompiledRoute | CompiledRoute[]): ChannelContr
 
 /** The daemon's receipt rule: a message id names one request, for good. */
 function makeDaemon(
-  options: { failSends?: number; onSend?: (agentId: string) => Promise<void> } = {},
+  options: {
+    failSends?: number;
+    failCreates?: number;
+    /** Sends refused before anything reached the daemon (a Host already away). */
+    refuseSends?: number;
+    onSend?: (agentId: string) => Promise<void>;
+  } = {},
 ) {
   const sends: { agentId: string; text: string; messageId: string }[] = [];
   const receipts = new Map<string, string>();
   let failures = options.failSends ?? 0;
+  let createFailures = options.failCreates ?? 0;
+  let refusals = options.refuseSends ?? 0;
   let seq = 0;
   const daemon: DaemonConnection = {
     ...configurationDaemonStub(),
     discovery: { url: "ws://127.0.0.1:6868/ws", source: "default-port" },
     waitForConnected: async () => undefined,
     createAgent: async () => {
+      if (createFailures > 0) {
+        createFailures -= 1;
+        throw new Error("the session could not start");
+      }
       const id = `agent-${seq++}`;
       return {
         agentId: id,
@@ -126,6 +143,10 @@ function makeDaemon(
       };
     },
     sendAgentMessage: async (agentId, text, sendOptions) => {
+      if (refusals > 0) {
+        refusals -= 1;
+        throw new HostNotReachedError();
+      }
       const messageId = sendOptions?.messageId ?? channelMessageId(sendOptions!.source!);
       const request = JSON.stringify([agentId, text]);
       const held = receipts.get(messageId);
@@ -146,7 +167,11 @@ function makeDaemon(
     setTimelineSubscription: async () => undefined,
     stop: () => undefined,
   };
-  return { daemon, sends };
+  /** The next send is refused before anything reaches the daemon. */
+  const refuseNext = () => {
+    refusals += 1;
+  };
+  return { daemon, sends, refuseNext };
 }
 
 let dataDirectory: string;
@@ -1307,5 +1332,283 @@ describe("a follow-up Steer on a Host with the input queue", () => {
     } finally {
       await flow.stop();
     }
+  });
+});
+
+describe("the thread a mention replies in", () => {
+  /** The snapshot the Slack vertical stores on a mention's ingress row. */
+  function threadOf(root: string, recent: { id: string; text: string }[] = []) {
+    return {
+      root: {
+        messageId: root,
+        senderId: "B0ALERT",
+        senderName: "Alertmanager",
+        text: "[FIRING:2] Disk full on example-host",
+      },
+      recent: recent.map(({ id, text }) => ({ messageId: id, senderId: "U0LAN", text })),
+    };
+  }
+  const ROOT_LINE = "Alertmanager (slack:B0ALERT): [FIRING:2] Disk full on example-host";
+
+  /** A mention carrying the thread snapshot, as the vertical admits it. */
+  function mentionIn(say: ReturnType<typeof conversation>, text: string): InboundMessage {
+    const message = say(text, { name: "Alice" });
+    return { ...message, threadContext: threadOf(message.conversation.threadId!) };
+  }
+
+  async function storedRow(message: InboundMessage) {
+    const rows = await store.listChannelIngress({ organizationId: ORGANIZATION_ID, limit: 1_000 });
+    return rows.find((row) => row.externalMessageId === message.externalMessageId)!;
+  }
+
+  it("is quoted before the mention, and a retry sends the same request from the stored row", async () => {
+    const say = conversation();
+    const daemon = makeDaemon({ failSends: 1 });
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    const mention = say("free up the disk", { name: "Alice" });
+    const root = mention.conversation.threadId!;
+    const withThread: InboundMessage = {
+      ...mention,
+      threadContext: {
+        ...threadOf(root, [{ id: `${root}9`, text: "it was the backups last time" }]),
+        omitted: 2,
+      },
+    };
+
+    const attempt = await flow.send(withThread).catch((error: unknown) => error);
+    assert.ok(attempt instanceof Error, "the first send's outcome is unknown");
+    const payload = {
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: { Message: withThread },
+    };
+    await flow.plane.onInbound(claimedInbound(payload, (await storedRow(withThread)).id));
+
+    const expected = lines(
+      THREAD_HEADER,
+      ROOT_LINE,
+      "(2 earlier replies are not shown; the message tool's read action has them.)",
+      "slack:U0LAN: it was the backups last time",
+      MESSAGE_HEADER,
+      "Alice (slack:U0ALICE): free up the disk",
+    );
+    assert.equal(daemon.sends.length, 2, "sent, then replayed");
+    assert.equal(daemon.sends[0]!.text, expected);
+    assert.deepEqual(daemon.sends[1], daemon.sends[0], "same session, text and receipt key");
+    await flow.plane.stop();
+  });
+
+  it("goes to a session once: a later mention to the same session leaves it out", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    await flow.send(mentionIn(say, "free up the disk"));
+    await flow.send(mentionIn(say, "and check the backups"));
+
+    assert.equal(daemon.sends.length, 2);
+    assert.equal(daemon.sends[0]!.agentId, daemon.sends[1]!.agentId);
+    assert.ok(daemon.sends[0]!.text.startsWith(THREAD_HEADER));
+    assert.equal(daemon.sends[1]!.text, "Alice (slack:U0ALICE): and check the backups");
+    await flow.plane.stop();
+  });
+
+  it("reaches a session bound before the upgrade: its first mention with a snapshot carries the thread", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    // Admitted by a vertical that did not read threads: no snapshot, no marker.
+    await flow.send(say("free up the disk", { name: "Alice" }));
+    await flow.send(mentionIn(say, "you missed the alert above"));
+
+    assert.equal(daemon.sends[0]!.agentId, daemon.sends[1]!.agentId, "the same session");
+    assert.equal(
+      daemon.sends[1]!.text,
+      lines(
+        THREAD_HEADER,
+        ROOT_LINE,
+        MESSAGE_HEADER,
+        "Alice (slack:U0ALICE): you missed the alert above",
+      ),
+    );
+    await flow.plane.stop();
+  });
+
+  it("counts only a marker the daemon confirmed, for that Agent and thread", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    await flow.send(say("hello", { name: "Alice" }));
+    const agentId = daemon.sends[0]!.agentId;
+    const failed = mentionIn(say, "free up the disk");
+    const later = mentionIn(say, "try again");
+    for (const message of [failed, later]) {
+      await store.enqueueChannelIngress({
+        organizationId: ORGANIZATION_ID,
+        channel: "slack",
+        accountId: ACCOUNT_ID,
+        externalEventId: message.externalMessageId!,
+        externalMessageId: message.externalMessageId!,
+        externalConversationId: message.conversation.rootConversationId,
+        externalThreadId: message.conversation.threadId,
+        laneKey: `lane:${String(message.conversation.threadId)}`,
+        payload: { channel: "slack", accountId: ACCOUNT_ID, ctxPayload: { Message: message } },
+      });
+      // Distinct arrival times: rows order by `created_at`.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    const thread = failed.conversation.threadId!;
+    const failedRow = await storedRow(failed);
+    const laterRow = await storedRow(later);
+    const scope = {
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      bindingKey: JSON.stringify(["C0FLOW", failed.conversation.threadId]),
+    };
+    await store.inbox.file(scope, [failedRow.id, laterRow.id], "held");
+    // The marker went down, then the attempt stopped before the send.
+    await store.inbox.markThreadContextSent(scope, failedRow.id, {
+      agentId,
+      deliveryId: "never-sent",
+    });
+    assert.equal(await store.inbox.threadContextSentTo(scope, agentId, thread, laterRow.id), false);
+    // The sent mark is written before the send: it proves nothing.
+    await store.inbox.markSent(scope, [failedRow.id], "never-sent");
+    assert.equal(await store.inbox.threadContextSentTo(scope, agentId, thread, laterRow.id), false);
+    // A confirmation for another prompt does not confirm this marker.
+    await store.inbox.confirmThreadContextSent(scope, failedRow.id, "another-prompt");
+    assert.equal(await store.inbox.threadContextSentTo(scope, agentId, thread, laterRow.id), false);
+    await store.inbox.confirmThreadContextSent(scope, failedRow.id, "never-sent");
+    assert.equal(await store.inbox.threadContextSentTo(scope, agentId, thread, laterRow.id), true);
+    assert.equal(
+      await store.inbox.threadContextSentTo(scope, "agent-other", thread, laterRow.id),
+      false,
+    );
+    assert.equal(
+      await store.inbox.threadContextSentTo(scope, agentId, "1799999999.000001", laterRow.id),
+      false,
+      "another thread of a channel-keyed session",
+    );
+    await flow.plane.stop();
+  });
+
+  it("is sent again after a prompt refused before delivery and dead-lettered", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    await flow.send(say("hello", { name: "Alice" }));
+    const agentId = daemon.sends[0]!.agentId;
+
+    // The Host is away when the snapshot's prompt goes out: marked sent, never delivered.
+    daemon.refuseNext();
+    const refused = mentionIn(say, "free up the disk");
+    await flow.send(refused).catch(() => undefined);
+    const record = await storedRow(refused);
+    assert.notEqual(record.sentIn, null, "the sent mark went down before the send");
+    assert.equal(daemon.sends.length, 1, "the refused prompt reached no session");
+    const payload = { channel: "slack", accountId: ACCOUNT_ID, ctxPayload: { Message: refused } };
+    await flow.plane.onDeadLettered({ ...record, payload });
+
+    await flow.send(mentionIn(say, "try again"));
+    const last = daemon.sends.at(-1)!;
+    assert.equal(last.agentId, agentId, "the same session");
+    assert.equal(
+      last.text,
+      lines(THREAD_HEADER, ROOT_LINE, MESSAGE_HEADER, "Alice (slack:U0ALICE): try again"),
+    );
+    await flow.plane.stop();
+  });
+
+  it("goes again to the new session after /new", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    await flow.send(mentionIn(say, "free up the disk"));
+    await flow.send(say("/new"));
+    await flow.send(mentionIn(say, "start over"));
+
+    const first = daemon.sends[0]!;
+    const last = daemon.sends.at(-1)!;
+    assert.notEqual(first.agentId, last.agentId, "/new started another session");
+    assert.equal(
+      last.text,
+      lines(THREAD_HEADER, ROOT_LINE, MESSAGE_HEADER, "Alice (slack:U0ALICE): start over"),
+    );
+    await flow.plane.stop();
+  });
+
+  it("does not repeat a thread message the prompt already carries as context", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    const chatter = say("it was the backups last time", {
+      name: "Lan",
+      sender: "slack:U0LAN",
+      mention: false,
+    });
+    await flow.send(chatter);
+    const mention = say("free up the disk", { name: "Alice" });
+    const root = mention.conversation.threadId!;
+    await flow.send({
+      ...mention,
+      threadContext: threadOf(root, [{ id: chatter.externalMessageId!, text: chatter.text }]),
+    });
+
+    assert.equal(
+      daemon.sends[0]!.text,
+      lines(
+        THREAD_HEADER,
+        ROOT_LINE,
+        CONTEXT_HEADER,
+        "Lan (slack:U0LAN): it was the backups last time",
+        MESSAGE_HEADER,
+        "Alice (slack:U0ALICE): free up the disk",
+      ),
+    );
+    await flow.plane.stop();
+  });
+
+  it("says when the thread could not be read", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    await flow.send({
+      ...say("free up the disk", { name: "Alice" }),
+      threadContext: { recent: [], unavailable: "missing_scope" },
+    });
+    assert.equal(
+      daemon.sends[0]!.text,
+      lines(
+        THREAD_HEADER,
+        "(The thread's earlier messages could not be read: missing_scope. The message tool's read action can try again.)",
+        MESSAGE_HEADER,
+        "Alice (slack:U0ALICE): free up the disk",
+      ),
+    );
+    await flow.plane.stop();
+  });
+
+  it("is left out with the rest of the context when the Route keeps none", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(
+      makeRoute({ context: { unmentioned: "none", maxMessages: 20 } }),
+      daemon,
+    );
+    await flow.plane.start(daemon.daemon, store);
+    await flow.send(mentionIn(say, "free up the disk"));
+    assert.deepEqual(
+      daemon.sends.map(({ text }) => text),
+      ["Alice (slack:U0ALICE): free up the disk"],
+    );
+    await flow.plane.stop();
   });
 });
