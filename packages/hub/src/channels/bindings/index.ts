@@ -48,13 +48,7 @@ import {
 import { mayUseChannelRoute } from "../policy/gate.js";
 import { mentionTrigger, type Trigger } from "../rule-trigger.js";
 import { admitInbound } from "./admission.js";
-import {
-  messagesOf,
-  threadLines,
-  type BindingInbox,
-  type Delivery,
-  type PreparedDelivery,
-} from "./inbox.js";
+import { messagesOf, type BindingInbox, type Delivery, type PreparedDelivery } from "./inbox.js";
 import { deliveryMessageId, renderConversationPrompt } from "./prompt.js";
 import type { ProcessingController } from "../plane/processing.js";
 import { processingSurfaceFor } from "../plane/processing.js";
@@ -504,7 +498,7 @@ export class BindingEngine {
     delivery: Delivery,
     route: CompiledRoute,
   ): Promise<void> {
-    const prepared = await this.prepare(delivery, route);
+    const prepared = await this.prepare(agentId, delivery, route);
     await prepared.markSent();
     await this.context.daemon.sendAgentMessage(agentId, prepared.prompt, {
       steer: true,
@@ -514,15 +508,17 @@ export class BindingEngine {
     await prepared.settle();
   }
 
-  private prepare(delivery: Delivery, route: CompiledRoute): Promise<PreparedDelivery> {
-    if (this.context.inbox !== undefined) return this.context.inbox.prepare(delivery, route);
+  private prepare(
+    agentId: string,
+    delivery: Delivery,
+    route: CompiledRoute,
+  ): Promise<PreparedDelivery> {
+    if (this.context.inbox !== undefined) {
+      return this.context.inbox.prepare(delivery, route, agentId);
+    }
     const messages = messagesOf(delivery);
     return Promise.resolve({
-      prompt: renderConversationPrompt({
-        thread: threadLines(messages, [], route),
-        context: [],
-        messages,
-      }),
+      prompt: renderConversationPrompt({ context: [], messages }),
       messageId: deliveryMessageId(messages),
       markSent: async () => undefined,
       settle: async () => undefined,

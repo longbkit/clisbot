@@ -12,9 +12,10 @@
  *
  * Admission (and so the Socket Mode ack) waits on this, so it is bounded: one
  * time budget for every page, and any failure (missing scope, not in channel,
- * rate limit, timeout) becomes `unavailable` instead of holding the message.
- * When the bot has already posted in the thread, or was mentioned in it before,
- * a session has been given the thread, and no snapshot is taken.
+ * rate limit, timeout) becomes `unavailable` instead of holding the message,
+ * keeping the root when the first page arrived. Every mention in a thread
+ * gets a snapshot; the Hub decides, per session and durably, whether a prompt
+ * carries it (`bindings/inbox.ts`).
  */
 import type { ChannelThreadContext, ChannelThreadContextMessage } from "@clisbot/channels-shared";
 import { decodeSlackEntities } from "../fusion/slack-entities.js";
@@ -61,28 +62,30 @@ export interface ReadSlackThreadContextParams {
   threadTs: string;
   /** The mention's ts: the snapshot holds only what came before it. */
   messageTs: string;
-  /** The bot's own ids: a thread it posted in gets no snapshot. */
-  botUserId?: string | undefined;
-  botId?: string | undefined;
   budgetMs?: number;
 }
 
-/** The snapshot for a mention, or undefined when the bot already posted in the thread. */
+/** The snapshot for a mention: what the thread showed before it, or why it could not be read. */
 export async function readSlackThreadContext(
   params: ReadSlackThreadContextParams,
-): Promise<ChannelThreadContext | undefined> {
+): Promise<ChannelThreadContext> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<"timeout">((resolve) => {
     timer = setTimeout(() => resolve("timeout"), params.budgetMs ?? THREAD_CONTEXT_BUDGET_MS);
   });
-  const read = readThread(params).then(
+  const progress: ThreadRead = { messages: [], complete: false };
+  const read = readThread(params, progress).then(
     (thread) => ({ thread }),
     (error: unknown) => ({ error: slackErrorCode(error) }),
   );
   try {
     const outcome = await Promise.race([read, timeout]);
-    if (outcome === "timeout") return { recent: [], unavailable: "timeout" };
-    if ("error" in outcome) return { recent: [], unavailable: outcome.error };
+    if (outcome === "timeout" || "error" in outcome) {
+      const reason = outcome === "timeout" ? "timeout" : outcome.error;
+      // The first page holds the root: keep it, and say the rest is missing.
+      if (progress.messages.length === 0) return { recent: [], unavailable: reason };
+      return { ...snapshotOf({ messages: [...progress.messages], complete: false }, params), unavailable: reason };
+    }
     return snapshotOf(outcome.thread, params);
   } finally {
     clearTimeout(timer);
@@ -91,13 +94,17 @@ export async function readSlackThreadContext(
 
 interface ThreadRead {
   messages: SlackThreadMessage[];
-  /** False when pages remained after `MAX_PAGES`. */
+  /** False when the read stopped before the thread's end: the page cap, a
+   * `has_more` without a cursor to follow, or the budget after the first page. */
   complete: boolean;
 }
 
-/** The thread up to (not including) the mention, oldest first, root included. */
-async function readThread(params: ReadSlackThreadContextParams): Promise<ThreadRead> {
-  const messages: SlackThreadMessage[] = [];
+/** The thread up to (not including) the mention, oldest first, root included,
+ * as far as it got: `progress` holds the pages read so far. */
+async function readThread(
+  params: ReadSlackThreadContextParams,
+  progress: ThreadRead,
+): Promise<ThreadRead> {
   let cursor: string | undefined;
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const response = (await params.client.conversations.replies({
@@ -108,26 +115,20 @@ async function readThread(params: ReadSlackThreadContextParams): Promise<ThreadR
       limit: PAGE_SIZE,
       ...(cursor === undefined ? {} : { cursor }),
     })) as SlackRepliesPage;
-    messages.push(...(response.messages ?? []));
-    const next = response.response_metadata?.next_cursor?.trim();
-    cursor = response.has_more === true && next ? next : undefined;
-    if (cursor === undefined) return { messages, complete: true };
+    progress.messages.push(...(response.messages ?? []));
+    if (response.has_more !== true) return { ...progress, complete: true };
+    cursor = response.response_metadata?.next_cursor?.trim() || undefined;
+    // More replies but no way to reach them: what was read is the oldest part.
+    if (cursor === undefined) return progress;
   }
-  return { messages, complete: false };
+  return progress;
 }
 
-function snapshotOf(
-  thread: ThreadRead,
-  params: ReadSlackThreadContextParams,
-): ChannelThreadContext | undefined {
+function snapshotOf(thread: ThreadRead, params: ReadSlackThreadContextParams): ChannelThreadContext {
   const before = thread.messages.filter(
     (message) =>
       typeof message.ts === "string" && compareSlackTs(message.ts, params.messageTs) < 0,
   );
-  // The bot posted, or was mentioned earlier: that mention carried the thread
-  // to a session already, so a second copy would only repeat it.
-  if (before.some((message) => isBot(message, params) || mentionsBot(message, params)))
-    return undefined;
   const root = before.find((message) => message.ts === params.threadTs);
   const replies = before.filter((message) => message.ts !== params.threadTs);
   const budget = { chars: THREAD_CONTEXT_TOTAL_CHARS };
@@ -149,17 +150,6 @@ function snapshotOf(
     ...(omitted === 0 ? {} : { omitted }),
     ...(root === undefined && thread.complete ? { unavailable: "root_not_returned" } : {}),
   };
-}
-
-function isBot(message: SlackThreadMessage, params: ReadSlackThreadContextParams): boolean {
-  return (
-    (params.botUserId !== undefined && message.user === params.botUserId) ||
-    (params.botId !== undefined && message.bot_id === params.botId)
-  );
-}
-
-function mentionsBot(message: SlackThreadMessage, params: ReadSlackThreadContextParams): boolean {
-  return params.botUserId !== undefined && (message.text ?? "").includes(`<@${params.botUserId}>`);
 }
 
 /** A message as a snapshot line, or undefined when the text budget is spent. */

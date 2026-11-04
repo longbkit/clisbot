@@ -280,8 +280,6 @@ describe("slack bolt provider: message families", () => {
         channelId: "C1",
         threadTs: "1700.000100",
         messageTs: "1700.000500",
-        botUserId: "U_BOT",
-        botId: "B_BOT",
       }),
     );
     expect(harness.admitted.map((event) => event.threadContext)).toEqual([snapshot, snapshot]);

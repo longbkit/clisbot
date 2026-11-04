@@ -31,7 +31,11 @@ import type {
 } from "@clisbot/channels-shared";
 import { foldInboundSlackMedia } from "../transport/media.js";
 import { SlackSenderDirectory, type SlackUsersClient } from "../transport/sender-directory.js";
-import { readSlackThreadContext, type SlackRepliesClient } from "../transport/thread-context.js";
+import {
+  readSlackThreadContext,
+  type ReadSlackThreadContextParams,
+  type SlackRepliesClient,
+} from "../transport/thread-context.js";
 import {
   buildSlackInboundEvent,
   buildSlackSlashCommandEvent,
@@ -105,7 +109,9 @@ export interface SlackBoltProviderOptions {
   senders?: Pick<SlackSenderDirectory, "name">;
   /** Reads the thread a mention arrived in (`thread-context.ts`); the default
    * asks Slack. Test seam. */
-  readThreadContext?: typeof readSlackThreadContext;
+  readThreadContext?: (
+    params: ReadSlackThreadContextParams,
+  ) => Promise<ChannelThreadContext | undefined>;
   /** Test seam: the Bolt exports. Defaults to a dynamic `@slack/bolt` import so
    * the module stays importable without the dep resolved. */
   interop?: SlackBoltResolvedExports;
@@ -247,8 +253,9 @@ export function createSlackBoltProvider(options: SlackBoltProviderOptions): Slac
   const threadReads = new Map<string, Promise<ChannelThreadContext | undefined>>();
 
   /**
-   * The thread a mention arrived in (`thread-context.ts`): only a reply that
-   * mentions the bot, so a root-level or unmentioned message costs no call.
+   * The thread a mention arrived in (`thread-context.ts`): every reply that
+   * mentions the bot, so a root-level or unmentioned message costs no call. The
+   * Hub decides whether a prompt carries it (`bindings/inbox.ts`).
    */
   const threadContextFor = (
     built: ChannelInboundEvent,
@@ -272,8 +279,6 @@ export function createSlackBoltProvider(options: SlackBoltProviderOptions): Slac
       channelId: built.externalConversationId,
       threadTs,
       messageTs: built.externalMessageId,
-      botUserId: identity.botUserId,
-      botId: identity.botId ?? options.botId,
     });
     threadReads.set(key, read);
     if (threadReads.size > THREAD_READS_KEPT) {

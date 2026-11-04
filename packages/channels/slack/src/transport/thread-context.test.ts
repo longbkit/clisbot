@@ -48,7 +48,7 @@ function client(thread: Record<string, unknown>[], pageSize = 200): SlackReplies
   return { conversations: { replies }, replies };
 }
 
-const base = { channelId: "C1", threadTs: ROOT, messageTs: MENTION, botUserId: "U_BOT", botId: "B_BOT" };
+const base = { channelId: "C1", threadTs: ROOT, messageTs: MENTION };
 
 describe("readSlackThreadContext", () => {
   it("reads an attachment-only app root and the replies before the mention", async () => {
@@ -82,38 +82,30 @@ describe("readSlackThreadContext", () => {
       has_more: false,
     });
     const context = await readSlackThreadContext({ ...base, client: slack });
-    expect(context?.recent).toEqual([]);
-    expect(context?.root?.messageId).toBe(ROOT);
+    expect(context.recent).toEqual([]);
+    expect(context.root?.messageId).toBe(ROOT);
   });
 
-  it("takes no snapshot when the bot already posted in the thread", async () => {
-    const byUser = await readSlackThreadContext({
-      ...base,
-      client: client([alertRoot, reply(1), { ts: "1793757500.000000", user: "U_BOT", text: "on it" }]),
-    });
-    const byBotId = await readSlackThreadContext({
-      ...base,
-      client: client([alertRoot, { ts: "1793757500.000000", bot_id: "B_BOT", text: "on it" }]),
-    });
-    expect(byUser).toBeUndefined();
-    expect(byBotId).toBeUndefined();
-  });
-
-  it("takes no snapshot when the bot was mentioned earlier in the thread", async () => {
+  it("snapshots every thread mention, the bot's own posts and earlier mentions included", async () => {
     const context = await readSlackThreadContext({
       ...base,
-      client: client([alertRoot, reply(1, { text: "<@U_BOT> look at this" }), reply(2)]),
+      client: client([
+        alertRoot,
+        reply(1, { text: "<@U_BOT> look at this" }),
+        { ts: "1793757500.000000", bot_id: "B_BOT", user: "U_BOT", text: "on it" },
+      ]),
     });
-    expect(context).toBeUndefined();
+    expect(context.root?.messageId).toBe(ROOT);
+    expect(context.recent.map((m) => m.text)).toEqual(["<@U_BOT> look at this", "on it"]);
   });
 
   it("keeps the newest replies and counts the ones left out", async () => {
     const replies = Array.from({ length: THREAD_CONTEXT_RECENT + 5 }, (_, i) => reply(i + 1));
     const context = await readSlackThreadContext({ ...base, client: client([alertRoot, ...replies]) });
-    expect(context?.recent).toHaveLength(THREAD_CONTEXT_RECENT);
-    expect(context?.recent[0]?.text).toBe("reply 6");
-    expect(context?.recent.at(-1)?.text).toBe(`reply ${THREAD_CONTEXT_RECENT + 5}`);
-    expect(context?.omitted).toBe(5);
+    expect(context.recent).toHaveLength(THREAD_CONTEXT_RECENT);
+    expect(context.recent[0]?.text).toBe("reply 6");
+    expect(context.recent.at(-1)?.text).toBe(`reply ${THREAD_CONTEXT_RECENT + 5}`);
+    expect(context.omitted).toBe(5);
   });
 
   it("follows Slack's cursor across pages", async () => {
@@ -121,7 +113,7 @@ describe("readSlackThreadContext", () => {
     const slack = client([alertRoot, ...replies], 2);
     const context = await readSlackThreadContext({ ...base, client: slack });
     expect(slack.replies).toHaveBeenCalledTimes(3);
-    expect(context?.recent.map((m) => m.text)).toEqual(replies.map((m) => m.text));
+    expect(context.recent.map((m) => m.text)).toEqual(replies.map((m) => m.text));
     expect(context).not.toHaveProperty("omitted");
   });
 
@@ -133,6 +125,51 @@ describe("readSlackThreadContext", () => {
     expect(context).toEqual({ root: expect.objectContaining({ messageId: ROOT }), recent: [], omitted: "unknown" });
   });
 
+  it("treats has_more without a cursor as an incomplete read and keeps only the root", async () => {
+    const slack = client([]);
+    slack.replies.mockResolvedValueOnce({ messages: [alertRoot, reply(1), reply(2)], has_more: true });
+    const context = await readSlackThreadContext({ ...base, client: slack });
+    expect(slack.replies).toHaveBeenCalledTimes(1);
+    expect(context).toEqual({
+      root: expect.objectContaining({ messageId: ROOT }),
+      recent: [],
+      omitted: "unknown",
+    });
+  });
+
+  it("keeps the root when the budget runs out after the first page", async () => {
+    const slack = client([]);
+    slack.replies
+      .mockResolvedValueOnce({
+        messages: [alertRoot, reply(1)],
+        has_more: true,
+        response_metadata: { next_cursor: "p2" },
+      })
+      .mockImplementationOnce(() => new Promise(() => undefined));
+    const context = await readSlackThreadContext({ ...base, client: slack, budgetMs: 30 });
+    expect(context).toEqual({
+      root: expect.objectContaining({ messageId: ROOT }),
+      recent: [],
+      omitted: "unknown",
+      unavailable: "timeout",
+    });
+  });
+
+  it("keeps the root when a later page fails", async () => {
+    const slack = client([]);
+    slack.replies
+      .mockResolvedValueOnce({
+        messages: [alertRoot, reply(1)],
+        has_more: true,
+        response_metadata: { next_cursor: "p2" },
+      })
+      .mockRejectedValueOnce(Object.assign(new Error("ratelimited"), { code: "slack_webapi_rate_limited_error" }));
+    const context = await readSlackThreadContext({ ...base, client: slack });
+    expect(context.root?.messageId).toBe(ROOT);
+    expect(context.unavailable).toBe("slack_webapi_rate_limited_error");
+    expect(context.omitted).toBe("unknown");
+  });
+
   it("cuts a long message and stops at the total budget, newest replies first", async () => {
     const long = "x".repeat(THREAD_CONTEXT_MESSAGE_CHARS + 50);
     const replies = Array.from({ length: THREAD_CONTEXT_RECENT }, (_, i) => reply(i + 1, { text: long }));
@@ -140,9 +177,9 @@ describe("readSlackThreadContext", () => {
     const texts = [context?.root?.text ?? "", ...(context?.recent ?? []).map((m) => m.text)];
     const kept = texts.reduce((sum, text) => sum + text.replace("… [cut]", "").length, 0);
     expect(kept).toBeLessThanOrEqual(THREAD_CONTEXT_TOTAL_CHARS);
-    expect(context?.recent[0]?.text.endsWith("… [cut]")).toBe(true);
-    expect(context?.recent.at(-1)?.messageId).toBe(reply(THREAD_CONTEXT_RECENT).ts);
-    expect(context?.omitted).toBe(THREAD_CONTEXT_RECENT - (context?.recent.length ?? 0));
+    expect(context.recent[0]?.text.endsWith("… [cut]")).toBe(true);
+    expect(context.recent.at(-1)?.messageId).toBe(reply(THREAD_CONTEXT_RECENT).ts);
+    expect(context.omitted).toBe(THREAD_CONTEXT_RECENT - (context?.recent.length ?? 0));
   });
 
   it.each([
