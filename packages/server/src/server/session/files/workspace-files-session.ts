@@ -64,7 +64,15 @@ const MAX_HELD_UPLOAD_BYTES_TOTAL = 128 * 1024 * 1024;
 const UPLOAD_OVERLOADED = "Upload storage overloaded: pending frame/byte limit exceeded";
 const UPLOAD_NOT_PERMITTED =
   "You do not have permission to perform this action. Ask your administrator for access.";
+// A request that never settles must not pin its frames, or the shared budget, for good.
+const HELD_UPLOAD_TIMEOUT_MS = 60_000;
+const UPLOAD_CONNECTION_CLOSED = "Upload connection closed";
 let heldUploadBytesTotal = 0;
+
+/** Bytes currently held for upload requests still being authorized, across all sessions. */
+export function heldUploadFrameBytes(): number {
+  return heldUploadBytesTotal;
+}
 
 interface HeldUploadFrames {
   queue: Array<{ frame: FileTransferFrame; bytes: number; allowed: () => boolean }>;
@@ -74,6 +82,7 @@ interface HeldUploadFrames {
   released: boolean;
   draining: boolean;
   failure: string | null;
+  timeout: ReturnType<typeof setTimeout>;
 }
 
 export interface WorkspaceFilesSessionOptions {
@@ -101,7 +110,7 @@ export class WorkspaceFilesSession {
   private readonly logger: pino.Logger;
   private readonly fileUploads: FileUploadStore;
   private readonly fileObserver: FileObserver;
-  private readonly heldUploadFrames = new WeakMap<object, Map<string, HeldUploadFrames>>();
+  private readonly heldUploadFrames = new Map<object, Map<string, HeldUploadFrames>>();
 
   constructor(private readonly options: WorkspaceFilesSessionOptions) {
     this.host = options.host;
@@ -284,6 +293,7 @@ export class WorkspaceFilesSession {
   }
 
   dispose(): void {
+    for (const source of Array.from(this.heldUploadFrames.keys())) this.releaseSource(source);
     void this.fileUploads
       .dispose()
       .catch((error) =>
@@ -538,13 +548,31 @@ export class WorkspaceFilesSession {
       released: false,
       draining: false,
       failure: null,
+      timeout: setTimeout(() => {
+        if (hold.released) return;
+        hold.failure = UPLOAD_OVERLOADED;
+        this.discardHeldFrames(hold);
+        this.forgetHold(request.requestId, source, hold);
+      }, HELD_UPLOAD_TIMEOUT_MS),
     };
+    hold.timeout.unref?.();
     holds.set(request.requestId, hold);
     this.heldUploadFrames.set(source, holds);
     return () => {
       hold.released = true;
+      clearTimeout(hold.timeout);
       void this.drainHeldUploadFrames(request.requestId, source, hold);
     };
+  }
+
+  /** A closed connection's held frames go; the store cancels its uploads with the operation. */
+  releaseSource(source: object): void {
+    for (const [requestId, hold] of this.heldUploadFrames.get(source) ?? []) {
+      hold.failure = UPLOAD_CONNECTION_CLOSED;
+      clearTimeout(hold.timeout);
+      this.discardHeldFrames(hold);
+      this.forgetHold(requestId, source, hold);
+    }
   }
 
   /** `allowed` is read when the frame is applied, after any hold: authority can change meanwhile. */
@@ -639,7 +667,9 @@ export class WorkspaceFilesSession {
 
   private forgetHold(requestId: string, source: object, hold: HeldUploadFrames): void {
     const holds = this.heldUploadFrames.get(source);
-    if (holds?.get(requestId) === hold) holds.delete(requestId);
+    if (holds?.get(requestId) !== hold) return;
+    holds.delete(requestId);
+    if (holds.size === 0) this.heldUploadFrames.delete(source);
   }
 
   async handleProjectIconRequest(

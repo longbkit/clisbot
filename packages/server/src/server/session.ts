@@ -1531,6 +1531,7 @@ export class Session {
   }
 
   clearAgentTimelineSubscription(source: object): void {
+    this.workspaceFilesSession.releaseSource(source);
     this.clientCapabilitiesBySource.delete(source);
     void this.delivery
       .detach(source)
