@@ -471,9 +471,10 @@ test("a background timeline listener does not keep an agent resident and still f
   await setBackgroundTimelineSubscription(listener, [agent.id]);
   expect(manager.isAgentTimelineViewed(agent.id)).toBe(false);
 
-  await viewer.client.setAgentTimelineSubscription([agent.id]);
+  // A viewer's set keeps the agent resident; clearing it lets the agent go.
+  await viewer.setLegacyTimelineMembership([agent.id]);
   expect(manager.isAgentTimelineViewed(agent.id)).toBe(true);
-  await viewer.client.setAgentTimelineSubscription([]);
+  await viewer.setLegacyTimelineMembership([]);
   expect(manager.isAgentTimelineViewed(agent.id)).toBe(false);
 
   await daemon.daemon.agentManager.closeAgent(agent.id);
@@ -804,9 +805,16 @@ test("plugin items are gated in provider child streams, child fetches, and rewin
   const oldChild = await legacy.client.fetchProviderSubagentTimeline(agent.id, "child");
   const newChild = await capable.client.fetchProviderSubagentTimeline(agent.id, "child");
   expect(newChild.rows.map((row) => row.item)).toContainEqual(plugin);
+  // A fetch keeps every row, so the window matches: an item an older client
+  // cannot render becomes an upgrade line, and none of its data is sent.
   expect(oldChild.rows.map((row) => row.item)).toEqual([
+    {
+      type: "assistant_message",
+      text: "Please upgrade Clisbot to view this subagent conversation.",
+    },
     { type: "assistant_message", text: "Child result" },
   ]);
+  expect(JSON.stringify(oldChild.rows)).not.toContain("Provider notice");
   expect(oldChild.window).toEqual(newChild.window);
 
   await capable.client.sendMessage(agent.id, "Rewind target");
