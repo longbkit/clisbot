@@ -218,11 +218,12 @@ function connectClient(
     subscribed?: boolean;
     reader?: NotificationReader | null;
     allowsResource?: boolean;
+    published?: unknown[];
   } = {},
 ) {
   const ws = createOpenSocket();
   const delivery = new SessionDelivery(() => {});
-  delivery.attach(ws, false);
+  delivery.attach(ws, options.published !== undefined);
   asInternals<WebSocketServerInternals>(server).sessions.set(ws, {
     kind: "trusted",
     session: {
@@ -231,6 +232,8 @@ function connectClient(
       wantsSourceNotification: () => true,
       notificationReader: () => (options.reader === undefined ? HOST_OWNER_READER : options.reader),
       allowsNotificationAbout: () => options.allowsResource ?? true,
+      wantsSourceEvent: () => true,
+      publishToSource: (_source: unknown, message: unknown) => options.published?.push(message),
     },
     clientId: "client-test",
     appVersion: null,
@@ -650,16 +653,172 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
     expect(delivered.map((entry) => entry.tokens)).toEqual([["bob-phone"]]);
   });
 
-  it("a connection that may not see the session gets no attention message or preview", async () => {
-    const { server } = setup({ createdBy: BOB });
-    const outsider = connectClient(
-      server,
-      { deviceType: "web", appVisible: false, focusedAgentId: null, lastActivityAt: new Date() },
-      { reader: memberReader(BOB, "all"), allowsResource: false },
+  it.each([["legacy"], ["owned-subscription"]] as const)(
+    "a %s connection that may not see the session gets no attention message or preview",
+    async (kind) => {
+      const { server } = setup({ createdBy: BOB });
+      const modern = kind === "owned-subscription";
+      const received = (published: unknown[], socket: ReturnType<typeof createOpenSocket>) =>
+        modern ? published.length : socket.send.mock.calls.length;
+      const outsiderPublished: unknown[] = [];
+      const insiderPublished: unknown[] = [];
+      const presence = {
+        deviceType: "web" as const,
+        appVisible: false,
+        focusedAgentId: null,
+        lastActivityAt: new Date(),
+      };
+      const outsider = connectClient(server, presence, {
+        reader: memberReader(BOB, "all"),
+        allowsResource: false,
+        ...(modern ? { published: outsiderPublished } : {}),
+      });
+      const insider = connectClient(server, presence, {
+        reader: memberReader(BOB, "all"),
+        ...(modern ? { published: insiderPublished } : {}),
+      });
+
+      await finish(server);
+
+      expect(received(outsiderPublished, outsider)).toBe(0);
+      expect(received(insiderPublished, insider)).toBe(1);
+    },
+  );
+});
+
+/**
+ * Legal acceptance (2026-11-04): who each push goes to, captured at the delivery hook just before
+ * Expo, for every reason that can push. Readers and payloads are synthetic. Set
+ * CLISBOT_PUSH_AUDIENCE_EVIDENCE to a file path to keep the captured matrix.
+ */
+describe("push audience before Expo", () => {
+  const CAROL = member("carol");
+  const DAVE = member("dave");
+  const ERIN = member("erin");
+  const FRANK = member("frank");
+  const ADMIN = member("admin");
+
+  function registerAudience(push: ReturnType<typeof createPushNotifications>, nowMs: number) {
+    const lease = (token: string, projectIds: string[] | null, expiresInMs = 3_600_000) => ({
+      leaseId: `lease-${token}`,
+      leaseExpiresAt: nowMs + expiresInMs,
+      projectIds,
+    });
+    push.renew("owner-phone");
+    push.renew("bob-phone", lease("bob-phone", [PROJECT_ID]), { actor: BOB });
+    push.renew("bob-tablet-off", lease("bob-tablet-off", [PROJECT_ID]), {
+      actor: BOB,
+      scope: "off",
+    });
+    push.renew("alice-mine", lease("alice-mine", [PROJECT_ID]), { actor: ALICE });
+    push.renew("alice-all", lease("alice-all", [PROJECT_ID]), { actor: ALICE, scope: "all" });
+    push.renew("carol-other-project-all", lease("carol", ["project-b"]), {
+      actor: CAROL,
+      scope: "all",
+    });
+    push.renew("admin-daemon-wide-mine", lease("admin", null), { actor: ADMIN });
+    push.renew("dave-revoked-all", lease("dave-revoked-all", [PROJECT_ID]), {
+      actor: DAVE,
+      scope: "all",
+    });
+    push.revokeLease("lease-dave-revoked-all");
+    push.renew("erin-expired-all", lease("erin", [PROJECT_ID], 1_000), {
+      actor: ERIN,
+      scope: "all",
+    });
+    push.renew("switched-phone", lease("switched-alice", [PROJECT_ID]), {
+      actor: ALICE,
+      scope: "all",
+    });
+    push.renew("switched-phone", lease("switched-frank", ["project-b"]), { actor: FRANK });
+    push.renew("signed-out-phone", lease("signed-out", [PROJECT_ID]), { actor: BOB });
+    push.revoke("signed-out-phone");
+  }
+
+  const AUTHOR_AUDIENCE = ["alice-all", "bob-phone", "owner-phone"];
+  const cases = [
+    {
+      reason: "finished",
+      assistant: "Synthetic summary for the author.",
+      expected: AUTHOR_AUDIENCE,
+    },
+    { reason: "finished", assistant: null, expected: AUTHOR_AUDIENCE, label: "fallback" },
+    { reason: "permission", assistant: null, expected: AUTHOR_AUDIENCE },
+    { reason: "error", assistant: "Synthetic error.", expected: [] },
+  ] as const;
+
+  it.each(cases)("$reason ($label) reaches only allowed readers", async (testCase) => {
+    let nowMs = Date.now();
+    const captured: Array<{ tokens: string[]; payload: PushPayload }> = [];
+    const dir = mkdtempSync(join(tmpdir(), "clisbot-push-before-expo-"));
+    const push = createPushNotifications({
+      logger: createStub<pino.Logger>(createLogger()),
+      filePath: join(dir, "push-tokens.json"),
+      now: () => nowMs,
+      deliver: async (tokens, payload) => {
+        captured.push({ tokens: [...tokens].sort(), payload });
+      },
+    });
+    registerAudience(push, nowMs);
+    nowMs += 5_000;
+    const { server } = createServer(
+      {
+        getAgent: vi.fn(() => ({
+          workspaceId: WORKSPACE_ID,
+          createdBy: BOB,
+          pendingPermissions: new Map(
+            testCase.reason === "permission"
+              ? [
+                  [
+                    "permission-1",
+                    {
+                      id: "permission-1",
+                      provider: "claude",
+                      name: "Bash",
+                      kind: "tool",
+                      title: "Run synthetic command",
+                    },
+                  ],
+                ]
+              : [],
+          ),
+        })),
+        getLastAssistantMessage: vi.fn(async () => testCase.assistant),
+      },
+      push,
     );
+    asInternals<{ projectIdForWorkspace: () => Promise<string> }>(server).projectIdForWorkspace =
+      async () => PROJECT_ID;
 
-    await finish(server);
+    await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
+      agentId: "agent-1",
+      provider: "claude",
+      reason: testCase.reason,
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    rmSync(dir, { recursive: true });
 
-    expect(outsider.send).not.toHaveBeenCalled();
+    const actual = captured.flatMap((entry) => entry.tokens);
+    const evidencePath = process.env.CLISBOT_PUSH_AUDIENCE_EVIDENCE;
+    if (evidencePath) {
+      const { appendFileSync } = await import("node:fs");
+      appendFileSync(
+        evidencePath,
+        `${JSON.stringify({
+          reason: testCase.reason,
+          label: "label" in testCase ? testCase.label : null,
+          projectId: PROJECT_ID,
+          createdBy: "member:bob",
+          payloadBeforeExpo: captured[0]?.payload ?? null,
+          expectedRecipients: testCase.expected,
+          actualRecipients: actual,
+        })}\n`,
+      );
+    }
+    expect(actual).toEqual(testCase.expected);
+    expect(captured.length).toBeLessThanOrEqual(1);
+    if (testCase.reason === "permission")
+      expect(captured[0]?.payload.body).toBe("Run synthetic command");
+    if ("label" in testCase) expect(captured[0]?.payload.body).toBe("Finished working.");
   });
 });

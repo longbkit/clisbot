@@ -53,6 +53,7 @@ import {
   asGitHubService,
   asWorkspaceGitService,
   asDaemonConfigStore,
+  asTerminalManager,
   findByType,
   createProviderSnapshot,
   createProviderSnapshotManagerStub,
@@ -2053,6 +2054,167 @@ test("a Hub-identified connection without a lease is judged as that account, not
     daemonWide: true,
     scope: "mine",
   });
+});
+
+function createProjectScopedAttentionSession(
+  options: { privileges?: readonly string[]; leaseExpiresAt?: number } = {},
+) {
+  const delivered: SessionOutboundMessage[] = [];
+  const source = {};
+  const project = (projectId: string) => ({
+    projectId,
+    rootPath: `/work/${projectId}`,
+    kind: "git",
+    displayName: projectId,
+    createdAt: "2026-11-04T00:00:00.000Z",
+    updatedAt: "2026-11-04T00:00:00.000Z",
+    archivedAt: null,
+  });
+  const workspace = (id: string, projectId: string) => ({
+    workspaceId: id,
+    projectId,
+    cwd: `/work/${projectId}`,
+    archivedAt: null,
+  });
+  const workspaces = [workspace("workspace-a", "project-a"), workspace("workspace-b", "project-b")];
+  const agents = new Map([
+    ["agent-a", { id: "agent-a", workspaceId: "workspace-a", lifecycle: "idle" }],
+    ["agent-b", { id: "agent-b", workspaceId: "workspace-b", lifecycle: "idle" }],
+  ]);
+  const terminals = new Map([
+    ["terminal-a", { id: "terminal-a", workspaceId: "workspace-a" }],
+    ["terminal-b", { id: "terminal-b", workspaceId: "workspace-b" }],
+  ]);
+  const grant = (privileges: readonly string[]) => ({
+    privileges: new Set(privileges),
+    agentConfigurations: [],
+  });
+  const projectA = (privileges: readonly string[]) =>
+    new Map([["project-a", grant(privileges)]]) as SessionResourceAuthorization["projects"];
+  const session = createSessionForTest({
+    permissions: ["workspace.read"],
+    resourceAuthorization: {
+      resourceMode: "projects",
+      projects: projectA(options.privileges ?? ["project.use", "terminal.use"]),
+      leaseId: "lease-a",
+      leaseExpiresAt: options.leaseExpiresAt ?? Date.now() + 60_000,
+    },
+    agentManager: { getAgent: (agentId: string) => agents.get(agentId) ?? null },
+    terminalManager: asTerminalManager({
+      getTerminal: (terminalId: string) => terminals.get(terminalId),
+    }),
+    projectRegistry: {
+      list: vi.fn().mockResolvedValue([project("project-a"), project("project-b")]),
+    },
+    workspaceRegistry: {
+      get: vi.fn(
+        async (id: string) => workspaces.find((entry) => entry.workspaceId === id) ?? null,
+      ),
+      list: vi.fn().mockResolvedValue(workspaces),
+    },
+    sendToSource: async (_source, message) => {
+      delivered.push(message);
+    },
+  });
+  const publishAll = async () => {
+    delivered.length = 0;
+    for (const [agentId, workspaceId] of [
+      ["agent-a", "workspace-a"],
+      ["agent-b", "workspace-b"],
+    ])
+      session.publishToSource(source, {
+        type: "agent_attention_required",
+        payload: {
+          agentId,
+          reason: "finished",
+          timestamp: "2026-11-04T00:00:00.000Z",
+          shouldNotify: true,
+          notification: {
+            title: "Agent finished",
+            body: `synthetic preview ${agentId}`,
+            data: { serverId: "srv", workspaceId, agentId, reason: "finished" },
+          },
+        },
+      });
+    for (const terminalId of ["terminal-a", "terminal-b"])
+      session.publishToSource(source, {
+        type: "terminal_attention_required",
+        payload: {
+          serverId: "srv",
+          terminalId,
+          cwd: `/work/${terminalId === "terminal-a" ? "project-a" : "project-b"}`,
+          workspaceId: terminalId === "terminal-a" ? "workspace-a" : "workspace-b",
+          reason: "finished",
+          title: "Terminal finished",
+          body: "shell",
+          shouldNotify: true,
+        },
+      });
+    await new Promise((resolve) => setImmediate(resolve));
+    return delivered.map((message) => {
+      if (message.type === "agent_attention_required") return message.payload.agentId;
+      if (message.type === "terminal_attention_required") return message.payload.terminalId;
+      return message.type;
+    });
+  };
+  const subscribe = async () => {
+    session.updateClientCapabilities({ [CLIENT_CAPS.ownedSubscriptions]: true }, source);
+    await session.handleMessage(
+      {
+        type: "session.events.set_subscription.request",
+        requestId: "events",
+        events: ["agent_attention_required", "terminal_attention_required"],
+        notifications: true,
+      },
+      source,
+    );
+  };
+  return { session, publishAll, subscribe };
+}
+
+test("a Project-scoped connection only learns about attention in its own Projects", async () => {
+  const { session, publishAll, subscribe } = createProjectScopedAttentionSession();
+  await subscribe();
+
+  expect(await publishAll()).toEqual(["agent-a", "terminal-a"]);
+  expect(session.allowsNotificationAbout({ agentId: "agent-a" })).toBe(true);
+  expect(session.allowsNotificationAbout({ agentId: "agent-b" })).toBe(false);
+  expect(session.allowsNotificationAbout({ terminalId: "terminal-b" })).toBe(false);
+  await session.cleanup();
+});
+
+test("terminal attention follows the Terminal privilege, not Project use alone", async () => {
+  const { session, publishAll, subscribe } = createProjectScopedAttentionSession({
+    privileges: ["project.use"],
+  });
+  await subscribe();
+
+  expect(await publishAll()).toEqual(["agent-a"]);
+  expect(session.allowsNotificationAbout({ terminalId: "terminal-a" })).toBe(false);
+  await session.cleanup();
+});
+
+test("attention access is decided when it is sent: a revoked Project or expired lease stops it", async () => {
+  const { session, publishAll, subscribe } = createProjectScopedAttentionSession();
+  await subscribe();
+  expect(await publishAll()).toEqual(["agent-a", "terminal-a"]);
+
+  session.replaceManagedAdmission({
+    permissions: ["workspace.read"],
+    resourceAuthorization: {
+      resourceMode: "projects",
+      projects: new Map(),
+      leaseId: "lease-a",
+      leaseExpiresAt: Date.now() + 60_000,
+    },
+  });
+  expect(await publishAll()).toEqual([]);
+  expect(session.allowsNotificationAbout({ agentId: "agent-a" })).toBe(false);
+
+  const expired = createProjectScopedAttentionSession({ leaseExpiresAt: Date.now() - 1 });
+  expect(expired.session.allowsNotificationAbout({ agentId: "agent-a" })).toBe(false);
+  await session.cleanup();
+  await expired.session.cleanup();
 });
 
 test("a managed lease without a Hub account is not a notification reader", () => {

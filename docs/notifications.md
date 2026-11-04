@@ -37,7 +37,11 @@ The daemon judges every reader separately, for both pushes and in-app notificati
   to their phone, and never suppresses or receives a teammate's.
 - The daemon cannot tell the Host owner's direct devices from the same person's Hub account, so
   they are separate readers: the owner can be notified on both, never on neither.
-- A connection only learns about sessions and terminals it may see.
+- A connection only learns about sessions and terminals it may read when the event is sent: the
+  same Project and Terminal rules as its other outbound messages, checked again in
+  `Session.publishToSource`, and nothing after its lease expires or its Project is revoked.
+- Opening a notification fetches the session over the reader's own connection, which the Host
+  authorizes again; the payload's ids grant nothing.
 
 Pushes are plain alerts with no Notification Service Extension, so iOS shows them before app code
 runs: filtering has to happen on the daemon. A Host without `features.notificationScope` keeps the

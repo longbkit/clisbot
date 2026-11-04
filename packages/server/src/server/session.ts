@@ -2683,7 +2683,12 @@ export class Session {
   }
 
   public publishToSource(source: object, message: SessionOutboundMessage): void {
-    if (!this.authorization.allowsOutbound(message)) return;
+    // The same Project boundary as emit: an attention event names a session and quotes it.
+    if (
+      !this.authorization.allowsOutbound(message) ||
+      !this.resourceAuthorizer.allowsOutbound(message)
+    )
+      return;
     this.emitSubscribedEvent(message, source);
   }
 
@@ -5719,12 +5724,15 @@ export class Session {
     });
   }
 
-  /** Whether this connection may see the session or terminal a notification is about. */
-  public allowsNotificationAbout(resource: { workspaceId?: string | null; cwd?: string }): boolean {
-    if (resource.workspaceId)
-      return this.resourceAuthorizer.allowsWorkspaceSync(resource.workspaceId);
-    if (resource.cwd) return this.resourceAuthorizer.allowsCwdSync(resource.cwd);
-    return !this.resourceAuthorizer.isRestricted();
+  /**
+   * Whether this connection may read the session or terminal a notification is about, now:
+   * the same Project and Terminal rules as its outbound messages, and only while its lease lasts.
+   */
+  public allowsNotificationAbout(target: { agentId: string } | { terminalId: string }): boolean {
+    if (!this.authorization.isLeaseActive()) return false;
+    return "agentId" in target
+      ? this.resourceAuthorizer.allowsAgentSync(target.agentId)
+      : this.resourceAuthorizer.allowsTerminalSync(target.terminalId);
   }
 
   private pushTokenAuthorization(): PushTokenAuthorization | undefined {

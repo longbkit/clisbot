@@ -3609,7 +3609,7 @@ export class VoiceAssistantWebSocketServer {
 
     for (const [ws, connection] of this.sessions) {
       if (
-        !connection.session.allowsNotificationAbout(agent) ||
+        !connection.session.allowsNotificationAbout({ agentId: params.agentId }) ||
         (connection.session.delivery.isModern(ws)
           ? !connection.session.wantsSourceEvent(ws, "agent_attention_required")
           : !(await connection.session.subscribesToAgent(agent, ws)))
@@ -3712,7 +3712,7 @@ export class VoiceAssistantWebSocketServer {
 
     for (const [ws, connection] of this.sessions) {
       if (
-        !connection.session.allowsNotificationAbout(params) ||
+        !connection.session.allowsNotificationAbout({ terminalId: params.terminalId }) ||
         (connection.session.delivery.isModern(ws)
           ? !connection.session.wantsSourceEvent(ws, "terminal_attention_required")
           : !(await connection.session.subscribesToTerminalDirectory(
