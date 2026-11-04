@@ -89,6 +89,7 @@ import {
   createPushNotifications,
   type PushNotifications,
   type PushNotificationSender,
+  type PushPayload,
 } from "./push/index.js";
 import type { ScriptHealthState } from "./script-health-monitor.js";
 import type { ServiceProxySubsystem } from "./service-proxy.js";
@@ -103,6 +104,8 @@ import {
   type AttentionClient,
 } from "./push/attention-audience.js";
 import { terminalLaunchOf } from "./managed-access/terminal-launches.js";
+import { NotificationFollowStore } from "./push/follow-store.js";
+import { notificationReaderKey } from "@clisbot/protocol/notification-audience";
 import {
   isPushEligibleAttentionReason,
   type ClientPresenceState,
@@ -708,6 +711,7 @@ export class VoiceAssistantWebSocketServer {
   private readonly daemonConfigStore: DaemonConfigStore;
   private readonly pushNotifications: PushNotifications;
   private readonly pushNotificationSender: PushNotificationSender;
+  private readonly notificationFollows: NotificationFollowStore;
   private readonly mcpBaseUrl: string | null;
   private speech!: SpeechService | null;
   private terminalManager!: TerminalManager | null;
@@ -946,6 +950,10 @@ export class VoiceAssistantWebSocketServer {
       filePath: join(clisbotHome, "push-tokens.json"),
     });
     this.pushNotificationSender = pushNotificationSender ?? this.pushNotifications;
+    this.notificationFollows = new NotificationFollowStore(
+      pushLogger,
+      join(clisbotHome, "notification-follows.json"),
+    );
 
     this.agentManager.setAgentAttentionCallback((params) => {
       void this.broadcastAgentAttention(params).catch((err) => {
@@ -1853,6 +1861,7 @@ export class VoiceAssistantWebSocketServer {
       publishScriptStatusUpdate: (message) => this.publishScriptStatusUpdate(message),
       downloadTokenStore: this.downloadTokenStore,
       pushNotifications: this.pushNotifications,
+      notificationFollows: this.notificationFollows,
       clisbotHome: this.clisbotHome,
       worktreesRoot: this.worktreesRoot,
       agentManager: this.agentManager,
@@ -2570,6 +2579,10 @@ export class VoiceAssistantWebSocketServer {
         pushTokenRevocation: true,
         // COMPAT(notificationScope): added after v2.2.2, remove gate after 2027-05-03.
         notificationScope: true,
+        // COMPAT(notificationFollows): added after v2.2.2, remove gate after 2027-05-04.
+        notificationFollows: true,
+        // COMPAT(notificationNeedsScope): added after v2.2.2, remove gate after 2027-05-04.
+        notificationNeedsScope: true,
         // COMPAT(plugins): added in v0.3.0, remove gate after 2027-08-07.
         plugins: true,
         pluginManagement: true,
@@ -2949,6 +2962,15 @@ export class VoiceAssistantWebSocketServer {
 
   public revokeManagedLeases(leaseIds: readonly string[]): number {
     const requested = new Set(leaseIds);
+    // A device that is offline has no connection left to close, but its push token still
+    // carries the lease: revoke it here or the token keeps receiving until the lease expires.
+    for (const leaseId of requested) {
+      try {
+        this.pushNotifications.revokeLease(leaseId);
+      } catch (error) {
+        this.logger.warn({ err: error, leaseId }, "Failed to revoke managed push subscription");
+      }
+    }
     const connections = new Set<SessionConnection>([
       ...this.sessions.values(),
       ...this.externalSessionsByKey.values(),
@@ -3639,26 +3661,38 @@ export class VoiceAssistantWebSocketServer {
     const evidence = await agentNotificationEvidence(agent, async (agentId) => {
       return this.agentManager.getAgent(agentId) ?? (await this.agentStorage.get(agentId));
     });
-    const pushEligible = isPushEligibleAttentionReason(params.reason);
+    // A failure is in-app only, except for readers who asked to hear only what needs them.
+    const pushable = isPushEligibleAttentionReason(params.reason);
     const plan = planAttentionAudience({
       clients: notificationEntries,
-      allows: allowsAgentNotification(evidence),
+      allows: allowsAgentNotification(
+        evidence,
+        params.reason === "finished" ? "update" : "needs",
+        (reader) =>
+          this.notificationFollows.isFollowing(notificationReaderKey(reader.actor), params.agentId),
+      ),
       focusTarget: { kind: "agent", id: params.agentId },
-      pushEligible,
+      pushEligible: (reader) => pushable || reader.scope === "needs",
       nowMs,
     });
 
-    if (pushEligible) {
-      const projectId = await this.projectIdForWorkspace(agent.workspaceId);
-      void this.pushNotificationSender
-        .send(notification, {
-          ...(projectId === null ? {} : { projectId }),
-          recipients: plan.pushRecipients,
-        })
-        .catch((err) => {
-          this.logger.warn({ err, agentId: params.agentId }, "Failed to send push notification");
-        });
-    }
+    const projectId = await this.projectIdForWorkspace(agent.workspaceId);
+    void this.pushNotificationSender
+      .send(notification, {
+        ...(projectId === null ? {} : { projectId }),
+        recipients: plan.pushRecipients,
+        ...this.leasePushPayload(
+          buildAgentAttentionNotificationPayload({
+            reason: params.reason,
+            serverId: this.serverId,
+            workspaceId: agent.workspaceId,
+            agentId: params.agentId,
+          }),
+        ),
+      })
+      .catch((err) => {
+        this.logger.warn({ err, agentId: params.agentId }, "Failed to send push notification");
+      });
 
     for (const { client: ws } of clientEntries) {
       const shouldNotify = plan.inAppRecipients.has(ws);
@@ -3740,9 +3774,12 @@ export class VoiceAssistantWebSocketServer {
 
     const plan = planAttentionAudience({
       clients: notificationEntries,
-      allows: allowsTerminalNotification(terminalLaunchOf(params.terminalId).createdBy),
+      allows: allowsTerminalNotification(
+        terminalLaunchOf(params.terminalId).createdBy,
+        params.reason === "needs_input" ? "needs" : "update",
+      ),
       focusTarget: { kind: "terminal", id: params.terminalId },
-      pushEligible: true,
+      pushEligible: () => true,
       nowMs,
     });
 
@@ -3762,7 +3799,20 @@ export class VoiceAssistantWebSocketServer {
             ...(workspaceId ? { workspaceId } : {}),
           },
         },
-        { ...(projectId === null ? {} : { projectId }), recipients: plan.pushRecipients },
+        {
+          ...(projectId === null ? {} : { projectId }),
+          recipients: plan.pushRecipients,
+          ...this.leasePushPayload({
+            title,
+            body: "Open Clisbot to see it.",
+            data: {
+              serverId: this.serverId,
+              terminalId: params.terminalId,
+              cwd: params.cwd,
+              ...(workspaceId ? { workspaceId } : {}),
+            },
+          }),
+        },
       )
       .catch((err) => {
         this.logger.warn(
@@ -3790,6 +3840,17 @@ export class VoiceAssistantWebSocketServer {
         this.sessions.get(ws)!.session.publishToSource(ws, message.message);
       else this.sendToClient(ws, message);
     }
+  }
+
+  /**
+   * A Hub revocation reaches this daemon only while it is connected to the Hub. Without that
+   * link a Member's lease cannot be trusted to still hold, so their devices get a payload with
+   * no session content; opening it re-checks access over their own connection.
+   */
+  private leasePushPayload(contentFree: PushPayload): { leasePayload?: PushPayload } {
+    return this.hubRelationships?.status().state === "connected"
+      ? {}
+      : { leasePayload: contentFree };
   }
 
   private async projectIdForWorkspace(

@@ -16,6 +16,8 @@ import type { NotificationReader } from "@clisbot/protocol/notification-audience
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { createPushNotifications } from "./push/index.js";
 import { forgetTerminalLaunch, recordTerminalLaunch } from "./managed-access/terminal-launches.js";
+import { NotificationFollowStore } from "./push/follow-store.js";
+import { notificationReaderKey } from "@clisbot/protocol/notification-audience";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -447,10 +449,21 @@ function createTokenAudience() {
       },
       { actor, scope: options.scope },
     );
-  return { push, delivered, registerMember, cleanup: () => rmSync(dir, { recursive: true }) };
+  return { push, delivered, registerMember, dir, cleanup: () => rmSync(dir, { recursive: true }) };
 }
 
-function createAudienceServer(agent: Record<string, unknown>, extraAgents = new Map()) {
+/** The daemon's Hub link, through which lease revocations arrive. */
+function setHubLink(server: VoiceAssistantWebSocketServer, state: "connected" | "reconnecting") {
+  asInternals<{ hubRelationships: unknown }>(server).hubRelationships = {
+    status: () => ({ state }),
+  };
+}
+
+function createAudienceServer(
+  agent: Record<string, unknown>,
+  extraAgents = new Map(),
+  hubLink: "connected" | "reconnecting" = "connected",
+) {
   const audience = createTokenAudience();
   const { server } = createServer(
     {
@@ -464,14 +477,24 @@ function createAudienceServer(agent: Record<string, unknown>, extraAgents = new 
   );
   asInternals<{ projectIdForWorkspace: () => Promise<string> }>(server).projectIdForWorkspace =
     async () => PROJECT_ID;
-  return { server, ...audience };
+  asInternals<{ pushNotifications: unknown }>(server).pushNotifications = audience.push;
+  const follows = new NotificationFollowStore(
+    createStub<pino.Logger>(createLogger()),
+    join(audience.dir, "notification-follows.json"),
+  );
+  asInternals<{ notificationFollows: unknown }>(server).notificationFollows = follows;
+  setHubLink(server, hubLink);
+  return { server, follows, ...audience };
 }
 
-async function finish(server: VoiceAssistantWebSocketServer) {
+async function finish(
+  server: VoiceAssistantWebSocketServer,
+  reason: "finished" | "permission" | "error" = "finished",
+) {
   await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
     agentId: "agent-1",
     provider: "claude",
-    reason: "finished",
+    reason,
   });
   await new Promise((resolve) => setImmediate(resolve));
 }
@@ -482,8 +505,12 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
     for (const cleanup of cleanups.splice(0)) cleanup();
   });
 
-  function setup(agent: Record<string, unknown>, extraAgents?: Map<string, unknown>) {
-    const result = createAudienceServer(agent, extraAgents);
+  function setup(
+    agent: Record<string, unknown>,
+    extraAgents?: Map<string, unknown>,
+    hubLink?: "connected" | "reconnecting",
+  ) {
+    const result = createAudienceServer(agent, extraAgents, hubLink);
     cleanups.push(result.cleanup);
     return result;
   }
@@ -628,6 +655,68 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
 
     expect(linked.delivered.map((entry) => entry.tokens)).toEqual([["alice-phone"]]);
     expect(unlinked.delivered).toEqual([]);
+  });
+
+  it("a Hub revocation for an offline device's lease removes its push token at once", async () => {
+    const { server, delivered, registerMember } = setup({ createdBy: BOB });
+    registerMember("bob-phone", BOB);
+
+    expect(server.revokeManagedLeases(["lease-bob-phone"])).toBe(0);
+    await finish(server);
+
+    expect(delivered).toEqual([]);
+  });
+
+  it("without a live Hub link, lease devices get no session content; the Host owner keeps it", async () => {
+    const { server, delivered, registerMember, push } = setup(
+      { createdBy: BOB },
+      undefined,
+      "reconnecting",
+    );
+    registerMember("bob-phone", BOB);
+    push.renew("owner-phone");
+    const internals = asInternals<{ agentManager: { getLastAssistantMessage: unknown } }>(server);
+    internals.agentManager.getLastAssistantMessage = async () => "Synthetic secret summary.";
+
+    await finish(server);
+
+    const bodies: Record<string, string> = {};
+    for (const entry of delivered)
+      for (const token of entry.tokens) bodies[token] = entry.payload.body;
+    expect(bodies).toEqual({
+      "owner-phone": "Synthetic secret summary.",
+      "bob-phone": "Finished working.",
+    });
+  });
+
+  it("Needs me pushes requests and failures in the reader's sessions, never finished turns", async () => {
+    const { server, delivered, registerMember } = setup({ createdBy: BOB });
+    registerMember("bob-needs", BOB, { scope: "needs" });
+    registerMember("bob-mine", BOB, { scope: "mine" });
+    registerMember("alice-needs", ALICE, { scope: "needs" });
+
+    const tokensFor = async (reason: "finished" | "permission" | "error") => {
+      delivered.length = 0;
+      await finish(server, reason);
+      return delivered.flatMap((entry) => entry.tokens).sort();
+    };
+
+    expect(await tokensFor("finished")).toEqual(["bob-mine"]);
+    expect(await tokensFor("permission")).toEqual(["bob-mine", "bob-needs"]);
+    // A failure stays in-app for For me, as before; Needs me asked for it on the phone.
+    expect(await tokensFor("error")).toEqual(["bob-needs"]);
+  });
+
+  it("a followed teammate session counts as For me, but a follow never crosses Project access", async () => {
+    const { server, delivered, registerMember, follows } = setup({ createdBy: BOB });
+    registerMember("alice-phone", ALICE);
+    registerMember("carol-other-project", member("carol"), { projectIds: ["project-b"] });
+    follows.set(notificationReaderKey(ALICE), "agent-1", true);
+    follows.set(notificationReaderKey(member("carol")), "agent-1", true);
+
+    await finish(server);
+
+    expect(delivered.flatMap((entry) => entry.tokens)).toEqual(["alice-phone"]);
   });
 
   it("a terminal notifies whoever launched it; an untracked terminal pages no Project Member", async () => {
@@ -789,6 +878,7 @@ describe("push audience before Expo", () => {
     );
     asInternals<{ projectIdForWorkspace: () => Promise<string> }>(server).projectIdForWorkspace =
       async () => PROJECT_ID;
+    setHubLink(server, "connected");
 
     await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
       agentId: "agent-1",

@@ -9,6 +9,7 @@ import {
   type NotificationScope,
 } from "@clisbot/protocol/notification-audience";
 import { SessionActorSchema, type SessionActor } from "@clisbot/protocol/session-authorship";
+import type { PushPayload } from "./push-service.js";
 
 /**
  * Store for Expo push tokens.
@@ -99,6 +100,11 @@ export class PushTokenStore {
   }
 
   getActiveTokens(target?: PushNotificationTarget): string[] {
+    return this.getActiveSubscriptions(target).map(({ token }) => token);
+  }
+
+  /** Active tokens for `target`, with whether each one depends on a managed lease. */
+  getActiveSubscriptions(target?: PushNotificationTarget): { token: string; leased: boolean }[] {
     const now = this.now();
     const active = new Map(this.subscriptions);
     for (const [token, subscription] of this.subscriptions) {
@@ -118,7 +124,7 @@ export class PushTokenStore {
     return Array.from(active)
       .filter(([, subscription]) => allowsTarget(subscription, target))
       .filter(([, subscription]) => allowsRecipient(subscription, target))
-      .map(([token]) => token);
+      .map(([token, subscription]) => ({ token, leased: subscription.leaseId !== null }));
   }
 
   private loadFromDisk(): void {
@@ -210,6 +216,11 @@ export interface PushNotificationTarget {
   projectId?: string;
   /** Which readers this notification is for; absent sends to every authorized token. */
   recipients?: (reader: NotificationReader) => boolean;
+  /**
+   * What tokens bound to a managed lease receive instead of the payload, when the sender
+   * cannot rely on a revocation of that lease having reached it. Carries no session content.
+   */
+  leasePayload?: PushPayload;
 }
 
 interface PushTokenSubscription {

@@ -229,8 +229,10 @@ import { HubExecutionController } from "./hub/execution-controller.js";
 import type { HubExecutionAgents } from "./hub/daemon-executions.js";
 import { DownloadTokenStore } from "./file-download/token-store.js";
 import type { PushNotifications, PushTokenAuthorization } from "./push/index.js";
+import type { NotificationFollowStore } from "./push/follow-store.js";
 import {
   DEFAULT_NOTIFICATION_SCOPE,
+  notificationReaderKey,
   type NotificationReader,
   type NotificationScope,
 } from "@clisbot/protocol/notification-audience";
@@ -511,6 +513,8 @@ export interface SessionOptions {
   logger: pino.Logger;
   downloadTokenStore: DownloadTokenStore;
   pushNotifications: PushNotifications;
+  /** Absent only in tests that do not exercise follows. */
+  notificationFollows?: NotificationFollowStore;
   clisbotHome: string;
   worktreesRoot?: string;
   agentManager: AgentManager;
@@ -849,6 +853,7 @@ export class Session {
   private readonly workspaceRecovery: WorkspaceRecoveryService;
   private readonly daemonConfigStore: DaemonConfigStore;
   private readonly pushNotifications: PushNotifications;
+  private readonly notificationFollows: NotificationFollowStore | undefined;
   private readonly pluginRuntime: SessionOptions["pluginRuntime"];
   private readonly orchestrationSkills: SessionOptions["orchestrationSkills"];
   private unsubscribeAgentEvents: (() => void) | null = null;
@@ -1013,6 +1018,7 @@ export class Session {
     this.onLifecycleIntent = onLifecycleIntent ?? null;
     this.onWorkspaceRecovered = onWorkspaceRecovered ?? null;
     this.pushNotifications = pushNotifications;
+    this.notificationFollows = options.notificationFollows;
     this.clisbotHome = clisbotHome;
     this.messageReceipts = options.messageReceipts;
     this.optionsInputQueues = options.inputQueues;
@@ -3780,6 +3786,15 @@ export class Session {
       case "notifications.set_scope.request":
         this.handleSetNotificationScope(msg.scope, msg.requestId);
         return;
+      case "notifications.set_follow.request":
+        this.handleSetNotificationFollow(msg.agentId, msg.followed, msg.requestId);
+        return;
+      case "notifications.list_follows.request":
+        this.emit({
+          type: "notifications.list_follows.response",
+          payload: { requestId: msg.requestId, agentIds: this.followedAgentIds() },
+        });
+        return;
       case "push.unregister.request":
         if (
           this.resourceAuthorizer.isRestricted() &&
@@ -5700,6 +5715,44 @@ export class Session {
       this.renewPushToken(this.registeredPushToken);
     }
     this.emit({ type: "notifications.set_scope.response", payload: { requestId, scope } });
+  }
+
+  /**
+   * Follows the session for this connection's reader. Only a session the reader may read
+   * now can be followed, and a follow grants nothing: sends check access again.
+   */
+  private handleSetNotificationFollow(agentId: string, followed: boolean, requestId: string): void {
+    const reader = this.notificationReader();
+    if (
+      !this.notificationFollows ||
+      reader === null ||
+      (followed && !this.allowsNotificationAbout({ agentId }))
+    ) {
+      this.emit({
+        type: "rpc_error",
+        payload: {
+          requestId,
+          requestType: "notifications.set_follow.request",
+          error: "Resource not found",
+          code: "resource_not_found",
+        },
+      });
+      return;
+    }
+    this.notificationFollows.set(notificationReaderKey(reader.actor), agentId, followed);
+    this.emit({
+      type: "notifications.set_follow.response",
+      payload: { requestId, agentId, followed },
+    });
+  }
+
+  /** Followed sessions this connection may still read; lost access hides a follow. */
+  private followedAgentIds(): string[] {
+    const reader = this.notificationReader();
+    if (!this.notificationFollows || reader === null) return [];
+    return this.notificationFollows
+      .list(notificationReaderKey(reader.actor))
+      .filter((agentId) => this.allowsNotificationAbout({ agentId }));
   }
 
   /**

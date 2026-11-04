@@ -2,6 +2,7 @@ import {
   notificationAllowed,
   notificationOwnership,
   notificationReaderKey,
+  type NotificationEventKind,
   type NotificationOwnership,
   type NotificationOwnershipEvidence,
   type NotificationReader,
@@ -45,7 +46,8 @@ export function planAttentionAudience<Client>(input: {
   clients: readonly AttentionClient<Client>[];
   allows: (reader: NotificationReader) => boolean;
   focusTarget: AttentionFocusTarget;
-  pushEligible: boolean;
+  /** Whether this event may reach the reader's phone at all; in-app delivery ignores it. */
+  pushEligible: (reader: NotificationReader) => boolean;
   nowMs: number;
 }): AttentionAudiencePlan<Client> {
   const groups = new Map<string, AttentionClient<Client>[]>();
@@ -60,7 +62,7 @@ export function planAttentionAudience<Client>(input: {
     const plan = computeNotificationPlan({
       allStates: entries.map((entry) => entry.state),
       focusTarget: input.focusTarget,
-      pushEligible: input.pushEligible,
+      pushEligible: input.pushEligible(entries[0]!.reader!),
       nowMs: input.nowMs,
     });
     if (plan.inAppRecipientIndex !== null)
@@ -70,7 +72,7 @@ export function planAttentionAudience<Client>(input: {
   return {
     inAppRecipients,
     pushRecipients: (reader) =>
-      input.pushEligible &&
+      input.pushEligible(reader) &&
       input.allows(reader) &&
       !reached.has(notificationReaderKey(reader.actor)),
   };
@@ -98,25 +100,34 @@ export async function agentNotificationEvidence(
     : evidence;
 }
 
-/** Whether a session with `evidence` may notify `reader`. */
+/**
+ * Whether a session with `evidence` may notify `reader`. A session the reader follows is
+ * theirs, as in the session list; following never widens who may read it.
+ */
 export function allowsAgentNotification(
   evidence: NotificationOwnershipEvidence,
+  kind: NotificationEventKind,
+  follows: (reader: NotificationReader) => boolean = () => false,
 ): (reader: NotificationReader) => boolean {
   return (reader) =>
     notificationAllowed(
       reader,
-      reader.actor === null ? "mine" : notificationOwnership(reader.actor, evidence),
+      reader.actor === null || follows(reader)
+        ? "mine"
+        : notificationOwnership(reader.actor, evidence),
+      kind,
     );
 }
 
 /** A terminal records only the Hub actor id that launched it, and only while it runs. */
 export function allowsTerminalNotification(
   createdBy: string | undefined,
+  kind: NotificationEventKind,
 ): (reader: NotificationReader) => boolean {
   return (reader) => {
     let ownership: NotificationOwnership = "unknown";
     if (reader.actor === null) ownership = "mine";
     else if (createdBy !== undefined) ownership = createdBy === reader.actor.id ? "mine" : "others";
-    return notificationAllowed(reader, ownership);
+    return notificationAllowed(reader, ownership, kind);
   };
 }

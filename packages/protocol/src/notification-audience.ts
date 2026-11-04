@@ -2,16 +2,23 @@ import { z } from "zod";
 import type { SessionActor, SessionAuthorship } from "./session-authorship.js";
 
 /**
- * Which sessions may notify a reader. The first three match the Home scope tabs
- * (For me / Others / All); `off` silences every session on that Host.
+ * Which sessions may notify a reader, matching Home: For me / Others / All tabs, and
+ * Needs me (`needs`), For me narrowed to what needs the reader. `off` silences every session.
  */
-export const NotificationScopeSchema = z.enum(["mine", "others", "all", "off"]);
+export const NotificationScopeSchema = z.enum(["mine", "needs", "others", "all", "off"]);
 export type NotificationScope = z.infer<typeof NotificationScopeSchema>;
 
 /** Every reader starts with For me, including installs that never chose a scope. */
 export const DEFAULT_NOTIFICATION_SCOPE: NotificationScope = "mine";
 
 export type NotificationOwnership = "mine" | "others" | "unknown";
+
+/**
+ * What the event asks of the reader. `needs` is what Home's Needs me shows unseen: a request
+ * waiting for an answer, or a failure (`issues.ts` `currentIssueKind`). Everything else is an
+ * `update`, such as a finished turn.
+ */
+export type NotificationEventKind = "update" | "needs";
 
 /**
  * Who a notification is for, as the daemon knows them.
@@ -115,10 +122,12 @@ export function notificationOwnership(
 export function notificationAllowed(
   reader: NotificationReader,
   ownership: NotificationOwnership,
+  kind: NotificationEventKind = "update",
 ): boolean {
   if (reader.scope === "off") return false;
   if (reader.scope === "all") return true;
   const mine =
     reader.actor === null || ownership === "mine" || (ownership === "unknown" && reader.daemonWide);
+  if (reader.scope === "needs") return mine && kind === "needs";
   return reader.scope === "mine" ? mine : !mine;
 }

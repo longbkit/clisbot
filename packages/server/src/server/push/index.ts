@@ -54,10 +54,24 @@ export function createPushNotifications(options: {
       store.revokeLease(leaseId);
     },
     async send(payload, target) {
-      const tokens = store.getActiveTokens(target);
-      options.logger.info({ tokenCount: tokens.length }, "Sending push notification");
-      if (tokens.length === 0) return;
-      await deliver(tokens, payload);
+      const subscriptions = store.getActiveSubscriptions(target);
+      const leasePayload = target?.leasePayload;
+      const full = subscriptions.filter((entry) => !leasePayload || !entry.leased);
+      const contentFree = leasePayload ? subscriptions.filter((entry) => entry.leased) : [];
+      options.logger.info(
+        { tokenCount: full.length, contentFreeTokenCount: contentFree.length },
+        "Sending push notification",
+      );
+      if (full.length > 0)
+        await deliver(
+          full.map((entry) => entry.token),
+          payload,
+        );
+      if (leasePayload && contentFree.length > 0)
+        await deliver(
+          contentFree.map((entry) => entry.token),
+          leasePayload,
+        );
     },
   };
 }

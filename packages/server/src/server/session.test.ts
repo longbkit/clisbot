@@ -20,6 +20,8 @@ import {
   assertPullRequestAutoMergeEnableReady,
 } from "../services/github-service.js";
 import { PARENT_AGENT_ID_LABEL } from "@clisbot/protocol/agent-labels";
+import { notificationReaderKey } from "@clisbot/protocol/notification-audience";
+import { NotificationFollowStore } from "./push/follow-store.js";
 import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
 import type { WorkspaceDescriptorPayload } from "@clisbot/protocol/messages";
 import {
@@ -299,6 +301,7 @@ vi.mock("./worktree-bootstrap.js", async (importOriginal) => {
 interface SessionForTestOptions {
   hubRelationships?: SessionOptions["hubRelationships"];
   accountActor?: SessionOptions["accountActor"];
+  notificationFollows?: SessionOptions["notificationFollows"];
   workspaceRuntimeStore?: WorkspaceRuntimeStore;
   sendToSource?: SessionOptions["onMessageToSource"];
   clientId?: string;
@@ -443,6 +446,7 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
       onChange: vi.fn(() => () => {}),
     }),
     pluginRuntime: options.pluginRuntime,
+    notificationFollows: options.notificationFollows,
     orchestrationSkills: options.orchestrationSkills,
     stt: options.stt ?? null,
     tts: null,
@@ -2057,7 +2061,12 @@ test("a Hub-identified connection without a lease is judged as that account, not
 });
 
 function createProjectScopedAttentionSession(
-  options: { privileges?: readonly string[]; leaseExpiresAt?: number } = {},
+  options: {
+    privileges?: readonly string[];
+    leaseExpiresAt?: number;
+    accountActor?: SessionOptions["accountActor"];
+    notificationFollows?: SessionOptions["notificationFollows"];
+  } = {},
 ) {
   const delivered: SessionOutboundMessage[] = [];
   const source = {};
@@ -2092,6 +2101,8 @@ function createProjectScopedAttentionSession(
   const projectA = (privileges: readonly string[]) =>
     new Map([["project-a", grant(privileges)]]) as SessionResourceAuthorization["projects"];
   const session = createSessionForTest({
+    accountActor: options.accountActor,
+    notificationFollows: options.notificationFollows,
     permissions: ["workspace.read"],
     resourceAuthorization: {
       resourceMode: "projects",
@@ -2169,7 +2180,7 @@ function createProjectScopedAttentionSession(
       source,
     );
   };
-  return { session, publishAll, subscribe };
+  return { session, publishAll, subscribe, delivered };
 }
 
 test("a Project-scoped connection only learns about attention in its own Projects", async () => {
@@ -2215,6 +2226,90 @@ test("attention access is decided when it is sent: a revoked Project or expired 
   expect(expired.session.allowsNotificationAbout({ agentId: "agent-a" })).toBe(false);
   await session.cleanup();
   await expired.session.cleanup();
+});
+
+test("a reader follows only sessions it may read, per account, and loses a follow with access", async () => {
+  const home = mkdtempSync(join(tmpdir(), "clisbot-follows-"));
+  const follows = new NotificationFollowStore(
+    pino({ level: "silent" }),
+    join(home, "notification-follows.json"),
+  );
+  const actor = (memberId: string) => ({
+    kind: "user" as const,
+    id: `user-${memberId}`,
+    memberId,
+    organizationId: "org-1",
+    hubOrigin: "https://hub.example",
+  });
+  const responses = (messages: SessionOutboundMessage[]) =>
+    messages.flatMap((message) => {
+      if (message.type === "notifications.set_follow.response")
+        return [`${message.payload.agentId}:${message.payload.followed}`];
+      if (message.type === "rpc_error")
+        return [`${message.payload.requestId}:${message.payload.code}`];
+      if (message.type === "notifications.list_follows.response")
+        return [`list:${message.payload.agentIds.join(",")}`];
+      return [];
+    });
+  try {
+    const alice = createProjectScopedAttentionSession({
+      accountActor: actor("alice"),
+      notificationFollows: follows,
+    });
+    const aliceMessages = alice.delivered;
+    for (const agentId of ["agent-a", "agent-b"])
+      await alice.session.handleMessage({
+        type: "notifications.set_follow.request",
+        agentId,
+        followed: true,
+        requestId: `follow-${agentId}`,
+      });
+    await alice.session.handleMessage({
+      type: "notifications.list_follows.request",
+      requestId: "l1",
+    });
+
+    const bob = createProjectScopedAttentionSession({
+      accountActor: actor("bob"),
+      notificationFollows: follows,
+    });
+    const bobMessages = bob.delivered;
+    await bob.session.handleMessage({
+      type: "notifications.list_follows.request",
+      requestId: "l2",
+    });
+
+    alice.session.replaceManagedAdmission({
+      permissions: ["workspace.read"],
+      resourceAuthorization: {
+        resourceMode: "projects",
+        projects: new Map(),
+        leaseId: "lease-a",
+        leaseExpiresAt: Date.now() + 60_000,
+      },
+    });
+    await alice.session.handleMessage({
+      type: "notifications.list_follows.request",
+      requestId: "l3",
+    });
+
+    expect(responses(aliceMessages)).toEqual([
+      "agent-a:true",
+      "follow-agent-b:resource_not_found",
+      "list:agent-a",
+      "list:",
+    ]);
+    expect(responses(bobMessages)).toEqual(["list:"]);
+    const restarted = new NotificationFollowStore(
+      pino({ level: "silent" }),
+      join(home, "notification-follows.json"),
+    );
+    expect(restarted.isFollowing(notificationReaderKey(actor("alice")), "agent-a")).toBe(true);
+    await alice.session.cleanup();
+    await bob.session.cleanup();
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test("a managed lease without a Hub account is not a notification reader", () => {
