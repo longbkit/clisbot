@@ -753,6 +753,11 @@ export class VoiceAssistantWebSocketServer {
   private unsubscribeTerminalActivity: (() => void) | null = null;
   private readonly browserToolsBroker: BrowserToolsBroker | null;
   private readonly hubRelationships: HubRelationshipManagement | null;
+  /** One Hub verification per lease at a time: notifications sent together share its answer. */
+  private readonly leaseVerifications = new Map<
+    string,
+    ReturnType<NonNullable<HubRelationshipManagement["verifyAccessLease"]>>
+  >();
   private connectionLifecycle: "starting" | "accepting" | "stopping" = "accepting";
   private readonly advertiseDaemonStatusRpc: boolean;
   private readonly advertiseRelayConfig: boolean;
@@ -3876,17 +3881,29 @@ export class VoiceAssistantWebSocketServer {
    * Hub, a timeout or an error all mean "not granted": the device gets a notification that
    * identifies nothing. A 401 is the Hub refusing the lease.
    */
+  private verifyLeaseOnce(
+    verify: NonNullable<HubRelationshipManagement["verifyAccessLease"]>,
+    leaseId: string,
+  ) {
+    const pending = this.leaseVerifications.get(leaseId);
+    if (pending) return pending;
+    const verification = verify(leaseId).finally(() => this.leaseVerifications.delete(leaseId));
+    this.leaseVerifications.set(leaseId, verification);
+    return verification;
+  }
+
   private confirmLeaseFor(
     event: SessionOutboundMessage["type"],
     allowsResource: (authorization: SessionAuthorization) => boolean,
   ): (leaseId: string) => Promise<LeaseConfirmation> {
     return async (leaseId) => {
       const relationships = this.hubRelationships;
-      if (!relationships?.verifyAccessLease || relationships.status().state !== "connected")
+      const verify = relationships?.verifyAccessLease?.bind(relationships);
+      if (!verify || relationships?.status().state !== "connected")
         return { granted: false, revoked: false };
       let authorization: SessionAuthorization;
       try {
-        const admission = await relationships.verifyAccessLease(leaseId);
+        const admission = await this.verifyLeaseOnce(verify, leaseId);
         authorization = new SessionAuthorization(admission.permissions, admission);
       } catch (error) {
         return {

@@ -560,6 +560,23 @@ function createAudienceServer(
   return { server, follows, ...audience };
 }
 
+/** Content deliveries per token, once each has `count` or a second has passed. */
+async function contentDeliveries(
+  delivered: ReadonlyArray<{ tokens: string[]; payload: PushPayload }>,
+  tokens: readonly string[],
+  count: number,
+): Promise<number[]> {
+  const counts = () =>
+    tokens.map(
+      (token) =>
+        delivered.filter((entry) => entry.tokens.includes(token) && entry.payload.data).length,
+    );
+  for (let waited = 0; waited < 1_000 && counts().some((value) => value < count); waited += 10) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return counts();
+}
+
 async function finish(
   server: VoiceAssistantWebSocketServer,
   reason: "finished" | "permission" | "error" = "finished",
@@ -868,6 +885,27 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
       await payloads(server, delivered);
       await payloads(server, delivered);
 
+      expect(hub.verifications).toBe(4);
+    });
+
+    it("notifications sent together share one Hub answer per lease; the next one asks again", async () => {
+      const { server, delivered, registerMember, hub } = setup({ createdBy: BOB });
+      registerMember("bob-phone", BOB);
+      registerMember("alice-all", ALICE, { scope: "all" });
+      let answer: (() => void) | undefined;
+      const answered = new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      hub.onVerify = () => answered;
+
+      const together = Promise.all([finish(server), finish(server)]);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      answer?.();
+      await together;
+
+      expect(hub.verifications).toBe(2);
+      expect(await contentDeliveries(delivered, ["bob-phone", "alice-all"], 2)).toEqual([2, 2]);
+      await finish(server);
       expect(hub.verifications).toBe(4);
     });
 
