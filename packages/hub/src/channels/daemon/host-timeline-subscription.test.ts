@@ -14,6 +14,8 @@ class OneSlotHost {
   connected = true;
   /** The timeline set of the socket that is live now. */
   timeline: string[] = [];
+  /** Timeline writes that reached the Host. */
+  writes = 0;
   private readonly frameHandlers = new Set<(message: Record<string, unknown>) => void>();
   private readonly connectedHandlers = new Set<() => void>();
   private readonly disconnectedHandlers = new Set<() => void>();
@@ -24,6 +26,7 @@ class OneSlotHost {
     write: async (frame) => {
       const message = (JSON.parse(frame) as { message: Record<string, unknown> }).message;
       if (message["type"] !== "agent.timeline.set_subscription.request") return;
+      this.writes += 1;
       this.timeline = [...(message["agentIds"] as string[])];
       queueMicrotask(() =>
         this.emit({
@@ -154,6 +157,61 @@ describe("the timeline set of a Host shared by several channel accounts", () => 
     await slack.setTimelineSubscription(["slack-agent", "slack-agent-2"]);
     assert.deepEqual(host.timeline, ["slack-agent", "slack-agent-2"]);
     slack.stop();
+  });
+
+  it("leaves a stopped account out after a reconnect when its own clear never reached the Host", async () => {
+    const host = new OneSlotHost();
+    const shared = new HostTimelineSubscription();
+    const slackSeen: string[] = [];
+    const slack = host.connect("slack:bot#1", (id) => slackSeen.push(id), shared);
+    const telegram = host.connect("telegram:bot#2", () => undefined, shared);
+    await slack.setTimelineSubscription(["slack-agent"]);
+    await telegram.setTimelineSubscription(["telegram-agent"]);
+
+    // The Host is away when Telegram's plane stops: its [] fails before `forget`.
+    host.connected = false;
+    await assert.rejects(telegram.setTimelineSubscription([]));
+    telegram.stop();
+    host.reconnect();
+    await settle();
+
+    assert.deepEqual(host.timeline, ["slack-agent"]);
+    host.stream("slack-agent");
+    await settle();
+    assert.deepEqual(slackSeen, ["slack-agent"]);
+    slack.stop();
+  });
+
+  it("sends nothing on reconnect once its only account has stopped", async () => {
+    const host = new OneSlotHost();
+    const shared = new HostTimelineSubscription();
+    const telegram = host.connect("telegram:bot#1", () => undefined, shared);
+    await telegram.setTimelineSubscription(["telegram-agent"]);
+    host.connected = false;
+    await assert.rejects(telegram.setTimelineSubscription([]));
+    telegram.stop();
+    const writes = host.writes;
+    host.reconnect();
+    await settle();
+    assert.equal(host.writes, writes);
+    assert.deepEqual(host.timeline, []);
+  });
+
+  it("keeps a restarted account's new connection when the old one stops after it", async () => {
+    const host = new OneSlotHost();
+    const shared = new HostTimelineSubscription();
+    const old = host.connect("telegram:bot#1", () => undefined, shared);
+    await old.setTimelineSubscription(["old-agent"]);
+    const fresh = host.connect("telegram:bot#2", () => undefined, shared);
+    await fresh.setTimelineSubscription(["new-agent"]);
+
+    host.connected = false;
+    await assert.rejects(old.setTimelineSubscription([]));
+    old.stop();
+    host.reconnect();
+    await settle();
+    assert.deepEqual(host.timeline, ["new-agent"]);
+    fresh.stop();
   });
 
   it("writes in order with the union as it is when each write runs", async () => {

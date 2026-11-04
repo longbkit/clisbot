@@ -17,6 +17,7 @@ import type {
   EffectiveDefaults,
 } from "../config/compile.js";
 import { connectEnrolledChannelDaemon, type DaemonConnection } from "../daemon/client.js";
+import type { AgentSnapshot } from "../daemon/types.js";
 import { HostNotReachedError } from "../daemon/enrolled-client.js";
 import { createMemorySteerTargets, type SteerTargetStore } from "../daemon/steer-target.js";
 import { AgentRequestRefusedError } from "../daemon/agent-request-refusal.js";
@@ -200,7 +201,7 @@ function conversation() {
 function makePlane(
   route: CompiledRoute | CompiledRoute[],
   daemon: ReturnType<typeof makeDaemon>,
-  options: { envFlag?: boolean; processingTtlMs?: number } = {},
+  options: { envFlag?: boolean; turnReconcileMs?: number } = {},
 ) {
   const clock = new ManualClock(1_000);
   const flushes: { admission: HeldFlushAdmission; id: string }[] = [];
@@ -239,7 +240,7 @@ function makePlane(
       findLatestChannelWorkflowExecution: async () => undefined,
     },
     clock,
-    ...(options.processingTtlMs === undefined ? {} : { processingTtlMs: options.processingTtlMs }),
+    ...(options.turnReconcileMs === undefined ? {} : { turnReconcileMs: options.turnReconcileMs }),
     logger: SILENT,
     post: async (post) => {
       posted.push(post.text);
@@ -936,25 +937,106 @@ describe("a Host that goes away mid-turn", () => {
 
   it("says nothing for a turn the Host already finished though its end never reached the plane", async () => {
     // 2026-11-03: the turn's stream was cut, so its terminal event never came.
-    // The Host said the agent was idle a minute later; a day after, a Host
-    // restart told the thread the machine went away while it was working.
-    const say = conversation();
-    const daemon = makeDaemon();
-    // The production floor: the typing indicator is on, so the turn holds a lease.
-    const sync = {
+    // A day later a Host restart told the thread the machine went away while
+    // it was working. Independent of the Route's progress settings.
+    const indicatorOn = {
       ...DEFAULTS.sync,
       progress: { ...DEFAULTS.sync.progress, typingIndicator: true },
     };
-    const flow = makePlane(makeRoute({ sync }), daemon, { processingTtlMs: 1_000 });
-    await flow.plane.start(daemon.daemon, store);
-    await flow.send(say("check the refresh logic"));
+    for (const sync of [DEFAULTS.sync, indicatorOn]) {
+      const say = conversation();
+      const daemon = makeDaemon();
+      const host = readsOf(daemon.daemon);
+      const flow = makePlane(makeRoute({ sync }), daemon, { turnReconcileMs: 10 });
+      await flow.plane.start(daemon.daemon, store);
+      host.answer = async () => [];
+      await flow.send(say("check the refresh logic"));
+      const before = host.reads;
+      await waitFor(() => host.reads > before);
+      await pause(30);
 
-    // `listAgents` reports no running agent; the sweep runs every second.
-    flow.clock.advance(1_001);
-    await new Promise((resolve) => setTimeout(resolve, 1_200));
+      await flow.plane.onHostLost();
+      assert.deepEqual(flow.posted, [], `typing indicator ${sync.progress.typingIndicator}`);
+      await flow.plane.stop();
+    }
+  });
+
+  it("keeps a turn that started while the Host's idle answer was on its way", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const host = readsOf(daemon.daemon);
+    const flow = makePlane(makeRoute({}), daemon, { turnReconcileMs: 10 });
+    await flow.plane.start(daemon.daemon, store);
+    host.answer = async () => [runningSnapshot("agent-0")];
+    const first = await flow.send(say("first"));
+    assert.equal(first.result.outcome?.kind === "bound" && first.result.outcome.agentId, "agent-0");
+
+    // The Host answers "idle" from before the follow-up started a new turn.
+    let release!: (agents: AgentSnapshot[]) => void;
+    const stale = new Promise<AgentSnapshot[]>((resolve) => {
+      release = resolve;
+    });
+    host.answer = () => stale;
+    const asked = host.reads;
+    await waitFor(() => host.reads > asked);
+    await flow.send(say("and the follow-up"));
+    host.answer = async () => [runningSnapshot("agent-0")];
+    release([]);
+    // Several more reconcile rounds, each reading "running".
+    await pause(60);
 
     await flow.plane.onHostLost();
-    assert.deepEqual(flow.posted, []);
+    assert.deepEqual(flow.posted, [HOST_LOST_NOTICE], "the new turn is still running");
+    await flow.plane.stop();
+  });
+
+  it("keeps a turn while a send is still on its way to the Host", async () => {
+    const say = conversation();
+    let release!: () => void;
+    let holding = false;
+    const daemon = makeDaemon({
+      onSend: async () => {
+        if (!holding) return;
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      },
+    });
+    const host = readsOf(daemon.daemon);
+    const flow = makePlane(makeRoute({}), daemon, { turnReconcileMs: 10 });
+    await flow.plane.start(daemon.daemon, store);
+    host.answer = async () => [runningSnapshot("agent-0")];
+    await flow.send(say("first"));
+    holding = true;
+    const followUp = flow.send(say("still sending"));
+    await waitFor(() => daemon.sends.length === 2);
+    host.answer = async () => [];
+    const before = host.reads;
+    await pause(60);
+
+    await flow.plane.onHostLost();
+    assert.deepEqual(flow.posted, [HOST_LOST_NOTICE], "nothing ended while a send was open");
+    assert.ok(host.reads >= before + 2, "the Host was asked while the send was open");
+    release();
+    await followUp;
+    await flow.plane.stop();
+  });
+
+  it("ends nothing when the Host's status cannot be read", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const host = readsOf(daemon.daemon);
+    const flow = makePlane(makeRoute({}), daemon, { turnReconcileMs: 10 });
+    await flow.plane.start(daemon.daemon, store);
+    host.answer = async () => {
+      throw new Error("host_not_connected");
+    };
+    await flow.send(say("long task"));
+    const before = host.reads;
+    await waitFor(() => host.reads >= before + 2);
+
+    await flow.plane.onHostLost();
+    assert.deepEqual(flow.posted, [HOST_LOST_NOTICE]);
     await flow.plane.stop();
   });
 
@@ -970,6 +1052,34 @@ describe("a Host that goes away mid-turn", () => {
     assert.deepEqual(flow.posted, []);
   });
 });
+
+/** Count the Host's status reads and choose each answer. */
+function readsOf(daemon: DaemonConnection) {
+  const host = {
+    reads: 0,
+    answer: async (): Promise<AgentSnapshot[]> => [],
+  };
+  daemon.listAgents = () => {
+    host.reads += 1;
+    return host.answer();
+  };
+  return host;
+}
+
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function runningSnapshot(id: string): AgentSnapshot {
+  return {
+    id,
+    provider: "codex",
+    cwd: "/tmp/repo",
+    title: null,
+    status: "running",
+    createdAt: "2026-09-22T00:00:00Z",
+    updatedAt: "2026-09-22T00:00:00Z",
+    labels: {},
+  };
+}
 
 async function waitFor(condition: () => boolean): Promise<void> {
   const deadline = Date.now() + 5_000;

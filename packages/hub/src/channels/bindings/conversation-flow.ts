@@ -35,6 +35,9 @@ import { deriveBindingKey, recordedRoute } from "./stored-route.js";
 /** How soon a flush the account could not serve comes back. */
 const HELD_FLUSH_RETRY_MS = 60_000;
 
+/** While the plane counts a turn as running, how often the Host is asked. */
+export const TURN_RECONCILE_MS = 60_000;
+
 /** What the plane lends the conversation flow. */
 export interface ConversationPlaneSeams {
   engine(): BindingEngine;
@@ -74,6 +77,13 @@ export interface ConversationFlowDeps {
   admitHeldFlush?: ((flush: HeldFlushAdmission) => Promise<void>) | undefined;
   logger: PlaneLogger;
   plane: ConversationPlaneSeams;
+  /**
+   * The agents the Host reports as running. A turn whose terminal event never
+   * reached the plane (its stream was cut) is ended when the Host says its
+   * agent is idle. Absent = turns end only on their terminal event.
+   */
+  readRunningAgentIds?: (() => Promise<ReadonlySet<string>>) | undefined;
+  reconcileEveryMs?: number | undefined;
 }
 
 /** A flush row's held messages, as the one delivery that sends them. */
@@ -95,6 +105,8 @@ interface TurnAddress {
   message: InboundMessage;
   account: CompiledChannelAccount;
   route: CompiledRoute;
+  /** The sequence its send began at. */
+  sentAt: number;
 }
 
 interface DeadLetter {
@@ -116,6 +128,14 @@ export class ConversationFlow {
    * start) before the send that started it returns. */
   private sequence = 0;
   private readonly turnEndedAt = new Map<string, number>();
+  /** Sends not yet returned: the agent they reach is not known until then. */
+  private sendsInFlight = 0;
+  /** Per agent, the sequence at which its latest send returned. */
+  private readonly sendReturnedAt = new Map<string, number>();
+  /** The sequence at which the latest send that named no agent returned. */
+  private unnamedSendReturnedAt = 0;
+  private reconciling = false;
+  private readonly reconcileTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(private readonly deps: ConversationFlowDeps) {
     this.inbox = new BindingInbox({
@@ -131,6 +151,13 @@ export class ConversationFlow {
       admit: (flush) => deps.admitHeldFlush?.(flush) ?? Promise.resolve(),
       logger: deps.logger,
     });
+    if (deps.readRunningAgentIds !== undefined) {
+      this.reconcileTimer = setInterval(
+        () => void this.reconcileTurns(),
+        deps.reconcileEveryMs ?? TURN_RECONCILE_MS,
+      );
+      this.reconcileTimer.unref?.();
+    }
   }
 
   /**
@@ -147,12 +174,77 @@ export class ConversationFlow {
   ): Promise<InboundOutcome> {
     this.sequence += 1;
     const sentAt = this.sequence;
-    const outcome = await this.deps.plane.engine().deliver(delivery, account, route, subscribe);
-    const started = outcome.kind === "bound" || outcome.kind === "steered";
-    if (started && (this.turnEndedAt.get(outcome.agentId) ?? 0) < sentAt) {
-      this.runningTurns.set(outcome.agentId, { message: delivery.message, account, route });
+    this.sendsInFlight += 1;
+    let agentId: string | undefined;
+    try {
+      const outcome = await this.deps.plane.engine().deliver(delivery, account, route, subscribe);
+      const started = outcome.kind === "bound" || outcome.kind === "steered";
+      if (started) agentId = outcome.agentId;
+      if (started && (this.turnEndedAt.get(outcome.agentId) ?? 0) < sentAt) {
+        this.runningTurns.set(outcome.agentId, {
+          message: delivery.message,
+          account,
+          route,
+          sentAt,
+        });
+      }
+      return outcome;
+    } finally {
+      this.sendsInFlight -= 1;
+      this.sequence += 1;
+      if (agentId === undefined) this.unnamedSendReturnedAt = this.sequence;
+      else this.sendReturnedAt.set(agentId, this.sequence);
     }
-    return outcome;
+  }
+
+  /**
+   * End the turns the Host says are no longer running. Their terminal event
+   * never reached the plane (a cut stream), and left "running" they hold
+   * queued messages forever and turn the next Host disconnect into a notice
+   * that the machine went away mid-turn. One status read per interval, and
+   * only while a turn is counted.
+   *
+   * The read can be older than a send that started a new turn on the same
+   * agent, so a turn is ended only when nothing could have started one since
+   * the read began: no send in flight, none returned for that agent (or for
+   * an unknown agent) after it, and the recorded turn itself is older. The
+   * checks and the end run with no await between them. A read that failed
+   * proves nothing and ends nothing.
+   */
+  async reconcileTurns(): Promise<void> {
+    const read = this.deps.readRunningAgentIds;
+    if (read === undefined || this.reconciling || this.runningTurns.size === 0) return;
+    this.reconciling = true;
+    try {
+      const readFrom = this.sequence;
+      let running: ReadonlySet<string>;
+      try {
+        running = await read();
+      } catch {
+        return;
+      }
+      // A snapshot: ending a turn awaits, and the map can change meanwhile.
+      for (const [agentId, at] of Array.from(this.runningTurns)) {
+        if (running.has(agentId)) continue;
+        // Re-checked per agent: ending one awaits, and a send may start meanwhile.
+        const quiet =
+          this.runningTurns.get(agentId) === at &&
+          at.sentAt <= readFrom &&
+          this.sendsInFlight === 0 &&
+          this.unnamedSendReturnedAt <= readFrom &&
+          (this.sendReturnedAt.get(agentId) ?? 0) <= readFrom;
+        if (!quiet) continue;
+        this.deps.logger.warn("channel turn ended without its terminal event", { agentId });
+        await this.turnEnded(agentId);
+      }
+      for (const [agentId, returnedAt] of this.sendReturnedAt) {
+        if (returnedAt <= readFrom && !this.runningTurns.has(agentId)) {
+          this.sendReturnedAt.delete(agentId);
+        }
+      }
+    } finally {
+      this.reconciling = false;
+    }
   }
 
   /** The turn ended (or its agent was let go): release what waited on it. */
@@ -292,9 +384,11 @@ export class ConversationFlow {
   }
 
   stop(): void {
+    if (this.reconcileTimer !== undefined) clearInterval(this.reconcileTimer);
     this.scheduler.stop();
     this.runningTurns.clear();
     this.turnEndedAt.clear();
+    this.sendReturnedAt.clear();
   }
 
   /**

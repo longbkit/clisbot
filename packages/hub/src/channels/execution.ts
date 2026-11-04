@@ -603,22 +603,6 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         logger,
         now: () => clock.now(),
         readRunningAgentIds,
-        // A turn whose end the plane never heard (its stream was lost) must not
-        // stay "running": what waits on it would wait forever, and the next
-        // Host disconnect would tell its thread the machine went away mid-turn.
-        onTurnGone: (agentId) => {
-          void agentEventOrder
-            .run(agentId, async () => {
-              executionLimiter?.completeAgent(agentId);
-              await conversationFlow?.turnEnded(agentId);
-            })
-            .catch((error: unknown) => {
-              logger.warn("channel turn end after a lost stream failed", {
-                agentId,
-                error: error instanceof Error ? error.message : String(error),
-              });
-            });
-        },
         ...(deps.typing !== undefined ? { drive: deps.typing } : {}),
         ...(deps.processingTtlMs !== undefined ? { ttlMs: deps.processingTtlMs } : {}),
       });
@@ -705,7 +689,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
             )
           ).dispatched,
       });
-      conversationFlow = new ConversationFlow({ ...deps, store: channelStore, plane: seams() });
+      conversationFlow = new ConversationFlow({
+        ...deps,
+        store: channelStore,
+        plane: seams(),
+        readRunningAgentIds,
+        ...(deps.turnReconcileMs === undefined ? {} : { reconcileEveryMs: deps.turnReconcileMs }),
+      });
       bindings = new BindingEngine({
         inbox: conversationFlow.inbox,
         organizationId: deps.organizationId,
