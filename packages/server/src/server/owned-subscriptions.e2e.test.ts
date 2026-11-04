@@ -156,6 +156,12 @@ test("a daemon advertises the notification scope and accepts a reader's choice",
             ?.notificationScope
         : undefined,
     ).toBe(true);
+    const features =
+      info?.type === "session" && info.message.type === "status"
+        ? (info.message.payload as { features?: Record<string, unknown> }).features
+        : undefined;
+    expect(features?.notificationFollows).toBe(true);
+    expect(features?.notificationNeedsScope).toBe(true);
 
     socket.send(
       JSON.stringify({
