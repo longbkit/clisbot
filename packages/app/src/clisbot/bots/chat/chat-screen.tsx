@@ -2,6 +2,7 @@ import type { MessagePayload } from "@/composer/types";
 import { profileNativeRegion } from "@/utils/render-profiler";
 import { ToolCallSheetProvider } from "@/components/tool-call-sheet";
 import { ComposerDock } from "@/composer/dock";
+import { FileDropZone } from "@/components/file-drop/file-drop-zone";
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
@@ -73,36 +74,40 @@ export function ChatScreen({
   return (
     <View style={styles.container} testID={`chat-screen-${chatId}`}>
       {!hideHeader ? <MenuHeader title={title} rightContent={headerRight} /> : null}
-      <ComposerDock>
-        <ToolCallSheetProvider>
-          {profileNativeRegion(
-            "BotChatHistory",
-            <ChatList
-              scrollKey={`${serverId}:${chatId}`}
-              rows={model.rows}
-              serverId={serverId}
-              bots={botsById}
-              members={members}
-              onReachTop={onReachTop}
-              toolDisplay={toolDisplay}
-            />,
-          )}
-        </ToolCallSheetProvider>
-        <ChatComposer
-          serverId={serverId}
-          chatId={chatId}
-          placeholder={placeholder}
-          disabled={!canSend}
-          busy={discussionActive || [...liveHeads.values()].some((head) => head.turnActive)}
-          hasPermission={[...liveHeads.values()].some((head) => head.permissions.length > 0)}
-          onSubmitMessage={onSubmitMessage}
-          mentionMembers={group ? members : undefined}
-        />
-      </ComposerDock>
+      {/* The composer's file drop sink needs this zone; without it a dropped file was ignored. */}
+      <FileDropZone style={styles.dropZone} disabled={!canSend}>
+        <ComposerDock>
+          <ToolCallSheetProvider>
+            {profileNativeRegion(
+              "BotChatHistory",
+              <ChatList
+                scrollKey={`${serverId}:${chatId}`}
+                rows={model.rows}
+                serverId={serverId}
+                bots={botsById}
+                members={members}
+                onReachTop={onReachTop}
+                toolDisplay={toolDisplay}
+              />,
+            )}
+          </ToolCallSheetProvider>
+          <ChatComposer
+            serverId={serverId}
+            chatId={chatId}
+            placeholder={placeholder}
+            disabled={!canSend}
+            busy={discussionActive || [...liveHeads.values()].some((head) => head.turnActive)}
+            hasPermission={[...liveHeads.values()].some((head) => head.permissions.length > 0)}
+            onSubmitMessage={onSubmitMessage}
+            mentionMembers={group ? members : undefined}
+          />
+        </ComposerDock>
+      </FileDropZone>
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.surface0 },
+  dropZone: { flex: 1 },
 }));

@@ -82,6 +82,9 @@ vi.mock("react-native", () => ({
     </ol>
   ),
 }));
+vi.mock("@/components/file-drop/file-drop-zone", () => ({
+  FileDropZone: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
 vi.mock("@/components/headers/menu-header", () => ({
   MenuHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
 }));
