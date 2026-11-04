@@ -41,9 +41,13 @@ The daemon judges every reader separately, for both pushes and in-app notificati
   that connection may read; the app subscribes only on a Host that advertises follows. A
   channel sender matches only through its linked Member. A session that names no verified person,
   such as a subagent, is its nearest parent's.
-- Work nobody can attribute notifies For me only for the Host owner and daemon-wide readers. The
-  session list still shows it under For me; a Project Member is not paged for it. A request or
-  failure from it, which can quote tool input, reaches only the Host owner or an All reader.
+- Work nobody can attribute (no verified creator, owner or sender: legacy, CLI, or started from
+  the Host owner's own device) notifies For me only for the Host owner and daemon-wide readers,
+  and is never Others, as in the session list. Known difference: the list shows it under For me
+  for every reader, but a Project Member is notified about it only with All, because it is often
+  the Host owner's own work and paging every Member for it is the noise this rule removes. A
+  request or failure from it, which can quote tool input, reaches only the Host owner or an All
+  reader.
 - Presence is per reader. One person's open app takes their own notification instead of a push
   to their phone, and never suppresses or receives a teammate's.
 - The daemon cannot tell the Host owner's direct devices from the same person's Hub account, so

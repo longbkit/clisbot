@@ -116,8 +116,9 @@ export function notificationOwnership(
  * Whether a session with `ownership` may notify `reader`.
  *
  * The Host owner's own devices (no Hub identity) own everything on their Host.
- * Unknown ownership notifies For me only for a reader with daemon-wide access, and a request
- * or failure from it only the Host owner: nobody is paged with someone else's request.
+ * Unknown ownership is never Others, as in the session list. It notifies For me only for a
+ * reader with daemon-wide access, and a request or failure from it only the Host owner: nobody
+ * is paged with someone else's request. Below that, only All hears about it.
  */
 export function notificationAllowed(
   reader: NotificationReader,
@@ -126,13 +127,14 @@ export function notificationAllowed(
 ): boolean {
   if (reader.scope === "off") return false;
   if (reader.scope === "all") return true;
-  // Unattributed work is provisionally a daemon-wide reader's, as in the session list, but a
-  // request or failure from it, which can quote tool input, goes only to the Host owner, or to
-  // a reader who asked for All; never to For me, Needs me or Others.
-  if (kind === "needs" && ownership === "unknown" && reader.actor !== null) return false;
-  const unknownIsMine = reader.daemonWide;
-  const mine =
-    reader.actor === null || ownership === "mine" || (ownership === "unknown" && unknownIsMine);
+  if (ownership === "unknown" && reader.actor !== null) {
+    // Unattributed work is never someone else's, as in the session list: no Others. It is
+    // provisionally a daemon-wide reader's For me, but a request or failure from it, which can
+    // quote tool input, goes only to the Host owner or to a reader who asked for All. A Project
+    // Member is not paged about it in For me either: it is often the Host owner's own work.
+    return reader.daemonWide && reader.scope === "mine" && kind === "update";
+  }
+  const mine = reader.actor === null || ownership === "mine";
   if (reader.scope === "needs") return mine && kind === "needs";
   return reader.scope === "mine" ? mine : !mine;
 }

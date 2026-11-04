@@ -1077,10 +1077,13 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
     expect(delivered.flatMap((entry) => entry.tokens)).toEqual(["bob-phone-needs"]);
   });
 
-  it("a request from a session nobody can attribute reaches only the Host owner", async () => {
+  it("a session nobody can attribute: never Others, For me only daemon-wide, requests only the owner or All", async () => {
     const { server, delivered, registerMember, push } = setup({});
     registerMember("admin-daemon-wide", BOB, { projectIds: null });
     registerMember("admin-needs", member("admin2"), { projectIds: null, scope: "needs" });
+    registerMember("admin-others", member("admin3"), { projectIds: null, scope: "others" });
+    registerMember("member-mine", member("m2"));
+    registerMember("member-needs", member("m5"), { scope: "needs" });
     registerMember("member-others", member("m3"), { scope: "others" });
     registerMember("member-all", member("m4"), { scope: "all" });
     push.renew("owner-phone");
@@ -1091,12 +1094,8 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
       return delivered.flatMap((entry) => entry.tokens).sort();
     };
 
-    expect(await tokensFor("finished")).toEqual([
-      "admin-daemon-wide",
-      "member-all",
-      "member-others",
-      "owner-phone",
-    ]);
+    // Unattributed work is never Others, as in the session list: only For me for daemon-wide.
+    expect(await tokensFor("finished")).toEqual(["admin-daemon-wide", "member-all", "owner-phone"]);
     // Others is not a way around it; only a reader who asked for All gets every request.
     expect(await tokensFor("permission")).toEqual(["member-all", "owner-phone"]);
   });
