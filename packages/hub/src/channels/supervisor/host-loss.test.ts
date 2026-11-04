@@ -34,7 +34,11 @@ function fakeTimers() {
 
 function notifier(timers: ReturnType<typeof fakeTimers>) {
   const notices: number[] = [];
+  const recoveries: number[] = [];
   const subject = new HostLossNotifier({
+    recovered: () => {
+      recoveries.push(recoveries.length + 1);
+    },
     graceMs: 5_000,
     setTimer: timers.setTimer,
     clearTimer: timers.clearTimer,
@@ -42,10 +46,24 @@ function notifier(timers: ReturnType<typeof fakeTimers>) {
       notices.push(notices.length + 1);
     },
   });
-  return { subject, notices };
+  return { subject, notices, recoveries };
 }
 
 describe("host-loss notifier", () => {
+  it("reports a return inside the grace, and only that", () => {
+    const timers = fakeTimers();
+    const { subject, notices, recoveries } = notifier(timers);
+    subject.connected(); // the first connect is no return
+    subject.disconnected();
+    subject.connected();
+    assert.deepEqual(recoveries, [1]);
+    subject.disconnected();
+    timers.elapse(); // told the machine went away instead
+    subject.connected();
+    assert.deepEqual(recoveries, [1]);
+    assert.deepEqual(notices, [1]);
+  });
+
   it("says nothing when the socket comes back inside the grace", () => {
     const timers = fakeTimers();
     const { subject, notices } = notifier(timers);

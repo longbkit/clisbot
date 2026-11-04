@@ -538,6 +538,9 @@ export interface ChannelPlaneDeps {
    * stream event before the Hub releases its surface; default
    * `PROCESSING_TTL_MS`. The provider's own expiry is the vertical's. */
   processingTtlMs?: number | undefined;
+  /** How often turns the plane still counts as running are checked against
+   * the Host; default `TURN_RECONCILE_MS` (`bindings/conversation-flow.ts`). */
+  turnReconcileMs?: number | undefined;
 }
 
 /** The Slack native thread-id shape (`epoch.seconds` `ts`): the only strings
