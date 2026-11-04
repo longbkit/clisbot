@@ -548,15 +548,24 @@ export async function readSlackMessages(
       ...exactBounds,
       oldest,
     });
-    const messages = ((result.messages ?? []) as SlackMessageSummary[])
+    const fetched = (result.messages ?? []) as SlackMessageSummary[];
+    const messages = fetched
       .filter((message) => {
         if (exactMessageId) {
           return message.ts === exactMessageId;
         }
-        // conversations.replies includes the parent message; drop it for replies-only reads.
+        // conversations.replies includes the parent message; it is re-added below, outside the limit.
         return message.ts !== opts.threadId;
       })
       .map(renderSlackReadMessageText);
+    // Fusion (D-046): the Hub has no inbound thread-starter context, so a read whose window
+    // reaches the thread start leads with the parent. Later pages (`after` past the parent) omit it.
+    if (!exactMessageId && readWindowIncludes(opts.threadId, exactBounds)) {
+      const parent =
+        fetched.find((message) => message.ts === opts.threadId) ??
+        (await readSlackThreadParent(client, channelId, opts.threadId));
+      if (parent) messages.unshift(renderSlackReadMessageText(parent));
+    }
     return {
       messages,
       hasMore: exactMessageId ? false : Boolean(result.has_more),
@@ -575,6 +584,29 @@ export async function readSlackMessages(
     messages,
     hasMore: exactMessageId ? false : Boolean(result.has_more),
   };
+}
+
+function readWindowIncludes(ts: string, bounds: { latest?: string; oldest?: string }): boolean {
+  if (bounds.oldest !== undefined && Number(bounds.oldest) >= Number(ts)) return false;
+  return bounds.latest === undefined || Number(bounds.latest) > Number(ts);
+}
+
+async function readSlackThreadParent(
+  client: WebClient,
+  channelId: string,
+  threadTs: string,
+): Promise<SlackMessageSummary | undefined> {
+  const result = await client.conversations.replies({
+    channel: channelId,
+    ts: threadTs,
+    inclusive: true,
+    latest: threadTs,
+    oldest: threadTs,
+    limit: 1,
+  });
+  return ((result.messages ?? []) as SlackMessageSummary[]).find(
+    (message) => message.ts === threadTs,
+  );
 }
 
 export async function getSlackMemberInfo(userId: string, opts: SlackActionClientOpts = {}) {

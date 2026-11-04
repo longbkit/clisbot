@@ -61,7 +61,7 @@
       "local": "src/actions.ts",
       "upstream": "extensions/slack/src/actions.ts",
       "status": "adapted",
-      "deviation": ["D-034"]
+      "deviation": ["D-034", "D-046"]
     },
     {
       "local": "src/agent-context.ts",
@@ -874,6 +874,12 @@
       "file": "src/markdown-tables.ts",
       "reason": "Fusion Text forward and channel_reply.message carry raw Markdown without a presentation. The Slack drive adapter parses table source ranges with markdown-core and compiles ordered prose/table blocks through the existing presentation sender, rendering the document together to preserve reference links and container context. Slack defaults to block only for capable renderers; markdown.tables code/bullets/off remain opt-outs, with account overrides taking precedence. The same compiler serves edit-based drafts, letting the edit owner derive fallback text once. Fenced examples are ignored; quoted/list, empty-cell and oversized tables retain a code fallback. The Hub and Clisbot wire contracts are unchanged.",
       "tests": ["src/markdown-tables.test.ts", "src/outbound.test.ts", "src/send.blocks.test.ts"]
+    },
+    {
+      "id": "D-046",
+      "file": "src/actions.ts",
+      "reason": "Thread reads lead with the thread parent. Upstream's `readSlackMessages` drops the parent because its inbound pipeline hands the agent a ThreadStarterBody; Fusion's Hub stops the vertical at the inbound event (`monitor/message-handler` is omitted), so the parent (often an app or webhook post whose content is only in `attachments`) was reachable only with `messageId` = the thread ts. A read whose window reaches the thread start now returns the parent first (from the page Slack returned, else one exact `conversations.replies` lookup), outside `limit`; a continuation page (`after` at or past the parent) and a `messageId` read are unchanged. The Hub still binds `threadId` to the conversation, so this widens nothing beyond the current thread.",
+      "tests": ["src/actions.read.test.ts", "src/actions.read-thread-root.test.ts"]
     }
   ]
 }
