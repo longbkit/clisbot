@@ -990,6 +990,37 @@ describe("a Host that goes away mid-turn", () => {
     await flow.plane.stop();
   });
 
+  it("keeps a turn when the app or another account starts one while the idle answer is on its way", async () => {
+    // The new turn never passes through this plane's sends: only its stream says so.
+    const say = conversation();
+    const daemon = makeDaemon();
+    const host = readsOf(daemon.daemon);
+    const flow = makePlane(makeRoute({}), daemon, { turnReconcileMs: 10 });
+    await flow.plane.start(daemon.daemon, store);
+    host.answer = async () => [runningSnapshot("agent-0")];
+    await flow.send(say("first"));
+
+    let release!: (agents: AgentSnapshot[]) => void;
+    const stale = new Promise<AgentSnapshot[]>((resolve) => {
+      release = resolve;
+    });
+    host.answer = () => stale;
+    const asked = host.reads;
+    await waitFor(() => host.reads > asked);
+    await flow.plane.onStreamEvent("agent-0", {
+      type: "turn_started",
+      provider: "codex",
+      turnId: "started-from-the-app",
+    });
+    host.answer = async () => [runningSnapshot("agent-0")];
+    release([]);
+    await pause(60);
+
+    await flow.plane.onHostLost();
+    assert.deepEqual(flow.posted, [HOST_LOST_NOTICE], "the idle answer predates the app's turn");
+    await flow.plane.stop();
+  });
+
   it("keeps a turn while a send is still on its way to the Host", async () => {
     const say = conversation();
     let release!: () => void;

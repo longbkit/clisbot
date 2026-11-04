@@ -134,6 +134,9 @@ export class ConversationFlow {
   private readonly sendReturnedAt = new Map<string, number>();
   /** The sequence at which the latest send that named no agent returned. */
   private unnamedSendReturnedAt = 0;
+  /** Per agent, the sequence of its latest stream event, from any source: a
+   * turn the app or another account started never passes through `deliver`. */
+  private readonly streamSeenAt = new Map<string, number>();
   private reconciling = false;
   private readonly reconcileTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -204,12 +207,14 @@ export class ConversationFlow {
    * that the machine went away mid-turn. One status read per interval, and
    * only while a turn is counted.
    *
-   * The read can be older than a send that started a new turn on the same
-   * agent, so a turn is ended only when nothing could have started one since
-   * the read began: no send in flight, none returned for that agent (or for
-   * an unknown agent) after it, and the recorded turn itself is older. The
-   * checks and the end run with no await between them. A read that failed
-   * proves nothing and ends nothing.
+   * The read can be older than a new turn on the same agent, so a turn is
+   * ended only when nothing could have started one since the read began: no
+   * send in flight, none returned for that agent (or for an unknown agent)
+   * after it, no stream event for that agent after it (a turn started from the
+   * app or another account), and the recorded turn itself is older. Anything
+   * else waits for the next read, or for the terminal event. The checks and
+   * the end run with no await between them. A read that failed proves nothing
+   * and ends nothing.
    */
   async reconcileTurns(): Promise<void> {
     const read = this.deps.readRunningAgentIds;
@@ -232,19 +237,31 @@ export class ConversationFlow {
           at.sentAt <= readFrom &&
           this.sendsInFlight === 0 &&
           this.unnamedSendReturnedAt <= readFrom &&
-          (this.sendReturnedAt.get(agentId) ?? 0) <= readFrom;
+          (this.sendReturnedAt.get(agentId) ?? 0) <= readFrom &&
+          (this.streamSeenAt.get(agentId) ?? 0) <= readFrom;
         if (!quiet) continue;
         this.deps.logger.warn("channel turn ended without its terminal event", { agentId });
         await this.turnEnded(agentId);
       }
-      for (const [agentId, returnedAt] of this.sendReturnedAt) {
-        if (returnedAt <= readFrom && !this.runningTurns.has(agentId)) {
-          this.sendReturnedAt.delete(agentId);
+      for (const marks of [this.sendReturnedAt, this.streamSeenAt]) {
+        for (const [agentId, at] of marks) {
+          if (at <= readFrom && !this.runningTurns.has(agentId)) marks.delete(agentId);
         }
       }
     } finally {
       this.reconciling = false;
     }
+  }
+
+  /**
+   * A stream event arrived for this agent. Called synchronously on receipt:
+   * the Host writes stream frames and the status answer on one ordered
+   * socket, so an event noted after a read began may belong to a turn that
+   * answer does not know about.
+   */
+  noteStream(agentId: string): void {
+    this.sequence += 1;
+    this.streamSeenAt.set(agentId, this.sequence);
   }
 
   /** The turn ended (or its agent was let go): release what waited on it. */
@@ -389,6 +406,7 @@ export class ConversationFlow {
     this.runningTurns.clear();
     this.turnEndedAt.clear();
     this.sendReturnedAt.clear();
+    this.streamSeenAt.clear();
   }
 
   /**

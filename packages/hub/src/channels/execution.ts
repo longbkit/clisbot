@@ -486,6 +486,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       // The follow-up window counts from the agent's latest activity, so a
       // long turn keeps it open and it closes `ttlMinutes` after the turn ends.
       bindings?.markActive(agentId);
+      // Before any await: ordered against the Host's status answers.
+      conversationFlow?.noteStream(agentId);
       await agentEventOrder.run(agentId, async () => {
         await consumeAgentStream(agentId, event);
         await lifecycleCommands?.onStream(agentId, event);
