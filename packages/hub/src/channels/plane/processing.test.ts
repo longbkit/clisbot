@@ -310,3 +310,57 @@ it("does not resurrect a terminal lease when its pending daemon query resolves",
   await settle();
   expect(h.calls.map((call) => call.action)).toEqual(["start", "stop"]);
 });
+
+describe("a turn whose end the plane never heard", () => {
+  function expire(h: Harness): Promise<void> {
+    h.now.value += 1001;
+    h.ticks[0]!();
+    return settle();
+  }
+
+  it("is reported gone when the Host says its Agent is not running", async () => {
+    const gone: string[] = [];
+    const h = harness({
+      ttlMs: 1000,
+      readRunningAgentIds: async () => new Set(),
+      onTurnGone: (agentId) => gone.push(agentId),
+    });
+    h.controller.open("lease", SURFACE);
+    h.controller.bind("lease", "agent");
+    await expire(h);
+    expect(gone).toEqual(["agent"]);
+  });
+
+  it("is not reported when the Host's status could not be read", async () => {
+    const gone: string[] = [];
+    const h = harness({
+      ttlMs: 1000,
+      readRunningAgentIds: async () => {
+        throw new Error("disconnected");
+      },
+      onTurnGone: (agentId) => gone.push(agentId),
+    });
+    h.controller.open("lease", SURFACE);
+    h.controller.bind("lease", "agent");
+    await expire(h);
+    expect(gone).toEqual([]);
+  });
+
+  it("is not reported while another accepted message waits on the same Agent", async () => {
+    const gone: string[] = [];
+    const h = harness({
+      ttlMs: 1000,
+      readRunningAgentIds: async () => new Set(),
+      onTurnGone: (agentId) => gone.push(agentId),
+    });
+    h.controller.open("old", SURFACE);
+    h.controller.bind("old", "agent");
+    h.now.value += 600;
+    h.controller.open("new", { ...SURFACE, to: "C2" });
+    h.controller.bind("new", "agent");
+    h.now.value += 401;
+    h.ticks[0]!();
+    await settle();
+    expect(gone).toEqual([]);
+  });
+});

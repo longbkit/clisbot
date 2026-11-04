@@ -42,6 +42,7 @@ import {
   type DaemonConnection,
 } from "../daemon/client.js";
 import type { DaemonSessionAccess } from "../../daemons/protocol.js";
+import { HostTimelineSubscription } from "../daemon/host-timeline-subscription.js";
 import { hostSocketOperationTarget } from "../daemon/session-operation.js";
 import { createChannelPlane, type ChannelPlane } from "../execution.js";
 import { awaitMonitorExit, MONITOR_STOP_GRACE_MS } from "./monitor-stop.js";
@@ -692,6 +693,12 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   private readonly store: ChannelStore;
   private readonly pinsPath: string;
   private readonly handles = new Map<string, AccountHandle>();
+  /** Per Host id: the one timeline set its socket carries for every account
+   * riding it (`host-timeline-subscription.ts`). */
+  private readonly hostTimelines = new Map<string, HostTimelineSubscription>();
+  /** Names each connection in its Host's set: an account's restart can start
+   * the new connection before the old one has cleared its agents. */
+  private timelineConnectionSeq = 0;
   /** Restarts an account whose transport died on its own (`account-restart.ts`). */
   private readonly restarts = new AccountRestartScheduler({
     // A start that was deferred (account disabled or removed) was decided, not
@@ -1754,10 +1761,19 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         // one at a time; saying it once here is the operator's lead.
         permissions: host.sessions.channel(host.id)?.permissions ?? [],
       });
+      let timeline = this.hostTimelines.get(host.id);
+      if (timeline === undefined) {
+        timeline = new HostTimelineSubscription();
+        this.hostTimelines.set(host.id, timeline);
+      }
       return connectEnrolledChannelDaemon({
         steerTargets,
         hostLabel: host.label,
         hostId: host.id,
+        timeline: {
+          shared: timeline,
+          clientKey: `${handleKey(handle.channel, handle.accountId)}#${++this.timelineConnectionSeq}`,
+        },
         resolveChannel: () => host.sessions.channel(host.id),
         subscribe: (handler) => host.sessions.subscribe(host.id, handler),
         onHostConnected: (handler) => host.sessions.onConnected(forHost(host.id, handler)),

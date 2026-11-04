@@ -200,8 +200,9 @@ function conversation() {
 function makePlane(
   route: CompiledRoute | CompiledRoute[],
   daemon: ReturnType<typeof makeDaemon>,
-  options: { envFlag?: boolean } = {},
+  options: { envFlag?: boolean; processingTtlMs?: number } = {},
 ) {
+  const clock = new ManualClock(1_000);
   const flushes: { admission: HeldFlushAdmission; id: string }[] = [];
   const posted: string[] = [];
   const postedThreads: (string | undefined)[] = [];
@@ -237,7 +238,8 @@ function makePlane(
       failAgentExecutionOutput: async () => false,
       findLatestChannelWorkflowExecution: async () => undefined,
     },
-    clock: new ManualClock(1_000),
+    clock,
+    ...(options.processingTtlMs === undefined ? {} : { processingTtlMs: options.processingTtlMs }),
     logger: SILENT,
     post: async (post) => {
       posted.push(post.text);
@@ -270,7 +272,7 @@ function makePlane(
     assert.ok(newest !== undefined, "a flush row was admitted");
     return plane.deliverHeld(newest.admission.payload, newest.id);
   };
-  return { plane, send, flush, flushes, posted, postedThreads, sends: daemon.sends };
+  return { plane, send, flush, flushes, posted, postedThreads, sends: daemon.sends, clock };
 }
 
 const lines = (...rows: string[]) => rows.join("\n");
@@ -929,6 +931,30 @@ describe("a Host that goes away mid-turn", () => {
     // The message was delivered: its row stays completed, never retried.
     assert.equal((await rowOf(running.record.id)).inboxState, "delivered");
     assert.equal(daemon.sends.length, 3);
+    await flow.plane.stop();
+  });
+
+  it("says nothing for a turn the Host already finished though its end never reached the plane", async () => {
+    // 2026-11-03: the turn's stream was cut, so its terminal event never came.
+    // The Host said the agent was idle a minute later; a day after, a Host
+    // restart told the thread the machine went away while it was working.
+    const say = conversation();
+    const daemon = makeDaemon();
+    // The production floor: the typing indicator is on, so the turn holds a lease.
+    const sync = {
+      ...DEFAULTS.sync,
+      progress: { ...DEFAULTS.sync.progress, typingIndicator: true },
+    };
+    const flow = makePlane(makeRoute({ sync }), daemon, { processingTtlMs: 1_000 });
+    await flow.plane.start(daemon.daemon, store);
+    await flow.send(say("check the refresh logic"));
+
+    // `listAgents` reports no running agent; the sweep runs every second.
+    flow.clock.advance(1_001);
+    await new Promise((resolve) => setTimeout(resolve, 1_200));
+
+    await flow.plane.onHostLost();
+    assert.deepEqual(flow.posted, []);
     await flow.plane.stop();
   });
 

@@ -50,6 +50,12 @@ export interface ProcessingControllerDeps {
   ttlMs?: number | undefined;
   /** Fresh authoritative daemon status for quiet tools; failure still expires the lease. */
   readRunningAgentIds?: (() => Promise<ReadonlySet<string>>) | undefined;
+  /**
+   * The Host said this agent is not running and no other lease waits on it:
+   * its turn ended without a terminal event reaching the plane. Not called
+   * when the status read failed, since that proves nothing about the turn.
+   */
+  onTurnGone?: ((agentId: string) => void) | undefined;
 }
 
 export interface ProcessingController {
@@ -225,7 +231,7 @@ export function createProcessingController(deps: ProcessingControllerDeps): Proc
     const expired = [...leases.values()].filter((lease) => deps.now() >= lease.deadline);
     if (expired.length === 0) return;
     const deadlines = new Map(expired.map((lease) => [lease.id, lease.deadline]));
-    const finish = (running: ReadonlySet<string>): void => {
+    const finish = (running: ReadonlySet<string>, confirmed: boolean): void => {
       for (const lease of expired) {
         // A terminal event, a new lease or fresh stream activity wins over a late RPC result.
         if (leases.get(lease.id) !== lease || lease.deadline !== deadlines.get(lease.id)) continue;
@@ -241,19 +247,25 @@ export function createProcessingController(deps: ProcessingControllerDeps): Proc
           agentId: lease.agentId ?? null,
         });
         release(lease.id);
+        if (confirmed && lease.agentId !== undefined && !byAgent.has(lease.agentId)) {
+          deps.onTurnGone?.(lease.agentId);
+        }
       }
     };
     if (
       deps.readRunningAgentIds === undefined ||
       expired.every((lease) => lease.agentId === undefined)
     ) {
-      finish(new Set());
+      finish(new Set(), false);
       return;
     }
     checking = true;
     void deps
       .readRunningAgentIds()
-      .then(finish, () => finish(new Set()))
+      .then(
+        (running) => finish(running, true),
+        () => finish(new Set(), false),
+      )
       .finally(() => {
         checking = false;
       });
