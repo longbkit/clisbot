@@ -25,6 +25,7 @@ import { recoverSessionSummary, type DurableSessionSummary } from "./session-sum
 import {
   SESSION_STORAGE_LIMITS,
   PagedJournal,
+  SessionPageBudgetError,
   type JournalEntry,
   type JournalOperation,
 } from "./paged-journal.js";
@@ -62,6 +63,28 @@ function selectRowRange(
     start = Math.max(start, end - limit + 1);
   }
   return { start, end };
+}
+
+/** Reads `start..end` in as many slices as the storage read budget needs, so a long session never fails a full read. */
+async function readRowsInSlices(
+  timeline: TimelineStream,
+  start: number,
+  end: number,
+): Promise<AgentTimelineRow[]> {
+  const rows: AgentTimelineRow[] = [];
+  let span = end - start + 1;
+  let seq = start;
+  while (seq <= end) {
+    const sliceEnd = Math.min(end, seq + span - 1);
+    try {
+      for (const entry of await timeline.read(seq, sliceEnd)) rows.push(entry.value);
+      seq = sliceEnd + 1;
+    } catch (error) {
+      if (sliceEnd === seq || !(error instanceof SessionPageBudgetError)) throw error;
+      span = Math.ceil(span / 2);
+    }
+  }
+  return rows;
 }
 
 /**
@@ -302,9 +325,7 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
     const reset = staleCursor || gap;
     const { start, end } = selectRowRange(state, direction, reset, options);
     const rows =
-      state.maxSeq === 0 || end < start
-        ? []
-        : (await timeline.read(start, end)).map((entry) => entry.value);
+      state.maxSeq === 0 || end < start ? [] : await readRowsInSlices(timeline, start, end);
     return {
       epoch: state.epoch,
       direction,
@@ -361,8 +382,7 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
       async () => {
         const timeline = await this.timeline(agentId);
         const state = await timeline.state();
-        // Legacy full-history API has a byte ceiling; paged consumers must use fetchCommitted.
-        return (await timeline.read(state.minSeq, state.maxSeq)).map((entry) => entry.value);
+        return state.maxSeq === 0 ? [] : readRowsInSlices(timeline, state.minSeq, state.maxSeq);
       },
       "read",
     );

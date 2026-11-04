@@ -4,6 +4,7 @@ import path from "node:path";
 import { createDurableDirectory, writeDurableFile, syncDirectory } from "./durable-file.js";
 import {
   SESSION_STORAGE_LIMITS,
+  SessionPageBudgetError,
   type JournalEntry,
   type JournalOperation,
 } from "./paged-journal.js";
@@ -392,8 +393,7 @@ export class SessionEventLog {
     }
     if (!wanted.length) return [];
     const bytes = wanted.reduce((total, item) => total + item.pointer.length, 0);
-    if (bytes > SESSION_STORAGE_LIMITS.readPageBytes)
-      throw new Error("Session page exceeds byte budget; request a smaller page");
+    if (bytes > SESSION_STORAGE_LIMITS.readPageBytes) throw new SessionPageBudgetError();
     const handle = await fs.open(this.eventPath, "r").catch((error: unknown) => {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw error;
