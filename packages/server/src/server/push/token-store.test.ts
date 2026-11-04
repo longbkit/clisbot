@@ -149,6 +149,24 @@ describe("PushTokenStore readers", () => {
     });
   });
 
+  test("access revoked while the device is offline is bounded by the lease the token was renewed with", () => {
+    withHome((tokenPath) => {
+      let now = NOW;
+      const store = new PushTokenStore(createLogger(), tokenPath, () => now, 48 * 60 * 60 * 1000);
+      // The Hub revokes the Member after this renewal; an offline device never reconnects, so
+      // the daemon learns nothing until the lease it last saw runs out.
+      store.renewToken("offline-phone", LEASE, { actor: ALICE, scope: "all" });
+
+      now = LEASE.leaseExpiresAt - 1;
+      expect(store.getActiveTokens({ projectId: "p", recipients: () => true })).toEqual([
+        "offline-phone",
+      ]);
+      now = LEASE.leaseExpiresAt;
+      expect(store.getActiveTokens({ projectId: "p", recipients: () => true })).toEqual([]);
+      expect(store.getActiveTokens({ projectId: "other", recipients: () => true })).toEqual([]);
+    });
+  });
+
   test("a lease token saved before readers were recorded is silent until its device renews it", () => {
     withHome((tokenPath) => {
       writeFileSync(
