@@ -17,7 +17,8 @@ import type {
 import type { PersistedWorkspaceRecord, WorkspaceRegistry } from "./workspace-registry.js";
 import { asInternals, createStub } from "./test-utils/class-mocks.js";
 import { createProviderSnapshotManagerStub } from "./test-utils/session-stubs.js";
-import type { PushNotificationSender, PushPayload } from "./push/index.js";
+import type { PushNotificationSender, PushNotificationTarget, PushPayload } from "./push/index.js";
+import type { NotificationReader } from "@clisbot/protocol/notification-audience";
 import type { WorkspaceAutoName } from "./workspace-auto-name.js";
 
 const wsModuleMock = vi.hoisted(() => {
@@ -53,10 +54,15 @@ vi.mock("./session.js", () => ({
 
 import { VoiceAssistantWebSocketServer } from "./websocket-server.js";
 
+/** The Host owner's own paired phone: no Hub identity, every Project. */
+const HOST_OWNER_READER: NotificationReader = { actor: null, daemonWide: true, scope: "mine" };
+
+/** Records what reaches the Host owner's phone, the token these tests have always modelled. */
 class RecordingPushNotificationSender implements PushNotificationSender {
   readonly sent: PushPayload[] = [];
 
-  async send(payload: PushPayload): Promise<void> {
+  async send(payload: PushPayload, target?: PushNotificationTarget): Promise<void> {
+    if (target?.recipients && !target.recipients(HOST_OWNER_READER)) return;
     this.sent.push(payload);
   }
 }
@@ -210,6 +216,8 @@ function connectClient(server: VoiceAssistantWebSocketServer, subscribed = true)
     session: {
       delivery,
       wantsSourceNotification: () => true,
+      notificationReader: () => HOST_OWNER_READER,
+      allowsNotificationAbout: () => true,
       getClientActivity: vi.fn(() => null),
       subscribesToTerminalDirectory: vi.fn(async () => subscribed),
     },

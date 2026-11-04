@@ -1872,6 +1872,26 @@ describe("handleSlackAction", () => {
     });
   });
 
+  it("reports a thread root the read could not include", async () => {
+    readSlackMessages.mockResolvedValueOnce({
+      messages: [{ ts: "1712345678.200000", text: "reply" }],
+      hasMore: true,
+      threadRootUnavailable: "ratelimited",
+    });
+
+    const result = await handleSlackAction(
+      { action: "readMessages", channelId: "C1", threadId: "1712345678.100000" },
+      slackConfig(),
+    );
+
+    expectRecordFields(requireDetails(result), {
+      threadId: "1712345678.100000",
+      hasMore: true,
+      threadRootUnavailable: "ratelimited",
+    });
+    expect(requireArray(requireDetails(result).messages, "read messages")).toHaveLength(1);
+  });
+
   it("passes threadId through to readSlackMessages", async () => {
     readSlackMessages.mockResolvedValueOnce({ messages: [], hasMore: false });
 

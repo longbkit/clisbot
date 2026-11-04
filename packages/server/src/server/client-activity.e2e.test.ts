@@ -3,13 +3,16 @@ import { createTestClisbotDaemon, type TestClisbotDaemon } from "./test-utils/cl
 import { DaemonClient } from "./test-utils/daemon-client.js";
 import type { AgentStreamEventPayload } from "@clisbot/protocol/messages";
 import type { AgentSnapshotPayload } from "./messages.js";
-import type { PushNotificationSender, PushPayload } from "./push/index.js";
+import type { PushNotificationSender, PushNotificationTarget, PushPayload } from "./push/index.js";
 import { PRESENCE_THRESHOLD_MS } from "./agent-attention-policy.js";
 
+/** Records what reaches the Host owner's own phone, the reader these direct clients are. */
 class RecordingPushNotificationSender implements PushNotificationSender {
   readonly sent: PushPayload[] = [];
 
-  async send(payload: PushPayload): Promise<void> {
+  async send(payload: PushPayload, target?: PushNotificationTarget): Promise<void> {
+    if (target?.recipients && !target.recipients({ actor: null, daemonWide: true, scope: "mine" }))
+      return;
     this.sent.push(payload);
   }
 }

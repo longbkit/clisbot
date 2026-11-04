@@ -46,6 +46,13 @@ export type SlackActionClientOpts = {
   client?: WebClient;
 };
 
+export type SlackReadMessagesResult = {
+  messages: SlackMessageSummary[];
+  hasMore: boolean;
+  /** Set when a thread read's window holds the parent but it could not be read (D-046). */
+  threadRootUnavailable?: string;
+};
+
 export type SlackMessageSummary = {
   ts?: string;
   text?: string;
@@ -518,7 +525,7 @@ export async function readSlackMessages(
     threadId?: string;
     messageId?: string;
   } = {},
-): Promise<{ messages: SlackMessageSummary[]; hasMore: boolean }> {
+): Promise<SlackReadMessagesResult> {
   const exactMessageId = opts.messageId?.trim();
   const readLimit = exactMessageId ? 1 : opts.limit;
   const exactBounds = exactMessageId
@@ -548,19 +555,31 @@ export async function readSlackMessages(
       ...exactBounds,
       oldest,
     });
-    const messages = ((result.messages ?? []) as SlackMessageSummary[])
+    const fetched = (result.messages ?? []) as SlackMessageSummary[];
+    const messages = fetched
       .filter((message) => {
         if (exactMessageId) {
           return message.ts === exactMessageId;
         }
-        // conversations.replies includes the parent message; drop it for replies-only reads.
+        // conversations.replies includes the parent message; it is re-added below, outside the limit.
         return message.ts !== opts.threadId;
       })
       .map(renderSlackReadMessageText);
-    return {
-      messages,
-      hasMore: exactMessageId ? false : Boolean(result.has_more),
-    };
+    const hasMore = exactMessageId ? false : Boolean(result.has_more);
+    // Fusion (D-046): the Hub has no inbound thread-starter context, so a read whose window
+    // reaches the thread start leads with the parent. Later pages (`after` past the parent) omit it.
+    if (exactMessageId || !readWindowIncludes(opts.threadId, exactBounds)) {
+      return { messages, hasMore };
+    }
+    const parent = fetched.find((message) => message.ts === opts.threadId);
+    if (parent) {
+      return { messages: [renderSlackReadMessageText(parent), ...messages], hasMore };
+    }
+    const lookup = await readSlackThreadParent(client, channelId, opts.threadId);
+    if ("error" in lookup) {
+      return { messages, hasMore, threadRootUnavailable: lookup.error };
+    }
+    return { messages: [renderSlackReadMessageText(lookup.parent), ...messages], hasMore };
   }
 
   const result = await client.conversations.history({
@@ -575,6 +594,63 @@ export async function readSlackMessages(
     messages,
     hasMore: exactMessageId ? false : Boolean(result.has_more),
   };
+}
+
+/** Slack ts order without float rounding: whole seconds, then the zero-padded fraction. */
+function compareSlackTs(a: string, b: string): number {
+  const [aSec = "0", aFrac = ""] = a.split(".");
+  const [bSec = "0", bFrac = ""] = b.split(".");
+  const seconds = BigInt(aSec) - BigInt(bSec);
+  if (seconds !== 0n) return seconds < 0n ? -1 : 1;
+  const width = Math.max(aFrac.length, bFrac.length);
+  const fraction = BigInt(aFrac.padEnd(width, "0") || "0") - BigInt(bFrac.padEnd(width, "0") || "0");
+  return fraction === 0n ? 0 : fraction < 0n ? -1 : 1;
+}
+
+/** True when an exclusive `oldest`/`latest` read window contains `ts`. */
+function readWindowIncludes(ts: string, bounds: { latest?: string; oldest?: string }): boolean {
+  if (bounds.oldest !== undefined && compareSlackTs(bounds.oldest, ts) >= 0) return false;
+  return bounds.latest === undefined || compareSlackTs(bounds.latest, ts) > 0;
+}
+
+/**
+ * The thread parent by its exact ts. A failure (rate limit, missing scope, a
+ * deleted parent) is reported, never thrown: the replies already read stay
+ * valid, and the caller says the root is missing instead of hiding it.
+ */
+async function readSlackThreadParent(
+  client: WebClient,
+  channelId: string,
+  threadTs: string,
+): Promise<{ parent: SlackMessageSummary } | { error: string }> {
+  try {
+    const result = await client.conversations.replies({
+      channel: channelId,
+      ts: threadTs,
+      inclusive: true,
+      latest: threadTs,
+      oldest: threadTs,
+      limit: 1,
+    });
+    const parent = ((result.messages ?? []) as SlackMessageSummary[]).find(
+      (message) => message.ts === threadTs,
+    );
+    return parent ? { parent } : { error: "not_found" };
+  } catch (err) {
+    const error = readSlackErrorCode(err);
+    logVerbose(`slack thread parent read failed channel=${channelId} ts=${threadTs}: ${error}`);
+    return { error };
+  }
+}
+
+function readSlackErrorCode(err: unknown): string {
+  if (err && typeof err === "object") {
+    const data = (err as { data?: { error?: unknown } }).data;
+    if (typeof data?.error === "string" && data.error !== "") return data.error;
+    const code = (err as { code?: unknown }).code;
+    if (typeof code === "string" && code !== "") return code;
+  }
+  return "read_failed";
 }
 
 export async function getSlackMemberInfo(userId: string, opts: SlackActionClientOpts = {}) {

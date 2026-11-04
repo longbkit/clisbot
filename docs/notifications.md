@@ -15,6 +15,41 @@ See [agent targets and deferred opens](expo-router.md#agent-targets) for route
 ownership and workspace recovery. Notification generation, presence, and push
 eligibility remain daemon concerns.
 
+## Audience
+
+A session notifies the people it belongs to, by the same For me / Others rule as the session list
+([navigation-v2](features/navigation-v2/README.md)). Each reader picks a scope in Settings →
+Notifications: For me (default), Others, All or Off. The app sends it to every Host with
+`notifications.set_scope.request` (gated by `features.notificationScope`) and resends it on each
+connect; the daemon stores it with that device's push token.
+
+The daemon judges every reader separately, for both pushes and in-app notifications:
+
+- The reader is the connection's Hub account, with or without a managed lease. A lease without one
+  is not notified. A connection with neither is the Host owner's own device, which owns everything
+  on its Host.
+- A session is For me when its verified creator, its schedule's verified owner, or a verified
+  sender is the reader. A channel sender matches only through its linked Member. A session that
+  names no verified person, such as a subagent, is its nearest parent's.
+- Work nobody can attribute notifies For me only for the Host owner and daemon-wide readers. The
+  session list still shows it under For me; a Project Member is not paged for it.
+- Presence is per reader. One person's open app takes their own notification instead of a push
+  to their phone, and never suppresses or receives a teammate's.
+- The daemon cannot tell the Host owner's direct devices from the same person's Hub account, so
+  they are separate readers: the owner can be notified on both, never on neither.
+- A connection only learns about sessions and terminals it may read when the event is sent: the
+  same Project and Terminal rules as its other outbound messages, checked again in
+  `Session.publishToSource`, and nothing after its lease expires or its Project is revoked.
+- Opening a notification fetches the session over the reader's own connection, which the Host
+  authorizes again; the payload's ids grant nothing.
+
+Pushes are plain alerts with no Notification Service Extension, so iOS shows them before app code
+runs: filtering has to happen on the daemon. A Host without `features.notificationScope` keeps the
+old behaviour of notifying every token its Project lease allows. The Hub-owned feed and push in
+[ADR-001](decisions/ADR-001-hub-control-plane-activity-feed-push.md) remain proposed.
+Implementation: `packages/protocol/src/notification-audience.ts` (rule) and
+`packages/server/src/server/push/attention-audience.ts` (per-reader plan).
+
 ## Native delivery
 
 Keep the router instance at module scope. Android's `singleTask` Activity can

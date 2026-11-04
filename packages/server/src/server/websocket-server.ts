@@ -96,7 +96,14 @@ import type { WorkspaceScriptRuntimeStore } from "./workspace-script-runtime-sto
 import type { SpeechReadinessSnapshot, SpeechService } from "./speech/speech-runtime.js";
 import type { VoiceCallerContext, VoiceSpeakHandler } from "./voice-types.js";
 import {
-  computeNotificationPlan,
+  agentNotificationEvidence,
+  allowsAgentNotification,
+  allowsTerminalNotification,
+  planAttentionAudience,
+  type AttentionClient,
+} from "./push/attention-audience.js";
+import { terminalLaunchOf } from "./managed-access/terminal-launches.js";
+import {
   isPushEligibleAttentionReason,
   type ClientPresenceState,
 } from "./agent-attention-policy.js";
@@ -2561,6 +2568,8 @@ export class VoiceAssistantWebSocketServer {
         ...(this.advertiseRelayConfig ? { relayConfig: true } : {}),
         // COMPAT(pushTokenRevocation): added in v0.3.2, remove gate after 2027-02-10.
         pushTokenRevocation: true,
+        // COMPAT(notificationScope): added after v2.2.2, remove gate after 2027-05-03.
+        notificationScope: true,
         // COMPAT(plugins): added in v0.3.0, remove gate after 2027-08-07.
         plugins: true,
         pluginManagement: true,
@@ -3596,28 +3605,26 @@ export class VoiceAssistantWebSocketServer {
     if (!agent?.workspaceId) {
       return;
     }
-    const clientEntries: Array<{
-      ws: WebSocketLike;
-      state: ClientPresenceState;
-    }> = [];
+    const clientEntries: AttentionClient<WebSocketLike>[] = [];
 
     for (const [ws, connection] of this.sessions) {
       if (
-        connection.session.delivery.isModern(ws)
+        !connection.session.allowsNotificationAbout({ agentId: params.agentId }) ||
+        (connection.session.delivery.isModern(ws)
           ? !connection.session.wantsSourceEvent(ws, "agent_attention_required")
-          : !(await connection.session.subscribesToAgent(agent, ws))
+          : !(await connection.session.subscribesToAgent(agent, ws)))
       )
         continue;
       clientEntries.push({
-        ws,
+        client: ws,
+        reader: connection.session.notificationReader(),
         state: this.getClientActivityState(connection.session, ws),
       });
     }
 
-    const notificationEntries = clientEntries.filter(({ ws }) =>
+    const notificationEntries = clientEntries.filter(({ client: ws }) =>
       this.sessions.get(ws)?.session.wantsSourceNotification(ws, "agent_attention_required"),
     );
-    const allStates = notificationEntries.map((e) => e.state);
     const nowMs = Date.now();
     const assistantMessage = await this.agentManager.getLastAssistantMessage(params.agentId);
     const notification = buildAgentAttentionNotificationPayload({
@@ -3629,26 +3636,32 @@ export class VoiceAssistantWebSocketServer {
       permissionRequest: findLatestPermissionRequest(agent.pendingPermissions),
     });
 
-    const plan = computeNotificationPlan({
-      allStates,
+    const evidence = await agentNotificationEvidence(agent, async (agentId) => {
+      return this.agentManager.getAgent(agentId) ?? (await this.agentStorage.get(agentId));
+    });
+    const pushEligible = isPushEligibleAttentionReason(params.reason);
+    const plan = planAttentionAudience({
+      clients: notificationEntries,
+      allows: allowsAgentNotification(evidence),
       focusTarget: { kind: "agent", id: params.agentId },
-      pushEligible: isPushEligibleAttentionReason(params.reason),
+      pushEligible,
       nowMs,
     });
 
-    if (plan.shouldPush) {
+    if (pushEligible) {
       const projectId = await this.projectIdForWorkspace(agent.workspaceId);
       void this.pushNotificationSender
-        .send(notification, projectId === null ? {} : { projectId })
+        .send(notification, {
+          ...(projectId === null ? {} : { projectId }),
+          recipients: plan.pushRecipients,
+        })
         .catch((err) => {
           this.logger.warn({ err, agentId: params.agentId }, "Failed to send push notification");
         });
     }
 
-    for (const { ws } of clientEntries) {
-      const shouldNotify =
-        plan.inAppRecipientIndex !== null &&
-        notificationEntries[plan.inAppRecipientIndex]?.ws === ws;
+    for (const { client: ws } of clientEntries) {
+      const shouldNotify = plan.inAppRecipients.has(ws);
       const timestamp = new Date().toISOString();
       const connection = this.sessions.get(ws);
       const attentionPayload = {
@@ -3695,14 +3708,12 @@ export class VoiceAssistantWebSocketServer {
     terminalName: string;
     reason: TerminalAttentionReason;
   }): Promise<void> {
-    const clientEntries: Array<{
-      ws: WebSocketLike;
-      state: ClientPresenceState;
-    }> = [];
+    const clientEntries: AttentionClient<WebSocketLike>[] = [];
 
     for (const [ws, connection] of this.sessions) {
       if (
-        connection.session.delivery.isModern(ws)
+        !connection.session.allowsNotificationAbout({ terminalId: params.terminalId }) ||
+        (connection.session.delivery.isModern(ws)
           ? !connection.session.wantsSourceEvent(ws, "terminal_attention_required")
           : !(await connection.session.subscribesToTerminalDirectory(
               {
@@ -3710,25 +3721,26 @@ export class VoiceAssistantWebSocketServer {
                 ...(params.workspaceId ? { workspaceId: params.workspaceId } : {}),
               },
               ws,
-            ))
+            )))
       ) {
         continue;
       }
       clientEntries.push({
-        ws,
+        client: ws,
+        reader: connection.session.notificationReader(),
         state: this.getClientActivityState(connection.session, ws),
       });
     }
 
-    const notificationEntries = clientEntries.filter(({ ws }) =>
+    const notificationEntries = clientEntries.filter(({ client: ws }) =>
       this.sessions.get(ws)?.session.wantsSourceNotification(ws, "terminal_attention_required"),
     );
-    const allStates = notificationEntries.map((e) => e.state);
     const nowMs = Date.now();
     const workspaceId = params.workspaceId;
 
-    const plan = computeNotificationPlan({
-      allStates,
+    const plan = planAttentionAudience({
+      clients: notificationEntries,
+      allows: allowsTerminalNotification(terminalLaunchOf(params.terminalId).createdBy),
       focusTarget: { kind: "terminal", id: params.terminalId },
       pushEligible: true,
       nowMs,
@@ -3737,34 +3749,30 @@ export class VoiceAssistantWebSocketServer {
     const title = terminalAttentionTitle(params.reason);
     const body = params.terminalName;
 
-    if (plan.shouldPush) {
-      const projectId = await this.projectIdForWorkspace(workspaceId, params.cwd);
-      void this.pushNotificationSender
-        .send(
-          {
-            title,
-            body,
-            data: {
-              serverId: this.serverId,
-              terminalId: params.terminalId,
-              cwd: params.cwd,
-              ...(workspaceId ? { workspaceId } : {}),
-            },
+    const projectId = await this.projectIdForWorkspace(workspaceId, params.cwd);
+    void this.pushNotificationSender
+      .send(
+        {
+          title,
+          body,
+          data: {
+            serverId: this.serverId,
+            terminalId: params.terminalId,
+            cwd: params.cwd,
+            ...(workspaceId ? { workspaceId } : {}),
           },
-          projectId === null ? {} : { projectId },
-        )
-        .catch((err) => {
-          this.logger.warn(
-            { err, terminalId: params.terminalId },
-            "Failed to send push notification",
-          );
-        });
-    }
+        },
+        { ...(projectId === null ? {} : { projectId }), recipients: plan.pushRecipients },
+      )
+      .catch((err) => {
+        this.logger.warn(
+          { err, terminalId: params.terminalId },
+          "Failed to send push notification",
+        );
+      });
 
-    for (const { ws } of clientEntries) {
-      const shouldNotify =
-        plan.inAppRecipientIndex !== null &&
-        notificationEntries[plan.inAppRecipientIndex]?.ws === ws;
+    for (const { client: ws } of clientEntries) {
+      const shouldNotify = plan.inAppRecipients.has(ws);
       const message = wrapSessionMessage({
         type: "terminal_attention_required",
         payload: {

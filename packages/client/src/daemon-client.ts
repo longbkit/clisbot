@@ -28,6 +28,7 @@ import {
 } from "@clisbot/protocol/managed-access";
 import type { SessionEventSubscription } from "@clisbot/protocol/messages";
 import type { AgentAttentionNotificationPayload } from "@clisbot/protocol/agent-attention-notification";
+import type { NotificationScope } from "@clisbot/protocol/notification-audience";
 import { MAX_WEBSOCKET_MESSAGE_BYTES } from "@clisbot/protocol/websocket-message-limit";
 import {
   AgentCreateFailedStatusPayloadSchema,
@@ -1451,6 +1452,7 @@ export class DaemonClient {
   private readonly logClientIdHash: string;
   private readonly logGeneration: number | null;
   private lastServerInfoMessage: ServerInfoStatusPayload | null = null;
+  private notificationScope: NotificationScope | null = null;
   private runtimeMetricsInterval: ReturnType<typeof setInterval> | null = null;
   private runtimeMetrics: DaemonClientRuntimeMetrics | null = null;
   private pingProbe: PingProbe | null = null;
@@ -2933,6 +2935,29 @@ export class DaemonClient {
       type: "register_push_token",
       token,
     });
+  }
+
+  /** Remembers which sessions may notify this reader and applies it on every connect. */
+  setNotificationScope(scope: NotificationScope): void {
+    this.notificationScope = scope;
+    this.sendNotificationScope();
+  }
+
+  private sendNotificationScope(): void {
+    const scope = this.notificationScope;
+    if (
+      scope === null ||
+      this.connectionState.status !== "connected" ||
+      this.lastServerInfoMessage?.features?.notificationScope !== true
+    )
+      return;
+    const requestId = this.createRequestId();
+    void this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "notifications.set_scope.request", scope, requestId },
+      responseType: "notifications.set_scope.response",
+      timeout: PUSH_TOKEN_REVOCATION_TIMEOUT_MS,
+    }).catch(() => undefined);
   }
 
   async unregisterPushToken(token: string): Promise<void> {
@@ -7956,6 +7981,7 @@ export class DaemonClient {
           });
           this.creations.reconnect();
           this.flushPendingSendQueue();
+          this.sendNotificationScope();
           this.resolveConnect();
         }
       }
