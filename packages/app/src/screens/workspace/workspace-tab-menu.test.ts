@@ -367,3 +367,48 @@ describe("buildWorkspaceTabMenuEntries", () => {
     expect(terminalSeparator?.key).toBe("rename-separator");
   });
 });
+
+describe("the Follow item", () => {
+  const input = (follow?: Parameters<typeof buildWorkspaceTabMenuEntries>[0]["follow"]) => ({
+    surface: "mobile" as const,
+    tab: createAgentTab(),
+    index: 0,
+    tabCount: 1,
+    menuTestIDBase: "menu",
+    onCopyResumeCommand: vi.fn(),
+    onCopyAgentId: vi.fn(),
+    onCopyTerminalId: vi.fn(),
+    onCopyFilePath: vi.fn(),
+    onReloadAgent: vi.fn(),
+    onRenameTab: vi.fn(),
+    onCloseTab: vi.fn(),
+    onCloseTabsBefore: vi.fn(),
+    onCloseTabsAfter: vi.fn(),
+    onCloseOtherTabs: vi.fn(),
+    ...(follow ? { follow } : {}),
+  });
+
+  it("appears only when the Host can follow, labelled by the current state, and toggles that agent", () => {
+    const onToggle = vi.fn();
+    const followItem = (followed: boolean) =>
+      buildWorkspaceTabMenuEntries(
+        input({
+          isFollowed: () => followed,
+          onToggle,
+          followLabel: "Follow",
+          unfollowLabel: "Unfollow",
+        }),
+      ).find((entry) => entry.kind === "item" && entry.key === "follow");
+
+    expect(
+      buildWorkspaceTabMenuEntries(input()).some(
+        (entry) => entry.kind === "item" && entry.key === "follow",
+      ),
+    ).toBe(false);
+    expect(followItem(false)).toMatchObject({ label: "Follow" });
+    const unfollow = followItem(true);
+    expect(unfollow).toMatchObject({ label: "Unfollow" });
+    if (unfollow?.kind === "item") unfollow.onSelect();
+    expect(onToggle).toHaveBeenCalledWith("agent-123");
+  });
+});

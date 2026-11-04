@@ -26,4 +26,6 @@ export type AgentDirectoryEntry = Pick<
   participationKey?: string;
   /** Its parent's evidence, for a subagent no verified person appears in (ownership-inheritance). */
   inheritedOwnership?: OwnershipEvidence;
+  /** The reader follows this session on its Host, so it is theirs (`watched`). */
+  watched?: boolean;
 };

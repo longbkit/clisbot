@@ -3076,6 +3076,43 @@ export const NotificationsSetScopeResponseSchema = z.object({
   }),
 });
 
+/** Follows or unfollows one session for this connection's reader on this Host. */
+export const NotificationsSetFollowRequestSchema = z.object({
+  type: z.literal("notifications.set_follow.request"),
+  agentId: z.string(),
+  followed: z.boolean(),
+  requestId: z.string(),
+});
+
+export const NotificationsSetFollowResponseSchema = z.object({
+  type: z.literal("notifications.set_follow.response"),
+  payload: z.object({
+    requestId: z.string(),
+    agentId: z.string(),
+    followed: z.boolean(),
+  }),
+});
+
+/** The reader's follows on this Host changed, from any of their devices. */
+export const NotificationsFollowsChangedSchema = z.object({
+  type: z.literal("notifications.follows_changed"),
+  payload: z.object({ agentIds: z.array(z.string()) }),
+});
+
+/** The sessions this connection's reader follows on this Host that it may still read. */
+export const NotificationsListFollowsRequestSchema = z.object({
+  type: z.literal("notifications.list_follows.request"),
+  requestId: z.string(),
+});
+
+export const NotificationsListFollowsResponseSchema = z.object({
+  type: z.literal("notifications.list_follows.response"),
+  payload: z.object({
+    requestId: z.string(),
+    agentIds: z.array(z.string()),
+  }),
+});
+
 // ============================================================================
 // Terminal Messages
 // ============================================================================
@@ -3335,6 +3372,8 @@ export const SessionEventSubscriptionSchema = z.enum([
   "activity_log",
   "hub.execution.agent.update",
   "hub.execution.agent.stream",
+  // COMPAT(notificationFollows): subscribe only when the Host advertises it; older Hosts reject it.
+  "notifications.follows_changed",
 ]);
 export type SessionEventSubscription = z.infer<typeof SessionEventSubscriptionSchema>;
 export const SessionEventsSetSubscriptionRequestSchema = z.object({
@@ -3624,6 +3663,8 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   RegisterPushTokenMessageSchema,
   PushUnregisterRequestSchema,
   NotificationsSetScopeRequestSchema,
+  NotificationsSetFollowRequestSchema,
+  NotificationsListFollowsRequestSchema,
   ListTerminalsRequestSchema,
   SubscribeTerminalsRequestSchema,
   UnsubscribeTerminalsRequestSchema,
@@ -3931,6 +3972,10 @@ export const ServerInfoStatusPayloadSchema = z
         pushTokenRevocation: z.boolean().optional(),
         // COMPAT(notificationScope): added after v2.2.2, remove gate after 2027-05-03.
         notificationScope: z.boolean().optional(),
+        // COMPAT(notificationFollows): added after v2.2.2, remove gate after 2027-05-04.
+        notificationFollows: z.boolean().optional(),
+        // COMPAT(notificationNeedsScope): added after v2.2.2, remove gate after 2027-05-04.
+        notificationNeedsScope: z.boolean().optional(),
         // COMPAT(plugins): added in v0.3.0, remove gate after 2027-08-07.
         plugins: z.boolean().optional(),
         // COMPAT(pluginManagement): added in v0.4.0, remove gate after 2027-08-14.
@@ -7377,6 +7422,9 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   PongMessageSchema,
   PushUnregisterResponseSchema,
   NotificationsSetScopeResponseSchema,
+  NotificationsSetFollowResponseSchema,
+  NotificationsListFollowsResponseSchema,
+  NotificationsFollowsChangedSchema,
   RpcErrorMessageSchema,
   ArtifactMessageSchema,
   AgentUpdateMessageSchema,
@@ -8034,6 +8082,10 @@ export type PushUnregisterRequest = z.infer<typeof PushUnregisterRequestSchema>;
 export type PushUnregisterResponse = z.infer<typeof PushUnregisterResponseSchema>;
 export type NotificationsSetScopeRequest = z.infer<typeof NotificationsSetScopeRequestSchema>;
 export type NotificationsSetScopeResponse = z.infer<typeof NotificationsSetScopeResponseSchema>;
+export type NotificationsSetFollowResponse = z.infer<typeof NotificationsSetFollowResponseSchema>;
+export type NotificationsListFollowsResponse = z.infer<
+  typeof NotificationsListFollowsResponseSchema
+>;
 
 // Terminal message types
 export type ListTerminalsRequest = z.infer<typeof ListTerminalsRequestSchema>;

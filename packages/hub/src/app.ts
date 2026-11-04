@@ -72,7 +72,11 @@ import type { EntitlementsService } from "./entitlements/service.js";
 import type { ExecutionAuthority } from "./execution-authority/index.js";
 import { replaceDaemonProjects } from "./access/daemon-projects.js";
 import { AccessStore } from "./access/store.js";
-import { consumeDaemonAccessTicket, refreshDaemonAccessLease } from "./managed-access/http.js";
+import {
+  consumeDaemonAccessTicket,
+  refreshDaemonAccessLease,
+  verifyDaemonAccessLease,
+} from "./managed-access/http.js";
 import { AccessTicketService } from "./managed-access/tickets.js";
 import { AccessLeaseRevocation } from "./managed-access/revocation.js";
 import { reconcileDaemonLeaseRevocations } from "./managed-access/reconcile-daemon.js";
@@ -146,6 +150,7 @@ export interface HubOperations {
   handleDaemonPermissionUpdate(request: Request, daemonId: string): Promise<Response>;
   handleDaemonAccessTicketConsumption(request: Request): Promise<Response>;
   handleDaemonAccessLeaseRefresh(request: Request): Promise<Response>;
+  handleDaemonAccessLeaseVerify(request: Request): Promise<Response>;
   handleDaemonProjectsReplacement(request: Request, daemonId: string): Promise<Response>;
   handleDaemonConnectionOfferReplacement(request: Request, daemonId: string): Promise<Response>;
   handleCliAuthorizationStart(request: Request): Promise<Response>;
@@ -419,6 +424,10 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
       options.database === null || accessTickets === null
         ? databaseUnavailable()
         : refreshDaemonAccessLease(request, options.database, accessTickets),
+    handleDaemonAccessLeaseVerify: (request) =>
+      options.database === null || accessTickets === null
+        ? databaseUnavailable()
+        : verifyDaemonAccessLease(request, options.database, accessTickets),
     handleDaemonProjectsReplacement: (request, daemonId) =>
       options.database === null || accessStore === null
         ? databaseUnavailable()

@@ -229,8 +229,10 @@ import { HubExecutionController } from "./hub/execution-controller.js";
 import type { HubExecutionAgents } from "./hub/daemon-executions.js";
 import { DownloadTokenStore } from "./file-download/token-store.js";
 import type { PushNotifications, PushTokenAuthorization } from "./push/index.js";
+import type { NotificationFollowStore } from "./push/follow-store.js";
 import {
   DEFAULT_NOTIFICATION_SCOPE,
+  notificationReaderKey,
   type NotificationReader,
   type NotificationScope,
 } from "@clisbot/protocol/notification-audience";
@@ -511,6 +513,12 @@ export interface SessionOptions {
   logger: pino.Logger;
   downloadTokenStore: DownloadTokenStore;
   pushNotifications: PushNotifications;
+  /** Absent only in tests that do not exercise follows. */
+  notificationFollows?: NotificationFollowStore;
+  /** Tells every connection of the reader that their follows changed. */
+  onFollowsChanged?: (readerKey: string) => void;
+  /** The paired device this connection was admitted with, recorded on its push token. */
+  pushDeviceId?: string;
   clisbotHome: string;
   worktreesRoot?: string;
   agentManager: AgentManager;
@@ -849,6 +857,9 @@ export class Session {
   private readonly workspaceRecovery: WorkspaceRecoveryService;
   private readonly daemonConfigStore: DaemonConfigStore;
   private readonly pushNotifications: PushNotifications;
+  private readonly notificationFollows: NotificationFollowStore | undefined;
+  private readonly onFollowsChanged: ((readerKey: string) => void) | undefined;
+  private readonly pushDeviceId: string | undefined;
   private readonly pluginRuntime: SessionOptions["pluginRuntime"];
   private readonly orchestrationSkills: SessionOptions["orchestrationSkills"];
   private unsubscribeAgentEvents: (() => void) | null = null;
@@ -1013,6 +1024,9 @@ export class Session {
     this.onLifecycleIntent = onLifecycleIntent ?? null;
     this.onWorkspaceRecovered = onWorkspaceRecovered ?? null;
     this.pushNotifications = pushNotifications;
+    this.notificationFollows = options.notificationFollows;
+    this.onFollowsChanged = options.onFollowsChanged;
+    this.pushDeviceId = options.pushDeviceId;
     this.clisbotHome = clisbotHome;
     this.messageReceipts = options.messageReceipts;
     this.optionsInputQueues = options.inputQueues;
@@ -2663,6 +2677,8 @@ export class Session {
     if (this.registeredPushToken) {
       this.renewPushToken(this.registeredPushToken);
     }
+    // Narrowed access hides follows of sessions this connection may no longer read.
+    void this.publishFollowsChanged().catch(() => undefined);
   }
 
   public subscribesToAgent(agent: ManagedAgent, source: object): Promise<boolean> {
@@ -3779,6 +3795,15 @@ export class Session {
         return;
       case "notifications.set_scope.request":
         this.handleSetNotificationScope(msg.scope, msg.requestId);
+        return;
+      case "notifications.set_follow.request":
+        await this.handleSetNotificationFollow(msg.agentId, msg.followed, msg.requestId);
+        return;
+      case "notifications.list_follows.request":
+        this.emit({
+          type: "notifications.list_follows.response",
+          payload: { requestId: msg.requestId, agentIds: await this.followedAgentIds() },
+        });
         return;
       case "push.unregister.request":
         if (
@@ -5703,6 +5728,81 @@ export class Session {
   }
 
   /**
+   * Follows the session for this connection's reader. Only a session the reader may read
+   * now can be followed, and a follow grants nothing: sends check access again.
+   */
+  private async handleSetNotificationFollow(
+    agentId: string,
+    followed: boolean,
+    requestId: string,
+  ): Promise<void> {
+    const reader = this.notificationReader();
+    const refuse = (code: "resource_not_found" | "follow_unavailable") =>
+      this.emit({
+        type: "rpc_error",
+        payload: {
+          requestId,
+          requestType: "notifications.set_follow.request",
+          error: code === "resource_not_found" ? "Resource not found" : "Could not save the follow",
+          code,
+        },
+      });
+    if (!this.notificationFollows || reader === null) return refuse("follow_unavailable");
+    // Following needs an existing session the reader may read now; unfollowing always works.
+    if (
+      followed &&
+      (agentId.length > 200 ||
+        !this.allowsNotificationAbout({ agentId }) ||
+        !(await this.agentExists(agentId)))
+    )
+      return refuse("resource_not_found");
+    let saved: boolean;
+    try {
+      saved = this.notificationFollows.set(notificationReaderKey(reader.actor), agentId, followed);
+    } catch {
+      saved = false;
+    }
+    if (!saved) return refuse("follow_unavailable");
+    this.emit({
+      type: "notifications.set_follow.response",
+      payload: { requestId, agentId, followed },
+    });
+    this.onFollowsChanged?.(notificationReaderKey(reader.actor));
+  }
+
+  /** Followed sessions that still exist and this connection may still read. */
+  private async followedAgentIds(): Promise<string[]> {
+    const reader = this.notificationReader();
+    if (!this.notificationFollows || reader === null) return [];
+    const followed = this.notificationFollows.list(notificationReaderKey(reader.actor));
+    const kept = await Promise.all(
+      followed.map(
+        async (agentId) =>
+          this.allowsNotificationAbout({ agentId }) && (await this.agentExists(agentId)),
+      ),
+    );
+    return followed.filter((_, index) => kept[index]);
+  }
+
+  /** This connection's reader, as the follow store and push tokens key them. */
+  public notificationReaderKey(): string | null {
+    const reader = this.notificationReader();
+    return reader === null ? null : notificationReaderKey(reader.actor);
+  }
+
+  /** Sends this connection its reader's current follows, filtered by what it may read. */
+  public async publishFollowsChanged(): Promise<void> {
+    this.emit({
+      type: "notifications.follows_changed",
+      payload: { agentIds: await this.followedAgentIds() },
+    });
+  }
+
+  private async agentExists(agentId: string): Promise<boolean> {
+    return Boolean(this.agentManager.getAgent(agentId) ?? (await this.agentStorage.get(agentId)));
+  }
+
+  /**
    * Who this connection's notifications are for: its Hub account, with or without a
    * managed lease. A managed lease without one cannot be attributed to anyone, so it
    * is not notified; a connection with neither is the Host owner's own device.
@@ -5721,6 +5821,7 @@ export class Session {
     this.pushNotifications.renew(token, this.pushTokenAuthorization(), {
       actor: this.accountActor,
       scope: this.notificationScope,
+      ...(this.pushDeviceId === undefined ? {} : { deviceId: this.pushDeviceId }),
     });
   }
 
@@ -10053,23 +10154,28 @@ function isValidGitHubRepoSegment(value: string): boolean {
   return /^[A-Za-z0-9._-]+$/u.test(value);
 }
 
+/** Outbound messages whose type is their own event subscription. */
+const SELF_NAMED_EVENTS: ReadonlySet<string> = new Set<SessionEventSubscription>([
+  "project.update",
+  "providers_snapshot_update",
+  "agent_attention_required",
+  "agent_permission_request",
+  "agent_permission_resolved",
+  "checkout_status_update",
+  "script_status_update",
+  "workspace_setup_progress",
+  "agent.provider_subagents.update",
+  "terminal_attention_required",
+  "activity_log",
+  "hub.execution.agent.update",
+  "hub.execution.agent.stream",
+  "notifications.follows_changed",
+]);
+
 function sessionEventCategory(message: SessionOutboundMessage): SessionEventSubscription | null {
   if (isResourcePush(message.type)) return message.type;
+  if (SELF_NAMED_EVENTS.has(message.type)) return message.type as SessionEventSubscription;
   switch (message.type) {
-    case "project.update":
-    case "providers_snapshot_update":
-    case "agent_attention_required":
-    case "agent_permission_request":
-    case "agent_permission_resolved":
-    case "checkout_status_update":
-    case "script_status_update":
-    case "workspace_setup_progress":
-    case "agent.provider_subagents.update":
-    case "terminal_attention_required":
-    case "activity_log":
-    case "hub.execution.agent.update":
-    case "hub.execution.agent.stream":
-      return message.type;
     case "status":
       switch (message.payload.status) {
         case "server_info":

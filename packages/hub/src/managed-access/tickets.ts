@@ -183,6 +183,25 @@ export class AccessTicketService {
     leaseId: string;
     now?: Date;
   }): Promise<AccessTicketAdmission> {
+    return this.liveLease(input, true);
+  }
+
+  /**
+   * Re-resolves live authority for an unexpired lease without extending it: a daemon asks this
+   * before it sends session content to a device that holds the lease but may be offline.
+   */
+  async verify(input: {
+    daemonId: string;
+    leaseId: string;
+    now?: Date;
+  }): Promise<AccessTicketAdmission> {
+    return this.liveLease(input, false);
+  }
+
+  private async liveLease(
+    input: { daemonId: string; leaseId: string; now?: Date },
+    extend: boolean,
+  ): Promise<AccessTicketAdmission> {
     const now = input.now ?? new Date();
     const admission = await this.runtime.transaction(async (handle) => {
       const database = handle.drizzle();
@@ -226,11 +245,14 @@ export class AccessTicketService {
           .where(eq(schema.daemonAccessLeases.id, lease.id));
         return null;
       }
-      const leaseExpiresAt = new Date(now.getTime() + this.leaseDurationMs);
-      await database
-        .update(schema.daemonAccessLeases)
-        .set({ expiresAt: leaseExpiresAt })
-        .where(eq(schema.daemonAccessLeases.id, lease.id));
+      const leaseExpiresAt = extend
+        ? new Date(now.getTime() + this.leaseDurationMs)
+        : lease.expiresAt;
+      if (extend)
+        await database
+          .update(schema.daemonAccessLeases)
+          .set({ expiresAt: leaseExpiresAt })
+          .where(eq(schema.daemonAccessLeases.id, lease.id));
       return {
         ...authority,
         leaseId: lease.id,

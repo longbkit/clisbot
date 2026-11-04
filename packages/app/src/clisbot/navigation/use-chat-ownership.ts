@@ -4,7 +4,7 @@ import { useSessionStore } from "@/stores/session-store";
 import type { HostTagged } from "@/clisbot/bots/data/aggregate";
 import type { BotPayload, ChatPayload } from "@/clisbot/bots/data/contracts";
 import { resolveDirectChatOwnership, resolveOwnership } from "./ownership";
-import { chatOwnershipEvidence } from "./chat-ownership";
+import { chatFollowed, chatOwnershipEvidence } from "./chat-ownership";
 import { useOwnershipHosts } from "./use-ownership-hosts";
 import { useReaderAccounts } from "./reader";
 
@@ -33,10 +33,18 @@ export function useChatOwnership(chats: readonly HostTagged<ChatPayload>[], acti
       );
     }),
   );
+  const followed = useSessionStore(
+    useShallow((state) =>
+      chats.map((chat) => chatFollowed(chat, state.sessions[chat.serverId]?.agents)),
+    ),
+  );
   last.current = { chats, keys };
   return useMemo(() => {
     const participation = new Map(
       chats.map((chat, index) => [`${chat.serverId}:${chat.id}`, keys[index]]),
+    );
+    const watched = new Set(
+      chats.flatMap((chat, index) => (followed[index] ? [`${chat.serverId}:${chat.id}`] : [])),
     );
     const context = (serverId: string) => ({
       accounts,
@@ -45,6 +53,7 @@ export function useChatOwnership(chats: readonly HostTagged<ChatPayload>[], acti
     const evidence = (chat: HostTagged<ChatPayload>) => ({
       createdBy: chat.record?.createdBy,
       participationKey: participation.get(`${chat.serverId}:${chat.id}`),
+      watched: watched.has(`${chat.serverId}:${chat.id}`),
     });
     return {
       chatOwnership: (chat: HostTagged<ChatPayload>) =>
@@ -58,5 +67,5 @@ export function useChatOwnership(chats: readonly HostTagged<ChatPayload>[], acti
           context(bot.serverId),
         ),
     };
-  }, [accounts, hostKinds, keys, chats]);
+  }, [accounts, hostKinds, keys, followed, chats]);
 }

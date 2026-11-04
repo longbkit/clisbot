@@ -105,6 +105,8 @@ export interface Agent extends SessionAuthorship {
   parentAgentId: string | null;
   labels: Record<string, string>;
   projectPlacement?: ProjectPlacementPayload | null;
+  /** This device's reader follows the session on its Host (`notifications.list_follows`). */
+  followed?: boolean;
 }
 
 export interface WorkspaceDescriptor extends SessionAuthorship {
@@ -224,6 +226,21 @@ function preserveWorkspaceDescriptorIdentity(
 }
 
 // May return `incoming` itself: the caller hands the map over and never mutates it again.
+/** Marks each agent followed or not, keeping the map and every unchanged agent's identity. */
+function stampFollowed(
+  agents: Map<string, Agent>,
+  followedAgentIds: ReadonlySet<string>,
+): Map<string, Agent> {
+  let next: Map<string, Agent> | null = null;
+  for (const [agentId, agent] of agents) {
+    const followed = followedAgentIds.has(agentId);
+    if ((agent.followed === true) === followed) continue;
+    next ??= new Map(agents);
+    next.set(agentId, { ...agent, followed });
+  }
+  return next ?? agents;
+}
+
 function preserveMapIdentity<Key, Value>(
   existing: Map<Key, Value>,
   incoming: Map<Key, Value>,
@@ -437,6 +454,8 @@ export interface SessionState {
 
   // Agents
   agents: Map<string, Agent>;
+  /** Sessions this device's reader follows on the Host; stamped onto `agents` as `followed`. */
+  followedAgentIds: ReadonlySet<string>;
   workspaceAgentActivity: Map<string, WorkspaceAgentActivity>;
   agentDetails: Map<string, Agent>;
   workspaces: Map<string, WorkspaceDescriptor>;
@@ -595,6 +614,7 @@ interface SessionStoreActions {
     serverId: string,
     agents: Map<string, Agent> | ((prev: Map<string, Agent>) => Map<string, Agent>),
   ) => void;
+  setFollowedAgents: (serverId: string, agentIds: Iterable<string>) => void;
   setAgentDetails: (
     serverId: string,
     agents: Map<string, Agent> | ((prev: Map<string, Agent>) => Map<string, Agent>),
@@ -701,6 +721,7 @@ function createInitialSessionState(
     agentAuthoritativeHistoryApplied: new Map(),
     initializingAgents: new Map(),
     agents: new Map(),
+    followedAgentIds: new Set(),
     workspaceAgentActivity: new Map(),
     agentDetails: new Map(),
     workspaces: new Map(),
@@ -1616,9 +1637,13 @@ export const useSessionStore = create<SessionStore>()(
           if (!session) {
             return prev;
           }
+          // Stamp the incoming agents first, so an equal followed agent keeps its identity.
           const nextAgents = preserveMapIdentity(
             session.agents,
-            typeof agents === "function" ? agents(session.agents) : agents,
+            stampFollowed(
+              typeof agents === "function" ? agents(session.agents) : agents,
+              session.followedAgentIds,
+            ),
           );
           if (session.agents === nextAgents) {
             return prev;
@@ -1635,6 +1660,25 @@ export const useSessionStore = create<SessionStore>()(
                   nextAgents,
                   session.workspaceAgentActivity,
                 ),
+              },
+            },
+          };
+        });
+      },
+
+      setFollowedAgents: (serverId, agentIds) => {
+        set((prev) => {
+          const session = prev.sessions[serverId];
+          if (!session) return prev;
+          const followedAgentIds = new Set(agentIds);
+          return {
+            ...prev,
+            sessions: {
+              ...prev.sessions,
+              [serverId]: {
+                ...session,
+                followedAgentIds,
+                agents: stampFollowed(session.agents, followedAgentIds),
               },
             },
           };

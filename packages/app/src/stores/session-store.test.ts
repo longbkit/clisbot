@@ -173,6 +173,41 @@ describe("batched session store updates", () => {
   });
 });
 
+describe("followed sessions", () => {
+  it("stamps follows onto agents, keeps a followed agent's identity across equal updates, and clears an unfollow", () => {
+    initializeTestSession();
+    const store = useSessionStore.getState();
+    store.setAgents(
+      "test-server",
+      new Map([
+        ["a", createTestAgent("a")],
+        ["b", createTestAgent("b")],
+      ]),
+    );
+    const untouched = useSessionStore.getState().sessions["test-server"]!.agents.get("b");
+
+    store.setFollowedAgents("test-server", ["a"]);
+    const followed = useSessionStore.getState().sessions["test-server"]!.agents.get("a");
+    store.setAgents(
+      "test-server",
+      new Map([
+        ["a", createTestAgent("a")],
+        ["b", createTestAgent("b")],
+      ]),
+    );
+    const after = useSessionStore.getState().sessions["test-server"]!.agents;
+
+    expect(followed?.followed).toBe(true);
+    expect(after.get("a")).toBe(followed);
+    expect(after.get("b")).toBe(untouched);
+
+    store.setFollowedAgents("test-server", []);
+    expect(useSessionStore.getState().sessions["test-server"]!.agents.get("a")?.followed).toBe(
+      false,
+    );
+  });
+});
+
 describe("setAgents identity", () => {
   it("keeps the stored agent and the session when an incoming agent is equal", () => {
     initializeTestSession();

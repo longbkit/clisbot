@@ -19,7 +19,10 @@ eligibility remain daemon concerns.
 
 A session notifies the people it belongs to, by the same For me / Others rule as the session list
 ([navigation-v2](features/navigation-v2/README.md)). Each reader picks a scope in Settings →
-Notifications: For me (default), Others, All or Off. The app sends it to every Host with
+Notifications: For me (default), Needs me, Others, All or Off. Needs me narrows For me to what
+Home's Needs me chip shows unseen: a request waiting for an answer, or a failure
+(`issues.ts` `currentIssueKind`); a failure, in-app only under For me, reaches a Needs me reader's
+phone. A Host without `features.notificationNeedsScope` is sent For me. The app sends it to every Host with
 `notifications.set_scope.request` (gated by `features.notificationScope`) and resends it on each
 connect; the daemon stores it with that device's push token.
 
@@ -28,11 +31,23 @@ The daemon judges every reader separately, for both pushes and in-app notificati
 - The reader is the connection's Hub account, with or without a managed lease. A lease without one
   is not notified. A connection with neither is the Host owner's own device, which owns everything
   on its Host.
-- A session is For me when its verified creator, its schedule's verified owner, or a verified
-  sender is the reader. A channel sender matches only through its linked Member. A session that
-  names no verified person, such as a subagent, is its nearest parent's.
-- Work nobody can attribute notifies For me only for the Host owner and daemon-wide readers. The
-  session list still shows it under For me; a Project Member is not paged for it.
+- A session is For me when the reader follows it, or its verified creator, its schedule's
+  verified owner, or a verified sender is the reader. Follows live on each Host per reader
+  (`notifications.set_follow` / `list_follows`, `features.notificationFollows`): a reader can follow
+  only a session it may read, the list hides follows whose access was lost, and a follow never
+  widens access. The app stamps follows onto its agents, so Home, Work, search, counts and Chats
+  (a chat holding a followed session) all treat it as For me. Every connection of the reader gets
+  `notifications.follows_changed` when any of their devices follows or unfollows, filtered by what
+  that connection may read; the app subscribes only on a Host that advertises follows. A
+  channel sender matches only through its linked Member. A session that names no verified person,
+  such as a subagent, is its nearest parent's.
+- Work nobody can attribute (no verified creator, owner or sender: legacy, CLI, or started from
+  the Host owner's own device) notifies For me only for the Host owner and daemon-wide readers,
+  and is never Others, as in the session list. Known difference: the list shows it under For me
+  for every reader, but a Project Member is notified about it only with All, because it is often
+  the Host owner's own work and paging every Member for it is the noise this rule removes. A
+  request or failure from it, which can quote tool input, reaches only the Host owner or an All
+  reader.
 - Presence is per reader. One person's open app takes their own notification instead of a push
   to their phone, and never suppresses or receives a teammate's.
 - The daemon cannot tell the Host owner's direct devices from the same person's Hub account, so
@@ -42,6 +57,37 @@ The daemon judges every reader separately, for both pushes and in-app notificati
   `Session.publishToSource`, and nothing after its lease expires or its Project is revoked.
 - Opening a notification fetches the session over the reader's own connection, which the Host
   authorizes again; the payload's ids grant nothing.
+- Session content reaches a lease's device only when the Hub, asked right before the send
+  (`POST /api/daemons/access-leases/verify`, which does not extend the lease), still grants that
+  lease the event's Project. Each lease is asked once per notification and never cached. A Hub
+  refusal marks the lease's tokens unconfirmed until the device renews them; so does a Hub
+  revocation notice and a managed connection closed for access, so offline and backgrounded
+  devices are covered. A down link, an older Hub without verify, a timeout or an error withhold
+  content for that send only. Withheld means one generic payload that identifies nothing: title
+  `Clisbot`, a generic body and no data, so no session text, Host, Project, workspace, path,
+  agent or terminal id. Tapping it opens the app without navigating; the app reads only what the
+  Host authorizes after it connects. A grant means the lease's live admission allows the event
+  the way its connection would be judged: the operation permission, then for a Project-restricted
+  lease `project.use` for an agent or the Terminal grant for how the terminal was launched. Only
+  a Hub refusal of the lease itself (`access_denied`, `invalid_ticket`) marks it unconfirmed; a
+  401 for the daemon does not. The Host owner's own devices are never asked, are sent first, and
+  keep full notifications; one failed delivery does not stop the others. Verified content to a
+  lease's device carries a 5-minute TTL, so an offline device does not show it days later. A
+  revoked paired device loses its push tokens at once, connected or not.
+- Load on the Hub is bounded per daemon (`push/lease-verifier.ts`): at most 8 verify requests in
+  flight and 256 waiting, and a request that waited 4 s is dropped unsent. Notifications asking
+  about a lease while its request is in flight share that answer, then judge it against their own
+  event; nothing is kept once it settles. Each lease's devices get content as soon as that lease
+  is confirmed, so a slow lease delays only its own devices. A notification waits at most 4 s for
+  its leases: one unconfirmed by then, refused for a full queue, or granted later gets the generic
+  notification for that send.
+  Tradeoffs: one Hub round trip (at most 3 s) per lease per push, shared by the notifications
+  sent during it, so that answer can be up to 3 s older than a notification that joined it; a
+  burst over the bounds sends some Members the generic notification; Members get only the generic
+  notification while the Hub is unreachable, until a revoked device renews, and against a Hub that
+  predates verify; a Member device offline for more than 5 minutes misses that notification's
+  content. Remaining window: a revocation committed after the Hub's answer, while the
+  notification waits for its device (at most 5 minutes).
 
 Pushes are plain alerts with no Notification Service Extension, so iOS shows them before app code
 runs: filtering has to happen on the daemon. A Host without `features.notificationScope` keeps the

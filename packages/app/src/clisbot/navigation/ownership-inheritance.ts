@@ -4,6 +4,8 @@ import { isVerifiedPerson, participationKeyOf, type OwnershipEvidence } from "./
 /** A session as the parent walk reads it; `parentAgentId` is a parent on the same Host. */
 export interface InheritanceSource extends SessionAuthorship {
   parentAgentId: string | null;
+  /** The reader follows this session on its Host; it then counts as theirs. */
+  followed?: boolean;
 }
 
 /** How far up a subagent's parents ownership is looked for; deeper chains stay unknown. */
@@ -45,6 +47,7 @@ export interface AgentOwnershipEvidence {
   createdBy: SessionAuthorship["createdBy"];
   participationKey: string | undefined;
   inheritedOwnership?: OwnershipEvidence;
+  watched?: boolean;
 }
 
 /** A session's ownership evidence for `resolveOwnership`, every surface's one way to build it. */
@@ -57,5 +60,6 @@ export function agentOwnershipEvidence(
     createdBy: agent.createdBy,
     participationKey: participationKeyOf(agent),
     ...(inheritedOwnership ? { inheritedOwnership } : {}),
+    ...(agent.followed ? { watched: true } : {}),
   };
 }

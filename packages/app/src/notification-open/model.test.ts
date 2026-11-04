@@ -132,6 +132,20 @@ describe("notification open", () => {
     stop();
   });
 
+  it("opens nothing for a push that identifies nothing (a lease the Host could not confirm)", async () => {
+    const { source, agents, routes, terminals, router } = setup();
+    const stop = router.start();
+    await flush();
+    agents.length = 0;
+    // The daemon's unidentified payload carries no data at all.
+    source.tap({ id: "unidentified", data: undefined });
+    source.tap({ id: "unidentified-empty", data: {} });
+    await flush();
+    expect({ agents, routes, terminals }).toEqual({ agents: [], routes: [], terminals: [] });
+    expect(source.acknowledged).toEqual(["one", "unidentified", "unidentified-empty"]);
+    stop();
+  });
+
   it("dispatches terminals and hosts through their navigation capabilities", async () => {
     const { source, routes, terminals, router } = setup();
     const stop = router.start();

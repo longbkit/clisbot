@@ -534,6 +534,66 @@ it("stores only a verifier, consumes once, binds the client, and rechecks curren
   );
 });
 
+it("verifies a lease's live grants without extending it, and refuses once access is gone", async () => {
+  const fixture = await seedAuthority();
+  const access = new AccessStore(bundle.runtime);
+  await access.replaceDaemonProjects(fixture.organizationId, fixture.daemonId, [
+    { projectId: "project-alpha", name: "Alpha" },
+  ]);
+  const assignment = await access.saveAssignment(
+    fixture.organizationId,
+    {
+      subjectKind: "member",
+      subjectId: fixture.memberMembershipId,
+      resourceKind: "daemon",
+      resourceId: fixture.daemonId,
+      privileges: ["daemon.connect", "project.use", "agent.interact"],
+      constraints: {},
+    },
+    fixture.ownerUserId,
+  );
+  const tickets = new AccessTicketService(bundle.runtime, access, {
+    leaseDurationMs: 60_000,
+    hubIdentity: "hub-stable-test-id",
+  });
+  const issued = await tickets.issue({
+    ...fixture,
+    userId: fixture.memberUserId,
+    membershipId: fixture.memberMembershipId,
+    clientId: "client-a",
+  });
+  const admission = await tickets.consume({
+    daemonId: fixture.daemonId,
+    accessTicket: issued.accessTicket,
+    clientId: "client-a",
+  });
+
+  const verified = await tickets.verify({
+    daemonId: fixture.daemonId,
+    leaseId: admission.leaseId,
+    now: new Date(admission.leaseExpiresAt.getTime() - 30_000),
+  });
+  assert.equal(verified.leaseExpiresAt.getTime(), admission.leaseExpiresAt.getTime());
+  const [storedAfterVerify] = await bundle.runtime
+    .drizzle()
+    .select({ expiresAt: schema.daemonAccessLeases.expiresAt })
+    .from(schema.daemonAccessLeases)
+    .where(eq(schema.daemonAccessLeases.id, admission.leaseId));
+  assert.equal(storedAfterVerify?.expiresAt.getTime(), admission.leaseExpiresAt.getTime());
+  assert.equal(verified.projects[0]?.projectId, "project-alpha");
+  assert.equal(verified.actor?.memberId, fixture.memberMembershipId);
+
+  await access.deleteAssignment(fixture.organizationId, assignment.id);
+  await assert.rejects(
+    tickets.verify({ daemonId: fixture.daemonId, leaseId: admission.leaseId }),
+    (error: unknown) => error instanceof AccessTicketError && error.code === "access_denied",
+  );
+  await assert.rejects(
+    tickets.verify({ daemonId: randomUUID(), leaseId: admission.leaseId }),
+    (error: unknown) => error instanceof AccessTicketError,
+  );
+});
+
 it("persists organization revocation before notifying each affected daemon", async () => {
   const fixture = await seedAuthority();
   const access = new AccessStore(bundle.runtime);

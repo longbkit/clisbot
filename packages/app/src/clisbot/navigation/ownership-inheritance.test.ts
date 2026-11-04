@@ -8,6 +8,7 @@ import { countWork } from "./work-items";
 import { agentOwnershipEvidence, type InheritanceSource } from "./ownership-inheritance";
 import { ownershipKey } from "./ownership-key";
 import { resolveOwnership } from "./ownership";
+import { chatOwnershipEvidence } from "./chat-ownership";
 
 const HUB = "https://hub.example";
 const accounts = [{ origin: HUB, id: "u-me", memberId: "m-me" }];
@@ -37,6 +38,34 @@ function ownershipOf(
     hostKind,
   });
 }
+
+describe("a chat with a followed session", () => {
+  it("is the reader's in Chats, like the session it holds", () => {
+    const chat = {
+      id: "chat-1",
+      record: { createdBy: teammate },
+      participants: [{ botId: "bot-1", agentId: "agent-9" }],
+    } as unknown as Parameters<typeof chatOwnershipEvidence>[0];
+    const ownership = (followed: boolean) =>
+      resolveOwnership({
+        ...chatOwnershipEvidence(chat, new Map([["agent-9", { createdBy: teammate, followed }]])),
+        accounts,
+        hostKind: "hub",
+      });
+
+    expect(ownership(true)).toBe("mine");
+    expect(ownership(false)).toBe("others");
+  });
+});
+
+describe("a followed session", () => {
+  it("is the reader's in every list even when a teammate created it", () => {
+    const host = hostOf({ ...session("t", null, { createdBy: teammate }), followed: true });
+    expect(ownershipOf("t", host)).toBe("mine");
+    const unfollowed = hostOf(session("t", null, { createdBy: teammate }));
+    expect(ownershipOf("t", unfollowed)).toBe("others");
+  });
+});
 
 describe("a subagent with no verified person of its own takes its parent's ownership", () => {
   it("is a teammate's under a teammate-created parent", () => {

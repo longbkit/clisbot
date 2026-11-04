@@ -58,6 +58,8 @@ export interface HubAccessTicketConsumption {
   clientId: string;
 }
 
+const LEASE_VERIFY_TIMEOUT_MS = 3_000;
+
 export interface HubAccessLeaseRefresh {
   daemonId: string;
   hubOrigin: string;
@@ -130,9 +132,19 @@ export interface HubRelationshipRemote {
   revoke(input: HubRevocation): Promise<void>;
   consumeAccessTicket(input: HubAccessTicketConsumption): Promise<ManagedAccessAdmission>;
   refreshAccessLease(input: HubAccessLeaseRefresh): Promise<ManagedAccessAdmission>;
+  /** Live grants of a lease without extending it; optional for remotes that predate it. */
+  verifyAccessLease?(input: HubAccessLeaseRefresh): Promise<ManagedAccessAdmission>;
   replaceProjects(input: HubProjectReplacement): Promise<void>;
   replaceConnectionOffer(input: HubConnectionOfferReplacement): Promise<void>;
   openSocket(input: HubSocketCredentials, events: HubSocketEvents): HubSocketConnection;
+}
+
+/** The Hub refused a lease itself: revoked, expired, unknown, or its access is gone. */
+export class HubLeaseRefusedError extends Error {
+  constructor(readonly code: "access_denied" | "invalid_ticket") {
+    super(`Hub refused the access lease (${code})`);
+    this.name = "HubLeaseRefusedError";
+  }
 }
 
 export class HubEnrollmentRejectedError extends Error {
@@ -375,6 +387,42 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
       if (!response.ok) throw new HubEnrollmentRejectedError(response.status);
       return stampAdmissionOrigin(parseAccessAdmission(await response.json()), input.hubOrigin);
     });
+  }
+
+  /**
+   * The lease's live grants without extending it. Bounded to a few seconds: a push waits for it,
+   * and a slow or old Hub must make the push withhold content rather than hang.
+   */
+  async verifyAccessLease(input: HubAccessLeaseRefresh): Promise<ManagedAccessAdmission> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), LEASE_VERIFY_TIMEOUT_MS);
+    timeout.unref?.();
+    try {
+      const response = await fetch(`${input.hubOrigin}/api/daemons/access-leases/verify`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${input.credential}`,
+          "x-clisbot-daemon-id": input.daemonId,
+          ...PROJECT_PRIVILEGES_HEADER,
+        },
+        body: JSON.stringify({ leaseId: input.leaseId }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
+        // Only the lease's own refusal revokes it; a 401 for the daemon itself does not.
+        if (
+          response.status === 401 &&
+          (body?.error === "access_denied" || body?.error === "invalid_ticket")
+        )
+          throw new HubLeaseRefusedError(body.error);
+        throw new HubEnrollmentRejectedError(response.status);
+      }
+      return stampAdmissionOrigin(parseAccessAdmission(await response.json()), input.hubOrigin);
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   async replaceProjects(input: HubProjectReplacement): Promise<void> {

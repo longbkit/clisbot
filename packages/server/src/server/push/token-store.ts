@@ -59,6 +59,8 @@ export class PushTokenStore {
           : [...new Set(authorization.projectIds)].sort(),
       actor: reader.actor ?? null,
       scope: reader.scope ?? current?.scope ?? DEFAULT_NOTIFICATION_SCOPE,
+      unconfirmed: false,
+      deviceId: reader.deviceId ?? null,
     };
     if (
       current !== undefined &&
@@ -87,6 +89,35 @@ export class PushTokenStore {
     this.logger.debug({ total: this.subscriptions.size }, "Revoked token");
   }
 
+  /**
+   * The Hub revoked this lease, often only to reissue it (a team or role change revokes a whole
+   * organization). Its tokens stay, but until their device renews them they receive only a
+   * notification that identifies nothing, and they still expire with the lease.
+   */
+  markLeaseUnconfirmed(leaseId: string): void {
+    const next = new Map(this.subscriptions);
+    let changed = false;
+    for (const [token, subscription] of this.subscriptions) {
+      if (subscription.leaseId !== leaseId || subscription.unconfirmed) continue;
+      next.set(token, { ...subscription, unconfirmed: true });
+      changed = true;
+    }
+    if (!changed) return;
+    this.persist(next);
+    this.subscriptions = next;
+  }
+
+  /** A revoked paired device keeps no notifications: it had no lease the Hub could judge. */
+  revokeDevice(deviceId: string): void {
+    const next = new Map(this.subscriptions);
+    for (const [token, subscription] of this.subscriptions) {
+      if (subscription.deviceId === deviceId) next.delete(token);
+    }
+    if (next.size === this.subscriptions.size) return;
+    this.persist(next);
+    this.subscriptions = next;
+  }
+
   revokeLease(leaseId: string): void {
     const next = new Map(this.subscriptions);
     for (const [token, subscription] of this.subscriptions) {
@@ -99,6 +130,11 @@ export class PushTokenStore {
   }
 
   getActiveTokens(target?: PushNotificationTarget): string[] {
+    return this.getActiveSubscriptions(target).map(({ token }) => token);
+  }
+
+  /** Active tokens for `target`, with whether each one depends on a managed lease. */
+  getActiveSubscriptions(target?: PushNotificationTarget): ActivePushSubscription[] {
     const now = this.now();
     const active = new Map(this.subscriptions);
     for (const [token, subscription] of this.subscriptions) {
@@ -118,7 +154,11 @@ export class PushTokenStore {
     return Array.from(active)
       .filter(([, subscription]) => allowsTarget(subscription, target))
       .filter(([, subscription]) => allowsRecipient(subscription, target))
-      .map(([token]) => token);
+      .map(([token, subscription]) => ({
+        token,
+        leaseId: subscription.leaseId,
+        unconfirmed: subscription.unconfirmed,
+      }));
   }
 
   private loadFromDisk(): void {
@@ -152,6 +192,8 @@ export class PushTokenStore {
               projectIds: null,
               actor: null,
               scope: DEFAULT_NOTIFICATION_SCOPE,
+              unconfirmed: false,
+              deviceId: null,
             });
           }
         }
@@ -177,6 +219,8 @@ export class PushTokenStore {
               ...(subscription.projectIds === null ? {} : { projectIds: subscription.projectIds }),
               ...(subscription.actor === null ? {} : { actor: subscription.actor }),
               scope: subscription.scope,
+              ...(subscription.unconfirmed ? { unconfirmed: true } : {}),
+              ...(subscription.deviceId === null ? {} : { deviceId: subscription.deviceId }),
             })),
           },
           null,
@@ -204,12 +248,29 @@ export interface PushTokenReaderUpdate {
   actor?: SessionActor;
   /** Absent keeps the saved choice. */
   scope?: NotificationScope;
+  /** The paired device the connection was admitted with, so revoking it removes the token. */
+  deviceId?: string;
 }
 
 export interface PushNotificationTarget {
   projectId?: string;
   /** Which readers this notification is for; absent sends to every authorized token. */
   recipients?: (reader: NotificationReader) => boolean;
+  /**
+   * Asks the Hub for a lease's live grants right before content is sent to its device, judged
+   * against what this event needs. Absent, or anything short of a grant, and the device gets
+   * only the notification that identifies nothing.
+   */
+  confirmLease?: (leaseId: string) => Promise<LeaseConfirmation>;
+}
+
+/** The Hub's live answer for a lease, already judged against what this event needs. */
+export type LeaseConfirmation = { granted: true } | { granted: false; revoked: boolean };
+
+export interface ActivePushSubscription {
+  token: string;
+  leaseId: string | null;
+  unconfirmed: boolean;
 }
 
 interface PushTokenSubscription {
@@ -218,6 +279,9 @@ interface PushTokenSubscription {
   projectIds: readonly string[] | null;
   actor: SessionActor | null;
   scope: NotificationScope;
+  /** Its lease was revoked by the Hub and the device has not renewed it since. */
+  unconfirmed: boolean;
+  deviceId: string | null;
 }
 
 /** One persisted subscription, permissively; absent reader fields read as written before them. */
@@ -232,6 +296,8 @@ function parseStoredSubscription(
     projectIds?: unknown;
     actor?: unknown;
     scope?: unknown;
+    unconfirmed?: unknown;
+    deviceId?: unknown;
   };
   if (typeof candidate.token !== "string" || typeof candidate.expiresAt !== "string") return null;
   const token = candidate.token.trim();
@@ -257,6 +323,9 @@ function parseStoredSubscription(
       projectIds: projectIds === null ? null : [...new Set(projectIds)].sort(),
       actor: actor.success ? actor.data : null,
       scope: scope.success ? scope.data : DEFAULT_NOTIFICATION_SCOPE,
+      unconfirmed: candidate.unconfirmed === true,
+      deviceId:
+        typeof candidate.deviceId === "string" && candidate.deviceId ? candidate.deviceId : null,
     },
   };
 }
@@ -265,6 +334,8 @@ function sameAuthorization(left: PushTokenSubscription, right: PushTokenSubscrip
   return (
     left.leaseId === right.leaseId &&
     left.scope === right.scope &&
+    left.unconfirmed === right.unconfirmed &&
+    left.deviceId === right.deviceId &&
     JSON.stringify(left.projectIds) === JSON.stringify(right.projectIds) &&
     JSON.stringify(left.actor) === JSON.stringify(right.actor)
   );

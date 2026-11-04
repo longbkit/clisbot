@@ -129,6 +129,7 @@ function agentPlacement(
       createdBy: agent.createdBy,
       participationKey: agent.participationKey,
       inheritedOwnership: agent.inheritedOwnership,
+      watched: agent.watched,
       accounts,
       hostKind: hostKinds.get(agent.serverId) ?? "unknown",
     }),

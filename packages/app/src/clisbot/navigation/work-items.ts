@@ -28,6 +28,7 @@ export interface WorkSession {
   createdBy?: SessionActor;
   participationKey?: string;
   inheritedOwnership?: OwnershipEvidence;
+  watched?: boolean;
   statusBucket: string;
   /** Its live state was dropped (the source is out of reach): unknown, so not Running or Done. */
   unverified?: boolean;
@@ -70,6 +71,7 @@ export interface WorkItem {
   createdBy?: SessionActor;
   participationKey?: string;
   inheritedOwnership?: OwnershipEvidence;
+  watched?: boolean;
   statusBucket: string;
   unverified?: boolean;
 }
@@ -109,6 +111,7 @@ export function workItemsOf(
             createdBy: session.createdBy,
             participationKey: session.participationKey,
             inheritedOwnership: session.inheritedOwnership,
+            watched: session.watched,
             statusBucket: session.statusBucket,
             ...(session.unverified ? { unverified: true } : {}),
           },
@@ -139,6 +142,7 @@ export function workItemPasses(item: WorkItem, query: WorkQuery, serverId: strin
     createdBy: item.createdBy,
     participationKey: item.participationKey,
     inheritedOwnership: item.inheritedOwnership,
+    watched: item.watched,
     accounts: query.accounts,
     hostKind: query.hostKinds.get(serverId) ?? "unknown",
   });
@@ -172,6 +176,7 @@ export function createWorkFilter(query: WorkQuery, sessionsOf: WorkSessionsOf): 
           createdBy: session.createdBy,
           participationKey: session.participationKey,
           inheritedOwnership: session.inheritedOwnership,
+          watched: session.watched,
           statusBucket: session.statusBucket,
           unverified: session.unverified,
         },
@@ -210,6 +215,7 @@ function countWorkWithOwnership(
         createdBy: item.createdBy,
         participationKey: item.participationKey,
         inheritedOwnership: item.inheritedOwnership,
+        watched: item.watched,
         accounts,
         hostKind: query.hostKinds.get(workspace.serverId) ?? "unknown",
       });
@@ -259,6 +265,7 @@ export function createWorkCounter(resolve: OwnershipResolver = resolveOwnership)
         item.unverified === other.unverified &&
         sameActor(item.createdBy, other.createdBy) &&
         item.participationKey === other.participationKey &&
+        item.watched === other.watched &&
         ownershipEvidenceKey(item.inheritedOwnership) ===
           ownershipEvidenceKey(other.inheritedOwnership) &&
         (showBots || isChatSession(item) === isChatSession(other))

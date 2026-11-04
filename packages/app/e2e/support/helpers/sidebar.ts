@@ -144,15 +144,19 @@ export async function selectWorkspaceInSidebar(page: Page, workspaceId: string):
   await row.click();
 }
 
-async function openWorkspaceSidebarKebab(page: Page, workspaceId: string) {
+export async function openWorkspaceSidebarKebab(page: Page, workspaceId: string) {
   const serverId = getServerId();
-  const row = page.getByTestId(`sidebar-workspace-row-${serverId}:${workspaceId}`);
+  const row = page.getByTestId(`sidebar-workspace-row-${serverId}:${workspaceId}`).first();
+  const kebab = page.getByTestId(`sidebar-workspace-kebab-${serverId}:${workspaceId}`).first();
   await expect(row).toBeVisible({ timeout: 30_000 });
-  await row.hover();
-
-  const kebab = page.getByTestId(`sidebar-workspace-kebab-${serverId}:${workspaceId}`);
-  await expect(kebab).toBeVisible({ timeout: 10_000 });
-  await kebab.click();
+  // The kebab shows while the row is hovered. The workspace hover card opening can end that
+  // hover with the pointer still on the row, and a pointer that never moves never enters the
+  // row again, so leave and re-enter it until the kebab takes the click.
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await row.hover();
+    await kebab.click({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
 
   return serverId;
 }

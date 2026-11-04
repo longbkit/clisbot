@@ -16,6 +16,9 @@ import type { NotificationReader } from "@clisbot/protocol/notification-audience
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { createPushNotifications } from "./push/index.js";
 import { forgetTerminalLaunch, recordTerminalLaunch } from "./managed-access/terminal-launches.js";
+import { NotificationFollowStore } from "./push/follow-store.js";
+import { HubEnrollmentRejectedError, HubLeaseRefusedError } from "./hub/relationship-remote.js";
+import { notificationReaderKey } from "@clisbot/protocol/notification-audience";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -424,6 +427,7 @@ function memberReader(
 
 /** A real token store on a scratch file; delivery is captured, nothing leaves the process. */
 function createTokenAudience() {
+  const fakeHub = createFakeHub();
   const delivered: Array<{ tokens: string[]; payload: PushPayload }> = [];
   const dir = mkdtempSync(join(tmpdir(), "clisbot-push-audience-"));
   const push = createPushNotifications({
@@ -437,20 +441,101 @@ function createTokenAudience() {
     token: string,
     actor: SessionActor,
     options: { scope?: NotificationReader["scope"]; projectIds?: string[] | null } = {},
-  ) =>
+  ) => {
+    const projectIds = options.projectIds === undefined ? [PROJECT_ID] : options.projectIds;
+    fakeHub.hub.grants.set(`lease-${token}`, projectIds);
     push.renew(
       token,
-      {
-        leaseId: `lease-${token}`,
-        leaseExpiresAt: Date.now() + 60 * 60 * 1000,
-        projectIds: options.projectIds === undefined ? [PROJECT_ID] : options.projectIds,
-      },
+      { leaseId: `lease-${token}`, leaseExpiresAt: Date.now() + 60 * 60 * 1000, projectIds },
       { actor, scope: options.scope },
     );
-  return { push, delivered, registerMember, cleanup: () => rmSync(dir, { recursive: true }) };
+  };
+  return {
+    push,
+    delivered,
+    registerMember,
+    dir,
+    fakeHub,
+    hub: fakeHub.hub,
+    cleanup: () => rmSync(dir, { recursive: true }),
+  };
 }
 
-function createAudienceServer(agent: Record<string, unknown>, extraAgents = new Map()) {
+/**
+ * The Hub as the daemon sees it: its link state and each lease's live grants, which the
+ * daemon asks for right before it sends session content to a lease's device.
+ */
+type ProjectGrants = Record<
+  string,
+  { privileges: readonly string[]; terminalProfiles?: "*" | readonly string[] }
+>;
+type LeaseGrant = readonly string[] | ProjectGrants | null;
+
+function createFakeHub(state: "connected" | "reconnecting" = "connected") {
+  const hub = {
+    state,
+    /**
+     * Live grants per lease: Project ids with just `project.use`, explicit Project grants, or
+     * null for daemon-wide. A missing lease is refused (401).
+     */
+    grants: new Map<string, LeaseGrant>(),
+    verifications: 0,
+    /** Set to make every verification fail without an answer, e.g. a dead socket's timeout. */
+    failure: null as Error | null,
+    /** False models a Hub that predates lease verification. */
+    supportsVerify: true,
+    /** Runs while the Hub is answering, to model what changes in the meantime. */
+    onVerify: null as ((leaseId: string) => Promise<void> | void) | null,
+  };
+  const verify = async (leaseId: string) => {
+    hub.verifications += 1;
+    if (hub.failure) throw hub.failure;
+    const grant = hub.grants.get(leaseId);
+    await hub.onVerify?.(leaseId);
+    if (grant === undefined) throw new HubLeaseRefusedError("invalid_ticket");
+    const lease = {
+      principalId: `member:${leaseId}`,
+      permissions: ["workspace.read"],
+      leaseId,
+      leaseExpiresAt: Date.now() + 60 * 60 * 1000,
+    };
+    if (grant === null) return { ...lease, resourceMode: "daemon", projects: new Map() };
+    const projects: ProjectGrants = Array.isArray(grant)
+      ? Object.fromEntries(grant.map((projectId) => [projectId, { privileges: ["project.use"] }]))
+      : (grant as ProjectGrants);
+    return {
+      ...lease,
+      resourceMode: "projects",
+      projects: new Map(
+        Object.entries(projects).map(([projectId, project]) => [
+          projectId,
+          {
+            privileges: new Set(project.privileges),
+            agentConfigurations: [],
+            ...(project.terminalProfiles ? { terminalProfiles: project.terminalProfiles } : {}),
+          },
+        ]),
+      ),
+    };
+  };
+  const relationships = {
+    status: () => ({ state: hub.state }),
+    get verifyAccessLease() {
+      return hub.supportsVerify ? verify : undefined;
+    },
+  };
+  return { hub, relationships };
+}
+
+function installHub(server: VoiceAssistantWebSocketServer, fake: ReturnType<typeof createFakeHub>) {
+  asInternals<{ hubRelationships: unknown }>(server).hubRelationships = fake.relationships;
+}
+
+function createAudienceServer(
+  agent: Record<string, unknown>,
+  extraAgents = new Map(),
+  hubLink: "connected" | "reconnecting" = "connected",
+) {
   const audience = createTokenAudience();
   const { server } = createServer(
     {
@@ -464,17 +549,84 @@ function createAudienceServer(agent: Record<string, unknown>, extraAgents = new 
   );
   asInternals<{ projectIdForWorkspace: () => Promise<string> }>(server).projectIdForWorkspace =
     async () => PROJECT_ID;
-  return { server, ...audience };
+  asInternals<{ pushNotifications: unknown }>(server).pushNotifications = audience.push;
+  const follows = new NotificationFollowStore(
+    createStub<pino.Logger>(createLogger()),
+    join(audience.dir, "notification-follows.json"),
+  );
+  asInternals<{ notificationFollows: unknown }>(server).notificationFollows = follows;
+  audience.hub.state = hubLink;
+  installHub(server, audience.fakeHub);
+  return { server, follows, ...audience };
 }
 
-async function finish(server: VoiceAssistantWebSocketServer) {
+/** What `token` was sent, once it has `count` deliveries or two seconds have passed. */
+async function payloadsFor(
+  delivered: ReadonlyArray<{ tokens: string[]; payload: PushPayload }>,
+  token: string,
+  count: number,
+): Promise<PushPayload[]> {
+  const received = () =>
+    delivered.filter((entry) => entry.tokens.includes(token)).map((entry) => entry.payload);
+  for (let waited = 0; waited < 2_000 && received().length < count; waited += 10) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return received();
+}
+
+/** Content deliveries per token, once each has `count` or two seconds have passed. */
+async function contentDeliveries(
+  delivered: ReadonlyArray<{ tokens: string[]; payload: PushPayload }>,
+  tokens: readonly string[],
+  count: number,
+): Promise<number[]> {
+  const counts = () =>
+    tokens.map(
+      (token) =>
+        delivered.filter((entry) => entry.tokens.includes(token) && entry.payload.data).length,
+    );
+  for (let waited = 0; waited < 2_000 && counts().some((value) => value < count); waited += 10) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return counts();
+}
+
+async function finish(
+  server: VoiceAssistantWebSocketServer,
+  reason: "finished" | "permission" | "error" = "finished",
+) {
   await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
     agentId: "agent-1",
     provider: "claude",
-    reason: "finished",
+    reason,
   });
   await new Promise((resolve) => setImmediate(resolve));
 }
+
+describe("follow changes", () => {
+  it("reach every connection of that reader, and no one else's", () => {
+    const { server } = createServer();
+    const published: string[] = [];
+    const fakeSession = (name: string, readerKey: string) => ({
+      notificationReaderKey: () => readerKey,
+      publishFollowsChanged: async () => {
+        published.push(name);
+      },
+    });
+    const sessions = asInternals<{ sessions: Map<unknown, unknown> }>(server).sessions;
+    const alicePhone = fakeSession("alice-phone", "alice");
+    sessions.set({}, { session: alicePhone });
+    sessions.set({}, { session: alicePhone });
+    sessions.set({}, { session: fakeSession("alice-desktop", "alice") });
+    sessions.set({}, { session: fakeSession("bob-desktop", "bob") });
+
+    asInternals<{ publishFollowsChanged(readerKey: string): void }>(server).publishFollowsChanged(
+      "alice",
+    );
+
+    expect(published.sort()).toEqual(["alice-desktop", "alice-phone"]);
+  });
+});
 
 describe("VoiceAssistantWebSocketServer notification audience", () => {
   const cleanups: Array<() => void> = [];
@@ -482,8 +634,12 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
     for (const cleanup of cleanups.splice(0)) cleanup();
   });
 
-  function setup(agent: Record<string, unknown>, extraAgents?: Map<string, unknown>) {
-    const result = createAudienceServer(agent, extraAgents);
+  function setup(
+    agent: Record<string, unknown>,
+    extraAgents?: Map<string, unknown>,
+    hubLink?: "connected" | "reconnecting",
+  ) {
+    const result = createAudienceServer(agent, extraAgents, hubLink);
     cleanups.push(result.cleanup);
     return result;
   }
@@ -578,7 +734,10 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
 
     await finish(server);
 
-    expect(delivered.map((entry) => entry.tokens)).toEqual([["admin-phone", "owner-phone"]]);
+    expect(delivered.flatMap((entry) => entry.tokens).sort()).toEqual([
+      "admin-phone",
+      "owner-phone",
+    ]);
   });
 
   it("a subagent belongs to whoever owns its parent", async () => {
@@ -628,6 +787,419 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
 
     expect(linked.delivered.map((entry) => entry.tokens)).toEqual([["alice-phone"]]);
     expect(unlinked.delivered).toEqual([]);
+  });
+
+  it("a Hub revocation for an offline device's lease withholds everything identifying until it renews", async () => {
+    const { server, delivered, registerMember, push } = setup({ createdBy: BOB });
+    registerMember("bob-phone", BOB);
+    push.renew("owner-phone");
+
+    expect(server.revokeManagedLeases(["lease-bob-phone"])).toBe(0);
+    await finish(server);
+    const revoked: Record<string, PushPayload> = {};
+    for (const entry of delivered) for (const token of entry.tokens) revoked[token] = entry.payload;
+    delivered.length = 0;
+    registerMember("bob-phone", BOB);
+    await finish(server);
+
+    expect(revoked["bob-phone"]).toStrictEqual({
+      title: "Clisbot",
+      body: "Open Clisbot to see what changed.",
+    });
+    expect(revoked["owner-phone"]?.data).toMatchObject({ agentId: "agent-1" });
+    expect(delivered.flatMap((entry) => entry.tokens).sort()).toEqual(["bob-phone", "owner-phone"]);
+    expect(delivered.every((entry) => entry.payload.data !== undefined)).toBe(true);
+  });
+
+  describe("content reaches a lease's device only when the Hub grants it right before sending", () => {
+    const UNIDENTIFIED = { title: "Clisbot", body: "Open Clisbot to see what changed." };
+    async function payloads(
+      server: VoiceAssistantWebSocketServer,
+      delivered: Array<{ tokens: string[]; payload: PushPayload }>,
+    ) {
+      delivered.length = 0;
+      await finish(server);
+      const byToken: Record<string, PushPayload> = {};
+      for (const entry of delivered)
+        for (const token of entry.tokens) byToken[token] = entry.payload;
+      return byToken;
+    }
+
+    it("the Hub reads as connected but already revoked the lease (before its replay, or in flight)", async () => {
+      const { server, delivered, registerMember, push, hub } = setup({ createdBy: BOB });
+      registerMember("bob-phone", BOB);
+      push.renew("owner-phone");
+      // The daemon has not been told: no revokeManagedLeases. The Hub answers for itself.
+      hub.grants.delete("lease-bob-phone");
+
+      const first = await payloads(server, delivered);
+      const second = await payloads(server, delivered);
+
+      expect(first["bob-phone"]).toStrictEqual(UNIDENTIFIED);
+      expect(first["owner-phone"]?.body).toBe("Finished working.");
+      // A refusal is remembered as unconfirmed: no more questions until the device renews.
+      expect(second["bob-phone"]).toStrictEqual(UNIDENTIFIED);
+      expect(hub.verifications).toBe(1);
+    });
+
+    it("a silent socket or slow Hub withholds content without forgetting the lease", async () => {
+      const { server, delivered, registerMember, hub } = setup({ createdBy: BOB });
+      registerMember("bob-phone", BOB);
+      hub.failure = new Error("Hub request timed out");
+
+      expect((await payloads(server, delivered))["bob-phone"]).toStrictEqual(UNIDENTIFIED);
+      hub.failure = null;
+      expect((await payloads(server, delivered))["bob-phone"]?.data).toMatchObject({
+        agentId: "agent-1",
+      });
+    });
+
+    it("a daemon-level 401 withholds content but does not mark the lease refused", async () => {
+      const { server, delivered, registerMember, hub } = setup({ createdBy: BOB });
+      registerMember("bob-phone", BOB);
+      hub.failure = new HubEnrollmentRejectedError(401);
+
+      expect((await payloads(server, delivered))["bob-phone"]).toStrictEqual(UNIDENTIFIED);
+      hub.failure = null;
+      expect((await payloads(server, delivered))["bob-phone"]?.data).toMatchObject({
+        agentId: "agent-1",
+      });
+    });
+
+    it("a token re-registered under another lease while the Hub answers is judged by that lease", async () => {
+      const { server, delivered, registerMember, hub, push } = setup({ createdBy: BOB });
+      registerMember("shared-phone", BOB);
+      hub.onVerify = () => {
+        hub.onVerify = null;
+        // Another account signs in on the same device; its lease was never verified.
+        push.renew(
+          "shared-phone",
+          { leaseId: "lease-other", leaseExpiresAt: Date.now() + 60_000, projectIds: [PROJECT_ID] },
+          { actor: BOB },
+        );
+      };
+
+      expect((await payloads(server, delivered))["shared-phone"]).toStrictEqual(UNIDENTIFIED);
+    });
+
+    it("a revoked paired device's token is gone even while it is offline", async () => {
+      const { server, delivered, push } = setup({ createdBy: BOB });
+      push.renew("paired-phone", undefined, { deviceId: "device-1" });
+
+      await server.revokeDeviceSessions("device-1");
+
+      expect((await payloads(server, delivered))["paired-phone"]).toBeUndefined();
+    });
+
+    it("asks once per lease per notification and never caches an answer", async () => {
+      const { server, delivered, registerMember, hub } = setup({ createdBy: BOB });
+      registerMember("bob-phone", BOB);
+      registerMember("alice-all", ALICE, { scope: "all" });
+
+      await payloads(server, delivered);
+      await payloads(server, delivered);
+
+      expect(hub.verifications).toBe(4);
+    });
+
+    it("notifications sent together share one Hub answer per lease; the next one asks again", async () => {
+      const { server, delivered, registerMember, hub } = setup({ createdBy: BOB });
+      registerMember("bob-phone", BOB);
+      registerMember("alice-all", ALICE, { scope: "all" });
+      let answer: (() => void) | undefined;
+      const answered = new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      hub.onVerify = () => answered;
+
+      // Both notifications have asked by the time they return; the Hub has not answered yet.
+      await Promise.all([finish(server), finish(server)]);
+      answer?.();
+
+      expect(hub.verifications).toBe(2);
+      expect(await contentDeliveries(delivered, ["bob-phone", "alice-all"], 2)).toEqual([2, 2]);
+      await finish(server);
+      expect(hub.verifications).toBe(4);
+    });
+
+    it("judges each account's lease on its own: one revoked, one granted", async () => {
+      const { server, delivered, registerMember, hub } = setup({ createdBy: BOB });
+      registerMember("bob-phone", BOB);
+      registerMember("alice-all", ALICE, { scope: "all" });
+      hub.grants.delete("lease-alice-all");
+
+      const byToken = await payloads(server, delivered);
+
+      expect(byToken["alice-all"]).toStrictEqual(UNIDENTIFIED);
+      expect(byToken["bob-phone"]?.data).toMatchObject({ agentId: "agent-1" });
+    });
+
+    it("a lease the Hub still honours but no longer for this Project gets nothing identifying", async () => {
+      const { server, delivered, registerMember, hub } = setup({ createdBy: BOB });
+      registerMember("bob-phone", BOB);
+      hub.grants.set("lease-bob-phone", ["project-b"]);
+
+      expect((await payloads(server, delivered))["bob-phone"]).toStrictEqual(UNIDENTIFIED);
+    });
+
+    it("a terminal's content needs the Terminal grant for how it was launched, not Project use", async () => {
+      const { server, delivered, registerMember, hub, push } = setup({});
+      const terminalCases = [
+        ["project-use-only", { [PROJECT_ID]: { privileges: ["project.use"] } }],
+        ["terminal-use", { [PROJECT_ID]: { privileges: ["project.use", "terminal.use"] } }],
+        [
+          "profile-p1",
+          {
+            [PROJECT_ID]: {
+              privileges: ["project.use", "terminal.profile.use"],
+              terminalProfiles: ["p1"],
+            },
+          },
+        ],
+        ["daemon-wide", null],
+      ] as const;
+      for (const [token, grant] of terminalCases) {
+        registerMember(token, member(token), { scope: "all" });
+        hub.grants.set(`lease-${token}`, grant);
+      }
+      push.renew("owner-phone");
+      const internals = asInternals<{
+        broadcastTerminalAttention(params: Record<string, string>): Promise<void>;
+      }>(server);
+      const contentFor = async (terminalId: string) => {
+        delivered.length = 0;
+        await internals.broadcastTerminalAttention({
+          terminalId,
+          cwd: "/work/secret-project",
+          workspaceId: WORKSPACE_ID,
+          terminalName: "secret-shell",
+          reason: "finished",
+        });
+        await new Promise((resolve) => setImmediate(resolve));
+        const withContent: string[] = [];
+        for (const entry of delivered)
+          if (entry.payload.data !== undefined) withContent.push(...entry.tokens);
+        return withContent.sort();
+      };
+      recordTerminalLaunch("shell-1", {});
+      recordTerminalLaunch("profile-1", { profileId: "p1" });
+
+      const shell = await contentFor("shell-1");
+      const profile = await contentFor("profile-1");
+      forgetTerminalLaunch("shell-1");
+      forgetTerminalLaunch("profile-1");
+
+      expect(shell).toEqual(["daemon-wide", "owner-phone", "terminal-use"]);
+      expect(profile).toEqual(["daemon-wide", "owner-phone", "profile-p1", "terminal-use"]);
+    });
+
+    it("a shared Hub answer is still judged per notification: agent content yes, terminal content no", async () => {
+      const { server, delivered, registerMember, hub } = setup({});
+      registerMember("project-use-only", member("project-use-only"), { scope: "all" });
+      hub.grants.set("lease-project-use-only", { [PROJECT_ID]: { privileges: ["project.use"] } });
+      let answer: (() => void) | undefined;
+      const answered = new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      hub.onVerify = () => answered;
+      const internals = asInternals<{
+        broadcastTerminalAttention(params: Record<string, string>): Promise<void>;
+      }>(server);
+      recordTerminalLaunch("shell-shared", {});
+
+      await Promise.all([
+        finish(server),
+        internals.broadcastTerminalAttention({
+          terminalId: "shell-shared",
+          cwd: "/work/secret-project",
+          workspaceId: WORKSPACE_ID,
+          terminalName: "secret-shell",
+          reason: "finished",
+        }),
+      ]);
+      answer?.();
+      const received = await payloadsFor(delivered, "project-use-only", 2);
+      forgetTerminalLaunch("shell-shared");
+
+      expect(hub.verifications).toBe(1);
+      expect(received).toHaveLength(2);
+      expect(received).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ data: expect.objectContaining({ agentId: "agent-1" }) }),
+          UNIDENTIFIED,
+        ]),
+      );
+    });
+
+    it("an agent's content needs the Project grant and the operation permission", async () => {
+      const { server, delivered, registerMember, hub } = setup({ createdBy: BOB });
+      registerMember("bob-phone", BOB);
+      registerMember("bob-no-project-use", member("bob-x"), { scope: "all" });
+      hub.grants.set("lease-bob-no-project-use", {
+        [PROJECT_ID]: { privileges: ["terminal.use"] },
+      });
+
+      const byToken = await payloads(server, delivered);
+
+      expect(byToken["bob-phone"]?.data).toMatchObject({ agentId: "agent-1" });
+      expect(byToken["bob-no-project-use"]).toStrictEqual(UNIDENTIFIED);
+    });
+
+    it("a Hub that cannot verify leases yet, or a down link, gets nothing identifying", async () => {
+      const { server, delivered, registerMember, hub } = setup({ createdBy: BOB });
+      registerMember("bob-phone", BOB);
+      hub.supportsVerify = false;
+      expect((await payloads(server, delivered))["bob-phone"]).toStrictEqual(UNIDENTIFIED);
+      hub.supportsVerify = true;
+      hub.state = "reconnecting";
+      expect((await payloads(server, delivered))["bob-phone"]).toStrictEqual(UNIDENTIFIED);
+      expect(hub.verifications).toBe(0);
+    });
+  });
+
+  it("one person's devices with different scopes are planned per device, not by the first one", async () => {
+    const { server, delivered, registerMember } = setup({ createdBy: BOB });
+    registerMember("bob-phone-needs", BOB, { scope: "needs" });
+    // Bob's desktop is connected on For me but idle, so nobody saw the failure in the app.
+    connectClient(
+      server,
+      {
+        deviceType: "web",
+        appVisible: false,
+        focusedAgentId: null,
+        lastActivityAt: new Date(Date.now() - 10 * 60_000),
+      },
+      { reader: memberReader(BOB, "mine") },
+    );
+
+    await finish(server, "error");
+
+    expect(delivered.flatMap((entry) => entry.tokens)).toEqual(["bob-phone-needs"]);
+  });
+
+  it("a session nobody can attribute: never Others, For me only daemon-wide, requests only the owner or All", async () => {
+    const { server, delivered, registerMember, push } = setup({});
+    registerMember("admin-daemon-wide", BOB, { projectIds: null });
+    registerMember("admin-needs", member("admin2"), { projectIds: null, scope: "needs" });
+    registerMember("admin-others", member("admin3"), { projectIds: null, scope: "others" });
+    registerMember("member-mine", member("m2"));
+    registerMember("member-needs", member("m5"), { scope: "needs" });
+    registerMember("member-others", member("m3"), { scope: "others" });
+    registerMember("member-all", member("m4"), { scope: "all" });
+    push.renew("owner-phone");
+
+    const tokensFor = async (reason: "finished" | "permission") => {
+      delivered.length = 0;
+      await finish(server, reason);
+      return delivered.flatMap((entry) => entry.tokens).sort();
+    };
+
+    // Unattributed work is never Others, as in the session list: only For me for daemon-wide.
+    expect(await tokensFor("finished")).toEqual(["admin-daemon-wide", "member-all", "owner-phone"]);
+    // Others is not a way around it; only a reader who asked for All gets every request.
+    expect(await tokensFor("permission")).toEqual(["member-all", "owner-phone"]);
+  });
+
+  it("without a live Hub link, lease devices get a payload that identifies nothing, until it reconnects", async () => {
+    const { server, delivered, registerMember, push, hub } = setup(
+      {
+        createdBy: BOB,
+        pendingPermissions: new Map([
+          [
+            "p1",
+            {
+              id: "p1",
+              provider: "claude",
+              name: "Bash",
+              kind: "tool",
+              title: "Run synthetic command",
+            },
+          ],
+        ]),
+      },
+      undefined,
+      "reconnecting",
+    );
+    registerMember("bob-phone", BOB, { scope: "all" });
+    push.renew("owner-phone");
+    recordTerminalLaunch("terminal-bob", { createdBy: BOB.id });
+    const internals = asInternals<{
+      agentManager: { getLastAssistantMessage: unknown };
+      broadcastTerminalAttention(params: Record<string, string>): Promise<void>;
+    }>(server);
+    internals.agentManager.getLastAssistantMessage = async () => "Synthetic secret summary.";
+    const payloadsByToken = async (send: () => Promise<void>) => {
+      delivered.length = 0;
+      await send();
+      await new Promise((resolve) => setImmediate(resolve));
+      const byToken: Record<string, PushPayload> = {};
+      for (const entry of delivered)
+        for (const token of entry.tokens) byToken[token] = entry.payload;
+      return byToken;
+    };
+    const terminal = () =>
+      internals.broadcastTerminalAttention({
+        terminalId: "terminal-bob",
+        cwd: "/work/secret-project",
+        workspaceId: WORKSPACE_ID,
+        terminalName: "secret-shell",
+        reason: "finished",
+      });
+    const unidentified = { title: "Clisbot", body: "Open Clisbot to see what changed." };
+
+    for (const send of [() => finish(server), () => finish(server, "permission"), terminal]) {
+      const payloads = await payloadsByToken(send);
+      expect(payloads["bob-phone"]).toStrictEqual(unidentified);
+      expect(payloads["owner-phone"]?.data).toMatchObject({ serverId: "srv-test" });
+    }
+
+    hub.state = "connected";
+    const reconnected = await payloadsByToken(() => finish(server));
+    forgetTerminalLaunch("terminal-bob");
+
+    expect(reconnected["bob-phone"]).toStrictEqual({
+      title: "Agent finished",
+      body: "Synthetic secret summary.",
+      data: {
+        serverId: "srv-test",
+        workspaceId: WORKSPACE_ID,
+        agentId: "agent-1",
+        reason: "finished",
+      },
+      // Verified content is dropped if the device stays offline past it.
+      ttlSeconds: 300,
+    });
+    expect(reconnected["owner-phone"]?.ttlSeconds).toBeUndefined();
+  });
+
+  it("Needs me pushes requests and failures in the reader's sessions, never finished turns", async () => {
+    const { server, delivered, registerMember } = setup({ createdBy: BOB });
+    registerMember("bob-needs", BOB, { scope: "needs" });
+    registerMember("bob-mine", BOB, { scope: "mine" });
+    registerMember("alice-needs", ALICE, { scope: "needs" });
+
+    const tokensFor = async (reason: "finished" | "permission" | "error") => {
+      delivered.length = 0;
+      await finish(server, reason);
+      return delivered.flatMap((entry) => entry.tokens).sort();
+    };
+
+    expect(await tokensFor("finished")).toEqual(["bob-mine"]);
+    expect(await tokensFor("permission")).toEqual(["bob-mine", "bob-needs"]);
+    // A failure stays in-app for For me, as before; Needs me asked for it on the phone.
+    expect(await tokensFor("error")).toEqual(["bob-needs"]);
+  });
+
+  it("a followed teammate session counts as For me, but a follow never crosses Project access", async () => {
+    const { server, delivered, registerMember, follows } = setup({ createdBy: BOB });
+    registerMember("alice-phone", ALICE);
+    registerMember("carol-other-project", member("carol"), { projectIds: ["project-b"] });
+    follows.set(notificationReaderKey(ALICE), "agent-1", true);
+    follows.set(notificationReaderKey(member("carol")), "agent-1", true);
+
+    await finish(server);
+
+    expect(delivered.flatMap((entry) => entry.tokens)).toEqual(["alice-phone"]);
   });
 
   it("a terminal notifies whoever launched it; an untracked terminal pages no Project Member", async () => {
@@ -736,6 +1308,16 @@ describe("push audience before Expo", () => {
   }
 
   const AUTHOR_AUDIENCE = ["alice-all", "bob-phone", "owner-phone"];
+  /** What the Hub still grants: Dave's lease was revoked and Erin's expired. */
+  const MATRIX_HUB_GRANTS: ReadonlyArray<readonly [string, LeaseGrant]> = [
+    ["lease-bob-phone", [PROJECT_ID]],
+    ["lease-bob-tablet-off", [PROJECT_ID]],
+    ["lease-alice-mine", [PROJECT_ID]],
+    ["lease-alice-all", [PROJECT_ID]],
+    ["lease-carol", ["project-b"]],
+    ["lease-admin", null],
+    ["lease-switched-frank", ["project-b"]],
+  ];
   const cases = [
     {
       reason: "finished",
@@ -789,6 +1371,10 @@ describe("push audience before Expo", () => {
     );
     asInternals<{ projectIdForWorkspace: () => Promise<string> }>(server).projectIdForWorkspace =
       async () => PROJECT_ID;
+    const fakeHub = createFakeHub();
+    for (const [leaseId, projectIds] of MATRIX_HUB_GRANTS)
+      fakeHub.hub.grants.set(leaseId, projectIds);
+    installHub(server, fakeHub);
 
     await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
       agentId: "agent-1",
@@ -798,7 +1384,7 @@ describe("push audience before Expo", () => {
     await new Promise((resolve) => setImmediate(resolve));
     rmSync(dir, { recursive: true });
 
-    const actual = captured.flatMap((entry) => entry.tokens);
+    const actual = captured.flatMap((entry) => entry.tokens).sort();
     const evidencePath = process.env.CLISBOT_PUSH_AUDIENCE_EVIDENCE;
     if (evidencePath) {
       const { appendFileSync } = await import("node:fs");
@@ -816,7 +1402,9 @@ describe("push audience before Expo", () => {
       );
     }
     expect(actual).toEqual(testCase.expected);
-    expect(captured.length).toBeLessThanOrEqual(1);
+    // The owner's devices and the verified Members get the same content; Members' expires sooner.
+    const contents = captured.map(({ payload }) => ({ title: payload.title, body: payload.body }));
+    expect(new Set(contents.map((content) => JSON.stringify(content))).size).toBeLessThanOrEqual(1);
     if (testCase.reason === "permission")
       expect(captured[0]?.payload.body).toBe("Run synthetic command");
     if ("label" in testCase) expect(captured[0]?.payload.body).toBe("Finished working.");

@@ -88,6 +88,7 @@ import { deriveProjectSlug } from "./workspace-git-metadata.js";
 import {
   createPushNotifications,
   type PushNotifications,
+  type LeaseConfirmation,
   type PushNotificationSender,
 } from "./push/index.js";
 import type { ScriptHealthState } from "./script-health-monitor.js";
@@ -103,6 +104,10 @@ import {
   type AttentionClient,
 } from "./push/attention-audience.js";
 import { terminalLaunchOf } from "./managed-access/terminal-launches.js";
+import { NotificationFollowStore } from "./push/follow-store.js";
+import { LeaseVerifier } from "./push/lease-verifier.js";
+import { HubLeaseRefusedError } from "./hub/relationship-remote.js";
+import { notificationReaderKey } from "@clisbot/protocol/notification-audience";
 import {
   isPushEligibleAttentionReason,
   type ClientPresenceState,
@@ -142,7 +147,12 @@ import type { SecurityMode } from "@clisbot/relay/e2ee";
 import type { BrowserToolsBroker } from "./browser-tools/broker.js";
 import type { DaemonRuntimeConfig } from "./session/daemon/daemon-session.js";
 import { DirectorySyncService } from "./directory-sync/index.js";
-import { OWNER_PERMISSIONS, type DaemonPermission } from "./authorization/index.js";
+import {
+  OWNER_PERMISSIONS,
+  SessionAuthorization,
+  type DaemonPermission,
+} from "./authorization/index.js";
+import { grantAllowsTerminalLaunch } from "./managed-access/terminal-access.js";
 import type { WorkspaceLabelService } from "./workspace-labels/index.js";
 import type { ChatService } from "./chats/chat-service.js";
 import type { BotService } from "./bots/index.js";
@@ -157,6 +167,7 @@ import {
   sendBoundedPhysicalFrameAndWait,
 } from "./websocket/physical-socket.js";
 import type {
+  ManagedAccessAdmission,
   ManagedAccessAdmissionResolver,
   ManagedAccessMode,
   ProjectAuthorization,
@@ -598,6 +609,8 @@ type SessionConnection = ReconnectableSessionConnection | PluginSessionConnectio
 interface SocketSessionOptions {
   localHubOperator?: boolean;
   accountActor?: SessionActor;
+  /** The paired device this connection was admitted with. */
+  pushDeviceId?: string;
   sourceId?: string;
   clientId: string;
   appVersion: string | null;
@@ -708,6 +721,7 @@ export class VoiceAssistantWebSocketServer {
   private readonly daemonConfigStore: DaemonConfigStore;
   private readonly pushNotifications: PushNotifications;
   private readonly pushNotificationSender: PushNotificationSender;
+  private readonly notificationFollows: NotificationFollowStore;
   private readonly mcpBaseUrl: string | null;
   private speech!: SpeechService | null;
   private terminalManager!: TerminalManager | null;
@@ -741,6 +755,8 @@ export class VoiceAssistantWebSocketServer {
   private unsubscribeTerminalActivity: (() => void) | null = null;
   private readonly browserToolsBroker: BrowserToolsBroker | null;
   private readonly hubRelationships: HubRelationshipManagement | null;
+  /** Bounded Hub requests confirming leases; notifications sent together share one per lease. */
+  private readonly leaseVerifier = new LeaseVerifier<ManagedAccessAdmission>();
   private connectionLifecycle: "starting" | "accepting" | "stopping" = "accepting";
   private readonly advertiseDaemonStatusRpc: boolean;
   private readonly advertiseRelayConfig: boolean;
@@ -946,6 +962,10 @@ export class VoiceAssistantWebSocketServer {
       filePath: join(clisbotHome, "push-tokens.json"),
     });
     this.pushNotificationSender = pushNotificationSender ?? this.pushNotifications;
+    this.notificationFollows = new NotificationFollowStore(
+      pushLogger,
+      join(clisbotHome, "notification-follows.json"),
+    );
 
     this.agentManager.setAgentAttentionCallback((params) => {
       void this.broadcastAgentAttention(params).catch((err) => {
@@ -1300,6 +1320,12 @@ export class VoiceAssistantWebSocketServer {
   public async revokeDeviceSessions(deviceId: string): Promise<void> {
     const principalId = `device:${deviceId}`;
     this.revokedDevicePrincipals.add(principalId);
+    // An offline revoked device has no connection to close; its push tokens go too.
+    try {
+      this.pushNotifications.revokeDevice(deviceId);
+    } catch (error) {
+      this.logger.warn({ err: error, deviceId }, "Failed to revoke a device's push subscriptions");
+    }
     for (const [socket, pending] of this.pendingConnections) {
       if (
         pending.admission?.principalId !== principalId &&
@@ -1710,6 +1736,7 @@ export class VoiceAssistantWebSocketServer {
       clientCapabilities,
       permissions: admission.permissions,
       accountActor: admission.actor,
+      pushDeviceId: admission.deviceCredential?.credentialId,
       localHubOperator:
         !!this.credentialSource?.deviceAuthority &&
         (admission.localOperator === true ||
@@ -1853,6 +1880,9 @@ export class VoiceAssistantWebSocketServer {
       publishScriptStatusUpdate: (message) => this.publishScriptStatusUpdate(message),
       downloadTokenStore: this.downloadTokenStore,
       pushNotifications: this.pushNotifications,
+      notificationFollows: this.notificationFollows,
+      pushDeviceId: options.pushDeviceId,
+      onFollowsChanged: (readerKey) => this.publishFollowsChanged(readerKey),
       clisbotHome: this.clisbotHome,
       worktreesRoot: this.worktreesRoot,
       agentManager: this.agentManager,
@@ -2570,6 +2600,10 @@ export class VoiceAssistantWebSocketServer {
         pushTokenRevocation: true,
         // COMPAT(notificationScope): added after v2.2.2, remove gate after 2027-05-03.
         notificationScope: true,
+        // COMPAT(notificationFollows): added after v2.2.2, remove gate after 2027-05-04.
+        notificationFollows: true,
+        // COMPAT(notificationNeedsScope): added after v2.2.2, remove gate after 2027-05-04.
+        notificationNeedsScope: true,
         // COMPAT(plugins): added in v0.3.0, remove gate after 2027-08-07.
         plugins: true,
         pluginManagement: true,
@@ -2949,6 +2983,15 @@ export class VoiceAssistantWebSocketServer {
 
   public revokeManagedLeases(leaseIds: readonly string[]): number {
     const requested = new Set(leaseIds);
+    // A device that is offline has no connection left to close, but its push token still
+    // carries the lease. Until it renews, it gets only notifications that identify nothing.
+    for (const leaseId of requested) {
+      try {
+        this.pushNotifications.markLeaseUnconfirmed(leaseId);
+      } catch (error) {
+        this.logger.warn({ err: error, leaseId }, "Failed to withhold a revoked push subscription");
+      }
+    }
     const connections = new Set<SessionConnection>([
       ...this.sessions.values(),
       ...this.externalSessionsByKey.values(),
@@ -3069,7 +3112,8 @@ export class VoiceAssistantWebSocketServer {
   ): Promise<void> {
     if (connection.managedLeaseId !== null) {
       try {
-        this.pushNotifications.revokeLease(connection.managedLeaseId);
+        // The device may simply be in the background; it renews when it reconnects.
+        this.pushNotifications.markLeaseUnconfirmed(connection.managedLeaseId);
       } catch (error) {
         this.logger.warn(
           { err: error, leaseId: connection.managedLeaseId },
@@ -3639,26 +3683,36 @@ export class VoiceAssistantWebSocketServer {
     const evidence = await agentNotificationEvidence(agent, async (agentId) => {
       return this.agentManager.getAgent(agentId) ?? (await this.agentStorage.get(agentId));
     });
-    const pushEligible = isPushEligibleAttentionReason(params.reason);
+    // A failure is in-app only, except for readers who asked to hear only what needs them.
+    const pushable = isPushEligibleAttentionReason(params.reason);
     const plan = planAttentionAudience({
       clients: notificationEntries,
-      allows: allowsAgentNotification(evidence),
+      allows: allowsAgentNotification(
+        evidence,
+        params.reason === "finished" ? "update" : "needs",
+        (reader) =>
+          this.notificationFollows.isFollowing(notificationReaderKey(reader.actor), params.agentId),
+      ),
       focusTarget: { kind: "agent", id: params.agentId },
-      pushEligible,
+      pushEligible: (reader) => pushable || reader.scope === "needs",
       nowMs,
     });
 
-    if (pushEligible) {
-      const projectId = await this.projectIdForWorkspace(agent.workspaceId);
-      void this.pushNotificationSender
-        .send(notification, {
-          ...(projectId === null ? {} : { projectId }),
-          recipients: plan.pushRecipients,
-        })
-        .catch((err) => {
-          this.logger.warn({ err, agentId: params.agentId }, "Failed to send push notification");
-        });
-    }
+    const projectId = await this.projectIdForWorkspace(agent.workspaceId);
+    void this.pushNotificationSender
+      .send(notification, {
+        ...(projectId === null ? {} : { projectId }),
+        recipients: plan.pushRecipients,
+        confirmLease: this.confirmLeaseFor(
+          "agent_attention_required",
+          (authorization) =>
+            projectId !== null &&
+            authorization.project(projectId)?.privileges.has("project.use") === true,
+        ),
+      })
+      .catch((err) => {
+        this.logger.warn({ err, agentId: params.agentId }, "Failed to send push notification");
+      });
 
     for (const { client: ws } of clientEntries) {
       const shouldNotify = plan.inAppRecipients.has(ws);
@@ -3740,9 +3794,12 @@ export class VoiceAssistantWebSocketServer {
 
     const plan = planAttentionAudience({
       clients: notificationEntries,
-      allows: allowsTerminalNotification(terminalLaunchOf(params.terminalId).createdBy),
+      allows: allowsTerminalNotification(
+        terminalLaunchOf(params.terminalId).createdBy,
+        params.reason === "needs_input" ? "needs" : "update",
+      ),
       focusTarget: { kind: "terminal", id: params.terminalId },
-      pushEligible: true,
+      pushEligible: () => true,
       nowMs,
     });
 
@@ -3762,7 +3819,19 @@ export class VoiceAssistantWebSocketServer {
             ...(workspaceId ? { workspaceId } : {}),
           },
         },
-        { ...(projectId === null ? {} : { projectId }), recipients: plan.pushRecipients },
+        {
+          ...(projectId === null ? {} : { projectId }),
+          recipients: plan.pushRecipients,
+          confirmLease: this.confirmLeaseFor(
+            "terminal_attention_required",
+            (authorization) =>
+              projectId !== null &&
+              grantAllowsTerminalLaunch(
+                authorization.project(projectId),
+                terminalLaunchOf(params.terminalId).profileId,
+              ),
+          ),
+        },
       )
       .catch((err) => {
         this.logger.warn(
@@ -3790,6 +3859,51 @@ export class VoiceAssistantWebSocketServer {
         this.sessions.get(ws)!.session.publishToSource(ws, message.message);
       else this.sendToClient(ws, message);
     }
+  }
+
+  /** Every connection of the reader learns their follows changed, each filtered by its access. */
+  private publishFollowsChanged(readerKey: string): void {
+    const sessions = new Set<Session>();
+    for (const connection of this.sessions.values()) sessions.add(connection.session);
+    for (const session of sessions) {
+      if (session.notificationReaderKey() !== readerKey) continue;
+      void session.publishFollowsChanged().catch((err) => {
+        this.logger.warn({ err }, "Failed to publish follow changes");
+      });
+    }
+  }
+
+  /**
+   * Asks the Hub, now, for a lease's live grants (without extending it) and grants content only
+   * when they let that device read this event: the same operation permission and resource rule
+   * its connection would need, judged by the real authorization model. Hub link down, an older
+   * Hub, a timeout or an error all mean "not granted": the device gets a notification that
+   * identifies nothing. A 401 is the Hub refusing the lease.
+   */
+  private confirmLeaseFor(
+    event: SessionOutboundMessage["type"],
+    allowsResource: (authorization: SessionAuthorization) => boolean,
+  ): (leaseId: string) => Promise<LeaseConfirmation> {
+    return async (leaseId) => {
+      const relationships = this.hubRelationships;
+      const verify = relationships?.verifyAccessLease?.bind(relationships);
+      if (!verify || relationships?.status().state !== "connected")
+        return { granted: false, revoked: false };
+      let authorization: SessionAuthorization;
+      try {
+        const admission = await this.leaseVerifier.verify(leaseId, verify);
+        authorization = new SessionAuthorization(admission.permissions, admission);
+      } catch (error) {
+        return {
+          granted: false,
+          revoked: error instanceof HubLeaseRefusedError,
+        };
+      }
+      const granted =
+        authorization.allowsOutbound({ type: event } as SessionOutboundMessage) &&
+        (!authorization.isResourceRestricted() || allowsResource(authorization));
+      return granted ? { granted: true } : { granted: false, revoked: false };
+    };
   }
 
   private async projectIdForWorkspace(

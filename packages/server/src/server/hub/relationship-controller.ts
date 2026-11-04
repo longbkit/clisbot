@@ -160,6 +160,8 @@ export interface HubRelationshipManagement {
     clientId: string;
   }): Promise<ManagedAccessAdmission>;
   refreshAccessLease(leaseId: string): Promise<ManagedAccessAdmission>;
+  /** Live grants of a lease without extending it. Absent on test doubles that predate it. */
+  verifyAccessLease?(leaseId: string): Promise<ManagedAccessAdmission>;
   disconnect(input: {
     force: boolean;
   }): Promise<{ status: HubRelationshipStatus; warning?: string }>;
@@ -435,6 +437,18 @@ export class HubRelationshipController implements HubRelationshipManagement {
       throw new Error("This daemon is not connected to a Hub");
     }
     return this.options.remote.refreshAccessLease({
+      daemonId: this.record.relationship.daemonId,
+      hubOrigin: this.record.relationship.hubOrigin,
+      credential: this.record.credential.secret,
+      leaseId,
+    });
+  }
+
+  async verifyAccessLease(leaseId: string): Promise<ManagedAccessAdmission> {
+    if (!this.record || this.record.state !== "active" || !this.options.remote.verifyAccessLease) {
+      throw new Error("This daemon cannot verify access with a Hub");
+    }
+    return this.options.remote.verifyAccessLease({
       daemonId: this.record.relationship.daemonId,
       hubOrigin: this.record.relationship.hubOrigin,
       credential: this.record.credential.secret,
