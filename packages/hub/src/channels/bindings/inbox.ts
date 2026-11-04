@@ -187,21 +187,27 @@ export class BindingInbox {
         }
         return this.deps.store.markSent(scope, carried, messageId);
       },
-      settle: () => this.deps.store.file(scope, [...carried, ...older], "delivered"),
+      settle: async () => {
+        if (carrier?.ingressId !== undefined && agentId !== undefined) {
+          await this.deps.store.confirmThreadContextSent(scope, carrier.ingressId, messageId);
+        }
+        await this.deps.store.file(scope, [...carried, ...older], "delivered");
+      },
     };
   }
 
   /**
    * The message whose thread snapshot this prompt carries, or undefined. The
-   * decision is durable, per session: a snapshot goes to an Agent once, and the
-   * marker (`markThreadContextSent`) is written with the prompt's sent mark,
-   * before the send. A replay of that prompt finds its own marker and carries
-   * the thread again, so it is the same request; a later prompt to the same
-   * Agent finds an earlier marker and leaves it out. A prompt that never
-   * reached the daemon (no `sent_in`) counts for nothing, and a new session
-   * (`/new`, a new binding) is a new Agent, so it gets the thread again. Rows
-   * written before this existed carry no marker: the first mention after an
-   * upgrade carries the thread.
+   * decision is durable, per session and native thread. The prompt carrying a
+   * snapshot writes a marker on its row with its sent mark, before the send
+   * (`markThreadContextSent`), and confirms it once the daemon took the prompt
+   * (`settle`). A replay of that prompt finds its own marker, confirmed or not,
+   * and carries the thread again, so it is the same request. A later prompt to
+   * the same Agent leaves the thread out only after an earlier confirmed
+   * marker: a prompt refused before delivery, or one whose outcome stayed
+   * unknown, does not count, so the thread is sent again (a possible duplicate,
+   * never a loss). A new session (`/new`, a new binding) is another Agent, and
+   * rows written before this existed carry no marker.
    */
   private async threadCarrier(
     scope: ChannelInboxScope,

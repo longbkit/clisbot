@@ -9,7 +9,7 @@
 // "Before" is always another row of the same table: a message's context is the
 // rows filed before it arrived, so replaying the same message reads the same
 // rows and sends the same prompt.
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, sql, type SQL } from "drizzle-orm";
 import * as schema from "./schema.js";
 import type { DrizzleHandle } from "./runtime/index.js";
 import type { ChannelIngressQueueRecord } from "./types.js";
@@ -128,10 +128,11 @@ export class ChannelInboxStore {
   }
 
   /**
-   * The thread snapshot on row `id` goes to `agentId` in prompt `deliveryId`
-   * (`bindings/inbox.ts`). Written with the prompt's sent mark, before the send,
-   * on the row's own payload, so a replay of that prompt sees it and renders
-   * the thread again, and a later prompt to the same session does not.
+   * The thread snapshot on row `id` is about to go to `agentId` in prompt
+   * `deliveryId` (`bindings/inbox.ts`). Written with the prompt's sent mark,
+   * before the send, on the row's own payload, so a replay of that prompt sees
+   * it and renders the thread again. It proves nothing about delivery: only
+   * `confirmThreadContextSent`, once the daemon took the prompt, does.
    */
   async markThreadContextSent(
     scope: ChannelInboxScope,
@@ -144,6 +145,26 @@ export class ChannelInboxStore {
         payload: sql`jsonb_set(${queue.payload}, '{threadContextSentTo}', ${JSON.stringify(marker)}::jsonb)`,
       })
       .where(and(...accountWhere(scope), eq(queue.id, id)));
+  }
+
+  /** The daemon took prompt `deliveryId`, whose thread snapshot row `id` holds. */
+  async confirmThreadContextSent(
+    scope: ChannelInboxScope,
+    id: string,
+    deliveryId: string,
+  ): Promise<void> {
+    await this.database
+      .update(queue)
+      .set({
+        payload: sql`jsonb_set(${queue.payload}, '{threadContextSentTo,confirmed}', 'true'::jsonb)`,
+      })
+      .where(
+        and(
+          ...accountWhere(scope),
+          eq(queue.id, id),
+          sql`${queue.payload}->'threadContextSentTo'->>'deliveryId' = ${deliveryId}`,
+        ),
+      );
   }
 
   /** The thread marker on row `id`, if a prompt already took its snapshot. */
@@ -163,9 +184,10 @@ export class ChannelInboxStore {
 
   /**
    * True when a row of the binding in native thread `threadId` that arrived
-   * before `before` took its thread snapshot to `agentId` in a prompt that
-   * reached the daemon (`sent_in`). The thread matters when one session serves
-   * a whole channel (`bindingKey: channel`): each thread's snapshot goes once.
+   * before `before` took its thread snapshot to `agentId` in a prompt the daemon
+   * confirmed taking. A sent mark (`sent_in`) is written before the send, so it
+   * is not enough. The thread matters when one session serves a whole channel
+   * (`bindingKey: channel`): each thread's snapshot goes once.
    */
   async threadContextSentTo(
     scope: ChannelInboxScope,
@@ -179,7 +201,7 @@ export class ChannelInboxStore {
       .where(
         and(
           ...scopeWhere(scope),
-          isNotNull(queue.sentIn),
+          sql`${queue.payload}->'threadContextSentTo'->>'confirmed' = 'true'`,
           eq(queue.externalThreadId, threadId),
           sql`${queue.payload}->'threadContextSentTo'->>'agentId' = ${agentId}`,
           arrivedBefore(before),

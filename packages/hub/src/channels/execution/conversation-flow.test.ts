@@ -17,7 +17,6 @@ import type {
   EffectiveDefaults,
 } from "../config/compile.js";
 import { connectEnrolledChannelDaemon, type DaemonConnection } from "../daemon/client.js";
-import { HostNotReachedError } from "../daemon/enrolled-client.js";
 import { createMemorySteerTargets, type SteerTargetStore } from "../daemon/steer-target.js";
 import { AgentRequestRefusedError } from "../daemon/agent-request-refusal.js";
 import { configurationDaemonStub } from "../daemon/test-support.js";
@@ -30,6 +29,7 @@ import {
   deliveryMessageId,
 } from "../bindings/prompt.js";
 import { claimedInbound } from "../ingress/claimed-inbound.js";
+import { HostNotReachedError } from "../daemon/enrolled-client.js";
 import type { InboundReplyParams } from "../loader/host.js";
 import { ManualClock } from "../plane/clock.js";
 import type { InboundMessage, PlaneLogger } from "../plane/types.js";
@@ -107,6 +107,8 @@ function makeDaemon(
   options: {
     failSends?: number;
     failCreates?: number;
+    /** Sends refused before anything reached the daemon (a Host already away). */
+    refuseSends?: number;
     onSend?: (agentId: string) => Promise<void>;
   } = {},
 ) {
@@ -114,6 +116,7 @@ function makeDaemon(
   const receipts = new Map<string, string>();
   let failures = options.failSends ?? 0;
   let createFailures = options.failCreates ?? 0;
+  let refusals = options.refuseSends ?? 0;
   let seq = 0;
   const daemon: DaemonConnection = {
     ...configurationDaemonStub(),
@@ -140,6 +143,10 @@ function makeDaemon(
       };
     },
     sendAgentMessage: async (agentId, text, sendOptions) => {
+      if (refusals > 0) {
+        refusals -= 1;
+        throw new HostNotReachedError();
+      }
       const messageId = sendOptions?.messageId ?? channelMessageId(sendOptions!.source!);
       const request = JSON.stringify([agentId, text]);
       const held = receipts.get(messageId);
@@ -160,7 +167,11 @@ function makeDaemon(
     setTimelineSubscription: async () => undefined,
     stop: () => undefined,
   };
-  return { daemon, sends };
+  /** The next send is refused before anything reaches the daemon. */
+  const refuseNext = () => {
+    refusals += 1;
+  };
+  return { daemon, sends, refuseNext };
 }
 
 let dataDirectory: string;
@@ -1425,7 +1436,7 @@ describe("the thread a mention replies in", () => {
     await flow.plane.stop();
   });
 
-  it("counts only a marker whose prompt reached the daemon", async () => {
+  it("counts only a marker the daemon confirmed, for that Agent and thread", async () => {
     const say = conversation();
     const daemon = makeDaemon();
     const flow = makePlane(makeRoute({}), daemon);
@@ -1465,7 +1476,13 @@ describe("the thread a mention replies in", () => {
       deliveryId: "never-sent",
     });
     assert.equal(await store.inbox.threadContextSentTo(scope, agentId, thread, laterRow.id), false);
+    // The sent mark is written before the send: it proves nothing.
     await store.inbox.markSent(scope, [failedRow.id], "never-sent");
+    assert.equal(await store.inbox.threadContextSentTo(scope, agentId, thread, laterRow.id), false);
+    // A confirmation for another prompt does not confirm this marker.
+    await store.inbox.confirmThreadContextSent(scope, failedRow.id, "another-prompt");
+    assert.equal(await store.inbox.threadContextSentTo(scope, agentId, thread, laterRow.id), false);
+    await store.inbox.confirmThreadContextSent(scope, failedRow.id, "never-sent");
     assert.equal(await store.inbox.threadContextSentTo(scope, agentId, thread, laterRow.id), true);
     assert.equal(
       await store.inbox.threadContextSentTo(scope, "agent-other", thread, laterRow.id),
@@ -1475,6 +1492,34 @@ describe("the thread a mention replies in", () => {
       await store.inbox.threadContextSentTo(scope, agentId, "1799999999.000001", laterRow.id),
       false,
       "another thread of a channel-keyed session",
+    );
+    await flow.plane.stop();
+  });
+
+  it("is sent again after a prompt refused before delivery and dead-lettered", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    await flow.send(say("hello", { name: "Alice" }));
+    const agentId = daemon.sends[0]!.agentId;
+
+    // The Host is away when the snapshot's prompt goes out: marked sent, never delivered.
+    daemon.refuseNext();
+    const refused = mentionIn(say, "free up the disk");
+    await flow.send(refused).catch(() => undefined);
+    const record = await storedRow(refused);
+    assert.notEqual(record.sentIn, null, "the sent mark went down before the send");
+    assert.equal(daemon.sends.length, 1, "the refused prompt reached no session");
+    const payload = { channel: "slack", accountId: ACCOUNT_ID, ctxPayload: { Message: refused } };
+    await flow.plane.onDeadLettered({ ...record, payload });
+
+    await flow.send(mentionIn(say, "try again"));
+    const last = daemon.sends.at(-1)!;
+    assert.equal(last.agentId, agentId, "the same session");
+    assert.equal(
+      last.text,
+      lines(THREAD_HEADER, ROOT_LINE, MESSAGE_HEADER, "Alice (slack:U0ALICE): try again"),
     );
     await flow.plane.stop();
   });
