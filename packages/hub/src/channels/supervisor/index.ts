@@ -1536,6 +1536,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
           });
         });
       },
+      recovered: () => plane.onHostReconnected(),
     }));
     const daemonOptions: ChannelDaemonClientOptions = {
       ...this.options.daemon,

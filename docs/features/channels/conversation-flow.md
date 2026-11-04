@@ -39,6 +39,13 @@ Commands follow the same rule: a command's lane is the session it acts on, so `/
 
 **A turn dies silently when its Host does.** The prompt was delivered, so the row is complete and is never retried — the Agent may have acted on it — but the turn goes with the daemon and no terminal event ever arrives. When the Hub loses the Host (socket drop, daemon stop, lost lease) it tells each conversation that had a turn running, once, and forgets them: a reconnect says nothing more, and a conversation whose turn had already ended hears nothing. The Hub knows which those are because it tracks the turns it started (`bindings/conversation-flow.ts`); after a Hub restart it knows none, so nothing is said. A turn that did finish after all still posts its answer when its late terminal event arrives, which is why the notice says an answer may never come rather than that the run failed.
 
+**A stream that misses part of a turn says so once, and resends nothing.** Every channel account on a Host rides that Host's one socket, and the daemon keeps one timeline set for it, so the Hub always sends the union of every account's agents and sends it again when the socket comes back (`daemon/host-timeline-subscription.ts`). Before that, one account's restart cut the other accounts' turns off mid-stream ([PR #66](https://github.com/longbkit/clisbot/pull/66)). Two cases are still told, once per turn, that the reply in the thread may be incomplete (`reply-unconfirmed`):
+
+- a socket that dropped and came back inside the 5 s grace while a turn ran, said when that turn ends;
+- a turn the Hub still counts as running that the Host reports idle, said when the Hub ends it.
+
+The Hub checks its counted turns against the Host once a minute, only while it counts one (`ConversationFlow.reconcileTurns`). It ends a turn only if nothing could have started a newer one since the read began: no send in flight or returned since, and no stream event for that agent, which covers a turn started from the app or another account. A failed read ends nothing. What was lost is not backfilled from the Host's timeline: the thread is told, and the session holds the full result.
+
 **A message enters a session once.** The daemon keys each prompt by the message and keeps a receipt. A batch carries every message id it contains. A failure the daemon knows happened before the prompt reached the provider (`PromptNotDeliveredError`) clears the receipt, so the same message can be sent again; any other failure stays "unknown" and is not resent.
 
 ## Slack tables in replies

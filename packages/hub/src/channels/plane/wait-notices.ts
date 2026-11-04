@@ -11,6 +11,10 @@ export const WAIT_NOTICE_TEXT = {
   refused: "This message could not be processed. Send it again.",
   "outcome-unknown":
     "Processing stopped before its outcome could be confirmed. It was not retried automatically. Check the session before sending this message again.",
+  // A turn that ended, or went on, while part of its stream never reached the
+  // Hub: what the thread shows may not be the whole reply. Nothing is resent.
+  "reply-unconfirmed":
+    "The connection to the machine that runs this bot was interrupted during this turn, so the reply here may be incomplete. Check the session for the full result. Nothing was sent again.",
   // A turn the Host took with it: its terminal event never comes.
   "host-lost":
     "The machine that runs this bot went away while it was working on this message, so an answer may never come. Send it again if you do not get one.",

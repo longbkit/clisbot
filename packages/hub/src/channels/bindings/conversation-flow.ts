@@ -52,7 +52,7 @@ export interface ConversationPlaneSeams {
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
-    kind: "unprocessed" | "refused" | "host-lost" | "outcome-unknown",
+    kind: "unprocessed" | "refused" | "host-lost" | "outcome-unknown" | "reply-unconfirmed",
   ): Promise<void>;
   mayUse(
     message: InboundMessage,
@@ -107,6 +107,9 @@ interface TurnAddress {
   route: CompiledRoute;
   /** The sequence its send began at. */
   sentAt: number;
+  /** The Host's socket dropped and came back while it ran: stream events in
+   * the gap never reached the plane. */
+  gapped?: boolean;
 }
 
 interface DeadLetter {
@@ -241,7 +244,10 @@ export class ConversationFlow {
           (this.streamSeenAt.get(agentId) ?? 0) <= readFrom;
         if (!quiet) continue;
         this.deps.logger.warn("channel turn ended without its terminal event", { agentId });
-        await this.turnEnded(agentId);
+        // Ended first (its synchronous part), so nothing can re-check it meanwhile.
+        const ended = this.turnEnded(agentId);
+        await this.unconfirmed(at);
+        await ended;
       }
       for (const marks of [this.sendReturnedAt, this.streamSeenAt]) {
         for (const [agentId, at] of marks) {
@@ -262,6 +268,34 @@ export class ConversationFlow {
   noteStream(agentId: string): void {
     this.sequence += 1;
     this.streamSeenAt.set(agentId, this.sequence);
+  }
+
+  /**
+   * The Host's socket came back inside the disconnect grace: the turns still
+   * running lost whatever their stream carried in the gap. Each is told once,
+   * when it ends, that its reply may be incomplete.
+   */
+  hostReconnected(): void {
+    for (const at of this.runningTurns.values()) at.gapped = true;
+  }
+
+  /** The turn's terminal event arrived. */
+  async turnCompleted(agentId: string): Promise<void> {
+    const at = this.runningTurns.get(agentId);
+    const ended = this.turnEnded(agentId);
+    if (at?.gapped === true) await this.unconfirmed(at);
+    await ended;
+  }
+
+  /** Say once that this turn's reply may be incomplete; nothing is resent. */
+  private async unconfirmed(at: TurnAddress): Promise<void> {
+    await this.deps.plane
+      .notice(at.message, at.account, at.route, "reply-unconfirmed")
+      .catch((error: unknown) => {
+        this.deps.logger.warn("channel unconfirmed-reply notice failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
   }
 
   /** The turn ended (or its agent was let go): release what waited on it. */

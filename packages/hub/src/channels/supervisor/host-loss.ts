@@ -19,6 +19,9 @@ export interface HostLossNotifierDeps {
   /** Tell the conversations that had a running turn. Called at most once per
    * disconnection, and never for a socket that came back inside the grace. */
   notify: () => Promise<void>;
+  /** The socket came back inside the grace: a running turn kept going, but
+   * what its stream carried in the gap never arrived. */
+  recovered?: (() => void) | undefined;
   setTimer?: ((run: () => void, ms: number) => unknown) | undefined;
   clearTimer?: ((timer: unknown) => void) | undefined;
 }
@@ -48,11 +51,14 @@ export class HostLossNotifier {
     this.pending = setTimer(run, this.deps.graceMs ?? HOST_LOSS_GRACE_MS);
   }
 
-  /** The socket is back. A turn that survived the gap keeps running, and its
-   * conversation is never told anything. */
+  /** The socket is back. A turn that survived the gap keeps running; it is
+   * not told the machine went away, only (by `recovered`) that its reply may
+   * be incomplete once it ends. */
   connected(): void {
+    const withinGrace = this.pending !== undefined;
     this.cancel();
     this.reported = false;
+    if (withinGrace) this.deps.recovered?.();
   }
 
   /** The account is stopping: drop the armed grace with it. */

@@ -887,6 +887,9 @@ describe("second review regressions", () => {
   });
 });
 
+const REPLY_UNCONFIRMED_NOTICE =
+  "The connection to the machine that runs this bot was interrupted during this turn, so the reply here may be incomplete. Check the session for the full result. Nothing was sent again.";
+
 const HOST_LOST_NOTICE =
   "The machine that runs this bot went away while it was working on this message, so an answer may never come. Send it again if you do not get one.";
 
@@ -935,7 +938,7 @@ describe("a Host that goes away mid-turn", () => {
     await flow.plane.stop();
   });
 
-  it("says nothing for a turn the Host already finished though its end never reached the plane", async () => {
+  it("tells a turn the Host finished unseen, once, that its reply may be incomplete, never that the machine went away", async () => {
     // 2026-11-03: the turn's stream was cut, so its terminal event never came.
     // A day later a Host restart told the thread the machine went away while
     // it was working. Independent of the Route's progress settings.
@@ -956,7 +959,12 @@ describe("a Host that goes away mid-turn", () => {
       await pause(30);
 
       await flow.plane.onHostLost();
-      assert.deepEqual(flow.posted, [], `typing indicator ${sync.progress.typingIndicator}`);
+      await pause(30);
+      assert.deepEqual(
+        flow.posted,
+        [REPLY_UNCONFIRMED_NOTICE],
+        `typing indicator ${sync.progress.typingIndicator}`,
+      );
       await flow.plane.stop();
     }
   });
@@ -1068,6 +1076,46 @@ describe("a Host that goes away mid-turn", () => {
 
     await flow.plane.onHostLost();
     assert.deepEqual(flow.posted, [HOST_LOST_NOTICE]);
+    await flow.plane.stop();
+  });
+
+  it("tells a turn that ran through a brief disconnect, once, when it ends", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const host = readsOf(daemon.daemon);
+    const flow = makePlane(makeRoute({}), daemon, { turnReconcileMs: 10 });
+    await flow.plane.start(daemon.daemon, store);
+    host.answer = async () => [runningSnapshot("agent-0")];
+    await flow.send(say("long task"));
+    flow.plane.onHostReconnected();
+
+    const completed = { type: "turn_completed" as const, provider: "codex", turnId: "t" };
+    await flow.plane.onStreamEvent("agent-0", completed);
+    await flow.plane.onStreamEvent("agent-0", completed);
+    assert.deepEqual(flow.posted, [REPLY_UNCONFIRMED_NOTICE]);
+    await flow.plane.onHostLost();
+    assert.deepEqual(flow.posted, [REPLY_UNCONFIRMED_NOTICE]);
+    await flow.plane.stop();
+  });
+
+  it("says nothing extra for a turn whose stream arrived whole", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const host = readsOf(daemon.daemon);
+    const flow = makePlane(makeRoute({}), daemon, { turnReconcileMs: 10 });
+    await flow.plane.start(daemon.daemon, store);
+    host.answer = async () => [runningSnapshot("agent-0")];
+    await flow.send(say("short task"));
+    await flow.plane.onStreamEvent("agent-0", {
+      type: "turn_completed",
+      provider: "codex",
+      turnId: "t",
+    });
+    // A reconnect after the turn ended marks nothing.
+    flow.plane.onHostReconnected();
+    host.answer = async () => [];
+    await pause(40);
+    assert.deepEqual(flow.posted, []);
     await flow.plane.stop();
   });
 

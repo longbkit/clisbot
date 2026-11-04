@@ -159,6 +159,8 @@ export interface ChannelPlane {
   /** The Host is gone: tell every conversation whose turn it took with it
    * (`ConversationFlow.hostLost`). */
   onHostLost(): Promise<void>;
+  /** The Host's socket came back inside the disconnect grace (`supervisor/host-loss.ts`). */
+  onHostReconnected(): void;
   /** A flush row came due (`ConversationFlow.deliverHeld`). */
   deliverHeld(payload: HeldFlushPayload, id: string): Promise<PlaneInboundDeferral | undefined>;
   /**
@@ -400,6 +402,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
 
     onDeadLettered: async (record) => conversationFlow?.onDeadLettered(record),
     onHostLost: async () => conversationFlow?.hostLost(),
+    onHostReconnected: () => conversationFlow?.hostReconnected(),
     deliverHeld: async (payload, id) => conversationFlow?.deliverHeld(payload, id),
 
     async onApprovalCallback(params) {
@@ -493,7 +496,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         await lifecycleCommands?.onStream(agentId, event);
         if (isTerminalStreamEvent(event)) {
           executionLimiter?.completeAgent(agentId);
-          await conversationFlow?.turnEnded(agentId);
+          await conversationFlow?.turnCompleted(agentId);
         }
       });
     },
@@ -1174,8 +1177,10 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       notice === "unprocessed" || notice === "outcome-unknown"
         ? unprocessedNotices
         : waitingNotices;
-    // `too-long` and `host-lost` are said once per message by construction.
-    const repeatable = notice === "too-long" || notice === "host-lost";
+    // `too-long`, `host-lost` and `reply-unconfirmed` are said once per message
+    // (or per turn) by construction.
+    const repeatable =
+      notice === "too-long" || notice === "host-lost" || notice === "reply-unconfirmed";
     if (!repeatable && (key === undefined || !once.remember(key))) return;
     await deps.post({
       channel: channelName(account),
