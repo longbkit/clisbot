@@ -364,6 +364,71 @@ routes:
 // --- Inbound normalizer -------------------------------------------------------
 
 describe("flatInboundNormalizer", () => {
+  const base = { Body: "check", ChatType: "channel", ChatId: "C0APP", SenderId: "U0000000001" };
+
+  it("reads back the thread snapshot the vertical stored on the row", () => {
+    const threadContext = {
+      root: {
+        messageId: "1.000001",
+        senderId: "B0ALERT",
+        senderName: "Alertmanager",
+        text: "[FIRING] disk",
+      },
+      recent: [{ messageId: "1.000002", senderId: "U2", text: "seen" }],
+      omitted: 3,
+    };
+    const message = flatInboundNormalizer({
+      channel: "slack",
+      accountId: "work",
+      ctxPayload: { ...base, ThreadContext: threadContext },
+    });
+    assert.deepEqual(message?.threadContext, threadContext);
+  });
+
+  it("caps a stored snapshot and drops what it cannot read", () => {
+    const long = "x".repeat(5_000);
+    const message = flatInboundNormalizer({
+      channel: "slack",
+      accountId: "work",
+      ctxPayload: {
+        ...base,
+        ThreadContext: {
+          root: { messageId: "1.000001", senderId: "B0ALERT", text: long },
+          recent: [
+            ...Array.from({ length: 30 }, (_, i) => ({
+              messageId: `2.${i}`,
+              senderId: "U2",
+              text: `r${i}`,
+            })),
+            { messageId: 7, text: "malformed" },
+          ],
+          omitted: -4,
+          unavailable: 12,
+        },
+      },
+    });
+    const context = message?.threadContext;
+    assert.ok(context !== undefined);
+    assert.ok((context.root?.text.length ?? 0) < 2_200);
+    assert.equal(context.recent.length, 20);
+    assert.equal(context.recent.at(-1)?.text, "r29");
+    assert.equal(context.omitted, undefined);
+    assert.equal(context.unavailable, undefined);
+  });
+
+  it.each([null, "text", { recent: "nope" }, { recent: [] }])(
+    "leaves the thread out for a stored value of %j",
+    (value) => {
+      const message = flatInboundNormalizer({
+        channel: "slack",
+        accountId: "work",
+        ctxPayload: { ...base, ThreadContext: value },
+      });
+      assert.equal(message?.text, "check");
+      assert.equal(message?.threadContext, undefined);
+    },
+  );
+
   it("carries the sender's name and handle the vertical stored on the row", () => {
     const message = flatInboundNormalizer({
       channel: "slack",

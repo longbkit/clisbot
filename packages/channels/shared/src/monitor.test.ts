@@ -96,6 +96,17 @@ const event = (
 });
 
 describe("buildInboundCtxPayload", () => {
+  it("stores the thread snapshot as one nested key, and nothing when there is none", () => {
+    const threadContext = {
+      root: { messageId: "1.000001", senderId: "B0ALERT", text: "[FIRING] disk" },
+      recent: [],
+    };
+    expect(buildInboundCtxPayload(event({ threadContext }), "work")["ThreadContext"]).toEqual(
+      threadContext,
+    );
+    expect(buildInboundCtxPayload(event(), "work")).not.toHaveProperty("ThreadContext");
+  });
+
   it("emits the flat pinned-contract keys (inbound.md)", () => {
     const ctx = buildInboundCtxPayload(event(), "work");
     expect(ctx["Body"]).toBe("hello");

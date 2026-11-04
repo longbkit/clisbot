@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import { registerChannelDriveConfig } from "../message-actions.js";
 import { createConversationMetadataResolver } from "../conversation-metadata.js";
-import type { ChannelConversationMetadata } from "@clisbot/channels-shared";
+import type {
+  ChannelConversationMetadata,
+  ChannelThreadContext,
+  ChannelThreadContextMessage,
+} from "@clisbot/channels-shared";
 import { channelTestMessage } from "../test-message.js";
 // The channel supervisor (plan §4-S1 / implementation doc §4.3.9): the
 // coordinate/mount module that drives the per-account lifecycle —
@@ -205,6 +209,61 @@ export function flatInboundNormalizer(params: InboundReplyParams): InboundMessag
     conversation,
     ...(conversationLabel !== null ? { conversationLabel } : {}),
     ...(messageSid !== null ? { externalMessageId: messageSid } : {}),
+    ...threadContextOf(ctx["ThreadContext"]),
+  };
+}
+
+/** Most replies a stored thread snapshot renders, whatever the row says. */
+const THREAD_CONTEXT_MAX_RECENT = 20;
+/** Longest text one snapshot line renders. */
+const THREAD_CONTEXT_MAX_CHARS = 2_100;
+
+/**
+ * The stored thread snapshot, read back defensively: the row is durable data
+ * written by a vertical, so a malformed one renders nothing rather than failing
+ * the delivery, and the caps hold even for a row written by another version.
+ */
+function threadContextOf(raw: unknown): { threadContext?: ChannelThreadContext } {
+  if (raw === null || typeof raw !== "object") return {};
+  const record = raw as Record<string, unknown>;
+  const root = threadMessageOf(record["root"]);
+  const recent = Array.isArray(record["recent"])
+    ? record["recent"].flatMap((entry) => {
+        const message = threadMessageOf(entry);
+        return message === undefined ? [] : [message];
+      })
+    : [];
+  const omitted = record["omitted"];
+  const unavailable = confirmedString(record["unavailable"]);
+  const context: ChannelThreadContext = {
+    ...(root === undefined ? {} : { root }),
+    recent: recent.slice(-THREAD_CONTEXT_MAX_RECENT),
+    ...(omitted === "unknown" ||
+    (typeof omitted === "number" && Number.isInteger(omitted) && omitted > 0)
+      ? { omitted }
+      : {}),
+    ...(unavailable === null ? {} : { unavailable }),
+  };
+  const empty = root === undefined && context.recent.length === 0 && unavailable === null;
+  return empty ? {} : { threadContext: context };
+}
+
+function threadMessageOf(raw: unknown): ChannelThreadContextMessage | undefined {
+  if (raw === null || typeof raw !== "object") return undefined;
+  const record = raw as Record<string, unknown>;
+  const messageId = confirmedString(record["messageId"]);
+  const senderId = confirmedString(record["senderId"]);
+  const text = typeof record["text"] === "string" ? record["text"] : null;
+  if (messageId === null || senderId === null || text === null) return undefined;
+  const senderName = confirmedString(record["senderName"]);
+  return {
+    messageId,
+    senderId,
+    ...(senderName === null ? {} : { senderName }),
+    text:
+      text.length > THREAD_CONTEXT_MAX_CHARS
+        ? `${text.slice(0, THREAD_CONTEXT_MAX_CHARS)}… [cut]`
+        : text,
   };
 }
 

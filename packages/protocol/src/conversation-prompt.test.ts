@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   CONTEXT_HEADER,
   MESSAGE_HEADER,
+  THREAD_HEADER,
   conversationMessageText,
   renderConversationPrompt,
   senderLabel,
@@ -105,5 +106,63 @@ describe("conversationMessageText", () => {
     "user: hi",
   ])("leaves %j alone", (text) => {
     expect(conversationMessageText(text)).toBe(text);
+  });
+});
+
+describe("the thread block", () => {
+  const root = line({
+    senderIdentity: "slack:B_ALERT",
+    senderName: "Alertmanager",
+    text: "[FIRING:2] Disk",
+  });
+  const reply = line({
+    senderIdentity: "slack:U2",
+    senderName: undefined,
+    text: "seen this before",
+  });
+  const trigger = line({ text: "@bot free up the disk" });
+
+  test("renders before the context, with notes as they are", () => {
+    const prompt = renderConversationPrompt({
+      thread: [root, { note: "(3 earlier replies are not shown.)" }, reply],
+      context: [line({ text: "unmentioned" })],
+      messages: [trigger],
+    });
+    expect(prompt.split("\n")).toEqual([
+      THREAD_HEADER,
+      "Alertmanager (slack:B_ALERT): [FIRING:2] Disk",
+      "(3 earlier replies are not shown.)",
+      "slack:U2: seen this before",
+      CONTEXT_HEADER,
+      "An Nguyễn (slack:U0000000001): unmentioned",
+      MESSAGE_HEADER,
+      "An Nguyễn (slack:U0000000001): @bot free up the disk",
+    ]);
+  });
+
+  test("renders a thread without context", () => {
+    expect(renderConversationPrompt({ thread: [root], context: [], messages: [trigger] })).toBe(
+      [
+        THREAD_HEADER,
+        "Alertmanager (slack:B_ALERT): [FIRING:2] Disk",
+        MESSAGE_HEADER,
+        "An Nguyễn (slack:U0000000001): @bot free up the disk",
+      ].join("\n"),
+    );
+  });
+
+  test("an empty thread changes nothing", () => {
+    expect(renderConversationPrompt({ thread: [], context: [], messages: [trigger] })).toBe(
+      "An Nguyễn (slack:U0000000001): @bot free up the disk",
+    );
+  });
+
+  test("history shows only what the person wrote", () => {
+    const prompt = renderConversationPrompt({
+      thread: [root, reply],
+      context: [],
+      messages: [trigger],
+    });
+    expect(conversationMessageText(prompt)).toBe("@bot free up the disk");
   });
 });
