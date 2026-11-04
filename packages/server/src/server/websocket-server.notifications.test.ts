@@ -17,7 +17,7 @@ import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { createPushNotifications } from "./push/index.js";
 import { forgetTerminalLaunch, recordTerminalLaunch } from "./managed-access/terminal-launches.js";
 import { NotificationFollowStore } from "./push/follow-store.js";
-import { HubEnrollmentRejectedError } from "./hub/relationship-remote.js";
+import { HubEnrollmentRejectedError, HubLeaseRefusedError } from "./hub/relationship-remote.js";
 import { notificationReaderKey } from "@clisbot/protocol/notification-audience";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -484,12 +484,15 @@ function createFakeHub(state: "connected" | "reconnecting" = "connected") {
     failure: null as Error | null,
     /** False models a Hub that predates lease verification. */
     supportsVerify: true,
+    /** Runs while the Hub is answering, to model what changes in the meantime. */
+    onVerify: null as ((leaseId: string) => Promise<void> | void) | null,
   };
   const verify = async (leaseId: string) => {
     hub.verifications += 1;
     if (hub.failure) throw hub.failure;
     const grant = hub.grants.get(leaseId);
-    if (grant === undefined) throw new HubEnrollmentRejectedError(401);
+    await hub.onVerify?.(leaseId);
+    if (grant === undefined) throw new HubLeaseRefusedError("invalid_ticket");
     const lease = {
       principalId: `member:${leaseId}`,
       permissions: ["workspace.read"],
@@ -700,7 +703,10 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
 
     await finish(server);
 
-    expect(delivered.map((entry) => entry.tokens)).toEqual([["admin-phone", "owner-phone"]]);
+    expect(delivered.flatMap((entry) => entry.tokens).sort()).toEqual([
+      "admin-phone",
+      "owner-phone",
+    ]);
   });
 
   it("a subagent belongs to whoever owns its parent", async () => {
@@ -815,6 +821,43 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
       expect((await payloads(server, delivered))["bob-phone"]?.data).toMatchObject({
         agentId: "agent-1",
       });
+    });
+
+    it("a daemon-level 401 withholds content but does not mark the lease refused", async () => {
+      const { server, delivered, registerMember, hub } = setup({ createdBy: BOB });
+      registerMember("bob-phone", BOB);
+      hub.failure = new HubEnrollmentRejectedError(401);
+
+      expect((await payloads(server, delivered))["bob-phone"]).toStrictEqual(UNIDENTIFIED);
+      hub.failure = null;
+      expect((await payloads(server, delivered))["bob-phone"]?.data).toMatchObject({
+        agentId: "agent-1",
+      });
+    });
+
+    it("a token re-registered under another lease while the Hub answers is judged by that lease", async () => {
+      const { server, delivered, registerMember, hub, push } = setup({ createdBy: BOB });
+      registerMember("shared-phone", BOB);
+      hub.onVerify = () => {
+        hub.onVerify = null;
+        // Another account signs in on the same device; its lease was never verified.
+        push.renew(
+          "shared-phone",
+          { leaseId: "lease-other", leaseExpiresAt: Date.now() + 60_000, projectIds: [PROJECT_ID] },
+          { actor: BOB },
+        );
+      };
+
+      expect((await payloads(server, delivered))["shared-phone"]).toStrictEqual(UNIDENTIFIED);
+    });
+
+    it("a revoked paired device's token is gone even while it is offline", async () => {
+      const { server, delivered, push } = setup({ createdBy: BOB });
+      push.renew("paired-phone", undefined, { deviceId: "device-1" });
+
+      await server.revokeDeviceSessions("device-1");
+
+      expect((await payloads(server, delivered))["paired-phone"]).toBeUndefined();
     });
 
     it("asks once per lease per notification and never caches an answer", async () => {
@@ -1035,7 +1078,10 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
         agentId: "agent-1",
         reason: "finished",
       },
+      // Verified content is dropped if the device stays offline past it.
+      ttlSeconds: 300,
     });
+    expect(reconnected["owner-phone"]?.ttlSeconds).toBeUndefined();
   });
 
   it("Needs me pushes requests and failures in the reader's sessions, never finished turns", async () => {
@@ -1250,7 +1296,7 @@ describe("push audience before Expo", () => {
     await new Promise((resolve) => setImmediate(resolve));
     rmSync(dir, { recursive: true });
 
-    const actual = captured.flatMap((entry) => entry.tokens);
+    const actual = captured.flatMap((entry) => entry.tokens).sort();
     const evidencePath = process.env.CLISBOT_PUSH_AUDIENCE_EVIDENCE;
     if (evidencePath) {
       const { appendFileSync } = await import("node:fs");
@@ -1268,7 +1314,9 @@ describe("push audience before Expo", () => {
       );
     }
     expect(actual).toEqual(testCase.expected);
-    expect(captured.length).toBeLessThanOrEqual(1);
+    // The owner's devices and the verified Members get the same content; Members' expires sooner.
+    const contents = captured.map(({ payload }) => ({ title: payload.title, body: payload.body }));
+    expect(new Set(contents.map((content) => JSON.stringify(content))).size).toBeLessThanOrEqual(1);
     if (testCase.reason === "permission")
       expect(captured[0]?.payload.body).toBe("Run synthetic command");
     if ("label" in testCase) expect(captured[0]?.payload.body).toBe("Finished working.");

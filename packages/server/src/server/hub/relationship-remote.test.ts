@@ -16,6 +16,7 @@ import {
 import {
   DirectHubRelationshipRemote,
   HubEnrollmentRejectedError,
+  HubLeaseRefusedError,
   type HubSocketConnection,
   type HubSocketEvents,
 } from "./relationship-remote.js";
@@ -1020,4 +1021,43 @@ test("admits the privileges it knows and ignores the rest, on the Host and per P
     projects: [{ ...admission.projects[0], privileges: ["project.use", "a.future.privilege"] }],
   });
   expect([...(newer.projects.get("project-a")?.privileges ?? [])]).toEqual(["project.use"]);
+});
+
+test("lease verification tells the lease's own refusal from a daemon or Hub problem", async () => {
+  let reply: { status: number; body: unknown } = { status: 200, body: {} };
+  const requests: Array<{ url?: string; body: unknown }> = [];
+  const server = createServer(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    requests.push({ url: request.url, body: JSON.parse(body) });
+    response
+      .writeHead(reply.status, { "content-type": "application/json" })
+      .end(JSON.stringify(reply.body));
+  });
+  openServers.push(server);
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address() as AddressInfo;
+  const verify = () =>
+    new DirectHubRelationshipRemote().verifyAccessLease({
+      daemonId: "daemon-1",
+      hubOrigin: `http://127.0.0.1:${address.port}`,
+      credential: "daemon-secret",
+      leaseId: "lease-1",
+    });
+
+  reply = { status: 401, body: { error: "access_denied" } };
+  await expect(verify()).rejects.toBeInstanceOf(HubLeaseRefusedError);
+  reply = { status: 401, body: { error: "invalid_ticket" } };
+  await expect(verify()).rejects.toBeInstanceOf(HubLeaseRefusedError);
+  reply = { status: 401, body: { error: "unauthorized" } };
+  await expect(verify()).rejects.toBeInstanceOf(HubEnrollmentRejectedError);
+  reply = { status: 404, body: { error: "not_found" } };
+  await expect(verify()).rejects.toBeInstanceOf(HubEnrollmentRejectedError);
+  expect(requests[0]).toEqual({
+    url: "/api/daemons/access-leases/verify",
+    body: { leaseId: "lease-1" },
+  });
 });

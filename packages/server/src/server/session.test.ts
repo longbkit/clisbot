@@ -2360,6 +2360,7 @@ test("a follow tells the reader's other devices, each sent only what it may stil
 
     await desktop.subscribe(["notifications.follows_changed"]);
     await desktop.session.publishFollowsChanged();
+    // Narrowing the connection's access republishes its follows without being asked.
     desktop.session.replaceManagedAdmission({
       permissions: ["workspace.read"],
       resourceAuthorization: {
@@ -2369,7 +2370,7 @@ test("a follow tells the reader's other devices, each sent only what it may stil
         leaseExpiresAt: Date.now() + 60_000,
       },
     });
-    await desktop.session.publishFollowsChanged();
+    await new Promise((resolve) => setImmediate(resolve));
 
     expect(
       desktop.delivered.flatMap((message) =>

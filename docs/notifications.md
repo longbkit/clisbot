@@ -62,11 +62,19 @@ The daemon judges every reader separately, for both pushes and in-app notificati
   content for that send only. Withheld means one generic payload that identifies nothing: title
   `Clisbot`, a generic body and no data, so no session text, Host, Project, workspace, path,
   agent or terminal id. Tapping it opens the app without navigating; the app reads only what the
-  Host authorizes after it connects. The Host owner's own devices are never asked and keep full
-  notifications. Tradeoffs: one Hub round trip (at most 3 s) per lease per push; Members get
-  only the generic notification while the Hub is unreachable, until a revoked device renews,
-  and against a Hub that predates verify. Remaining window: a revocation committed between the
-  Hub's answer and Expo's delivery.
+  Host authorizes after it connects. A grant means the lease's live admission allows the event
+  the way its connection would be judged: the operation permission, then for a Project-restricted
+  lease `project.use` for an agent or the Terminal grant for how the terminal was launched. Only
+  a Hub refusal of the lease itself (`access_denied`, `invalid_ticket`) marks it unconfirmed; a
+  401 for the daemon does not. The Host owner's own devices are never asked, are sent first, and
+  keep full notifications; one failed delivery does not stop the others. Verified content to a
+  lease's device carries a 5-minute TTL, so an offline device does not show it days later. A
+  revoked paired device loses its push tokens at once, connected or not.
+  Tradeoffs: one Hub round trip (at most 3 s) per lease per push; Members get only the generic
+  notification while the Hub is unreachable, until a revoked device renews, and against a Hub that
+  predates verify; a Member device offline for more than 5 minutes misses that notification's
+  content. Remaining window: a revocation committed after the Hub's answer, while the
+  notification waits for its device (at most 5 minutes).
 
 Pushes are plain alerts with no Notification Service Extension, so iOS shows them before app code
 runs: filtering has to happen on the daemon. A Host without `features.notificationScope` keeps the

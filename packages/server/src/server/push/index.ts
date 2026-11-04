@@ -19,6 +19,8 @@ export type {
 } from "./token-store.js";
 
 const PUSH_TOKEN_LEASE_MS = 48 * 60 * 60 * 1000;
+/** How long a verified notification may wait for an offline Member's device. */
+const LEASE_CONTENT_TTL_SECONDS = 300;
 
 /**
  * What a device whose access the daemon cannot currently confirm receives instead: no session,
@@ -38,6 +40,7 @@ export interface PushNotifications {
   revoke(token: string): void;
   revokeLease(leaseId: string): void;
   markLeaseUnconfirmed(leaseId: string): void;
+  revokeDevice(deviceId: string): void;
   send(payload: PushPayload, target?: PushNotificationTarget): Promise<void>;
 }
 
@@ -55,6 +58,20 @@ export function createPushNotifications(options: {
   const deliver =
     options.deliver ??
     ((tokens: string[], payload: PushPayload) => service.sendPush(tokens, payload));
+  const deliverLogged = async (
+    entries: readonly ActivePushSubscription[],
+    payload: PushPayload,
+  ): Promise<void> => {
+    if (entries.length === 0) return;
+    try {
+      await deliver(
+        entries.map((entry) => entry.token),
+        payload,
+      );
+    } catch (err) {
+      options.logger.warn({ err, tokenCount: entries.length }, "Failed to deliver push");
+    }
+  };
 
   return {
     renew(token, authorization, reader) {
@@ -69,57 +86,68 @@ export function createPushNotifications(options: {
     markLeaseUnconfirmed(leaseId) {
       store.markLeaseUnconfirmed(leaseId);
     },
+    revokeDevice(deviceId) {
+      store.revokeDevice(deviceId);
+    },
     async send(payload, target) {
-      const subscriptions = store.getActiveSubscriptions(target);
-      const contentAllowed = await confirmContent(subscriptions, target, (leaseId) =>
+      // The Host owner's own devices are never asked: deliver to them first, whatever follows.
+      const owned = store.getActiveSubscriptions(target).filter((entry) => entry.leaseId === null);
+      await deliverLogged(owned, payload);
+      const granted = await confirmLeases(store.getActiveSubscriptions(target), target, (leaseId) =>
         store.markLeaseUnconfirmed(leaseId),
       );
-      const full = subscriptions.filter(contentAllowed);
-      const withheld = subscriptions.filter((entry) => !contentAllowed(entry));
+      // Read again: a token re-registered while the Hub answered is judged by its lease now.
+      const leased = store.getActiveSubscriptions(target).filter((entry) => entry.leaseId !== null);
+      const verified = leased.filter(
+        (entry) => !entry.unconfirmed && entry.leaseId !== null && granted.has(entry.leaseId),
+      );
+      const withheld = leased.filter((entry) => !verified.includes(entry));
       options.logger.info(
-        { tokenCount: full.length, unidentifiedTokenCount: withheld.length },
+        {
+          ownedTokenCount: owned.length,
+          verifiedTokenCount: verified.length,
+          unidentifiedTokenCount: withheld.length,
+        },
         "Sending push notification",
       );
-      if (full.length > 0)
-        await deliver(
-          full.map((entry) => entry.token),
-          payload,
-        );
-      if (withheld.length > 0)
-        await deliver(
-          withheld.map((entry) => entry.token),
-          UNIDENTIFIED_PUSH_PAYLOAD,
-        );
+      // Verified content goes stale with the access it was verified for: drop it if undelivered.
+      await deliverLogged(verified, { ...payload, ttlSeconds: LEASE_CONTENT_TTL_SECONDS });
+      await deliverLogged(withheld, UNIDENTIFIED_PUSH_PAYLOAD);
     },
   };
 }
 
 /**
- * Which tokens may receive session content. The Host owner's own devices always may. A device
- * admitted by a lease may only when the Hub, asked now, still grants that lease what the event
- * needs; each lease is asked once per notification and never cached.
+ * Leases the Hub, asked now, still grants what this notification needs. Each lease is asked once
+ * per notification and never cached; a refusal marks it unconfirmed until its device renews.
  */
-async function confirmContent(
+async function confirmLeases(
   subscriptions: readonly ActivePushSubscription[],
   target: PushNotificationTarget | undefined,
   markUnconfirmed: (leaseId: string) => void,
-): Promise<(entry: ActivePushSubscription) => boolean> {
+): Promise<ReadonlySet<string>> {
+  const granted = new Set<string>();
   const confirm = target?.confirmLease;
+  if (!confirm) return granted;
   const leaseIds = new Set(
     subscriptions.flatMap((entry) =>
       entry.leaseId !== null && !entry.unconfirmed ? [entry.leaseId] : [],
     ),
   );
-  const granted = new Set<string>();
-  if (confirm)
-    await Promise.all(
-      [...leaseIds].map(async (leaseId) => {
-        const answer = await confirm(leaseId).catch(
-          (): LeaseConfirmation => ({ granted: false, revoked: false }),
-        );
-        if (answer.granted) granted.add(leaseId);
-        else if (answer.revoked) markUnconfirmed(leaseId);
-      }),
-    );
-  return (entry) => entry.leaseId === null || (!entry.unconfirmed && granted.has(entry.leaseId));
+  await Promise.all(
+    [...leaseIds].map(async (leaseId) => {
+      const answer = await confirm(leaseId).catch(
+        (): LeaseConfirmation => ({ granted: false, revoked: false }),
+      );
+      if (answer.granted) granted.add(leaseId);
+      else if (answer.revoked) {
+        try {
+          markUnconfirmed(leaseId);
+        } catch {
+          // Still withheld for this send; the next refusal tries to record it again.
+        }
+      }
+    }),
+  );
+  return granted;
 }

@@ -60,6 +60,7 @@ export class PushTokenStore {
       actor: reader.actor ?? null,
       scope: reader.scope ?? current?.scope ?? DEFAULT_NOTIFICATION_SCOPE,
       unconfirmed: false,
+      deviceId: reader.deviceId ?? null,
     };
     if (
       current !== undefined &&
@@ -102,6 +103,17 @@ export class PushTokenStore {
       changed = true;
     }
     if (!changed) return;
+    this.persist(next);
+    this.subscriptions = next;
+  }
+
+  /** A revoked paired device keeps no notifications: it had no lease the Hub could judge. */
+  revokeDevice(deviceId: string): void {
+    const next = new Map(this.subscriptions);
+    for (const [token, subscription] of this.subscriptions) {
+      if (subscription.deviceId === deviceId) next.delete(token);
+    }
+    if (next.size === this.subscriptions.size) return;
     this.persist(next);
     this.subscriptions = next;
   }
@@ -181,6 +193,7 @@ export class PushTokenStore {
               actor: null,
               scope: DEFAULT_NOTIFICATION_SCOPE,
               unconfirmed: false,
+              deviceId: null,
             });
           }
         }
@@ -207,6 +220,7 @@ export class PushTokenStore {
               ...(subscription.actor === null ? {} : { actor: subscription.actor }),
               scope: subscription.scope,
               ...(subscription.unconfirmed ? { unconfirmed: true } : {}),
+              ...(subscription.deviceId === null ? {} : { deviceId: subscription.deviceId }),
             })),
           },
           null,
@@ -234,6 +248,8 @@ export interface PushTokenReaderUpdate {
   actor?: SessionActor;
   /** Absent keeps the saved choice. */
   scope?: NotificationScope;
+  /** The paired device the connection was admitted with, so revoking it removes the token. */
+  deviceId?: string;
 }
 
 export interface PushNotificationTarget {
@@ -265,6 +281,7 @@ interface PushTokenSubscription {
   scope: NotificationScope;
   /** Its lease was revoked by the Hub and the device has not renewed it since. */
   unconfirmed: boolean;
+  deviceId: string | null;
 }
 
 /** One persisted subscription, permissively; absent reader fields read as written before them. */
@@ -280,6 +297,7 @@ function parseStoredSubscription(
     actor?: unknown;
     scope?: unknown;
     unconfirmed?: unknown;
+    deviceId?: unknown;
   };
   if (typeof candidate.token !== "string" || typeof candidate.expiresAt !== "string") return null;
   const token = candidate.token.trim();
@@ -306,6 +324,8 @@ function parseStoredSubscription(
       actor: actor.success ? actor.data : null,
       scope: scope.success ? scope.data : DEFAULT_NOTIFICATION_SCOPE,
       unconfirmed: candidate.unconfirmed === true,
+      deviceId:
+        typeof candidate.deviceId === "string" && candidate.deviceId ? candidate.deviceId : null,
     },
   };
 }
@@ -315,6 +335,7 @@ function sameAuthorization(left: PushTokenSubscription, right: PushTokenSubscrip
     left.leaseId === right.leaseId &&
     left.scope === right.scope &&
     left.unconfirmed === right.unconfirmed &&
+    left.deviceId === right.deviceId &&
     JSON.stringify(left.projectIds) === JSON.stringify(right.projectIds) &&
     JSON.stringify(left.actor) === JSON.stringify(right.actor)
   );

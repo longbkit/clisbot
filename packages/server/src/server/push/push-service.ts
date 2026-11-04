@@ -4,6 +4,8 @@ export interface PushPayload {
   title: string;
   body: string;
   data?: Record<string, unknown>;
+  /** Seconds Expo and the provider may hold it for an offline device before dropping it. */
+  ttlSeconds?: number;
 }
 
 interface ExpoPushMessage {
@@ -12,6 +14,7 @@ interface ExpoPushMessage {
   body: string;
   data?: Record<string, unknown>;
   sound?: "default";
+  ttl?: number;
 }
 
 interface ExpoPushTicket {
@@ -48,6 +51,7 @@ export class PushService {
       body: payload.body,
       data: payload.data,
       sound: "default",
+      ...(payload.ttlSeconds === undefined ? {} : { ttl: payload.ttlSeconds }),
     }));
 
     // Batch tokens (max 100 per request per Expo limits)

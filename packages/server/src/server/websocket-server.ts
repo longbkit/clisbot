@@ -105,7 +105,7 @@ import {
 } from "./push/attention-audience.js";
 import { terminalLaunchOf } from "./managed-access/terminal-launches.js";
 import { NotificationFollowStore } from "./push/follow-store.js";
-import { HubEnrollmentRejectedError } from "./hub/relationship-remote.js";
+import { HubLeaseRefusedError } from "./hub/relationship-remote.js";
 import { notificationReaderKey } from "@clisbot/protocol/notification-audience";
 import {
   isPushEligibleAttentionReason,
@@ -607,6 +607,8 @@ type SessionConnection = ReconnectableSessionConnection | PluginSessionConnectio
 interface SocketSessionOptions {
   localHubOperator?: boolean;
   accountActor?: SessionActor;
+  /** The paired device this connection was admitted with. */
+  pushDeviceId?: string;
   sourceId?: string;
   clientId: string;
   appVersion: string | null;
@@ -1314,6 +1316,12 @@ export class VoiceAssistantWebSocketServer {
   public async revokeDeviceSessions(deviceId: string): Promise<void> {
     const principalId = `device:${deviceId}`;
     this.revokedDevicePrincipals.add(principalId);
+    // An offline revoked device has no connection to close; its push tokens go too.
+    try {
+      this.pushNotifications.revokeDevice(deviceId);
+    } catch (error) {
+      this.logger.warn({ err: error, deviceId }, "Failed to revoke a device's push subscriptions");
+    }
     for (const [socket, pending] of this.pendingConnections) {
       if (
         pending.admission?.principalId !== principalId &&
@@ -1724,6 +1732,7 @@ export class VoiceAssistantWebSocketServer {
       clientCapabilities,
       permissions: admission.permissions,
       accountActor: admission.actor,
+      pushDeviceId: admission.deviceCredential?.credentialId,
       localHubOperator:
         !!this.credentialSource?.deviceAuthority &&
         (admission.localOperator === true ||
@@ -1868,6 +1877,7 @@ export class VoiceAssistantWebSocketServer {
       downloadTokenStore: this.downloadTokenStore,
       pushNotifications: this.pushNotifications,
       notificationFollows: this.notificationFollows,
+      pushDeviceId: options.pushDeviceId,
       onFollowsChanged: (readerKey) => this.publishFollowsChanged(readerKey),
       clisbotHome: this.clisbotHome,
       worktreesRoot: this.worktreesRoot,
@@ -3881,7 +3891,7 @@ export class VoiceAssistantWebSocketServer {
       } catch (error) {
         return {
           granted: false,
-          revoked: error instanceof HubEnrollmentRejectedError && error.statusCode === 401,
+          revoked: error instanceof HubLeaseRefusedError,
         };
       }
       const granted =

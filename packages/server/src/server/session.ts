@@ -517,6 +517,8 @@ export interface SessionOptions {
   notificationFollows?: NotificationFollowStore;
   /** Tells every connection of the reader that their follows changed. */
   onFollowsChanged?: (readerKey: string) => void;
+  /** The paired device this connection was admitted with, recorded on its push token. */
+  pushDeviceId?: string;
   clisbotHome: string;
   worktreesRoot?: string;
   agentManager: AgentManager;
@@ -857,6 +859,7 @@ export class Session {
   private readonly pushNotifications: PushNotifications;
   private readonly notificationFollows: NotificationFollowStore | undefined;
   private readonly onFollowsChanged: ((readerKey: string) => void) | undefined;
+  private readonly pushDeviceId: string | undefined;
   private readonly pluginRuntime: SessionOptions["pluginRuntime"];
   private readonly orchestrationSkills: SessionOptions["orchestrationSkills"];
   private unsubscribeAgentEvents: (() => void) | null = null;
@@ -1023,6 +1026,7 @@ export class Session {
     this.pushNotifications = pushNotifications;
     this.notificationFollows = options.notificationFollows;
     this.onFollowsChanged = options.onFollowsChanged;
+    this.pushDeviceId = options.pushDeviceId;
     this.clisbotHome = clisbotHome;
     this.messageReceipts = options.messageReceipts;
     this.optionsInputQueues = options.inputQueues;
@@ -2673,6 +2677,8 @@ export class Session {
     if (this.registeredPushToken) {
       this.renewPushToken(this.registeredPushToken);
     }
+    // Narrowed access hides follows of sessions this connection may no longer read.
+    void this.publishFollowsChanged().catch(() => undefined);
   }
 
   public subscribesToAgent(agent: ManagedAgent, source: object): Promise<boolean> {
@@ -5815,6 +5821,7 @@ export class Session {
     this.pushNotifications.renew(token, this.pushTokenAuthorization(), {
       actor: this.accountActor,
       scope: this.notificationScope,
+      ...(this.pushDeviceId === undefined ? {} : { deviceId: this.pushDeviceId }),
     });
   }
 

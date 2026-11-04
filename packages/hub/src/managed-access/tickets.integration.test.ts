@@ -574,6 +574,12 @@ it("verifies a lease's live grants without extending it, and refuses once access
     now: new Date(admission.leaseExpiresAt.getTime() - 30_000),
   });
   assert.equal(verified.leaseExpiresAt.getTime(), admission.leaseExpiresAt.getTime());
+  const [storedAfterVerify] = await bundle.runtime
+    .drizzle()
+    .select({ expiresAt: schema.daemonAccessLeases.expiresAt })
+    .from(schema.daemonAccessLeases)
+    .where(eq(schema.daemonAccessLeases.id, admission.leaseId));
+  assert.equal(storedAfterVerify?.expiresAt.getTime(), admission.leaseExpiresAt.getTime());
   assert.equal(verified.projects[0]?.projectId, "project-alpha");
   assert.equal(verified.actor?.memberId, fixture.memberMembershipId);
 

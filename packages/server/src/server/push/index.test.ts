@@ -134,3 +134,65 @@ describe("push notifications", () => {
     expect(deliveries).toEqual([["ExponentPushToken[renewed]"]]);
   });
 });
+
+describe("push delivery around lease verification", () => {
+  const LEASE = (leaseId: string) => ({
+    leaseId,
+    leaseExpiresAt: Date.now() + 60 * 60 * 1000,
+    projectIds: ["p"],
+  });
+
+  function create(
+    deliver: (tokens: string[], payload: { title: string; body: string }) => Promise<void>,
+  ) {
+    const home = mkdtempSync(path.join(tmpdir(), "clisbot-push-verify-"));
+    const push = createPushNotifications({
+      logger: createLogger(),
+      filePath: path.join(home, "push-tokens.json"),
+      deliver,
+    });
+    return { push, cleanup: () => rmSync(home, { recursive: true, force: true }) };
+  }
+
+  test("the owner's devices are reached first, and one failed delivery does not stop the rest", async () => {
+    const calls: string[][] = [];
+    const { push, cleanup } = create(async (tokens) => {
+      calls.push(tokens);
+      if (tokens.includes("owner-phone")) throw new Error("Expo is down for this batch");
+    });
+    try {
+      push.renew("owner-phone");
+      push.renew("member-phone", LEASE("lease-m"), { scope: "all" });
+      push.renew("revoked-phone", LEASE("lease-r"), { scope: "all" });
+
+      await push.send(
+        { title: "Agent finished", body: "Synthetic" },
+        {
+          projectId: "p",
+          confirmLease: async (leaseId) =>
+            leaseId === "lease-m" ? { granted: true } : { granted: false, revoked: true },
+        },
+      );
+
+      expect(calls).toEqual([["owner-phone"], ["member-phone"], ["revoked-phone"]]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("a device revoked as a paired device keeps no subscription", async () => {
+    const calls: string[][] = [];
+    const { push, cleanup } = create(async (tokens) => {
+      calls.push(tokens);
+    });
+    try {
+      push.renew("paired-phone", undefined, { deviceId: "device-1" });
+      push.renew("other-phone", undefined, { deviceId: "device-2" });
+      push.revokeDevice("device-1");
+      await push.send({ title: "Agent finished", body: "Synthetic" });
+      expect(calls).toEqual([["other-phone"]]);
+    } finally {
+      cleanup();
+    }
+  });
+});

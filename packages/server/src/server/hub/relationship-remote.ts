@@ -139,6 +139,14 @@ export interface HubRelationshipRemote {
   openSocket(input: HubSocketCredentials, events: HubSocketEvents): HubSocketConnection;
 }
 
+/** The Hub refused a lease itself: revoked, expired, unknown, or its access is gone. */
+export class HubLeaseRefusedError extends Error {
+  constructor(readonly code: "access_denied" | "invalid_ticket") {
+    super(`Hub refused the access lease (${code})`);
+    this.name = "HubLeaseRefusedError";
+  }
+}
+
 export class HubEnrollmentRejectedError extends Error {
   constructor(
     readonly statusCode: number,
@@ -401,7 +409,16 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
         body: JSON.stringify({ leaseId: input.leaseId }),
         signal: controller.signal,
       });
-      if (!response.ok) throw new HubEnrollmentRejectedError(response.status);
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
+        // Only the lease's own refusal revokes it; a 401 for the daemon itself does not.
+        if (
+          response.status === 401 &&
+          (body?.error === "access_denied" || body?.error === "invalid_ticket")
+        )
+          throw new HubLeaseRefusedError(body.error);
+        throw new HubEnrollmentRejectedError(response.status);
+      }
       return stampAdmissionOrigin(parseAccessAdmission(await response.json()), input.hubOrigin);
     } finally {
       clearTimeout(timeout);
