@@ -515,6 +515,8 @@ export interface SessionOptions {
   pushNotifications: PushNotifications;
   /** Absent only in tests that do not exercise follows. */
   notificationFollows?: NotificationFollowStore;
+  /** Tells every connection of the reader that their follows changed. */
+  onFollowsChanged?: (readerKey: string) => void;
   clisbotHome: string;
   worktreesRoot?: string;
   agentManager: AgentManager;
@@ -854,6 +856,7 @@ export class Session {
   private readonly daemonConfigStore: DaemonConfigStore;
   private readonly pushNotifications: PushNotifications;
   private readonly notificationFollows: NotificationFollowStore | undefined;
+  private readonly onFollowsChanged: ((readerKey: string) => void) | undefined;
   private readonly pluginRuntime: SessionOptions["pluginRuntime"];
   private readonly orchestrationSkills: SessionOptions["orchestrationSkills"];
   private unsubscribeAgentEvents: (() => void) | null = null;
@@ -1019,6 +1022,7 @@ export class Session {
     this.onWorkspaceRecovered = onWorkspaceRecovered ?? null;
     this.pushNotifications = pushNotifications;
     this.notificationFollows = options.notificationFollows;
+    this.onFollowsChanged = options.onFollowsChanged;
     this.clisbotHome = clisbotHome;
     this.messageReceipts = options.messageReceipts;
     this.optionsInputQueues = options.inputQueues;
@@ -5757,6 +5761,7 @@ export class Session {
       type: "notifications.set_follow.response",
       payload: { requestId, agentId, followed },
     });
+    this.onFollowsChanged?.(notificationReaderKey(reader.actor));
   }
 
   /** Followed sessions that still exist and this connection may still read. */
@@ -5771,6 +5776,20 @@ export class Session {
       ),
     );
     return followed.filter((_, index) => kept[index]);
+  }
+
+  /** This connection's reader, as the follow store and push tokens key them. */
+  public notificationReaderKey(): string | null {
+    const reader = this.notificationReader();
+    return reader === null ? null : notificationReaderKey(reader.actor);
+  }
+
+  /** Sends this connection its reader's current follows, filtered by what it may read. */
+  public async publishFollowsChanged(): Promise<void> {
+    this.emit({
+      type: "notifications.follows_changed",
+      payload: { agentIds: await this.followedAgentIds() },
+    });
   }
 
   private async agentExists(agentId: string): Promise<boolean> {
@@ -10128,23 +10147,28 @@ function isValidGitHubRepoSegment(value: string): boolean {
   return /^[A-Za-z0-9._-]+$/u.test(value);
 }
 
+/** Outbound messages whose type is their own event subscription. */
+const SELF_NAMED_EVENTS: ReadonlySet<string> = new Set<SessionEventSubscription>([
+  "project.update",
+  "providers_snapshot_update",
+  "agent_attention_required",
+  "agent_permission_request",
+  "agent_permission_resolved",
+  "checkout_status_update",
+  "script_status_update",
+  "workspace_setup_progress",
+  "agent.provider_subagents.update",
+  "terminal_attention_required",
+  "activity_log",
+  "hub.execution.agent.update",
+  "hub.execution.agent.stream",
+  "notifications.follows_changed",
+]);
+
 function sessionEventCategory(message: SessionOutboundMessage): SessionEventSubscription | null {
   if (isResourcePush(message.type)) return message.type;
+  if (SELF_NAMED_EVENTS.has(message.type)) return message.type as SessionEventSubscription;
   switch (message.type) {
-    case "project.update":
-    case "providers_snapshot_update":
-    case "agent_attention_required":
-    case "agent_permission_request":
-    case "agent_permission_resolved":
-    case "checkout_status_update":
-    case "script_status_update":
-    case "workspace_setup_progress":
-    case "agent.provider_subagents.update":
-    case "terminal_attention_required":
-    case "activity_log":
-    case "hub.execution.agent.update":
-    case "hub.execution.agent.stream":
-      return message.type;
     case "status":
       switch (message.payload.status) {
         case "server_info":

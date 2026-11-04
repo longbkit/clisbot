@@ -3093,6 +3093,12 @@ export const NotificationsSetFollowResponseSchema = z.object({
   }),
 });
 
+/** The reader's follows on this Host changed, from any of their devices. */
+export const NotificationsFollowsChangedSchema = z.object({
+  type: z.literal("notifications.follows_changed"),
+  payload: z.object({ agentIds: z.array(z.string()) }),
+});
+
 /** The sessions this connection's reader follows on this Host that it may still read. */
 export const NotificationsListFollowsRequestSchema = z.object({
   type: z.literal("notifications.list_follows.request"),
@@ -3366,6 +3372,8 @@ export const SessionEventSubscriptionSchema = z.enum([
   "activity_log",
   "hub.execution.agent.update",
   "hub.execution.agent.stream",
+  // COMPAT(notificationFollows): subscribe only when the Host advertises it; older Hosts reject it.
+  "notifications.follows_changed",
 ]);
 export type SessionEventSubscription = z.infer<typeof SessionEventSubscriptionSchema>;
 export const SessionEventsSetSubscriptionRequestSchema = z.object({
@@ -7416,6 +7424,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   NotificationsSetScopeResponseSchema,
   NotificationsSetFollowResponseSchema,
   NotificationsListFollowsResponseSchema,
+  NotificationsFollowsChangedSchema,
   RpcErrorMessageSchema,
   ArtifactMessageSchema,
   AgentUpdateMessageSchema,

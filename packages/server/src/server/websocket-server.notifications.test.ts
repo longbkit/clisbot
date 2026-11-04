@@ -544,6 +544,31 @@ async function finish(
   await new Promise((resolve) => setImmediate(resolve));
 }
 
+describe("follow changes", () => {
+  it("reach every connection of that reader, and no one else's", () => {
+    const { server } = createServer();
+    const published: string[] = [];
+    const fakeSession = (name: string, readerKey: string) => ({
+      notificationReaderKey: () => readerKey,
+      publishFollowsChanged: async () => {
+        published.push(name);
+      },
+    });
+    const sessions = asInternals<{ sessions: Map<unknown, unknown> }>(server).sessions;
+    const alicePhone = fakeSession("alice-phone", "alice");
+    sessions.set({}, { session: alicePhone });
+    sessions.set({}, { session: alicePhone });
+    sessions.set({}, { session: fakeSession("alice-desktop", "alice") });
+    sessions.set({}, { session: fakeSession("bob-desktop", "bob") });
+
+    asInternals<{ publishFollowsChanged(readerKey: string): void }>(server).publishFollowsChanged(
+      "alice",
+    );
+
+    expect(published.sort()).toEqual(["alice-desktop", "alice-phone"]);
+  });
+});
+
 describe("VoiceAssistantWebSocketServer notification audience", () => {
   const cleanups: Array<() => void> = [];
   afterEach(() => {

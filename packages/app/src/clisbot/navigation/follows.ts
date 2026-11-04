@@ -6,19 +6,40 @@ import type { WorkspaceTabFollow } from "@/screens/workspace/workspace-tab-menu"
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { useSessionStore } from "@/stores/session-store";
 
-/** Keeps the Host's follows for this device's reader in the store, on every connect. */
+/**
+ * Keeps the Host's follows for this device's reader in the store: listed on every connect, then
+ * live as any of the reader's devices follows or unfollows (`notifications.follows_changed`).
+ */
 export function useSyncFollows(client: DaemonClient, serverId: string): void {
   useEffect(() => {
+    const apply = (agentIds: readonly string[]) =>
+      useSessionStore.getState().setFollowedAgents(serverId, agentIds);
+    let feed: ReturnType<DaemonClient["observeEvents"]> | null = null;
+    let stopFeed: (() => void) | null = null;
     const sync = () => {
       void client
         .listNotificationFollows()
-        .then((agentIds) => useSessionStore.getState().setFollowedAgents(serverId, agentIds))
+        .then(apply)
         .catch(() => undefined);
+      // Only a Host that advertises follows knows this event; an older one rejects it.
+      if (feed || !client.supportsNotificationFollows()) return;
+      feed = client.observeEvents(["notifications.follows_changed"]);
+      stopFeed = feed.subscribe({
+        snapshot: () => {},
+        update: (message) => {
+          if (message.type === "notifications.follows_changed") apply(message.payload.agentIds);
+        },
+      });
     };
     if (client.isConnected) sync();
-    return client.subscribeConnectionStatus((state) => {
+    const stopStatus = client.subscribeConnectionStatus((state) => {
       if (state.status === "connected") sync();
     });
+    return () => {
+      stopStatus();
+      stopFeed?.();
+      void feed?.release().catch(() => undefined);
+    };
   }, [client, serverId]);
 }
 

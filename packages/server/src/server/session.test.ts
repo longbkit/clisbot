@@ -43,7 +43,11 @@ import { createPersistedProjectRecord } from "./workspace-registry.js";
 import { deriveProjectKey } from "./project-key.js";
 import type { SessionOptions } from "./session.js";
 import type { SessionResourceAuthorization } from "./managed-access/types.js";
-import type { SessionInboundMessage, SessionOutboundMessage } from "./messages.js";
+import type {
+  SessionEventSubscription,
+  SessionInboundMessage,
+  SessionOutboundMessage,
+} from "./messages.js";
 import {
   asSessionInternals as asSessionInternalsHelper,
   asAgentManager,
@@ -302,6 +306,7 @@ interface SessionForTestOptions {
   hubRelationships?: SessionOptions["hubRelationships"];
   accountActor?: SessionOptions["accountActor"];
   notificationFollows?: SessionOptions["notificationFollows"];
+  onFollowsChanged?: SessionOptions["onFollowsChanged"];
   workspaceRuntimeStore?: WorkspaceRuntimeStore;
   sendToSource?: SessionOptions["onMessageToSource"];
   clientId?: string;
@@ -447,6 +452,7 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
     }),
     pluginRuntime: options.pluginRuntime,
     notificationFollows: options.notificationFollows,
+    onFollowsChanged: options.onFollowsChanged,
     orchestrationSkills: options.orchestrationSkills,
     stt: options.stt ?? null,
     tts: null,
@@ -2066,6 +2072,7 @@ function createProjectScopedAttentionSession(
     leaseExpiresAt?: number;
     accountActor?: SessionOptions["accountActor"];
     notificationFollows?: SessionOptions["notificationFollows"];
+    onFollowsChanged?: SessionOptions["onFollowsChanged"];
   } = {},
 ) {
   const delivered: SessionOutboundMessage[] = [];
@@ -2103,6 +2110,7 @@ function createProjectScopedAttentionSession(
   const session = createSessionForTest({
     accountActor: options.accountActor,
     notificationFollows: options.notificationFollows,
+    onFollowsChanged: options.onFollowsChanged,
     permissions: ["workspace.read"],
     resourceAuthorization: {
       resourceMode: "projects",
@@ -2168,13 +2176,18 @@ function createProjectScopedAttentionSession(
       return message.type;
     });
   };
-  const subscribe = async () => {
+  const subscribe = async (
+    events: SessionEventSubscription[] = [
+      "agent_attention_required",
+      "terminal_attention_required",
+    ],
+  ) => {
     session.updateClientCapabilities({ [CLIENT_CAPS.ownedSubscriptions]: true }, source);
     await session.handleMessage(
       {
         type: "session.events.set_subscription.request",
         requestId: "events",
-        events: ["agent_attention_required", "terminal_attention_required"],
+        events,
         notifications: true,
       },
       source,
@@ -2307,6 +2320,64 @@ test("a reader follows only sessions it may read, per account, and loses a follo
     expect(restarted.isFollowing(notificationReaderKey(actor("alice")), "agent-a")).toBe(true);
     await alice.session.cleanup();
     await bob.session.cleanup();
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("a follow tells the reader's other devices, each sent only what it may still read", async () => {
+  const home = mkdtempSync(join(tmpdir(), "clisbot-follows-live-"));
+  const follows = new NotificationFollowStore(
+    pino({ level: "silent" }),
+    join(home, "notification-follows.json"),
+  );
+  const alice = {
+    kind: "user" as const,
+    id: "user-alice",
+    memberId: "alice",
+    organizationId: "org-1",
+    hubOrigin: "https://hub.example",
+  };
+  const changedFor: string[] = [];
+  try {
+    const phone = createProjectScopedAttentionSession({
+      accountActor: alice,
+      notificationFollows: follows,
+      onFollowsChanged: (readerKey) => changedFor.push(readerKey),
+    });
+    const desktop = createProjectScopedAttentionSession({
+      accountActor: alice,
+      notificationFollows: follows,
+    });
+    await phone.session.handleMessage({
+      type: "notifications.set_follow.request",
+      agentId: "agent-a",
+      followed: true,
+      requestId: "follow-a",
+    });
+    expect(changedFor).toEqual([notificationReaderKey(alice)]);
+    expect(desktop.session.notificationReaderKey()).toBe(notificationReaderKey(alice));
+
+    await desktop.subscribe(["notifications.follows_changed"]);
+    await desktop.session.publishFollowsChanged();
+    desktop.session.replaceManagedAdmission({
+      permissions: ["workspace.read"],
+      resourceAuthorization: {
+        resourceMode: "projects",
+        projects: new Map(),
+        leaseId: "lease-a",
+        leaseExpiresAt: Date.now() + 60_000,
+      },
+    });
+    await desktop.session.publishFollowsChanged();
+
+    expect(
+      desktop.delivered.flatMap((message) =>
+        message.type === "notifications.follows_changed" ? [message.payload.agentIds] : [],
+      ),
+    ).toEqual([["agent-a"], []]);
+    await phone.session.cleanup();
+    await desktop.session.cleanup();
   } finally {
     rmSync(home, { recursive: true, force: true });
   }

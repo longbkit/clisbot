@@ -504,6 +504,7 @@ const OUTBOUND_PERMISSION = {
   "notifications.set_scope.response": "workspace.read",
   "notifications.set_follow.response": "workspace.read",
   "notifications.list_follows.response": "workspace.read",
+  "notifications.follows_changed": "workspace.read",
   "push.unregister.response": "workspace.read",
   read_project_config_response: "workspace.read",
   refresh_providers_snapshot_response: ["daemon.read", "hub.execute"],

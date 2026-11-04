@@ -1863,6 +1863,7 @@ export class VoiceAssistantWebSocketServer {
       downloadTokenStore: this.downloadTokenStore,
       pushNotifications: this.pushNotifications,
       notificationFollows: this.notificationFollows,
+      onFollowsChanged: (readerKey) => this.publishFollowsChanged(readerKey),
       clisbotHome: this.clisbotHome,
       worktreesRoot: this.worktreesRoot,
       agentManager: this.agentManager,
@@ -3825,6 +3826,18 @@ export class VoiceAssistantWebSocketServer {
       if (message.type === "session" && this.sessions.get(ws)?.session.delivery.isModern(ws))
         this.sessions.get(ws)!.session.publishToSource(ws, message.message);
       else this.sendToClient(ws, message);
+    }
+  }
+
+  /** Every connection of the reader learns their follows changed, each filtered by its access. */
+  private publishFollowsChanged(readerKey: string): void {
+    const sessions = new Set<Session>();
+    for (const connection of this.sessions.values()) sessions.add(connection.session);
+    for (const session of sessions) {
+      if (session.notificationReaderKey() !== readerKey) continue;
+      void session.publishFollowsChanged().catch((err) => {
+        this.logger.warn({ err }, "Failed to publish follow changes");
+      });
     }
   }
 
