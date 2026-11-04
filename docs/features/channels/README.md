@@ -334,7 +334,12 @@ conversation when the union of its Rules' Where covers it
   catalog capability; the Route editor reads that claim to offer the filter and
   to warn when a rule uses it on a channel without it.
   Threads and topics belong to their room; a thread or topic id under
-  `conversations` narrows to it.
+  `conversations` narrows to it. A thread without a binding of its own joins its
+  room's session and Route, unless a Route names its id: then Route selection
+  decides, so a forum topic with its own Route never inherits the group's
+  session (`bindingForInbound`, `execution.ts`). A Route that names only the
+  thread keeps one session per thread even under `binding.key: channel`
+  (`deriveBindingKey`).
 - **Who resolves per message.** `resolveChannelSender` (`policy/sender-facts.ts`)
   maps the sender through Channel identities to a Member, their organization role
   and Teams; `admin` includes Owners, `member` is every linked Member. The resolver

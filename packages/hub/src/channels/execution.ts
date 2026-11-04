@@ -2203,7 +2203,12 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     ) {
       candidates.push(message.externalMessageId);
     }
-    candidates.push(null);
+    // A thread or topic falls back to its room's binding unless a Route names
+    // it by its own id: then that Route's selection decides, not the room's
+    // session (#42, a Telegram forum topic with its own Route).
+    if (conversation.threadId === null || !routeNamesThread(account, conversation)) {
+      candidates.push(null);
+    }
     for (const externalThreadId of new Set(candidates)) {
       const binding = await store.findThreadBinding(
         deps.organizationId,
@@ -2214,6 +2219,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       if (binding !== undefined) return binding;
     }
     return undefined;
+  }
+
+  function routeNamesThread(
+    account: CompiledChannelAccount,
+    conversation: InboundMessage["conversation"],
+  ): boolean {
+    return account.routes.some((route) => route.where.conversations.includes(conversation.id));
   }
 
   /**
