@@ -848,3 +848,45 @@ function rewindMessageId(
     throw new Error("Expected rewind target");
   return target.item.messageId;
 }
+
+// The Hub rides one Host socket for every channel account, and that socket
+// keeps one timeline set: the Hub must send the union, never one account's set
+// (`packages/hub/src/channels/daemon/host-timeline-subscription.ts`).
+test("a legacy selective socket keeps only its latest timeline set", async () => {
+  await daemon.close();
+  daemon = await createTestClisbotDaemon({
+    isDev: true,
+    agentClients: { mock: new MockLoadTestAgentClient() },
+  });
+  const hub = await connect({ clientId: "hub-shared-socket", selective: true });
+  const slackAgent = await hub.client.createAgent({
+    provider: "mock",
+    cwd: "/tmp",
+    title: "Slack account agent",
+    model: "ten-second-stream",
+  });
+  const telegramAgent = await hub.client.createAgent({
+    provider: "mock",
+    cwd: "/tmp",
+    title: "Telegram account agent",
+    model: "ten-second-stream",
+  });
+
+  await hub.setLegacyTimelineMembership([slackAgent.id]);
+  await hub.setLegacyTimelineMembership([telegramAgent.id]);
+  hub.clear();
+  await daemon.daemon.agentManager.appendTimelineItem(slackAgent.id, {
+    type: "assistant_message",
+    text: "the Slack answer",
+  });
+  await hub.barrier("replaced");
+  expect(hub.hasTimeline(slackAgent.id)).toBe(false);
+
+  await hub.setLegacyTimelineMembership([slackAgent.id, telegramAgent.id]);
+  hub.clear();
+  await daemon.daemon.agentManager.appendTimelineItem(slackAgent.id, {
+    type: "assistant_message",
+    text: "the Slack answer, again",
+  });
+  await hub.next(isAgentStream(slackAgent.id), "union timeline delivery");
+});

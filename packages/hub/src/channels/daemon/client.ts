@@ -20,6 +20,7 @@ import {
 } from "./steer-target.js";
 import type { DaemonSessionChannel } from "../../daemons/protocol.js";
 import { discoverLocalDaemon, type DaemonDiscoveryResult } from "./discovery.js";
+import type { HostTimelineSubscription } from "./host-timeline-subscription.js";
 import type {
   AgentPermissionResponse,
   AgentSnapshot,
@@ -198,6 +199,12 @@ export interface EnrolledChannelDaemonOptions {
   onStream?: (payload: { agentId: string; event: unknown; seq?: number }) => void;
   onAgentUpdate?: (agent: AgentSnapshot) => void;
   onSubagentUpdate?: (frame: unknown) => void;
+  /**
+   * The timeline set every account on this Host's socket shares
+   * (`host-timeline-subscription.ts`): `clientKey` names this account in it.
+   * Absent = this connection's set is the socket's whole set.
+   */
+  timeline?: { shared: HostTimelineSubscription; clientKey: string };
 }
 
 /** What the facade needs of a transport. `ws-client.ts` dials the daemon;
@@ -242,13 +249,37 @@ export function connectEnrolledChannelDaemon(
       : { onSubagentUpdate: options.onSubagentUpdate }),
   });
   socket.connect();
-  return createFacade(
+  const timeline = options.timeline;
+  if (timeline === undefined) {
+    return createFacade(
+      socket,
+      { url: options.hostLabel, source: "enrolled" },
+      options.resolveSessionOperationTicket,
+      options.hostId,
+      options.steerTargets,
+    );
+  }
+  const write = (agentIds: readonly string[]) => writeTimelineSubscription(socket, agentIds);
+  // A reconnected Host holds no set: the old socket's went with it.
+  const releaseResend = options.onHostConnected?.(() => {
+    void timeline.shared.resend(write).catch(() => undefined);
+  });
+  const facade = createFacade(
     socket,
     { url: options.hostLabel, source: "enrolled" },
     options.resolveSessionOperationTicket,
     options.hostId,
     options.steerTargets,
   );
+  return {
+    ...facade,
+    setTimelineSubscription: (agentIds) => timeline.shared.set(timeline.clientKey, agentIds, write),
+    stop: () => {
+      releaseResend?.();
+      timeline.shared.forget(timeline.clientKey);
+      facade.stop();
+    },
+  };
 }
 
 /**
@@ -625,17 +656,24 @@ function createFacade(
         itemCount: Number(payload["itemCount"]),
       };
     },
-    setTimelineSubscription: (agentIds) =>
-      socket
-        .call("agent.timeline.set_subscription.request", {
-          agentIds: [...agentIds],
-          // The plane only relays output; an idle channel agent may be closed
-          // and is resumed by the next message.
-          keepsAgentsResident: false,
-        })
-        .then(() => undefined),
+    setTimelineSubscription: (agentIds) => writeTimelineSubscription(socket, agentIds),
     stop: () => socket.stop(),
   };
+}
+
+/** Replace the set of agents whose streams this socket receives. */
+function writeTimelineSubscription(
+  socket: ChannelDaemonSocket,
+  agentIds: readonly string[],
+): Promise<void> {
+  return socket
+    .call("agent.timeline.set_subscription.request", {
+      agentIds: [...agentIds],
+      // The plane only relays output; an idle channel agent may be closed
+      // and is resumed by the next message.
+      keepsAgentsResident: false,
+    })
+    .then(() => undefined);
 }
 
 function mapCreatedAgent(payload: unknown): CreateAgentResult {
