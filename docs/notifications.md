@@ -50,8 +50,12 @@ The daemon judges every reader separately, for both pushes and in-app notificati
   authorizes again; the payload's ids grant nothing.
 - A Hub revocation removes the push tokens of every revoked lease, including devices that are
   offline. While the daemon's Hub link is not connected a revocation cannot reach it, so
-  lease-bound tokens get a payload with no session content; the Host owner's devices keep previews.
-  The remaining window is a Hub link that reads as connected while a revocation is in flight.
+  lease-bound tokens get one generic payload that identifies nothing: no title or preview from the
+  session and no Host, Project, workspace, path, agent or terminal id. Tapping it opens the app
+  without navigating, and the app reads only what the Host authorizes after it connects. The
+  Host owner's own devices keep full notifications. Tradeoff: during a Hub outage Members lose
+  the deep link and the preview. The remaining window is a Hub link that reads as connected while
+  a revocation is still in flight.
 
 Pushes are plain alerts with no Notification Service Extension, so iOS shows them before app code
 runs: filtering has to happen on the daemon. A Host without `features.notificationScope` keeps the

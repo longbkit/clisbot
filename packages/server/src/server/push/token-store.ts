@@ -218,7 +218,7 @@ export interface PushNotificationTarget {
   recipients?: (reader: NotificationReader) => boolean;
   /**
    * What tokens bound to a managed lease receive instead of the payload, when the sender
-   * cannot rely on a revocation of that lease having reached it. Carries no session content.
+   * cannot rely on a revocation of that lease having reached it. Identifies nothing.
    */
   leasePayload?: PushPayload;
 }

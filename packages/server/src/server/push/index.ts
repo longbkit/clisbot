@@ -17,6 +17,15 @@ export type {
 
 const PUSH_TOKEN_LEASE_MS = 48 * 60 * 60 * 1000;
 
+/**
+ * What a device whose access the daemon cannot currently confirm receives instead: no session,
+ * terminal, Project, path or Host identifier, so tapping it opens nothing in particular.
+ */
+export const UNIDENTIFIED_PUSH_PAYLOAD: PushPayload = {
+  title: "Clisbot",
+  body: "Open Clisbot to see what changed.",
+};
+
 export interface PushNotifications {
   renew(
     token: string,

@@ -87,6 +87,7 @@ import type { WorkspaceAutoName } from "./workspace-auto-name.js";
 import { deriveProjectSlug } from "./workspace-git-metadata.js";
 import {
   createPushNotifications,
+  UNIDENTIFIED_PUSH_PAYLOAD,
   type PushNotifications,
   type PushNotificationSender,
   type PushPayload,
@@ -3681,14 +3682,7 @@ export class VoiceAssistantWebSocketServer {
       .send(notification, {
         ...(projectId === null ? {} : { projectId }),
         recipients: plan.pushRecipients,
-        ...this.leasePushPayload(
-          buildAgentAttentionNotificationPayload({
-            reason: params.reason,
-            serverId: this.serverId,
-            workspaceId: agent.workspaceId,
-            agentId: params.agentId,
-          }),
-        ),
+        ...this.leasePushPayload(),
       })
       .catch((err) => {
         this.logger.warn({ err, agentId: params.agentId }, "Failed to send push notification");
@@ -3802,16 +3796,7 @@ export class VoiceAssistantWebSocketServer {
         {
           ...(projectId === null ? {} : { projectId }),
           recipients: plan.pushRecipients,
-          ...this.leasePushPayload({
-            title,
-            body: "Open Clisbot to see it.",
-            data: {
-              serverId: this.serverId,
-              terminalId: params.terminalId,
-              cwd: params.cwd,
-              ...(workspaceId ? { workspaceId } : {}),
-            },
-          }),
+          ...this.leasePushPayload(),
         },
       )
       .catch((err) => {
@@ -3844,13 +3829,13 @@ export class VoiceAssistantWebSocketServer {
 
   /**
    * A Hub revocation reaches this daemon only while it is connected to the Hub. Without that
-   * link a Member's lease cannot be trusted to still hold, so their devices get a payload with
-   * no session content; opening it re-checks access over their own connection.
+   * link a Member's lease cannot be trusted to still hold, so their devices get a payload that
+   * identifies nothing; opening the app re-checks access over their own connection.
    */
-  private leasePushPayload(contentFree: PushPayload): { leasePayload?: PushPayload } {
+  private leasePushPayload(): { leasePayload?: PushPayload } {
     return this.hubRelationships?.status().state === "connected"
       ? {}
-      : { leasePayload: contentFree };
+      : { leasePayload: UNIDENTIFIED_PUSH_PAYLOAD };
   }
 
   private async projectIdForWorkspace(

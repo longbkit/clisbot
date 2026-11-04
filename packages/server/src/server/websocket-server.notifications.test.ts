@@ -667,25 +667,72 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
     expect(delivered).toEqual([]);
   });
 
-  it("without a live Hub link, lease devices get no session content; the Host owner keeps it", async () => {
+  it("without a live Hub link, lease devices get a payload that identifies nothing, until it reconnects", async () => {
     const { server, delivered, registerMember, push } = setup(
-      { createdBy: BOB },
+      {
+        createdBy: BOB,
+        pendingPermissions: new Map([
+          [
+            "p1",
+            {
+              id: "p1",
+              provider: "claude",
+              name: "Bash",
+              kind: "tool",
+              title: "Run synthetic command",
+            },
+          ],
+        ]),
+      },
       undefined,
       "reconnecting",
     );
-    registerMember("bob-phone", BOB);
+    registerMember("bob-phone", BOB, { scope: "all" });
     push.renew("owner-phone");
-    const internals = asInternals<{ agentManager: { getLastAssistantMessage: unknown } }>(server);
+    recordTerminalLaunch("terminal-bob", { createdBy: BOB.id });
+    const internals = asInternals<{
+      agentManager: { getLastAssistantMessage: unknown };
+      broadcastTerminalAttention(params: Record<string, string>): Promise<void>;
+    }>(server);
     internals.agentManager.getLastAssistantMessage = async () => "Synthetic secret summary.";
+    const payloadsByToken = async (send: () => Promise<void>) => {
+      delivered.length = 0;
+      await send();
+      await new Promise((resolve) => setImmediate(resolve));
+      const byToken: Record<string, PushPayload> = {};
+      for (const entry of delivered)
+        for (const token of entry.tokens) byToken[token] = entry.payload;
+      return byToken;
+    };
+    const terminal = () =>
+      internals.broadcastTerminalAttention({
+        terminalId: "terminal-bob",
+        cwd: "/work/secret-project",
+        workspaceId: WORKSPACE_ID,
+        terminalName: "secret-shell",
+        reason: "finished",
+      });
+    const unidentified = { title: "Clisbot", body: "Open Clisbot to see what changed." };
 
-    await finish(server);
+    for (const send of [() => finish(server), () => finish(server, "permission"), terminal]) {
+      const payloads = await payloadsByToken(send);
+      expect(payloads["bob-phone"]).toStrictEqual(unidentified);
+      expect(payloads["owner-phone"]?.data).toMatchObject({ serverId: "srv-test" });
+    }
 
-    const bodies: Record<string, string> = {};
-    for (const entry of delivered)
-      for (const token of entry.tokens) bodies[token] = entry.payload.body;
-    expect(bodies).toEqual({
-      "owner-phone": "Synthetic secret summary.",
-      "bob-phone": "Finished working.",
+    setHubLink(server, "connected");
+    const reconnected = await payloadsByToken(() => finish(server));
+    forgetTerminalLaunch("terminal-bob");
+
+    expect(reconnected["bob-phone"]).toStrictEqual({
+      title: "Agent finished",
+      body: "Synthetic secret summary.",
+      data: {
+        serverId: "srv-test",
+        workspaceId: WORKSPACE_ID,
+        agentId: "agent-1",
+        reason: "finished",
+      },
     });
   });
 
