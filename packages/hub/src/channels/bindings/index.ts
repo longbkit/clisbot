@@ -498,7 +498,7 @@ export class BindingEngine {
     delivery: Delivery,
     route: CompiledRoute,
   ): Promise<void> {
-    const prepared = await this.prepare(delivery, route);
+    const prepared = await this.prepare(agentId, delivery, route);
     await prepared.markSent();
     await this.context.daemon.sendAgentMessage(agentId, prepared.prompt, {
       steer: true,
@@ -508,8 +508,14 @@ export class BindingEngine {
     await prepared.settle();
   }
 
-  private prepare(delivery: Delivery, route: CompiledRoute): Promise<PreparedDelivery> {
-    if (this.context.inbox !== undefined) return this.context.inbox.prepare(delivery, route);
+  private prepare(
+    agentId: string,
+    delivery: Delivery,
+    route: CompiledRoute,
+  ): Promise<PreparedDelivery> {
+    if (this.context.inbox !== undefined) {
+      return this.context.inbox.prepare(delivery, route, agentId);
+    }
     const messages = messagesOf(delivery);
     return Promise.resolve({
       prompt: renderConversationPrompt({ context: [], messages }),

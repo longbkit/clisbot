@@ -5,6 +5,7 @@ import { normalizeAccountId } from "@clisbot/channels-core/plugin-sdk/account-re
 import type { OpenClawConfig } from "@clisbot/channels-core/plugin-sdk/config-contracts";
 import { resolveMarkdownTableMode } from "@clisbot/channels-core/plugin-sdk/markdown-table-runtime";
 import { requireRuntimeConfig } from "./fusion/plugin-config.js";
+import { compareSlackTs, slackErrorCode } from "./fusion/slack-read.js";
 import { logVerbose } from "@clisbot/channels-core/plugin-sdk/runtime-env";
 import { normalizeOptionalString } from "@clisbot/channels-core/plugin-sdk/string-coerce-runtime";
 import { z } from "zod";
@@ -596,17 +597,6 @@ export async function readSlackMessages(
   };
 }
 
-/** Slack ts order without float rounding: whole seconds, then the zero-padded fraction. */
-function compareSlackTs(a: string, b: string): number {
-  const [aSec = "0", aFrac = ""] = a.split(".");
-  const [bSec = "0", bFrac = ""] = b.split(".");
-  const seconds = BigInt(aSec) - BigInt(bSec);
-  if (seconds !== 0n) return seconds < 0n ? -1 : 1;
-  const width = Math.max(aFrac.length, bFrac.length);
-  const fraction = BigInt(aFrac.padEnd(width, "0") || "0") - BigInt(bFrac.padEnd(width, "0") || "0");
-  return fraction === 0n ? 0 : fraction < 0n ? -1 : 1;
-}
-
 /** True when an exclusive `oldest`/`latest` read window contains `ts`. */
 function readWindowIncludes(ts: string, bounds: { latest?: string; oldest?: string }): boolean {
   if (bounds.oldest !== undefined && compareSlackTs(bounds.oldest, ts) >= 0) return false;
@@ -637,20 +627,10 @@ async function readSlackThreadParent(
     );
     return parent ? { parent } : { error: "not_found" };
   } catch (err) {
-    const error = readSlackErrorCode(err);
+    const error = slackErrorCode(err);
     logVerbose(`slack thread parent read failed channel=${channelId} ts=${threadTs}: ${error}`);
     return { error };
   }
-}
-
-function readSlackErrorCode(err: unknown): string {
-  if (err && typeof err === "object") {
-    const data = (err as { data?: { error?: unknown } }).data;
-    if (typeof data?.error === "string" && data.error !== "") return data.error;
-    const code = (err as { code?: unknown }).code;
-    if (typeof code === "string" && code !== "") return code;
-  }
-  return "read_failed";
 }
 
 export async function getSlackMemberInfo(userId: string, opts: SlackActionClientOpts = {}) {

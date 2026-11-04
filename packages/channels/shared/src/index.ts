@@ -66,6 +66,8 @@ export type {
   ChannelInboundReactionFacts,
   ChannelInboundTargetFacts,
   ChannelInboundTopicFacts,
+  ChannelThreadContext,
+  ChannelThreadContextMessage,
   InboundEventDecision,
   InboundEventProcessorOptions,
 } from "./monitor.js";

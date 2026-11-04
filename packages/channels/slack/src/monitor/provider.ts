@@ -24,9 +24,18 @@
 //     3s response window, then admitted (D-041).
 
 import type { App, Receiver } from "@slack/bolt";
-import type { ChannelInboundEvent, HostChildLogger } from "@clisbot/channels-shared";
+import type {
+  ChannelInboundEvent,
+  ChannelThreadContext,
+  HostChildLogger,
+} from "@clisbot/channels-shared";
 import { foldInboundSlackMedia } from "../transport/media.js";
 import { SlackSenderDirectory, type SlackUsersClient } from "../transport/sender-directory.js";
+import {
+  readSlackThreadContext,
+  type ReadSlackThreadContextParams,
+  type SlackRepliesClient,
+} from "../transport/thread-context.js";
 import {
   buildSlackInboundEvent,
   buildSlackSlashCommandEvent,
@@ -98,6 +107,11 @@ export interface SlackBoltProviderOptions {
   /** Names senders and mentioned people (`sender-directory.ts`); the default
    * asks Slack through a per-account cache. Test seam. */
   senders?: Pick<SlackSenderDirectory, "name">;
+  /** Reads the thread a mention arrived in (`thread-context.ts`); the default
+   * asks Slack. Test seam. */
+  readThreadContext?: (
+    params: ReadSlackThreadContextParams,
+  ) => Promise<ChannelThreadContext | undefined>;
   /** Test seam: the Bolt exports. Defaults to a dynamic `@slack/bolt` import so
    * the module stays importable without the dep resolved. */
   interop?: SlackBoltResolvedExports;
@@ -108,11 +122,15 @@ export interface SlackBoltProvider {
   start(): Promise<void>;
 }
 
+/** Mentions whose thread read is remembered, so the event's twin reuses it. */
+const THREAD_READS_KEPT = 200;
+
 type SlackListenerArgs = {
   event: Record<string, unknown>;
   body: Record<string, unknown>;
-  /** Bolt's Web API client for this event; names senders (`sender-directory.ts`). */
-  client?: SlackUsersClient;
+  /** Bolt's Web API client for this event; names senders (`sender-directory.ts`)
+   * and reads the thread a mention arrived in (`thread-context.ts`). */
+  client?: SlackUsersClient & Partial<SlackRepliesClient>;
 };
 
 /** Upstream's interop resolution over a dynamic `@slack/bolt` import, so the
@@ -205,7 +223,12 @@ export function createSlackBoltProvider(options: SlackBoltProviderOptions): Slac
     }
     const built = buildSlackInboundEvent(event, source, identity, options.botId);
     if (built === undefined) return;
-    const inbound = await senders.name(args.client, built);
+    // Both waits bound the ack; they run side by side, not one after the other.
+    const [named, threadContext] = await Promise.all([
+      senders.name(args.client, built),
+      threadContextFor(built, args),
+    ]);
+    const inbound = threadContext === undefined ? named : { ...named, threadContext };
     let admitted: ChannelInboundEvent | null = inbound;
     if (options.media !== undefined) {
       admitted = await foldInboundSlackMedia(
@@ -223,6 +246,46 @@ export function createSlackBoltProvider(options: SlackBoltProviderOptions): Slac
     }
     if (admitted === null) return;
     await admit(admitted);
+  };
+
+  /** One read per mention: Slack sends a channel mention as both `message` and
+   * `app_mention`, and both admissions share the read. */
+  const threadReads = new Map<string, Promise<ChannelThreadContext | undefined>>();
+
+  /**
+   * The thread a mention arrived in (`thread-context.ts`): every reply that
+   * mentions the bot, so a root-level or unmentioned message costs no call. The
+   * Hub decides whether a prompt carries it (`bindings/inbox.ts`).
+   */
+  const threadContextFor = (
+    built: ChannelInboundEvent,
+    args: SlackListenerArgs,
+  ): Promise<ChannelThreadContext | undefined> => {
+    const threadTs = built.messageThreadId;
+    const replies = args.client?.conversations;
+    if (
+      !built.wasMentioned ||
+      built.isOwnMessage === true ||
+      typeof threadTs !== "string" ||
+      threadTs === built.externalMessageId ||
+      replies === undefined
+    )
+      return Promise.resolve(undefined);
+    const key = `${built.externalConversationId}:${built.externalMessageId}`;
+    const pending = threadReads.get(key);
+    if (pending !== undefined) return pending;
+    const read = (options.readThreadContext ?? readSlackThreadContext)({
+      client: { conversations: replies },
+      channelId: built.externalConversationId,
+      threadTs,
+      messageTs: built.externalMessageId,
+    });
+    threadReads.set(key, read);
+    if (threadReads.size > THREAD_READS_KEPT) {
+      const oldest = threadReads.keys().next().value;
+      if (oldest !== undefined) threadReads.delete(oldest);
+    }
+    return read;
   };
 
   // ---------------------------------------------------------------- register

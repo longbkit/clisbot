@@ -1,3 +1,4 @@
+import type { ChannelThreadContext } from "@clisbot/channels-shared";
 import type { ApprovalPrivilege } from "../../access/contract.js";
 // Shared vocabulary for the channel execution plane (plan §4-S2/§4-S5/§4-S6).
 // One place for the shapes that the bindings, relay, and approval engines all
@@ -75,6 +76,9 @@ export interface InboundMessage {
   /** The conversation's human label (Telegram group/topic title) when the
    * vertical carries it — diagnostics only; the plane decides on the ids. */
   conversationLabel?: string;
+  /** The thread a mention arrived in, as the vertical read it at admission and
+   * stored on the ingress row (Slack `ThreadContext`). */
+  threadContext?: ChannelThreadContext;
 }
 
 /** What the plane did with one inbound message. */
