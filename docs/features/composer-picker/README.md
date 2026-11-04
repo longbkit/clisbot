@@ -380,6 +380,25 @@ permission request the agent still raises. Agents sometimes ask under bypass any
   `mode` preference, and a stored `full-auto-accept` preference resolves to the provider's
   default.
 
+## Fork with another model
+
+A session keeps its provider for life: `/model` only offers the current provider's models. To
+continue a conversation on another provider, the fork menu's **Fork with another model…** opens
+this panel on the fork button, listing every provider on the Host. Picking a model forks into a
+new tab whose draft starts on it, with the `chat_history` attachment like any fork. Another
+provider's draft starts on its default mode, effort and options; another model of the same
+provider keeps the mode and options and resets the effort (`applyForkModelChoice`).
+
+The panel hides its effort, speed and mode rows; you set those in the fork's composer. Web
+popovers do not flip, and a fork button can sit anywhere in the conversation, so the panel opens
+downward when it fits below the button or there is more room below than above.
+
+Flag: `EXPO_PUBLIC_CLISBOT_FORK_WITH_MODEL` (on unless `0`), and off whenever the picker is.
+Code: `packages/app/src/clisbot/fork-with-model/`. The upstream fork menu, turn footers and
+`useForkAgent` carry the optional model through; the agent stream provides the source
+(`ForkModelSourceProvider`). Test: `e2e/browser/fork-with-model.spec.ts` (screenshots to
+`.debug/fork-with-model/`).
+
 ## Code
 
 `packages/app/src/clisbot/composer-layout/`: `chat-composer-presentation.tsx` (the container,

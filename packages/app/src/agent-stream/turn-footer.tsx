@@ -13,8 +13,10 @@ import {
   AssistantTurnFooter,
   LiveElapsed,
   STREAM_METADATA_FONT_SIZE,
+  type AssistantForkHandler,
   type AssistantForkTarget,
 } from "@/components/message";
+import type { ForkModelChoice } from "@/clisbot/fork-with-model/feature";
 import type { TurnFooterHost } from "./layout";
 import { AssistantForkMenu } from "@/components/assistant-fork-menu";
 import { SyncedLoader } from "@/components/synced-loader";
@@ -29,6 +31,7 @@ export type TurnContentStrategy = StreamStrategy;
 export type AssistantTurnForkHandler = (input: {
   target: AssistantForkTarget;
   boundary: AssistantTurnForkBoundary;
+  model?: ForkModelChoice;
 }) => Promise<void> | void;
 /**
  * Fork handler for the turn that is still streaming. It deliberately takes no
@@ -40,7 +43,7 @@ export type AssistantTurnForkHandler = (input: {
  * Kept separate from `AssistantTurnForkHandler` (whose `boundary` stays
  * required) so the compiler keeps enforcing that completed turns always pin one.
  */
-export type InFlightTurnForkHandler = (target: AssistantForkTarget) => Promise<void> | void;
+export type InFlightTurnForkHandler = AssistantForkHandler;
 
 export const TurnFooter = memo(function TurnFooter({
   isRunning,
@@ -201,12 +204,12 @@ function CompletedTurnFooter({
     startIndex,
     supportsTimelineCursor,
   });
-  const handleFork = useCallback(
-    (target: AssistantForkTarget) => {
+  const handleFork = useCallback<AssistantForkHandler>(
+    (target, model) => {
       if (!boundary) {
         return;
       }
-      return onForkAssistantTurn?.({ target, boundary });
+      return onForkAssistantTurn?.({ target, boundary, model });
     },
     [boundary, onForkAssistantTurn],
   );

@@ -367,6 +367,7 @@ export const ru: TranslationResources = {
       forkMenu: "Форкнуть чат отсюда",
       forkInNewTab: "Создать форк в новой вкладке",
       forkInNewWorkspace: "Создать форк в новом рабочем пространстве",
+      forkWithModel: "Создать форк с другой моделью…",
       forkUnavailable: "Обновите хост, чтобы использовать эту функцию.",
       forkMissingWorkspace: "Этот агент не связан с рабочим пространством.",
       forkFailed: "Не удалось создать форк чата",
