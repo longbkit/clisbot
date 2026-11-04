@@ -230,6 +230,11 @@ import type { HubExecutionAgents } from "./hub/daemon-executions.js";
 import { DownloadTokenStore } from "./file-download/token-store.js";
 import type { PushNotifications, PushTokenAuthorization } from "./push/index.js";
 import {
+  DEFAULT_NOTIFICATION_SCOPE,
+  type NotificationReader,
+  type NotificationScope,
+} from "@clisbot/protocol/notification-audience";
+import {
   archivePersistedWorkspaceRecord,
   archiveWorkspaceContents,
 } from "./workspace-archive-service.js";
@@ -859,6 +864,8 @@ export class Session {
   >();
   private readonly clientCapabilitiesBySource = new Map<object, ReadonlySet<ClientCapability>>();
   private registeredPushToken: string | null = null;
+  /** Undefined until the client chooses; a token then keeps its saved scope. */
+  private notificationScope: NotificationScope | undefined;
   private readonly clientSources = new Map<
     object,
     {
@@ -2637,7 +2644,7 @@ export class Session {
   public extendManagedLease(leaseId: string, leaseExpiresAt: number): boolean {
     const extended = this.authorization.extendLease(leaseId, leaseExpiresAt);
     if (extended && this.registeredPushToken) {
-      this.pushNotifications.renew(this.registeredPushToken, this.pushTokenAuthorization());
+      this.renewPushToken(this.registeredPushToken);
     }
     return extended;
   }
@@ -2654,7 +2661,7 @@ export class Session {
       this.accountActor = admission.actor;
     }
     if (this.registeredPushToken) {
-      this.pushNotifications.renew(this.registeredPushToken, this.pushTokenAuthorization());
+      this.renewPushToken(this.registeredPushToken);
     }
   }
 
@@ -2676,7 +2683,12 @@ export class Session {
   }
 
   public publishToSource(source: object, message: SessionOutboundMessage): void {
-    if (!this.authorization.allowsOutbound(message)) return;
+    // The same Project boundary as emit: an attention event names a session and quotes it.
+    if (
+      !this.authorization.allowsOutbound(message) ||
+      !this.resourceAuthorizer.allowsOutbound(message)
+    )
+      return;
     this.emitSubscribedEvent(message, source);
   }
 
@@ -3764,6 +3776,9 @@ export class Session {
         return;
       case "register_push_token":
         this.handleRegisterPushToken(msg.token);
+        return;
+      case "notifications.set_scope.request":
+        this.handleSetNotificationScope(msg.scope, msg.requestId);
         return;
       case "push.unregister.request":
         if (
@@ -5653,7 +5668,7 @@ export class Session {
       void this.clearFocusedTerminalAttention(focusedTerminalId);
     }
     if (metadata.pushToken) {
-      this.pushNotifications.renew(metadata.pushToken, this.pushTokenAuthorization());
+      this.renewPushToken(metadata.pushToken);
     }
   }
 
@@ -5675,8 +5690,49 @@ export class Session {
   private handleRegisterPushToken(token: string): void {
     this.registeredPushToken = token;
     this.currentClientMetadata().pushToken = token;
-    this.pushNotifications.renew(token, this.pushTokenAuthorization());
+    this.renewPushToken(token);
     this.sessionLogger.info("Registered push token");
+  }
+
+  private handleSetNotificationScope(scope: NotificationScope, requestId: string): void {
+    this.notificationScope = scope;
+    if (this.registeredPushToken) {
+      this.renewPushToken(this.registeredPushToken);
+    }
+    this.emit({ type: "notifications.set_scope.response", payload: { requestId, scope } });
+  }
+
+  /**
+   * Who this connection's notifications are for: its Hub account, with or without a
+   * managed lease. A managed lease without one cannot be attributed to anyone, so it
+   * is not notified; a connection with neither is the Host owner's own device.
+   */
+  public notificationReader(): NotificationReader | null {
+    const actor = this.accountActor ?? null;
+    if (actor === null && this.authorization.leaseId() !== null) return null;
+    return {
+      actor,
+      daemonWide: this.authorization.authorizedProjectIds() === null,
+      scope: this.notificationScope ?? DEFAULT_NOTIFICATION_SCOPE,
+    };
+  }
+
+  private renewPushToken(token: string): void {
+    this.pushNotifications.renew(token, this.pushTokenAuthorization(), {
+      actor: this.accountActor,
+      scope: this.notificationScope,
+    });
+  }
+
+  /**
+   * Whether this connection may read the session or terminal a notification is about, now:
+   * the same Project and Terminal rules as its outbound messages, and only while its lease lasts.
+   */
+  public allowsNotificationAbout(target: { agentId: string } | { terminalId: string }): boolean {
+    if (!this.authorization.isLeaseActive()) return false;
+    return "agentId" in target
+      ? this.resourceAuthorizer.allowsAgentSync(target.agentId)
+      : this.resourceAuthorizer.allowsTerminalSync(target.terminalId);
   }
 
   private pushTokenAuthorization(): PushTokenAuthorization | undefined {

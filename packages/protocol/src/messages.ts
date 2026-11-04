@@ -52,6 +52,7 @@ import {
 } from "./host-tailscale.js";
 import { HubConnectionSchema } from "./device-pairing-offer.js";
 import { SessionActorSchema, SessionAuthorshipShape } from "./session-authorship.js";
+import { NotificationScopeSchema } from "./notification-audience.js";
 import { AgentMessageSchema } from "./agent-message.js";
 import {
   HostsListRequestSchema,
@@ -3060,6 +3061,21 @@ export const PushUnregisterResponseSchema = z.object({
   }),
 });
 
+/** Sets which sessions may notify this connection and the push token it registers. */
+export const NotificationsSetScopeRequestSchema = z.object({
+  type: z.literal("notifications.set_scope.request"),
+  scope: NotificationScopeSchema,
+  requestId: z.string(),
+});
+
+export const NotificationsSetScopeResponseSchema = z.object({
+  type: z.literal("notifications.set_scope.response"),
+  payload: z.object({
+    requestId: z.string(),
+    scope: NotificationScopeSchema,
+  }),
+});
+
 // ============================================================================
 // Terminal Messages
 // ============================================================================
@@ -3607,6 +3623,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ListCommandsRequestSchema,
   RegisterPushTokenMessageSchema,
   PushUnregisterRequestSchema,
+  NotificationsSetScopeRequestSchema,
   ListTerminalsRequestSchema,
   SubscribeTerminalsRequestSchema,
   UnsubscribeTerminalsRequestSchema,
@@ -3912,6 +3929,8 @@ export const ServerInfoStatusPayloadSchema = z
         relayConfig: z.boolean().optional(),
         // COMPAT(pushTokenRevocation): added in v0.3.2, remove gate after 2027-02-10.
         pushTokenRevocation: z.boolean().optional(),
+        // COMPAT(notificationScope): added after v2.2.2, remove gate after 2027-05-03.
+        notificationScope: z.boolean().optional(),
         // COMPAT(plugins): added in v0.3.0, remove gate after 2027-08-07.
         plugins: z.boolean().optional(),
         // COMPAT(pluginManagement): added in v0.4.0, remove gate after 2027-08-14.
@@ -7357,6 +7376,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   StatusMessageSchema,
   PongMessageSchema,
   PushUnregisterResponseSchema,
+  NotificationsSetScopeResponseSchema,
   RpcErrorMessageSchema,
   ArtifactMessageSchema,
   AgentUpdateMessageSchema,
@@ -8012,6 +8032,8 @@ export type ListCommandsResponse = z.infer<typeof ListCommandsResponseSchema>;
 export type RegisterPushTokenMessage = z.infer<typeof RegisterPushTokenMessageSchema>;
 export type PushUnregisterRequest = z.infer<typeof PushUnregisterRequestSchema>;
 export type PushUnregisterResponse = z.infer<typeof PushUnregisterResponseSchema>;
+export type NotificationsSetScopeRequest = z.infer<typeof NotificationsSetScopeRequestSchema>;
+export type NotificationsSetScopeResponse = z.infer<typeof NotificationsSetScopeResponseSchema>;
 
 // Terminal message types
 export type ListTerminalsRequest = z.infer<typeof ListTerminalsRequestSchema>;

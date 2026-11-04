@@ -206,6 +206,35 @@ describe("loadAppSettingsFromStorage", () => {
     expect(result.workspaceTitleSource).toBe("title");
   });
 
+  it("notifies For me on an install that never chose a notification scope", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({ sendBehavior: "steer" }),
+      }),
+    });
+
+    expect((await loadAppSettingsFromStorage(deps)).notificationScope).toBe("mine");
+  });
+
+  it.each(["all", "others", "off"] as const)(
+    "keeps a chosen %s notification scope and replaces an unknown one with For me",
+    async (scope) => {
+      const chosen = makeDeps({
+        storage: createInMemoryKeyValueStorage({
+          [APP_SETTINGS_KEY]: JSON.stringify({ notificationScope: scope }),
+        }),
+      });
+      const unknown = makeDeps({
+        storage: createInMemoryKeyValueStorage({
+          [APP_SETTINGS_KEY]: JSON.stringify({ notificationScope: `${scope}-future` }),
+        }),
+      });
+
+      expect((await loadAppSettingsFromStorage(chosen)).notificationScope).toBe(scope);
+      expect((await loadAppSettingsFromStorage(unknown)).notificationScope).toBe("mine");
+    },
+  );
+
   it("enables the chat outline by default", async () => {
     const deps = makeDeps();
 

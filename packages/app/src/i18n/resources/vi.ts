@@ -6,6 +6,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { messageDelivery } from "./message-delivery";
+import { notificationScope } from "./notification-scope";
 import { navigation } from "./navigation";
 import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
@@ -3103,6 +3104,7 @@ export const vi: TranslationResources = {
   productAnalytics: productAnalytics.vi,
   home: home.vi,
   messageDelivery: messageDelivery.vi,
+  notificationScope: notificationScope.vi,
 
   providerUsage: {
     options: "Cài đặt",

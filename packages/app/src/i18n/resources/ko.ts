@@ -7,6 +7,7 @@ import { bots } from "./bots";
 import { heartbeats } from "./heartbeats";
 import { home } from "./home";
 import { messageDelivery } from "./message-delivery";
+import { notificationScope } from "./notification-scope";
 import { navigation } from "./navigation";
 import { productAnalytics } from "./product-analytics";
 import { connectors } from "./connectors";
@@ -3088,4 +3089,5 @@ export const ko: TranslationResources = {
   productAnalytics: productAnalytics.ko,
   home: home.ko,
   messageDelivery: messageDelivery.ko,
+  notificationScope: notificationScope.ko,
 };
