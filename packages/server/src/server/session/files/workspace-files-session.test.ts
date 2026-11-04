@@ -596,6 +596,7 @@ describe("WorkspaceFilesSession", () => {
         },
       }),
       source,
+      () => true,
     );
     await subsystem.handleFileTransferFrame(
       uploadFrame({
@@ -604,6 +605,7 @@ describe("WorkspaceFilesSession", () => {
         payload: new TextEncoder().encode("hello world"),
       }),
       source,
+      () => true,
     );
     await subsystem.handleFileTransferFrame(
       uploadFrame({
@@ -611,6 +613,7 @@ describe("WorkspaceFilesSession", () => {
         requestId: "req-upload",
       }),
       source,
+      () => true,
     );
 
     const message = emitted.find((entry) => entry.type === "file.upload.response");

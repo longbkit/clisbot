@@ -56,6 +56,14 @@ export interface WorkspaceFilesSessionHost {
   hasBinaryChannel(): boolean;
 }
 
+const MAX_HELD_UPLOAD_FRAMES = 64;
+
+interface HeldUploadFrames {
+  source: object;
+  tail: Promise<void>;
+  frames: number;
+}
+
 export interface WorkspaceFilesSessionOptions {
   host: WorkspaceFilesSessionHost;
   downloadTokenStore: DownloadTokenStore;
@@ -81,6 +89,7 @@ export class WorkspaceFilesSession {
   private readonly logger: pino.Logger;
   private readonly fileUploads: FileUploadStore;
   private readonly fileObserver: FileObserver;
+  private readonly heldUploadFrames = new Map<string, HeldUploadFrames>();
 
   constructor(private readonly options: WorkspaceFilesSessionOptions) {
     this.host = options.host;
@@ -495,8 +504,59 @@ export class WorkspaceFilesSession {
     );
   }
 
-  async handleFileTransferFrame(frame: FileTransferFrame, source: object): Promise<void> {
-    await this.fileUploads.receiveFrame(frame, source);
+  /**
+   * A client sends the begin frame right behind its upload request, and the socket hands binary
+   * frames over at once while a Project-scoped request is still being authorized. Without this
+   * hold the begin frame found no upload and was dropped, so every chunk then failed with
+   * "Upload chunks arrived before file begin". Frames wait, in arrival order, until the request
+   * has been admitted or refused.
+   */
+  holdUploadFrames(requestId: string, source: object | undefined): () => void {
+    if (!source || this.heldUploadFrames.has(requestId)) return () => {};
+    let release!: () => void;
+    const hold: HeldUploadFrames = {
+      source,
+      tail: new Promise<void>((resolve) => (release = resolve)),
+      frames: 0,
+    };
+    this.heldUploadFrames.set(requestId, hold);
+    const forget = (): void => {
+      const tail = hold.tail;
+      void tail.then(() => {
+        if (hold.tail !== tail) return forget();
+        if (this.heldUploadFrames.get(requestId) === hold) this.heldUploadFrames.delete(requestId);
+        return undefined;
+      });
+    };
+    return () => {
+      release();
+      forget();
+    };
+  }
+
+  /** `allowed` is read when the frame is applied, after any hold: authority can change meanwhile. */
+  async handleFileTransferFrame(
+    frame: FileTransferFrame,
+    source: object,
+    allowed: () => boolean,
+  ): Promise<void> {
+    const apply = async () => {
+      if (allowed()) await this.fileUploads.receiveFrame(frame, source);
+    };
+    const hold = this.heldUploadFrames.get(frame.requestId);
+    if (!hold || hold.source !== source) {
+      await apply();
+      return;
+    }
+    // Past the store's own per-upload frame budget the upload fails with a size mismatch.
+    if (hold.frames >= MAX_HELD_UPLOAD_FRAMES) return;
+    hold.frames += 1;
+    const received = hold.tail.then(apply);
+    hold.tail = received.then(
+      () => undefined,
+      () => undefined,
+    );
+    await received;
   }
 
   async handleProjectIconRequest(

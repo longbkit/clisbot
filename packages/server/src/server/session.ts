@@ -2491,7 +2491,16 @@ export class Session {
   }
 
   public async handleMessage(msg: SessionInboundMessage, source?: object): Promise<void> {
-    return this.delivery.request(source, msg, () => this.handleRequest(msg, source));
+    // Registered before the first await: the upload's binary frames may already be next.
+    const releaseUploadFrames =
+      msg.type === "file.upload.request"
+        ? this.workspaceFilesSession.holdUploadFrames(msg.requestId, source)
+        : undefined;
+    try {
+      return await this.delivery.request(source, msg, () => this.handleRequest(msg, source));
+    } finally {
+      releaseUploadFrames?.();
+    }
   }
 
   private async handleRequest(msg: SessionInboundMessage, source?: object): Promise<void> {
@@ -3823,16 +3832,22 @@ export class Session {
       this.connectedHostSession?.binary(binaryFrame.frame, source);
       return;
     }
+    if (binaryFrame.kind === "file_transfer") {
+      await this.workspaceFilesSession.handleFileTransferFrame(
+        binaryFrame.frame,
+        source,
+        () =>
+          this.authorization.isLeaseActive() &&
+          this.authorization.allowsPermission("workspace.write") &&
+          this.resourceAuthorizer.allowsAnyProject(),
+      );
+      return;
+    }
     if (
       !this.authorization.isLeaseActive() ||
       !this.authorization.allowsPermission("workspace.write")
     )
       return;
-    if (binaryFrame.kind === "file_transfer") {
-      if (!this.resourceAuthorizer.allowsAnyProject()) return;
-      await this.workspaceFilesSession.handleFileTransferFrame(binaryFrame.frame, source);
-      return;
-    }
     this.terminalController.handleBinaryFrame(binaryFrame.frame, source);
   }
 
