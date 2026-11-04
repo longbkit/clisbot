@@ -9,8 +9,11 @@ import type { InboundMessage } from "../plane/types.js";
 export {
   CONTEXT_HEADER,
   MESSAGE_HEADER,
+  THREAD_HEADER,
   renderConversationPrompt,
   senderLabel,
+  type ConversationLine,
+  type ConversationNote,
   type ConversationPrompt,
 } from "@clisbot/protocol/conversation-prompt";
 

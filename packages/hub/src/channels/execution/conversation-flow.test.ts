@@ -23,7 +23,12 @@ import { AgentRequestRefusedError } from "../daemon/agent-request-refusal.js";
 import { configurationDaemonStub } from "../daemon/test-support.js";
 import { channelMessageId } from "../daemon/session-operation.js";
 import type { HeldFlushAdmission } from "../bindings/held-flush.js";
-import { CONTEXT_HEADER, MESSAGE_HEADER, deliveryMessageId } from "../bindings/prompt.js";
+import {
+  CONTEXT_HEADER,
+  MESSAGE_HEADER,
+  THREAD_HEADER,
+  deliveryMessageId,
+} from "../bindings/prompt.js";
 import { claimedInbound } from "../ingress/claimed-inbound.js";
 import type { InboundReplyParams } from "../loader/host.js";
 import { ManualClock } from "../plane/clock.js";
@@ -1307,5 +1312,130 @@ describe("a follow-up Steer on a Host with the input queue", () => {
     } finally {
       await flow.stop();
     }
+  });
+});
+
+describe("the thread a mention replies in", () => {
+  /** The snapshot the Slack vertical stores on a mention's ingress row. */
+  function threadOf(root: string, recent: { id: string; text: string }[] = []) {
+    return {
+      root: {
+        messageId: root,
+        senderId: "B0ALERT",
+        senderName: "Alertmanager",
+        text: "[FIRING:2] Disk full on example-host",
+      },
+      recent: recent.map(({ id, text }) => ({ messageId: id, senderId: "U0LAN", text })),
+    };
+  }
+
+  it("is quoted before the mention, and a retry sends the same request from the stored row", async () => {
+    const say = conversation();
+    const daemon = makeDaemon({ failSends: 1 });
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    const mention = say("free up the disk", { name: "Alice" });
+    const root = mention.conversation.threadId!;
+    const withThread: InboundMessage = {
+      ...mention,
+      threadContext: {
+        ...threadOf(root, [{ id: `${root}9`, text: "it was the backups last time" }]),
+        omitted: 2,
+      },
+    };
+
+    const attempt = await flow.send(withThread).catch((error: unknown) => error);
+    assert.ok(attempt instanceof Error, "the first send's outcome is unknown");
+    const payload = {
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: { Message: withThread },
+    };
+    const rows = await store.listChannelIngress({ organizationId: ORGANIZATION_ID, limit: 1_000 });
+    const record = rows.find((row) => row.externalMessageId === withThread.externalMessageId)!;
+    await flow.plane.onInbound(claimedInbound(payload, record.id));
+
+    const expected = lines(
+      THREAD_HEADER,
+      "Alertmanager (slack:B0ALERT): [FIRING:2] Disk full on example-host",
+      "(2 earlier replies are not shown; the message tool's read action has them.)",
+      "slack:U0LAN: it was the backups last time",
+      MESSAGE_HEADER,
+      "Alice (slack:U0ALICE): free up the disk",
+    );
+    assert.equal(daemon.sends.length, 2, "sent, then replayed");
+    assert.equal(daemon.sends[0]!.text, expected);
+    assert.deepEqual(daemon.sends[1], daemon.sends[0], "same session, text and receipt key");
+    await flow.plane.stop();
+  });
+
+  it("does not repeat a thread message the prompt already carries as context", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    const chatter = say("it was the backups last time", {
+      name: "Lan",
+      sender: "slack:U0LAN",
+      mention: false,
+    });
+    await flow.send(chatter);
+    const mention = say("free up the disk", { name: "Alice" });
+    const root = mention.conversation.threadId!;
+    await flow.send({
+      ...mention,
+      threadContext: threadOf(root, [{ id: chatter.externalMessageId!, text: chatter.text }]),
+    });
+
+    assert.equal(
+      daemon.sends[0]!.text,
+      lines(
+        THREAD_HEADER,
+        "Alertmanager (slack:B0ALERT): [FIRING:2] Disk full on example-host",
+        CONTEXT_HEADER,
+        "Lan (slack:U0LAN): it was the backups last time",
+        MESSAGE_HEADER,
+        "Alice (slack:U0ALICE): free up the disk",
+      ),
+    );
+    await flow.plane.stop();
+  });
+
+  it("says when the thread could not be read", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(makeRoute({}), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    await flow.send({
+      ...say("free up the disk", { name: "Alice" }),
+      threadContext: { recent: [], unavailable: "missing_scope" },
+    });
+    assert.equal(
+      daemon.sends[0]!.text,
+      lines(
+        THREAD_HEADER,
+        "(The thread's earlier messages could not be read: missing_scope. The message tool's read action can try again.)",
+        MESSAGE_HEADER,
+        "Alice (slack:U0ALICE): free up the disk",
+      ),
+    );
+    await flow.plane.stop();
+  });
+
+  it("is left out with the rest of the context when the Route keeps none", async () => {
+    const say = conversation();
+    const daemon = makeDaemon();
+    const flow = makePlane(
+      makeRoute({ context: { unmentioned: "none", maxMessages: 20 } }),
+      daemon,
+    );
+    await flow.plane.start(daemon.daemon, store);
+    const mention = say("free up the disk", { name: "Alice" });
+    await flow.send({ ...mention, threadContext: threadOf(mention.conversation.threadId!) });
+    assert.deepEqual(
+      daemon.sends.map(({ text }) => text),
+      ["Alice (slack:U0ALICE): free up the disk"],
+    );
+    await flow.plane.stop();
   });
 });

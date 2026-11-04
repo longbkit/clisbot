@@ -8,7 +8,13 @@ import type { ChannelIngressQueueRecord } from "../../db/types.js";
 import type { CompiledRoute } from "../config/compile.js";
 import { conversationSettings } from "../config/conversation.js";
 import type { InboundMessage } from "../plane/types.js";
-import { deliveryMessageId, renderConversationPrompt } from "./prompt.js";
+import type { ChannelThreadContextMessage } from "@clisbot/channels-shared";
+import {
+  deliveryMessageId,
+  renderConversationPrompt,
+  type ConversationLine,
+  type ConversationNote,
+} from "./prompt.js";
 import { deriveBindingKey, type ThreadKey } from "./stored-route.js";
 import { ingressAttempt } from "../ingress/attempt.js";
 
@@ -67,6 +73,59 @@ function ingressIds(messages: readonly InboundMessage[]): string[] {
   );
 }
 
+/**
+ * The thread block of a prompt: the snapshot the vertical stored on the
+ * delivery's first message that has one (`ThreadContext`), so a replay renders
+ * it again from the row. A message the prompt already carries as context or as
+ * a message is not repeated. It is context, so `context.unmentioned: none`
+ * turns it off with the rest.
+ */
+export function threadLines(
+  messages: readonly InboundMessage[],
+  context: readonly InboundMessage[],
+  route: CompiledRoute,
+): (ConversationLine | ConversationNote)[] {
+  if (conversationSettings(route.defaults).context.unmentioned === "none") return [];
+  const carrier = messages.find((message) => message.threadContext !== undefined);
+  const thread = carrier?.threadContext;
+  if (carrier === undefined || thread === undefined) return [];
+  const carried = new Set(
+    [...context, ...messages].flatMap((message) =>
+      message.externalMessageId === undefined ? [] : [message.externalMessageId],
+    ),
+  );
+  const line = (message: ChannelThreadContextMessage): ConversationLine[] =>
+    carried.has(message.messageId)
+      ? []
+      : [
+          {
+            senderIdentity: `${carrier.channel}:${message.senderId}`,
+            ...(message.senderName === undefined ? {} : { senderName: message.senderName }),
+            text: message.text,
+          },
+        ];
+  const lines: (ConversationLine | ConversationNote)[] = [];
+  if (thread.unavailable !== undefined) {
+    const what =
+      thread.root === undefined && thread.recent.length > 0
+        ? "The thread's root post"
+        : "The thread's earlier messages";
+    lines.push({
+      note: `(${what} could not be read: ${thread.unavailable}. The message tool's read action can try again.)`,
+    });
+  }
+  if (thread.root !== undefined) lines.push(...line(thread.root));
+  if (thread.omitted === "unknown") {
+    lines.push({ note: "(Later replies are not shown; the message tool's read action has them.)" });
+  } else if (thread.omitted !== undefined) {
+    lines.push({
+      note: `(${thread.omitted} earlier ${thread.omitted === 1 ? "reply is" : "replies are"} not shown; the message tool's read action has them.)`,
+    });
+  }
+  for (const message of thread.recent) lines.push(...line(message));
+  return lines.some((entry) => !("note" in entry)) || thread.unavailable !== undefined ? lines : [];
+}
+
 export class BindingInbox {
   constructor(private readonly deps: BindingInboxDeps) {}
 
@@ -91,7 +150,11 @@ export class BindingInbox {
     const messageId = deliveryMessageId(messages);
     const through = messages.at(-1)?.ingressId;
     const prompt = (context: readonly InboundMessage[]) =>
-      renderConversationPrompt({ context, messages });
+      renderConversationPrompt({
+        thread: threadLines(messages, context, route),
+        context,
+        messages,
+      });
     if (through === undefined) {
       const none = async () => undefined;
       return { prompt: prompt([]), messageId, markSent: none, settle: none };
