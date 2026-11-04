@@ -107,13 +107,89 @@ describe("Slack thread reads include the thread parent", () => {
     expect(result.messages.map((message) => message.ts)).toEqual(["1793758229.210519"]);
   });
 
-  it("returns replies alone when the parent is gone", async () => {
+  it("says the root is missing when the parent is gone", async () => {
     const { client, replies } = slackClient();
     replies.mockImplementationOnce(async () => ({ messages: thread.slice(1), has_more: false }));
     replies.mockImplementationOnce(async () => ({ messages: [], has_more: false }));
     const result = await read(client);
-    expect(result.messages.map((message) => message.ts)).toEqual(
-      thread.slice(1).map((m) => m.ts),
-    );
+    expect(result).toEqual({
+      messages: thread.slice(1),
+      hasMore: false,
+      threadRootUnavailable: "not_found",
+    });
+  });
+
+  it("keeps the replies and hasMore when the parent lookup is rate limited", async () => {
+    const { client, replies } = slackClient();
+    replies.mockImplementationOnce(async () => ({ messages: thread.slice(1, 2), has_more: true }));
+    replies.mockImplementationOnce(async () => {
+      throw Object.assign(new Error("A rate limit was exceeded"), {
+        code: "slack_webapi_rate_limited_error",
+        retryAfter: 30,
+      });
+    });
+    const result = await read(client, { limit: 1 });
+    expect(result).toEqual({
+      messages: thread.slice(1, 2),
+      hasMore: true,
+      threadRootUnavailable: "slack_webapi_rate_limited_error",
+    });
+  });
+
+  it("reports the Slack platform error when the parent lookup is denied", async () => {
+    const { client, replies } = slackClient();
+    replies.mockImplementationOnce(async () => ({ messages: thread.slice(1), has_more: false }));
+    replies.mockImplementationOnce(async () => {
+      throw Object.assign(new Error("An API error occurred: missing_scope"), {
+        code: "slack_webapi_platform_error",
+        data: { ok: false, error: "missing_scope" },
+      });
+    });
+    const result = await read(client);
+    expect(result.messages.map((message) => message.ts)).toEqual(thread.slice(1).map((m) => m.ts));
+    expect(result.threadRootUnavailable).toBe("missing_scope");
+  });
+
+  it("still throws when the replies page itself fails", async () => {
+    const { client, replies } = slackClient();
+    replies.mockRejectedValueOnce(new Error("channel_not_found"));
+    await expect(read(client)).rejects.toThrow("channel_not_found");
+  });
+
+  it("returns the root of a thread with no replies yet", async () => {
+    const { client, replies } = slackClient();
+    replies.mockImplementationOnce(async () => ({ messages: [], has_more: false }));
+    const result = await read(client, { limit: 1 });
+    expect(result).toEqual({ messages: [alertRoot], hasMore: false });
+    expect(result).not.toHaveProperty("threadRootUnavailable");
+  });
+
+  it("adds the root to a page Slack returned empty but with more to come", async () => {
+    const { client, replies } = slackClient();
+    replies.mockImplementationOnce(async () => ({ messages: [], has_more: true }));
+    const result = await read(client, { limit: 1 });
+    expect(result).toEqual({ messages: [alertRoot], hasMore: true });
+  });
+
+  it("does not duplicate the root when Slack's limited page holds only the root", async () => {
+    const { client, replies } = slackClient({ parentAlways: true });
+    replies.mockImplementationOnce(async () => ({ messages: [alertRoot], has_more: true }));
+    const result = await read(client, { after: "1793756900.000000", limit: 1 });
+    expect(replies).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ messages: [alertRoot], hasMore: true });
+  });
+
+  it.each([
+    ["after one microsecond before the root", { after: "1793756938.227778" }, true],
+    ["after exactly the root", { after: ROOT_TS }, false],
+    ["after the root written with a trailing zero", { after: "1793756938.2277790" }, false],
+    ["before one microsecond after the root", { before: "1793756938.227780" }, true],
+    ["before exactly the root", { before: ROOT_TS }, false],
+    ["before the root's whole second", { before: "1793756938" }, false],
+  ])("compares the window bound exactly: %s", async (_label, bounds, included) => {
+    const { client } = slackClient();
+    const result = await read(client, bounds);
+    expect(result.messages.some((message) => message.ts === ROOT_TS)).toBe(included);
+    expect(result).not.toHaveProperty("threadRootUnavailable");
   });
 });

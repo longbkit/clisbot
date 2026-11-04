@@ -63,7 +63,7 @@ Upstream `openclaw-private` at `5d8067a4483`. Roots: `extensions/slack/src` → 
 | `src/accounts.runtime.ts`                         | `extensions/slack/src/accounts.runtime.ts`                          | verbatim      | —                                 |
 | `src/accounts.ts`                                 | `extensions/slack/src/accounts.ts`                                  | verbatim      | —                                 |
 | `src/action-runtime.runtime.ts`                   | `extensions/slack/src/action-runtime.runtime.ts`                    | verbatim      | —                                 |
-| `src/action-runtime.ts`                           | `extensions/slack/src/action-runtime.ts`                            | verbatim      | —                                 |
+| `src/action-runtime.ts`                           | `extensions/slack/src/action-runtime.ts`                            | adapted       | D-046                             |
 | `src/action-threading.ts`                         | `extensions/slack/src/action-threading.ts`                          | verbatim      | —                                 |
 | `src/actions.ts`                                  | `extensions/slack/src/actions.ts`                                   | adapted       | D-034, D-046                      |
 | `src/agent-context.ts`                            | `extensions/slack/src/agent-context.ts`                             | verbatim      | —                                 |
