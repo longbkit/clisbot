@@ -281,6 +281,24 @@ describe("file uploads", () => {
     });
     expect(readFileSync(path, "utf8")).toBe("hello world");
   });
+
+  it("keeps accepting files after many uploads that were never sent", async () => {
+    const clisbotHome = makeClisbotHome();
+    const uploads = new FileUploadStore({ clisbotHome });
+    // The app uploads a chosen file once at pick time and again at send; only the second is linked.
+    const unsent = [];
+    for (let index = 0; index < 256; index++) {
+      unsent.push(await uploadNamed(uploads, `draft-${index}.pdf`));
+    }
+
+    const next = await uploadNamed(uploads, "clip.mp4");
+
+    expect(next && uploads.ownsUploadedFile(next)).toBe(true);
+    expect(unsent[0] && uploads.ownsUploadedFile(unsent[0])).toBe(false);
+    expect(unsent[1] && uploads.ownsUploadedFile(unsent[1])).toBe(true);
+    // Untracking does not delete bytes: a terminal may still hold the pasted path.
+    expect(existsSync(unsent[0]!.path)).toBe(true);
+  });
 });
 
 let uploadCount = 0;

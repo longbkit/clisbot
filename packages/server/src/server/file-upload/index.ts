@@ -66,8 +66,15 @@ export class FileUploadStore {
     finished: (response: FileUploadResponse | null) => void = () => {},
   ): () => Promise<void> {
     const count = [...this.pending.values()].reduce((total, uploads) => total + uploads.size, 0);
-    if (count >= MAX_PENDING_UPLOADS || this.completed.size >= MAX_COMPLETED_UPLOADS)
+    if (count >= MAX_PENDING_UPLOADS)
       throw new Error("Upload storage overloaded: too many unfinished drafts");
+    // Apps upload a chosen file again at send, so most completed uploads are never linked.
+    // Refusing at the cap blocked every later file for the rest of the session; forget the
+    // oldest instead. Its bytes stay: a terminal may hold its pasted path.
+    if (this.completed.size >= MAX_COMPLETED_UPLOADS) {
+      const oldest = this.completed.keys().next();
+      if (!oldest.done) this.completed.delete(oldest.value);
+    }
     const existingUpload = this.pending.get(source)?.get(request.requestId);
     if (existingUpload) void this.cancel(existingUpload).catch(() => {});
     const fileName = sanitizeFileName(request.fileName);
