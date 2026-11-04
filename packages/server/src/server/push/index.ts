@@ -96,8 +96,8 @@ export function createPushNotifications(options: {
 
 /**
  * Which tokens may receive session content. The Host owner's own devices always may. A device
- * admitted by a lease may only when the Hub, asked now, still grants that lease the Project;
- * each lease is asked once per notification and never cached.
+ * admitted by a lease may only when the Hub, asked now, still grants that lease what the event
+ * needs; each lease is asked once per notification and never cached.
  */
 async function confirmContent(
   subscriptions: readonly ActivePushSubscription[],
@@ -117,16 +117,8 @@ async function confirmContent(
         const answer = await confirm(leaseId).catch(
           (): LeaseConfirmation => ({ granted: false, revoked: false }),
         );
-        if (!answer.granted) {
-          if (answer.revoked) markUnconfirmed(leaseId);
-          return;
-        }
-        const projectId = target?.projectId;
-        if (
-          answer.projectIds === null ||
-          (projectId !== undefined && answer.projectIds.includes(projectId))
-        )
-          granted.add(leaseId);
+        if (answer.granted) granted.add(leaseId);
+        else if (answer.revoked) markUnconfirmed(leaseId);
       }),
     );
   return (entry) => entry.leaseId === null || (!entry.unconfirmed && granted.has(entry.leaseId));

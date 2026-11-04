@@ -146,7 +146,12 @@ import type { SecurityMode } from "@clisbot/relay/e2ee";
 import type { BrowserToolsBroker } from "./browser-tools/broker.js";
 import type { DaemonRuntimeConfig } from "./session/daemon/daemon-session.js";
 import { DirectorySyncService } from "./directory-sync/index.js";
-import { OWNER_PERMISSIONS, type DaemonPermission } from "./authorization/index.js";
+import {
+  OWNER_PERMISSIONS,
+  SessionAuthorization,
+  type DaemonPermission,
+} from "./authorization/index.js";
+import { grantAllowsTerminalLaunch } from "./managed-access/terminal-access.js";
 import type { WorkspaceLabelService } from "./workspace-labels/index.js";
 import type { ChatService } from "./chats/chat-service.js";
 import type { BotService } from "./bots/index.js";
@@ -3684,7 +3689,12 @@ export class VoiceAssistantWebSocketServer {
       .send(notification, {
         ...(projectId === null ? {} : { projectId }),
         recipients: plan.pushRecipients,
-        confirmLease: this.confirmLease,
+        confirmLease: this.confirmLeaseFor(
+          "agent_attention_required",
+          (authorization) =>
+            projectId !== null &&
+            authorization.project(projectId)?.privileges.has("project.use") === true,
+        ),
       })
       .catch((err) => {
         this.logger.warn({ err, agentId: params.agentId }, "Failed to send push notification");
@@ -3798,7 +3808,15 @@ export class VoiceAssistantWebSocketServer {
         {
           ...(projectId === null ? {} : { projectId }),
           recipients: plan.pushRecipients,
-          confirmLease: this.confirmLease,
+          confirmLease: this.confirmLeaseFor(
+            "terminal_attention_required",
+            (authorization) =>
+              projectId !== null &&
+              grantAllowsTerminalLaunch(
+                authorization.project(projectId),
+                terminalLaunchOf(params.terminalId).profileId,
+              ),
+          ),
         },
       )
       .catch((err) => {
@@ -3842,32 +3860,36 @@ export class VoiceAssistantWebSocketServer {
   }
 
   /**
-   * Asks the Hub, now, whether a lease still grants its device access, without extending it.
-   * Hub link down, an older Hub, a timeout or an error all mean "not granted": the device then
-   * gets a notification that identifies nothing. A 401 is the Hub refusing the lease.
+   * Asks the Hub, now, for a lease's live grants (without extending it) and grants content only
+   * when they let that device read this event: the same operation permission and resource rule
+   * its connection would need, judged by the real authorization model. Hub link down, an older
+   * Hub, a timeout or an error all mean "not granted": the device gets a notification that
+   * identifies nothing. A 401 is the Hub refusing the lease.
    */
-  private readonly confirmLease = async (leaseId: string): Promise<LeaseConfirmation> => {
-    const relationships = this.hubRelationships;
-    if (!relationships?.verifyAccessLease || relationships.status().state !== "connected")
-      return { granted: false, revoked: false };
-    try {
-      const admission = await relationships.verifyAccessLease(leaseId);
-      return {
-        granted: true,
-        projectIds:
-          admission.resourceMode === "daemon"
-            ? null
-            : [...admission.projects]
-                .filter(([, grant]) => grant.privileges.has("project.use"))
-                .map(([projectId]) => projectId),
-      };
-    } catch (error) {
-      return {
-        granted: false,
-        revoked: error instanceof HubEnrollmentRejectedError && error.statusCode === 401,
-      };
-    }
-  };
+  private confirmLeaseFor(
+    event: SessionOutboundMessage["type"],
+    allowsResource: (authorization: SessionAuthorization) => boolean,
+  ): (leaseId: string) => Promise<LeaseConfirmation> {
+    return async (leaseId) => {
+      const relationships = this.hubRelationships;
+      if (!relationships?.verifyAccessLease || relationships.status().state !== "connected")
+        return { granted: false, revoked: false };
+      let authorization: SessionAuthorization;
+      try {
+        const admission = await relationships.verifyAccessLease(leaseId);
+        authorization = new SessionAuthorization(admission.permissions, admission);
+      } catch (error) {
+        return {
+          granted: false,
+          revoked: error instanceof HubEnrollmentRejectedError && error.statusCode === 401,
+        };
+      }
+      const granted =
+        authorization.allowsOutbound({ type: event } as SessionOutboundMessage) &&
+        (!authorization.isResourceRestricted() || allowsResource(authorization));
+      return granted ? { granted: true } : { granted: false, revoked: false };
+    };
+  }
 
   private async projectIdForWorkspace(
     workspaceId: string | undefined,

@@ -241,16 +241,15 @@ export interface PushNotificationTarget {
   /** Which readers this notification is for; absent sends to every authorized token. */
   recipients?: (reader: NotificationReader) => boolean;
   /**
-   * Asks the Hub for a lease's live grants right before content is sent to its device. Absent,
-   * or anything short of a grant covering `projectId`, and the device gets only the
-   * notification that identifies nothing.
+   * Asks the Hub for a lease's live grants right before content is sent to its device, judged
+   * against what this event needs. Absent, or anything short of a grant, and the device gets
+   * only the notification that identifies nothing.
    */
   confirmLease?: (leaseId: string) => Promise<LeaseConfirmation>;
 }
 
-export type LeaseConfirmation =
-  | { granted: true; projectIds: readonly string[] | null }
-  | { granted: false; revoked: boolean };
+/** The Hub's live answer for a lease, already judged against what this event needs. */
+export type LeaseConfirmation = { granted: true } | { granted: false; revoked: boolean };
 
 export interface ActivePushSubscription {
   token: string;

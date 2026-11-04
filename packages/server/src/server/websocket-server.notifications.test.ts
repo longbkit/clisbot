@@ -465,11 +465,20 @@ function createTokenAudience() {
  * The Hub as the daemon sees it: its link state and each lease's live grants, which the
  * daemon asks for right before it sends session content to a lease's device.
  */
+type ProjectGrants = Record<
+  string,
+  { privileges: readonly string[]; terminalProfiles?: "*" | readonly string[] }
+>;
+type LeaseGrant = readonly string[] | ProjectGrants | null;
+
 function createFakeHub(state: "connected" | "reconnecting" = "connected") {
   const hub = {
     state,
-    /** Live Project grants per lease; null is daemon-wide. A missing lease is refused (401). */
-    grants: new Map<string, readonly string[] | null>(),
+    /**
+     * Live grants per lease: Project ids with just `project.use`, explicit Project grants, or
+     * null for daemon-wide. A missing lease is refused (401).
+     */
+    grants: new Map<string, LeaseGrant>(),
     verifications: 0,
     /** Set to make every verification fail without an answer, e.g. a dead socket's timeout. */
     failure: null as Error | null,
@@ -479,16 +488,32 @@ function createFakeHub(state: "connected" | "reconnecting" = "connected") {
   const verify = async (leaseId: string) => {
     hub.verifications += 1;
     if (hub.failure) throw hub.failure;
-    const projectIds = hub.grants.get(leaseId);
-    if (projectIds === undefined) throw new HubEnrollmentRejectedError(401);
-    return projectIds === null
-      ? { resourceMode: "daemon", projects: new Map() }
-      : {
-          resourceMode: "projects",
-          projects: new Map(
-            projectIds.map((projectId) => [projectId, { privileges: new Set(["project.use"]) }]),
-          ),
-        };
+    const grant = hub.grants.get(leaseId);
+    if (grant === undefined) throw new HubEnrollmentRejectedError(401);
+    const lease = {
+      principalId: `member:${leaseId}`,
+      permissions: ["workspace.read"],
+      leaseId,
+      leaseExpiresAt: Date.now() + 60 * 60 * 1000,
+    };
+    if (grant === null) return { ...lease, resourceMode: "daemon", projects: new Map() };
+    const projects: ProjectGrants = Array.isArray(grant)
+      ? Object.fromEntries(grant.map((projectId) => [projectId, { privileges: ["project.use"] }]))
+      : (grant as ProjectGrants);
+    return {
+      ...lease,
+      resourceMode: "projects",
+      projects: new Map(
+        Object.entries(projects).map(([projectId, project]) => [
+          projectId,
+          {
+            privileges: new Set(project.privileges),
+            agentConfigurations: [],
+            ...(project.terminalProfiles ? { terminalProfiles: project.terminalProfiles } : {}),
+          },
+        ]),
+      ),
+    };
   };
   const relationships = {
     status: () => ({ state: hub.state }),
@@ -823,6 +848,71 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
       expect((await payloads(server, delivered))["bob-phone"]).toStrictEqual(UNIDENTIFIED);
     });
 
+    it("a terminal's content needs the Terminal grant for how it was launched, not Project use", async () => {
+      const { server, delivered, registerMember, hub, push } = setup({});
+      const terminalCases = [
+        ["project-use-only", { [PROJECT_ID]: { privileges: ["project.use"] } }],
+        ["terminal-use", { [PROJECT_ID]: { privileges: ["project.use", "terminal.use"] } }],
+        [
+          "profile-p1",
+          {
+            [PROJECT_ID]: {
+              privileges: ["project.use", "terminal.profile.use"],
+              terminalProfiles: ["p1"],
+            },
+          },
+        ],
+        ["daemon-wide", null],
+      ] as const;
+      for (const [token, grant] of terminalCases) {
+        registerMember(token, member(token), { scope: "all" });
+        hub.grants.set(`lease-${token}`, grant);
+      }
+      push.renew("owner-phone");
+      const internals = asInternals<{
+        broadcastTerminalAttention(params: Record<string, string>): Promise<void>;
+      }>(server);
+      const contentFor = async (terminalId: string) => {
+        delivered.length = 0;
+        await internals.broadcastTerminalAttention({
+          terminalId,
+          cwd: "/work/secret-project",
+          workspaceId: WORKSPACE_ID,
+          terminalName: "secret-shell",
+          reason: "finished",
+        });
+        await new Promise((resolve) => setImmediate(resolve));
+        const withContent: string[] = [];
+        for (const entry of delivered)
+          if (entry.payload.data !== undefined) withContent.push(...entry.tokens);
+        return withContent.sort();
+      };
+      recordTerminalLaunch("shell-1", {});
+      recordTerminalLaunch("profile-1", { profileId: "p1" });
+
+      const shell = await contentFor("shell-1");
+      const profile = await contentFor("profile-1");
+      forgetTerminalLaunch("shell-1");
+      forgetTerminalLaunch("profile-1");
+
+      expect(shell).toEqual(["daemon-wide", "owner-phone", "terminal-use"]);
+      expect(profile).toEqual(["daemon-wide", "owner-phone", "profile-p1", "terminal-use"]);
+    });
+
+    it("an agent's content needs the Project grant and the operation permission", async () => {
+      const { server, delivered, registerMember, hub } = setup({ createdBy: BOB });
+      registerMember("bob-phone", BOB);
+      registerMember("bob-no-project-use", member("bob-x"), { scope: "all" });
+      hub.grants.set("lease-bob-no-project-use", {
+        [PROJECT_ID]: { privileges: ["terminal.use"] },
+      });
+
+      const byToken = await payloads(server, delivered);
+
+      expect(byToken["bob-phone"]?.data).toMatchObject({ agentId: "agent-1" });
+      expect(byToken["bob-no-project-use"]).toStrictEqual(UNIDENTIFIED);
+    });
+
     it("a Hub that cannot verify leases yet, or a down link, gets nothing identifying", async () => {
       const { server, delivered, registerMember, hub } = setup({ createdBy: BOB });
       registerMember("bob-phone", BOB);
@@ -1085,7 +1175,7 @@ describe("push audience before Expo", () => {
 
   const AUTHOR_AUDIENCE = ["alice-all", "bob-phone", "owner-phone"];
   /** What the Hub still grants: Dave's lease was revoked and Erin's expired. */
-  const MATRIX_HUB_GRANTS: ReadonlyArray<readonly [string, readonly string[] | null]> = [
+  const MATRIX_HUB_GRANTS: ReadonlyArray<readonly [string, LeaseGrant]> = [
     ["lease-bob-phone", [PROJECT_ID]],
     ["lease-bob-tablet-off", [PROJECT_ID]],
     ["lease-alice-mine", [PROJECT_ID]],
