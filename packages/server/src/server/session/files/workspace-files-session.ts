@@ -67,6 +67,7 @@ const UPLOAD_NOT_PERMITTED =
 // A request that never settles must not pin its frames, or the shared budget, for good.
 const HELD_UPLOAD_TIMEOUT_MS = 60_000;
 const UPLOAD_CONNECTION_CLOSED = "Upload connection closed";
+const UPLOAD_AUTHORIZATION_TIMED_OUT = "Upload request timed out waiting for authorization";
 let heldUploadBytesTotal = 0;
 
 /** Bytes currently held for upload requests still being authorized, across all sessions. */
@@ -82,6 +83,8 @@ interface HeldUploadFrames {
   released: boolean;
   draining: boolean;
   failure: string | null;
+  /** The client already has its one answer; a late admission or refusal must stay silent. */
+  answered: boolean;
   timeout: ReturnType<typeof setTimeout>;
 }
 
@@ -95,6 +98,8 @@ export interface WorkspaceFilesSessionOptions {
   resolveAgentDirectory?: (agentId: string) => Promise<string>;
   resolveAgentReadDirectory?: (agentId: string) => Promise<string>;
   resolveForkSource?: ResolveForkSource;
+  /** How long an upload request may wait for authorization before it is answered with an error. */
+  heldUploadTimeoutMs?: number;
 }
 
 /**
@@ -548,12 +553,27 @@ export class WorkspaceFilesSession {
       released: false,
       draining: false,
       failure: null,
+      answered: false,
+      // The hold stays as a marker until the request settles, so late frames are dropped and
+      // a late admission is cancelled instead of left behind.
       timeout: setTimeout(() => {
         if (hold.released) return;
-        hold.failure = UPLOAD_OVERLOADED;
+        hold.failure = UPLOAD_AUTHORIZATION_TIMED_OUT;
+        hold.answered = true;
         this.discardHeldFrames(hold);
-        this.forgetHold(request.requestId, source, hold);
-      }, HELD_UPLOAD_TIMEOUT_MS),
+        this.host.emit(
+          {
+            type: "rpc_error",
+            payload: {
+              requestId: request.requestId,
+              requestType: "file.upload.request",
+              error: UPLOAD_AUTHORIZATION_TIMED_OUT,
+              code: "upload_authorization_timeout",
+            },
+          },
+          source,
+        );
+      }, this.options.heldUploadTimeoutMs ?? HELD_UPLOAD_TIMEOUT_MS),
     };
     hold.timeout.unref?.();
     holds.set(request.requestId, hold);
@@ -563,6 +583,11 @@ export class WorkspaceFilesSession {
       clearTimeout(hold.timeout);
       void this.drainHeldUploadFrames(request.requestId, source, hold);
     };
+  }
+
+  /** True once a timed-out hold answered this request; Session then emits no refusal for it. */
+  uploadRequestAnswered(requestId: string, source: object | undefined): boolean {
+    return source ? this.heldUploadFrames.get(source)?.get(requestId)?.answered === true : false;
   }
 
   /** A closed connection's held frames go; the store cancels its uploads with the operation. */
@@ -642,6 +667,10 @@ export class WorkspaceFilesSession {
     // Before admission the request may still be refused; the drain at release reports then.
     if (!hold.released) return;
     this.forgetHold(requestId, source, hold);
+    if (hold.answered) {
+      await this.fileUploads.discardUpload(requestId, source);
+      return;
+    }
     await this.fileUploads.failUpload(requestId, source, failure);
     // Without workspace.write the upload response is no longer delivered; rpc_error always is.
     if (failure === UPLOAD_NOT_PERMITTED)

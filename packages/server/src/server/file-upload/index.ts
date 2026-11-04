@@ -166,6 +166,12 @@ export class FileUploadStore {
     if (upload) await this.cancel(upload, buildUploadResponse(upload, error));
   }
 
+  /** Ends an unfinished upload without answering; its request was already answered. */
+  async discardUpload(requestId: string, source: object = this.defaultSource): Promise<void> {
+    const upload = this.pending.get(source)?.get(requestId);
+    if (upload) await this.cancel(upload);
+  }
+
   ownsUploadedFile(attachment: UploadedFileAttachment): boolean {
     const completed = this.completed.get(attachment.id);
     return (

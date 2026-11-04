@@ -24,7 +24,7 @@ afterEach(() => {
   expect(heldUploadFrameBytes()).toBe(0);
 });
 
-function setup() {
+function setup(options: { heldUploadTimeoutMs?: number } = {}) {
   const home = realpathSync(mkdtempSync(join(tmpdir(), "held-upload-")));
   homes.push(home);
   const emitted: SessionOutboundMessage[] = [];
@@ -37,6 +37,7 @@ function setup() {
     downloadTokenStore: new DownloadTokenStore({ ttlMs: 60_000 }),
     clisbotHome: home,
     logger: pino({ level: "silent" }),
+    ...options,
   });
   subsystems.push(subsystem);
   const ownership = new SessionDelivery((_source, message) => emitted.push(message));
@@ -66,7 +67,13 @@ function setup() {
         (message.type === "file.upload.response" || message.type === "rpc_error") &&
         message.payload.requestId === requestId,
     );
-  return { subsystem, connect, admit, send, answer };
+  const answers = (requestId: string) =>
+    emitted.filter(
+      (message) =>
+        (message.type === "file.upload.response" || message.type === "rpc_error") &&
+        message.payload.requestId === requestId,
+    );
+  return { subsystem, ownership, connect, admit, send, answer, answers };
 }
 
 function frames(requestId: string, size: number): FileTransferFrame[] {
@@ -140,9 +147,52 @@ test("a request that never settles gives its hold up", async () => {
   expect(heldUploadFrameBytes()).toBe(MiB);
   await vi.advanceTimersByTimeAsync(60_000);
   expect(heldUploadFrameBytes()).toBe(0);
+  expect(t.answers("stuck")).toEqual([
+    expect.objectContaining({
+      type: "rpc_error",
+      payload: expect.objectContaining({ code: "upload_authorization_timeout" }),
+    }),
+  ]);
+  expect(t.subsystem.uploadRequestAnswered("stuck", source)).toBe(true);
+  // Frames still on the wire are dropped by the marker, not held again.
   await Promise.all(t.send(source, frames("stuck", CHUNK).slice(1, 2)));
   expect(heldUploadFrameBytes()).toBe(0);
 });
+
+test("a connection that closes while held frames drain stops the drain and returns the bytes", async () => {
+  const t = setup();
+  const source = t.connect();
+  const release = t.subsystem.holdUploadFrames({ requestId: "midway", size: 16 * MiB }, source);
+  const delivered = t.send(source, frames("midway", 16 * MiB));
+  await t.admit(source, "midway", 16 * MiB);
+  release();
+  // Socket close, as the websocket server does it: release the hold, then the delivery source.
+  t.subsystem.releaseSource(source);
+  await t.ownership.detach(source);
+  await Promise.all(delivered);
+  expect(heldUploadFrameBytes()).toBe(0);
+  expect(
+    t
+      .answers("midway")
+      .some((message) => message.type === "file.upload.response" && message.payload.error === null),
+  ).toBe(false);
+});
+
+test("the authorization timeout cannot fire once held frames are draining", async () => {
+  const t = setup({ heldUploadTimeoutMs: 50 });
+  const source = t.connect();
+  const release = t.subsystem.holdUploadFrames({ requestId: "slow", size: 32 * MiB }, source);
+  const delivered = t.send(source, frames("slow", 32 * MiB));
+  await t.admit(source, "slow", 32 * MiB);
+  release();
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  await Promise.all(delivered);
+  await expect.poll(() => t.answer("slow")?.type, { timeout: 30_000 }).toBe("file.upload.response");
+  expect(t.answers("slow")).toHaveLength(1);
+  const answer = t.answer("slow");
+  expect(answer?.type === "file.upload.response" && answer.payload.error).toBeNull();
+  await expect.poll(() => heldUploadFrameBytes()).toBe(0);
+}, 60_000);
 
 test("disposing the session releases every connection's holds", () => {
   const t = setup();

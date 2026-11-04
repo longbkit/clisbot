@@ -497,6 +497,8 @@ export interface SessionOptions {
   clientId: string;
   permissions: readonly DaemonPermission[];
   resourceAuthorization?: SessionResourceAuthorization;
+  /** Tests shorten how long an upload request may wait for authorization. */
+  heldUploadTimeoutMs?: number;
   appVersion?: string | null;
   clientCapabilities?: Record<string, unknown> | null;
   onMessage: (msg: SessionOutboundMessage) => void;
@@ -1037,6 +1039,7 @@ export class Session {
       clisbotHome,
       logger: this.sessionLogger,
       sessionStorageEnabled: () => this.agentManager.sessionStorageEnabled,
+      heldUploadTimeoutMs: options.heldUploadTimeoutMs,
       resolveForkSource: async (source) => {
         if (!(await this.resourceAuthorizer.allowsAgent(source.agentId, "project.use")))
           throw new Error("Fork source not found");
@@ -2491,6 +2494,14 @@ export class Session {
     );
   }
 
+  /** A timed-out upload request already has its answer; a late outcome must not add another. */
+  private uploadRequestAnswered(msg: SessionInboundMessage, source?: object): boolean {
+    return (
+      msg.type === "file.upload.request" &&
+      this.workspaceFilesSession.uploadRequestAnswered(msg.requestId, source)
+    );
+  }
+
   public async handleMessage(msg: SessionInboundMessage, source?: object): Promise<void> {
     // Registered before the first await: the upload's binary frames may already be next.
     const releaseUploadFrames =
@@ -2526,7 +2537,7 @@ export class Session {
           : true;
       if (!operationAllowed || !resourceAllowed) {
         const requestId = sessionRequestId(msg);
-        if (requestId) {
+        if (requestId && !this.uploadRequestAnswered(msg, source)) {
           const code = resourceAllowed
             ? "access_denied"
             : await this.resourceAuthorizer.denialCode(msg);
@@ -2556,7 +2567,7 @@ export class Session {
 
         const requestId =
           "requestId" in msg && typeof msg.requestId === "string" ? msg.requestId : undefined;
-        if (typeof requestId === "string") {
+        if (typeof requestId === "string" && !this.uploadRequestAnswered(msg, source)) {
           try {
             this.emit({
               type: "rpc_error",

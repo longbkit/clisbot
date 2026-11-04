@@ -19,6 +19,7 @@ import { WorkspaceGitServiceImpl } from "../workspace-git-service.js";
 import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { createStub } from "../test-utils/class-mocks.js";
 import { createProviderSnapshotManagerStub } from "../test-utils/session-stubs.js";
+import { heldUploadFrameBytes } from "../session/files/workspace-files-session.js";
 
 function frame(input: Parameters<typeof encodeFileTransferFrame>[0]): FileTransferFrame {
   const decoded = decodeFileTransferFrame(encodeFileTransferFrame(input));
@@ -37,7 +38,9 @@ afterEach(async () => {
 });
 
 // A Project-scoped (Hub Member) session, the way the Hub admits a Member's app.
-async function scopedSession(options: { granted?: boolean } = {}) {
+async function scopedSession(
+  options: { granted?: boolean; authorization?: Promise<void>; heldUploadTimeoutMs?: number } = {},
+) {
   const root = await mkdtemp(path.join(tmpdir(), "managed-upload-order-"));
   const repo = path.join(root, "repo");
   await mkdir(repo);
@@ -56,6 +59,15 @@ async function scopedSession(options: { granted?: boolean } = {}) {
     displayName: "Repo",
     timestamp: new Date().toISOString(),
   });
+  // Resource authorization first loads the Project registry; this is where it can stall.
+  if (options.authorization) {
+    const list = projects.list.bind(projects);
+    const gate = options.authorization;
+    projects.list = async () => {
+      await gate;
+      return list();
+    };
+  }
   const grant = {
     privileges: new Set(["project.use", "agent.interact"] as const),
     agentConfigurations: [],
@@ -70,6 +82,7 @@ async function scopedSession(options: { granted?: boolean } = {}) {
       leaseExpiresAt: Date.now() + 60_000,
       projects: new Map(options.granted === false ? [] : [[project.projectId, grant]]),
     },
+    ...(options.heldUploadTimeoutMs ? { heldUploadTimeoutMs: options.heldUploadTimeoutMs } : {}),
     logger,
     clisbotHome: daemon.clisbotHome,
     creationService: new CreationService(path.join(root, "creation-receipts"), logger),
@@ -161,6 +174,14 @@ function deliver(scoped: Scoped, source: object, frames: FileTransferFrame[]) {
 async function outcome(scoped: Scoped, requestId: string) {
   await expect.poll(() => findOutcome(scoped, requestId), { timeout: 20_000 }).toBeTruthy();
   return findOutcome(scoped, requestId)!;
+}
+
+function answers(scoped: Scoped, requestId: string) {
+  return scoped.messages.filter(
+    (message) =>
+      (message.type === "file.upload.response" || message.type === "rpc_error") &&
+      message.payload.requestId === requestId,
+  );
 }
 
 function findOutcome(scoped: Scoped, requestId: string) {
@@ -269,3 +290,53 @@ test("frames from another connection with the same request id do not join a held
   expect(result.error).toBeNull();
   expect((await readFile(result.path!)).equals(bytes)).toBe(true);
 });
+
+test("an upload whose authorization never finishes is answered once within the timeout", async () => {
+  const scoped = await scopedSession({
+    authorization: new Promise<void>(() => {}),
+    heldUploadTimeoutMs: 300,
+  });
+  const source = scoped.connect();
+  const bytes = randomBytes(3 * MiB);
+  void request(scoped, source, "stalled", bytes.byteLength);
+  void Promise.all(deliver(scoped, source, uploadFrames("stalled", bytes)));
+  expect((await outcome(scoped, "stalled")).error).toMatch(/timed out waiting for authorization/);
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  expect(answers(scoped, "stalled")).toHaveLength(1);
+  expect(heldUploadFrameBytes()).toBe(0);
+  expect(await uploadedFiles(scoped.clisbotHome)).toEqual([]);
+});
+
+for (const late of ["admitted", "refused"] as const)
+  test(`authorization that arrives after the timeout answer (${late}) adds no answer and no upload`, async () => {
+    let authorize!: () => void;
+    const scoped = await scopedSession({
+      granted: late === "admitted",
+      authorization: new Promise<void>((resolve) => (authorize = resolve)),
+      heldUploadTimeoutMs: 300,
+    });
+    const source = scoped.connect();
+    const bytes = randomBytes(2 * MiB);
+    const pending = request(scoped, source, "late", bytes.byteLength);
+    const frames = uploadFrames("late", bytes);
+    void Promise.all(deliver(scoped, source, frames.slice(0, 4)));
+    expect((await outcome(scoped, "late")).error).toMatch(/timed out/);
+    // The client stopped at the answer; frames already on the wire still land.
+    void Promise.all(deliver(scoped, source, frames.slice(4)));
+    authorize();
+    await pending;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(answers(scoped, "late")).toHaveLength(1);
+    expect(heldUploadFrameBytes()).toBe(0);
+    expect(await uploadedFiles(scoped.clisbotHome)).toEqual([]);
+    if (late === "refused") return;
+    // The cancelled late upload holds no slot: the next file goes through.
+    const next = randomBytes(MiB);
+    await Promise.all([
+      request(scoped, source, "after", next.byteLength),
+      ...deliver(scoped, source, uploadFrames("after", next)),
+    ]);
+    const result = await outcome(scoped, "after");
+    expect(result.error).toBeNull();
+    expect((await readFile(result.path!)).equals(next)).toBe(true);
+  });
