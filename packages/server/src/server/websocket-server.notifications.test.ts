@@ -560,7 +560,21 @@ function createAudienceServer(
   return { server, follows, ...audience };
 }
 
-/** Content deliveries per token, once each has `count` or a second has passed. */
+/** What `token` was sent, once it has `count` deliveries or two seconds have passed. */
+async function payloadsFor(
+  delivered: ReadonlyArray<{ tokens: string[]; payload: PushPayload }>,
+  token: string,
+  count: number,
+): Promise<PushPayload[]> {
+  const received = () =>
+    delivered.filter((entry) => entry.tokens.includes(token)).map((entry) => entry.payload);
+  for (let waited = 0; waited < 2_000 && received().length < count; waited += 10) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return received();
+}
+
+/** Content deliveries per token, once each has `count` or two seconds have passed. */
 async function contentDeliveries(
   delivered: ReadonlyArray<{ tokens: string[]; payload: PushPayload }>,
   tokens: readonly string[],
@@ -571,7 +585,7 @@ async function contentDeliveries(
       (token) =>
         delivered.filter((entry) => entry.tokens.includes(token) && entry.payload.data).length,
     );
-  for (let waited = 0; waited < 1_000 && counts().some((value) => value < count); waited += 10) {
+  for (let waited = 0; waited < 2_000 && counts().some((value) => value < count); waited += 10) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   return counts();
@@ -898,10 +912,9 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
       });
       hub.onVerify = () => answered;
 
-      const together = Promise.all([finish(server), finish(server)]);
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      // Both notifications have asked by the time they return; the Hub has not answered yet.
+      await Promise.all([finish(server), finish(server)]);
       answer?.();
-      await together;
 
       expect(hub.verifications).toBe(2);
       expect(await contentDeliveries(delivered, ["bob-phone", "alice-all"], 2)).toEqual([2, 2]);
@@ -978,6 +991,44 @@ describe("VoiceAssistantWebSocketServer notification audience", () => {
 
       expect(shell).toEqual(["daemon-wide", "owner-phone", "terminal-use"]);
       expect(profile).toEqual(["daemon-wide", "owner-phone", "profile-p1", "terminal-use"]);
+    });
+
+    it("a shared Hub answer is still judged per notification: agent content yes, terminal content no", async () => {
+      const { server, delivered, registerMember, hub } = setup({});
+      registerMember("project-use-only", member("project-use-only"), { scope: "all" });
+      hub.grants.set("lease-project-use-only", { [PROJECT_ID]: { privileges: ["project.use"] } });
+      let answer: (() => void) | undefined;
+      const answered = new Promise<void>((resolve) => {
+        answer = resolve;
+      });
+      hub.onVerify = () => answered;
+      const internals = asInternals<{
+        broadcastTerminalAttention(params: Record<string, string>): Promise<void>;
+      }>(server);
+      recordTerminalLaunch("shell-shared", {});
+
+      await Promise.all([
+        finish(server),
+        internals.broadcastTerminalAttention({
+          terminalId: "shell-shared",
+          cwd: "/work/secret-project",
+          workspaceId: WORKSPACE_ID,
+          terminalName: "secret-shell",
+          reason: "finished",
+        }),
+      ]);
+      answer?.();
+      const received = await payloadsFor(delivered, "project-use-only", 2);
+      forgetTerminalLaunch("shell-shared");
+
+      expect(hub.verifications).toBe(1);
+      expect(received).toHaveLength(2);
+      expect(received).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ data: expect.objectContaining({ agentId: "agent-1" }) }),
+          UNIDENTIFIED,
+        ]),
+      );
     });
 
     it("an agent's content needs the Project grant and the operation permission", async () => {

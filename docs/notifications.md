@@ -70,7 +70,16 @@ The daemon judges every reader separately, for both pushes and in-app notificati
   keep full notifications; one failed delivery does not stop the others. Verified content to a
   lease's device carries a 5-minute TTL, so an offline device does not show it days later. A
   revoked paired device loses its push tokens at once, connected or not.
-  Tradeoffs: one Hub round trip (at most 3 s) per lease per push; Members get only the generic
+- Load on the Hub is bounded per daemon (`push/lease-verifier.ts`): at most 8 verify requests in
+  flight and 256 waiting, and a request that waited 4 s is dropped unsent. Notifications asking
+  about a lease while its request is in flight share that answer, then judge it against their own
+  event; nothing is kept once it settles. Each lease's devices get content as soon as that lease
+  is confirmed, so a slow lease delays only its own devices. A notification waits at most 4 s for
+  its leases: one unconfirmed by then, refused for a full queue, or granted later gets the generic
+  notification for that send.
+  Tradeoffs: one Hub round trip (at most 3 s) per lease per push, shared by the notifications
+  sent during it, so that answer can be up to 3 s older than a notification that joined it; a
+  burst over the bounds sends some Members the generic notification; Members get only the generic
   notification while the Hub is unreachable, until a revoked device renews, and against a Hub that
   predates verify; a Member device offline for more than 5 minutes misses that notification's
   content. Remaining window: a revocation committed after the Hub's answer, while the

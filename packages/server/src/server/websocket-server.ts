@@ -105,6 +105,7 @@ import {
 } from "./push/attention-audience.js";
 import { terminalLaunchOf } from "./managed-access/terminal-launches.js";
 import { NotificationFollowStore } from "./push/follow-store.js";
+import { LeaseVerifier } from "./push/lease-verifier.js";
 import { HubLeaseRefusedError } from "./hub/relationship-remote.js";
 import { notificationReaderKey } from "@clisbot/protocol/notification-audience";
 import {
@@ -166,6 +167,7 @@ import {
   sendBoundedPhysicalFrameAndWait,
 } from "./websocket/physical-socket.js";
 import type {
+  ManagedAccessAdmission,
   ManagedAccessAdmissionResolver,
   ManagedAccessMode,
   ProjectAuthorization,
@@ -753,11 +755,8 @@ export class VoiceAssistantWebSocketServer {
   private unsubscribeTerminalActivity: (() => void) | null = null;
   private readonly browserToolsBroker: BrowserToolsBroker | null;
   private readonly hubRelationships: HubRelationshipManagement | null;
-  /** One Hub verification per lease at a time: notifications sent together share its answer. */
-  private readonly leaseVerifications = new Map<
-    string,
-    ReturnType<NonNullable<HubRelationshipManagement["verifyAccessLease"]>>
-  >();
+  /** Bounded Hub requests confirming leases; notifications sent together share one per lease. */
+  private readonly leaseVerifier = new LeaseVerifier<ManagedAccessAdmission>();
   private connectionLifecycle: "starting" | "accepting" | "stopping" = "accepting";
   private readonly advertiseDaemonStatusRpc: boolean;
   private readonly advertiseRelayConfig: boolean;
@@ -3881,17 +3880,6 @@ export class VoiceAssistantWebSocketServer {
    * Hub, a timeout or an error all mean "not granted": the device gets a notification that
    * identifies nothing. A 401 is the Hub refusing the lease.
    */
-  private verifyLeaseOnce(
-    verify: NonNullable<HubRelationshipManagement["verifyAccessLease"]>,
-    leaseId: string,
-  ) {
-    const pending = this.leaseVerifications.get(leaseId);
-    if (pending) return pending;
-    const verification = verify(leaseId).finally(() => this.leaseVerifications.delete(leaseId));
-    this.leaseVerifications.set(leaseId, verification);
-    return verification;
-  }
-
   private confirmLeaseFor(
     event: SessionOutboundMessage["type"],
     allowsResource: (authorization: SessionAuthorization) => boolean,
@@ -3903,7 +3891,7 @@ export class VoiceAssistantWebSocketServer {
         return { granted: false, revoked: false };
       let authorization: SessionAuthorization;
       try {
-        const admission = await this.verifyLeaseOnce(verify, leaseId);
+        const admission = await this.leaseVerifier.verify(leaseId, verify);
         authorization = new SessionAuthorization(admission.permissions, admission);
       } catch (error) {
         return {

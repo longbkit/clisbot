@@ -197,46 +197,49 @@ describe("push delivery around lease verification", () => {
   });
 });
 
-describe("lease checks at scale", () => {
-  const LEASE = (leaseId: string) => ({
+describe("a lease the Hub is slow on", () => {
+  const homes: string[] = [];
+  const PAYLOAD = { title: "Agent finished", body: "Synthetic" };
+  const lease = (leaseId: string) => ({
     leaseId,
     leaseExpiresAt: Date.now() + 60 * 60 * 1000,
     projectIds: ["p"],
   });
-  const homes: string[] = [];
 
   afterEach(() => {
     for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true });
   });
 
-  function create(limits: { concurrency: number; maxQueued: number; deadlineMs: number }) {
-    const home = mkdtempSync(path.join(tmpdir(), "clisbot-push-scale-"));
+  function create(
+    leaseConfirmDeadlineMs: number,
+    onDeliver: (tokens: string[], content: boolean) => void = () => undefined,
+  ) {
+    const home = mkdtempSync(path.join(tmpdir(), "clisbot-push-slow-lease-"));
     homes.push(home);
-    const calls: { tokens: string[]; content: boolean; atMs: number }[] = [];
-    const startedAt = Date.now();
+    const calls: { tokens: string[]; content: boolean }[] = [];
     const push = createPushNotifications({
       logger: createLogger(),
       filePath: path.join(home, "push-tokens.json"),
-      leaseChecks: limits,
+      leaseConfirmDeadlineMs,
       deliver: async (tokens, payload) => {
-        calls.push({
-          tokens: [...tokens].sort(),
-          content: payload.body === "Synthetic",
-          atMs: Date.now() - startedAt,
-        });
+        const content = payload.body === PAYLOAD.body;
+        calls.push({ tokens: [...tokens], content });
+        onDeliver(tokens, content);
       },
     });
+    push.renew("owner-phone");
+    push.renew("healthy-phone", lease("lease-healthy"), { scope: "all" });
+    push.renew("slow-phone", lease("lease-slow"), { scope: "all" });
     return { push, calls };
   }
 
-  const PAYLOAD = { title: "Agent finished", body: "Synthetic" };
-
-  test("a lease the Hub is slow on delays neither the owner nor healthy leases, and gets no content", async () => {
-    const { push, calls } = create({ concurrency: 8, maxQueued: 256, deadlineMs: 300 });
-    push.renew("owner-phone");
-    push.renew("healthy-phone", LEASE("lease-healthy"), { scope: "all" });
-    push.renew("slow-phone", LEASE("lease-slow"), { scope: "all" });
-    let grantSlow: (() => void) | undefined;
+  test("does not hold back the owner or a healthy lease's devices", async () => {
+    let answerSlow: (() => void) | undefined;
+    // The slow lease is answered only once the healthy device has its content: if healthy
+    // devices waited for every lease, nothing would answer it before the 60 second deadline.
+    const { push, calls } = create(60_000, (tokens, content) => {
+      if (content && tokens.includes("healthy-phone")) answerSlow?.();
+    });
 
     await push.send(PAYLOAD, {
       projectId: "p",
@@ -244,74 +247,37 @@ describe("lease checks at scale", () => {
         leaseId === "lease-healthy"
           ? Promise.resolve({ granted: true })
           : new Promise((resolve) => {
-              grantSlow = () => resolve({ granted: true });
+              answerSlow = () => resolve({ granted: true });
             }),
     });
-    // The Hub answers for the slow lease only after the notification gave up on it.
-    grantSlow?.();
+
+    expect(calls).toEqual([
+      { tokens: ["owner-phone"], content: true },
+      { tokens: ["healthy-phone"], content: true },
+      { tokens: ["slow-phone"], content: true },
+    ]);
+  });
+
+  test("gets only the generic notification when unanswered by the deadline, even if granted later", async () => {
+    const { push, calls } = create(100);
+    let grantLate: (() => void) | undefined;
+
+    await push.send(PAYLOAD, {
+      projectId: "p",
+      confirmLease: (leaseId) =>
+        leaseId === "lease-healthy"
+          ? Promise.resolve({ granted: true })
+          : new Promise((resolve) => {
+              grantLate = () => resolve({ granted: true });
+            }),
+    });
+    grantLate?.();
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(calls.map(({ tokens, content }) => ({ tokens, content }))).toEqual([
+    expect(calls).toEqual([
       { tokens: ["owner-phone"], content: true },
       { tokens: ["healthy-phone"], content: true },
       { tokens: ["slow-phone"], content: false },
     ]);
-    expect(calls[0]!.atMs).toBeLessThan(100);
-    expect(calls[1]!.atMs).toBeLessThan(100);
-    expect(calls[2]!.atMs).toBeGreaterThanOrEqual(290);
-  });
-
-  test("many leases across concurrent notifications never exceed the in-flight bound", async () => {
-    const { push, calls } = create({ concurrency: 4, maxQueued: 256, deadlineMs: 5_000 });
-    for (let index = 0; index < 30; index += 1) {
-      push.renew(`member-${index}`, LEASE(`lease-${index}`), { scope: "all" });
-    }
-    let inFlight = 0;
-    let peak = 0;
-    let asked = 0;
-    const confirmLease = async () => {
-      asked += 1;
-      inFlight += 1;
-      peak = Math.max(peak, inFlight);
-      await new Promise((resolve) => setTimeout(resolve, 5));
-      inFlight -= 1;
-      return { granted: true as const };
-    };
-
-    await Promise.all([
-      push.send(PAYLOAD, { projectId: "p", confirmLease }),
-      push.send(PAYLOAD, { projectId: "p", confirmLease }),
-      push.send(PAYLOAD, { projectId: "p", confirmLease }),
-    ]);
-
-    expect(asked).toBe(90);
-    expect(peak).toBe(4);
-    const contentTokens = calls.filter((call) => call.content).flatMap((call) => call.tokens);
-    expect(contentTokens).toHaveLength(90);
-    expect(calls.some((call) => !call.content && call.tokens.length > 0)).toBe(false);
-  });
-
-  test("leases beyond the waiting room are not asked and get only the generic notification", async () => {
-    const { push, calls } = create({ concurrency: 1, maxQueued: 2, deadlineMs: 1_000 });
-    for (let index = 0; index < 5; index += 1) {
-      push.renew(`member-${index}`, LEASE(`lease-${index}`), { scope: "all" });
-    }
-    const asked: string[] = [];
-
-    await push.send(PAYLOAD, {
-      projectId: "p",
-      confirmLease: async (leaseId) => {
-        asked.push(leaseId);
-        await new Promise((resolve) => setTimeout(resolve, 5));
-        return { granted: true };
-      },
-    });
-
-    expect(asked).toHaveLength(3);
-    const content = calls.filter((call) => call.content).flatMap((call) => call.tokens);
-    const generic = calls.filter((call) => !call.content).flatMap((call) => call.tokens);
-    expect(content).toHaveLength(3);
-    expect(generic).toHaveLength(2);
-    expect(new Set([...content, ...generic]).size).toBe(5);
   });
 });

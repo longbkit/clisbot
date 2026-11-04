@@ -23,22 +23,11 @@ const PUSH_TOKEN_LEASE_MS = 48 * 60 * 60 * 1000;
 const LEASE_CONTENT_TTL_SECONDS = 300;
 
 /**
- * Bounds on asking the Hub about leases, shared by every notification on this daemon: at most
- * `concurrency` requests in flight and `maxQueued` waiting, and no lease waits past `deadlineMs`
- * for one notification. A lease not confirmed in time gets the generic notification.
+ * How long one notification waits for the Hub to confirm its leases. A lease not confirmed by
+ * then gets the generic notification; one Hub request is cut at 3 seconds, the rest covers a
+ * short wait for the daemon's bounded request slots (`LeaseVerifier`).
  */
-export interface LeaseCheckLimits {
-  concurrency: number;
-  maxQueued: number;
-  deadlineMs: number;
-}
-
-const DEFAULT_LEASE_CHECK_LIMITS: LeaseCheckLimits = {
-  concurrency: 8,
-  maxQueued: 256,
-  // One Hub request is cut at 3 seconds; the rest covers a short wait for a free slot.
-  deadlineMs: 4_000,
-};
+const LEASE_CONFIRM_DEADLINE_MS = 4_000;
 
 /**
  * What a device whose access the daemon cannot currently confirm receives instead: no session,
@@ -69,11 +58,10 @@ export function createPushNotifications(options: {
   filePath: string;
   now?: () => number;
   deliver?: (tokens: string[], payload: PushPayload) => Promise<void>;
-  leaseChecks?: LeaseCheckLimits;
+  leaseConfirmDeadlineMs?: number;
 }): PushNotifications {
   const now = options.now ?? Date.now;
-  const limits = options.leaseChecks ?? DEFAULT_LEASE_CHECK_LIMITS;
-  const leaseCheckSlots = createLimiter(limits.concurrency, limits.maxQueued);
+  const deadlineMs = options.leaseConfirmDeadlineMs ?? LEASE_CONFIRM_DEADLINE_MS;
   const store = new PushTokenStore(options.logger, options.filePath, now, PUSH_TOKEN_LEASE_MS);
   const service = new PushService(options.logger, (token) => store.revokeToken(token));
   const deliver =
@@ -141,8 +129,7 @@ export function createPushNotifications(options: {
       const verifiedLeaseCount = await confirmLeases({
         subscriptions: store.getActiveSubscriptions(target),
         confirm: target?.confirmLease,
-        limits,
-        slots: leaseCheckSlots,
+        deadlineMs,
         markUnconfirmed: (leaseId) => store.markLeaseUnconfirmed(leaseId),
         onGranted: (leaseId) => {
           if (ready.length === 0) setTimeout(flush, 0);
@@ -172,13 +159,13 @@ export function createPushNotifications(options: {
  * Asks the Hub, now, whether each lease still grants what this notification needs, calling
  * `onGranted` as each answer arrives. Each lease is asked once per notification and never cached;
  * a refusal marks it unconfirmed until its device renews. Returns the number granted in time.
- * Fails closed: an error, a full queue, or the deadline leaves the lease unverified.
+ * Fails closed: an error or the deadline leaves the lease unverified, and a grant that arrives
+ * after the deadline is ignored.
  */
 async function confirmLeases(input: {
   subscriptions: readonly ActivePushSubscription[];
   confirm: ((leaseId: string) => Promise<LeaseConfirmation>) | undefined;
-  limits: LeaseCheckLimits;
-  slots: Limiter;
+  deadlineMs: number;
   markUnconfirmed: (leaseId: string) => void;
   onGranted: (leaseId: string) => void;
 }): Promise<number> {
@@ -194,17 +181,14 @@ async function confirmLeases(input: {
   let granted = 0;
   const checks = Promise.all(
     [...leaseIds].map(async (leaseId) => {
-      const answer = await input.slots
-        .run(
-          () => confirm(leaseId),
-          () => closed,
-        )
-        .catch((): LeaseConfirmation => ({ granted: false, revoked: false }));
-      if (answer?.granted) {
+      const answer = await confirm(leaseId).catch(
+        (): LeaseConfirmation => ({ granted: false, revoked: false }),
+      );
+      if (answer.granted) {
         if (closed) return;
         granted += 1;
         input.onGranted(leaseId);
-      } else if (answer?.revoked) {
+      } else if (answer.revoked) {
         try {
           input.markUnconfirmed(leaseId);
         } catch {
@@ -215,42 +199,11 @@ async function confirmLeases(input: {
   );
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, input.limits.deadlineMs);
+    timer = setTimeout(resolve, input.deadlineMs);
     timer.unref?.();
   });
   await Promise.race([checks, deadline]);
   clearTimeout(timer);
   closed = true;
   return granted;
-}
-
-interface Limiter {
-  /**
-   * Runs `task` when a slot is free. Resolves undefined, without running it, when the queue is
-   * full or `abandoned()` is true by the time a slot frees up.
-   */
-  run<T>(task: () => Promise<T>, abandoned: () => boolean): Promise<T | undefined>;
-}
-
-function createLimiter(concurrency: number, maxQueued: number): Limiter {
-  let active = 0;
-  const waiting: (() => void)[] = [];
-  // A freed slot passes straight to the next waiter, so a newcomer can never take it in between.
-  const release = () => {
-    const next = waiting.shift();
-    if (next) next();
-    else active -= 1;
-  };
-  return {
-    async run(task, abandoned) {
-      if (active < concurrency) active += 1;
-      else if (waiting.length >= maxQueued) return undefined;
-      else await new Promise<void>((resolve) => waiting.push(resolve));
-      try {
-        return abandoned() ? undefined : await task();
-      } finally {
-        release();
-      }
-    },
-  };
 }
