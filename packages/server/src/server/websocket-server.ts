@@ -88,6 +88,7 @@ import { deriveProjectSlug } from "./workspace-git-metadata.js";
 import {
   createPushNotifications,
   type PushNotifications,
+  type LeaseConfirmation,
   type PushNotificationSender,
 } from "./push/index.js";
 import type { ScriptHealthState } from "./script-health-monitor.js";
@@ -104,6 +105,7 @@ import {
 } from "./push/attention-audience.js";
 import { terminalLaunchOf } from "./managed-access/terminal-launches.js";
 import { NotificationFollowStore } from "./push/follow-store.js";
+import { HubEnrollmentRejectedError } from "./hub/relationship-remote.js";
 import { notificationReaderKey } from "@clisbot/protocol/notification-audience";
 import {
   isPushEligibleAttentionReason,
@@ -3090,7 +3092,8 @@ export class VoiceAssistantWebSocketServer {
   ): Promise<void> {
     if (connection.managedLeaseId !== null) {
       try {
-        this.pushNotifications.revokeLease(connection.managedLeaseId);
+        // The device may simply be in the background; it renews when it reconnects.
+        this.pushNotifications.markLeaseUnconfirmed(connection.managedLeaseId);
       } catch (error) {
         this.logger.warn(
           { err: error, leaseId: connection.managedLeaseId },
@@ -3680,7 +3683,7 @@ export class VoiceAssistantWebSocketServer {
       .send(notification, {
         ...(projectId === null ? {} : { projectId }),
         recipients: plan.pushRecipients,
-        ...this.leasePushPayload(),
+        confirmLease: this.confirmLease,
       })
       .catch((err) => {
         this.logger.warn({ err, agentId: params.agentId }, "Failed to send push notification");
@@ -3794,7 +3797,7 @@ export class VoiceAssistantWebSocketServer {
         {
           ...(projectId === null ? {} : { projectId }),
           recipients: plan.pushRecipients,
-          ...this.leasePushPayload(),
+          confirmLease: this.confirmLease,
         },
       )
       .catch((err) => {
@@ -3826,13 +3829,32 @@ export class VoiceAssistantWebSocketServer {
   }
 
   /**
-   * A Hub revocation reaches this daemon only while it is connected to the Hub. Without that
-   * link a Member's lease cannot be trusted to still hold, so their devices get a payload that
-   * identifies nothing; opening the app re-checks access over their own connection.
+   * Asks the Hub, now, whether a lease still grants its device access, without extending it.
+   * Hub link down, an older Hub, a timeout or an error all mean "not granted": the device then
+   * gets a notification that identifies nothing. A 401 is the Hub refusing the lease.
    */
-  private leasePushPayload(): { leasesUnconfirmed?: boolean } {
-    return this.hubRelationships?.status().state === "connected" ? {} : { leasesUnconfirmed: true };
-  }
+  private readonly confirmLease = async (leaseId: string): Promise<LeaseConfirmation> => {
+    const relationships = this.hubRelationships;
+    if (!relationships?.verifyAccessLease || relationships.status().state !== "connected")
+      return { granted: false, revoked: false };
+    try {
+      const admission = await relationships.verifyAccessLease(leaseId);
+      return {
+        granted: true,
+        projectIds:
+          admission.resourceMode === "daemon"
+            ? null
+            : [...admission.projects]
+                .filter(([, grant]) => grant.privileges.has("project.use"))
+                .map(([projectId]) => projectId),
+      };
+    } catch (error) {
+      return {
+        granted: false,
+        revoked: error instanceof HubEnrollmentRejectedError && error.statusCode === 401,
+      };
+    }
+  };
 
   private async projectIdForWorkspace(
     workspaceId: string | undefined,

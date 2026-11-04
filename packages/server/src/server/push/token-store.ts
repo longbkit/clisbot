@@ -122,9 +122,7 @@ export class PushTokenStore {
   }
 
   /** Active tokens for `target`, with whether each one depends on a managed lease. */
-  getActiveSubscriptions(
-    target?: PushNotificationTarget,
-  ): { token: string; leased: boolean; unconfirmed: boolean }[] {
+  getActiveSubscriptions(target?: PushNotificationTarget): ActivePushSubscription[] {
     const now = this.now();
     const active = new Map(this.subscriptions);
     for (const [token, subscription] of this.subscriptions) {
@@ -146,7 +144,7 @@ export class PushTokenStore {
       .filter(([, subscription]) => allowsRecipient(subscription, target))
       .map(([token, subscription]) => ({
         token,
-        leased: subscription.leaseId !== null,
+        leaseId: subscription.leaseId,
         unconfirmed: subscription.unconfirmed,
       }));
   }
@@ -243,10 +241,21 @@ export interface PushNotificationTarget {
   /** Which readers this notification is for; absent sends to every authorized token. */
   recipients?: (reader: NotificationReader) => boolean;
   /**
-   * The sender cannot rely on a revocation of any lease having reached it (its Hub link is
-   * down), so every lease-bound token gets the notification that identifies nothing.
+   * Asks the Hub for a lease's live grants right before content is sent to its device. Absent,
+   * or anything short of a grant covering `projectId`, and the device gets only the
+   * notification that identifies nothing.
    */
-  leasesUnconfirmed?: boolean;
+  confirmLease?: (leaseId: string) => Promise<LeaseConfirmation>;
+}
+
+export type LeaseConfirmation =
+  | { granted: true; projectIds: readonly string[] | null }
+  | { granted: false; revoked: boolean };
+
+export interface ActivePushSubscription {
+  token: string;
+  leaseId: string | null;
+  unconfirmed: boolean;
 }
 
 interface PushTokenSubscription {

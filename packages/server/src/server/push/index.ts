@@ -3,6 +3,8 @@ import type pino from "pino";
 import { PushService, type PushPayload } from "./push-service.js";
 import {
   PushTokenStore,
+  type ActivePushSubscription,
+  type LeaseConfirmation,
   type PushNotificationTarget,
   type PushTokenAuthorization,
   type PushTokenReaderUpdate,
@@ -10,6 +12,7 @@ import {
 
 export type { PushPayload };
 export type {
+  LeaseConfirmation,
   PushNotificationTarget,
   PushTokenAuthorization,
   PushTokenReaderUpdate,
@@ -68,10 +71,11 @@ export function createPushNotifications(options: {
     },
     async send(payload, target) {
       const subscriptions = store.getActiveSubscriptions(target);
-      const unidentified = (entry: { leased: boolean; unconfirmed: boolean }) =>
-        entry.leased && (entry.unconfirmed || target?.leasesUnconfirmed === true);
-      const full = subscriptions.filter((entry) => !unidentified(entry));
-      const withheld = subscriptions.filter(unidentified);
+      const contentAllowed = await confirmContent(subscriptions, target, (leaseId) =>
+        store.markLeaseUnconfirmed(leaseId),
+      );
+      const full = subscriptions.filter(contentAllowed);
+      const withheld = subscriptions.filter((entry) => !contentAllowed(entry));
       options.logger.info(
         { tokenCount: full.length, unidentifiedTokenCount: withheld.length },
         "Sending push notification",
@@ -88,4 +92,42 @@ export function createPushNotifications(options: {
         );
     },
   };
+}
+
+/**
+ * Which tokens may receive session content. The Host owner's own devices always may. A device
+ * admitted by a lease may only when the Hub, asked now, still grants that lease the Project;
+ * each lease is asked once per notification and never cached.
+ */
+async function confirmContent(
+  subscriptions: readonly ActivePushSubscription[],
+  target: PushNotificationTarget | undefined,
+  markUnconfirmed: (leaseId: string) => void,
+): Promise<(entry: ActivePushSubscription) => boolean> {
+  const confirm = target?.confirmLease;
+  const leaseIds = new Set(
+    subscriptions.flatMap((entry) =>
+      entry.leaseId !== null && !entry.unconfirmed ? [entry.leaseId] : [],
+    ),
+  );
+  const granted = new Set<string>();
+  if (confirm)
+    await Promise.all(
+      [...leaseIds].map(async (leaseId) => {
+        const answer = await confirm(leaseId).catch(
+          (): LeaseConfirmation => ({ granted: false, revoked: false }),
+        );
+        if (!answer.granted) {
+          if (answer.revoked) markUnconfirmed(leaseId);
+          return;
+        }
+        const projectId = target?.projectId;
+        if (
+          answer.projectIds === null ||
+          (projectId !== undefined && answer.projectIds.includes(projectId))
+        )
+          granted.add(leaseId);
+      }),
+    );
+  return (entry) => entry.leaseId === null || (!entry.unconfirmed && granted.has(entry.leaseId));
 }

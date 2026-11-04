@@ -48,6 +48,7 @@ import { Route as ApiIntegrationsGithubSetupRouteImport } from './routes/api/int
 import { Route as ApiIntegrationsGithubCallbackRouteImport } from './routes/api/integrations/github/callback'
 import { Route as ApiIntegrationsDiscordCallbackRouteImport } from './routes/api/integrations/discord/callback'
 import { Route as ApiDaemonsAccessTicketsConsumeRouteImport } from './routes/api/daemons/access-tickets/consume'
+import { Route as ApiDaemonsAccessLeasesVerifyRouteImport } from './routes/api/daemons/access-leases/verify'
 import { Route as ApiDaemonsAccessLeasesRefreshRouteImport } from './routes/api/daemons/access-leases/refresh'
 import { Route as ApiDaemonsDaemonIdProjectsRouteImport } from './routes/api/daemons/$daemonId/projects'
 import { Route as ApiDaemonsDaemonIdConnectionOfferRouteImport } from './routes/api/daemons/$daemonId/connection-offer'
@@ -271,6 +272,12 @@ const ApiDaemonsAccessTicketsConsumeRoute =
     path: '/api/daemons/access-tickets/consume',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiDaemonsAccessLeasesVerifyRoute =
+  ApiDaemonsAccessLeasesVerifyRouteImport.update({
+    id: '/api/daemons/access-leases/verify',
+    path: '/api/daemons/access-leases/verify',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiDaemonsAccessLeasesRefreshRoute =
   ApiDaemonsAccessLeasesRefreshRouteImport.update({
     id: '/api/daemons/access-leases/refresh',
@@ -415,6 +422,7 @@ export interface FileRoutesByFullPath {
   '/api/daemons/$daemonId/connection-offer': typeof ApiDaemonsDaemonIdConnectionOfferRoute
   '/api/daemons/$daemonId/projects': typeof ApiDaemonsDaemonIdProjectsRoute
   '/api/daemons/access-leases/refresh': typeof ApiDaemonsAccessLeasesRefreshRoute
+  '/api/daemons/access-leases/verify': typeof ApiDaemonsAccessLeasesVerifyRoute
   '/api/daemons/access-tickets/consume': typeof ApiDaemonsAccessTicketsConsumeRoute
   '/api/integrations/discord/callback': typeof ApiIntegrationsDiscordCallbackRoute
   '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
@@ -471,6 +479,7 @@ export interface FileRoutesByTo {
   '/api/daemons/$daemonId/connection-offer': typeof ApiDaemonsDaemonIdConnectionOfferRoute
   '/api/daemons/$daemonId/projects': typeof ApiDaemonsDaemonIdProjectsRoute
   '/api/daemons/access-leases/refresh': typeof ApiDaemonsAccessLeasesRefreshRoute
+  '/api/daemons/access-leases/verify': typeof ApiDaemonsAccessLeasesVerifyRoute
   '/api/daemons/access-tickets/consume': typeof ApiDaemonsAccessTicketsConsumeRoute
   '/api/integrations/discord/callback': typeof ApiIntegrationsDiscordCallbackRoute
   '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
@@ -531,6 +540,7 @@ export interface FileRoutesById {
   '/api/daemons/$daemonId/connection-offer': typeof ApiDaemonsDaemonIdConnectionOfferRoute
   '/api/daemons/$daemonId/projects': typeof ApiDaemonsDaemonIdProjectsRoute
   '/api/daemons/access-leases/refresh': typeof ApiDaemonsAccessLeasesRefreshRoute
+  '/api/daemons/access-leases/verify': typeof ApiDaemonsAccessLeasesVerifyRoute
   '/api/daemons/access-tickets/consume': typeof ApiDaemonsAccessTicketsConsumeRoute
   '/api/integrations/discord/callback': typeof ApiIntegrationsDiscordCallbackRoute
   '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
@@ -591,6 +601,7 @@ export interface FileRouteTypes {
     | '/api/daemons/$daemonId/connection-offer'
     | '/api/daemons/$daemonId/projects'
     | '/api/daemons/access-leases/refresh'
+    | '/api/daemons/access-leases/verify'
     | '/api/daemons/access-tickets/consume'
     | '/api/integrations/discord/callback'
     | '/api/integrations/github/callback'
@@ -647,6 +658,7 @@ export interface FileRouteTypes {
     | '/api/daemons/$daemonId/connection-offer'
     | '/api/daemons/$daemonId/projects'
     | '/api/daemons/access-leases/refresh'
+    | '/api/daemons/access-leases/verify'
     | '/api/daemons/access-tickets/consume'
     | '/api/integrations/discord/callback'
     | '/api/integrations/github/callback'
@@ -706,6 +718,7 @@ export interface FileRouteTypes {
     | '/api/daemons/$daemonId/connection-offer'
     | '/api/daemons/$daemonId/projects'
     | '/api/daemons/access-leases/refresh'
+    | '/api/daemons/access-leases/verify'
     | '/api/daemons/access-tickets/consume'
     | '/api/integrations/discord/callback'
     | '/api/integrations/github/callback'
@@ -754,6 +767,7 @@ export interface RootRouteChildren {
   McpChannelTokenRoute: typeof McpChannelTokenRoute
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute: typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
   ApiDaemonsAccessLeasesRefreshRoute: typeof ApiDaemonsAccessLeasesRefreshRoute
+  ApiDaemonsAccessLeasesVerifyRoute: typeof ApiDaemonsAccessLeasesVerifyRoute
   ApiDaemonsAccessTicketsConsumeRoute: typeof ApiDaemonsAccessTicketsConsumeRoute
   ApiIntegrationsDiscordCallbackRoute: typeof ApiIntegrationsDiscordCallbackRoute
   ApiIntegrationsGithubCallbackRoute: typeof ApiIntegrationsGithubCallbackRoute
@@ -1043,6 +1057,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDaemonsAccessTicketsConsumeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/daemons/access-leases/verify': {
+      id: '/api/daemons/access-leases/verify'
+      path: '/api/daemons/access-leases/verify'
+      fullPath: '/api/daemons/access-leases/verify'
+      preLoaderRoute: typeof ApiDaemonsAccessLeasesVerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/daemons/access-leases/refresh': {
       id: '/api/daemons/access-leases/refresh'
       path: '/api/daemons/access-leases/refresh'
@@ -1325,6 +1346,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute:
     AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute,
   ApiDaemonsAccessLeasesRefreshRoute: ApiDaemonsAccessLeasesRefreshRoute,
+  ApiDaemonsAccessLeasesVerifyRoute: ApiDaemonsAccessLeasesVerifyRoute,
   ApiDaemonsAccessTicketsConsumeRoute: ApiDaemonsAccessTicketsConsumeRoute,
   ApiIntegrationsDiscordCallbackRoute: ApiIntegrationsDiscordCallbackRoute,
   ApiIntegrationsGithubCallbackRoute: ApiIntegrationsGithubCallbackRoute,

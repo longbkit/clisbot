@@ -127,8 +127,10 @@ export function notificationAllowed(
   if (reader.scope === "off") return false;
   if (reader.scope === "all") return true;
   // Unattributed work is provisionally a daemon-wide reader's, as in the session list, but a
-  // request or failure from it, which can quote tool input, goes only to the Host owner.
-  const unknownIsMine = kind === "needs" ? reader.actor === null : reader.daemonWide;
+  // request or failure from it, which can quote tool input, goes only to the Host owner, or to
+  // a reader who asked for All; never to For me, Needs me or Others.
+  if (kind === "needs" && ownership === "unknown" && reader.actor !== null) return false;
+  const unknownIsMine = reader.daemonWide;
   const mine =
     reader.actor === null || ownership === "mine" || (ownership === "unknown" && unknownIsMine);
   if (reader.scope === "needs") return mine && kind === "needs";

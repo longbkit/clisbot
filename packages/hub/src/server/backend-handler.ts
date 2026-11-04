@@ -65,6 +65,7 @@ const endpoints: Record<string, Endpoint> = {
     r.operations.handleDaemonAccessTicketConsumption(q),
   "POST /api/daemons/access-leases/refresh": (r, q) =>
     r.operations.handleDaemonAccessLeaseRefresh(q),
+  "POST /api/daemons/access-leases/verify": (r, q) => r.operations.handleDaemonAccessLeaseVerify(q),
   "GET /api/v1/channels": (r, q) => r.operations.handleChannelList(q),
   "PUT /api/v1/channels": (r, q) => r.operations.handleChannelAdd(q),
   "POST /api/v1/channels": (r, q) => r.operations.handleChannelAdd(q),

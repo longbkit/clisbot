@@ -80,6 +80,26 @@ export async function refreshDaemonAccessLease(
   database: Database,
   tickets: AccessTicketService,
 ): Promise<Response> {
+  return answerLease(request, database, (input) => tickets.refresh(input));
+}
+
+/** The lease's live authority, without extending it (daemon push confirmation). */
+export async function verifyDaemonAccessLease(
+  request: Request,
+  database: Database,
+  tickets: AccessTicketService,
+): Promise<Response> {
+  return answerLease(request, database, (input) => tickets.verify(input));
+}
+
+async function answerLease(
+  request: Request,
+  database: Database,
+  resolve: (input: {
+    daemonId: string;
+    leaseId: string;
+  }) => ReturnType<AccessTicketService["refresh"]>,
+): Promise<Response> {
   const daemonId = request.headers.get("x-clisbot-daemon-id");
   if (daemonId === null) return Response.json({ error: "unauthorized" }, { status: 401 });
   const daemon = await authenticateDaemonRequest(request, daemonId, database);
@@ -90,7 +110,7 @@ export async function refreshDaemonAccessLease(
   const body = refreshBodySchema.safeParse(await request.json().catch(() => undefined));
   if (!body.success) return Response.json({ error: "invalid_request" }, { status: 400 });
   try {
-    const admission = await tickets.refresh({ daemonId, leaseId: body.data.leaseId });
+    const admission = await resolve({ daemonId, leaseId: body.data.leaseId });
     return accessAdmissionResponse(admission, request);
   } catch (error) {
     if (error instanceof AccessTicketError) {

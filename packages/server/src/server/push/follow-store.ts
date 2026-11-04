@@ -1,5 +1,5 @@
 import type pino from "pino";
-import { copyFileSync, existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync } from "node:fs";
 
 import { ensurePrivateFile, writePrivateFileAtomicSync } from "../private-files.js";
 
@@ -66,10 +66,10 @@ export class NotificationFollowStore {
         if (ids.length > 0) this.follows.set(readerKey, new Set(ids));
       }
     } catch (error) {
-      // Keep the unreadable file beside the new one instead of overwriting it on the next write.
+      // Move the unreadable file aside, once, instead of overwriting it on the next write.
       const backup = `${this.filePath}.unreadable-${Date.now()}`;
       try {
-        copyFileSync(this.filePath, backup);
+        renameSync(this.filePath, backup);
       } catch {
         // The warning below still records that follows were not loaded.
       }

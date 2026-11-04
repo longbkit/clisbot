@@ -3792,7 +3792,7 @@ export class Session {
       case "notifications.list_follows.request":
         this.emit({
           type: "notifications.list_follows.response",
-          payload: { requestId: msg.requestId, agentIds: this.followedAgentIds() },
+          payload: { requestId: msg.requestId, agentIds: await this.followedAgentIds() },
         });
         return;
       case "push.unregister.request":
@@ -5727,44 +5727,54 @@ export class Session {
     requestId: string,
   ): Promise<void> {
     const reader = this.notificationReader();
-    const refuse = () =>
+    const refuse = (code: "resource_not_found" | "follow_unavailable") =>
       this.emit({
         type: "rpc_error",
         payload: {
           requestId,
           requestType: "notifications.set_follow.request",
-          error: "Resource not found",
-          code: "resource_not_found",
+          error: code === "resource_not_found" ? "Resource not found" : "Could not save the follow",
+          code,
         },
       });
-    if (!this.notificationFollows || reader === null) return refuse();
+    if (!this.notificationFollows || reader === null) return refuse("follow_unavailable");
     // Following needs an existing session the reader may read now; unfollowing always works.
-    if (followed) {
-      const exists =
-        agentId.length <= 200 &&
-        Boolean(this.agentManager.getAgent(agentId) ?? (await this.agentStorage.get(agentId)));
-      if (!exists || !this.allowsNotificationAbout({ agentId })) return refuse();
-    }
+    if (
+      followed &&
+      (agentId.length > 200 ||
+        !this.allowsNotificationAbout({ agentId }) ||
+        !(await this.agentExists(agentId)))
+    )
+      return refuse("resource_not_found");
     let saved: boolean;
     try {
       saved = this.notificationFollows.set(notificationReaderKey(reader.actor), agentId, followed);
     } catch {
       saved = false;
     }
-    if (!saved) return refuse();
+    if (!saved) return refuse("follow_unavailable");
     this.emit({
       type: "notifications.set_follow.response",
       payload: { requestId, agentId, followed },
     });
   }
 
-  /** Followed sessions this connection may still read; lost access hides a follow. */
-  private followedAgentIds(): string[] {
+  /** Followed sessions that still exist and this connection may still read. */
+  private async followedAgentIds(): Promise<string[]> {
     const reader = this.notificationReader();
     if (!this.notificationFollows || reader === null) return [];
-    return this.notificationFollows
-      .list(notificationReaderKey(reader.actor))
-      .filter((agentId) => this.allowsNotificationAbout({ agentId }));
+    const followed = this.notificationFollows.list(notificationReaderKey(reader.actor));
+    const kept = await Promise.all(
+      followed.map(
+        async (agentId) =>
+          this.allowsNotificationAbout({ agentId }) && (await this.agentExists(agentId)),
+      ),
+    );
+    return followed.filter((_, index) => kept[index]);
+  }
+
+  private async agentExists(agentId: string): Promise<boolean> {
+    return Boolean(this.agentManager.getAgent(agentId) ?? (await this.agentStorage.get(agentId)));
   }
 
   /**
