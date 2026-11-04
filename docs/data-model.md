@@ -596,6 +596,10 @@ One subscription per Expo push token, written privately with an atomic temp-file
 
 The legacy `{ "tokens": [...] }` form is still read and migrated to daemon-wide subscriptions.
 
+**Follows:** `$CLISBOT_HOME/notification-follows.json` holds `{ "readers": { "<reader key>": ["<agentId>", ...] } }`,
+the sessions each reader follows on this Host, written privately and atomically
+([audience](notifications.md#audience)).
+
 ---
 
 ## 7. Daemon meta files

@@ -19,6 +19,7 @@ import {
   buildWorkspaceTabMenuEntries,
   type WorkspaceTabMenuLabels,
 } from "@/screens/workspace/workspace-tab-menu";
+import { useTabFollow } from "@/clisbot/navigation/follows";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
 
 // The non-header count trigger retains its existing vertical touch clearance.
@@ -234,6 +235,7 @@ export function MobileWorkspaceTabOption({
     [t],
   );
   const menuTestIDBase = `workspace-tab-menu-${tab.tabId}`;
+  const follow = useTabFollow(normalizedServerId);
   const menuEntries = buildWorkspaceTabMenuEntries({
     surface: "mobile",
     tab,
@@ -251,6 +253,7 @@ export function MobileWorkspaceTabOption({
     onCloseTabsAfter: onCloseTabsBelow,
     onCloseOtherTabs,
     labels: tabMenuLabels,
+    follow,
   });
 
   const fallbackLabels = useMemo(

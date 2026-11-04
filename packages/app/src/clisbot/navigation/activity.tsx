@@ -40,7 +40,7 @@ const MINUTE = 60_000;
 
 type OwnedAgent = Pick<
   AggregatedAgent,
-  "serverId" | "createdBy" | "participationKey" | "inheritedOwnership"
+  "serverId" | "createdBy" | "participationKey" | "inheritedOwnership" | "watched"
 >;
 
 interface NavigationActivity {
@@ -233,6 +233,7 @@ function useOwnership() {
         createdBy: agent.createdBy,
         participationKey: agent.participationKey,
         inheritedOwnership: agent.inheritedOwnership,
+        watched: agent.watched,
         accounts,
         hostKind: hostKinds.get(agent.serverId) ?? "unknown",
       }),

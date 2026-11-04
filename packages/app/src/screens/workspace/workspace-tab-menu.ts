@@ -67,6 +67,14 @@ export type WorkspaceTabMenuEntry =
       key: string;
     };
 
+/** Follow an agent tab's session for notifications and the For me lists. */
+export interface WorkspaceTabFollow {
+  isFollowed: (agentId: string) => boolean;
+  onToggle: (agentId: string) => void;
+  followLabel: string;
+  unfollowLabel: string;
+}
+
 interface BuildWorkspaceTabMenuEntriesInput {
   surface: WorkspaceTabMenuSurface;
   tab: WorkspaceTabDescriptor;
@@ -84,6 +92,8 @@ interface BuildWorkspaceTabMenuEntriesInput {
   onCloseTabsAfter: (tabId: string) => Promise<void> | void;
   onCloseOtherTabs: (tabId: string) => Promise<void> | void;
   labels?: WorkspaceTabMenuLabels;
+  /** Absent when the Host cannot follow sessions. */
+  follow?: WorkspaceTabFollow;
 }
 
 interface BuildWorkspaceDesktopTabActionsInput {
@@ -101,6 +111,8 @@ interface BuildWorkspaceDesktopTabActionsInput {
   onCloseTabsToRight: (tabId: string) => Promise<void> | void;
   onCloseOtherTabs: (tabId: string) => Promise<void> | void;
   labels?: WorkspaceTabMenuLabels;
+  /** Absent when the Host cannot follow sessions. */
+  follow?: WorkspaceTabFollow;
 }
 
 export interface WorkspaceDesktopTabActions {
@@ -219,6 +231,16 @@ export function buildWorkspaceTabMenuEntries(
         void onCopyAgentId(agentId);
       },
     });
+    if (input.follow) {
+      const { follow } = input;
+      entries.push({
+        kind: "item",
+        key: "follow",
+        label: follow.isFollowed(agentId) ? follow.unfollowLabel : follow.followLabel,
+        testID: `${menuTestIDBase}-follow`,
+        onSelect: () => follow.onToggle(agentId),
+      });
+    }
   }
 
   if (tab.target.kind === "terminal") {
@@ -354,6 +376,7 @@ export function buildWorkspaceDesktopTabActions(
       onCloseTabsAfter: input.onCloseTabsToRight,
       onCloseOtherTabs: input.onCloseOtherTabs,
       labels: input.labels,
+      follow: input.follow,
     }),
     closeButtonTestId: getCloseButtonTestId(input.tab),
   };

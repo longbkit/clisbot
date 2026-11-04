@@ -38,6 +38,15 @@ function ownershipOf(
   });
 }
 
+describe("a followed session", () => {
+  it("is the reader's in every list even when a teammate created it", () => {
+    const host = hostOf({ ...session("t", null, { createdBy: teammate }), followed: true });
+    expect(ownershipOf("t", host)).toBe("mine");
+    const unfollowed = hostOf(session("t", null, { createdBy: teammate }));
+    expect(ownershipOf("t", unfollowed)).toBe("others");
+  });
+});
+
 describe("a subagent with no verified person of its own takes its parent's ownership", () => {
   it("is a teammate's under a teammate-created parent", () => {
     const host = hostOf(

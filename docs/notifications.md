@@ -19,7 +19,10 @@ eligibility remain daemon concerns.
 
 A session notifies the people it belongs to, by the same For me / Others rule as the session list
 ([navigation-v2](features/navigation-v2/README.md)). Each reader picks a scope in Settings →
-Notifications: For me (default), Others, All or Off. The app sends it to every Host with
+Notifications: For me (default), Needs me, Others, All or Off. Needs me narrows For me to what
+Home's Needs me chip shows unseen: a request waiting for an answer, or a failure
+(`issues.ts` `currentIssueKind`); a failure, in-app only under For me, reaches a Needs me reader's
+phone. A Host without `features.notificationNeedsScope` is sent For me. The app sends it to every Host with
 `notifications.set_scope.request` (gated by `features.notificationScope`) and resends it on each
 connect; the daemon stores it with that device's push token.
 
@@ -28,8 +31,11 @@ The daemon judges every reader separately, for both pushes and in-app notificati
 - The reader is the connection's Hub account, with or without a managed lease. A lease without one
   is not notified. A connection with neither is the Host owner's own device, which owns everything
   on its Host.
-- A session is For me when its verified creator, its schedule's verified owner, or a verified
-  sender is the reader. A channel sender matches only through its linked Member. A session that
+- A session is For me when the reader follows it, or its verified creator, its schedule's
+  verified owner, or a verified sender is the reader. Follows live on each Host per reader
+  (`notifications.set_follow` / `list_follows`, `features.notificationFollows`): a reader can follow
+  only a session it may read, the list hides follows whose access was lost, and a follow never
+  widens access. The app stamps follows onto its agents, so every list agrees. A channel sender matches only through its linked Member. A session that
   names no verified person, such as a subagent, is its nearest parent's.
 - Work nobody can attribute notifies For me only for the Host owner and daemon-wide readers. The
   session list still shows it under For me; a Project Member is not paged for it.
@@ -42,6 +48,10 @@ The daemon judges every reader separately, for both pushes and in-app notificati
   `Session.publishToSource`, and nothing after its lease expires or its Project is revoked.
 - Opening a notification fetches the session over the reader's own connection, which the Host
   authorizes again; the payload's ids grant nothing.
+- A Hub revocation removes the push tokens of every revoked lease, including devices that are
+  offline. While the daemon's Hub link is not connected a revocation cannot reach it, so
+  lease-bound tokens get a payload with no session content; the Host owner's devices keep previews.
+  The remaining window is a Hub link that reads as connected while a revocation is in flight.
 
 Pushes are plain alerts with no Notification Service Extension, so iOS shows them before app code
 runs: filtering has to happen on the daemon. A Host without `features.notificationScope` keeps the

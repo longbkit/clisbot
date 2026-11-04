@@ -2133,6 +2133,43 @@ test("sends the notification scope only to a Host that supports it, and again on
   expect(sentScopes(old)).toEqual([]);
 });
 
+test("Needs me reaches a Host that has it; an older Host gets For me and refuses follows", async () => {
+  const scopesSent = (mock: ReturnType<typeof createMockTransport>) =>
+    mock.sent
+      .map((frame) => parseSentFrame(frame))
+      .filter((message) => message?.type === "notifications.set_scope.request")
+      .map((message) => message.scope);
+  const connect = async (clientId: string, features: Record<string, boolean>) => {
+    const mock = createMockTransport();
+    const client = new DaemonClient({
+      url: "ws://test",
+      clientId,
+      reconnect: { enabled: false },
+      transportFactory: () => mock.transport,
+    });
+    clients.push(client);
+    client.setNotificationScope("needs");
+    const connecting = client.connect();
+    mock.triggerOpen({ features });
+    await connecting;
+    return { client, mock };
+  };
+
+  const current = await connect("clsk_needs_current", {
+    notificationScope: true,
+    notificationNeedsScope: true,
+    notificationFollows: true,
+  });
+  const older = await connect("clsk_needs_older", { notificationScope: true });
+
+  expect(scopesSent(current.mock)).toEqual(["needs"]);
+  expect(scopesSent(older.mock)).toEqual(["mine"]);
+  expect(current.client.supportsNotificationFollows()).toBe(true);
+  expect(older.client.supportsNotificationFollows()).toBe(false);
+  await expect(older.client.listNotificationFollows()).resolves.toEqual([]);
+  await expect(older.client.setNotificationFollow("agent-1", true)).rejects.toThrow();
+});
+
 test("bounds the wait for push token revocation", async () => {
   useHeartbeatClock();
   const mock = createMockTransport();

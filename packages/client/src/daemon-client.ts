@@ -2944,11 +2944,16 @@ export class DaemonClient {
   }
 
   private sendNotificationScope(): void {
-    const scope = this.notificationScope;
+    const features = this.lastServerInfoMessage?.features;
+    // A Host without Needs me can only send For me, the closest scope it has.
+    const scope =
+      this.notificationScope === "needs" && features?.notificationNeedsScope !== true
+        ? "mine"
+        : this.notificationScope;
     if (
       scope === null ||
       this.connectionState.status !== "connected" ||
-      this.lastServerInfoMessage?.features?.notificationScope !== true
+      features?.notificationScope !== true
     )
       return;
     const requestId = this.createRequestId();
@@ -2958,6 +2963,36 @@ export class DaemonClient {
       responseType: "notifications.set_scope.response",
       timeout: PUSH_TOKEN_REVOCATION_TIMEOUT_MS,
     }).catch(() => undefined);
+  }
+
+  /** Sessions this reader follows on the Host; empty when the Host has no follows. */
+  async listNotificationFollows(): Promise<string[]> {
+    if (this.lastServerInfoMessage?.features?.notificationFollows !== true) return [];
+    const requestId = this.createRequestId();
+    const response = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "notifications.list_follows.request", requestId },
+      responseType: "notifications.list_follows.response",
+      timeout: PUSH_TOKEN_REVOCATION_TIMEOUT_MS,
+    });
+    return response.agentIds;
+  }
+
+  /** Follows or unfollows a session for this reader; rejects when the Host refuses. */
+  async setNotificationFollow(agentId: string, followed: boolean): Promise<void> {
+    if (this.lastServerInfoMessage?.features?.notificationFollows !== true)
+      throw new Error("This Host does not support following sessions");
+    const requestId = this.createRequestId();
+    await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "notifications.set_follow.request", agentId, followed, requestId },
+      responseType: "notifications.set_follow.response",
+      timeout: PUSH_TOKEN_REVOCATION_TIMEOUT_MS,
+    });
+  }
+
+  supportsNotificationFollows(): boolean {
+    return this.lastServerInfoMessage?.features?.notificationFollows === true;
   }
 
   async unregisterPushToken(token: string): Promise<void> {

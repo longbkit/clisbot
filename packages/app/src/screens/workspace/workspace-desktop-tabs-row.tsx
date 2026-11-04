@@ -65,6 +65,7 @@ import {
   type WorkspaceTabMenuEntry,
   type WorkspaceTabMenuLabels,
 } from "@/screens/workspace/workspace-tab-menu";
+import { useTabFollow } from "@/clisbot/navigation/follows";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
 import type { PaneHost } from "@/panels/panel-manifest";
 import type { WorkspaceTabLaunchPurpose } from "@/workspace-tabs/launcher";
@@ -1511,6 +1512,7 @@ function ResolvedDesktopTabChip({
 }) {
   const { t } = useTranslation();
   const presentation = item.presentation;
+  const follow = useTabFollow(serverId);
   const resolvedTab = useMemo(
     () =>
       buildWorkspaceDesktopTabActions({
@@ -1528,8 +1530,10 @@ function ResolvedDesktopTabChip({
         onCloseTabsToRight,
         onCloseOtherTabs,
         labels,
+        follow,
       }),
     [
+      follow,
       index,
       item.tab,
       onCloseOtherTabs,
