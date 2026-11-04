@@ -56,12 +56,24 @@ export interface WorkspaceFilesSessionHost {
   hasBinaryChannel(): boolean;
 }
 
-const MAX_HELD_UPLOAD_FRAMES = 64;
+// A held upload may be the whole file: the app allows 50 MiB, sent in 128 KiB chunks.
+const MAX_HELD_UPLOAD_BYTES = 64 * 1024 * 1024;
+const MAX_HELD_UPLOAD_FRAMES = 1024;
+// Bounds memory across every session while their upload requests are authorized.
+const MAX_HELD_UPLOAD_BYTES_TOTAL = 128 * 1024 * 1024;
+const UPLOAD_OVERLOADED = "Upload storage overloaded: pending frame/byte limit exceeded";
+const UPLOAD_NOT_PERMITTED =
+  "You do not have permission to perform this action. Ask your administrator for access.";
+let heldUploadBytesTotal = 0;
 
 interface HeldUploadFrames {
-  source: object;
-  tail: Promise<void>;
-  frames: number;
+  queue: Array<{ frame: FileTransferFrame; bytes: number; allowed: () => boolean }>;
+  /** Declared size, capped: more than this cannot be a valid upload. */
+  limit: number;
+  bytes: number;
+  released: boolean;
+  draining: boolean;
+  failure: string | null;
 }
 
 export interface WorkspaceFilesSessionOptions {
@@ -89,7 +101,7 @@ export class WorkspaceFilesSession {
   private readonly logger: pino.Logger;
   private readonly fileUploads: FileUploadStore;
   private readonly fileObserver: FileObserver;
-  private readonly heldUploadFrames = new Map<string, HeldUploadFrames>();
+  private readonly heldUploadFrames = new WeakMap<object, Map<string, HeldUploadFrames>>();
 
   constructor(private readonly options: WorkspaceFilesSessionOptions) {
     this.host = options.host;
@@ -509,28 +521,29 @@ export class WorkspaceFilesSession {
    * frames over at once while a Project-scoped request is still being authorized. Without this
    * hold the begin frame found no upload and was dropped, so every chunk then failed with
    * "Upload chunks arrived before file begin". Frames wait, in arrival order, until the request
-   * has been admitted or refused.
+   * has been admitted or refused, then reach the store one at a time. A hold that outgrows its
+   * budget, or whose sender loses authority, ends the upload with an error instead of a hang.
    */
-  holdUploadFrames(requestId: string, source: object | undefined): () => void {
-    if (!source || this.heldUploadFrames.has(requestId)) return () => {};
-    let release!: () => void;
+  holdUploadFrames(
+    request: { requestId: string; size: number },
+    source: object | undefined,
+  ): () => void {
+    if (!source) return () => {};
+    const holds = this.heldUploadFrames.get(source) ?? new Map<string, HeldUploadFrames>();
+    if (holds.has(request.requestId)) return () => {};
     const hold: HeldUploadFrames = {
-      source,
-      tail: new Promise<void>((resolve) => (release = resolve)),
-      frames: 0,
+      queue: [],
+      limit: Math.min(Math.max(request.size, 0), MAX_HELD_UPLOAD_BYTES),
+      bytes: 0,
+      released: false,
+      draining: false,
+      failure: null,
     };
-    this.heldUploadFrames.set(requestId, hold);
-    const forget = (): void => {
-      const tail = hold.tail;
-      void tail.then(() => {
-        if (hold.tail !== tail) return forget();
-        if (this.heldUploadFrames.get(requestId) === hold) this.heldUploadFrames.delete(requestId);
-        return undefined;
-      });
-    };
+    holds.set(request.requestId, hold);
+    this.heldUploadFrames.set(source, holds);
     return () => {
-      release();
-      forget();
+      hold.released = true;
+      void this.drainHeldUploadFrames(request.requestId, source, hold);
     };
   }
 
@@ -540,23 +553,93 @@ export class WorkspaceFilesSession {
     source: object,
     allowed: () => boolean,
   ): Promise<void> {
-    const apply = async () => {
+    const hold = this.heldUploadFrames.get(source)?.get(frame.requestId);
+    if (!hold) {
       if (allowed()) await this.fileUploads.receiveFrame(frame, source);
-    };
-    const hold = this.heldUploadFrames.get(frame.requestId);
-    if (!hold || hold.source !== source) {
-      await apply();
       return;
     }
-    // Past the store's own per-upload frame budget the upload fails with a size mismatch.
-    if (hold.frames >= MAX_HELD_UPLOAD_FRAMES) return;
-    hold.frames += 1;
-    const received = hold.tail.then(apply);
-    hold.tail = received.then(
-      () => undefined,
-      () => undefined,
-    );
-    await received;
+    if (hold.failure) return;
+    const bytes = frame.opcode === FileTransferOpcode.FileChunk ? frame.payload.byteLength : 0;
+    if (
+      hold.bytes + bytes > hold.limit ||
+      hold.queue.length >= MAX_HELD_UPLOAD_FRAMES ||
+      heldUploadBytesTotal + bytes > MAX_HELD_UPLOAD_BYTES_TOTAL
+    ) {
+      await this.failHeldUpload(frame.requestId, source, hold, UPLOAD_OVERLOADED);
+      return;
+    }
+    hold.bytes += bytes;
+    heldUploadBytesTotal += bytes;
+    hold.queue.push({ frame, bytes, allowed });
+    if (hold.released) await this.drainHeldUploadFrames(frame.requestId, source, hold);
+  }
+
+  private async drainHeldUploadFrames(
+    requestId: string,
+    source: object,
+    hold: HeldUploadFrames,
+  ): Promise<void> {
+    if (hold.draining) return;
+    hold.draining = true;
+    try {
+      if (hold.failure) return await this.failHeldUpload(requestId, source, hold, hold.failure);
+      // A refused request registered nothing; its frames are discarded unread.
+      if (!this.fileUploads.hasPendingUpload(requestId, source)) {
+        this.discardHeldFrames(hold);
+        return;
+      }
+      for (let next = hold.queue.shift(); next; next = hold.queue.shift()) {
+        hold.bytes -= next.bytes;
+        heldUploadBytesTotal -= next.bytes;
+        if (!next.allowed())
+          return await this.failHeldUpload(requestId, source, hold, UPLOAD_NOT_PERMITTED);
+        await this.fileUploads.receiveFrame(next.frame, source).catch(() => null);
+      }
+    } finally {
+      hold.draining = false;
+      // No await separates the empty check from the removal, so a later frame goes straight
+      // to the store behind every frame drained here.
+      if (hold.queue.length === 0 || hold.failure) this.forgetHold(requestId, source, hold);
+    }
+  }
+
+  private async failHeldUpload(
+    requestId: string,
+    source: object,
+    hold: HeldUploadFrames,
+    failure: string,
+  ): Promise<void> {
+    hold.failure = failure;
+    this.discardHeldFrames(hold);
+    // Before admission the request may still be refused; the drain at release reports then.
+    if (!hold.released) return;
+    this.forgetHold(requestId, source, hold);
+    await this.fileUploads.failUpload(requestId, source, failure);
+    // Without workspace.write the upload response is no longer delivered; rpc_error always is.
+    if (failure === UPLOAD_NOT_PERMITTED)
+      this.host.emit(
+        {
+          type: "rpc_error",
+          payload: {
+            requestId,
+            requestType: "file.upload.request",
+            error: failure,
+            code: "access_denied",
+          },
+        },
+        source,
+      );
+  }
+
+  private discardHeldFrames(hold: HeldUploadFrames): void {
+    heldUploadBytesTotal -= hold.bytes;
+    hold.bytes = 0;
+    hold.queue = [];
+  }
+
+  private forgetHold(requestId: string, source: object, hold: HeldUploadFrames): void {
+    const holds = this.heldUploadFrames.get(source);
+    if (holds?.get(requestId) === hold) holds.delete(requestId);
   }
 
   async handleProjectIconRequest(

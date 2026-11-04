@@ -2494,7 +2494,7 @@ export class Session {
     // Registered before the first await: the upload's binary frames may already be next.
     const releaseUploadFrames =
       msg.type === "file.upload.request"
-        ? this.workspaceFilesSession.holdUploadFrames(msg.requestId, source)
+        ? this.workspaceFilesSession.holdUploadFrames(msg, source)
         : undefined;
     try {
       return await this.delivery.request(source, msg, () => this.handleRequest(msg, source));

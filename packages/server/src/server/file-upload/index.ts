@@ -159,6 +159,20 @@ export class FileUploadStore {
     return operation;
   }
 
+  hasPendingUpload(requestId: string, source: object = this.defaultSource): boolean {
+    return this.pending.get(source)?.has(requestId) === true;
+  }
+
+  /** Ends an unfinished upload and answers its request with `error`. */
+  async failUpload(
+    requestId: string,
+    source: object = this.defaultSource,
+    error: string,
+  ): Promise<void> {
+    const upload = this.pending.get(source)?.get(requestId);
+    if (upload) await this.cancel(upload, buildUploadResponse(upload, error));
+  }
+
   ownsUploadedFile(attachment: UploadedFileAttachment): boolean {
     const completed = this.completed.get(attachment.id);
     return (
