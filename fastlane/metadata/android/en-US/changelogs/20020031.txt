@@ -1,0 +1,11 @@
+Added
+- Choose which work can notify you: For me, Needs me, Others, All or Off; follow accessible sessions across your devices
+
+Changed
+- When a Host is updated before its Hub, member notifications are generic until the Hub is updated
+
+Fixed
+- Fixed channel follow-ups sent while an agent is working being refused; update older Hosts to 2.2.2 or later for the remaining turn-change race
+- Fixed Files and changes not opening in desktop Bot chats
+
+Full notes: https://clisbot.com/changelog
