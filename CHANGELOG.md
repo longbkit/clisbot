@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.2.3 - 2026-11-05
+
+### Added
+
+- Choose which work can notify you: For me, Needs me, Others, All or Off; follow accessible sessions across your devices
+
+### Changed
+
+- When a Host is updated before its Hub, member notifications are generic until the Hub is updated
+
+### Fixed
+
+- Fixed channel follow-ups sent while an agent is working being refused; update older Hosts to 2.2.2 or later for the remaining turn-change race
+- Fixed Files and changes not opening in desktop Bot chats
+- Fixed Telegram forum topics with their own route inheriting the group's session
+- Fixed notifications reaching unrelated project members and tightened access checks for session and terminal attention; update both Hosts and apps
+- Fixed Slack thread reads missing the root, and included bounded thread context when mentioning a bot in a thread
+- Fixed channel accounts on the same Host overwriting each other's timeline subscriptions; a thread now warns when its reply may be incomplete
+- Fixed file uploads in project-scoped sessions failing or hanging, and restored file drag and drop in Bot chats
+
 ## 2.2.2 - 2026-11-03
 
 ### Added
