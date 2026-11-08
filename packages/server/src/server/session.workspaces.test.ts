@@ -8536,6 +8536,20 @@ test("overlapping workspace rebuilds publish the newest provider subagent status
   providerSubagents[0] = completedSubagent;
   listener?.({ type: "provider_subagent", event: { type: "upsert", subagent: completedSubagent } });
   await waitForImmediate();
+
+  // A third ordinary update arrives while the second rebuild is still queued.
+  // It should coalesce into that queued rebuild instead of creating a third one.
+  const completedSubagentRefresh = {
+    ...completedSubagent,
+    updatedAt: "2026-08-01T10:03:00.000Z",
+  };
+  providerSubagents[0] = completedSubagentRefresh;
+  listener?.({
+    type: "provider_subagent",
+    event: { type: "upsert", subagent: completedSubagentRefresh },
+  });
+  await waitForImmediate();
+
   releaseFirstBuild.resolve();
   await vi.waitFor(() => expect(buildCount).toBe(2));
   await waitForImmediate();

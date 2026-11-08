@@ -717,6 +717,12 @@ interface WorkspaceUpdateOptions {
   optimisticStatus?: WorkspaceDescriptorPayload["status"];
 }
 
+interface WorkspaceUpdateQueueEntry {
+  promise: Promise<void>;
+  started: boolean;
+  coalescible: boolean;
+}
+
 function resolveDirectorySync(service: DirectorySyncService | undefined): DirectorySyncService {
   return service ?? new DirectorySyncService();
 }
@@ -900,6 +906,7 @@ export class Session {
     { owner: OwnedSubscription; events: Set<SessionEventSubscription>; notifications: boolean }
   >();
   private readonly workspaceUpdateTails = new Map<string, Promise<void>>();
+  private readonly pendingWorkspaceUpdates = new Map<string, WorkspaceUpdateQueueEntry>();
   private readonly terminalManager: TerminalManager | null;
   private readonly providerSnapshotManager: ProviderSnapshotManager;
   private readonly serviceProxy: ServiceProxySubsystem | null;
@@ -6986,14 +6993,27 @@ export class Session {
     subscription: WorkspaceUpdatesSubscriptionState,
     options: WorkspaceUpdateOptions | undefined,
   ): Promise<void> {
+    const batchKey = `${subscription.subscriptionId}:${Array.from(workspaceIds).sort().join("\0")}`;
+    const pending = this.pendingWorkspaceUpdates.get(batchKey);
+    // A normal update only needs the newest descriptor when it starts. Keep one
+    // queued rebuild per subscription/batch while preserving ordered special
+    // updates such as optimistic statuses and project removals.
+    if (pending && !pending.started && pending.coalescible && options === undefined) {
+      return pending.promise;
+    }
+
     const previous = Array.from(workspaceIds, (workspaceId) =>
       (this.workspaceUpdateTails.get(workspaceId) ?? Promise.resolve()).catch(() => undefined),
     );
-    const next = Promise.all(previous).then(() =>
-      this.delivery.forSource(subscription.owner.source, () =>
+    let entry!: WorkspaceUpdateQueueEntry;
+    const next = Promise.all(previous).then(() => {
+      entry.started = true;
+      return this.delivery.forSource(subscription.owner.source, () =>
         this.emitWorkspaceUpdateBatch(workspaceIds, subscription, options),
-      ),
-    );
+      );
+    });
+    entry = { promise: next, started: false, coalescible: options === undefined };
+    this.pendingWorkspaceUpdates.set(batchKey, entry);
     for (const workspaceId of workspaceIds) {
       this.workspaceUpdateTails.set(workspaceId, next);
     }
@@ -7003,6 +7023,9 @@ export class Session {
         if (this.workspaceUpdateTails.get(workspaceId) === next) {
           this.workspaceUpdateTails.delete(workspaceId);
         }
+      }
+      if (this.pendingWorkspaceUpdates.get(batchKey) === entry) {
+        this.pendingWorkspaceUpdates.delete(batchKey);
       }
     };
     void next.then(clearTail, clearTail);
