@@ -1,8 +1,10 @@
 import { compare, hashSync } from "bcryptjs";
 import { timingSafeEqual } from "node:crypto";
+import type { IncomingHttpHeaders } from "node:http";
 import type { RequestHandler } from "express";
 import { matchesLocalCredential } from "./local-credential.js";
 import type { DeviceAuthority } from "@clisbot/device-access/authority";
+import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
 
 export const DAEMON_PASSWORD_BCRYPT_COST = 12;
 
@@ -114,6 +116,11 @@ export function createRequireBearerMiddleware(
   };
 }
 
+/**
+ * Routes exempt from the daemon-password middleware. Each one checks its own credential:
+ * `/api/files/download` a single-use download token, `/mcp/agents` the per-run agent
+ * capability token or the daemon password (classifyAgentMcpRequestAuthority).
+ */
 const SELF_AUTHENTICATING_ROUTES = new Set(["/api/files/download", "/mcp/agents"]);
 
 /** Connectors relay routes check their own per-agent capability token (connectors/connector-relay.ts). */
@@ -134,6 +141,29 @@ export function shouldBypassBearerAuth(method: string, path: string): boolean {
   return isBearerFreeRoute(path);
 }
 
+const LOOPBACK_SOCKET_ADDRESSES = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+
+export function isLoopbackSocketAddress(remoteAddress: string | undefined): boolean {
+  return remoteAddress !== undefined && LOOPBACK_SOCKET_ADDRESSES.has(remoteAddress);
+}
+
+/** Headers a reverse proxy adds; their presence means the loopback peer is a proxy, not the caller. */
+const FORWARDING_HEADERS = ["forwarded", "x-forwarded-for", "x-forwarded-host", "x-real-ip"];
+
+/**
+ * True only for a request whose TCP peer is loopback and which carries no proxy forwarding
+ * header. Reads the socket address, never `req.ip`, so the `trust proxy` setting cannot turn
+ * a proxied request into a local one. A proxy that adds no forwarding header still looks
+ * local, so this is a narrowing condition, never a credential on its own.
+ */
+export function isDirectLoopbackHttpRequest(req: {
+  socket: { remoteAddress?: string };
+  headers: IncomingHttpHeaders;
+}): boolean {
+  if (!isLoopbackSocketAddress(req.socket.remoteAddress)) return false;
+  return FORWARDING_HEADERS.every((name) => req.headers[name] === undefined);
+}
+
 /** Credential authority is established once per HTTP request, never by callerAgentId. */
 export type AgentMcpRequestAuthority =
   | "agent-capability"
@@ -144,11 +174,34 @@ export type AgentMcpRequestAuthority =
 interface AgentMcpRequestAuthInput {
   password: string | undefined;
   devicePairingEnabled?: boolean;
+  /** `daemon.mcp.allowAnonymous`: explicit opt-in to tokenless callers on a no-password daemon. */
+  allowAnonymous?: boolean;
+  /** Current managed access mode; `external` never admits tokenless callers. */
+  managedAccessMode?: ManagedAccessMode;
+  /** isDirectLoopbackHttpRequest for this request; anonymous admission requires it. */
+  directLoopback?: boolean;
   capabilityToken: string | null;
   authorizationHeader: string | undefined;
 }
 
-/** Legacy anonymous admission remains compatible but grants no managed saved-Host authority. */
+/**
+ * Anonymous admission grants the full agent tool surface (terminals, agents, schedules) to a
+ * caller that proved nothing, so it needs every guard at once: the explicit opt-in, managed
+ * access not `external`, and a direct loopback request.
+ */
+function admitsLegacyAnonymous(input: AgentMcpRequestAuthInput): boolean {
+  return (
+    input.allowAnonymous === true &&
+    input.managedAccessMode !== "external" &&
+    input.directLoopback === true
+  );
+}
+
+/**
+ * The daemon's own agents present the injected capability token; operators may present the
+ * daemon password. A no-password daemon rejects every other caller unless legacy anonymous
+ * admission is explicitly enabled (admitsLegacyAnonymous).
+ */
 export async function classifyAgentMcpRequestAuthority(
   input: AgentMcpRequestAuthInput,
 ): Promise<AgentMcpRequestAuthority> {
@@ -163,7 +216,7 @@ export async function classifyAgentMcpRequestAuthority(
   if (input.devicePairingEnabled) return "rejected";
   // The generic password validator allows no-password daemons. That is admission
   // compatibility, not evidence that an HTTP caller owns an operator credential.
-  if (!input.password) return "legacy-anonymous";
+  if (!input.password) return admitsLegacyAnonymous(input) ? "legacy-anonymous" : "rejected";
   return (await isBearerTokenValidAsync({ password: input.password, token }))
     ? "password-operator"
     : "rejected";

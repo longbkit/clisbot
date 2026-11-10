@@ -236,10 +236,15 @@ async function enableClisbotTools(clisbotHome: string): Promise<void> {
         ...existing,
         daemon: {
           ...existing.daemon,
+          // Specs call /mcp/agents directly from the test process, which cannot read the
+          // daemon's per-run agent capability token; opt this loopback-only fixture into
+          // legacy anonymous admission (never honoured under external managed access).
+          managedAccess: existing.daemon?.managedAccess ?? { mode: "off" },
           mcp: {
             ...existing.daemon?.mcp,
             enabled: true,
             injectIntoAgents: true,
+            allowAnonymous: true,
           },
         },
       },

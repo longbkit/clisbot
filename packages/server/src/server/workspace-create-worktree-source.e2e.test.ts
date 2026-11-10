@@ -13,7 +13,7 @@ import {
   DaemonClient as SocketDaemonClient,
   type WebSocketLike,
 } from "@clisbot/client/internal/daemon-client";
-import { createTestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
+import { agentMcpTransportOptions, createTestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
 
 // The reshaped workspace.create.request forwards its worktree `source`
 // (action/refName/branchName/githubPrNumber/worktreeSlug) into createWorktreeCore.
@@ -621,7 +621,10 @@ test("setup details follow one workspace/source and restore after reconnect with
   const mcp = new Client({ name: "setup-test", version: "1.0.0" });
   try {
     await mcp.connect(
-      new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${daemon.port}/mcp/agents`)),
+      new StreamableHTTPClientTransport(
+        new URL(`http://127.0.0.1:${daemon.port}/mcp/agents`),
+        agentMcpTransportOptions(daemon.daemon.agentManager.getMcpAuthToken()),
+      ),
     );
     writeFileSync(
       path.join(repoDir, "clisbot.json"),

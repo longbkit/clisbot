@@ -468,6 +468,7 @@ describe("clisbot daemon bootstrap", () => {
       );
       const beforeMcp = await fetch(`http://127.0.0.1:${target.port}/mcp/agents`, {
         method: "POST",
+        headers: { Authorization: `Bearer ${daemon.agentManager.getMcpAuthToken()}` },
       });
       expect(beforeMcp.status).toBe(406);
       const beforeProxyReload = await httpGetWithHost(target.port, proxyHost, "/", {
@@ -1053,26 +1054,82 @@ export default function contribute(plugin: unknown) {
         createClisbotDaemon({ ...config, managedAccessMode: "external" }, logger, dependencies),
     });
     try {
+      // A no-password daemon under external managed access admits no tokenless caller,
+      // whatever caller selector it forges (incident 31.22.91.132).
       for (const selector of [undefined, "forged-operator-context"]) {
-        const denied = await callAgentMcpAuthorityTool(
-          anonymous.port,
-          undefined,
-          selector,
-          "list_agents",
-          { serverId: "private-destination" },
-        );
-        expect(denied).toMatchObject({
-          isError: true,
-          structuredContent: { code: "permission_denied" },
-        });
+        await expect(
+          callAgentMcpAuthorityTool(anonymous.port, undefined, selector, "list_agents", {
+            serverId: "private-destination",
+          }),
+        ).rejects.toThrow();
+        await expect(
+          callAgentMcpAuthorityTool(anonymous.port, "forged-token", selector, "list_hosts"),
+        ).rejects.toThrow();
       }
       tickets.mockReturnValue(false);
+      await expect(
+        callAgentMcpAuthorityTool(anonymous.port, undefined, undefined, "list_hosts"),
+      ).rejects.toThrow();
+      const capability = anonymous.daemon.agentManager.getMcpAuthToken();
       expect(
-        (await callAgentMcpAuthorityTool(anonymous.port, undefined, undefined, "list_hosts"))
+        (await callAgentMcpAuthorityTool(anonymous.port, capability!, undefined, "list_hosts"))
           .isError,
       ).not.toBe(true);
     } finally {
+      tickets.mockRestore();
       await anonymous.close();
+    }
+  }, 30000);
+
+  test("Agent MCP returns 401 to tokenless callers unless anonymous admission is explicitly enabled", async () => {
+    const initialize = (headers: Record<string, string>) =>
+      fetch(`http://127.0.0.1:${daemonHandle.port}/mcp/agents`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json, text/event-stream",
+          "Content-Type": "application/json",
+          ...headers,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-03-26",
+            capabilities: {},
+            clientInfo: { name: "anonymous-admission-regression", version: "1" },
+          },
+        }),
+      });
+    // Default no-password daemon (managed access off in the test fixture).
+    let daemonHandle = await createTestClisbotDaemon();
+    try {
+      expect((await initialize({})).status).toBe(401);
+      expect((await initialize({ Authorization: "Bearer not-the-capability" })).status).toBe(401);
+      const capability = daemonHandle.daemon.agentManager.getMcpAuthToken();
+      expect((await initialize({ Authorization: `Bearer ${capability}` })).status).toBe(200);
+    } finally {
+      await daemonHandle.close();
+    }
+    // Explicit opt-in admits a direct loopback caller, but never a proxied one.
+    daemonHandle = await createTestClisbotDaemon({ mcpAllowAnonymous: true });
+    try {
+      expect((await initialize({})).status).toBe(200);
+      expect((await initialize({ "X-Forwarded-For": "31.22.91.132" })).status).toBe(401);
+      expect((await initialize({ Forwarded: "for=31.22.91.132" })).status).toBe(401);
+    } finally {
+      await daemonHandle.close();
+    }
+    // The opt-in never applies under external managed access.
+    daemonHandle = await createTestClisbotDaemon({
+      mcpAllowAnonymous: true,
+      createDaemon: (config, logger, dependencies) =>
+        createClisbotDaemon({ ...config, managedAccessMode: "external" }, logger, dependencies),
+    });
+    try {
+      expect((await initialize({})).status).toBe(401);
+    } finally {
+      await daemonHandle.close();
     }
   }, 30000);
 
@@ -1092,10 +1149,12 @@ export default function contribute(plugin: unknown) {
     });
 
     try {
+      const capability = daemonHandle.daemon.agentManager.getMcpAuthToken();
+      expect(capability).toEqual(expect.any(String));
       const response = await fetch(`http://127.0.0.1:${daemonHandle.port}/mcp/agents`, {
         method: "POST",
         headers: {
-          Authorization: "Bearer secret-debug-token",
+          Authorization: `Bearer ${capability}`,
           Accept: "application/json, text/event-stream",
           "Content-Type": "application/json",
         },
@@ -1115,7 +1174,7 @@ export default function contribute(plugin: unknown) {
       expect(logs).toContain("[redacted]");
       expect(logs).toContain('"method":"tools/call"');
       expect(logs).toContain('"hasParams":true');
-      expect(logs).not.toContain("secret-debug-token");
+      expect(logs).not.toContain(capability!);
       expect(logs).not.toContain("secret-body-token");
       expect(logs).not.toContain("apiKey");
     } finally {

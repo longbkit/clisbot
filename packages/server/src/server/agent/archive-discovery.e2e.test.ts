@@ -7,7 +7,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { z } from "zod";
 import { AgentListItemPayloadSchema, AgentSnapshotPayloadSchema } from "@clisbot/protocol/messages";
-import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
+import { agentMcpTransportOptions, createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import { createTestAgentClients } from "../test-utils/fake-agent-client.js";
 import { CodexAppServerAgentClient } from "./providers/codex-app-server-agent.js";
@@ -48,7 +48,10 @@ test.each(["codex", "claude"] as const)(
     try {
       await client.connect();
       await mcp.connect(
-        new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${daemon.port}/mcp/agents`)),
+        new StreamableHTTPClientTransport(
+          new URL(`http://127.0.0.1:${daemon.port}/mcp/agents`),
+          agentMcpTransportOptions(daemon.daemon.agentManager.getMcpAuthToken()),
+        ),
       );
       const realModel = provider === "codex" ? "gpt-5.6-sol" : "haiku";
       const agent = await client.createAgent({

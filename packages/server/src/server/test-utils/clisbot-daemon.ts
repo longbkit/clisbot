@@ -30,6 +30,7 @@ interface TestClisbotDaemonOptions {
   listenPort?: number;
   logger?: Parameters<typeof createClisbotDaemon>[1];
   mcpEnabled?: boolean;
+  mcpAllowAnonymous?: boolean;
   mcpDebug?: boolean;
   isDev?: boolean;
   relayEnabled?: boolean;
@@ -69,6 +70,16 @@ export interface TestClisbotDaemon {
   clisbotHome: string;
   staticDir: string;
   close: () => Promise<void>;
+}
+
+/**
+ * Streamable HTTP transport options carrying the daemon's per-run Agent MCP capability token,
+ * as its injected agents send it. `/mcp/agents` rejects tokenless callers by default.
+ */
+export function agentMcpTransportOptions(token: string | null | undefined): {
+  requestInit: RequestInit;
+} {
+  return { requestInit: { headers: token ? { Authorization: `Bearer ${token}` } : {} } };
 }
 
 const TEST_DAEMON_START_TIMEOUT_MS = 20_000;
@@ -201,6 +212,7 @@ async function prepareTestDaemonConfig(
     bots: options.bots,
     hostnames: true,
     mcpEnabled: options.mcpEnabled ?? true,
+    mcpAllowAnonymous: options.mcpAllowAnonymous,
     staticDir,
     mcpDebug: options.mcpDebug ?? false,
     isDev: options.isDev,

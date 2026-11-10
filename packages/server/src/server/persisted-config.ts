@@ -251,6 +251,12 @@ export const PersistedConfigSchema = z
           .object({
             enabled: z.boolean().optional(),
             injectIntoAgents: z.boolean().optional(),
+            allowAnonymous: z
+              .boolean()
+              .optional()
+              .describe(
+                "Admit Agent MCP (/mcp/agents) callers without the per-run agent capability token on a daemon without a password. Defaults to false. Ignored when managed access mode is external and for proxied or non-loopback requests.",
+              ),
           })
           .passthrough()
           .optional(),

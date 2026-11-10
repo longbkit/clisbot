@@ -25,7 +25,12 @@ const daemon = await createTestClisbotDaemon({
       String(prompt).includes("HOLD_CHILD") ? held.promise : Promise.resolve(),
   }),
 });
-process.send({ port: daemon.port, clisbotHome: daemon.clisbotHome, cwd: daemon.staticDir });
+process.send({
+  port: daemon.port,
+  clisbotHome: daemon.clisbotHome,
+  cwd: daemon.staticDir,
+  mcpCapabilityToken: daemon.daemon.agentManager.getMcpAuthToken(),
+});
 process.on("message", (message) => {
   if (message === "finish") held.resolve();
   if (message === "stop") {

@@ -639,6 +639,8 @@ export function resolveConfigFromPersisted(
     trustedProxies,
     mcpEnabled,
     mcpInjectIntoAgents,
+    // Restart-only and never part of a config patch, so a remote client cannot enable it.
+    mcpAllowAnonymous: persisted.daemon?.mcp?.allowAnonymous ?? false,
     browserToolsEnabled,
     git: resolveGitProcessConfig(env, persisted),
     autoArchiveAfterMerge,
