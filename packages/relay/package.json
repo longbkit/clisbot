@@ -1,6 +1,6 @@
 {
   "name": "@clisbot/relay",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "description": "Clisbot relay for bridging daemon and client connections",
   "files": [
     "dist",

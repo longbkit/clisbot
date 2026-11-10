@@ -1,0 +1,6 @@
+Scripts that call Agent MCP directly must send the daemon password. On a Host without a password, daemon.mcp.allowAnonymous admits direct local callers again, except under external managed access.
+
+Security
+- Fixed Agent MCP accepting callers without a token on Hosts without a password
+
+Full notes: https://clisbot.com/changelog
