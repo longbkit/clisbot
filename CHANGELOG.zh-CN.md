@@ -1,5 +1,13 @@
 # 更新日志
 
+## 2.2.4 - 2026-11-10
+
+### 安全
+
+- 修复未设置密码的主机上 Agent MCP 接受未携带令牌的调用方的问题 ([#71](https://github.com/longbkit/clisbot/pull/71))
+
+直接调用 Agent MCP 的脚本需要提供 daemon 密码。未设置密码的主机可通过 `daemon.mcp.allowAnonymous` 重新允许本机直接调用，但外部托管访问模式下不生效。
+
 ## 2.2.3 - 2026-11-05
 
 ### 新增

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.4 - 2026-11-10
+
+### Security
+
+- Fixed Agent MCP accepting callers without a token on Hosts without a password ([#71](https://github.com/longbkit/clisbot/pull/71))
+
+Scripts that call Agent MCP directly must send the daemon password. On a Host without a password, `daemon.mcp.allowAnonymous` admits direct local callers again, except under external managed access.
+
 ## 2.2.3 - 2026-11-05
 
 ### Added
