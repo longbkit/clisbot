@@ -338,7 +338,7 @@ agents that can access the host through a shell.
 `/mcp/agents` admits only the per-run agent capability token the daemon injects into its own
 agents, or the daemon password when one is set. `daemon.mcp.allowAnonymous` (default `false`,
 restart-only, not patchable over the WebSocket) re-enables tokenless callers on a daemon without a
-password, and only for direct loopback requests (no `Forwarded`/`X-Forwarded-*`/`X-Real-IP`) while
+password, and only for direct loopback requests (no `Forwarded`, `Via`, `X-Forwarded-*`, `X-Real-IP` or similar proxy header) while
 `daemon.managedAccess.mode` is not `external`. It exists for local test harnesses that cannot read
 the token; never set it on a daemon behind a reverse proxy.
 

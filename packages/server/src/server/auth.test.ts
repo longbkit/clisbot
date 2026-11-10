@@ -364,7 +364,17 @@ test("direct loopback detection ignores trust proxy and refuses forwarded reques
     false,
   );
   expect(isDirectLoopbackHttpRequest({ ...loopback, socket: {} })).toBe(false);
-  for (const header of ["forwarded", "x-forwarded-for", "x-forwarded-host", "x-real-ip"])
+  for (const header of [
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-forwarded-port",
+    "x-real-ip",
+    "via",
+    "true-client-ip",
+    "cf-connecting-ip",
+  ])
     expect(
       isDirectLoopbackHttpRequest({ ...loopback, headers: { [header]: "31.22.91.132" } }),
     ).toBe(false);

@@ -147,8 +147,25 @@ export function isLoopbackSocketAddress(remoteAddress: string | undefined): bool
   return remoteAddress !== undefined && LOOPBACK_SOCKET_ADDRESSES.has(remoteAddress);
 }
 
-/** Headers a reverse proxy adds; their presence means the loopback peer is a proxy, not the caller. */
-const FORWARDING_HEADERS = ["forwarded", "x-forwarded-for", "x-forwarded-host", "x-real-ip"];
+/**
+ * Headers reverse proxies and CDNs add; any of them means the loopback peer is a proxy, not the
+ * caller. Every `x-forwarded-*` header counts, so a proxy that sets only `X-Forwarded-Proto` is
+ * still recognised.
+ */
+const FORWARDING_HEADERS = new Set([
+  "forwarded",
+  "via",
+  "x-real-ip",
+  "x-client-ip",
+  "x-cluster-client-ip",
+  "true-client-ip",
+  "cf-connecting-ip",
+  "fastly-client-ip",
+]);
+
+function isForwardingHeader(name: string): boolean {
+  return FORWARDING_HEADERS.has(name) || name.startsWith("x-forwarded-");
+}
 
 /**
  * True only for a request whose TCP peer is loopback and which carries no proxy forwarding
@@ -161,7 +178,7 @@ export function isDirectLoopbackHttpRequest(req: {
   headers: IncomingHttpHeaders;
 }): boolean {
   if (!isLoopbackSocketAddress(req.socket.remoteAddress)) return false;
-  return FORWARDING_HEADERS.every((name) => req.headers[name] === undefined);
+  return !Object.keys(req.headers).some((name) => isForwardingHeader(name.toLowerCase()));
 }
 
 /** Credential authority is established once per HTTP request, never by callerAgentId. */
