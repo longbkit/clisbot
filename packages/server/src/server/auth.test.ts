@@ -11,6 +11,7 @@ import {
   hashDaemonPassword,
   isAgentMcpRequestAuthorized,
   isBearerTokenValidAsync,
+  isDirectLoopbackHttpRequest,
   shouldBypassBearerAuth,
 } from "./auth.js";
 import { resolveSessionAdmission } from "./session-admission-auth.js";
@@ -68,8 +69,8 @@ describe("daemon bearer validator", () => {
     expect(shouldBypassBearerAuth("GET", "/api/health")).toBe(true);
     // Guarded by its own single-use download token, not the daemon password.
     expect(shouldBypassBearerAuth("GET", "/api/files/download")).toBe(true);
-    // Guarded by its own per-daemon-run capability token (see
-    // isAgentMcpRequestAuthorized), not the daemon password.
+    // Guarded by its own per-daemon-run capability token or the daemon password
+    // (see classifyAgentMcpRequestAuthority), never by the generic middleware.
     expect(shouldBypassBearerAuth("POST", "/mcp/agents")).toBe(true);
     // Everything else stays behind the daemon password.
     expect(shouldBypassBearerAuth("GET", "/api/status")).toBe(false);
@@ -80,14 +81,17 @@ describe("daemon bearer validator", () => {
 describe("agent MCP request authorizer", () => {
   const CAPABILITY_TOKEN = "cap-token-abc123";
 
-  test("allows any request when no daemon password is configured", async () => {
-    expect(
-      await isAgentMcpRequestAuthorized({
-        password: undefined,
-        capabilityToken: CAPABILITY_TOKEN,
-        authorizationHeader: undefined,
-      }),
-    ).toBe(true);
+  test("rejects tokenless requests when no daemon password is configured", async () => {
+    // A no-password daemon behind a reverse proxy must not hand its agent tools
+    // (terminals, agents, schedules) to whoever reaches the proxy.
+    for (const authorizationHeader of [undefined, "Bearer arbitrary", "Basic not-bearer"])
+      expect(
+        await isAgentMcpRequestAuthorized({
+          password: undefined,
+          capabilityToken: CAPABILITY_TOKEN,
+          authorizationHeader,
+        }),
+      ).toBe(false);
   });
 
   test("accepts the injected capability token", async () => {
@@ -236,6 +240,14 @@ test("Agent MCP credential authority distinguishes injected capability, configur
   expect(
     await classifyAgentMcpRequestAuthority({
       ...base,
+      password: undefined,
+      managedAccessMode: "external",
+      authorizationHeader: "Bearer injected-agent-token",
+    }),
+  ).toBe("agent-capability");
+  expect(
+    await classifyAgentMcpRequestAuthority({
+      ...base,
       password: CORRECT_PASSWORD_HASH,
       authorizationHeader: "Bearer injected-agent-token",
     }),
@@ -247,10 +259,14 @@ test("Agent MCP credential authority distinguishes injected capability, configur
       authorizationHeader: "Bearer correct-password",
     }),
   ).toBe("password-operator");
-  for (const authorizationHeader of [undefined, "Bearer arbitrary", "Basic not-bearer"])
-    expect(
-      await classifyAgentMcpRequestAuthority({ ...base, password: undefined, authorizationHeader }),
-    ).toBe("legacy-anonymous");
+  expect(
+    await classifyAgentMcpRequestAuthority({
+      ...base,
+      password: CORRECT_PASSWORD_HASH,
+      managedAccessMode: "external",
+      authorizationHeader: "Bearer correct-password",
+    }),
+  ).toBe("password-operator");
   expect(
     await classifyAgentMcpRequestAuthority({
       ...base,
@@ -274,4 +290,92 @@ test("Agent MCP credential authority distinguishes injected capability, configur
       authorizationHeader: undefined,
     }),
   ).toBe("rejected");
+});
+
+test("Agent MCP rejects tokenless callers on a no-password daemon unless legacy admission is explicitly enabled", async () => {
+  const base = {
+    capabilityToken: "injected-agent-token",
+    devicePairingEnabled: false,
+    password: undefined,
+  };
+  const tokenless = [undefined, "Bearer arbitrary", "Basic not-bearer"];
+  // Default: no opt-in, whatever the managed access mode or request origin.
+  for (const managedAccessMode of [undefined, "off", "external"] as const)
+    for (const authorizationHeader of tokenless)
+      expect(
+        await classifyAgentMcpRequestAuthority({
+          ...base,
+          managedAccessMode,
+          directLoopback: true,
+          authorizationHeader,
+        }),
+      ).toBe("rejected");
+  // Explicit opt-in on a direct loopback request with managed access off.
+  for (const authorizationHeader of tokenless)
+    expect(
+      await classifyAgentMcpRequestAuthority({
+        ...base,
+        allowAnonymous: true,
+        managedAccessMode: "off",
+        directLoopback: true,
+        authorizationHeader,
+      }),
+    ).toBe("legacy-anonymous");
+  // The opt-in never applies under external managed access or to a proxied/remote request.
+  expect(
+    await classifyAgentMcpRequestAuthority({
+      ...base,
+      allowAnonymous: true,
+      managedAccessMode: "external",
+      directLoopback: true,
+      authorizationHeader: undefined,
+    }),
+  ).toBe("rejected");
+  expect(
+    await classifyAgentMcpRequestAuthority({
+      ...base,
+      allowAnonymous: true,
+      managedAccessMode: "off",
+      directLoopback: false,
+      authorizationHeader: undefined,
+    }),
+  ).toBe("rejected");
+  // A configured password always wins over the anonymous opt-in.
+  expect(
+    await classifyAgentMcpRequestAuthority({
+      ...base,
+      password: CORRECT_PASSWORD_HASH,
+      allowAnonymous: true,
+      managedAccessMode: "off",
+      directLoopback: true,
+      authorizationHeader: undefined,
+    }),
+  ).toBe("rejected");
+});
+
+test("direct loopback detection ignores trust proxy and refuses forwarded requests", () => {
+  const loopback = { socket: { remoteAddress: "127.0.0.1" }, headers: {} };
+  expect(isDirectLoopbackHttpRequest(loopback)).toBe(true);
+  expect(isDirectLoopbackHttpRequest({ ...loopback, socket: { remoteAddress: "::1" } })).toBe(true);
+  expect(
+    isDirectLoopbackHttpRequest({ ...loopback, socket: { remoteAddress: "::ffff:127.0.0.1" } }),
+  ).toBe(true);
+  expect(isDirectLoopbackHttpRequest({ ...loopback, socket: { remoteAddress: "10.0.0.5" } })).toBe(
+    false,
+  );
+  expect(isDirectLoopbackHttpRequest({ ...loopback, socket: {} })).toBe(false);
+  for (const header of [
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-forwarded-port",
+    "x-real-ip",
+    "via",
+    "true-client-ip",
+    "cf-connecting-ip",
+  ])
+    expect(
+      isDirectLoopbackHttpRequest({ ...loopback, headers: { [header]: "31.22.91.132" } }),
+    ).toBe(false);
 });

@@ -66,6 +66,10 @@
             },
             "injectIntoAgents": {
               "type": "boolean"
+            },
+            "allowAnonymous": {
+              "description": "Admit Agent MCP (/mcp/agents) callers without the per-run agent capability token on a daemon without a password. Defaults to false. Ignored when managed access mode is external and for proxied or non-loopback requests.",
+              "type": "boolean"
             }
           },
           "additionalProperties": {}

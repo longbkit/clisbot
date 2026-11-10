@@ -12,7 +12,11 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { afterEach, expect, test } from "vitest";
 import { createClisbotApi } from "@clisbot/client";
 import { createHostClient, createHostChannelTransport } from "@clisbot/client/node";
-import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
+import {
+  agentMcpTransportOptions,
+  createTestClisbotDaemon,
+  type TestClisbotDaemon,
+} from "../test-utils/clisbot-daemon.js";
 import type { HostDirectory } from "@clisbot/protocol/hosts";
 
 const cleanup: (() => Promise<unknown>)[] = [];
@@ -1355,6 +1359,7 @@ test(
     await mcp.connect(
       new StreamableHTTPClientTransport(
         new URL(`http://127.0.0.1:${a.port}/mcp/agents?callerAgentId=${parent.id}`),
+        agentMcpTransportOptions(a.daemon.agentManager.getMcpAuthToken()),
       ),
     );
     const result = await mcp.callTool({ name: "list_hosts", arguments: {} });
@@ -1574,6 +1579,7 @@ test(
       await mcp.connect(
         new StreamableHTTPClientTransport(
           new URL(`http://127.0.0.1:${host.port}/mcp/agents?callerAgentId=${agentId}`),
+          agentMcpTransportOptions(host.daemon.agentManager.getMcpAuthToken()),
         ),
       );
       cleanup.push(() => mcp.close());
@@ -1759,7 +1765,10 @@ test(
     const mcp = new Client({ name: "human-mode-send", version: "1" });
     cleanup.push(() => mcp.close());
     await mcp.connect(
-      new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${a.port}/mcp/agents`)),
+      new StreamableHTTPClientTransport(
+        new URL(`http://127.0.0.1:${a.port}/mcp/agents`),
+        agentMcpTransportOptions(a.daemon.agentManager.getMcpAuthToken()),
+      ),
     );
     const response = await mcp.callTool({
       name: "send_agent_prompt",
@@ -1837,6 +1846,7 @@ test(
     await mcp.connect(
       new StreamableHTTPClientTransport(
         new URL(`http://127.0.0.1:${a.port}/mcp/agents?callerAgentId=${parent.id}`),
+        agentMcpTransportOptions(a.daemon.agentManager.getMcpAuthToken()),
       ),
     );
     cleanup.push(() => mcp.close());
@@ -1926,6 +1936,7 @@ test(
     await mcp.connect(
       new StreamableHTTPClientTransport(
         new URL(`http://127.0.0.1:${a.port}/mcp/agents?callerAgentId=${parent.id}`),
+        agentMcpTransportOptions(a.daemon.agentManager.getMcpAuthToken()),
       ),
     );
     const response = await mcp.callTool({
@@ -2015,6 +2026,7 @@ test(
     await mcp.connect(
       new StreamableHTTPClientTransport(
         new URL(`http://127.0.0.1:${a.port}/mcp/agents?callerAgentId=${parent.id}`),
+        agentMcpTransportOptions(a.daemon.agentManager.getMcpAuthToken()),
       ),
     );
     await origin.clisbot.hosts.update(saved.registrationId, { enabled: false });
@@ -2073,6 +2085,7 @@ test.each(["removed", "disabled"] as const)(
     await mcp.connect(
       new StreamableHTTPClientTransport(
         new URL(`http://127.0.0.1:${a.port}/mcp/agents?callerAgentId=${parent.id}`),
+        agentMcpTransportOptions(a.daemon.agentManager.getMcpAuthToken()),
       ),
     );
     const response = await mcp.callTool({

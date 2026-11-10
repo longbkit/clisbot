@@ -216,7 +216,7 @@ snapshot so a mixed edit can apply its live subset and still name the paths that
     listen: "127.0.0.1:6868",
     hostnames: true | string[],   // legacy alias `allowedHosts` is migrated on load
     trustedProxies: true | string[], // defaults to ["loopback"]; Express proxy names/CIDRs
-    mcp: { enabled: boolean, injectIntoAgents: boolean }, // new homes materialize injectIntoAgents: true
+    mcp: { enabled: boolean, injectIntoAgents: boolean, allowAnonymous: boolean }, // new homes materialize injectIntoAgents: true; allowAnonymous defaults to false
     browserTools: { enabled: boolean },  // new homes materialize enabled: true
     git: { maxProcessesPerSecond: number, maxProcessConcurrency: number },
     appendSystemPrompt: string,    // appended to supported provider system/developer prompts
@@ -334,6 +334,13 @@ IDs to omit. The policy covers the core and browser catalog, not the voice-only 
 Browser tools also require `daemon.browserTools.enabled` and a connected browser host.
 This policy controls the catalog presented to an agent. It is not an authorization boundary for
 agents that can access the host through a shell.
+
+`/mcp/agents` admits only the per-run agent capability token the daemon injects into its own
+agents, or the daemon password when one is set. `daemon.mcp.allowAnonymous` (default `false`,
+restart-only, not patchable over the WebSocket) re-enables tokenless callers on a daemon without a
+password, and only for direct loopback requests (no `Forwarded`, `Via`, `X-Forwarded-*`, `X-Real-IP` or similar proxy header) while
+`daemon.managedAccess.mode` is not `external`. It exists for local test harnesses that cannot read
+the token; never set it on a daemon behind a reverse proxy.
 
 `daemon.mcp.injectIntoAgents` is the Host default. A new home writes it and
 `daemon.browserTools.enabled` as `true` into its first `config.json`; a home whose file lacks them

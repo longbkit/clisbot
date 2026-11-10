@@ -1,7 +1,11 @@
 import { test } from "../support/helpers/codex-workspace-restore";
 
 test.use({
-  e2eDaemonConfig: { version: 1, daemon: { mcp: { enabled: true } } },
+  // The spec's MCP client cannot read the daemon's per-run agent capability token.
+  e2eDaemonConfig: {
+    version: 1,
+    daemon: { managedAccess: { mode: "off" }, mcp: { enabled: true, allowAnonymous: true } },
+  },
   trace: "on",
   video: "on",
 });

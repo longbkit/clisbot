@@ -79,7 +79,7 @@ function getStructuredContent(result: McpToolResult): StructuredContent | null {
   return null;
 }
 
-async function createMcpClient(url: string, authToken?: string): Promise<McpClient> {
+async function createMcpClient(url: string, authToken?: string | null): Promise<McpClient> {
   const transport = new StreamableHTTPClientTransport(
     new URL(url),
     authToken ? { requestInit: { headers: { Authorization: `Bearer ${authToken}` } } } : undefined,
@@ -121,7 +121,10 @@ async function startOfflineMcpDaemon(): Promise<OfflineMcpDaemon> {
   });
   try {
     await daemon.start();
-    const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
+    const client = await createMcpClient(
+      `http://127.0.0.1:${port}/mcp/agents`,
+      daemon.agentManager.getMcpAuthToken(),
+    );
     return {
       client,
       stop: async () => {
@@ -252,7 +255,10 @@ describe("agent MCP end-to-end (offline)", () => {
     const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
-    const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
+    const client = await createMcpClient(
+      `http://127.0.0.1:${port}/mcp/agents`,
+      daemon.agentManager.getMcpAuthToken(),
+    );
 
     let agentId: string | null = null;
     try {
@@ -412,7 +418,10 @@ describe("agent MCP end-to-end (offline)", () => {
     const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
-    const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
+    const client = await createMcpClient(
+      `http://127.0.0.1:${port}/mcp/agents`,
+      daemon.agentManager.getMcpAuthToken(),
+    );
 
     const disabledClisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-home-disabled-"));
     const disabledStaticDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-static-disabled-"));
@@ -437,7 +446,10 @@ describe("agent MCP end-to-end (offline)", () => {
     );
     await disabledDaemon.start();
 
-    const disabledClient = await createMcpClient(`http://127.0.0.1:${disabledPort}/mcp/agents`);
+    const disabledClient = await createMcpClient(
+      `http://127.0.0.1:${disabledPort}/mcp/agents`,
+      disabledDaemon.agentManager.getMcpAuthToken(),
+    );
 
     let agentId: string | null = null;
     let disabledAgentId: string | null = null;
@@ -525,7 +537,10 @@ describe("agent MCP end-to-end (offline)", () => {
     const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
-    const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
+    const client = await createMcpClient(
+      `http://127.0.0.1:${port}/mcp/agents`,
+      daemon.agentManager.getMcpAuthToken(),
+    );
 
     let agentId: string | null = null;
     try {
@@ -584,7 +599,10 @@ describe("agent MCP end-to-end (offline)", () => {
     const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
-    const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
+    const client = await createMcpClient(
+      `http://127.0.0.1:${port}/mcp/agents`,
+      daemon.agentManager.getMcpAuthToken(),
+    );
 
     let agentId: string | null = null;
     try {
@@ -764,7 +782,10 @@ describe("agent MCP end-to-end (offline)", () => {
     const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
-    const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
+    const client = await createMcpClient(
+      `http://127.0.0.1:${port}/mcp/agents`,
+      daemon.agentManager.getMcpAuthToken(),
+    );
 
     try {
       const result = await client.callTool({
@@ -811,7 +832,10 @@ describe("agent MCP end-to-end (offline)", () => {
     const daemon = await createClisbotDaemon(daemonConfig, pino({ level: "silent" }));
     await daemon.start();
 
-    const client = await createMcpClient(`http://127.0.0.1:${port}/mcp/agents`);
+    const client = await createMcpClient(
+      `http://127.0.0.1:${port}/mcp/agents`,
+      daemon.agentManager.getMcpAuthToken(),
+    );
 
     let agentId: string | null = null;
     try {

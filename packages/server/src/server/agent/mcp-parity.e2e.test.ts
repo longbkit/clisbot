@@ -8,7 +8,11 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { z } from "zod";
 
 import { AGENT_WAIT_TIMEOUT_MS } from "./mcp-shared.js";
-import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
+import {
+  agentMcpTransportOptions,
+  createTestClisbotDaemon,
+  type TestClisbotDaemon,
+} from "../test-utils/clisbot-daemon.js";
 import { createTestAgentClients } from "../test-utils/fake-agent-client.js";
 import type { AgentClient, AgentProvider, AgentSessionConfig } from "./agent-sdk-types.js";
 import { PARENT_AGENT_ID_LABEL } from "@clisbot/protocol/agent-labels";
@@ -82,8 +86,14 @@ function getStructuredContent(result: McpToolResult): StructuredContent | null {
   return null;
 }
 
-async function createMcpClient(url: string): Promise<McpClient> {
-  const transport = new StreamableHTTPClientTransport(new URL(url));
+async function createMcpClient(
+  url: string,
+  daemon: TestClisbotDaemon = daemonHandle,
+): Promise<McpClient> {
+  const transport = new StreamableHTTPClientTransport(
+    new URL(url),
+    agentMcpTransportOptions(daemon.daemon.agentManager.getMcpAuthToken()),
+  );
   const rawClient = await experimental_createMCPClient({ transport });
   const boundCallTool: McpClient["callTool"] = Reflect.get(rawClient, "callTool").bind(rawClient);
   return { callTool: boundCallTool, close: () => rawClient.close() };
@@ -362,6 +372,7 @@ describe("Suite A: Core Fixes", () => {
             port: daemon.port,
             agentId: caller.id,
           }),
+          daemon,
         );
         const created = await callToolStructured(mcp, "create_agent", {
           relationship: { kind: relationship },
@@ -480,6 +491,7 @@ describe("Suite A: Core Fixes", () => {
         });
         mcp = await createMcpClient(
           buildExpectedAgentMcpUrl({ host: "127.0.0.1", port: daemon.port, agentId: parent.id }),
+          daemon,
         );
         const created = await callToolStructured(mcp, "create_agent", {
           relationship: { kind: "subagent" },

@@ -124,7 +124,9 @@ function seedClisbotHome(clisbotHome, listen, workspaceRoot) {
     daemon: {
       listen,
       relay: { enabled: false },
-      mcp: { enabled: true, injectIntoAgents: true },
+      // This harness calls /mcp/agents without the daemon's per-run agent capability token.
+      managedAccess: { mode: "off" },
+      mcp: { enabled: true, injectIntoAgents: true, allowAnonymous: true },
       browserTools: { enabled: true },
       cors: { allowedOrigins: ["*"] },
     },

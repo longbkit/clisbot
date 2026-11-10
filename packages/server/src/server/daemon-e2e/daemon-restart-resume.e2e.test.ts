@@ -5,7 +5,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { createDaemonTestContext, type DaemonTestContext } from "../test-utils/index.js";
+import {
+  agentMcpTransportOptions,
+  createDaemonTestContext,
+  type DaemonTestContext,
+} from "../test-utils/index.js";
 import type { PersistenceHandle } from "@clisbot/protocol/messages";
 
 function tmpCwd(): string {
@@ -94,7 +98,13 @@ async function restartFixture(root: string) {
   });
   const ready = await Promise.race([
     once(child, "message").then(
-      ([message]) => message as { port: number; clisbotHome: string; cwd: string },
+      ([message]) =>
+        message as {
+          port: number;
+          clisbotHome: string;
+          cwd: string;
+          mcpCapabilityToken: string | null;
+        },
     ),
     once(child, "exit").then(([code]) => {
       throw new Error(`Fixture exited ${code}: ${output}`);
@@ -145,6 +155,7 @@ test.each([false, true])(
       await mcp.connect(
         new StreamableHTTPClientTransport(
           new URL(`http://127.0.0.1:${first.port}/mcp/agents?callerAgentId=${parent.id}`),
+          agentMcpTransportOptions(first.mcpCapabilityToken),
         ),
       );
       const result = await mcp.callTool({

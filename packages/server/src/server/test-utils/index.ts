@@ -1,4 +1,8 @@
-export { createTestClisbotDaemon, type TestClisbotDaemon } from "./clisbot-daemon.js";
+export {
+  agentMcpTransportOptions,
+  createTestClisbotDaemon,
+  type TestClisbotDaemon,
+} from "./clisbot-daemon.js";
 export {
   DaemonClient,
   type DaemonClientConfig,

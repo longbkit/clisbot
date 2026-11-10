@@ -248,6 +248,8 @@ import { isHostnameAllowed, type HostnamesConfig } from "./hostnames.js";
 import {
   createRequireBearerMiddleware,
   classifyAgentMcpRequestAuthority,
+  isDirectLoopbackHttpRequest,
+  isLoopbackSocketAddress,
   type DaemonAuthConfig,
 } from "./auth.js";
 import { deleteLocalCredential, writeLocalCredential } from "./local-credential.js";
@@ -333,17 +335,11 @@ const TERMINAL_ACTIVITY_STATE_MAP = {
   "needs-input": "attention",
 } as const;
 
-const LOOPBACK_REMOTE_ADDRESSES = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
-
-function isLoopbackRemoteAddress(remoteAddress: string | undefined): boolean {
-  return remoteAddress !== undefined && LOOPBACK_REMOTE_ADDRESSES.has(remoteAddress);
-}
-
 export function createTerminalActivityRouteHandler(
   terminalManager: TerminalManager,
 ): express.RequestHandler {
   return async (req, res) => {
-    if (!isLoopbackRemoteAddress(req.socket.remoteAddress)) {
+    if (!isLoopbackSocketAddress(req.socket.remoteAddress)) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }
@@ -444,6 +440,11 @@ export interface ClisbotDaemonConfig {
   trustedProxies?: true | string[];
   mcpEnabled?: boolean;
   mcpInjectIntoAgents?: boolean;
+  /**
+   * `daemon.mcp.allowAnonymous`: admit tokenless Agent MCP callers on a no-password daemon.
+   * Off by default; never honoured under external managed access or for proxied requests.
+   */
+  mcpAllowAnonymous?: boolean;
   browserToolsEnabled?: boolean;
   git?: {
     maxProcessesPerSecond: number;
@@ -1947,17 +1948,30 @@ export async function createClisbotDaemon(
         res.status(404).json({ error: "Agent MCP endpoint disabled" });
         return;
       }
-      // This route is exempt from the global daemon-password middleware, so it
-      // authenticates here using the injected capability token (or a valid
-      // daemon password). Without this, a password-protected daemon would be
-      // wide open on its agent control plane.
+      // This route is exempt from the global daemon-password middleware (and so from
+      // managed access), so it authenticates here: the injected capability token or a
+      // valid daemon password. A no-password daemon rejects tokenless callers unless
+      // `daemon.mcp.allowAnonymous` is set; otherwise anyone reaching a reverse proxy in
+      // front of a loopback daemon would get its terminals and agents.
       const hostAuthority = await classifyAgentMcpRequestAuthority({
         password: config.auth?.password,
         devicePairingEnabled: config.devicePairingEnabled,
+        allowAnonymous: config.mcpAllowAnonymous,
+        managedAccessMode: daemonConfigStore.get().managedAccess.mode,
+        directLoopback: isDirectLoopbackHttpRequest(req),
         capabilityToken: agentMcpAuthToken,
         authorizationHeader: req.header("authorization"),
       });
       if (hostAuthority === "rejected") {
+        logger.warn(
+          {
+            method: req.method,
+            ip: req.ip,
+            remoteAddress: req.socket.remoteAddress,
+            hasToken: req.header("authorization") !== undefined,
+          },
+          "Rejected Agent MCP request without a valid credential",
+        );
         res.status(401).json({ error: "Unauthorized" });
         return;
       }
@@ -2029,6 +2043,12 @@ export async function createClisbotDaemon(
     app.get(agentMcpRoute, handleAgentMcpRequest);
     app.delete(agentMcpRoute, handleAgentMcpRequest);
     logger.info({ route: agentMcpRoute, enabled: mcpEnabled }, "Agent MCP route mounted");
+    if (config.mcpAllowAnonymous) {
+      logger.warn(
+        { route: agentMcpRoute },
+        "daemon.mcp.allowAnonymous is set: tokenless direct-loopback Agent MCP callers are admitted while managed access is not external",
+      );
+    }
     connectors.mountRelay(app);
   }
 

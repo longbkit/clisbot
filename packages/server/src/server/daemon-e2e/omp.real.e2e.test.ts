@@ -16,7 +16,11 @@ import {
   formatOmpVersionSupport,
 } from "../agent/providers/omp/agent.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
+import {
+  agentMcpTransportOptions,
+  createTestClisbotDaemon,
+  type TestClisbotDaemon,
+} from "../test-utils/clisbot-daemon.js";
 import { createRealProviderClients, getRealProviderConfig } from "./real-provider-test-config.js";
 
 const execFileAsync = promisify(execFile);
@@ -298,6 +302,7 @@ describe("daemon E2E (real OMP)", () => {
             new URL(
               `http://127.0.0.1:${harness.daemon.port}/mcp/agents?callerAgentId=${parent.id}`,
             ),
+            agentMcpTransportOptions(harness.daemon.daemon.agentManager.getMcpAuthToken()),
           ),
         );
         const response = await mcp.callTool({
