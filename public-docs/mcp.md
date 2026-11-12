@@ -111,7 +111,7 @@ Clisbot agents receive finish, error, and permission notifications by default; s
 | `rename_workspace`  | Change the user-visible name of the current or specified workspace.                                                                                                                                                                                                                                             |
 | `archive_workspace` | Archive a workspace and the sessions it owns.                                                                                                                                                                                                                                                                   |
 
-For worktree isolation, `create_workspace` accepts the same useful choices as the app: branch off from a base, check out an existing branch, or check out a pull request. The worktree remains an implementation detail of the workspace lifecycle.
+For worktree isolation, `create_workspace` accepts the same useful choices as the app: branch off from a base, check out an existing branch, or check out a pull request. In a large repository, `sparse` checks out only the listed directories and files, plus the root files unless `includeRootFiles` is false. The worktree remains an implementation detail of the workspace lifecycle.
 
 ### Workspace scripts
 

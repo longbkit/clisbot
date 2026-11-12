@@ -235,6 +235,32 @@ test("creates a worktree workspace at the selected project subdirectory", async 
   });
 });
 
+test("keeps the selected project subdirectory in a sparse worktree", async () => {
+  const { repoDir, tempDir } = createGitRepo();
+  cleanupPaths.push(tempDir);
+  for (const dir of ["packages/app", "packages/admin", "libs/shared"]) {
+    mkdirSync(path.join(repoDir, dir), { recursive: true });
+    writeFileSync(path.join(repoDir, dir, "index.ts"), `${dir}\n`);
+  }
+  commitAll(repoDir, "add monorepo");
+
+  const result = await createClisbotWorktree(
+    {
+      cwd: path.join(repoDir, "packages", "app"),
+      worktreeSlug: "sparse-subdirectory",
+      sparse: { paths: ["libs/shared"] },
+      clisbotHome: path.join(tempDir, ".clisbot"),
+    },
+    createDeps(),
+  );
+
+  const worktreePath = result.worktree.worktreePath;
+  expect(result.workspace.cwd).toBe(path.join(worktreePath, "packages", "app"));
+  expect(existsSync(path.join(worktreePath, "packages", "app", "index.ts"))).toBe(true);
+  expect(existsSync(path.join(worktreePath, "libs", "shared", "index.ts"))).toBe(true);
+  expect(existsSync(path.join(worktreePath, "packages", "admin"))).toBe(false);
+});
+
 test("seeds an uncommitted exact-project config into the mapped worktree directory", async () => {
   const { repoDir, tempDir } = createGitRepo();
   cleanupPaths.push(tempDir);

@@ -15,6 +15,7 @@ import {
 } from "./resolve-worktree-creation-intent.js";
 import type { ChangeRequestCheckoutSource, FirstAgentContext } from "@clisbot/protocol/messages";
 import type { WorkspaceGitService } from "./workspace-git-service.js";
+import type { SparseCheckoutRequest } from "../utils/sparse-worktree.js";
 import { runWithGitCommandPriority } from "../utils/run-git-command.js";
 
 export interface CreateWorktreeCoreInput {
@@ -28,6 +29,7 @@ export interface CreateWorktreeCoreInput {
   firstAgentContext?: FirstAgentContext;
   clisbotHome?: string;
   worktreesRoot?: string;
+  sparse?: SparseCheckoutRequest;
 }
 
 export interface CreateWorktreeCoreDeps {
@@ -121,6 +123,7 @@ async function createWorktreeCoreWithPriority(
       source: intent,
       clisbotHome: input.clisbotHome,
       worktreesRoot: input.worktreesRoot,
+      ...(input.sparse ? { sparse: input.sparse } : {}),
     }),
     intent,
     repoRoot,
