@@ -27,6 +27,7 @@ import { AfterPaintPublication } from "@/composer/after-paint-publication";
 import { useShallow } from "zustand/shallow";
 import type { ComposerTextSource } from "@/composer/text-source";
 import { isWeb } from "@/constants/platform";
+import { useDraftOfferedModes } from "@/clisbot/composer-picker/use-draft-mode-control";
 
 type AttachmentUpdater =
   | UserComposerAttachment[]
@@ -239,6 +240,11 @@ export function useAgentInputDraft(input: UseAgentInputDraftInput): AgentInputDr
     };
   }, [draftKey, publishTextReplacement]);
 
+  // Check the submitted mode against the list the Mode control shows, Full auto-accept included.
+  const offeredModeOptions = useDraftOfferedModes(
+    formState.selectedServerId,
+    formState.modeOptions,
+  );
   const providerSelection = useMemo<ProviderSelectionState>(
     () => ({
       provider: formState.selectedProvider,
@@ -246,11 +252,11 @@ export function useAgentInputDraft(input: UseAgentInputDraftInput): AgentInputDr
       modeId: formState.selectedMode,
       thinkingOptionId: formState.selectedThinkingOptionId,
       availableModels: formState.availableModels,
-      modeOptions: formState.modeOptions,
+      modeOptions: offeredModeOptions,
     }),
     [
       formState.availableModels,
-      formState.modeOptions,
+      offeredModeOptions,
       formState.selectedMode,
       formState.selectedModel,
       formState.selectedProvider,

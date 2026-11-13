@@ -12,6 +12,23 @@ import {
   shouldClearProviderAutoAccept,
 } from "./mode-options";
 
+/** Whether a draft's Mode list on this Host ends with Full auto-accept. */
+export function useFullAutoAcceptOffered(serverId: string | null): boolean {
+  return useHostFeature(serverId, "fullAutoAccept") && COMPOSER_PICKER_ENABLED;
+}
+
+/**
+ * The modes a draft can be created with: the same list its Mode control shows. The submitted mode
+ * is checked against this list, so a draft created in Full auto-accept keeps it.
+ */
+export function useDraftOfferedModes(serverId: string | null, modes: AgentMode[]): AgentMode[] {
+  const fullAutoAcceptOffered = useFullAutoAcceptOffered(serverId);
+  return useMemo(
+    () => buildComposerModeOptions(modes, fullAutoAcceptOffered),
+    [fullAutoAcceptOffered, modes],
+  );
+}
+
 /**
  * A draft's Mode control. With the composer picker on and a Host that has Full auto-accept, the
  * list ends with Full auto-accept, and a draft carrying the provider's own `auto_accept` (a
@@ -31,8 +48,7 @@ export function useDraftModeControl(input: {
 }): AgentModeControlValue | null {
   const { selectedProvider, providerDefinitions, modeOptions, selectedMode, disabled } = input;
   const { onSelectMode, onSetFeature } = input;
-  const fullAutoAcceptSupported =
-    useHostFeature(input.serverId, "fullAutoAccept") && COMPOSER_PICKER_ENABLED;
+  const fullAutoAcceptSupported = useFullAutoAcceptOffered(input.serverId);
   const hiddenAutoAccept = fullAutoAcceptSupported && isProviderAutoAcceptOn(input.features);
   const handleSelectMode = useCallback(
     (modeId: string) => {

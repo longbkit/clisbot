@@ -433,8 +433,10 @@ export function normalizeClaudeRuntimeModelId(value: string | null | undefined):
     }
   }
 
+  // The lookahead stops an unknown minor release ("claude-fable-5-2") from collapsing onto
+  // its major ("claude-fable-5"). An 8-digit date suffix is still a major-only spelling.
   const singleSegmentMatch = trimmed.match(
-    /claude[-_ ](mythos|fable|opus|sonnet|haiku)[-_ ]+(\d+)(\[1m\])?/i,
+    /claude[-_ ](mythos|fable|opus|sonnet|haiku)[-_ ]+(\d+)(?!\d)(?![-.]\d{1,2}(?!\d))(\[1m\])?/i,
   );
   if (!singleSegmentMatch) {
     return null;
@@ -445,6 +447,36 @@ export function normalizeClaudeRuntimeModelId(value: string | null | undefined):
     singleSegmentMatch[2],
     trimmed.toLowerCase().includes("[1m]"),
   );
+}
+
+const CLAUDE_FIRST_PARTY_MODEL_ID =
+  /^claude-(mythos|fable|opus|sonnet|haiku)-(\d+)(?:-(\d{1,2}))?(\[1m\])?$/i;
+
+/**
+ * Describe a first-party Claude model the curated manifest does not know yet, such as a release
+ * Claude Code advertises before Clisbot ships a manifest entry. The id is kept verbatim so it
+ * reaches Claude Code unchanged; capabilities fall back to the custom-model defaults.
+ */
+export function describeUncuratedClaudeModel(modelId: string): AgentModelDefinition | null {
+  const id = modelId.trim();
+  const match = id.match(CLAUDE_FIRST_PARTY_MODEL_ID);
+  if (!match || normalizeClaudeManifestModelId(id) !== null) {
+    return null;
+  }
+  const [, familyValue, major, minor, oneMillionSuffix] = match;
+  const family = familyValue.charAt(0).toUpperCase() + familyValue.slice(1).toLowerCase();
+  const version = minor === undefined ? major : `${major}.${minor}`;
+  const label = `${family} ${version}${oneMillionSuffix ? " 1M" : ""}`;
+  const thinkingOptions = getClaudeCustomModelThinkingOptions();
+  return {
+    provider: "claude",
+    id,
+    label,
+    description: `${label} · Reported by Claude Code`,
+    ...(oneMillionSuffix ? { contextWindowMaxTokens: 1_000_000 } : {}),
+    thinkingOptions,
+    defaultThinkingOptionId: CLAUDE_DEFAULT_THINKING_OPTION_ID,
+  };
 }
 
 export function getClaudeCustomModelThinkingOptions(): AgentSelectOption[] {

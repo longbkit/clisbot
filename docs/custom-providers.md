@@ -799,6 +799,36 @@ The built-in `claude` provider appends concrete model IDs from `~/.claude/settin
 
 This lets users who already configured Claude Code for Bedrock, OpenRouter, ollama, Z.AI, or another Anthropic-compatible gateway select the exact model ID in Clisbot. Explicit model IDs are passed unchanged to Claude Code, even when the same string is a compatibility alias for a built-in model. When `agents.providers.claude.models` is set it **replaces** both the hardcoded first-party Claude list and any settings.json-discovered entries; use `agents.providers.claude.additionalModels` to keep the first-party list and append curated entries on top.
 
+### New Claude models without an app update
+
+A catalog refresh also lists any first-party model Claude Code advertises that Clisbot's manifest (`packages/server/src/server/agent/providers/claude/model-manifest.ts`) does not know yet, labeled from its id (`claude-fable-5-2` → "Fable 5.2") with Low/Medium/High/Max reasoning. When Claude Code does not advertise it, add it to `$CLISBOT_HOME/config.json` (`~/.clisbot/config.json` for the desktop app) and refresh the model list:
+
+```json
+{
+  "agents": {
+    "providers": {
+      "claude": {
+        "additionalModels": [
+          {
+            "id": "claude-fable-5-2",
+            "label": "Fable 5.2",
+            "thinkingOptions": [
+              { "id": "low", "label": "Low" },
+              { "id": "medium", "label": "Medium" },
+              { "id": "high", "label": "High", "isDefault": true },
+              { "id": "xhigh", "label": "Extra High" },
+              { "id": "max", "label": "Max" }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+An unknown id stays exact through selection, display, persistence and launch. Runtime ids are normalized only onto a manifest entry for the same release (a date suffix, `[1m]`, a gateway prefix); `claude-fable-5-2` never collapses onto `claude-fable-5`.
+
 ### Gotcha: `extends: "claude"` with third-party endpoints
 
 When a custom provider extends `"claude"` but points `ANTHROPIC_BASE_URL` at a non-Anthropic API (Z.AI, Alibaba/Qwen, proxies), the Claude Agent SDK may try to use Anthropic-only server-side tools like `WebSearch`. Third-party APIs don't support these tools, causing errors.
