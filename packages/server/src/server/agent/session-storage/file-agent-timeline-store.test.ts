@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentTimelineRow } from "../agent-timeline-store-types.js";
 import { FileAgentTimelineStore } from "./file-agent-timeline-store.js";
+import { SESSION_STORAGE_LIMITS } from "./paged-journal.js";
 import { SessionEventLog } from "./session-event-log.js";
 import { resolveSessionLogWriteConcurrency } from "./session-storage-io.js";
 import {
@@ -360,5 +361,25 @@ describe("index checkpoints", () => {
     expect(await new FileAgentTimelineStore(async () => root).getLatestCommittedSeq("agent")).toBe(
       4,
     );
+  });
+});
+
+describe("full reads", () => {
+  it("reads a history over the read page budget in slices instead of refusing it", async () => {
+    const root = await temporaryRoot();
+    const store = new FileAgentTimelineStore(async () => root);
+    const history = Array.from({ length: 10 }, (_, index) =>
+      row(index + 1, String(index).repeat(1024 * 1024)),
+    );
+    expect(Buffer.byteLength(JSON.stringify(history))).toBeGreaterThan(
+      SESSION_STORAGE_LIMITS.readPageBytes,
+    );
+    await store.replaceCommitted("agent", history);
+    await store.flush();
+    SessionEventLog.forget(root);
+    // A cold store reads from disk; a fork and a timeline search both need every row.
+    const reopened = new FileAgentTimelineStore(async () => root);
+    expect((await reopened.fetchCommitted("agent", { limit: 0 })).rows).toEqual(history);
+    expect(await reopened.getCommittedRows("agent")).toEqual(history);
   });
 });

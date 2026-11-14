@@ -11,6 +11,7 @@ import type { AgentTimelineRow } from "../agent-timeline-store-types.js";
 import { recordSessionInteraction } from "../session-authorship.js";
 import {
   SESSION_STORAGE_LIMITS,
+  SessionPageBudgetError,
   type JournalEntry,
   type JournalOperation,
 } from "./paged-journal.js";
@@ -108,12 +109,7 @@ async function replayPage<T>(
     try {
       return await stream.read(start, boundedEnd);
     } catch (error) {
-      if (
-        boundedEnd <= start ||
-        !(error instanceof Error) ||
-        error.message !== "Session page exceeds byte budget; request a smaller page"
-      )
-        throw error;
+      if (boundedEnd <= start || !(error instanceof SessionPageBudgetError)) throw error;
       boundedEnd = start + Math.floor((boundedEnd - start) / 2);
     }
   }
