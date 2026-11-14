@@ -1765,7 +1765,12 @@ export class AgentManager {
         config,
         env: options.env,
       });
-      config = { ...request.config, internal: config.internal };
+      // The hook sees only wire fields, so carry back the daemon-owned flags it cannot hold.
+      config = {
+        ...request.config,
+        internal: config.internal,
+        ...(config.fullAutoAccept ? { fullAutoAccept: true } : {}),
+      };
       options = { ...options, env: request.env };
     }
     const storedDraft = await this.registry?.get(resolvedAgentId);

@@ -4,6 +4,7 @@ import type { Logger } from "pino";
 
 import type { AgentModelDefinition } from "../../agent-sdk-types.js";
 import {
+  describeUncuratedClaudeModel,
   getClaudeCustomModelThinkingOptions,
   getClaudeManifestModels,
   normalizeClaudeManifestModelId,
@@ -87,6 +88,24 @@ export async function getClaudeModelsWithSettings(
   }
 
   return models;
+}
+
+/**
+ * Append models Claude Code advertises that the curated manifest does not know yet, so a new
+ * release shows up on a catalog refresh instead of waiting for a Clisbot update.
+ */
+export function appendUncuratedClaudeModels(
+  models: AgentModelDefinition[],
+  advertisedModelIds: Iterable<string>,
+): AgentModelDefinition[] {
+  const result = [...models];
+  for (const advertisedModelId of advertisedModelIds) {
+    const model = describeUncuratedClaudeModel(advertisedModelId);
+    if (model && !result.some((candidate) => candidate.id === model.id)) {
+      result.push(model);
+    }
+  }
+  return result;
 }
 
 async function readClaudeSettingsModels(

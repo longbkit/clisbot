@@ -359,7 +359,11 @@ permission request the agent still raises. Agents sometimes ask under bypass any
   so an older app shows the provider's own mode and its own `auto_accept` toggle. The flag is
   persisted in the agent config and restored on resume. The app offers the mode only when
   `server_info.features.fullAutoAccept` is set (`COMPAT(fullAutoAccept)`), and then hides the
-  per-provider `auto_accept` toggle.
+  per-provider `auto_accept` toggle. Two places once dropped it at creation, so a new agent ran
+  in the provider's first mode (Claude Plan) or in Bypass without the daemon's approvals: a
+  draft checks its submitted mode against the list its Mode control shows
+  (`useDraftOfferedModes`), not the provider's own list; and `AgentManager` carries
+  `fullAutoAccept` back after the plugin `agent.create` hook, whose wire schema strips it.
 - **A provider's own `auto_accept` shows as Full auto-accept.** Hiding the toggle does not turn
   it off: unattended creates (children of an unattended parent) and older apps still
   set it on ACP, Copilot and OpenCode sessions. While it is on, the Mode reads Full auto-accept,

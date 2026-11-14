@@ -18,6 +18,8 @@ import type { ModelInfo } from "@anthropic-ai/claude-agent-sdk";
 import {
   findClaudeModel,
   getClaudeContextWindowMaxTokens,
+  resolveConfiguredClaudeModel,
+  resolveObservedClaudeModelId,
   getClaudeModels,
   normalizeClaudeRuntimeModelId,
 } from "./models.js";
@@ -877,6 +879,90 @@ describe("Claude Haiku 5.5 catalog", () => {
     expect(findClaudeModel("claude-haiku-5-5-20261007")?.id).toBe("claude-haiku-5-5");
     expect(findClaudeModel("claude-haiku-5-5-20261007[1m]")?.id).toBe("claude-haiku-5-5");
     expect(findClaudeModel("claude-haiku-5-5[1m]")?.contextWindowMaxTokens).toBe(1_000_000);
+  });
+});
+
+describe("Claude models newer than the curated manifest", () => {
+  it.each([
+    "claude-fable-5-2",
+    "claude-fable-5-2[1m]",
+    "claude-fable-5-2-20261101",
+    "anthropic/claude-fable-5-2",
+    "us.anthropic.claude-fable-5-2-v1:0",
+    "claude-opus-5-6",
+    "claude-sonnet-5-9",
+  ])("does not collapse %s onto an older release of the same family", (modelId) => {
+    expect(normalizeClaudeRuntimeModelId(modelId)).toBeNull();
+    expect(findClaudeModel(modelId)).toBeUndefined();
+  });
+
+  it("keeps the exact id when it is observed at runtime", () => {
+    expect(resolveObservedClaudeModelId("claude-fable-5-2")).toBe("claude-fable-5-2");
+  });
+
+  it("keeps resolving existing aliases and dated major releases", () => {
+    expect(normalizeClaudeRuntimeModelId("claude-fable-5[1m]")).toBe("claude-fable-5");
+    expect(normalizeClaudeRuntimeModelId("claude-fable-5-20260301")).toBe("claude-fable-5");
+    expect(normalizeClaudeRuntimeModelId("us.anthropic.claude-opus-5-20260724-v1:0")).toBe(
+      "claude-opus-5",
+    );
+  });
+
+  it("gives a configured new model the custom thinking options without renaming it", () => {
+    const model = resolveConfiguredClaudeModel({
+      provider: "claude",
+      id: "claude-fable-5-2",
+      label: "Fable 5.2",
+    });
+    expect(model.id).toBe("claude-fable-5-2");
+    expect(model.label).toBe("Fable 5.2");
+    expect(model.thinkingOptions?.map((option) => option.id)).toEqual([
+      "low",
+      "medium",
+      "high",
+      "max",
+    ]);
+  });
+
+  it("lists a release Claude Code advertises before the manifest knows it", async () => {
+    const configDir = await createClaudeConfigDir({});
+    const client = new ClaudeAgentClient({
+      logger: createTestLogger(),
+      resolveVersion: async () => "2.1.293",
+      runtimeSettings: { env: { CLAUDE_CONFIG_DIR: configDir } },
+      discoverModels: async () => [
+        {
+          value: "fable",
+          resolvedModel: "claude-fable-5-2",
+          displayName: "Fable",
+          description: "",
+        },
+        { value: "opus", resolvedModel: "claude-opus-5-5", displayName: "Opus", description: "" },
+        { value: "default", displayName: "Default", description: "" },
+      ],
+    });
+    const { models } = await client.fetchCatalog({
+      scope: "workspace",
+      cwd: configDir,
+      force: true,
+    });
+    const curated = getClaudeModels("2.1.293").filter((model) => model.id !== "claude-mythos-5-1");
+    expect(models.slice(0, curated.length)).toEqual(curated);
+    expect(models.slice(curated.length)).toEqual([
+      {
+        provider: "claude",
+        id: "claude-fable-5-2",
+        label: "Fable 5.2",
+        description: "Fable 5.2 · Reported by Claude Code",
+        thinkingOptions: [
+          { id: "low", label: "Low" },
+          { id: "medium", label: "Medium" },
+          { id: "high", label: "High", isDefault: true },
+          { id: "max", label: "Max" },
+        ],
+        defaultThinkingOptionId: "high",
+      },
+    ]);
   });
 });
 

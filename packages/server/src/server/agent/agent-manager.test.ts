@@ -60,6 +60,7 @@ import type {
 } from "./agent-sdk-types.js";
 import type { ClisbotToolCatalog } from "./tools/types.js";
 import type { ProviderDefinition } from "./provider-registry.js";
+import { validateBeforeRequest } from "../plugins/lifecycle/index.js";
 
 const DESKTOP_OPEN_AGENT_TAB_LABEL = getOpenAgentTabLabel("desktop-client");
 const MOBILE_OPEN_AGENT_TAB_LABEL = getOpenAgentTabLabel("mobile-client");
@@ -8414,6 +8415,33 @@ test("workspace ownership does not turn an ordinary agent into a disposable help
   expect(await storage.get(agentId)).not.toBeNull();
   // Workspace ownership preserves ordinary agent lifecycle hooks.
   expect(beforeHookCalls).toContain("agent.create");
+});
+
+test("keeps Full auto-accept when plugin agent.create hooks parse the config", async () => {
+  const agentId = "00000000-0000-4000-8000-000000000117";
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-test-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  const manager = new AgentManager({
+    clients: { codex: new TestAgentClient() },
+    registry: storage,
+    logger,
+    idFactory: () => agentId,
+    // The plugin runtime parses each before-hook request with the wire schema.
+    pluginLifecycle: {
+      emit: () => {},
+      before: async (name, request) => validateBeforeRequest(name, request),
+    },
+  });
+
+  await manager.createAgent(
+    { provider: "codex", cwd: workdir, modeId: "full-access", fullAutoAccept: true },
+    undefined,
+    { workspaceId: "wks_full_auto_accept" },
+  );
+
+  expect(manager.getAgent(agentId)?.config.fullAutoAccept).toBe(true);
+  await manager.flush();
+  expect((await storage.get(agentId))?.config?.fullAutoAccept).toBe(true);
 });
 
 test("global subscribers receive internal agent events only when they opt in", async () => {

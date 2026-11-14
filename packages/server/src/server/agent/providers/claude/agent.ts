@@ -34,6 +34,7 @@ import {
 } from "./task-notification-tool-call.js";
 import {
   getClaudeContextWindowMaxTokens,
+  appendUncuratedClaudeModels,
   getClaudeModelsWithSettings,
   normalizeClaudeRuntimeModelId,
   resolveConfiguredClaudeModel,
@@ -1680,6 +1681,7 @@ export class ClaudeAgentClient implements AgentClient {
     }
     const env = this.buildProviderEnv();
     let discoveredModelIds = new Set<string>();
+    let advertisedModelIds: string[] = [];
     try {
       const advertisedModels = await runProviderRefreshActivity(context, "models", () =>
         this.discoverModels({
@@ -1689,9 +1691,10 @@ export class ClaudeAgentClient implements AgentClient {
           signal: context?.signal,
         }),
       );
+      advertisedModelIds = advertisedModels.map((model) => model.resolvedModel ?? model.value);
       discoveredModelIds = new Set(
-        advertisedModels
-          .map((model) => normalizeClaudeRuntimeModelId(model.resolvedModel ?? model.value))
+        advertisedModelIds
+          .map((id) => normalizeClaudeRuntimeModelId(id))
           .filter((id): id is string => id !== null),
       );
     } catch (error) {
@@ -1701,7 +1704,7 @@ export class ClaudeAgentClient implements AgentClient {
         "Claude model discovery failed; omitting discovery-required models",
       );
     }
-    const models = await runProviderRefreshActivity(context, "settings", () =>
+    const curatedModels = await runProviderRefreshActivity(context, "settings", () =>
       getClaudeModelsWithSettings(
         this.logger,
         claudeConfigDir(env),
@@ -1709,6 +1712,7 @@ export class ClaudeAgentClient implements AgentClient {
         discoveredModelIds,
       ),
     );
+    const models = appendUncuratedClaudeModels(curatedModels, advertisedModelIds);
     const modeCatalog = claudeModeCatalog(env);
     return {
       models,
