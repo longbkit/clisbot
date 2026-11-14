@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.2.5 - 2026-11-14
+
+### Added
+
+- Added Claude models that Claude Code reports but Clisbot does not list yet to the model list on refresh ([#72](https://github.com/longbkit/clisbot/pull/72))
+
+### Fixed
+
+- Fixed a chat created in Full auto-accept starting in Plan or another mode ([#72](https://github.com/longbkit/clisbot/pull/72))
+- Fixed Full auto-accept not approving requests or surviving a restart when set at creation ([#72](https://github.com/longbkit/clisbot/pull/72))
+- Fixed a new Claude model such as `claude-fable-5-2` showing as an older model like Fable 5 ([#72](https://github.com/longbkit/clisbot/pull/72))
+
 ## 2.2.4 - 2026-11-10
 
 ### Security

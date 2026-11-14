@@ -1,5 +1,17 @@
 # 更新日志
 
+## 2.2.5 - 2026-11-14
+
+### 新增
+
+- 刷新模型列表时，会显示 Claude Code 报告但 Clisbot 尚未收录的 Claude 模型 ([#72](https://github.com/longbkit/clisbot/pull/72))
+
+### 修复
+
+- 修复以完全自动接受模式创建的聊天以 Plan 或其他模式启动的问题 ([#72](https://github.com/longbkit/clisbot/pull/72))
+- 修复创建时设置的完全自动接受模式不自动批准请求、重启后丢失的问题 ([#72](https://github.com/longbkit/clisbot/pull/72))
+- 修复 `claude-fable-5-2` 等新 Claude 模型显示为 Fable 5 等旧模型的问题 ([#72](https://github.com/longbkit/clisbot/pull/72))
+
 ## 2.2.4 - 2026-11-10
 
 ### 安全
