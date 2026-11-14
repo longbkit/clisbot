@@ -1,0 +1,9 @@
+Added
+- Added Claude models that Claude Code reports but Clisbot does not list yet to the model list on refresh
+
+Fixed
+- Fixed a chat created in Full auto-accept starting in Plan or another mode
+- Fixed Full auto-accept not approving requests or surviving a restart when set at creation
+- Fixed a new Claude model such as claude-fable-5-2 showing as an older model like Fable 5
+
+Full notes: https://clisbot.com/changelog
