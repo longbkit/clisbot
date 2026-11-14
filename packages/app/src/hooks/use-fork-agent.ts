@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import type { AgentForkContextOptions, DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { WorkspaceComposerAttachment } from "@/attachments/types";
+import { applyForkModelChoice, type ForkModelChoice } from "@/clisbot/fork-with-model/feature";
 import type { AssistantForkTarget } from "@/components/assistant-fork-menu";
 import type { ToastApi } from "@/components/toast-host";
 import type { AgentScreenAgent } from "@/hooks/use-agent-screen-state-machine";
@@ -54,6 +55,8 @@ export interface ForkAgentRequest {
   workspaceId?: string;
   target: AssistantForkTarget;
   boundary?: ForkAgentBoundary;
+  /** Start the fork on this model instead of the source agent's. */
+  model?: ForkModelChoice;
 }
 
 export interface UseForkAgentInput {
@@ -87,7 +90,10 @@ function buildChatHistoryAttachment(input: {
   };
 }
 
-function buildForkDraftSetup(agent: ForkAgentSource): WorkspaceDraftTabSetup | undefined {
+function buildForkDraftSetup(
+  agent: ForkAgentSource,
+  model: ForkModelChoice | undefined,
+): WorkspaceDraftTabSetup | undefined {
   if (!agent.provider) {
     return undefined;
   }
@@ -97,14 +103,17 @@ function buildForkDraftSetup(agent: ForkAgentSource): WorkspaceDraftTabSetup | u
     featureValues[feature.id] = feature.value;
   }
 
-  return {
-    provider: agent.provider,
-    cwd: agent.cwd,
-    modeId: agent.currentModeId ?? agent.runtimeInfo?.modeId ?? null,
-    model: agent.model ?? agent.runtimeInfo?.model ?? null,
-    thinkingOptionId: agent.thinkingOptionId ?? agent.runtimeInfo?.thinkingOptionId ?? null,
-    featureValues,
-  };
+  return applyForkModelChoice(
+    {
+      provider: agent.provider,
+      cwd: agent.cwd,
+      modeId: agent.currentModeId ?? agent.runtimeInfo?.modeId ?? null,
+      model: agent.model ?? agent.runtimeInfo?.model ?? null,
+      thinkingOptionId: agent.thinkingOptionId ?? agent.runtimeInfo?.thinkingOptionId ?? null,
+      featureValues,
+    },
+    model,
+  );
 }
 
 function buildForkDraftTabTarget(
@@ -129,7 +138,7 @@ export function useForkAgent(
   const client = useSessionStore((state) => state.sessions[serverId]?.client ?? null);
   const supportsAgentForkContext = useHostFeature(serverId, "agentForkContext") && !readOnly;
 
-  return useStableEvent(async ({ agentId, agent, workspaceId, target, boundary }) => {
+  return useStableEvent(async ({ agentId, agent, workspaceId, target, boundary, model }) => {
     try {
       if (!supportsAgentForkContext) {
         toast?.error(t("message.actions.forkUnavailable"));
@@ -138,7 +147,7 @@ export function useForkAgent(
       if (!client) {
         throw new Error(t("workspace.terminal.hostDisconnected"));
       }
-      const draftSetup = buildForkDraftSetup(agent);
+      const draftSetup = buildForkDraftSetup(agent, model);
       const prepareForkDraft = async () => {
         const draftId = generateDraftId();
         const payload = await client.buildAgentForkContext(agentId, boundary);

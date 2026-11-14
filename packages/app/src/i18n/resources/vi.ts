@@ -364,6 +364,7 @@ export const vi: TranslationResources = {
       forkMenu: "Fork cuộc trò chuyện từ đây",
       forkInNewTab: "Fork sang tab mới",
       forkInNewWorkspace: "Fork sang workspace mới",
+      forkWithModel: "Fork với model khác…",
       forkUnavailable: "Hãy cập nhật host để dùng tính năng này.",
       forkMissingWorkspace: "Agent này không thuộc workspace nào.",
       forkFailed: "Fork cuộc trò chuyện thất bại",

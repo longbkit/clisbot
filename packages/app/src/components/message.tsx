@@ -9,7 +9,11 @@ import { ActorResponseRow } from "@/clisbot/session-storage/actor-row";
 import { useMessageSender } from "@/clisbot/session-storage/message-sender";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { getAgentAttachmentPillContent } from "@/attachments/attachment-pill-content";
-import { AssistantForkMenu, type AssistantForkTarget } from "@/components/assistant-fork-menu";
+import {
+  AssistantForkMenu,
+  type AssistantForkHandler,
+  type AssistantForkTarget,
+} from "@/components/assistant-fork-menu";
 import { AttachmentLightbox, type ImageLightboxSource } from "@/components/attachment-lightbox";
 import {
   AttachmentFrame,
@@ -99,7 +103,7 @@ import { PlanCard } from "./plan-card";
 import { ToolCallDetailsContent } from "./tool-call-details";
 import { useToolCallSheet } from "./tool-call-sheet";
 export type { InlinePathTarget } from "@/assistant-file-links";
-export type { AssistantForkTarget };
+export type { AssistantForkHandler, AssistantForkTarget };
 
 interface UserMessageProps {
   sender?: SessionActor;
@@ -692,7 +696,7 @@ interface AssistantTurnFooterProps {
   getContent: () => string;
   completedAt?: Date;
   durationMs?: number | null;
-  onFork?: (target: AssistantForkTarget) => Promise<void> | void;
+  onFork?: AssistantForkHandler;
   metadata?: ReactNode;
   revealed?: boolean;
 }
@@ -783,9 +787,9 @@ export const AssistantTurnFooter = memo(function AssistantTurnFooter({
       revealTimerRef.current = null;
     }, TIMESTAMP_REVEAL_MS);
   }, [canSwap]);
-  const handleFork = useCallback(
-    (target: AssistantForkTarget) => {
-      return onFork?.(target);
+  const handleFork = useCallback<AssistantForkHandler>(
+    (target, model) => {
+      return onFork?.(target, model);
     },
     [onFork],
   );
