@@ -24,6 +24,7 @@ import {
   writeClisbotWorktreeFirstAgentBranchAutoNameMetadata,
 } from "../utils/worktree-metadata.js";
 import type { WorktreeCreationIntent } from "./resolve-worktree-creation-intent.js";
+import { withWorkspaceDirectory } from "../utils/sparse-worktree.js";
 import { resolveFirstAgentPromptTitle } from "./agent/create-agent-title.js";
 import { buildAgentBranchNameSeed } from "./agent/prompt-attachments.js";
 import type { FirstAgentContext } from "@clisbot/protocol/messages";
@@ -75,7 +76,11 @@ async function createClisbotWorktreeWithPriority(
   deps: CreateClisbotWorktreeDeps,
 ): Promise<CreateClisbotWorktreeResult> {
   const workspaceCwdPlan = await planWorkspaceCwdForWorktree(input.cwd, deps.workspaceGitService);
-  const createdWorktree = await createWorktreeCore(input, deps);
+  const sparse = withWorkspaceDirectory(input.sparse, workspaceCwdPlan.relativeWorkspaceCwd);
+  const createdWorktree = await createWorktreeCore(
+    { ...input, ...(sparse ? { sparse } : {}) },
+    deps,
+  );
   try {
     if (!input.branchName?.trim()) maybeMarkFirstAgentBranchAutoNameEligible({ createdWorktree });
     const workspaceCwd = mapWorkspaceRelativeCwdToWorktree({
