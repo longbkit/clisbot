@@ -1464,3 +1464,163 @@ it("a Project grant never delegates the daemon's saved-host credentials", async 
   ] as const)
     expect(await authorizer.allowsInbound(message)).toBe(false);
 });
+
+describe("CB-01: agent configuration on every create path, and unknown types fail closed", () => {
+  const FULL_APPROVALS = [
+    "approval.file",
+    "approval.config",
+    "approval.command",
+    "approval.command.destructive",
+    "approval.channel",
+    "approval.other",
+  ] as const satisfies readonly ProjectPrivilege[];
+  const granted = {
+    provider: "codex",
+    cwd: "/work/a",
+    model: "gpt-5.6",
+    thinkingOptionId: "high",
+  } as const;
+
+  function agentCreate(
+    config: Record<string, unknown>,
+    placement: { workspaceId?: string; projectId?: string } = {},
+  ) {
+    return {
+      type: "agent.create.request" as const,
+      requestId: "agent-create",
+      config: config as typeof granted,
+      labels: {},
+      ...placement,
+    };
+  }
+
+  function workspaceCreate(agent: Record<string, unknown> | undefined) {
+    return {
+      type: "workspace.create.request" as const,
+      requestId: "workspace-create",
+      source: { kind: "directory" as const, projectId: "project-a", path: "/work/a" },
+      ...(agent
+        ? {
+            agent: { labels: {}, ...agent } as {
+              labels: Record<string, string>;
+              config: typeof granted;
+            },
+          }
+        : {}),
+    };
+  }
+
+  it("denies agent.create.request without a workspace or project to a member with no permissions", async () => {
+    const none = createHarness([]);
+    await expect(none.allowsInbound(agentCreate(granted))).resolves.toBe(false);
+    await expect(none.allowsInbound(agentCreate({ ...granted, cwd: "/etc" }))).resolves.toBe(false);
+    // Even with agent.create, a cwd outside every granted Project is refused.
+    const creator = createHarness(["project.use", "agent.create"]);
+    await expect(creator.allowsInbound(agentCreate({ ...granted, cwd: "/etc" }))).resolves.toBe(
+      false,
+    );
+    await expect(creator.allowsInbound(agentCreate(granted))).resolves.toBe(true);
+  });
+
+  it("checks provider and unattended mode on agent.create.request with a workspaceId", async () => {
+    const creator = createHarness(["project.use", "agent.create"]);
+    const inWorkspace = { workspaceId: "workspace-a" };
+    await expect(creator.allowsInbound(agentCreate(granted, inWorkspace))).resolves.toBe(true);
+    await expect(
+      creator.allowsInbound(agentCreate({ ...granted, provider: "claude" }, inWorkspace)),
+    ).resolves.toBe(false);
+    await expect(
+      creator.allowsInbound(agentCreate({ ...granted, modeId: "full-access" }, inWorkspace)),
+    ).resolves.toBe(false);
+    await expect(
+      creator.allowsInbound(agentCreate({ ...granted, cwd: "/work/b" }, inWorkspace)),
+    ).resolves.toBe(false);
+    await expect(
+      createHarness(["project.use", "agent.create", ...FULL_APPROVALS]).allowsInbound(
+        agentCreate({ ...granted, modeId: "full-access" }, inWorkspace),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it("checks the initial agent of workspace.create.request against the grant", async () => {
+    const creator = createHarness(["project.use", "workspace.create", "agent.create"]);
+    await expect(creator.allowsInbound(workspaceCreate(undefined))).resolves.toBe(true);
+    await expect(creator.allowsInbound(workspaceCreate({ config: granted }))).resolves.toBe(true);
+    for (const config of [
+      { ...granted, provider: "claude" },
+      { ...granted, model: "gpt-unknown" },
+      { ...granted, modeId: "full-access" },
+      { ...granted, cwd: "/work/b" },
+      { ...granted, cwd: "/etc" },
+    ]) {
+      await expect(creator.allowsInbound(workspaceCreate({ config }))).resolves.toBe(false);
+    }
+    await expect(
+      creator.allowsInbound(workspaceCreate({ config: granted, projectId: "project-b" })),
+    ).resolves.toBe(false);
+    // Creating the workspace alone does not grant creating its agent.
+    await expect(
+      createHarness(["project.use", "workspace.create"]).allowsInbound(
+        workspaceCreate({ config: granted }),
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it("checks sessionMode on send_agent_message_request like a mode change", async () => {
+    const send = (sessionMode?: string) => ({
+      type: "send_agent_message_request" as const,
+      requestId: "send",
+      agentId: "agent-a",
+      text: "hello",
+      ...(sessionMode === undefined ? {} : { sessionMode }),
+    });
+    const member = createHarness(["project.use", "agent.interact"]);
+    await expect(member.allowsInbound(send())).resolves.toBe(true);
+    await expect(member.allowsInbound(send("auto"))).resolves.toBe(true);
+    await expect(member.allowsInbound(send("full-access"))).resolves.toBe(false);
+    await expect(member.allowsInbound(send("full-auto-accept"))).resolves.toBe(false);
+    await expect(
+      createHarness(["project.use", "agent.interact", ...FULL_APPROVALS]).allowsInbound(
+        send("full-access"),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it("denies message types that are not explicitly allowed for a Project-scoped session", async () => {
+    const member = createHarness(["project.use", "agent.create", "agent.interact"]);
+    for (const message of [
+      { type: "shutdown_server_request", requestId: "shutdown" },
+      { type: "restart_server_request", requestId: "restart" },
+      { type: "plugin.list.request", requestId: "plugins" },
+      { type: "daemon.update.request", requestId: "update" },
+    ] as const) {
+      await expect(member.allowsInbound(message)).resolves.toBe(false);
+    }
+    await expect(
+      member.allowsInbound({
+        type: "hub.execution.agent.create.request",
+        requestId: "hub-create",
+        executionId: "execution",
+        provider: "claude",
+        cwd: "/work/a",
+        prompt: "hi",
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("leaves an unrestricted (owner/admin) session unchanged", async () => {
+    const owner = new ManagedResourceAuthorizer(
+      new SessionAuthorization([]),
+      {} as ProjectRegistry,
+      {} as WorkspaceRegistry,
+      {} as AgentManager,
+      {} as ConstructorParameters<typeof ManagedResourceAuthorizer>[4],
+      null,
+      { isUnattendedConfiguration: async () => true },
+    );
+    await expect(owner.allowsInbound(agentCreate({ ...granted, cwd: "/etc" }))).resolves.toBe(true);
+    await expect(
+      owner.allowsInbound({ type: "shutdown_server_request", requestId: "shutdown" }),
+    ).resolves.toBe(true);
+  });
+});
