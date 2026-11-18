@@ -2155,7 +2155,8 @@ export async function createClisbotDaemon(
               {
                 getAllowedOrigins: () => allowedOrigins,
                 encryptedDirectKey: config.devicePairingEnabled ? daemonKeyPair.keyPair : undefined,
-                shouldHandleUpgrade: (request) => !hubHttpProxy.handlesUpgrade(request),
+                shouldHandleUpgrade: (request) =>
+                  !hubHttpProxy.handlesUpgrade(request) && !serviceProxy.handlesUpgrade(request),
                 getHostnames: () => configuredHostnames,
                 daemonStatusRpc: dependencies.serverFeatureOverrides?.daemonStatusRpc,
                 relayConfig: dependencies.serverFeatureOverrides?.relayConfig,

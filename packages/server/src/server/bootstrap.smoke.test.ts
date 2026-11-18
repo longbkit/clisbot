@@ -748,6 +748,83 @@ describe("clisbot daemon bootstrap", () => {
     }
   });
 
+  test("daemon websocket rejects *.localhost service-proxy origins on a password-less daemon (CB-02)", async () => {
+    const upstream = http.createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.end("service-ok");
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+    const address = upstream.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Expected upstream TCP address");
+    }
+    const daemonHandle = await createTestClisbotDaemon();
+    const port = daemonHandle.port;
+    const daemonWsUrl = `ws://127.0.0.1:${port}/ws`;
+    try {
+      const route = daemonHandle.daemon.serviceProxy.registerWorkspaceService({
+        workspaceId: "workspace-cb02",
+        projectSlug: "miniweb",
+        branchName: null,
+        scriptName: "dev",
+        port: address.port,
+      });
+      const serviceHost = `${route.hostname}:${port}`;
+
+      // Loopback aliases of the daemon itself stay same-origin.
+      await expect(
+        probeWebSocketConnection(daemonWsUrl, {
+          host: `localhost:${port}`,
+          origin: `http://localhost:${port}`,
+        }),
+      ).resolves.toEqual({ status: "connected" });
+      await expect(
+        probeWebSocketConnection(daemonWsUrl, {
+          host: `localhost:${port}`,
+          origin: `http://[::1]:${port}`,
+        }),
+      ).resolves.toEqual({ status: "connected" });
+
+      // A page served by the service proxy cannot drive the daemon socket.
+      await expect(
+        probeWebSocketConnection(daemonWsUrl, {
+          host: `localhost:${port}`,
+          origin: `http://${serviceHost}`,
+        }),
+      ).resolves.toEqual({ status: "rejected", statusCode: 403 });
+      await expect(
+        probeWebSocketConnection(daemonWsUrl, {
+          host: `localhost:${port}`,
+          origin: `http://foo.localhost:${port}`,
+        }),
+      ).resolves.toEqual({ status: "rejected", statusCode: 403 });
+      // Unregistered service names fall through to the daemon upgrade handler.
+      await expect(
+        probeWebSocketConnection(daemonWsUrl, {
+          host: `missing--miniweb.localhost:${port}`,
+          origin: `http://missing--miniweb.localhost:${port}`,
+        }),
+      ).resolves.toEqual({ status: "rejected", statusCode: 403 });
+      // Registered service hosts belong to the proxy, never to the daemon /ws.
+      await expect(
+        probeWebSocketConnection(daemonWsUrl, {
+          host: serviceHost,
+          origin: `http://${serviceHost}`,
+        }),
+      ).resolves.not.toEqual({ status: "connected" });
+      // Foreign origins are still refused at the handshake.
+      await expect(
+        probeWebSocketConnection(daemonWsUrl, {
+          host: `localhost:${port}`,
+          origin: "http://evil.example",
+        }),
+      ).resolves.toEqual({ status: "rejected", statusCode: 403 });
+    } finally {
+      await daemonHandle.close();
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
+  });
+
   test("relay config changes during Hub enrollment reach the live runtime", async () => {
     const clisbotHomeRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-relay-startup-"));
     const clisbotHome = path.join(clisbotHomeRoot, ".clisbot");
