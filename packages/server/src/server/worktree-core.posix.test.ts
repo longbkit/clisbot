@@ -56,6 +56,7 @@ function createGitHubServiceStub(): ForgeService {
       headRepositorySshUrl: null,
       headRepositoryUrl: null,
       isCrossRepository: false,
+      sourceTrust: "trusted",
     }),
     defaultCheckoutRefs: ({ changeRequestNumber }) => [
       { remoteName: "origin", remoteRef: `refs/pull/${changeRequestNumber}/head` },
@@ -484,6 +485,7 @@ describe.skipIf(isPlatform("win32"))("worktree-core POSIX-only", () => {
         baseRefName: "main",
         checkoutRefs: [{ remoteName: "origin", remoteRef: "refs/pull/123/head" }],
         trackOriginHead: true,
+        sourceTrusted: true,
       });
       expect(result.worktree.branchName).toBe("feature/review-pr");
     });
@@ -608,6 +610,7 @@ describe.skipIf(isPlatform("win32"))("worktree-core POSIX-only", () => {
         baseRefName: "main",
         checkoutRefs: [{ remoteName: "origin", remoteRef: "refs/pull/123/head" }],
         trackOriginHead: true,
+        sourceTrusted: true,
       });
       expect(result.worktree.branchName).toBe("pr-123");
     });
@@ -675,6 +678,7 @@ describe.skipIf(isPlatform("win32"))("worktree-core POSIX-only", () => {
           headRepositorySshUrl: null,
           headRepositoryUrl: null,
           isCrossRepository: false,
+          sourceTrust: "trusted",
         }),
       };
 
@@ -702,6 +706,7 @@ describe.skipIf(isPlatform("win32"))("worktree-core POSIX-only", () => {
         baseRefName: "main",
         checkoutRefs: [{ remoteName: "origin", remoteRef: "refs/heads/feature/gitlab-mr" }],
         trackOriginHead: true,
+        sourceTrusted: true,
       });
       expect(branch).toBe("feature/gitlab-mr");
       expect(readFileSync(path.join(result.worktree.worktreePath, "README.md"), "utf8")).toBe(
@@ -1221,6 +1226,7 @@ describe.skipIf(isPlatform("win32"))("worktree-core POSIX-only", () => {
         checkoutRefs: [{ remoteName: "origin", remoteRef: "refs/pull/526/head" }],
         localBranchName: "therainisme/main",
         pushRemoteUrl: headRemoteDir,
+        untrustedSourceLabel: "therainisme/therainisme",
       });
       expect(result.worktree.branchName).toBe("therainisme/main");
       expect(path.basename(result.worktree.worktreePath)).toBe("therainisme-main");
@@ -1474,6 +1480,7 @@ describe.skipIf(isPlatform("win32"))("worktree-core POSIX-only", () => {
           headRepositorySshUrl: null,
           headRepositoryUrl: null,
           isCrossRepository: false,
+          sourceTrust: "trusted",
         }),
         getPullRequestHeadRef: async ({ cwd, number }) => {
           headRefLookups.push({ cwd, number });
@@ -1500,6 +1507,7 @@ describe.skipIf(isPlatform("win32"))("worktree-core POSIX-only", () => {
         baseRefName: "main",
         checkoutRefs: [{ remoteName: "origin", remoteRef: "refs/pull/123/head" }],
         trackOriginHead: true,
+        sourceTrusted: true,
       });
       expect(result.worktree.branchName).toBe("feature/from-service");
     });

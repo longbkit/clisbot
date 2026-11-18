@@ -2284,7 +2284,7 @@ describe("createGiteaService", () => {
   it("maps a same-repo pull request to a checkout target", async () => {
     const { service } = makeService((args) =>
       args[0] === "api"
-        ? ok(JSON.stringify({ head: { repo: { id: 1 } }, base: { repo: { id: 1 } } }))
+        ? ok(JSON.stringify({ flow: 0, head: { repo: { id: 1 } }, base: { repo: { id: 1 } } }))
         : ok(JSON.stringify(STATUS_PR_VIEW)),
     );
 
@@ -2304,6 +2304,8 @@ describe("createGiteaService", () => {
       headRepositoryUrl: null,
       isCrossRepository: false,
       headRefKind: "branch",
+      sourceTrust: "trusted",
+      authorLogin: null,
     });
   });
 
@@ -2341,9 +2343,109 @@ describe("createGiteaService", () => {
       headRepositoryUrl: "https://gitea.com/contributor/sample-repo",
       isCrossRepository: true,
       headRefKind: "branch",
+      sourceTrust: "untrusted",
+      authorLogin: null,
     });
 
     expect(calls).toContainEqual(["api", "repos/example-user/sample-repo/pulls/5"]);
+  });
+
+  it("does not trust an AGit pull request whose author only has read access (CB-03)", async () => {
+    const { service, calls } = makeService((args) => {
+      if (args[0] !== "api") return ok(JSON.stringify(STATUS_PR_VIEW));
+      if (args[1]?.endsWith("/permission")) return ok(JSON.stringify({ permission: "read" }));
+      return ok(
+        JSON.stringify({
+          flow: 1,
+          user: { login: "outsider" },
+          head: { ref: "refs/pull/5/head", repo: { id: 1 } },
+          base: { repo: { id: 1 } },
+        }),
+      );
+    });
+
+    const target = await service.getPullRequestCheckoutTarget({ cwd: "/repo", number: 5 });
+
+    expect(target).toMatchObject({
+      isCrossRepository: false,
+      sourceTrust: "untrusted",
+      authorLogin: "outsider",
+    });
+    expect(calls).toContainEqual([
+      "api",
+      "repos/example-user/sample-repo/collaborators/outsider/permission",
+    ]);
+  });
+
+  it("trusts an AGit pull request whose author has write access", async () => {
+    const { service } = makeService((args) => {
+      if (args[0] !== "api") return ok(JSON.stringify(STATUS_PR_VIEW));
+      if (args[1]?.endsWith("/permission")) return ok(JSON.stringify({ permission: "write" }));
+      return ok(
+        JSON.stringify({
+          flow: 1,
+          user: { login: "maintainer" },
+          head: { ref: "refs/pull/5/head", repo: { id: 1 } },
+          base: { repo: { id: 1 } },
+        }),
+      );
+    });
+
+    const target = await service.getPullRequestCheckoutTarget({ cwd: "/repo", number: 5 });
+
+    expect(target).toMatchObject({ sourceTrust: "trusted", authorLogin: "maintainer" });
+  });
+
+  it("fails closed when the AGit author permission cannot be read", async () => {
+    const { service } = makeService((args) => {
+      if (args[0] !== "api") return ok(JSON.stringify(STATUS_PR_VIEW));
+      if (args[1]?.endsWith("/permission")) {
+        throw new TeaCommandError({ args, cwd: "/repo", exitCode: 1, stderr: "403 Forbidden" });
+      }
+      return ok(
+        JSON.stringify({
+          flow: 1,
+          user: { login: "outsider" },
+          head: { ref: "refs/pull/5/head", repo: { id: 1 } },
+          base: { repo: { id: 1 } },
+        }),
+      );
+    });
+
+    const target = await service.getPullRequestCheckoutTarget({ cwd: "/repo", number: 5 });
+
+    expect(target.sourceTrust).toBe("untrusted");
+  });
+
+  it("checks the author permission when the server does not report the PR flow", async () => {
+    const { service, calls } = makeService((args) => {
+      if (args[0] !== "api") return ok(JSON.stringify(STATUS_PR_VIEW));
+      if (args[1]?.endsWith("/permission")) return ok(JSON.stringify({ permission: "none" }));
+      return ok(
+        JSON.stringify({
+          user: { login: "outsider" },
+          head: { repo: { id: 1 } },
+          base: { repo: { id: 1 } },
+        }),
+      );
+    });
+
+    const target = await service.getPullRequestCheckoutTarget({ cwd: "/repo", number: 5 });
+
+    expect(target.sourceTrust).toBe("untrusted");
+    expect(calls.some((args) => args[1]?.endsWith("/permission"))).toBe(true);
+  });
+
+  it("does not trust a pull request when the base repository is missing", async () => {
+    const { service } = makeService((args) =>
+      args[0] === "api"
+        ? ok(JSON.stringify({ flow: 0, head: { repo: { id: 1 } } }))
+        : ok(JSON.stringify(STATUS_PR_VIEW)),
+    );
+
+    const target = await service.getPullRequestCheckoutTarget({ cwd: "/repo", number: 5 });
+
+    expect(target).toMatchObject({ isCrossRepository: false, sourceTrust: "untrusted" });
   });
 
   it("skips the origin branch fallback and tracking for an AGit pull request", async () => {

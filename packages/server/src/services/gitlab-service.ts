@@ -1187,6 +1187,12 @@ export function createGitLabService(options: CreateGitLabServiceOptions = {}): F
       input: GetPullRequestOptions,
     ): Promise<PullRequestCheckoutTarget> {
       const mr = await viewMergeRequest(input.cwd, String(input.number));
+      // A same-project MR needs a branch pushed to the target project (Developer role or above).
+      // When either project id is missing the origin is unknown, so it stays untrusted.
+      const sameProject =
+        typeof mr.source_project_id === "number" &&
+        typeof mr.target_project_id === "number" &&
+        mr.source_project_id === mr.target_project_id;
       return {
         number: mr.iid,
         baseRefName: mr.target_branch,
@@ -1205,6 +1211,7 @@ export function createGitLabService(options: CreateGitLabServiceOptions = {}): F
           mr.target_project_id !== null &&
           mr.source_project_id !== mr.target_project_id,
         headRefKind: "branch",
+        sourceTrust: sameProject ? "trusted" : "untrusted",
       };
     },
 

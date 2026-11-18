@@ -478,8 +478,19 @@ describe("createGitLabService", () => {
       headRepositoryUrl: null,
       isCrossRepository: false,
       headRefKind: "branch",
+      sourceTrust: "trusted",
     });
     expect(calls[0]).toEqual(["mr", "view", "14", "-F", "json"]);
+  });
+
+  it("does not trust a merge request whose project ids are missing", async () => {
+    const { service } = makeService(() =>
+      ok(JSON.stringify({ ...OPEN_MR, source_project_id: null, target_project_id: undefined })),
+    );
+
+    await expect(
+      service.getPullRequestCheckoutTarget?.({ cwd: "/repo", number: 14 }),
+    ).resolves.toMatchObject({ isCrossRepository: false, sourceTrust: "untrusted" });
   });
 
   it("marks fork merge request checkout targets as cross-repository", async () => {
@@ -502,6 +513,7 @@ describe("createGitLabService", () => {
       headOwnerLogin: null,
       headRepositorySshUrl: null,
       headRepositoryUrl: null,
+      sourceTrust: "untrusted",
     });
   });
 

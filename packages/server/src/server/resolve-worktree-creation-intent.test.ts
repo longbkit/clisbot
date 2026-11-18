@@ -68,6 +68,7 @@ function createResolverHarness(overrides?: {
       headRepositorySshUrl: null,
       headRepositoryUrl: null,
       isCrossRepository: false,
+      sourceTrust: "trusted",
     }),
     getCurrentPullRequestStatus: async () => null,
     createPullRequest: async () => ({
@@ -147,6 +148,7 @@ describe("resolveWorktreeCreationIntent", () => {
       baseRefName: "main",
       checkoutRefs: [{ remoteName: "origin", remoteRef: "refs/pull/42/head" }],
       trackOriginHead: true,
+      sourceTrusted: true,
     });
     expect(deps.headRefLookups).toEqual([]);
   });
@@ -161,6 +163,7 @@ describe("resolveWorktreeCreationIntent", () => {
       headRepositorySshUrl: "git@github.com:longbkit/clisbot.git",
       headRepositoryUrl: "https://github.com/longbkit/clisbot",
       isCrossRepository: false,
+      sourceTrust: "trusted",
     });
 
     await expect(
@@ -173,8 +176,79 @@ describe("resolveWorktreeCreationIntent", () => {
       baseRefName: "main",
       checkoutRefs: [{ remoteName: "origin", remoteRef: "refs/pull/1790/head" }],
       trackOriginHead: true,
+      sourceTrusted: true,
     });
     expect(deps.headRefLookups).toEqual([]);
+  });
+
+  test("does not trust a same-repo target the forge did not confirm (CB-03)", async () => {
+    const deps = createResolverHarness();
+    deps.forgeService.getPullRequestCheckoutTarget = async () => ({
+      number: 5,
+      baseRefName: "main",
+      headRefName: "topic",
+      headOwnerLogin: null,
+      headRepositorySshUrl: null,
+      headRepositoryUrl: null,
+      isCrossRepository: false,
+    });
+
+    const intent = await resolveWorktreeCreationIntent(
+      { action: "checkout", githubPrNumber: 5 },
+      repoRoot,
+      deps,
+    );
+
+    expect(intent).not.toHaveProperty("sourceTrusted");
+    expect(intent).toMatchObject({ untrustedSourceLabel: "an unverified source" });
+  });
+
+  test("labels an untrusted same-repo AGit target by its author", async () => {
+    const deps = createResolverHarness({ forge: "gitea" });
+    deps.forgeService.getPullRequestCheckoutTarget = async () => ({
+      number: 5,
+      baseRefName: "main",
+      headRefName: "refs/pull/5/head",
+      headOwnerLogin: null,
+      headRepositorySshUrl: null,
+      headRepositoryUrl: null,
+      isCrossRepository: false,
+      headRefKind: "pull-ref",
+      sourceTrust: "untrusted",
+      authorLogin: "attacker",
+    });
+
+    const intent = await resolveWorktreeCreationIntent(
+      { action: "checkout", checkoutSource: { kind: "change_request", number: 5 } },
+      repoRoot,
+      deps,
+    );
+
+    expect(intent).not.toHaveProperty("sourceTrusted");
+    expect(intent).toMatchObject({ untrustedSourceLabel: "@attacker" });
+  });
+
+  test("never trusts a cross-repository target even if the adapter says trusted", async () => {
+    const deps = createResolverHarness();
+    deps.forgeService.getPullRequestCheckoutTarget = async () => ({
+      number: 526,
+      baseRefName: "main",
+      headRefName: "main",
+      headOwnerLogin: "contributor",
+      headRepositorySshUrl: null,
+      headRepositoryUrl: "https://github.com/contributor/clisbot",
+      isCrossRepository: true,
+      sourceTrust: "trusted",
+    });
+
+    const intent = await resolveWorktreeCreationIntent(
+      { action: "checkout", githubPrNumber: 526 },
+      repoRoot,
+      deps,
+    );
+
+    expect(intent).not.toHaveProperty("sourceTrusted");
+    expect(intent).toMatchObject({ untrustedSourceLabel: "contributor/clisbot" });
   });
 
   test("does not track origin for a same-repo head with no origin branch", async () => {
@@ -224,6 +298,7 @@ describe("resolveWorktreeCreationIntent", () => {
       headRepository: "therainisme/clisbot",
       localBranchName: "therainisme/main",
       pushRemoteUrl: "git@github.com:therainisme/clisbot.git",
+      untrustedSourceLabel: "therainisme/clisbot",
     });
     expect(deps.headRefLookups).toEqual([]);
   });
@@ -268,6 +343,7 @@ describe("resolveWorktreeCreationIntent", () => {
       baseRefName: "main",
       checkoutRefs: [{ remoteName: "origin", remoteRef: "refs/pull/42/head" }],
       trackOriginHead: true,
+      sourceTrusted: true,
     });
     expect(deps.headRefLookups).toEqual([]);
   });
@@ -284,6 +360,7 @@ describe("resolveWorktreeCreationIntent", () => {
           headRepositorySshUrl: null,
           headRepositoryUrl: null,
           isCrossRepository: false,
+          sourceTrust: "trusted",
         }),
       },
     });
@@ -298,6 +375,7 @@ describe("resolveWorktreeCreationIntent", () => {
       baseRefName: "main",
       checkoutRefs: [{ remoteName: "origin", remoteRef: "refs/heads/feature/mr-source" }],
       trackOriginHead: true,
+      sourceTrusted: true,
     });
     expect(deps.headRefLookups).toEqual([]);
   });
@@ -329,6 +407,7 @@ describe("resolveWorktreeCreationIntent", () => {
       headRepository: "unknown repository",
       baseRefName: "main",
       checkoutRefs: [{ remoteName: "origin", remoteRef: "refs/merge-requests/7/head" }],
+      untrustedSourceLabel: "unknown repository",
     });
     expect(deps.headRefLookups).toEqual([]);
   });
