@@ -9,15 +9,23 @@ describe("system-browser Google handoff", () => {
   it("keeps authentication material out of URL queries and fixes the trusted auth origin", () => {
     const input = {
       clientId: "123.apps.googleusercontent.com",
-      nonce: "n".repeat(43),
       transactionId: "t".repeat(32),
+      hubId: "hub-one",
+      hubKey: "aHViLW9uZS1lMmVlLXB1YmxpYy1rZXktZml4dHVyZTA=",
     };
     const url = new URL(
       googleSignInUrl(input, "http://127.0.0.1:9000/hub-google/callback/" + "x".repeat(43)),
     );
     expect(url.origin).toBe("https://app.clisbot.com");
     expect(url.search).toBe("");
-    expect(new URLSearchParams(url.hash.slice(1)).get("nonce")).toBe(input.nonce);
+    const fragment = new URLSearchParams(url.hash.slice(1));
+    expect(fragment.get("hubId")).toBe(input.hubId);
+    expect(fragment.get("hubKey")).toBe(input.hubKey);
+    // CB-04: the page derives the nonce from the pinned Hub identity; none is forwarded.
+    expect(fragment.has("nonce")).toBe(false);
+    expect(GoogleSignInInputSchema.safeParse({ ...input, nonce: "n".repeat(43) }).success).toBe(
+      false,
+    );
     expect(
       GoogleSignInInputSchema.safeParse({
         ...input,

@@ -107,7 +107,7 @@ contextBridge.exposeInMainWorld("clisbotDesktop", {
     }) => ipcRenderer.invoke("clisbot:hub:request", input),
   },
   google: {
-    signIn: (input: { clientId: string; nonce: string; transactionId: string }) =>
+    signIn: (input: { clientId: string; transactionId: string; hubId: string; hubKey: string }) =>
       ipcRenderer.invoke("clisbot:google:sign-in", input),
   },
   deviceSecrets: {
