@@ -4114,15 +4114,31 @@ function defaultPortForOriginProtocol(protocol: string): string | null {
   return null;
 }
 
+/**
+ * Loopback names that address the daemon itself: exactly `localhost`, IPv4
+ * `127.0.0.0/8`, and IPv6 `::1`.
+ *
+ * `<label>.localhost` is deliberately NOT an alias. Browsers resolve every
+ * `*.localhost` name to loopback, and the workspace service proxy serves
+ * arbitrary dev-server code on `<script>--<project>.localhost:<daemonPort>`.
+ * Treating those origins as the daemon's own would let any page a workspace
+ * script serves open `ws://localhost:<daemonPort>/ws` and drive the daemon
+ * (CB-02).
+ */
 function isLoopbackAlias(hostname: string): boolean {
   const normalized = stripIpv6Brackets(hostname).toLowerCase();
-  if (normalized === "localhost" || normalized.endsWith(".localhost")) {
+  if (normalized === "localhost") {
     return true;
   }
   if (normalized === "::1" || normalized === "0:0:0:0:0:0:0:1") {
     return true;
   }
   return /^127(?:\.\d{1,3}){3}$/.test(normalized);
+}
+
+function isLocalhostSubdomain(hostname: string): boolean {
+  const normalized = stripIpv6Brackets(hostname).toLowerCase().replace(/\.$/u, "");
+  return normalized.endsWith(".localhost");
 }
 
 export function isWebSocketSameOrigin(
@@ -4133,15 +4149,24 @@ export function isWebSocketSameOrigin(
     return false;
   }
 
-  if (origin === `http://${requestHost}` || origin === `https://${requestHost}`) {
-    return true;
-  }
-
   let originUrl: URL;
   try {
     originUrl = new URL(origin);
   } catch {
     return false;
+  }
+
+  // `*.localhost` origins are service-proxy territory (see isLoopbackAlias).
+  // They are never implicitly same-origin with the daemon, not even when the
+  // Host header repeats them: a proxied page can target its own hostname, and
+  // unregistered `*.localhost` hosts fall through to the daemon. Operators who
+  // really serve the daemon UI on such a name must list it in cors.allowedOrigins.
+  if (isLocalhostSubdomain(originUrl.hostname)) {
+    return false;
+  }
+
+  if (origin === `http://${requestHost}` || origin === `https://${requestHost}`) {
+    return true;
   }
   const originPort = originUrl.port || defaultPortForOriginProtocol(originUrl.protocol);
   if (!originPort) {

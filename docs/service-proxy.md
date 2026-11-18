@@ -26,6 +26,8 @@ dev--feature-auth--miniweb.localhost
 
 Local and public routes use one combined leftmost label (`script--branch--project`). This keeps the hostname compatible with normal single-level wildcard DNS and TLS. If the combined label would exceed DNS's 63-character label limit, Clisbot truncates it with a deterministic hash suffix to avoid collisions.
 
+Service pages share the daemon's port but are never same-origin with the daemon. The daemon's `/ws` handshake treats only `localhost`, `127.0.0.0/8`, and `::1` as loopback aliases of itself, so a `<label>.localhost` origin gets `403` unless it is listed in `daemon.cors.allowedOrigins`. WebSocket upgrades to a registered service hostname always go to the service, never to the daemon's `/ws`. See `isWebSocketSameOrigin` in `packages/server/src/server/websocket-server.ts`.
+
 ## Managing workspace scripts
 
 Configured `clisbot.json` scripts can be managed without addressing their backing terminal directly:
