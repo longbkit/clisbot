@@ -23,7 +23,11 @@ import {
   readClisbotWorktreeMetadata,
   writeClisbotWorktreeFirstAgentBranchAutoNameMetadata,
 } from "../utils/worktree-metadata.js";
-import type { WorktreeCreationIntent } from "./resolve-worktree-creation-intent.js";
+import {
+  UNVERIFIED_SOURCE_LABEL,
+  type WorktreeCreationIntent,
+} from "./resolve-worktree-creation-intent.js";
+import type { UntrustedWorkspaceSource } from "./workspace-automation-gate.js";
 import { resolveFirstAgentPromptTitle } from "./agent/create-agent-title.js";
 import { buildAgentBranchNameSeed } from "./agent/prompt-attachments.js";
 import type { FirstAgentContext } from "@clisbot/protocol/messages";
@@ -105,17 +109,7 @@ async function createClisbotWorktreeWithPriority(
       expectsInitialAgent: Boolean(input.firstAgentContext),
       background: input.background,
       callerWorkspaceId: input.callerWorkspaceId,
-      ...(createdWorktree.intent.kind === "checkout-change-request" &&
-      createdWorktree.intent.headRepository
-        ? {
-            untrustedSource: {
-              kind: "change_request" as const,
-              forge: createdWorktree.intent.forge,
-              number: createdWorktree.intent.changeRequestNumber,
-              headRepository: createdWorktree.intent.headRepository,
-            },
-          }
-        : {}),
+      ...resolveUntrustedSource(createdWorktree.intent),
     });
 
     deps.github.invalidate({ cwd: createdWorktree.worktree.worktreePath });
@@ -141,6 +135,40 @@ async function createClisbotWorktreeWithPriority(
       },
       error,
     );
+  }
+}
+
+/**
+ * Every change-request checkout is untrusted unless the forge confirmed its head comes from a
+ * writer of the base repository. Untrusted workspaces keep repository automation (clisbot.json
+ * setup, automatic terminals) blocked until the user runs setup explicitly.
+ */
+function resolveUntrustedSource(intent: WorktreeCreationIntent): {
+  untrustedSource?: UntrustedWorkspaceSource;
+} {
+  switch (intent.kind) {
+    case "checkout-change-request":
+      if (intent.sourceTrusted === true) return {};
+      return {
+        untrustedSource: {
+          kind: "change_request",
+          forge: intent.forge,
+          number: intent.changeRequestNumber,
+          headRepository:
+            intent.headRepository ?? intent.untrustedSourceLabel ?? UNVERIFIED_SOURCE_LABEL,
+        },
+      };
+    case "checkout-github-pr":
+      return {
+        untrustedSource: {
+          kind: "change_request",
+          forge: "github",
+          number: intent.githubPrNumber,
+          headRepository: intent.headRepositoryOwner ?? UNVERIFIED_SOURCE_LABEL,
+        },
+      };
+    default:
+      return {};
   }
 }
 

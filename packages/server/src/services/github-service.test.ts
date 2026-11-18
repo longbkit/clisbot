@@ -408,7 +408,7 @@ function pullRequestJson(title: string): string {
   ]);
 }
 
-function pullRequestCheckoutTargetJson(): string {
+function pullRequestCheckoutTargetJson(overrides: Record<string, unknown> = {}): string {
   return JSON.stringify({
     data: {
       repository: {
@@ -422,6 +422,7 @@ function pullRequestCheckoutTargetJson(): string {
             sshUrl: "git@github.com:therainisme/clisbot.git",
             url: "https://github.com/therainisme/clisbot",
           },
+          ...overrides,
         },
       },
     },
@@ -798,6 +799,7 @@ describe("ForgeService", () => {
       headRepositoryUrl: "https://github.com/therainisme/clisbot",
       isCrossRepository: true,
       headRefKind: "branch",
+      sourceTrust: "untrusted",
     });
 
     expect(runner.calls).toHaveLength(2);
@@ -810,6 +812,38 @@ describe("ForgeService", () => {
     expect(runner.calls[1]?.args).toContain("owner=getpaseo");
     expect(runner.calls[1]?.args).toContain("name=clisbot");
     expect(runner.calls[1]?.args).toContain("number=526");
+  });
+
+  it("trusts a same-repository pull request only when GitHub says so explicitly", async () => {
+    const runner = createRunner([
+      repoViewJson(),
+      pullRequestCheckoutTargetJson({ isCrossRepository: false }),
+    ]);
+    const service = createGitHubService({
+      runner: runner.runner,
+      resolveGhPath: async () => "/usr/bin/gh",
+      now: () => 100,
+    });
+
+    await expect(
+      service.getPullRequestCheckoutTarget?.({ cwd: "/repo", number: 526 }),
+    ).resolves.toMatchObject({ isCrossRepository: false, sourceTrust: "trusted" });
+  });
+
+  it("does not trust a pull request when GitHub omits isCrossRepository", async () => {
+    const runner = createRunner([
+      repoViewJson(),
+      pullRequestCheckoutTargetJson({ isCrossRepository: null }),
+    ]);
+    const service = createGitHubService({
+      runner: runner.runner,
+      resolveGhPath: async () => "/usr/bin/gh",
+      now: () => 100,
+    });
+
+    await expect(
+      service.getPullRequestCheckoutTarget?.({ cwd: "/repo", number: 526 }),
+    ).resolves.toMatchObject({ isCrossRepository: false, sourceTrust: "untrusted" });
   });
 
   it("populates repoOwner/repoName from a GitHub Enterprise PR URL", async () => {

@@ -31,6 +31,9 @@ export interface ResolveWorktreeCreationIntentDeps {
   resolveDefaultBranch: (repoRoot: string) => Promise<string>;
 }
 
+/** Shown as the origin of a blocked change request when the forge gave nothing better. */
+export const UNVERIFIED_SOURCE_LABEL = "an unverified source";
+
 export class MissingCheckoutTargetError extends Error {
   readonly action = "checkout";
 
@@ -193,6 +196,7 @@ async function resolvePrCheckoutIntent(
   const crossRepository = resolveCrossRepositoryFields(checkoutTarget);
   const trackOriginHead =
     !checkoutTarget.isCrossRepository && checkoutTarget.headRefKind !== "pull-ref";
+  const sourceTrust = resolveSourceTrust(checkoutTarget, crossRepository.headRepository);
 
   return {
     kind: "checkout-change-request",
@@ -204,6 +208,26 @@ async function resolvePrCheckoutIntent(
     checkoutRefs: checkoutTarget.checkoutRefs ?? defaultRefs,
     ...(localBranchName && localBranchName !== headRef ? { localBranchName } : {}),
     ...(trackOriginHead ? { trackOriginHead } : {}),
+    ...sourceTrust,
+  };
+}
+
+/**
+ * Fail closed: a change request is trusted only when the forge adapter confirmed the head was
+ * pushed by a writer of the base repository. Same-repository alone is not proof (Gitea/Forgejo
+ * AGit PRs), and missing or unknown forge data stays untrusted.
+ */
+function resolveSourceTrust(
+  target: PullRequestCheckoutTarget,
+  crossRepositoryHead: string | undefined,
+): { sourceTrusted: true } | { untrustedSourceLabel: string } {
+  if (!target.isCrossRepository && target.sourceTrust === "trusted") {
+    return { sourceTrusted: true };
+  }
+  const authorLogin = target.authorLogin?.trim();
+  return {
+    untrustedSourceLabel:
+      crossRepositoryHead ?? (authorLogin ? `@${authorLogin}` : UNVERIFIED_SOURCE_LABEL),
   };
 }
 
