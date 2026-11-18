@@ -35,10 +35,16 @@ export function openOfficialHubGoogle(connection: HubConnection): void {
   // Browsers may return null with noopener even when opening succeeds.
   void opened;
 }
+/**
+ * What the managed Google page needs. There is deliberately no nonce: the page derives it from the
+ * pinned Hub identity (`hubId`, `hubKey`) and the transaction, exactly as the verifying Hub does
+ * (`googleSignInNonce` in @clisbot/device-access/proof).
+ */
 export interface GoogleTokenInput {
   clientId: string;
-  nonce: string;
   transactionId: string;
+  hubId: string;
+  hubKey: string;
 }
 export function prepareGooglePopup(): Window | undefined {
   if (Platform.OS !== "web" || getDesktopHost()) return undefined;
@@ -58,7 +64,12 @@ export async function acquireGoogleIdToken(
     return result.idToken;
   }
   const auth = new URL(AUTH_PAGE);
-  const parameters = new URLSearchParams({ ...input });
+  const parameters = new URLSearchParams({
+    clientId: input.clientId,
+    transactionId: input.transactionId,
+    hubId: input.hubId,
+    hubKey: input.hubKey,
+  });
   if (Platform.OS === "web") {
     parameters.set("mode", "popup");
     parameters.set("returnOrigin", window.location.origin);

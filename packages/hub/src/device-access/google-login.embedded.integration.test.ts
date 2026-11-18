@@ -1,9 +1,10 @@
 import { expect, test } from "vitest";
 import { generateKeyPairSync, randomBytes, randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
-import { createDeviceKey } from "@clisbot/device-access/proof";
+import { createDeviceKey, googleSignInNonce } from "@clisbot/device-access/proof";
 import {
   testHub,
+  TEST_HUB_PUBLIC_KEY,
   DEVICE,
   jsonRequest,
   accountCookie,
@@ -46,6 +47,11 @@ function token(nonce: string, email: string, overrides: Record<string, unknown> 
   );
 }
 
+/** What the app derives for the Hub it pinned; the target Hub recomputes it from its identity. */
+function boundNonce(hubId: string, transactionId: string, hubPublicKey = TEST_HUB_PUBLIC_KEY) {
+  return googleSignInNonce({ hubId, hubPublicKey, transactionId });
+}
+
 function mockGoogleCertificates(): () => void {
   const original = globalThis.fetch;
   globalThis.fetch = (input, init) => {
@@ -71,11 +77,9 @@ test("Google first-owner setup needs the separate grant; Better Auth verifies no
         ),
         googleChallengeSchema,
       );
-    const signIn = (
-      transaction: { transactionId: string; nonce: string },
-      idToken: string,
-      setupToken?: string,
-    ) =>
+    const nonce = (transaction: { transactionId: string }) =>
+      boundNonce(hub.hubId, transaction.transactionId);
+    const signIn = (transaction: { transactionId: string }, idToken: string, setupToken?: string) =>
       hub.auth.handle(
         hub.request(
           device.key,
@@ -89,7 +93,7 @@ test("Google first-owner setup needs the separate grant; Better Auth verifies no
       );
     let transaction = await challenge();
     expect(
-      (await signIn(transaction, token(transaction.nonce, "google-owner@example.test"))).status,
+      (await signIn(transaction, token(nonce(transaction), "google-owner@example.test"))).status,
     ).toBe(403);
     expect((await hub.runtime.query(`select * from "user"`)).rowCount).toBe(0);
     for (const overrides of [
@@ -102,7 +106,7 @@ test("Google first-owner setup needs the separate grant; Better Auth verifies no
       transaction = await challenge();
       const response = await signIn(
         transaction,
-        token(transaction.nonce, "google-owner@example.test", overrides),
+        token(nonce(transaction), "google-owner@example.test", overrides),
         device.ownerSetupToken,
       );
       expect(response.status).toBeGreaterThanOrEqual(400);
@@ -111,7 +115,7 @@ test("Google first-owner setup needs the separate grant; Better Auth verifies no
     transaction = await challenge();
     const response = await signIn(
       transaction,
-      token(transaction.nonce, "google-owner@example.test"),
+      token(nonce(transaction), "google-owner@example.test"),
       device.ownerSetupToken,
     );
     expect(response.status).toBe(200);
@@ -134,7 +138,7 @@ test("Google first-owner setup needs the separate grant; Better Auth verifies no
       (
         await signIn(
           transaction,
-          token(transaction.nonce, "google-owner@example.test"),
+          token(nonce(transaction), "google-owner@example.test"),
           device.ownerSetupToken,
         )
       ).status,
@@ -183,7 +187,10 @@ test("Google account URL entry reuses organization admission and prevents cross-
     const other = await create();
     const request = {
       transactionId: device.transaction.transactionId,
-      idToken: token(device.transaction.nonce, "member@example.test"),
+      idToken: token(
+        boundNonce(hub.hubId, device.transaction.transactionId),
+        "member@example.test",
+      ),
     };
     expect(
       (
@@ -214,7 +221,10 @@ test("Google account URL entry reuses organization admission and prevents cross-
     const response = await hub.auth.handle(
       hub.request(admitted.key, admitted.credentialId, DEVICE + "/google/sign-in", "POST", {
         transactionId: admitted.transaction.transactionId,
-        idToken: token(admitted.transaction.nonce, "member@example.test"),
+        idToken: token(
+          boundNonce(hub.hubId, admitted.transaction.transactionId),
+          "member@example.test",
+        ),
       }),
     );
     expect(response.status).toBe(200);
@@ -236,6 +246,82 @@ test("Google account URL entry reuses organization admission and prevents cross-
     expect(await hub.devices.authority.list()).toMatchObject([
       { grant: "login", label: "Google phone" },
     ]);
+  } finally {
+    restore();
+    await hub.close();
+  }
+}, 60_000);
+
+test("CB-04: a victim's Google token relayed by another Hub cannot obtain a device credential here", async () => {
+  const restore = mockGoogleCertificates();
+  const hub = await testHub({ bootstrap: true, google: GOOGLE });
+  try {
+    const bootstrap = (
+      await hub.runtime.query<{ owner: string; organization: string }>(
+        `select owner_user_id as owner, organization_id as organization from instance_bootstrap`,
+      )
+    ).rows[0]!;
+    await hub.runtime.query(
+      `insert into invitation (id, organization_id, email, role, status, expires_at, inviter_id)
+      values ($1, $2, 'victim@example.test', 'member', 'pending', now() + interval '1 day', $3)`,
+      [randomUUID(), bootstrap.organization, bootstrap.owner],
+    );
+    // The operator of Hub X opens an ordinary login entry here (target Hub T) with its own key D.
+    const attacker = createDeviceKey(randomBytes(32));
+    const login = await readJson(
+      await hub.auth.handle(
+        jsonRequest(DEVICE + "/login-challenge", {
+          publicKey: attacker.publicKey,
+          label: "Attacker relay",
+        }),
+      ),
+      loginChallengeSchema,
+    );
+    const credentialId = "login:" + login.challengeId;
+    const challenge = async () => {
+      const response = await hub.auth.handle(
+        hub.request(attacker, credentialId, DEVICE + "/google/challenge", "POST", {}),
+      );
+      return (await response.json()) as Record<string, unknown> & {
+        transactionId: string;
+      };
+    };
+    const exchange = (transactionId: string, nonce: string) =>
+      hub.auth.handle(
+        hub.request(attacker, credentialId, DEVICE + "/google/sign-in", "POST", {
+          transactionId,
+          idToken: token(nonce, "victim@example.test"),
+        }),
+      );
+
+    // X relays T's transaction and client ID to a victim app connected to X. T no longer hands out
+    // a nonce X could relay, so the victim's app never mints a token carrying T's binding.
+    const relayed = await challenge();
+    expect(relayed).not.toHaveProperty("nonce");
+    expect(relayed["hubId"]).toBe(hub.hubId);
+    // The victim's app derives the nonce from the Hub it pinned: X, not T.
+    const forX = boundNonce(
+      "hub-x",
+      relayed.transactionId,
+      "aHViLXgtZTJlZS1wdWJsaWMta2V5LWZpeHR1cmU=",
+    );
+    expect((await exchange(relayed.transactionId, forX)).status).toBe(401);
+    // Even an old app that still forwards a raw Hub-supplied nonce cannot help: T verifies only
+    // its own derivation, never a nonce that merely came from some Hub's challenge.
+    expect((await exchange(relayed.transactionId, "x".repeat(43))).status).toBe(401);
+    expect(await hub.devices.authority.list()).toHaveLength(0);
+    expect(
+      (await hub.runtime.query(`select * from "user" where email = 'victim@example.test'`))
+        .rowCount,
+    ).toBe(0);
+
+    // The same identity signing in while really connected to T is admitted, once.
+    const direct = await challenge();
+    const nonce = boundNonce(hub.hubId, direct.transactionId);
+    const response = await exchange(direct.transactionId, nonce);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-clisbot-device-credential")).toBeTruthy();
+    expect((await exchange(direct.transactionId, nonce)).status).toBe(401);
   } finally {
     restore();
     await hub.close();

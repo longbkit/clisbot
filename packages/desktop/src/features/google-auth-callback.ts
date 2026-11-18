@@ -5,8 +5,17 @@ import { z } from "zod";
 export const GoogleSignInInputSchema = z
   .object({
     clientId: z.string().regex(/^[A-Za-z0-9._-]+\.apps\.googleusercontent\.com$/),
-    nonce: z.string().regex(/^[A-Za-z0-9_-]{22,128}$/),
     transactionId: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/),
+    // The pinned Hub identity; the managed page derives the OIDC nonce from it (CB-04).
+    hubId: z
+      .string()
+      .min(1)
+      .max(128)
+      .refine((value) => [...value].every((char) => char.charCodeAt(0) > 0x1f && char !== "\x7f")),
+    hubKey: z
+      .string()
+      .max(128)
+      .regex(/^[A-Za-z0-9+/_-]{16,126}={0,2}$/),
   })
   .strict();
 export type GoogleSignInInput = z.infer<typeof GoogleSignInInputSchema>;

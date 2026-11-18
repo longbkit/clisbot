@@ -196,8 +196,9 @@ export interface DesktopHostBridge {
   google?: {
     signIn(input: {
       clientId: string;
-      nonce: string;
       transactionId: string;
+      hubId: string;
+      hubKey: string;
     }): Promise<{ transactionId: string; idToken: string }>;
   };
   deviceSecrets?: {

@@ -113,8 +113,9 @@ system. Review fixes included:
   retry and concurrent-success regressions verify this distinction.
 - First-owner setup requires a separate hashed approval, bound to the paired device and
   consumed in the existing owner-claim transaction. Password and Google paths enforce it.
-- Google token verification checks signature, issuer, audience, expiry and the Hub-issued
-  device nonce before consuming authority. Invalid tokens cannot saturate the transaction
+- Google token verification checks signature, issuer, audience, expiry and a nonce derived
+  from the verifying Hub's identity and the device-bound transaction before consuming
+  authority; clients derive the same nonce from the Hub identity they pinned (CB-04). Invalid tokens cannot saturate the transaction
   ledger. The managed page returns popup tokens only to the official app origin.
 - Account sessions are explicitly associated with device credentials and managed
   tickets/leases. Exact-session sign-out removes refresh authority, commits revocation

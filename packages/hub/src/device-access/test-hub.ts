@@ -28,7 +28,6 @@ export const loginChallengeSchema = z.object({
 export const credentialSchema = z.object({ backendId: z.string(), credentialId: z.string() });
 export const googleChallengeSchema = z.object({
   transactionId: z.string(),
-  nonce: z.string(),
   clientId: z.string(),
   expiresAt: z.number(),
 });
@@ -42,6 +41,8 @@ export const TEST_OPERATOR = "local-operator-fixture-secret";
 export const TEST_PASSWORD = "correct-owner-password";
 export const LOGIN = "/api/auth/sign-in/email";
 export const DEVICE = "/api/auth/clisbot/device";
+/** The E2EE identity key a paired app pins for this fixture Hub. */
+export const TEST_HUB_PUBLIC_KEY = "dGVzdC1odWItZTJlZS1wdWJsaWMta2V5LWZpeHR1cmU=";
 
 export async function testHub(
   options: {
@@ -60,7 +61,13 @@ export async function testHub(
   await runtime.migrate();
   const database = createDatabase(runtime, locks, createTestCredentialCipher());
   const entitlements = composeEntitlements(database, runtime);
-  const devices = new HubDeviceAccess(runtime, !options.personal, undefined, TEST_OPERATOR);
+  const devices = new HubDeviceAccess(
+    runtime,
+    !options.personal,
+    undefined,
+    TEST_OPERATOR,
+    Promise.resolve(TEST_HUB_PUBLIC_KEY),
+  );
   const policy: InstanceAuthPolicy = {
     registrationMode: "invite_only",
     organizationCreation: "disabled",
