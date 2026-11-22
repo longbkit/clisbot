@@ -22,6 +22,7 @@ import {
   type StoredChatParticipant,
 } from "./chat-record.js";
 import { KeyedSerialQueue } from "./keyed-queue.js";
+import { ForkCarryStore, type ForkCarry } from "./fork-carry-store.js";
 
 const RECORD_FILE = "chat.json";
 
@@ -66,6 +67,7 @@ export class ChatStore {
   private readonly listeners = new Set<ChatChangeListener>();
   private loaded: Promise<void> | null = null;
   private readonly logger: Logger;
+  private readonly carries: ForkCarryStore;
 
   constructor(
     readonly rootDir: string,
@@ -73,6 +75,7 @@ export class ChatStore {
     private readonly now: () => string = () => new Date().toISOString(),
   ) {
     this.logger = logger.child({ module: "chats", component: "chat-store" });
+    this.carries = new ForkCarryStore(this.logger);
   }
 
   /** `$CLISBOT_HOME/chats/{chatId}`; the id is checked before it joins a path. */
@@ -99,8 +102,10 @@ export class ChatStore {
       if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
       const file = path.join(this.rootDir, entry.name, RECORD_FILE);
       const chat = await this.readRecord(file);
-      if (chat && chat.id === entry.name) this.cache.set(chat.id, chat);
-      else if (chat) this.logger.warn({ file, id: chat.id }, "chat.record.directory_mismatch");
+      if (chat && chat.id === entry.name) {
+        this.cache.set(chat.id, chat);
+        await this.carries.load(chat.id, path.join(this.rootDir, entry.name));
+      } else if (chat) this.logger.warn({ file, id: chat.id }, "chat.record.directory_mismatch");
     }
   }
 
@@ -267,20 +272,26 @@ export class ChatStore {
     );
   }
 
-  /** `/new` (D7): drops the session cache and marks the time, so a label scan never re-adopts it. */
+  /**
+   * `/new` (D7): drops the session cache and marks the time, so a label scan never re-adopts it.
+   * The new `resetAt` also makes a switch's undelivered carry stale (`forkCarry`).
+   */
   resetParticipantSession(chatId: string, botId: string): Promise<StoredChat> {
     return this.update(chatId, (chat, at) =>
-      mapParticipant(chat, botId, (entry) => {
-        // A fresh session asked for none of the earlier conversation, a fork's promise included.
-        const { pendingContext: _dropped, ...rest } = entry;
-        return { ...rest, agentId: null, resetAt: at, completedTurn: null };
-      }),
+      mapParticipant(chat, botId, (entry) => ({
+        ...entry,
+        agentId: null,
+        resetAt: at,
+        completedTurn: null,
+      })),
     );
   }
 
   /**
-   * A provider switch (`chat.session.fork`): the chat's launch and the Bot's new session in one
-   * write. `resetAt` predates the new session, so a label scan adopts it and never the old one.
+   * A provider switch (`chat.session.fork`): the carry first, then the chat's launch and the Bot's
+   * new session in one `chat.json` write. The carry names the `resetAt` it belongs to, so one
+   * written before a failed record write is never current. `resetAt` predates the new session, so
+   * a label scan adopts it and never the old one.
    */
   forkParticipantSession(
     chatId: string,
@@ -289,33 +300,37 @@ export class ChatStore {
       launch: BotLaunchDefaults;
       agentId: string;
       resetAt: string;
-      pendingContext: StoredChatParticipant["pendingContext"];
+      carry: Omit<ForkCarry, "agentId" | "resetAt"> | null;
     },
   ): Promise<StoredChat> {
-    return this.update(chatId, (chat) => ({
-      ...mapParticipant(chat, botId, (entry) => {
-        const { pendingContext: _previous, ...rest } = entry;
-        return {
-          ...rest,
-          agentId: fork.agentId,
-          resetAt: fork.resetAt,
-          completedTurn: null,
-          ...(fork.pendingContext ? { pendingContext: fork.pendingContext } : {}),
-        };
-      }),
-      launch: fork.launch,
-    }));
+    return this.writes.run(chatId, async () => {
+      const current = await this.require(chatId);
+      const { agentId, resetAt } = fork;
+      const carry = fork.carry ? { ...fork.carry, agentId, resetAt } : null;
+      await this.carries.set(chatId, this.directory(chatId), botId, carry);
+      const next = mapParticipant(current, botId, (entry) => ({
+        ...entry,
+        agentId,
+        resetAt,
+        completedTurn: null,
+      }));
+      return this.write({ ...next, launch: fork.launch, updatedAt: this.now() });
+    });
   }
 
-  /** The fork's context from `fromAgentId` went with a message; a later fork's promise stays. */
-  clearPendingContext(chatId: string, botId: string, fromAgentId: string): Promise<StoredChat> {
-    return this.update(chatId, (chat) =>
-      mapParticipant(chat, botId, (entry) => {
-        if (entry.pendingContext?.fromAgentId !== fromAgentId) return entry;
-        const { pendingContext: _carried, ...rest } = entry;
-        return rest;
-      }),
-    );
+  /** The switch's carry this Bot still owes, while no `/new` or later switch replaced it. */
+  forkCarry(chatId: string, botId: string): ForkCarry | null {
+    const carry = this.carries.get(chatId, botId);
+    const entry = this.cache.get(chatId)?.participants.find((p) => p.botId === botId);
+    return carry && entry?.resetAt === carry.resetAt ? carry : null;
+  }
+
+  /** The carry went with a message; a later switch's carry stays. */
+  clearForkCarry(chatId: string, botId: string, resetAt: string): Promise<void> {
+    return this.writes.run(chatId, async () => {
+      if (this.carries.get(chatId, botId)?.resetAt !== resetAt) return;
+      await this.carries.set(chatId, this.directory(chatId), botId, null);
+    });
   }
 
   recordCompletedTurn(

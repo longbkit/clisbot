@@ -103,6 +103,8 @@ export interface ChatService {
   fetchTranscript(chatId: string, options?: TranscriptFetchOptions): Promise<TranscriptWindow>;
   /** `/new` for one bot in one chat (D7). */
   newSession(chatId: string, botId: string): Promise<void>;
+  /** The session whose conversation a switch still owes this Bot, while it is owed. */
+  forkCarrySource(chatId: string, botId: string): string | null;
   /** A direct chat's Bot moved to another provider in a new session (`session-fork.ts`). */
   forkSession(input: {
     chatId: string;
@@ -381,6 +383,7 @@ function chatWrites({
     },
     postScheduled: (input) => engine.postScheduled(input),
     newSession: (chatId, botId) => engine.newSession(chatId, botId),
+    forkCarrySource: (chatId, botId) => store.forkCarry(chatId, botId)?.sourceAgentId ?? null,
     forkSession: async (input) => {
       const { agentId } = await engine.forkSession(input);
       return { chat: await engine.payload(await store.require(input.chatId)), agentId };

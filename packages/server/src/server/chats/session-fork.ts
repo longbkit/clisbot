@@ -1,9 +1,10 @@
 // A Chat Bot moved to another provider (`chat.session.fork`, docs/features/bots-and-chats/README.md
 // "Switching provider"). The previous session's conversation is read through the Host's own
-// timeline when the switch is confirmed, before anything changes, and kept on the participant
-// (`pendingContext`), never on a label. The new session's next message carries it as the same
-// `chat_history` attachment an agent fork uses; it is removed only once that message was handed
-// over, so a failed delivery or a restart retries with it.
+// timeline when the switch is confirmed, before anything changes, and kept by the daemon in the
+// chat's `fork-carry.json` (`fork-carry-store.ts`), never on a label. The new session's next
+// message carries it as the same `chat_history` attachment an agent fork uses; it is removed only
+// once that message was handed over, so a failed delivery or a restart retries with it. A second
+// switch before that keeps the first carry.
 import type { BotLaunchDefaults } from "@clisbot/protocol/bots/types";
 import type { Logger } from "pino";
 import { buildAgentForkContextAttachment } from "../agent/activity-curator.js";
@@ -11,7 +12,8 @@ import { ensureAgentLoaded } from "../agent/agent-loading.js";
 import type { AgentManager } from "../agent/agent-manager.js";
 import type { AgentStorage } from "../agent/agent-storage.js";
 import { formatProviderModel } from "../agent/create-agent/create.js";
-import type { ForkCarry } from "./bot-sessions.js";
+import type { ForkCarryInput } from "./bot-sessions.js";
+import type { ForkCarry } from "./fork-carry-store.js";
 import { chatKindOf, type ChatBot, type StoredChat } from "./chat-record.js";
 
 const STALE_CONFIRMATION =
@@ -19,7 +21,7 @@ const STALE_CONFIRMATION =
 
 export interface SessionForks {
   /** The session's conversation as a `chat_history` attachment; throws when it cannot be read. */
-  contextOf(agentId: string): Promise<ForkCarry["attachment"]>;
+  contextOf(agentId: string): Promise<ForkCarryInput["attachment"]>;
 }
 
 export function createSessionForks(deps: {
@@ -61,6 +63,7 @@ export function assertForkable(chat: StoredChat, bot: ChatBot, launch: BotLaunch
  */
 export function repeatedFork(
   chat: StoredChat,
+  carry: ForkCarry | null,
   botId: string,
   launch: BotLaunchDefaults,
   expectedAgentId: string | null,
@@ -70,8 +73,7 @@ export function repeatedFork(
   const sameLaunch =
     chat.launch?.provider === launch.provider &&
     (chat.launch?.model ?? null) === (launch.model ?? null);
-  const fromExpected =
-    expectedAgentId === null || participant.pendingContext?.fromAgentId === expectedAgentId;
+  const fromExpected = expectedAgentId === null || carry?.previousAgentId === expectedAgentId;
   if (sameLaunch && fromExpected && participant.agentId) return participant.agentId;
   throw new Error(STALE_CONFIRMATION);
 }

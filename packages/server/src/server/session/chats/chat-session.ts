@@ -89,7 +89,7 @@ export class ChatSession {
       )
         throw new Error("Existing Bot session configuration access denied");
       // A provider switch's carried conversation is the earlier session's: still yours to send.
-      const source = participant.pendingContext?.fromAgentId;
+      const source = this.service.forkCarrySource(chatId, participant.botId);
       if (source && !(await this.authority.allowsChatSessionConfiguration(source)))
         throw new Error("Earlier Bot session access denied");
       if (

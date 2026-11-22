@@ -1082,9 +1082,11 @@ describe("provider switch (chat.session.fork)", () => {
     expect(h.createInputs.at(-1)).toMatchObject({ provider: "claude/sonnet", cwd: alpha.cwd });
     const chat = await h.store.require("cht_f");
     expect(chat.launch).toEqual(claude);
-    expect(chat.participants[0]).toMatchObject({
+    expect(chat.participants[0]).toMatchObject({ agentId: "agent-bot_a-2" });
+    expect(h.store.forkCarry("cht_f", alpha.id)).toMatchObject({
+      sourceAgentId: "agent-bot_a-1",
+      previousAgentId: "agent-bot_a-1",
       agentId: "agent-bot_a-2",
-      pendingContext: { fromAgentId: "agent-bot_a-1", agentId: "agent-bot_a-2" },
     });
     // The old session is left as it was, for Cowork.
     expect(h.agents.get("agent-bot_a-1")?.archivedAt).toBeUndefined();
@@ -1099,7 +1101,7 @@ describe("provider switch (chat.session.fork)", () => {
       text: "conversation of agent-bot_a-1",
     });
     expect(JSON.stringify(carried.prompt)).toContain("two");
-    expect((await h.store.require("cht_f")).participants[0]?.pendingContext).toBeUndefined();
+    expect(h.store.forkCarry("cht_f", alpha.id)).toBeNull();
 
     await h.completeTurn("agent-bot_a-2", "second answer");
     await h.engine.send({ chatId: "cht_f", text: "three", messageId: "m3" });
@@ -1126,9 +1128,7 @@ describe("provider switch (chat.session.fork)", () => {
     await h.engine.send({ chatId: "cht_r", text: "two", messageId: "m2" });
     await h.engine.idle();
     expect(h.sent.filter((prompt) => prompt.agentId === "agent-bot_a-2")).toHaveLength(0);
-    expect((await h.store.require("cht_r")).participants[0]?.pendingContext?.fromAgentId).toBe(
-      "agent-bot_a-1",
-    );
+    expect(h.store.forkCarry("cht_r", alpha.id)?.sourceAgentId).toBe("agent-bot_a-1");
   });
 
   test("an unreadable conversation stops the switch before anything changes", async () => {
@@ -1203,12 +1203,99 @@ describe("provider switch (chat.session.fork)", () => {
       expectedAgentId: "agent-bot_a-1",
     });
     await h.engine.newSession("cht_f", alpha.id);
-    expect((await h.store.require("cht_f")).participants[0]?.pendingContext).toBeUndefined();
+    expect(h.store.forkCarry("cht_f", alpha.id)).toBeNull();
     await h.engine.send({ chatId: "cht_f", text: "two", messageId: "m2" });
     await h.engine.idle();
     expect(JSON.stringify(h.sent.at(-1)!.prompt)).not.toContain("conversation of");
     // The chat keeps the switched launch.
     expect(h.createInputs.at(-1)).toMatchObject({ provider: "claude/sonnet" });
+  });
+
+  test("a second switch before the first was delivered keeps the first conversation", async () => {
+    const { h, reads } = await forked();
+    await h.engine.forkSession({
+      chatId: "cht_f",
+      botId: alpha.id,
+      launch: claude,
+      expectedAgentId: "agent-bot_a-1",
+    });
+    const gemini = { provider: "gemini", model: "pro" };
+    const second = await h.engine.forkSession({
+      chatId: "cht_f",
+      botId: alpha.id,
+      launch: gemini,
+      expectedAgentId: "agent-bot_a-2",
+    });
+    expect(second.agentId).toBe("agent-bot_a-3");
+    // B never heard the conversation; it is not read again from B's empty session.
+    expect(reads).toEqual(["agent-bot_a-1"]);
+    expect(h.store.forkCarry("cht_f", alpha.id)).toMatchObject({
+      sourceAgentId: "agent-bot_a-1",
+      previousAgentId: "agent-bot_a-2",
+      agentId: "agent-bot_a-3",
+    });
+    // A repeat of the second confirmation answers with it; a repeat of the first is stale now.
+    const repeat = await h.engine.forkSession({
+      chatId: "cht_f",
+      botId: alpha.id,
+      launch: gemini,
+      expectedAgentId: "agent-bot_a-2",
+    });
+    expect(repeat.agentId).toBe("agent-bot_a-3");
+    await expect(
+      h.engine.forkSession({
+        chatId: "cht_f",
+        botId: alpha.id,
+        launch: claude,
+        expectedAgentId: "agent-bot_a-1",
+      }),
+    ).rejects.toThrow("changed since you chose");
+    expect(h.createInputs).toHaveLength(3);
+
+    await h.engine.send({ chatId: "cht_f", text: "two", messageId: "m2" });
+    await h.engine.idle();
+    const carried = h.sent.at(-1)!;
+    expect(carried.agentId).toBe("agent-bot_a-3");
+    expect(JSON.stringify(carried.prompt)).toContain("conversation of agent-bot_a-1");
+    expect(h.store.forkCarry("cht_f", alpha.id)).toBeNull();
+  });
+
+  test("chat.json keeps the shape an older daemon reads; the carry lives beside it", async () => {
+    const { h } = await forked();
+    await h.engine.forkSession({
+      chatId: "cht_f",
+      botId: alpha.id,
+      launch: claude,
+      expectedAgentId: "agent-bot_a-1",
+    });
+    const directory = h.store.directory("cht_f");
+    const record = JSON.parse(await fs.readFile(path.join(directory, "chat.json"), "utf8"));
+    // The 2.2.5 strict participant and chat fields, nothing else.
+    const participantKeys = new Set([
+      "botId",
+      "addedAt",
+      "agentId",
+      "resetAt",
+      "deliveredSeq",
+      "completedTurn",
+      "roomSeen",
+    ]);
+    for (const participant of record.participants)
+      for (const key of Object.keys(participant)) expect(participantKeys).toContain(key);
+    const carryFile = JSON.parse(
+      await fs.readFile(path.join(directory, "fork-carry.json"), "utf8"),
+    );
+    expect(carryFile[alpha.id]).toMatchObject({ sourceAgentId: "agent-bot_a-1" });
+
+    // A restart reads the carry back; a missing carry file still loads the chat.
+    const reopened = new ChatStore(h.store.rootDir, createTestLogger());
+    await reopened.load();
+    expect(reopened.forkCarry("cht_f", alpha.id)?.sourceAgentId).toBe("agent-bot_a-1");
+    await fs.rm(path.join(directory, "fork-carry.json"));
+    const withoutCarry = new ChatStore(h.store.rootDir, createTestLogger());
+    await withoutCarry.load();
+    expect(withoutCarry.getCached("cht_f")?.launch).toEqual(claude);
+    expect(withoutCarry.forkCarry("cht_f", alpha.id)).toBeNull();
   });
 
   test("a Host without session forks refuses", async () => {

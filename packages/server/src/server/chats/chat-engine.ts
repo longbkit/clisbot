@@ -14,7 +14,7 @@ import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import type { AgentManager } from "../agent/agent-manager.js";
 import type { PromptDispatchDisposition } from "../agent/agent-prompt.js";
 import { resolveClientMessageId } from "../client-message-id.js";
-import type { BotSessions } from "./bot-sessions.js";
+import type { BotSessions, ForkCarryInput } from "./bot-sessions.js";
 import {
   chatKindOf,
   chatPayload,
@@ -388,15 +388,19 @@ export class ChatEngine implements TurnTrackerHost {
       const forks = this.deps.sessionForks;
       if (!forks) throw new Error("This Host cannot switch a chat's provider.");
       const chat = await this.deps.store.require(chatId);
-      const repeated = repeatedFork(chat, botId, launch, input.expectedAgentId);
+      const owed = this.deps.store.forkCarry(chatId, botId);
+      const repeated = repeatedFork(chat, owed, botId, launch, input.expectedAgentId);
       if (repeated) return { agentId: repeated };
       const bot = await this.deps.bots.get(botId);
       if (!bot) throw new Error(`Bot ${botId} is not in chat ${chatId}`);
       assertForkable(chat, bot, launch);
-      // Read before anything changes: a conversation that cannot be read stops the switch.
-      const carry = fromAgentId
-        ? { fromAgentId, attachment: await forks.contextOf(fromAgentId) }
-        : null;
+      // A carry not delivered yet goes on unchanged: the session it was promised to never heard
+      // the conversation. Otherwise read the session left behind, before anything changes; a
+      // conversation that cannot be read stops the switch.
+      let carry: ForkCarryInput | null = null;
+      if (owed) carry = { sourceAgentId: owed.sourceAgentId, attachment: owed.attachment };
+      else if (fromAgentId)
+        carry = { sourceAgentId: fromAgentId, attachment: await forks.contextOf(fromAgentId) };
       const room = this.roomOf(chat, botId);
       const session = await this.deps.botSessions.fork(
         chat,
@@ -408,9 +412,10 @@ export class ChatEngine implements TurnTrackerHost {
           ...(actor ? { creationIdentity: { actor } } : {}),
         },
         carry,
+        fromAgentId,
       );
       if (fromAgentId) this.tracker.unwatch(fromAgentId);
-      await this.appendSystem(chatId, forkNotice(bot, launch, fromAgentId !== null));
+      await this.appendSystem(chatId, forkNotice(bot, launch, carry !== null));
       return { agentId: session.agentId };
     });
   }
@@ -622,8 +627,8 @@ export class ChatEngine implements TurnTrackerHost {
     );
     if (session.replaced) await this.appendSystem(chatId, replacementNotice(bot, session.replaced));
     // A provider switch's promised context goes with the next message, also to a session that
-    // replaced the forked one (it could not resume); `/new` drops the promise.
-    const pending = participant.pendingContext ?? null;
+    // replaced the forked one (it could not resume); `/new` makes it stale.
+    const pending = this.deps.store.forkCarry(chatId, botId);
     const deliveredSeq = Math.max(...lines.map((entry) => entry.seq));
     const window = await this.windowOf(chatId, participant.deliveredSeq, deliveredSeq, rules);
     const prompt = renderChatPrompt({
@@ -649,8 +654,7 @@ export class ChatEngine implements TurnTrackerHost {
       // A duplicate or out-of-band command binds no turn, so nothing will end it.
       if (disposition === "out_of_band") started = false;
       // The fork's context was handed over with this message; a failed send keeps it for a retry.
-      else if (pending)
-        await this.deps.store.clearPendingContext(chatId, botId, pending.fromAgentId);
+      else if (pending) await this.deps.store.clearForkCarry(chatId, botId, pending.resetAt);
     }
     // A new session read the room in its system prompt; a prompted one read it or its update.
     if (room && (prompt !== "" || session.created))

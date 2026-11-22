@@ -1,5 +1,4 @@
 import { BotLaunchDefaultsSchema } from "@clisbot/protocol/bots/types";
-import { TextAttachmentSchema } from "@clisbot/protocol/agent-attachments";
 // `chat.json`: the durable facts of a Chat (docs/features/bots-and-chats/README.md, D5, D9).
 // Strict on read like the persisted config: an unknown key is a bug or a newer daemon's
 // record, never silently dropped. Rule defaults are applied on read, not stored, so a
@@ -88,15 +87,6 @@ export const StoredChatParticipantSchema = z
     completedTurn: ChatCompletedTurnSchema.nullable().optional(),
     /** `roomFingerprint` of the members and room instructions this bot's session was last told. */
     roomSeen: z.string().optional(),
-    /**
-     * A provider switch's promise (`session-fork.ts`): the previous session's conversation, read
-     * through the Host when the switch was confirmed, goes with the new session's next message.
-     * Removed once that message was handed over, so the record returns to its usual shape.
-     */
-    pendingContext: z
-      .object({ fromAgentId: z.string(), agentId: z.string(), attachment: TextAttachmentSchema })
-      .strict()
-      .optional(),
   })
   .strict();
 export type StoredChatParticipant = z.infer<typeof StoredChatParticipantSchema>;

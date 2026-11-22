@@ -41,6 +41,7 @@ function harness(actorId: string) {
       endSeq: 0,
     })),
     send: vi.fn(async () => ({ messageId: "m", seq: 1, targets: [bot.id] })),
+    forkCarrySource: () => null,
   } as unknown as ChatService;
   const bots = {
     list: async () => [bot],
@@ -208,6 +209,7 @@ function forkHarness(input: {
   allowsLaunch: (provider: string) => boolean;
   allowsSession: (agentId: string) => boolean;
   record: StoredChat;
+  carrySource?: string;
 }) {
   const messages: SessionOutboundMessage[] = [];
   const forkSession = vi.fn(async () => ({ chat: {}, agentId: "agent-new" }));
@@ -216,6 +218,7 @@ function forkHarness(input: {
     record: (id: string) => (id === input.record.id ? input.record : null),
     subscribe: () => () => {},
     list: async () => [input.record],
+    forkCarrySource: () => input.carrySource ?? null,
     forkSession,
     send,
   } as unknown as ChatService;
@@ -286,18 +289,13 @@ test("a provider switch needs the new launch to be allowed, and passes the expec
 test("a carried conversation is sent only while its earlier session is still yours", async () => {
   const record = {
     ...chat,
-    participants: [
-      {
-        botId: bot.id,
-        agentId: "agent-new",
-        pendingContext: { fromAgentId: "agent-old", agentId: "agent-new", attachment: {} },
-      },
-    ],
+    participants: [{ botId: bot.id, agentId: "agent-new" }],
   } as unknown as StoredChat;
   const h = forkHarness({
     allowsLaunch: () => true,
     allowsSession: (agentId) => agentId !== "agent-old",
     record,
+    carrySource: "agent-old",
   });
   await h.session.handle({ type: "chat.list.request", requestId: "l" });
   await h.session.handle({

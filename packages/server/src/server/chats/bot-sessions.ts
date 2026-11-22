@@ -41,9 +41,12 @@ export interface BotSessionsDependencies {
   discardAgent?: (agentId: string) => Promise<void>;
 }
 
-/** What a fork carries: the previous session and its conversation, read when it was confirmed. */
-export interface ForkCarry {
-  fromAgentId: string;
+/**
+ * What a fork carries: the session whose conversation it is (`sourceAgentId`, read when the first
+ * switch was confirmed) and the session this switch leaves (`previousAgentId`).
+ */
+export interface ForkCarryInput {
+  sourceAgentId: string;
   attachment: Extract<AgentAttachment, { type: "text" }>;
 }
 
@@ -97,7 +100,8 @@ export class BotSessions {
     bot: ChatBot,
     launch: BotLaunchDefaults,
     start: SessionStart,
-    carry: ForkCarry | null,
+    carry: ForkCarryInput | null,
+    previousAgentId: string | null,
   ): Promise<ResolvedBotSession> {
     return this.queue.run(pairKey(chat.id, bot.id), async () => {
       // Before the new session exists: the label scan adopts only sessions created after it.
@@ -108,7 +112,7 @@ export class BotSessions {
           launch,
           agentId,
           resetAt,
-          pendingContext: carry ? { ...carry, agentId } : undefined,
+          carry: carry ? { ...carry, previousAgentId } : null,
         });
       } catch (error) {
         await this.deps.discardAgent?.(agentId).catch(() => undefined);
