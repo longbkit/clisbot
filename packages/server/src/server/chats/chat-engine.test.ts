@@ -2,7 +2,7 @@ import { currentSessionOperationIdentity } from "../agent/session-operation-cont
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import type { ChatMessagePayload, ChatPayload } from "@clisbot/protocol/chats/types";
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import type { AgentSubscriber } from "../agent/agent-manager.js";
@@ -1260,6 +1260,90 @@ describe("provider switch (chat.session.fork)", () => {
     expect(h.store.forkCarry("cht_f", alpha.id)).toBeNull();
   });
 
+  test("a second switch whose record write fails keeps the first carry, also after a restart", async () => {
+    const { h, reads } = await forked();
+    await h.engine.forkSession({
+      chatId: "cht_f",
+      botId: alpha.id,
+      launch: claude,
+      expectedAgentId: "agent-bot_a-1",
+    });
+    // The second switch writes its carry, then chat.json fails: B stays the bound session.
+    const write = vi
+      .spyOn(h.store as unknown as { write: (chat: unknown) => Promise<unknown> }, "write")
+      .mockRejectedValueOnce(new Error("disk full"));
+    await expect(
+      h.engine.forkSession({
+        chatId: "cht_f",
+        botId: alpha.id,
+        launch: { provider: "gemini" },
+        expectedAgentId: "agent-bot_a-2",
+      }),
+    ).rejects.toThrow("disk full");
+    write.mockRestore();
+    expect(reads).toEqual(["agent-bot_a-1"]);
+    const reopened = new ChatStore(h.store.rootDir, createTestLogger());
+    await reopened.load();
+    expect(reopened.getCached("cht_f")?.participants[0]?.agentId).toBe("agent-bot_a-2");
+    expect(reopened.forkCarry("cht_f", alpha.id)).toMatchObject({
+      sourceAgentId: "agent-bot_a-1",
+      agentId: "agent-bot_a-2",
+    });
+    expect(h.store.forkCarry("cht_f", alpha.id)?.sourceAgentId).toBe("agent-bot_a-1");
+  });
+
+  test("a carry from before /new never comes back, whatever the clock says", async () => {
+    const { h } = await forked();
+    const frozen = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-22T00:00:00.000Z"));
+    try {
+      await h.engine.forkSession({
+        chatId: "cht_f",
+        botId: alpha.id,
+        launch: claude,
+        expectedAgentId: "agent-bot_a-1",
+      });
+      await h.engine.newSession("cht_f", alpha.id);
+      expect(h.store.forkCarry("cht_f", alpha.id)).toBeNull();
+      await h.engine.send({ chatId: "cht_f", text: "two", messageId: "m2" });
+      await h.engine.idle();
+      expect(JSON.stringify(h.sent.at(-1)!.prompt)).not.toContain("conversation of");
+    } finally {
+      frozen.mockRestore();
+    }
+  });
+
+  test("an unreadable carry file never loads anyone's history", async () => {
+    const { h } = await forked();
+    await h.engine.forkSession({
+      chatId: "cht_f",
+      botId: alpha.id,
+      launch: claude,
+      expectedAgentId: "agent-bot_a-1",
+    });
+    const file = path.join(h.store.directory("cht_f"), "fork-carry.json");
+    await fs.writeFile(file, "{ not json");
+    const reopened = new ChatStore(h.store.rootDir, createTestLogger());
+    await reopened.load();
+    expect(reopened.getCached("cht_f")).not.toBeNull();
+    expect(reopened.forkCarry("cht_f", alpha.id)).toBeNull();
+    // A carry naming another session than the bound one is ignored too.
+    await fs.writeFile(
+      file,
+      JSON.stringify({
+        "agent-someone-else": {
+          botId: alpha.id,
+          sourceAgentId: "agent-x",
+          previousAgentId: null,
+          agentId: "agent-someone-else",
+          attachment: { type: "text", mimeType: "text/plain", text: "secret" },
+        },
+      }),
+    );
+    const again = new ChatStore(h.store.rootDir, createTestLogger());
+    await again.load();
+    expect(again.forkCarry("cht_f", alpha.id)).toBeNull();
+  });
+
   test("chat.json keeps the shape an older daemon reads; the carry lives beside it", async () => {
     const { h } = await forked();
     await h.engine.forkSession({
@@ -1285,7 +1369,12 @@ describe("provider switch (chat.session.fork)", () => {
     const carryFile = JSON.parse(
       await fs.readFile(path.join(directory, "fork-carry.json"), "utf8"),
     );
-    expect(carryFile[alpha.id]).toMatchObject({ sourceAgentId: "agent-bot_a-1" });
+    // Keyed by the session that owes it; the session it replaced has no entry left.
+    expect(Object.keys(carryFile)).toEqual(["agent-bot_a-2"]);
+    expect(carryFile["agent-bot_a-2"]).toMatchObject({
+      botId: alpha.id,
+      sourceAgentId: "agent-bot_a-1",
+    });
 
     // A restart reads the carry back; a missing carry file still loads the chat.
     const reopened = new ChatStore(h.store.rootDir, createTestLogger());

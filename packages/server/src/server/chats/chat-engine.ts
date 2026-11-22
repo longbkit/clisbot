@@ -618,6 +618,9 @@ export class ChatEngine implements TurnTrackerHost {
     const title = sessionTitleFor(chat.title, lines[0]?.text ?? "");
     await this.rememberBots(chat);
     const room = this.roomOf(chat, botId);
+    // A provider switch's promised context, owed by the bound session; read before resolving, so
+    // a session that replaced it (it could not resume) still gets it. `/new` unbinds it.
+    const pending = this.deps.store.forkCarry(chatId, botId);
     const session = await this.deps.botSessions.resolve(
       chat,
       bot,
@@ -626,9 +629,6 @@ export class ChatEngine implements TurnTrackerHost {
       lines.findLast((line) => line.sender.kind === "user")?.sessionIdentity,
     );
     if (session.replaced) await this.appendSystem(chatId, replacementNotice(bot, session.replaced));
-    // A provider switch's promised context goes with the next message, also to a session that
-    // replaced the forked one (it could not resume); `/new` makes it stale.
-    const pending = this.deps.store.forkCarry(chatId, botId);
     const deliveredSeq = Math.max(...lines.map((entry) => entry.seq));
     const window = await this.windowOf(chatId, participant.deliveredSeq, deliveredSeq, rules);
     const prompt = renderChatPrompt({
@@ -654,7 +654,7 @@ export class ChatEngine implements TurnTrackerHost {
       // A duplicate or out-of-band command binds no turn, so nothing will end it.
       if (disposition === "out_of_band") started = false;
       // The fork's context was handed over with this message; a failed send keeps it for a retry.
-      else if (pending) await this.deps.store.clearForkCarry(chatId, botId, pending.resetAt);
+      else if (pending) await this.deps.store.clearForkCarry(chatId, pending.agentId);
     }
     // A new session read the room in its system prompt; a prompted one read it or its update.
     if (room && (prompt !== "" || session.created))

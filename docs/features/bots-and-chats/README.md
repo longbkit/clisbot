@@ -228,10 +228,13 @@ sends nothing. The old session is never changed.
 
 - **Direct chat** (`chat.session.fork`, gated on `chatProviderFork`): under the pair's lock the
   daemon reads the current session's conversation through the Host's own timeline, then starts the
-  new session on the chosen launch. It writes the conversation to the chat's `fork-carry.json`,
-  then the launch and the session to `chat.json`. The carry names the `resetAt` it belongs to, so a
-  later `/new` or switch makes it stale. A conversation that cannot be read, or a launch that
-  cannot start, refuses before anything changes; a session that could not be recorded is archived.
+  new session on the chosen launch. It adds the conversation to the chat's `fork-carry.json`, keyed
+  by the new session, writes the launch and the session to `chat.json`, then drops entries no
+  session is bound to. A carry counts only while `chat.json` binds the Bot to the session that owes
+  it, so a failed record write or a stop in between leaves the old session bound with what it owed,
+  and `/new` (which unbinds) ends it whatever the clock says. A conversation that cannot be read, or
+  a launch that cannot start, refuses before anything changes; a session that could not be recorded
+  is archived.
   The next delivered message carries the conversation as the `chat_history` attachment; it is
   removed only once that message was handed over, so a failed send or a restart retries with it.
   A second switch before that keeps the first carry (the session in between never heard it).
@@ -242,6 +245,11 @@ sends nothing. The old session is never changed.
 - **Why a separate file:** a daemon before this change reads `chat.json` with a strict schema and
   skips the whole chat on an unknown field. It never opens `fork-carry.json`, so after a downgrade
   the chat, its launch and its history load; only an undelivered carry is left behind.
+- **Known gaps:** a `fork-carry.json` that cannot be read or parsed counts as empty (logged as
+  `chat.fork_carry.unreadable` / `.invalid`), so its undelivered carry is dropped rather than
+  attributed to anyone, and the next switch rewrites the file. A session that replaced a forked one
+  through the label scan after a lost `chat.json` cache, rather than as its bound successor, does
+  not receive the carry.
 - **Work session**: the turn footer's fork (`agent.fork_context`) opens a draft tab on the chosen
   provider and model with the conversation attached; nothing is sent until the person sends.
 - A Host without the feature says it needs an update; the pick is never silently dropped.

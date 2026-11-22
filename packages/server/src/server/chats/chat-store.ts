@@ -274,7 +274,7 @@ export class ChatStore {
 
   /**
    * `/new` (D7): drops the session cache and marks the time, so a label scan never re-adopts it.
-   * The new `resetAt` also makes a switch's undelivered carry stale (`forkCarry`).
+   * Unbinding the session also ends any carry it owed (`forkCarry`).
    */
   resetParticipantSession(chatId: string, botId: string): Promise<StoredChat> {
     return this.update(chatId, (chat, at) =>
@@ -288,10 +288,10 @@ export class ChatStore {
   }
 
   /**
-   * A provider switch (`chat.session.fork`): the carry first, then the chat's launch and the Bot's
-   * new session in one `chat.json` write. The carry names the `resetAt` it belongs to, so one
-   * written before a failed record write is never current. `resetAt` predates the new session, so
-   * a label scan adopts it and never the old one.
+   * A provider switch (`chat.session.fork`): adds the new session's carry, writes the chat's
+   * launch and the Bot's new session to `chat.json`, then drops carries no session is bound to.
+   * Until the record write lands, the old session stays bound with whatever it owed. `resetAt`
+   * predates the new session, so a label scan adopts it and never the old one.
    */
   forkParticipantSession(
     chatId: string,
@@ -300,36 +300,46 @@ export class ChatStore {
       launch: BotLaunchDefaults;
       agentId: string;
       resetAt: string;
-      carry: Omit<ForkCarry, "agentId" | "resetAt"> | null;
+      carry: Omit<ForkCarry, "agentId" | "botId"> | null;
     },
   ): Promise<StoredChat> {
     return this.writes.run(chatId, async () => {
       const current = await this.require(chatId);
       const { agentId, resetAt } = fork;
-      const carry = fork.carry ? { ...fork.carry, agentId, resetAt } : null;
-      await this.carries.set(chatId, this.directory(chatId), botId, carry);
+      const directory = this.directory(chatId);
+      if (fork.carry) {
+        const add = { ...fork.carry, botId, agentId };
+        await this.carries.update(chatId, directory, { add, keep: boundSessions(current) });
+      }
       const next = mapParticipant(current, botId, (entry) => ({
         ...entry,
         agentId,
         resetAt,
         completedTurn: null,
       }));
-      return this.write({ ...next, launch: fork.launch, updatedAt: this.now() });
+      const written = await this.write({ ...next, launch: fork.launch, updatedAt: this.now() });
+      // The switch has happened; an entry left by a failed cleanup is unbound and never read.
+      await this.carries
+        .update(chatId, directory, { keep: boundSessions(written) })
+        .catch((err: unknown) => this.logger.warn({ chatId, err }, "chat.fork_carry.prune_failed"));
+      return written;
     });
   }
 
-  /** The switch's carry this Bot still owes, while no `/new` or later switch replaced it. */
+  /** The carry the Bot's bound session still owes; none once `/new` or a switch unbound it. */
   forkCarry(chatId: string, botId: string): ForkCarry | null {
-    const carry = this.carries.get(chatId, botId);
     const entry = this.cache.get(chatId)?.participants.find((p) => p.botId === botId);
-    return carry && entry?.resetAt === carry.resetAt ? carry : null;
+    return entry?.agentId ? this.carries.get(chatId, botId, entry.agentId) : null;
   }
 
-  /** The carry went with a message; a later switch's carry stays. */
-  clearForkCarry(chatId: string, botId: string, resetAt: string): Promise<void> {
+  /** The carry `agentId` owed went with a message. */
+  clearForkCarry(chatId: string, agentId: string): Promise<void> {
     return this.writes.run(chatId, async () => {
-      if (this.carries.get(chatId, botId)?.resetAt !== resetAt) return;
-      await this.carries.set(chatId, this.directory(chatId), botId, null);
+      const current = await this.require(chatId);
+      await this.carries.update(chatId, this.directory(chatId), {
+        remove: agentId,
+        keep: boundSessions(current),
+      });
     });
   }
 
@@ -379,6 +389,11 @@ export class ChatStore {
   idle(): Promise<void> {
     return this.writes.idle();
   }
+}
+
+/** The sessions a chat's Bots are bound to now. */
+function boundSessions(chat: StoredChat): ReadonlySet<string> {
+  return new Set(chat.participants.flatMap((entry) => (entry.agentId ? [entry.agentId] : [])));
 }
 
 function participant(botId: string, addedAt: string): StoredChatParticipant {

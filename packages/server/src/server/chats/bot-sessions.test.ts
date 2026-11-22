@@ -310,7 +310,7 @@ describe("BotSessions.fork", () => {
     expect(stored.participants[0]?.agentId).toBe("agent-old");
   });
 
-  test("a carry is cleared only for its own switch, and /new makes it stale", async () => {
+  test("a carry counts only while its session is bound: cleared by its own key, gone after /new", async () => {
     const { store, chat } = await harness();
     const resetAt = new Date().toISOString();
     await store.forkParticipantSession(chat.id, bot.id, {
@@ -319,20 +319,25 @@ describe("BotSessions.fork", () => {
       resetAt,
       carry: { sourceAgentId: "agent-old", previousAgentId: "agent-old", attachment },
     });
-    await store.clearForkCarry(chat.id, bot.id, "2000-01-01T00:00:00.000Z");
-    expect(store.forkCarry(chat.id, bot.id)).not.toBeNull();
-    await store.clearForkCarry(chat.id, bot.id, resetAt);
+    await store.clearForkCarry(chat.id, "agent-other");
+    expect(store.forkCarry(chat.id, bot.id)).toMatchObject({ agentId: "agent-new" });
+    await store.clearForkCarry(chat.id, "agent-new");
     expect(store.forkCarry(chat.id, bot.id)).toBeNull();
 
+    // Same resetAt as before (a frozen clock): the binding, not the time, decides.
     await store.forkParticipantSession(chat.id, bot.id, {
       launch,
       agentId: "agent-newer",
-      resetAt: new Date(Date.now() + 5).toISOString(),
+      resetAt,
       carry: { sourceAgentId: "agent-old", previousAgentId: "agent-new", attachment },
     });
-    expect(store.forkCarry(chat.id, bot.id)).not.toBeNull();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(store.forkCarry(chat.id, bot.id)).toMatchObject({ agentId: "agent-newer" });
     await store.resetParticipantSession(chat.id, bot.id);
     expect(store.forkCarry(chat.id, bot.id)).toBeNull();
+    // Re-binding the same session id cannot happen through a fork; even a manual cache write
+    // only finds a carry the file still holds for exactly that session and Bot.
+    const reopened = new ChatStore(store.rootDir, createTestLogger());
+    await reopened.load();
+    expect(reopened.forkCarry(chat.id, bot.id)).toBeNull();
   });
 });
