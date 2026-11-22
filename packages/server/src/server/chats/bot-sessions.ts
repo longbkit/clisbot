@@ -5,6 +5,8 @@ import { withSessionOperationIdentity } from "../agent/session-operation-context
 // cache of the lookup. A session that cannot resume, or was archived from the
 // cowork view, is replaced by a new one and the caller writes the system line.
 import { BOT_ID_LABEL, CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
+import type { AgentAttachment } from "@clisbot/protocol/agent-attachments";
+import type { BotLaunchDefaults } from "@clisbot/protocol/bots/types";
 import type { StoredAgentRecord } from "../agent/agent-storage.js";
 import { formatProviderModel, type BoundCreateAgentCommand } from "../agent/create-agent/create.js";
 import type { ChatBot, StoredChat } from "./chat-record.js";
@@ -23,7 +25,10 @@ export interface ResolvedBotSession {
 
 export interface BotSessionsDependencies {
   agentStorage: Pick<import("../agent/agent-storage.js").AgentStorage, "get" | "list">;
-  store: Pick<ChatStore, "require" | "setParticipantAgent" | "resetParticipantSession">;
+  store: Pick<
+    ChatStore,
+    "require" | "setParticipantAgent" | "resetParticipantSession" | "forkParticipantSession"
+  >;
   createAgent: BoundCreateAgentCommand;
   /** Loads (resumes) the session; throws when the provider cannot resume it. */
   ensureLoaded: (agentId: string) => Promise<unknown>;
@@ -32,10 +37,18 @@ export interface BotSessionsDependencies {
    * into the Chat after `/new` (docs/audits/2026-10-06-conversation-schedules.md). Never throws.
    */
   moveHeartbeats?: (fromAgentIds: readonly string[], toAgentId: string) => Promise<void>;
+  /** Archives a session a fork created but could not record, so no scan adopts it. */
+  discardAgent?: (agentId: string) => Promise<void>;
+}
+
+/** What a fork carries: the previous session and its conversation, read when it was confirmed. */
+export interface ForkCarry {
+  fromAgentId: string;
+  attachment: Extract<AgentAttachment, { type: "text" }>;
 }
 
 /** What a session created by `resolve` starts with. */
-interface SessionStart {
+export interface SessionStart {
   title: string | undefined;
   systemPrompt: string | undefined;
   creationIdentity?: SessionOperationIdentity;
@@ -70,6 +83,39 @@ export class BotSessions {
   reset(chatId: string, botId: string): Promise<void> {
     return this.queue.run(pairKey(chatId, botId), async () => {
       await this.deps.store.resetParticipantSession(chatId, botId);
+    });
+  }
+
+  /**
+   * A provider switch: starts the pair's session on `launch` now, then records the launch, the
+   * session and what it carries in one write. A launch that cannot start throws before anything
+   * changes; a session that could not be recorded is archived. Either way the old session stays
+   * the pair's.
+   */
+  fork(
+    chat: StoredChat,
+    bot: ChatBot,
+    launch: BotLaunchDefaults,
+    start: SessionStart,
+    carry: ForkCarry | null,
+  ): Promise<ResolvedBotSession> {
+    return this.queue.run(pairKey(chat.id, bot.id), async () => {
+      // Before the new session exists: the label scan adopts only sessions created after it.
+      const resetAt = new Date(Date.now() - 1).toISOString();
+      const agentId = await this.launchAgent(chat, bot, launch, start, {});
+      try {
+        await this.deps.store.forkParticipantSession(chat.id, bot.id, {
+          launch,
+          agentId,
+          resetAt,
+          pendingContext: carry ? { ...carry, agentId } : undefined,
+        });
+      } catch (error) {
+        await this.deps.discardAgent?.(agentId).catch(() => undefined);
+        throw error;
+      }
+      await this.moveHeartbeats(chat.id, bot.id, agentId);
+      return { agentId, created: true, replaced: null };
     });
   }
 
@@ -128,10 +174,23 @@ export class BotSessions {
   private async create(
     chat: StoredChat,
     bot: ChatBot,
-    { title, systemPrompt, creationIdentity }: SessionStart,
+    start: SessionStart,
     replaced: BotSessionReplacement | null,
   ): Promise<ResolvedBotSession> {
-    const launch = chat.launch ?? bot.launch;
+    const agentId = await this.launchAgent(chat, bot, chat.launch ?? bot.launch, start, {});
+    await this.deps.store.setParticipantAgent(chat.id, bot.id, agentId);
+    await this.moveHeartbeats(chat.id, bot.id, agentId);
+    return { agentId, created: true, replaced };
+  }
+
+  /** Creates the pair's agent on `launch`; it carries the pair's labels plus `labels`. */
+  private async launchAgent(
+    chat: StoredChat,
+    bot: ChatBot,
+    launch: BotLaunchDefaults,
+    { title, systemPrompt, creationIdentity }: SessionStart,
+    labels: Record<string, string>,
+  ): Promise<string> {
     const result = await withSessionOperationIdentity(
       creationIdentity ?? { actor: chat.createdBy },
       () =>
@@ -145,15 +204,12 @@ export class BotSessions {
           ...(systemPrompt ? { config: { systemPrompt } } : {}),
           cwd: bot.cwd,
           workspaceId: bot.workspaceId,
-          labels: { [BOT_ID_LABEL]: bot.id, [CHAT_ID_LABEL]: chat.id },
+          labels: { ...labels, [BOT_ID_LABEL]: bot.id, [CHAT_ID_LABEL]: chat.id },
           notifyOnFinish: false,
           promptFailure: "throw",
         }),
     );
-    const agentId = result.snapshot.id;
-    await this.deps.store.setParticipantAgent(chat.id, bot.id, agentId);
-    await this.moveHeartbeats(chat.id, bot.id, agentId);
-    return { agentId, created: true, replaced };
+    return result.snapshot.id;
   }
 
   private async moveHeartbeats(chatId: string, botId: string, agentId: string): Promise<void> {

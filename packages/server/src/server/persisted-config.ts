@@ -405,12 +405,10 @@ const DEFAULT_PERSISTED_CONFIG = PersistedConfigSchema.parse({
   daemon: {
     listen: "127.0.0.1:6868",
     // A new home offers agents the Clisbot tools; an existing home without
-    // these keys keeps the off defaults in config.ts.
+    // the key keeps the off default in config.ts. The browser tools are not
+    // written: they stay off until the person turns them on (Host or Project).
     mcp: {
       injectIntoAgents: true,
-    },
-    browserTools: {
-      enabled: true,
     },
     cors: {
       allowedOrigins: [DEFAULT_APP_BASE_URL],

@@ -211,6 +211,19 @@ export const ptBR: TranslationResources = {
     clientCommands: {
       archiveAgent: "Arquivar o agente atual",
       freshDraft: "Arquivar este agente e iniciar um novo rascunho",
+      freshChatSession: "Inicia uma sessão nova; o histórico deste chat é mantido",
+    },
+    providerSwitch: {
+      newSessionTag: "sessão nova",
+      title: "Mudar para {{provider}}?",
+      workMessage:
+        "{{provider}} não pode continuar esta sessão de {{current}}. Uma sessão nova começa em outra aba com esta conversa copiada como contexto. Esta sessão fica como está.",
+      chatMessage:
+        "{{provider}} não pode continuar esta sessão de {{current}}. O bot começa uma sessão nova no {{provider}} e sua próxima mensagem leva esta conversa como contexto. A sessão anterior fica no Cowork e o histórico do chat continua aqui.",
+      confirm: "Iniciar sessão nova",
+      cancel: "Cancelar",
+      hostNeedsUpdate: "Atualize este Host para mudar de provedor; nada foi alterado.",
+      failed: "Não foi possível mudar de provedor; nada foi alterado.",
     },
     github: {
       searching: "Buscando...",

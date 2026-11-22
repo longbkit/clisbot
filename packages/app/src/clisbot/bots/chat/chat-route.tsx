@@ -147,7 +147,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
   const attachmentsSupported = useSessionStore(
     (state) => state.sessions[serverId]?.serverInfo?.features?.bots === true,
   );
-  const { send, sending } = useChatSend(
+  const { send, sending, startFreshSession } = useChatSend(
     client,
     online && authorized,
     chatId,
@@ -176,6 +176,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
     serverId,
     botRows,
     workspaceByBotId,
+    startFreshSession,
   });
   // Clisbot: a direct chat shows tool calls as its Bot says, a group as the group says.
   const directBot = !group ? botRows.find((b) => b.id === chat?.participants[0]?.botId) : undefined;
@@ -252,6 +253,7 @@ function ChatRouteContent({ serverId, chatId }: { serverId: string; chatId: stri
                     discussionActive={chat?.discussionActive === true}
                     canSend={chat !== null && online && authorized && !sending}
                     onSubmitMessage={send}
+                    onStartFreshSession={startFreshSession}
                     onReachTop={reachTop}
                     toolDisplay={toolDisplay}
                   />,
@@ -488,11 +490,13 @@ function useChatHeadingActions({
   serverId,
   botRows,
   workspaceByBotId,
+  startFreshSession,
 }: {
   chat: ChatPayload | null;
   serverId: string;
   botRows: ChatIdentities["botRows"];
   workspaceByBotId: ChatIdentities["workspaceByBotId"];
+  startFreshSession: () => Promise<void>;
 }) {
   return useMemo(
     () =>
@@ -503,11 +507,12 @@ function useChatHeadingActions({
             chat={chat}
             bots={botRows}
             workspaceByBotId={workspaceByBotId}
+            onStartFreshSession={startFreshSession}
           />
           <ChatHeartbeatsButton serverId={serverId} chat={chat} />
         </>
       ) : null,
-    [botRows, chat, serverId, workspaceByBotId],
+    [botRows, chat, serverId, workspaceByBotId, startFreshSession],
   );
 }
 

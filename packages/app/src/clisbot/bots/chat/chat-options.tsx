@@ -50,11 +50,14 @@ export function ChatOptions({
   chat,
   bots,
   workspaceByBotId,
+  onStartFreshSession,
 }: {
   serverId: string;
   chat: ChatPayload;
   bots: BotPayload[];
   workspaceByBotId?: ReadonlyMap<string, string>;
+  /** Start a fresh session: the same reset `/new` runs. */
+  onStartFreshSession?: () => Promise<void>;
 }) {
   const compact = useIsCompactFormFactor();
   const active = useRetainedPanelActive();
@@ -86,6 +89,17 @@ export function ChatOptions({
     archive: membership.archive,
   });
   const busy = membership.busy || !membership.connected;
+  const freshSession = useMemo(
+    () =>
+      onStartFreshSession && membership.connected
+        ? () => {
+            close();
+            // The route shows a failure; the chat's history stays either way.
+            onStartFreshSession().catch(() => undefined);
+          }
+        : undefined,
+    [onStartFreshSession, membership.connected, close],
+  );
   const renderCompactMenu = useCallback(
     (onOpenCowork: () => void) => (
       <ChatOptionsMenu
@@ -95,10 +109,11 @@ export function ChatOptions({
         onAction={runAction}
         onOpenProject={openProject}
         onOpenCowork={onOpenCowork}
+        onFreshSession={freshSession}
         archiveDisabled={busy}
       />
     ),
-    [serverId, group, actions, runAction, openProject, busy],
+    [serverId, group, actions, runAction, openProject, busy, freshSession],
   );
   return (
     <>
@@ -118,6 +133,7 @@ export function ChatOptions({
           actions={actions}
           onAction={runAction}
           onOpenProject={openProject}
+          onFreshSession={freshSession}
           archiveDisabled={busy}
         />
       )}
@@ -149,6 +165,7 @@ function ChatOptionsMenu({
   onOpenProject,
   archiveDisabled,
   onOpenCowork,
+  onFreshSession,
 }: {
   serverId: string;
   group: boolean;
@@ -157,6 +174,8 @@ function ChatOptionsMenu({
   onOpenProject: () => void;
   archiveDisabled: boolean;
   onOpenCowork?: () => void;
+  /** Absent while the Host is offline: the item shows disabled. */
+  onFreshSession?: () => void;
 }) {
   const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
@@ -219,9 +238,15 @@ function ChatOptionsMenu({
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />
-        <DropdownMenuSubTrigger id="fresh" leading={FRESH_SESSION_ICON}>
+        <DropdownMenuItem
+          disabled={!onFreshSession}
+          onSelect={onFreshSession}
+          leading={FRESH_SESSION_ICON}
+          description={t("bots.chat.options.freshHint")}
+          testID="chat-options-fresh-session"
+        >
           {t("bots.chat.options.freshSession")}
-        </DropdownMenuSubTrigger>
+        </DropdownMenuItem>
         {pinAction ? <ResourceActionItem action={pinAction} onSelect={onAction} /> : null}
         {archiveAction ? (
           <ResourceActionItem

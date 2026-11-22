@@ -2,7 +2,8 @@ import { useClientChatQueue } from "./client-queue/use-client-chat-queue";
 import { useSessionStore } from "@/stores/session-store";
 import { useConversationProjectContext } from "./conversation-project-context";
 import { useRetainedPanelActive } from "@/components/retained-panel";
-import { memo, useCallback } from "react";
+import { memo, useCallback, useMemo } from "react";
+import type { ProviderSwitchTarget } from "@/clisbot/composer-picker/provider-switch";
 import { useTranslation } from "react-i18next";
 import { conversationFilePath } from "./source-file-path";
 import { View } from "react-native";
@@ -10,6 +11,7 @@ import { StyleSheet } from "react-native-unistyles";
 import { Composer } from "@/composer";
 import { useAgentInputDraft } from "@/composer/draft/input-draft";
 import type { MessagePayload } from "@/composer/types";
+import type { ClientSlashCommand } from "@/client-slash-commands";
 import type { MentionMember } from "./member-mentions";
 import { isNative } from "@/constants/platform";
 
@@ -27,6 +29,8 @@ interface ChatComposerProps {
   busy?: boolean;
   hasPermission?: boolean;
   onSubmitMessage: (payload: MessagePayload) => Promise<void>;
+  /** `/new`: a fresh session for the chat's Bots; the chat's history stays. */
+  onStartFreshSession?: () => Promise<void>;
   /** Group members the `@` picker offers; none in a direct chat. */
   mentionMembers?: readonly MentionMember[];
 }
@@ -43,6 +47,7 @@ export const ChatComposer = memo(function ChatComposer({
   busy = false,
   hasPermission = false,
   onSubmitMessage,
+  onStartFreshSession,
   mentionMembers,
 }: ChatComposerProps) {
   const { t } = useTranslation();
@@ -54,6 +59,18 @@ export const ChatComposer = memo(function ChatComposer({
   const draftKey = buildChatDraftKey(serverId, chatId);
   const draft = useAgentInputDraft({ draftKey });
   const project = useConversationProjectContext();
+  const runCommand = useCallback(
+    async (command: ClientSlashCommand) => {
+      if (command.kind !== "fresh-chat-session" || !onStartFreshSession) return;
+      await onStartFreshSession();
+    },
+    [onStartFreshSession],
+  );
+  // A direct chat's Bot can move to another provider; a group's Bots keep their own launch.
+  const providerSwitch = useMemo<ProviderSwitchTarget>(
+    () => (mentionMembers ? { kind: "unavailable" } : { kind: "chat", chatId }),
+    [mentionMembers, chatId],
+  );
   const resolveWorkspaceFilePath = useCallback(
     (path: string) => conversationFilePath(project?.cwd, path),
     [project?.cwd],
@@ -73,6 +90,7 @@ export const ChatComposer = memo(function ChatComposer({
         // One `bots` gate covers attachments and canonical spoken-input routing.
         realtimeVoiceEnabled={attachmentsSupported}
         showAgentControls={project?.canConfigure === true}
+        providerSwitch={providerSwitch}
         pendingSessionReason={
           !project?.agentId ? t("bots.chat.composer.pendingSession") : undefined
         }
@@ -84,6 +102,7 @@ export const ChatComposer = memo(function ChatComposer({
         autoFocusKey={chatId}
         placeholder={placeholder}
         onSubmitMessage={onSubmitMessage}
+        onClientSlashCommand={onStartFreshSession ? runCommand : undefined}
         isSubmitLoading={disabled}
         blurOnSubmit={isNative}
         textSource={draft.textSource}

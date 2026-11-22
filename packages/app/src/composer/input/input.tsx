@@ -128,6 +128,7 @@ export interface ComposerInputSnapshot {
 
 export interface ComposerKeyPressEvent {
   key: string;
+  shiftKey?: boolean;
   preventDefault: () => void;
   input: ComposerInputSnapshot;
 }
@@ -446,6 +447,7 @@ function handleDesktopKeyPressImpl(
   if (ctx.onKeyPressCallback) {
     const handled = ctx.onKeyPressCallback({
       key: event.nativeEvent.key,
+      shiftKey: event.nativeEvent.shiftKey,
       preventDefault: () => event.preventDefault(),
       input: ctx.input,
     });

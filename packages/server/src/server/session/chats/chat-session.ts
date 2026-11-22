@@ -88,6 +88,10 @@ export class ChatSession {
         !(await this.authority.allowsChatSessionConfiguration(participant.agentId))
       )
         throw new Error("Existing Bot session configuration access denied");
+      // A provider switch's carried conversation is the earlier session's: still yours to send.
+      const source = participant.pendingContext?.fromAgentId;
+      if (source && !(await this.authority.allowsChatSessionConfiguration(source)))
+        throw new Error("Earlier Bot session access denied");
       if (
         !(await this.authority.allowsAgentConfiguration(bot.workspaceId, {
           ...(chat.launch ?? bot.launch),
@@ -166,6 +170,33 @@ export class ChatSession {
     return { chat: result.chat, ...(result.sent ? { sent: result.sent } : {}) };
   }
 
+  /**
+   * A provider switch: the person may run this Chat as it is (its current session included) and
+   * may configure the Bot with the new launch, as `chat.create` with a launch requires.
+   */
+  private async fork(
+    request: Extract<Request, { type: "chat.session.fork.request" }>,
+  ): Promise<Record<string, unknown>> {
+    await this.requireRun(request.chatId);
+    const bot = await this.bots.get(request.botId);
+    if (
+      !bot ||
+      !(await this.authority.allowsAgentConfiguration(bot.workspaceId, {
+        ...request.launch,
+        cwd: bot.cwd,
+      }))
+    )
+      throw new Error("Bot session configuration access denied");
+    const result = await this.service.forkSession({
+      chatId: request.chatId,
+      botId: request.botId,
+      launch: request.launch,
+      expectedAgentId: request.expectedAgentId,
+      actor: this.actor() ?? LOCAL_OWNER,
+    });
+    return { chatId: request.chatId, botId: request.botId, ...result };
+  }
+
   private async dispatch(request: Request): Promise<Record<string, unknown>> {
     switch (request.type) {
       case "chat.create.request":
@@ -206,6 +237,8 @@ export class ChatSession {
       case "chat.session.reset.request":
         await this.service.newSession(request.chatId, request.botId);
         return { chatId: request.chatId, botId: request.botId };
+      case "chat.session.fork.request":
+        return this.fork(request);
       case "chat.discussion.stop.request":
         await this.requireRun(request.chatId);
         await this.service.stopDiscussion(request.chatId);
@@ -230,6 +263,7 @@ export function dispatchChatMessage(
     case "chat.update.request":
     case "chat.archive.request":
     case "chat.session.reset.request":
+    case "chat.session.fork.request":
     case "chat.discussion.stop.request":
       if (session) return session.handle(message);
       emit({
@@ -259,6 +293,8 @@ function errorDefaults(request: Request): Record<string, unknown> {
       return { messageId: null, seq: null, targets: [] };
     case "chat.session.reset.request":
       return { chatId: request.chatId, botId: request.botId };
+    case "chat.session.fork.request":
+      return { chatId: request.chatId, botId: request.botId, chat: null, agentId: null };
     case "chat.discussion.stop.request":
       return { chatId: request.chatId };
     default:

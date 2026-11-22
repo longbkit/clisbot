@@ -2,6 +2,7 @@
 // prompt, and how a bot reply, a notice and a repeated send become transcript lines.
 // Nothing here reads the store or an agent.
 import { createHash } from "node:crypto";
+import type { AgentAttachment } from "@clisbot/protocol/messages";
 import type { AgentPromptInput } from "../agent/agent-sdk-types.js";
 import { buildAgentPrompt } from "../agent/prompt-attachments.js";
 import { ClientMessageIdConflict, resolveClientMessageId } from "../client-message-id.js";
@@ -66,12 +67,14 @@ export function agentPromptFor(
   prompt: string,
   lines: TranscriptLine[],
   window: TranscriptLine[],
+  /** A forked session's earlier conversation, ahead of the files (`session-fork.ts`). */
+  context: AgentAttachment[] = [],
 ): AgentPromptInput {
   const userLines = window.filter((line) => line.sender.kind === "user");
   return buildAgentPrompt(
     lines.some((line) => line.spokenInputAgentId === agentId) ? wrapSpokenInput(prompt) : prompt,
     userLines.flatMap((line) => line.images ?? []),
-    userLines.flatMap((line) => line.attachments ?? []),
+    [...context, ...userLines.flatMap((line) => line.attachments ?? [])],
   );
 }
 

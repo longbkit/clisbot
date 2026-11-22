@@ -217,7 +217,7 @@ snapshot so a mixed edit can apply its live subset and still name the paths that
     hostnames: true | string[],   // legacy alias `allowedHosts` is migrated on load
     trustedProxies: true | string[], // defaults to ["loopback"]; Express proxy names/CIDRs
     mcp: { enabled: boolean, injectIntoAgents: boolean, allowAnonymous: boolean }, // new homes materialize injectIntoAgents: true; allowAnonymous defaults to false
-    browserTools: { enabled: boolean },  // new homes materialize enabled: true
+    browserTools: { enabled: boolean },  // absent means false; never written for the person
     git: { maxProcessesPerSecond: number, maxProcessConcurrency: number },
     appendSystemPrompt: string,    // appended to supported provider system/developer prompts
     terminalProfiles: TerminalProfile[],  // named shell commands; omitted means DEFAULT_TERMINAL_PROFILES
@@ -342,11 +342,22 @@ password, and only for direct loopback requests (no `Forwarded`, `Via`, `X-Forwa
 `daemon.managedAccess.mode` is not `external`. It exists for local test harnesses that cannot read
 the token; never set it on a daemon behind a reverse proxy.
 
-`daemon.mcp.injectIntoAgents` is the Host default. A new home writes it and
-`daemon.browserTools.enabled` as `true` into its first `config.json`; a home whose file lacks them
-reads both as `false`, so an existing Host does not gain tools on upgrade. A home upgraded from
-v1 (`clisbot.json`) counts as new: the upgrade writes both as `true` unless it kept an existing
-v2 `config.json`. When it is `false`, no provider receives
+`daemon.mcp.injectIntoAgents` is the Host default. A new home writes it as `true` into its first
+`config.json`; a home whose file lacks it reads it as `false`, so an existing Host does not gain
+tools on upgrade. A home upgraded from v1 (`clisbot.json`) counts as new: the upgrade writes it as
+`true` unless it kept an existing v2 `config.json`.
+
+`daemon.browserTools.enabled` is never written for the person: a new or upgraded home has no key,
+which reads as `false`, and an agent gets the 22 `browser_*` tools only after the person turns
+them on (**Settings → Host → Browser tools**, or a Project's **Tools** tab). An explicit value in
+`config.json` is kept as written, on or off. Homes created from 2026-10-09 until this change had
+`enabled: true` written at creation (and v1 upgrades from 2026-10-11); that value cannot be told
+apart from a deliberate opt-in, so it is kept. To turn it off, switch **Browser tools** off in
+**Settings → Host**, or set `daemon.browserTools.enabled` to `false` in `config.json` (hot-applied).
+A Project that followed the Host while it was on then follows it off; set the Project's Browser
+switch to keep it on.
+
+When `daemon.mcp.injectIntoAgents` is `false`, no provider receives
 Clisbot tools unless the session's Project turns them on; otherwise the provider policy applies. A
 Project can turn them on or off and narrow them per tool
 ([Agent tools](features/connectors/README.md#agent-tools)). Provider and global policy are resolved when a

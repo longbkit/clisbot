@@ -224,8 +224,9 @@ tool, named by what it does. Host follows the Host's **Inject Clisbot tools**
 (`daemon.mcp.injectIntoAgents`); On and Off win over the Host, so one Project can have them while
 the Host's default is off. Disabling the MCP endpoint itself (`daemon.mcp.enabled`) still withholds
 the server from every session, including Projects set to On. The Browser group also has the Host's **Browser tools** default
-(`daemon.browserTools.enabled`): its switch stores `browserTools` only while it differs from the
-Host, and switching it back to the Host's value follows the Host again.
+(`daemon.browserTools.enabled`, off unless the person turned it on; see
+[the config notes](../../data-model.md)): its switch stores `browserTools` only while it differs from
+the Host, and switching it back to the Host's value follows the Host again.
 
 - **One table.** `AGENT_TOOL_GROUPS` names every tool for the app and for the session switches.
   `mcp-server.test.ts` fails when the daemon registers a tool the table does not list, or the

@@ -54,6 +54,12 @@ export interface ForkAgentRequest {
   workspaceId?: string;
   target: AssistantForkTarget;
   boundary?: ForkAgentBoundary;
+  /**
+   * Clisbot: the provider and model the fork starts on instead of the source's (a provider switch
+   * from the model picker). Mode, effort and features belong to the source's provider, so they
+   * reset to the new provider's defaults.
+   */
+  launch?: { provider: string; model: string };
 }
 
 export interface UseForkAgentInput {
@@ -87,7 +93,20 @@ function buildChatHistoryAttachment(input: {
   };
 }
 
-function buildForkDraftSetup(agent: ForkAgentSource): WorkspaceDraftTabSetup | undefined {
+function buildForkDraftSetup(
+  agent: ForkAgentSource,
+  launch?: ForkAgentRequest["launch"],
+): WorkspaceDraftTabSetup | undefined {
+  if (launch) {
+    return {
+      provider: launch.provider,
+      cwd: agent.cwd,
+      modeId: null,
+      model: launch.model,
+      thinkingOptionId: null,
+      featureValues: {},
+    };
+  }
   if (!agent.provider) {
     return undefined;
   }
@@ -129,7 +148,7 @@ export function useForkAgent(
   const client = useSessionStore((state) => state.sessions[serverId]?.client ?? null);
   const supportsAgentForkContext = useHostFeature(serverId, "agentForkContext") && !readOnly;
 
-  return useStableEvent(async ({ agentId, agent, workspaceId, target, boundary }) => {
+  return useStableEvent(async ({ agentId, agent, workspaceId, target, boundary, launch }) => {
     try {
       if (!supportsAgentForkContext) {
         toast?.error(t("message.actions.forkUnavailable"));
@@ -138,7 +157,7 @@ export function useForkAgent(
       if (!client) {
         throw new Error(t("workspace.terminal.hostDisconnected"));
       }
-      const draftSetup = buildForkDraftSetup(agent);
+      const draftSetup = buildForkDraftSetup(agent, launch);
       const prepareForkDraft = async () => {
         const draftId = generateDraftId();
         const payload = await client.buildAgentForkContext(agentId, boundary);

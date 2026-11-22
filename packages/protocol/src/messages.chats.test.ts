@@ -59,6 +59,14 @@ describe("chat wire schemas", () => {
       { type: "chat.transcript.fetch.request", requestId: "r6", chatId: chat.id },
       { type: "chat.archive.request", requestId: "r7", chatId: chat.id },
       { type: "chat.session.reset.request", requestId: "r8", chatId: chat.id, botId: "bot_x" },
+      {
+        type: "chat.session.fork.request",
+        requestId: "r9",
+        chatId: chat.id,
+        botId: "bot_x",
+        launch: { provider: "claude", model: "sonnet" },
+        expectedAgentId: "agent-old",
+      },
     ];
     for (const request of requests) {
       expect(SessionInboundMessageSchema.parse(request)).toMatchObject({ type: request.type });
@@ -140,6 +148,17 @@ describe("chat wire schemas", () => {
       {
         type: "chat.session.reset.response",
         payload: { requestId: "r8", chatId: chat.id, botId: "bot_x", error: null },
+      },
+      {
+        type: "chat.session.fork.response",
+        payload: {
+          requestId: "r9",
+          chatId: chat.id,
+          botId: "bot_x",
+          chat,
+          agentId: "agent-new",
+          error: null,
+        },
       },
       { type: "chat.transcript.appended", payload: { chatId: chat.id, line } },
       { type: "chat.updated", payload: { chat } },

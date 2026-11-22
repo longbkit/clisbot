@@ -212,6 +212,35 @@ One long-lived session per (bot, chat) pair, resumed across restarts. `/new` sta
 for that pair. Context compaction belongs to the provider. A session that cannot resume is replaced
 by a new one and the transcript gets a system line saying so.
 
+`/new` is the Chat's own command: the Chat composer offers `/new` and none of an agent tab's
+commands (`/clear`, `/exit` archive an agent). Only the whole text `/new` (trailing spaces allowed,
+nothing attached) resets; `/new later` goes to the bot as typed. In the open command list Tab only
+completes the name and Enter runs it, Shift+Tab and a closed list keep normal focus movement, and
+Escape closes the list keeping the text. **Start a fresh session** in the ⋯ menu runs the same reset
+at once. One reset runs at a time, so a double press resets once (`use-chat-send.ts`).
+
+#### Switching provider
+
+A running session is one provider's process. In the model picker, the session's own provider comes
+first and changes the model in place; other providers follow, marked "new session", and ask first:
+confirming starts a NEW session on that provider carrying this conversation, Cancel changes and
+sends nothing. The old session is never changed.
+
+- **Direct chat** (`chat.session.fork`, gated on `chatProviderFork`): under the pair's lock the
+  daemon reads the current session's conversation through the Host's own timeline, then starts the
+  new session on the chosen launch and stores the launch, the session and the conversation
+  (`pendingContext`) on the participant in one write. A conversation that cannot be read, or a
+  launch that cannot start, refuses before anything changes; a session that could not be recorded
+  is archived. The next delivered message carries the conversation as the `chat_history`
+  attachment; it is removed only once that message was handed over, so a failed send or a restart
+  retries with it, and `/new` drops it. Sending it requires access to the earlier session. The
+  request names the session the person saw (`expectedAgentId`): a repeat of a fork that already
+  happened answers with it, any other change refuses. Group chats do not offer other providers;
+  their Bots keep their own launch.
+- **Work session**: the turn footer's fork (`agent.fork_context`) opens a draft tab on the chosen
+  provider and model with the conversation attached; nothing is sent until the person sends.
+- A Host without the feature says it needs an update; the pick is never silently dropped.
+
 ### D8. No turn serialization per bot
 
 A bot in several chats runs several sessions on the same cwd, concurrently. Overlapping writes to
@@ -397,7 +426,8 @@ the inputs they require.
 - `bot.create.request` / `.response`, `bot.list`, `bot.update`, `bot.archive`, `bot.template.seed`
   (re-seeding and explicit overwrite; the one verb that touches files, kept apart from `bot.update`)
 - `chat.create.request` / `.response`, `chat.list`, `chat.participant.add`, `chat.participant.remove`,
-  `chat.message.send`, `chat.transcript.fetch`
+  `chat.message.send`, `chat.transcript.fetch`, `chat.session.reset`, `chat.session.fork`
+  (`chatProviderFork`, [Switching provider](#switching-provider))
 - pushed: `chat.transcript.appended`, `chat.updated`, `bot.updated`
 
 `bot.create` names an existing slug idempotently and returns that bot with `reused: true` only

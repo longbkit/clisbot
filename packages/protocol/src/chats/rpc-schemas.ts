@@ -194,6 +194,39 @@ export const ChatSessionResetResponseSchema = z.object({
   }),
 });
 
+/**
+ * Moves one Bot of a direct chat to another provider: the chat's launch changes, a new session
+ * starts on it now, and the old session's conversation goes with the next message as context. The
+ * old session stays (Cowork). A same-provider model change stays in place (`set_agent_model`).
+ * Gated on `server_info.features.chatProviderFork`.
+ */
+export const ChatSessionForkRequestSchema = z.object({
+  type: z.literal("chat.session.fork.request"),
+  requestId: z.string(),
+  chatId: z.string(),
+  botId: z.string(),
+  launch: BotLaunchDefaultsSchema,
+  /**
+   * The session the person saw when confirming; null when there was none yet. A repeated
+   * confirmation of a fork that already happened answers with it instead of forking twice.
+   */
+  expectedAgentId: z.string().nullable(),
+});
+
+export const ChatSessionForkResponseSchema = z.object({
+  type: z.literal("chat.session.fork.response"),
+  payload: z.object({
+    requestId: z.string(),
+    chatId: z.string(),
+    botId: z.string(),
+    chat: ChatPayloadSchema.nullable(),
+    /** The new session; null when the fork failed and nothing changed. */
+    agentId: z.string().nullable(),
+    error: z.string().nullable(),
+    errorCode: z.string().optional(),
+  }),
+});
+
 export const ChatTranscriptAppendedSchema = z.object({
   type: z.literal("chat.transcript.appended"),
   payload: z.object({
@@ -225,6 +258,8 @@ export type ChatArchiveRequest = z.infer<typeof ChatArchiveRequestSchema>;
 export type ChatArchiveResponse = z.infer<typeof ChatArchiveResponseSchema>;
 export type ChatSessionResetRequest = z.infer<typeof ChatSessionResetRequestSchema>;
 export type ChatSessionResetResponse = z.infer<typeof ChatSessionResetResponseSchema>;
+export type ChatSessionForkRequest = z.infer<typeof ChatSessionForkRequestSchema>;
+export type ChatSessionForkResponse = z.infer<typeof ChatSessionForkResponseSchema>;
 export type ChatTranscriptAppendedMessage = z.infer<typeof ChatTranscriptAppendedSchema>;
 export type ChatUpdatedMessage = z.infer<typeof ChatUpdatedSchema>;
 

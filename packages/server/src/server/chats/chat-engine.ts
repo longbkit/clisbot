@@ -24,6 +24,8 @@ import {
   type StoredChat,
 } from "./chat-record.js";
 import type { ChatStore } from "./chat-store.js";
+import type { BotLaunchDefaults } from "@clisbot/protocol/bots/types";
+import { assertForkable, forkNotice, repeatedFork, type SessionForks } from "./session-fork.js";
 import { renderChatPrompt, sessionTitleFor } from "./context-prompt.js";
 import { KeyedSerialQueue } from "./keyed-queue.js";
 import {
@@ -78,6 +80,8 @@ export interface ChatEngineDependencies {
   agentManager: Pick<AgentManager, "subscribe" | "getAgent" | "cancelAgentRun">;
   sendPrompt: ChatPromptSender;
   publisher: ChatPublisher;
+  /** Provider switches (`chat.session.fork`); without it a fork is refused. */
+  sessionForks?: SessionForks;
   logger: Logger;
   now?: () => string;
   onBoundary?: (chatId: string) => void;
@@ -367,6 +371,50 @@ export class ChatEngine implements TurnTrackerHost {
     });
   }
 
+  /**
+   * A provider switch for one Bot of a direct chat: proves the old session's conversation can be
+   * read, starts the new session on `launch`, then says so in the chat. Anything that fails before
+   * the new session exists leaves the chat, its launch and the old session as they were.
+   */
+  forkSession(input: {
+    chatId: string;
+    botId: string;
+    launch: BotLaunchDefaults;
+    expectedAgentId: string | null;
+    actor?: SessionActor;
+  }): Promise<{ agentId: string }> {
+    const { chatId, botId, launch, actor } = input;
+    return this.changeIdleParticipant(chatId, botId, async (fromAgentId) => {
+      const forks = this.deps.sessionForks;
+      if (!forks) throw new Error("This Host cannot switch a chat's provider.");
+      const chat = await this.deps.store.require(chatId);
+      const repeated = repeatedFork(chat, botId, launch, input.expectedAgentId);
+      if (repeated) return { agentId: repeated };
+      const bot = await this.deps.bots.get(botId);
+      if (!bot) throw new Error(`Bot ${botId} is not in chat ${chatId}`);
+      assertForkable(chat, bot, launch);
+      // Read before anything changes: a conversation that cannot be read stops the switch.
+      const carry = fromAgentId
+        ? { fromAgentId, attachment: await forks.contextOf(fromAgentId) }
+        : null;
+      const room = this.roomOf(chat, botId);
+      const session = await this.deps.botSessions.fork(
+        chat,
+        bot,
+        launch,
+        {
+          title: chat.title ?? bot.displayName,
+          systemPrompt: room ? renderRoomContract(room) : undefined,
+          ...(actor ? { creationIdentity: { actor } } : {}),
+        },
+        carry,
+      );
+      if (fromAgentId) this.tracker.unwatch(fromAgentId);
+      await this.appendSystem(chatId, forkNotice(bot, launch, fromAgentId !== null));
+      return { agentId: session.agentId };
+    });
+  }
+
   removeParticipant(chatId: string, botId: string): Promise<StoredChat> {
     return this.changeIdleParticipant(chatId, botId, async (agentId) => {
       const chat = await this.deps.store.removeParticipant(chatId, botId);
@@ -573,6 +621,9 @@ export class ChatEngine implements TurnTrackerHost {
       lines.findLast((line) => line.sender.kind === "user")?.sessionIdentity,
     );
     if (session.replaced) await this.appendSystem(chatId, replacementNotice(bot, session.replaced));
+    // A provider switch's promised context goes with the next message, also to a session that
+    // replaced the forked one (it could not resume); `/new` drops the promise.
+    const pending = participant.pendingContext ?? null;
     const deliveredSeq = Math.max(...lines.map((entry) => entry.seq));
     const window = await this.windowOf(chatId, participant.deliveredSeq, deliveredSeq, rules);
     const prompt = renderChatPrompt({
@@ -585,9 +636,21 @@ export class ChatEngine implements TurnTrackerHost {
     if (started) {
       const update = room && !session.created ? roomUpdateFor(room, participant.roomSeen) : null;
       const text = [update, prompt, cue].filter(Boolean).join("\n\n");
-      const disposition = await this.prompt(chat, bot, session.agentId, rules, lines, text, window);
+      const disposition = await this.prompt(
+        chat,
+        bot,
+        session.agentId,
+        rules,
+        lines,
+        text,
+        window,
+        pending ? [pending.attachment] : [],
+      );
       // A duplicate or out-of-band command binds no turn, so nothing will end it.
       if (disposition === "out_of_band") started = false;
+      // The fork's context was handed over with this message; a failed send keeps it for a retry.
+      else if (pending)
+        await this.deps.store.clearPendingContext(chatId, botId, pending.fromAgentId);
     }
     // A new session read the room in its system prompt; a prompted one read it or its update.
     if (room && (prompt !== "" || session.created))
@@ -622,6 +685,7 @@ export class ChatEngine implements TurnTrackerHost {
     lines: TranscriptLine[],
     prompt: string,
     window: TranscriptLine[],
+    context: AgentAttachment[] = [],
   ): Promise<PromptDispatchDisposition> {
     const selectedBehavior = lines.at(-1)?.activeTurnBehavior;
     const activeTurnBehavior =
@@ -636,7 +700,7 @@ export class ChatEngine implements TurnTrackerHost {
       () =>
         this.deps.sendPrompt({
           agentId,
-          prompt: agentPromptFor(agentId, prompt, lines, window),
+          prompt: agentPromptFor(agentId, prompt, lines, window, context),
           messageId: lines.at(-1)!.id,
           activeTurnBehavior,
           ...(lines.at(-1)?.activeTurnBehavior === "steer" ? { strictSteer: true } : {}),

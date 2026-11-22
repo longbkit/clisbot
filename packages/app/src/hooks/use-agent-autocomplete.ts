@@ -13,7 +13,7 @@ import {
   orderAutocompleteOptions,
   type AutocompleteOptionsPosition,
 } from "@/components/ui/autocomplete-utils";
-import { useAutocomplete } from "./use-autocomplete";
+import { useAutocomplete, type AutocompleteSelectIntent } from "./use-autocomplete";
 import { useSessionStore } from "@/stores/session-store";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { CLIENT_SLASH_COMMANDS, type ClientSlashCommand } from "@/client-slash-commands";
@@ -48,8 +48,11 @@ interface UseAgentAutocompleteInput {
   draft?: DraftCommandTarget;
   resolveWorkspaceFilePath?: (path: string) => string;
   onAutocompleteApplied?: () => void;
-  onClientSlashCommand?: (command: ClientSlashCommand) => void;
+  /** Returns false when it does not run the command; the command's text is inserted instead. */
+  onClientSlashCommand?: (command: ClientSlashCommand) => boolean | void;
   canExecuteClientSlashCommand?: boolean;
+  /** The composer's own commands: an agent tab's by default, a Chat's in a Chat. */
+  clientSlashCommands?: readonly ClientSlashCommand[];
   pluginClientSlashCommands?: readonly PluginClientSlashCommand[];
   /** Group chat members offered before files when typing `@` (Clisbot Bots & Chats). */
   mentionMembers?: readonly AutocompleteMentionMember[];
@@ -62,6 +65,7 @@ interface UseAgentAutocompleteInput {
 
 interface AgentAutocompleteKeyPressEvent {
   key: string;
+  shiftKey?: boolean;
   preventDefault: () => void;
   input: AgentAutocompleteInputSnapshot;
 }
@@ -93,7 +97,12 @@ interface AgentAutocompleteResult {
   errorMessage?: string;
   loadingText: string;
   emptyText: string;
-  onSelectOption: (option: AutocompleteOption, input?: AgentAutocompleteInputSnapshot) => void;
+  /** A tap or click commits; `intent` "accept" (Tab) completes the text and runs nothing. */
+  onSelectOption: (
+    option: AutocompleteOption,
+    input?: AgentAutocompleteInputSnapshot,
+    intent?: AutocompleteSelectIntent,
+  ) => void;
   onKeyPress: (event: AgentAutocompleteKeyPressEvent) => boolean;
 }
 
@@ -207,12 +216,26 @@ function mapCommandToOption(entry: AvailableCommand, t: TFunction): AgentAutocom
   };
 }
 
+/**
+ * Runs a picked immediate client command when the pick commits (Enter, a tap); Tab only
+ * completes. False when nothing ran, so the command's text is inserted instead.
+ */
+function ranImmediateCommand(
+  selected: AgentAutocompleteOption,
+  intent: AutocompleteSelectIntent,
+  run: ((command: ClientSlashCommand) => boolean | void) | undefined,
+): boolean {
+  if (intent !== "commit" || selected.type !== "client_command" || !run) return false;
+  return selected.command.execution === "immediate" && run(selected.command) !== false;
+}
+
 type AutocompleteMode = "command" | "file" | null;
 
 interface BuildAutocompleteOptionsInput {
   isVisible: boolean;
   mode: AutocompleteMode;
   commands: AgentSlashCommand[];
+  clientCommands: readonly ClientSlashCommand[];
   pluginCommands: readonly PluginClientSlashCommand[];
   isDraftContext: boolean;
   commandFilterQuery: string;
@@ -233,7 +256,7 @@ function buildCommandAutocompleteOptions(input: BuildAutocompleteOptionsInput) {
       command,
     }));
     const rootCommands: AvailableCommand[] = mergeSlashCommandSources({
-      builtIn: CLIENT_SLASH_COMMANDS,
+      builtIn: input.clientCommands,
       plugins: input.pluginCommands,
       provider: input.commands,
       onPluginCollision(command, winner) {
@@ -431,6 +454,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
     onClientSlashCommand,
     canExecuteClientSlashCommand,
     pluginClientSlashCommands = [],
+    clientSlashCommands = CLIENT_SLASH_COMMANDS,
   } = input;
   const mentionMembers = input.mentionMembers ?? EMPTY_MEMBERS;
 
@@ -532,6 +556,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
         activeFileMention,
         commandFilterQuery,
         commands,
+        clientCommands: clientSlashCommands,
         pluginCommands: pluginClientSlashCommands,
         activeSlashCommand,
         fileSuggestions: fileSuggestionsQuery.data ?? [],
@@ -545,6 +570,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
       activeSlashCommand,
       commandFilterQuery,
       commands,
+      clientSlashCommands,
       pluginClientSlashCommands,
       fileSuggestionsQuery.data,
       isDraftContext,
@@ -561,7 +587,11 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
   }, [commandOptions, memberOptions, optionsPosition]);
 
   const onSelectOption = useCallback(
-    (option: AutocompleteOption, snapshot?: AgentAutocompleteInputSnapshot) => {
+    (
+      option: AutocompleteOption,
+      snapshot?: AgentAutocompleteInputSnapshot,
+      intent: AutocompleteSelectIntent = "commit",
+    ) => {
       const selected = option as AgentAutocompleteOption;
       const current = resolveAgentAutocompleteSnapshot({
         input: snapshot,
@@ -576,14 +606,10 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
         selected.type === "provider_command";
       if (snapshot && selectedIsCommand && !current.slashCommand) return;
       if (
-        selected.type === "client_command" &&
-        selected.command.execution === "immediate" &&
         canExecuteClientSlashCommand &&
-        onClientSlashCommand
-      ) {
-        onClientSlashCommand(selected.command);
+        ranImmediateCommand(selected, intent, onClientSlashCommand)
+      )
         return;
-      }
 
       if (selectedIsCommand) {
         if (!current.slashCommand) {
@@ -630,21 +656,20 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
   );
 
   const selectOptionFromKeyPress = useCallback(
-    (option: AutocompleteOption, event?: AgentAutocompleteKeyPressEvent) =>
-      onSelectOption(option, event?.input),
+    (
+      option: AutocompleteOption,
+      event: AgentAutocompleteKeyPressEvent,
+      intent: AutocompleteSelectIntent,
+    ) => onSelectOption(option, event.input, intent),
     [onSelectOption],
   );
 
-  const { selectedIndex, onKeyPress } = useAutocomplete({
+  const { selectedIndex, dismissed, onKeyPress } = useAutocomplete({
     isVisible,
     options,
     optionsPosition,
     query: mode === "command" ? commandFilterQuery : fileFilterQuery,
     onSelectOption: selectOptionFromKeyPress,
-    onEscape:
-      mode === "command" && activeSlashCommand?.position === "start"
-        ? () => setUserInput("")
-        : undefined,
   });
 
   const isLoading = resolveAutocompleteIsLoading({
@@ -674,7 +699,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
   const emptyText = resolveAutocompleteEmptyText({ mode, draft, t });
 
   return {
-    isVisible,
+    isVisible: isVisible && !dismissed,
     options,
     selectedIndex,
     isLoading,

@@ -146,15 +146,15 @@ async function applyConfig(home: string, report: LegacyUpgradeReport): Promise<v
 }
 
 // COMPAT(v1UpgradeTools): added in v2.0.2, remove after 2027-04-01.
-// v2.0.0 and v2.0.1 wrote an upgraded config.json without the tool switches a
-// new home gets, so those homes started with Clisbot and browser tools off.
+// v2.0.0 and v2.0.1 wrote an upgraded config.json without the Clisbot tools
+// switch a new home gets, so those homes started with Clisbot tools off. The
+// browser tools are never turned on here: they need the person's opt-in.
 // A key the user has since set, either way, is left alone.
 function restoreUpgradeTools(home: string, report: LegacyUpgradeReport): void {
   if (report.config === "preserved" || !existsSync(path.join(home, "config.json"))) return;
-  for (const field of ["daemon.mcp.injectIntoAgents", "daemon.browserTools.enabled"]) {
-    if (getPersistedConfigValue(readPersistedConfig(home), field) === undefined)
-      editPersistedConfig(home, field, { value: true });
-  }
+  const field = "daemon.mcp.injectIntoAgents";
+  if (getPersistedConfigValue(readPersistedConfig(home), field) === undefined)
+    editPersistedConfig(home, field, { value: true });
 }
 
 async function prepare(home: string): Promise<LegacyUpgradeReport> {

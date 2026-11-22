@@ -8,7 +8,6 @@ import { MenuTextField } from "@/components/ui/menu";
 import { mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
 import { useConversationTabsContext } from "./conversation-tabs-context";
 import { ConversationSourceLabelsContext } from "./conversation-source-labels";
-import { useConversationDraftContext } from "./conversation-draft-context";
 import { buildConversationTabOptions, filterConversationTabs } from "./conversation-tab-options";
 
 const ThemedMessageSquare = withUnistyles(MessageSquare);
@@ -20,12 +19,11 @@ const TAB_DIFF_ICON = <ThemedFileDiff size={16} uniProps={mutedIconColorMapping}
 
 type TabOption = ReturnType<typeof buildConversationTabOptions>[number];
 
-/** The chat options menu's sub-pages: Switch tab and Start a fresh session. */
+/** The chat options menu's sub-page: Switch tab. */
 export function useChatOptionsPages(group: boolean) {
   const { t } = useTranslation();
   const tabs = useConversationTabsContext();
   const labels = useContext(ConversationSourceLabelsContext);
-  const draft = useConversationDraftContext();
   const tabOptions = useMemo(
     () => buildConversationTabOptions(tabs?.tabs ?? [], labels, group),
     [tabs?.tabs, labels, group],
@@ -40,21 +38,8 @@ export function useChatOptionsPages(group: boolean) {
           <ChatTabsPage options={tabOptions} activeId={tabs?.activeId} onSelect={tabs?.selectTab} />
         ),
       },
-      {
-        id: "fresh",
-        title: t("bots.chat.options.freshSession"),
-        hoverIntent: false,
-        content: (
-          <>
-            <DropdownMenuHint>{t("bots.chat.options.freshHint")}</DropdownMenuHint>
-            <DropdownMenuItem disabled={!draft} onSelect={draft?.focusMessages}>
-              {t("bots.chat.options.goToMessages")}
-            </DropdownMenuItem>
-          </>
-        ),
-      },
     ],
-    [tabOptions, tabs, draft, t],
+    [tabOptions, tabs, t],
   );
   return { pages, tabCount: tabOptions.length };
 }

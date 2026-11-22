@@ -210,6 +210,19 @@ export const ko: TranslationResources = {
     clientCommands: {
       archiveAgent: "현재 에이전트 보관",
       freshDraft: "이 에이전트를 보관하고 새 초안을 시작합니다",
+      freshChatSession: "새 세션을 시작합니다. 이 채팅 기록은 유지됩니다",
+    },
+    providerSwitch: {
+      newSessionTag: "새 세션",
+      title: "{{provider}}(으)로 전환할까요?",
+      workMessage:
+        "{{provider}}는 이 {{current}} 세션을 이어갈 수 없습니다. 이 대화를 컨텍스트로 복사한 새 세션이 새 탭에서 시작됩니다. 이 세션은 그대로 남습니다.",
+      chatMessage:
+        "{{provider}}는 이 {{current}} 세션을 이어갈 수 없습니다. 봇이 {{provider}}에서 새 세션을 시작하고, 다음 메시지에 이 대화가 컨텍스트로 함께 전달됩니다. 이전 세션은 Cowork에 남고 채팅 기록은 여기에 남습니다.",
+      confirm: "새 세션 시작",
+      cancel: "취소",
+      hostNeedsUpdate: "제공자를 바꾸려면 이 Host를 업데이트하세요. 변경된 내용은 없습니다.",
+      failed: "제공자를 바꾸지 못했습니다. 변경된 내용은 없습니다.",
     },
     github: {
       searching: "검색 중...",

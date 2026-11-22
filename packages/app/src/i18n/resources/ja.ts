@@ -212,6 +212,20 @@ export const ja: TranslationResources = {
     clientCommands: {
       archiveAgent: "現在のエージェントをアーカイブ",
       freshDraft: "このエージェントをアーカイブして新しい下書きを開始",
+      freshChatSession: "新しいセッションを開始します。このチャットの履歴は残ります",
+    },
+    providerSwitch: {
+      newSessionTag: "新しいセッション",
+      title: "{{provider}} に切り替えますか？",
+      workMessage:
+        "{{provider}} はこの {{current}} のセッションを続けられません。この会話をコンテキストとして引き継いだ新しいセッションが新しいタブで始まります。このセッションはそのまま残ります。",
+      chatMessage:
+        "{{provider}} はこの {{current}} のセッションを続けられません。ボットは {{provider}} で新しいセッションを始め、次のメッセージでこの会話をコンテキストとして渡します。以前のセッションは Cowork に、チャットの履歴はここに残ります。",
+      confirm: "新しいセッションを開始",
+      cancel: "キャンセル",
+      hostNeedsUpdate:
+        "プロバイダーを切り替えるにはこの Host を更新してください。何も変更されていません。",
+      failed: "プロバイダーを切り替えられませんでした。何も変更されていません。",
     },
     github: {
       searching: "検索中...",

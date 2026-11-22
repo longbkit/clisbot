@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
@@ -25,6 +25,20 @@ describe("daemon browser tools config", () => {
     const home = await createClisbotHome({ version: 1 });
 
     expect(loadConfig(home, { env: {} }).browserToolsEnabled).toBe(false);
+  });
+
+  test("a brand-new home starts with browser tools off and writes no opt-in", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-browser-tools-"));
+    roots.push(root);
+    const home = path.join(root, ".clisbot");
+    await mkdir(home, { recursive: true });
+
+    const config = loadConfig(home, { env: {} });
+
+    expect(config.browserToolsEnabled).toBe(false);
+    const written = JSON.parse(await readFile(path.join(home, "config.json"), "utf8"));
+    expect(written.daemon.browserTools).toBeUndefined();
+    expect(written.daemon.mcp.injectIntoAgents).toBe(true);
   });
 
   test("loads browser tools opt-in from persisted daemon config", async () => {

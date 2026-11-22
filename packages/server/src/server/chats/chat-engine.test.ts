@@ -47,7 +47,12 @@ interface SentPrompt {
 }
 
 async function harness(
-  options: { failPromptFor?: string[]; waitPrompt?: Promise<void>; outOfBandFor?: string[] } = {},
+  options: {
+    failPromptFor?: string[];
+    waitPrompt?: Promise<void>;
+    outOfBandFor?: string[];
+    sessionForks?: import("./session-fork.js").SessionForks;
+  } = {},
 ) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "chat-engine-"));
   roots.push(root);
@@ -132,6 +137,7 @@ async function harness(
       transcriptAppended: (_chatId, line) => appended.push(line),
       chatUpdated: (chat) => updated.push(chat),
     },
+    ...(options.sessionForks ? { sessionForks: options.sessionForks } : {}),
     logger,
   });
   let seq = 0;
@@ -1032,5 +1038,189 @@ describe("group room contract (plans/group-discussion.md)", () => {
     await h.completeTurn("agent-bot_b-2", null);
     expect((await h.lines("cht_g")).map((line) => line.text)).toEqual(["@alpha @beta thoughts?"]);
     expect(h.sent).toHaveLength(2);
+  });
+});
+
+describe("provider switch (chat.session.fork)", () => {
+  const history = (from: string) => ({
+    type: "text" as const,
+    mimeType: "text/plain",
+    contextKind: "chat_history" as const,
+    title: "Chat history",
+    text: `conversation of ${from}`,
+  });
+  const claude = { provider: "claude", model: "sonnet" };
+
+  async function forked(contextOf?: (agentId: string) => Promise<ReturnType<typeof history>>) {
+    const reads: string[] = [];
+    const h = await harness({
+      failPromptFor: [],
+      sessionForks: {
+        contextOf: contextOf ?? (async (agentId) => (reads.push(agentId), history(agentId))),
+      },
+    });
+    await h.store.create({ id: "cht_f", botIds: [alpha.id] });
+    await h.engine.send({ chatId: "cht_f", text: "one", messageId: "m1" });
+    await h.engine.idle();
+    await h.completeTurn("agent-bot_a-1", "first answer");
+    return { h, reads };
+  }
+
+  const blocksOf = (prompt: unknown) => (Array.isArray(prompt) ? prompt : [prompt]);
+
+  test("starts the new provider's session now and carries the old conversation once", async () => {
+    const { h, reads } = await forked();
+    const result = await h.engine.forkSession({
+      chatId: "cht_f",
+      botId: alpha.id,
+      launch: claude,
+      expectedAgentId: "agent-bot_a-1",
+      actor,
+    });
+    expect(result.agentId).toBe("agent-bot_a-2");
+    expect(reads).toEqual(["agent-bot_a-1"]);
+    expect(h.createInputs.at(-1)).toMatchObject({ provider: "claude/sonnet", cwd: alpha.cwd });
+    const chat = await h.store.require("cht_f");
+    expect(chat.launch).toEqual(claude);
+    expect(chat.participants[0]).toMatchObject({
+      agentId: "agent-bot_a-2",
+      pendingContext: { fromAgentId: "agent-bot_a-1", agentId: "agent-bot_a-2" },
+    });
+    // The old session is left as it was, for Cowork.
+    expect(h.agents.get("agent-bot_a-1")?.archivedAt).toBeUndefined();
+    expect((await h.lines("cht_f")).at(-1)?.text).toContain("Alpha moved to claude/sonnet");
+
+    await h.engine.send({ chatId: "cht_f", text: "two", messageId: "m2" });
+    await h.engine.idle();
+    const carried = h.sent.at(-1)!;
+    expect(carried.agentId).toBe("agent-bot_a-2");
+    expect(blocksOf(carried.prompt)[0]).toMatchObject({
+      contextKind: "chat_history",
+      text: "conversation of agent-bot_a-1",
+    });
+    expect(JSON.stringify(carried.prompt)).toContain("two");
+    expect((await h.store.require("cht_f")).participants[0]?.pendingContext).toBeUndefined();
+
+    await h.completeTurn("agent-bot_a-2", "second answer");
+    await h.engine.send({ chatId: "cht_f", text: "three", messageId: "m3" });
+    await h.engine.idle();
+    expect(JSON.stringify(h.sent.at(-1)!.prompt)).not.toContain("conversation of");
+  });
+
+  test("a failed delivery keeps the promised context for the retry", async () => {
+    const reads: string[] = [];
+    const h = await harness({
+      failPromptFor: ["agent-bot_a-2"],
+      sessionForks: { contextOf: async (agentId) => (reads.push(agentId), history(agentId)) },
+    });
+    await h.store.create({ id: "cht_r", botIds: [alpha.id] });
+    await h.engine.send({ chatId: "cht_r", text: "one", messageId: "m1" });
+    await h.engine.idle();
+    await h.completeTurn("agent-bot_a-1", "first answer");
+    await h.engine.forkSession({
+      chatId: "cht_r",
+      botId: alpha.id,
+      launch: claude,
+      expectedAgentId: "agent-bot_a-1",
+    });
+    await h.engine.send({ chatId: "cht_r", text: "two", messageId: "m2" });
+    await h.engine.idle();
+    expect(h.sent.filter((prompt) => prompt.agentId === "agent-bot_a-2")).toHaveLength(0);
+    expect((await h.store.require("cht_r")).participants[0]?.pendingContext?.fromAgentId).toBe(
+      "agent-bot_a-1",
+    );
+  });
+
+  test("an unreadable conversation stops the switch before anything changes", async () => {
+    const { h } = await forked(async () => {
+      throw new Error("timeline unavailable");
+    });
+    const before = await h.store.require("cht_f");
+    await expect(
+      h.engine.forkSession({
+        chatId: "cht_f",
+        botId: alpha.id,
+        launch: claude,
+        expectedAgentId: "agent-bot_a-1",
+      }),
+    ).rejects.toThrow("timeline unavailable");
+    const after = await h.store.require("cht_f");
+    expect(after.launch).toBeUndefined();
+    expect(after.participants).toEqual(before.participants);
+    expect(h.createInputs).toHaveLength(1);
+  });
+
+  test("a repeated confirmation answers with the same fork; a stale one is refused", async () => {
+    const { h } = await forked();
+    const input = {
+      chatId: "cht_f",
+      botId: alpha.id,
+      launch: claude,
+      expectedAgentId: "agent-bot_a-1",
+    };
+    const [first, second] = await Promise.all([
+      h.engine.forkSession(input),
+      h.engine.forkSession(input),
+    ]);
+    expect(first.agentId).toBe("agent-bot_a-2");
+    expect(second.agentId).toBe("agent-bot_a-2");
+    expect(h.createInputs).toHaveLength(2);
+    expect((await h.lines("cht_f")).filter((line) => line.text.includes("moved to"))).toHaveLength(
+      1,
+    );
+    await expect(
+      h.engine.forkSession({ ...input, launch: { provider: "gemini" } }),
+    ).rejects.toThrow("changed since you chose");
+  });
+
+  test("a group chat and the same provider are refused", async () => {
+    const { h } = await forked();
+    await expect(
+      h.engine.forkSession({
+        chatId: "cht_f",
+        botId: alpha.id,
+        launch: { provider: "codex", model: "other" },
+        expectedAgentId: "agent-bot_a-1",
+      }),
+    ).rejects.toThrow("same provider");
+    await h.store.create({ id: "cht_g", botIds: [alpha.id, beta.id], kind: "group" });
+    await expect(
+      h.engine.forkSession({
+        chatId: "cht_g",
+        botId: alpha.id,
+        launch: claude,
+        expectedAgentId: null,
+      }),
+    ).rejects.toThrow("direct chat");
+  });
+
+  test("/new after a switch drops the promised context", async () => {
+    const { h } = await forked();
+    await h.engine.forkSession({
+      chatId: "cht_f",
+      botId: alpha.id,
+      launch: claude,
+      expectedAgentId: "agent-bot_a-1",
+    });
+    await h.engine.newSession("cht_f", alpha.id);
+    expect((await h.store.require("cht_f")).participants[0]?.pendingContext).toBeUndefined();
+    await h.engine.send({ chatId: "cht_f", text: "two", messageId: "m2" });
+    await h.engine.idle();
+    expect(JSON.stringify(h.sent.at(-1)!.prompt)).not.toContain("conversation of");
+    // The chat keeps the switched launch.
+    expect(h.createInputs.at(-1)).toMatchObject({ provider: "claude/sonnet" });
+  });
+
+  test("a Host without session forks refuses", async () => {
+    const h = await harness();
+    await h.store.create({ id: "cht_n", botIds: [alpha.id] });
+    await expect(
+      h.engine.forkSession({
+        chatId: "cht_n",
+        botId: alpha.id,
+        launch: claude,
+        expectedAgentId: null,
+      }),
+    ).rejects.toThrow("cannot switch");
   });
 });

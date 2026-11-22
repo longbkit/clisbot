@@ -169,6 +169,7 @@ import {
   ChatArchiveRequestSchema,
   ChatUpdateRequestSchema,
   ChatSessionResetRequestSchema,
+  ChatSessionForkRequestSchema,
   ChatDiscussionStopRequestSchema,
   ChatCreateResponseSchema,
   ChatListResponseSchema,
@@ -179,6 +180,7 @@ import {
   ChatArchiveResponseSchema,
   ChatUpdateResponseSchema,
   ChatSessionResetResponseSchema,
+  ChatSessionForkResponseSchema,
   ChatDiscussionStopResponseSchema,
   ChatTranscriptAppendedSchema,
   ChatUpdatedSchema,
@@ -3508,6 +3510,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ChatArchiveRequestSchema,
   ChatUpdateRequestSchema,
   ChatSessionResetRequestSchema,
+  ChatSessionForkRequestSchema,
   ChatDiscussionStopRequestSchema,
   WorkspaceRecoveryInspectRequestSchema,
   WorkspaceRecoveryRestoreRequestSchema,
@@ -3932,6 +3935,10 @@ export const ServerInfoStatusPayloadSchema = z
         // `template.overwrite` on `bot.create`, for a bot made from an existing Project; added in
         // v0.10.3-fusion; remove the gate after 2027-04-08.
         botTemplatePreview: z.boolean().optional(),
+        // COMPAT(chatProviderFork): `chat.session.fork`, a direct chat's Bot moved to another
+        // provider in a new session that carries the old one's context; added in v2.2.6; remove
+        // the gate after 2027-05-31.
+        chatProviderFork: z.boolean().optional(),
         // COMPAT(connectors): Clisbot Connectors (Composio apps and MCP servers for Bots); added in
         // v0.10.2-fusion; remove the gate after 2027-06-30 once the daemon floor advertises it.
         connectors: z.boolean().optional(),
@@ -7467,6 +7474,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ChatArchiveResponseSchema,
   ChatUpdateResponseSchema,
   ChatSessionResetResponseSchema,
+  ChatSessionForkResponseSchema,
   ChatDiscussionStopResponseSchema,
   ChatTranscriptAppendedSchema,
   ChatUpdatedSchema,

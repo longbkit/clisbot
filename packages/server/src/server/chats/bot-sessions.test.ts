@@ -44,6 +44,7 @@ async function harness(
     agents?: StoredAgentRecord[];
     failsToLoad?: string[];
     moveHeartbeats?: BotSessionsDependencies["moveHeartbeats"];
+    discardAgent?: BotSessionsDependencies["discardAgent"];
   } = {},
 ) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "bot-sessions-"));
@@ -72,8 +73,9 @@ async function harness(
       if (options.failsToLoad?.includes(id)) throw new Error(`cannot resume ${id}`);
     },
     moveHeartbeats: options.moveHeartbeats,
+    discardAgent: options.discardAgent,
   };
-  return { store, chat, sessions: new BotSessions(deps), created, loaded };
+  return { store, chat, sessions: new BotSessions(deps), created, loaded, agents };
 }
 
 describe("BotSessions", () => {
@@ -216,5 +218,99 @@ describe("BotSessions", () => {
     await sessions.reset("cht_1", bot.id);
     await sessions.resolve(chat, bot);
     expect(moves).toEqual([{ from: ["agent-new-1"], to: "agent-new-2" }]);
+  });
+});
+
+describe("BotSessions.fork", () => {
+  const launch = { provider: "claude", model: "sonnet" };
+  const attachment = {
+    type: "text" as const,
+    mimeType: "text/plain",
+    contextKind: "chat_history" as const,
+    text: "earlier",
+  };
+  const start = { title: "Research sync", systemPrompt: undefined };
+
+  test("records the launch, the new session and the carry in one write; a scan adopts it", async () => {
+    const old = agentRecord("agent-old");
+    const { store, chat, sessions } = await harness({ agents: [old] });
+    await store.setParticipantAgent(chat.id, bot.id, "agent-old");
+    const forked = await sessions.fork(chat, bot, launch, start, {
+      fromAgentId: "agent-old",
+      attachment,
+    });
+    const stored = await store.require(chat.id);
+    expect(stored.launch).toEqual(launch);
+    expect(stored.participants[0]).toMatchObject({
+      agentId: forked.agentId,
+      pendingContext: { fromAgentId: "agent-old", agentId: forked.agentId, attachment },
+    });
+    // A lost cache is repaired to the fork, never back to the old session.
+    await store.setParticipantAgent(chat.id, bot.id, null);
+    const resolved = await sessions.resolve(await store.require(chat.id), bot);
+    expect(resolved).toMatchObject({ agentId: forked.agentId, created: false });
+  });
+
+  test("a session that cannot be recorded is archived and the old one stays", async () => {
+    const old = agentRecord("agent-old");
+    const discarded: string[] = [];
+    const { store, chat, sessions } = await harness({
+      agents: [old],
+      discardAgent: async (agentId) => {
+        discarded.push(agentId);
+      },
+    });
+    await store.setParticipantAgent(chat.id, bot.id, "agent-old");
+    const failing = Object.assign(Object.create(Object.getPrototypeOf(store)), store, {
+      forkParticipantSession: async () => {
+        throw new Error("disk full");
+      },
+    });
+    const broken = new BotSessions({
+      agentStorage: { get: async () => null, list: async () => [] },
+      store: failing,
+      createAgent: async () => ({ snapshot: { id: "agent-orphan" } }) as never,
+      ensureLoaded: async () => undefined,
+      discardAgent: async (agentId) => {
+        discarded.push(agentId);
+      },
+    });
+    await expect(broken.fork(chat, bot, launch, start, null)).rejects.toThrow("disk full");
+    expect(discarded).toEqual(["agent-orphan"]);
+    expect((await store.require(chat.id)).participants[0]?.agentId).toBe("agent-old");
+    expect((await store.require(chat.id)).launch).toBeUndefined();
+    void sessions;
+  });
+
+  test("a launch that cannot start changes nothing", async () => {
+    const { store, chat } = await harness();
+    await store.setParticipantAgent(chat.id, bot.id, "agent-old");
+    const sessions = new BotSessions({
+      agentStorage: { get: async () => null, list: async () => [] },
+      store,
+      createAgent: async () => {
+        throw new Error("claude is not installed");
+      },
+      ensureLoaded: async () => undefined,
+    });
+    await expect(sessions.fork(chat, bot, launch, start, null)).rejects.toThrow("not installed");
+    const stored = await store.require(chat.id);
+    expect(stored.launch).toBeUndefined();
+    expect(stored.participants[0]?.agentId).toBe("agent-old");
+  });
+
+  test("clearing the carry removes only the promise from that session", async () => {
+    const { store, chat } = await harness();
+    await store.forkParticipantSession(chat.id, bot.id, {
+      launch,
+      agentId: "agent-new",
+      resetAt: new Date().toISOString(),
+      pendingContext: { fromAgentId: "agent-old", agentId: "agent-new", attachment },
+    });
+    await store.clearPendingContext(chat.id, bot.id, "agent-other");
+    expect((await store.require(chat.id)).participants[0]?.pendingContext).toBeDefined();
+    await store.clearPendingContext(chat.id, bot.id, "agent-old");
+    const participant = (await store.require(chat.id)).participants[0]!;
+    expect("pendingContext" in participant).toBe(false);
   });
 });

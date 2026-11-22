@@ -19,6 +19,7 @@ import type { AgentStorage } from "../agent/agent-storage.js";
 import type { AgentTimelineStore } from "../agent/agent-timeline-store-types.js";
 import type { BoundCreateAgentCommand } from "../agent/create-agent/create.js";
 import { BotSessions } from "./bot-sessions.js";
+import { createSessionForks } from "./session-fork.js";
 import { reconcileChats } from "./reconcile.js";
 import {
   ChatEngine,
@@ -102,6 +103,14 @@ export interface ChatService {
   fetchTranscript(chatId: string, options?: TranscriptFetchOptions): Promise<TranscriptWindow>;
   /** `/new` for one bot in one chat (D7). */
   newSession(chatId: string, botId: string): Promise<void>;
+  /** A direct chat's Bot moved to another provider in a new session (`session-fork.ts`). */
+  forkSession(input: {
+    chatId: string;
+    botId: string;
+    launch: BotLaunchDefaults;
+    expectedAgentId: string | null;
+    actor?: SessionActor;
+  }): Promise<{ chat: ChatPayload; agentId: string }>;
   /** Stop all (plans/group-discussion.md): ends the discussion and interrupts running turns. */
   stopDiscussion(chatId: string): Promise<boolean>;
 }
@@ -233,6 +242,9 @@ function createEngine(
           );
       }
     },
+    discardAgent: async (agentId) => {
+      await agentManager.archiveAgent(agentId);
+    },
   });
   return new ChatEngine({
     onBoundary,
@@ -243,6 +255,7 @@ function createEngine(
     agentManager,
     publisher,
     logger,
+    sessionForks: createSessionForks({ agentManager, agentStorage, logger }),
     sendPrompt: (params) =>
       sendPromptToAgent({
         agentManager,
@@ -368,6 +381,10 @@ function chatWrites({
     },
     postScheduled: (input) => engine.postScheduled(input),
     newSession: (chatId, botId) => engine.newSession(chatId, botId),
+    forkSession: async (input) => {
+      const { agentId } = await engine.forkSession(input);
+      return { chat: await engine.payload(await store.require(input.chatId)), agentId };
+    },
     stopDiscussion: (chatId) => engine.stopDiscussion(chatId),
   };
 }

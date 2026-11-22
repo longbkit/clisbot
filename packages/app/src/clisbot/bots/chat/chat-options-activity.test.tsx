@@ -6,7 +6,7 @@ import type { ChatPayload } from "@clisbot/protocol/chats/types";
 interface Children {
   children?: React.ReactNode;
 }
-const state = vi.hoisted(() => ({ active: true, setVisible: vi.fn() }));
+const state = vi.hoisted(() => ({ active: true, setVisible: vi.fn(), client: null as unknown }));
 vi.mock("react-native", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-native")>()),
   View: "div",
@@ -52,7 +52,7 @@ vi.mock("expo-router", () => ({
   usePathname: () => "/",
   useLocalSearchParams: () => ({}),
 }));
-vi.mock("@/runtime/host-runtime", () => ({ useHostRuntimeClient: () => null }));
+vi.mock("@/runtime/host-runtime", () => ({ useHostRuntimeClient: () => state.client }));
 vi.mock("@/utils/confirm-dialog", () => ({ confirmDialog: vi.fn() }));
 vi.mock("../sidebar/pins", () => ({
   useResourcePins: () => ({ toggle: vi.fn(), isPinned: () => false }),
@@ -106,4 +106,35 @@ it("dismisses route-owned sheets and clears their mounted draft when the convers
   view.rerender(React.cloneElement(element));
   expect(screen.getByTestId("sheet").getAttribute("data-visible")).toBe("false");
   expect(screen.queryByLabelText("Pending group name")).toBeNull();
+});
+
+it("Start a fresh session resets at once, without a submenu or the composer", async () => {
+  const onStartFreshSession = vi.fn(async () => undefined);
+  render(
+    <ChatOptions serverId="host" chat={chat} bots={[]} onStartFreshSession={onStartFreshSession} />,
+    {
+      wrapper: RootRoute,
+    },
+  );
+  // Offline: the item shows disabled and does nothing.
+  fireEvent.click(screen.getByText("Start a fresh session"));
+  expect(onStartFreshSession).not.toHaveBeenCalled();
+  cleanup();
+  state.client = {};
+  try {
+    render(
+      <ChatOptions
+        serverId="host"
+        chat={chat}
+        bots={[]}
+        onStartFreshSession={onStartFreshSession}
+      />,
+      { wrapper: RootRoute },
+    );
+    fireEvent.click(screen.getByText("Start a fresh session"));
+    expect(onStartFreshSession).toHaveBeenCalledTimes(1);
+    expect(state.setVisible).toHaveBeenCalledWith(false);
+  } finally {
+    state.client = null;
+  }
 });

@@ -715,14 +715,32 @@ describe("loadPersistedConfig", () => {
     }
   });
 
-  test("materializes Clisbot tools on for a new Clisbot home", () => {
+  test("materializes Clisbot tools on, and no browser tools, for a new Clisbot home", () => {
     const home = createTempHome();
     try {
       const config = loadPersistedConfig(home);
       expect(config.daemon?.mcp?.injectIntoAgents).toBe(true);
-      expect(config.daemon?.browserTools?.enabled).toBe(true);
+      // Browser tools stay off until the person opts in (Host switch or a Project's Tools tab).
+      expect(config.daemon?.browserTools).toBeUndefined();
+      const written = JSON.parse(readFileSync(path.join(home, "config.json"), "utf8"));
+      expect(written.daemon.browserTools).toBeUndefined();
     } finally {
       rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test("keeps an existing home's explicit browser tools choice, on or off", () => {
+    for (const enabled of [true, false]) {
+      const home = createTempHome();
+      try {
+        writeFileSync(
+          path.join(home, "config.json"),
+          JSON.stringify({ version: 1, daemon: { browserTools: { enabled } } }),
+        );
+        expect(loadPersistedConfig(home).daemon?.browserTools?.enabled).toBe(enabled);
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
     }
   });
 

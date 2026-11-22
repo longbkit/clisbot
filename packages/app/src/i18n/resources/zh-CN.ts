@@ -210,6 +210,19 @@ export const zhCN: TranslationResources = {
     clientCommands: {
       archiveAgent: "归档当前 Agent",
       freshDraft: "归档此 Agent 并开始新的草稿",
+      freshChatSession: "开始新会话；此聊天的历史记录会保留",
+    },
+    providerSwitch: {
+      newSessionTag: "新会话",
+      title: "切换到 {{provider}}？",
+      workMessage:
+        "{{provider}} 无法继续这个 {{current}} 会话。将在新标签页中开始一个新会话，并把这段对话复制为上下文。此会话保持不变。",
+      chatMessage:
+        "{{provider}} 无法继续这个 {{current}} 会话。机器人将在 {{provider}} 上开始新会话，你的下一条消息会把这段对话作为上下文带过去。之前的会话保留在 Cowork 中，聊天记录保留在这里。",
+      confirm: "开始新会话",
+      cancel: "取消",
+      hostNeedsUpdate: "请更新此 Host 以切换提供商；没有任何更改。",
+      failed: "无法切换提供商；没有任何更改。",
     },
     github: {
       searching: "正在搜索...",

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { ProviderSwitchTarget } from "@/clisbot/composer-picker/provider-switch";
 import { COMPOSER_LAYOUT_ENABLED } from "@/clisbot/composer-layout/feature";
 import { chatComposerActions, chatInnerFace } from "@/clisbot/composer-layout/geometry";
 import { resolveQueueCapability } from "./queue-capability";
@@ -172,7 +173,11 @@ import { useComposerForgeAutoAttach } from "./forge-auto-attach";
 import { readClipboardImage } from "./clipboard-image";
 import { normalizeNativePastedImages, type NativePastedFile } from "./native-pasted-image";
 import { PluginResourceAttachmentPill, usePluginAttachmentPicker } from "@/plugins";
-import { resolveClientSlashCommand, type ClientSlashCommand } from "@/client-slash-commands";
+import {
+  clientSlashCommandsFor,
+  resolveClientSlashCommand,
+  type ClientSlashCommand,
+} from "@/client-slash-commands";
 import {
   appendWorkspaceFileAttachment,
   getWorkspaceFileAttachmentKey,
@@ -312,6 +317,7 @@ function buildAgentStateSelector(serverId: string, agentId: string) {
 
 interface RenderLeftContentArgs {
   agentControls: DraftAgentControlsProps | undefined;
+  providerSwitch: ProviderSwitchTarget;
   agentId: string;
   serverId: string;
   focusInput: () => void;
@@ -332,6 +338,7 @@ function renderLeftContent(args: RenderLeftContentArgs): ReactElement | null {
       serverId={serverId}
       onDropdownClose={focusInput}
       isCompactLayout={isCompactLayout}
+      providerSwitch={args.providerSwitch}
     />
   );
   // Clisbot Connectors: the session's apps, after the agent controls; renders nothing without them.
@@ -917,6 +924,11 @@ interface ComposerProps {
   conversationBusy?: boolean;
   conversationHasPermission?: boolean;
   showAgentControls?: boolean;
+  /**
+   * Clisbot: where picking another provider in the live model picker goes. An agent tab forks a
+   * Work session; a Chat passes its own target. Defaults by `submissionTarget`.
+   */
+  providerSwitch?: ProviderSwitchTarget;
   pendingSessionReason?: string;
   realtimeVoiceEnabled?: boolean;
   /** Resolve file references at insertion, before the composer source can change. */
@@ -1279,6 +1291,7 @@ function ComposerContentImpl({
   conversationBusy = false,
   conversationHasPermission = false,
   showAgentControls = true,
+  providerSwitch: providerSwitchProp,
   realtimeVoiceEnabled = true,
   resolveWorkspaceFilePath,
   mentionMembers,
@@ -1527,6 +1540,8 @@ function ComposerContentImpl({
     [onChangeText],
   );
 
+  // A Chat offers its own commands (`/new`), never the agent tab's archive and draft ones.
+  const clientSlashCommands = clientSlashCommandsFor(submissionTarget);
   const runClientSlashCommand = useCallback(
     (command: ClientSlashCommand): boolean => {
       if (command.execution !== "immediate" || !onClientSlashCommand) {
@@ -1961,6 +1976,7 @@ function ComposerContentImpl({
       const clientSlashCommand = resolveClientSlashCommand({
         text: payload.text,
         hasAttachments: outgoingAttachments.length > 0,
+        commands: clientSlashCommands,
       });
       if (clientSlashCommand && runClientSlashCommand(clientSlashCommand)) {
         return;
@@ -1987,6 +2003,7 @@ function ComposerContentImpl({
       blurOnSubmit,
       buildOutgoingAttachments,
       runClientSlashCommand,
+      clientSlashCommands,
       pluginClientSlashCommands,
       runPluginClientSlashCommand,
       sendMessageWithContent,
@@ -2366,6 +2383,7 @@ function ComposerContentImpl({
       const clientSlashCommand = resolveClientSlashCommand({
         text: payload.text,
         hasAttachments: outgoingAttachments.length > 0,
+        commands: clientSlashCommands,
       });
       if (clientSlashCommand && runClientSlashCommand(clientSlashCommand)) {
         return;
@@ -2384,6 +2402,7 @@ function ComposerContentImpl({
     [
       attachments,
       buildOutgoingAttachments,
+      clientSlashCommands,
       pluginClientSlashCommands,
       queueMessage,
       runClientSlashCommand,
@@ -2620,10 +2639,17 @@ function ComposerContentImpl({
     [attachments, setSelectedAttachments, setGithubSearchQuery, setIsGithubPickerOpen],
   );
 
+  const providerSwitch = useMemo<ProviderSwitchTarget>(
+    () =>
+      providerSwitchProp ??
+      (submissionTarget === "agent" ? { kind: "workspace", workspaceId } : { kind: "unavailable" }),
+    [providerSwitchProp, submissionTarget, workspaceId],
+  );
   const leftContent = useMemo(
     () =>
       renderLeftContent({
         agentControls,
+        providerSwitch,
         agentId,
         serverId,
         focusInput,
@@ -2633,6 +2659,7 @@ function ComposerContentImpl({
       }),
     [
       agentControls,
+      providerSwitch,
       agentId,
       focusInput,
       isCompactLayout,
@@ -2905,6 +2932,7 @@ function ComposerContentImpl({
       resolveWorkspaceFilePath,
       canExecuteClientSlashCommand: buildOutgoingAttachments(attachments).length === 0,
       onClientSlashCommand: runClientSlashCommand,
+      clientSlashCommands,
       pluginClientSlashCommands,
       mentionMembers,
     }),
@@ -2917,6 +2945,7 @@ function ComposerContentImpl({
       buildOutgoingAttachments,
       attachments,
       runClientSlashCommand,
+      clientSlashCommands,
       pluginClientSlashCommands,
       mentionMembers,
     ],

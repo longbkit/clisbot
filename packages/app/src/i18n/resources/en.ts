@@ -207,6 +207,19 @@ export const en = {
     clientCommands: {
       archiveAgent: "Archive the current agent",
       freshDraft: "Archive this agent and start a fresh draft",
+      freshChatSession: "Start a fresh session; this chat's history stays",
+    },
+    providerSwitch: {
+      newSessionTag: "new session",
+      title: "Switch to {{provider}}?",
+      workMessage:
+        "{{provider}} can't continue this {{current}} session. A new session starts in a new tab with this conversation copied in as context. This session stays as it is.",
+      chatMessage:
+        "{{provider}} can't continue this {{current}} session. The bot starts a new session on {{provider}}, and your next message carries this conversation as context. The previous session stays in Cowork and this chat's history stays here.",
+      confirm: "Start new session",
+      cancel: "Cancel",
+      hostNeedsUpdate: "Update this Host to switch provider; nothing was changed.",
+      failed: "Could not switch provider; nothing was changed.",
     },
     github: {
       searching: "Searching...",

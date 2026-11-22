@@ -2557,7 +2557,9 @@ export class VoiceAssistantWebSocketServer {
         // COMPAT(bots): Clisbot Bots, added in v0.9.2-fusion; remove the gate after 2027-03-31.
         // COMPAT(botTemplatePreview): a bot from an existing Project; added in v0.10.3-fusion,
         // remove the gate after 2027-04-08.
-        ...(this.botService ? { bots: true, botTemplatePreview: true } : {}),
+        ...(this.botService
+          ? { bots: true, botTemplatePreview: true, chatProviderFork: true }
+          : {}),
         // COMPAT(connectors): Clisbot Connectors, added in v0.10.2-fusion; remove the gate after 2027-06-30.
         ...(this.connectorService ? { connectors: true } : {}),
         // COMPAT(chatTools): a Chat's tools off list, added in v0.10.2-fusion; remove the gate after 2027-06-30.

@@ -175,3 +175,114 @@ it("encodes image-only content without treating attached /new text as a reset", 
   );
   expect(resetChatSession).not.toHaveBeenCalled();
 });
+
+const twoBots = {
+  id: "chat-a",
+  participants: [{ botId: "bot-a" }, { botId: "bot-b" }],
+} as unknown as ChatPayload;
+
+function mountWith(chat: ChatPayload, client: DaemonClient) {
+  return renderHook(() => {
+    const [current, setChat] = useState<ChatPayload | null>(chat);
+    const [error, setError] = useState<string | null>(null);
+    return {
+      ...useChatSend(client, true, "chat-a", current, setChat, setError, true, "host"),
+      error,
+    };
+  });
+}
+
+it("/new and /new with trailing spaces reset every Bot once and add no line", async () => {
+  for (const text of ["/new", "/new   "]) {
+    const resetChatSession = vi.fn(async (_params: unknown) => ({ error: null }));
+    const sendChatMessage = vi.fn();
+    const client = {
+      resetChatSession,
+      sendChatMessage,
+      listChats: async () => ({ chats: [twoBots] }),
+    } as unknown as DaemonClient;
+    const hook = mountWith(twoBots, client);
+    await act(async () => {
+      await hook.result.current.send({ text, attachments: [], cwd: "/project" });
+    });
+    expect(resetChatSession.mock.calls.map(([params]) => params)).toEqual([
+      { chatId: "chat-a", botId: "bot-a" },
+      { chatId: "chat-a", botId: "bot-b" },
+    ]);
+    expect(sendChatMessage).not.toHaveBeenCalled();
+    hook.unmount();
+  }
+});
+
+it("a second fresh-session press while one runs joins it instead of resetting again", async () => {
+  let finish!: () => void;
+  const resetChatSession = vi.fn(
+    () =>
+      new Promise<{ error: null }>((resolve) => {
+        finish = () => resolve({ error: null });
+      }),
+  );
+  const chat = { id: "chat-a", participants: [{ botId: "bot-a" }] } as unknown as ChatPayload;
+  const client = {
+    resetChatSession,
+    listChats: async () => ({ chats: [chat] }),
+  } as unknown as DaemonClient;
+  const hook = mountWith(chat, client);
+  let first!: Promise<void>;
+  let second!: Promise<void>;
+  act(() => {
+    first = hook.result.current.startFreshSession();
+    second = hook.result.current.startFreshSession();
+  });
+  await act(async () => {
+    finish();
+    await Promise.all([first, second]);
+  });
+  expect(resetChatSession).toHaveBeenCalledTimes(1);
+  // Once settled, a later press is a new reset.
+  await act(async () => {
+    const third = hook.result.current.startFreshSession();
+    finish();
+    await third;
+  });
+  expect(resetChatSession).toHaveBeenCalledTimes(2);
+});
+
+it("/new with arguments is an ordinary message for the Bot", async () => {
+  const resetChatSession = vi.fn();
+  const sendChatMessage = vi.fn(async () => ({}));
+  const client = {
+    resetChatSession,
+    sendChatMessage,
+    listChats: async () => ({ chats: [twoBots] }),
+  } as unknown as DaemonClient;
+  useSessionStore.getState().initializeSession("host", client);
+  const hook = mountWith(twoBots, client);
+  await act(async () => {
+    await hook.result.current.send({ text: "/new later", attachments: [], cwd: "/project" });
+  });
+  await vi.waitFor(() => expect(sendChatMessage).toHaveBeenCalledTimes(1));
+  expect(resetChatSession).not.toHaveBeenCalled();
+  useSessionStore.getState().clearSession("host");
+});
+
+it("a failed reset shows the error and leaves no reset in flight", async () => {
+  const resetChatSession = vi
+    .fn()
+    .mockResolvedValueOnce({ error: "Bot is running" })
+    .mockResolvedValue({ error: null });
+  const client = {
+    resetChatSession,
+    listChats: async () => ({ chats: [initial] }),
+  } as unknown as DaemonClient;
+  const chat = { id: "chat-a", participants: [{ botId: "bot-a" }] } as unknown as ChatPayload;
+  const hook = mountWith(chat, client);
+  await act(async () => {
+    await expect(hook.result.current.startFreshSession()).rejects.toThrow("Bot is running");
+  });
+  expect(hook.result.current.error).toContain("Bot is running");
+  await act(async () => {
+    await hook.result.current.startFreshSession();
+  });
+  expect(resetChatSession).toHaveBeenCalledTimes(2);
+});

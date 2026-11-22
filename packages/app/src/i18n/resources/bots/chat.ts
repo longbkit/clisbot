@@ -45,8 +45,7 @@ const en = {
     noMatchingTabs: "No matching tabs",
     projectActions: "Project actions",
     freshSession: "Start a fresh session",
-    freshHint: "Send /new in Messages to reset bot context. This chat’s history stays here.",
-    goToMessages: "Go to Messages",
+    freshHint: "The bot starts over; this chat’s history stays here.",
   },
   actions: {
     botSettings: "Bot settings",
@@ -214,8 +213,7 @@ const ar: ChatCopy = {
     noMatchingTabs: "لا توجد علامات تبويب مطابقة",
     projectActions: "إجراءات المشروع",
     freshSession: "بدء جلسة جديدة",
-    freshHint: "أرسل /new في الرسائل لإعادة تعيين سياق البوت. يبقى سجل هذه الدردشة هنا.",
-    goToMessages: "الانتقال إلى الرسائل",
+    freshHint: "يبدأ البوت من جديد؛ يبقى سجل هذه الدردشة هنا.",
   },
   actions: {
     botSettings: "إعدادات البوت",
@@ -379,9 +377,7 @@ const es: ChatCopy = {
     noMatchingTabs: "No hay pestañas que coincidan",
     projectActions: "Acciones del proyecto",
     freshSession: "Iniciar una sesión nueva",
-    freshHint:
-      "Envía /new en Mensajes para reiniciar el contexto del bot. El historial de este chat se queda aquí.",
-    goToMessages: "Ir a Mensajes",
+    freshHint: "El bot empieza de cero; el historial de este chat se queda aquí.",
   },
   actions: {
     botSettings: "Ajustes del bot",
@@ -546,9 +542,7 @@ const fr: ChatCopy = {
     noMatchingTabs: "Aucun onglet correspondant",
     projectActions: "Actions du projet",
     freshSession: "Démarrer une nouvelle session",
-    freshHint:
-      "Envoyez /new dans Messages pour réinitialiser le contexte du bot. L'historique de cette discussion reste ici.",
-    goToMessages: "Aller aux Messages",
+    freshHint: "Le bot repart de zéro ; l’historique de ce chat reste ici.",
   },
   actions: {
     botSettings: "Paramètres du bot",
@@ -713,9 +707,7 @@ const ja: ChatCopy = {
     noMatchingTabs: "一致するタブはありません",
     projectActions: "プロジェクトの操作",
     freshSession: "新しいセッションを開始",
-    freshHint:
-      "メッセージで /new を送信すると、ボットのコンテキストがリセットされます。このチャットの履歴はここに残ります。",
-    goToMessages: "メッセージへ移動",
+    freshHint: "ボットは最初からやり直します。このチャットの履歴はここに残ります。",
   },
   actions: {
     botSettings: "ボット設定",
@@ -880,9 +872,7 @@ const ko: ChatCopy = {
     noMatchingTabs: "일치하는 탭 없음",
     projectActions: "프로젝트 작업",
     freshSession: "새 세션 시작",
-    freshHint:
-      "메시지에서 /new를 보내면 봇 컨텍스트가 초기화됩니다. 이 채팅의 기록은 여기에 그대로 남습니다.",
-    goToMessages: "메시지로 이동",
+    freshHint: "봇이 처음부터 다시 시작합니다. 이 채팅 기록은 여기에 남습니다.",
   },
   actions: {
     botSettings: "봇 설정",
@@ -1047,9 +1037,7 @@ const ptBR: ChatCopy = {
     noMatchingTabs: "Nenhuma aba correspondente",
     projectActions: "Ações do projeto",
     freshSession: "Iniciar uma sessão nova",
-    freshHint:
-      "Envie /new em Mensagens para redefinir o contexto do bot. O histórico deste chat continua aqui.",
-    goToMessages: "Ir para Mensagens",
+    freshHint: "O bot recomeça do zero; o histórico deste chat fica aqui.",
   },
   actions: {
     botSettings: "Configurações do bot",
@@ -1214,9 +1202,7 @@ const ru: ChatCopy = {
     noMatchingTabs: "Нет подходящих вкладок",
     projectActions: "Действия проекта",
     freshSession: "Начать новую сессию",
-    freshHint:
-      "Отправьте /new в «Сообщениях», чтобы сбросить контекст бота. История этого чата останется здесь.",
-    goToMessages: "Перейти к «Сообщениям»",
+    freshHint: "Бот начнёт заново; история этого чата останется здесь.",
   },
   actions: {
     botSettings: "Настройки бота",
@@ -1381,9 +1367,7 @@ const vi: ChatCopy = {
     noMatchingTabs: "Không có tab nào khớp",
     projectActions: "Thao tác dự án",
     freshSession: "Bắt đầu phiên mới",
-    freshHint:
-      "Gửi /new trong Tin nhắn để đặt lại ngữ cảnh của Bot. Lịch sử của chat này vẫn được giữ ở đây.",
-    goToMessages: "Đến Tin nhắn",
+    freshHint: "Bot bắt đầu lại từ đầu; lịch sử trò chuyện này vẫn ở đây.",
   },
   actions: {
     botSettings: "Cài đặt Bot",
@@ -1548,8 +1532,7 @@ const zhCN: ChatCopy = {
     noMatchingTabs: "没有匹配的标签页",
     projectActions: "项目操作",
     freshSession: "开始新会话",
-    freshHint: "在“消息”中发送 /new 可重置机器人上下文。此聊天的历史记录会保留在这里。",
-    goToMessages: "前往“消息”",
+    freshHint: "机器人将重新开始；此聊天的历史记录会保留在这里。",
   },
   actions: {
     botSettings: "机器人设置",

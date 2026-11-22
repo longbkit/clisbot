@@ -31,6 +31,8 @@ export interface ChatScreenProps {
   canSend?: boolean;
   discussionActive?: boolean;
   onSubmitMessage: (payload: MessagePayload) => Promise<void>;
+  /** `/new` in the composer: the same reset as the ⋯ menu's Start a fresh session. */
+  onStartFreshSession?: () => Promise<void>;
   onReachTop?: () => void;
   headerRight?: ReactNode;
   hideHeader?: boolean;
@@ -54,6 +56,7 @@ export function ChatScreen({
   canSend = true,
   discussionActive = false,
   onSubmitMessage,
+  onStartFreshSession,
   onReachTop,
   headerRight,
   hideHeader = false,
@@ -99,6 +102,7 @@ export function ChatScreen({
             busy={discussionActive || [...liveHeads.values()].some((head) => head.turnActive)}
             hasPermission={[...liveHeads.values()].some((head) => head.permissions.length > 0)}
             onSubmitMessage={onSubmitMessage}
+            onStartFreshSession={onStartFreshSession}
             mentionMembers={group ? members : undefined}
           />
         </ComposerDock>

@@ -3,6 +3,10 @@ import { COMPOSER_PICKER_ENABLED } from "@/clisbot/composer-picker/feature";
 import { PickerAgentControls } from "@/clisbot/composer-picker/picker-agent-controls";
 import { useDraftModeControl } from "@/clisbot/composer-picker/use-draft-mode-control";
 import {
+  useLiveProviderChoices,
+  type ProviderSwitchTarget,
+} from "@/clisbot/composer-picker/provider-switch";
+import {
   memo,
   useCallback,
   useEffect,
@@ -178,6 +182,8 @@ interface AgentControlsProps {
   serverId: string;
   onDropdownClose?: () => void;
   isCompactLayout?: boolean;
+  /** Clisbot: where picking another provider goes; absent offers only this session's provider. */
+  providerSwitch?: ProviderSwitchTarget;
 }
 
 function AgentControlCommandCenterRegistration({
@@ -1573,6 +1579,7 @@ export const AgentControls = memo(function AgentControls({
   serverId,
   onDropdownClose,
   isCompactLayout,
+  providerSwitch,
 }: AgentControlsProps) {
   const { updatePreferences } = useFormPreferences(serverId);
   const agent = useSessionStore(
@@ -1609,7 +1616,7 @@ export const AgentControls = memo(function AgentControls({
     () => buildAgentProviderModels(agent?.provider, models),
     [agent?.provider, models],
   );
-  const agentModelSelectorProviders = useMemo(() => {
+  const ownModelSelectorProviders = useMemo(() => {
     if (snapshotSelectedEntry) {
       return buildSelectableProviderSelectorProviders([snapshotSelectedEntry]);
     }
@@ -1660,9 +1667,22 @@ export const AgentControls = memo(function AgentControls({
     },
     [agentId, agentProvider, client, toast, updatePreferences],
   );
+  // Clisbot: the same provider changes the model in place; another one asks, then forks.
+  const {
+    providers: agentModelSelectorProviders,
+    selectProviderAndModel: handleSelectProviderAndModel,
+  } = useLiveProviderChoices({
+    serverId,
+    agentId,
+    target: providerSwitch,
+    entries: snapshotEntries,
+    ownProviders: ownModelSelectorProviders,
+    ownProviderId: agentProvider,
+    selectModel: handleSelectModel,
+  });
   const handleSelectCommandCenterModel = useCallback(
-    (_provider: AgentProvider, modelId: string) => handleSelectModel(modelId),
-    [handleSelectModel],
+    (provider: AgentProvider, modelId: string) => handleSelectProviderAndModel(provider, modelId),
+    [handleSelectProviderAndModel],
   );
 
   // A running agent is one provider's process, so only that provider's profiles
@@ -1815,6 +1835,7 @@ export const AgentControls = memo(function AgentControls({
         modelOptions={modelOptions}
         selectedModelId={modelSelection.activeModelId ?? undefined}
         onSelectModel={handleSelectModel}
+        onSelectProviderAndModel={handleSelectProviderAndModel}
         agentProfiles={agentProfiles}
         onApplyAgentProfile={agentProfiles?.applyProfile}
         onEditAgentProfiles={handleEditAgentProfiles}

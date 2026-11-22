@@ -270,12 +270,51 @@ export class ChatStore {
   /** `/new` (D7): drops the session cache and marks the time, so a label scan never re-adopts it. */
   resetParticipantSession(chatId: string, botId: string): Promise<StoredChat> {
     return this.update(chatId, (chat, at) =>
-      mapParticipant(chat, botId, (entry) => ({
-        ...entry,
-        agentId: null,
-        resetAt: at,
-        completedTurn: null,
-      })),
+      mapParticipant(chat, botId, (entry) => {
+        // A fresh session asked for none of the earlier conversation, a fork's promise included.
+        const { pendingContext: _dropped, ...rest } = entry;
+        return { ...rest, agentId: null, resetAt: at, completedTurn: null };
+      }),
+    );
+  }
+
+  /**
+   * A provider switch (`chat.session.fork`): the chat's launch and the Bot's new session in one
+   * write. `resetAt` predates the new session, so a label scan adopts it and never the old one.
+   */
+  forkParticipantSession(
+    chatId: string,
+    botId: string,
+    fork: {
+      launch: BotLaunchDefaults;
+      agentId: string;
+      resetAt: string;
+      pendingContext: StoredChatParticipant["pendingContext"];
+    },
+  ): Promise<StoredChat> {
+    return this.update(chatId, (chat) => ({
+      ...mapParticipant(chat, botId, (entry) => {
+        const { pendingContext: _previous, ...rest } = entry;
+        return {
+          ...rest,
+          agentId: fork.agentId,
+          resetAt: fork.resetAt,
+          completedTurn: null,
+          ...(fork.pendingContext ? { pendingContext: fork.pendingContext } : {}),
+        };
+      }),
+      launch: fork.launch,
+    }));
+  }
+
+  /** The fork's context from `fromAgentId` went with a message; a later fork's promise stays. */
+  clearPendingContext(chatId: string, botId: string, fromAgentId: string): Promise<StoredChat> {
+    return this.update(chatId, (chat) =>
+      mapParticipant(chat, botId, (entry) => {
+        if (entry.pendingContext?.fromAgentId !== fromAgentId) return entry;
+        const { pendingContext: _carried, ...rest } = entry;
+        return rest;
+      }),
     );
   }
 

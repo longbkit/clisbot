@@ -72,7 +72,8 @@ describe("v1 home handover", () => {
     expect(config.features.devicePairing).toBe(true);
     expect(config.daemon.managedAccess.mode).toBe("off");
     expect(config.daemon.mcp.injectIntoAgents).toBe(true);
-    expect(config.daemon.browserTools.enabled).toBe(true);
+    // Browser tools need the person's opt-in, even on an upgraded home.
+    expect(config.daemon.browserTools).toBeUndefined();
     expect(config.daemon.agentProfiles).toEqual([
       { id: "legacy-v1-0", name: "My assistant", provider: "codex" },
     ]);
@@ -103,6 +104,31 @@ describe("v1 home handover", () => {
     expect(repaired.daemon.mcp.injectIntoAgents).toBe(true);
     expect(repaired.daemon.browserTools.enabled).toBe(false);
     expect(repaired.daemon.agentProfiles).toEqual(config.daemon.agentProfiles);
+  });
+
+  it("never turns browser tools on while repairing an upgraded home", async () => {
+    const directory = home();
+    await prepareV1Upgrade(directory);
+    const configPath = path.join(directory, "config.json");
+    const config = JSON.parse(readFileSync(configPath, "utf8"));
+    delete config.daemon.mcp;
+    delete config.daemon.browserTools;
+    writeFileSync(configPath, JSON.stringify(config));
+    await prepareV1Upgrade(directory);
+    const repaired = JSON.parse(readFileSync(configPath, "utf8"));
+    expect(repaired.daemon.mcp.injectIntoAgents).toBe(true);
+    expect(repaired.daemon.browserTools).toBeUndefined();
+  });
+
+  it("keeps a browser opt-in the person already made on an upgraded home", async () => {
+    const directory = home();
+    await prepareV1Upgrade(directory);
+    const configPath = path.join(directory, "config.json");
+    const config = JSON.parse(readFileSync(configPath, "utf8"));
+    config.daemon.browserTools = { enabled: true };
+    writeFileSync(configPath, JSON.stringify(config));
+    await prepareV1Upgrade(directory);
+    expect(JSON.parse(readFileSync(configPath, "utf8")).daemon.browserTools.enabled).toBe(true);
   });
 
   it("leaves the tool switches of a preserved config.json unset", async () => {

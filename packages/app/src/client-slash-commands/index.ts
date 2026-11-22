@@ -1,14 +1,20 @@
 import type { Agent } from "@/stores/session-store";
 import type { WorkspaceDraftTabSetup } from "@/workspace-tabs/model";
 
-export type ClientSlashCommandKind = "archive-agent" | "replace-agent-with-draft";
+export type ClientSlashCommandKind =
+  | "archive-agent"
+  | "replace-agent-with-draft"
+  | "fresh-chat-session";
 export type ClientSlashCommandExecution = "immediate" | "insert";
 
 export interface ClientSlashCommand {
   name: string;
   aliases: readonly string[];
   description: string;
-  descriptionKey: "composer.clientCommands.archiveAgent" | "composer.clientCommands.freshDraft";
+  descriptionKey:
+    | "composer.clientCommands.archiveAgent"
+    | "composer.clientCommands.freshDraft"
+    | "composer.clientCommands.freshChatSession";
   argumentHint: string;
   kind: ClientSlashCommandKind;
   execution: ClientSlashCommandExecution;
@@ -35,17 +41,52 @@ export const CLIENT_SLASH_COMMANDS: readonly ClientSlashCommand[] = [
   },
 ];
 
-const COMMAND_BY_NAME = new Map<string, ClientSlashCommand>();
-for (const command of CLIENT_SLASH_COMMANDS) {
-  COMMAND_BY_NAME.set(command.name, command);
-  for (const alias of command.aliases) {
-    COMMAND_BY_NAME.set(alias, command);
+/**
+ * Clisbot Bots & Chats: a Chat's own commands. A Chat is not an agent tab, so it has none of the
+ * tab's archive or draft commands; `/new` starts a fresh session for its Bots and keeps the
+ * Chat's history (docs/features/bots-and-chats/README.md, D7).
+ */
+export const CONVERSATION_SLASH_COMMANDS: readonly ClientSlashCommand[] = [
+  {
+    name: "new",
+    aliases: [],
+    description: "Start a fresh session; this chat's history stays",
+    descriptionKey: "composer.clientCommands.freshChatSession",
+    argumentHint: "",
+    kind: "fresh-chat-session",
+    execution: "immediate",
+  },
+];
+
+function indexCommands(commands: readonly ClientSlashCommand[]) {
+  const byName = new Map<string, ClientSlashCommand>();
+  for (const command of commands) {
+    byName.set(command.name, command);
+    for (const alias of command.aliases) byName.set(alias, command);
   }
+  return byName;
 }
 
+const COMMANDS_BY_SET = new Map<readonly ClientSlashCommand[], Map<string, ClientSlashCommand>>([
+  [CLIENT_SLASH_COMMANDS, indexCommands(CLIENT_SLASH_COMMANDS)],
+  [CONVERSATION_SLASH_COMMANDS, indexCommands(CONVERSATION_SLASH_COMMANDS)],
+]);
+
+/** The command set a composer offers: an agent tab's, or a Chat's. */
+export function clientSlashCommandsFor(
+  target: "agent" | "conversation" | undefined,
+): readonly ClientSlashCommand[] {
+  return target === "conversation" ? CONVERSATION_SLASH_COMMANDS : CLIENT_SLASH_COMMANDS;
+}
+
+/**
+ * The command a whole submitted text names, with nothing after it. Text with arguments
+ * (`/new later`) is never a client command; it goes to the agent as typed.
+ */
 export function resolveClientSlashCommand(input: {
   text: string;
   hasAttachments: boolean;
+  commands?: readonly ClientSlashCommand[];
 }): ClientSlashCommand | null {
   if (input.hasAttachments) {
     return null;
@@ -61,7 +102,9 @@ export function resolveClientSlashCommand(input: {
     return null;
   }
 
-  return COMMAND_BY_NAME.get(commandName) ?? null;
+  const commands = input.commands ?? CLIENT_SLASH_COMMANDS;
+  const byName = COMMANDS_BY_SET.get(commands) ?? indexCommands(commands);
+  return byName.get(commandName) ?? null;
 }
 
 export function buildDraftAgentSetup(agent: Agent): WorkspaceDraftTabSetup {

@@ -203,3 +203,111 @@ test("only the Chat owner with current Project access may update group settings"
   owner.session.dispose();
   other.session.dispose();
 });
+
+function forkHarness(input: {
+  allowsLaunch: (provider: string) => boolean;
+  allowsSession: (agentId: string) => boolean;
+  record: StoredChat;
+}) {
+  const messages: SessionOutboundMessage[] = [];
+  const forkSession = vi.fn(async () => ({ chat: {}, agentId: "agent-new" }));
+  const send = vi.fn(async () => ({ messageId: "m", seq: 1, targets: [bot.id] }));
+  const service = {
+    record: (id: string) => (id === input.record.id ? input.record : null),
+    subscribe: () => () => {},
+    list: async () => [input.record],
+    forkSession,
+    send,
+  } as unknown as ChatService;
+  const bots = {
+    list: async () => [bot],
+    get: async () => bot,
+    subscribe: () => () => {},
+  } as unknown as BotService;
+  const session = new ChatSession(
+    service,
+    bots,
+    {
+      isRestricted: () => true,
+      allowsProject: () => true,
+      mayCreateProjectAt: async () => false,
+      allowsAgentConfiguration: async (_workspace: string, launch: { provider: string }) =>
+        input.allowsLaunch(launch.provider),
+      allowsChatSessionConfiguration: async (agentId: string) => input.allowsSession(agentId),
+    },
+    () => ({ kind: "user", id: "alice", organizationId: "org" }),
+    (message) => messages.push(message),
+  );
+  return { session, messages, forkSession, send };
+}
+
+test("a provider switch needs the new launch to be allowed, and passes the expected session", async () => {
+  const record = { ...chat, participants: [{ botId: bot.id, agentId: "agent-old" }] } as StoredChat;
+  const denied = forkHarness({
+    allowsLaunch: (provider) => provider !== "codex",
+    allowsSession: () => true,
+    record,
+  });
+  await denied.session.handle({ type: "chat.list.request", requestId: "l" });
+  await denied.session.handle({
+    type: "chat.session.fork.request",
+    requestId: "f",
+    chatId: chat.id,
+    botId: bot.id,
+    launch: { provider: "codex" },
+    expectedAgentId: "agent-old",
+  });
+  expect(denied.forkSession).not.toHaveBeenCalled();
+  expect(denied.messages.at(-1)).toMatchObject({
+    type: "chat.session.fork.response",
+    payload: { agentId: null, chat: null, error: "Bot session configuration access denied" },
+  });
+
+  const allowed = forkHarness({ allowsLaunch: () => true, allowsSession: () => true, record });
+  await allowed.session.handle({ type: "chat.list.request", requestId: "l" });
+  await allowed.session.handle({
+    type: "chat.session.fork.request",
+    requestId: "f",
+    chatId: chat.id,
+    botId: bot.id,
+    launch: { provider: "codex", model: "gpt-5" },
+    expectedAgentId: "agent-old",
+  });
+  expect(allowed.forkSession).toHaveBeenCalledWith({
+    chatId: chat.id,
+    botId: bot.id,
+    launch: { provider: "codex", model: "gpt-5" },
+    expectedAgentId: "agent-old",
+    actor: { kind: "user", id: "alice", organizationId: "org" },
+  });
+  expect(allowed.messages.at(-1)).toMatchObject({ payload: { agentId: "agent-new", error: null } });
+});
+
+test("a carried conversation is sent only while its earlier session is still yours", async () => {
+  const record = {
+    ...chat,
+    participants: [
+      {
+        botId: bot.id,
+        agentId: "agent-new",
+        pendingContext: { fromAgentId: "agent-old", agentId: "agent-new", attachment: {} },
+      },
+    ],
+  } as unknown as StoredChat;
+  const h = forkHarness({
+    allowsLaunch: () => true,
+    allowsSession: (agentId) => agentId !== "agent-old",
+    record,
+  });
+  await h.session.handle({ type: "chat.list.request", requestId: "l" });
+  await h.session.handle({
+    type: "chat.message.send.request",
+    requestId: "s",
+    chatId: chat.id,
+    text: "next",
+  });
+  expect(h.send).not.toHaveBeenCalled();
+  expect(h.messages.at(-1)).toMatchObject({
+    payload: { error: "Earlier Bot session access denied" },
+  });
+});

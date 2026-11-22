@@ -210,6 +210,19 @@ export const ar: TranslationResources = {
     clientCommands: {
       archiveAgent: "أرشفة الوكيل الحالي",
       freshDraft: "أرشفة هذا الوكيل وابدأ مسودة جديدة",
+      freshChatSession: "ابدأ جلسة جديدة؛ يبقى سجل هذه الدردشة",
+    },
+    providerSwitch: {
+      newSessionTag: "جلسة جديدة",
+      title: "التبديل إلى {{provider}}؟",
+      workMessage:
+        "لا يستطيع {{provider}} متابعة جلسة {{current}} هذه. تبدأ جلسة جديدة في علامة تبويب جديدة مع نسخ هذه المحادثة كسياق. تبقى هذه الجلسة كما هي.",
+      chatMessage:
+        "لا يستطيع {{provider}} متابعة جلسة {{current}} هذه. يبدأ البوت جلسة جديدة على {{provider}}، وتحمل رسالتك التالية هذه المحادثة كسياق. تبقى الجلسة السابقة في Cowork ويبقى سجل الدردشة هنا.",
+      confirm: "بدء جلسة جديدة",
+      cancel: "إلغاء",
+      hostNeedsUpdate: "حدّث هذا المضيف لتبديل المزوّد؛ لم يتغير شيء.",
+      failed: "تعذّر تبديل المزوّد؛ لم يتغير شيء.",
     },
     github: {
       searching: "جارٍ البحث...",

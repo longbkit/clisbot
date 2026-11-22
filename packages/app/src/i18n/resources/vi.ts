@@ -211,6 +211,19 @@ export const vi: TranslationResources = {
     clientCommands: {
       archiveAgent: "Lưu trữ agent hiện tại",
       freshDraft: "Lưu trữ agent này và bắt đầu bản nháp mới",
+      freshChatSession: "Bắt đầu phiên mới; lịch sử trò chuyện này vẫn được giữ",
+    },
+    providerSwitch: {
+      newSessionTag: "phiên mới",
+      title: "Chuyển sang {{provider}}?",
+      workMessage:
+        "{{provider}} không thể tiếp tục phiên {{current}} này. Một phiên mới mở trong tab mới, mang theo cuộc trò chuyện này làm ngữ cảnh. Phiên hiện tại giữ nguyên.",
+      chatMessage:
+        "{{provider}} không thể tiếp tục phiên {{current}} này. Bot bắt đầu phiên mới trên {{provider}}, và tin nhắn tiếp theo của bạn mang theo cuộc trò chuyện này làm ngữ cảnh. Phiên trước vẫn ở Cowork và lịch sử trò chuyện vẫn ở đây.",
+      confirm: "Bắt đầu phiên mới",
+      cancel: "Hủy",
+      hostNeedsUpdate: "Cập nhật Host này để đổi nhà cung cấp; chưa có gì thay đổi.",
+      failed: "Không thể đổi nhà cung cấp; chưa có gì thay đổi.",
     },
     github: {
       searching: "Đang tìm...",

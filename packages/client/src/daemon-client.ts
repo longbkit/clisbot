@@ -2841,6 +2841,17 @@ export class DaemonClient {
       message: { ...params, type: "chat.session.reset.request" },
     });
   }
+  /** Moves a direct chat's Bot to another provider in a new session (`chatProviderFork`). */
+  forkChatSession(
+    params: Omit<
+      Extract<SessionInboundMessage, { type: "chat.session.fork.request" }>,
+      "type" | "requestId"
+    >,
+  ) {
+    return this.sendNamespacedCorrelatedSessionRequest<"chat.session.fork.response">({
+      message: { ...params, type: "chat.session.fork.request" },
+    });
+  }
   /** Stop all: ends the group discussion and interrupts every bot turn running in the chat. */
   stopChatDiscussion(chatId: string) {
     return this.sendNamespacedCorrelatedSessionRequest<"chat.discussion.stop.response">({
