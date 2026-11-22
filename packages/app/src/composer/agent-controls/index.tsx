@@ -1671,6 +1671,7 @@ export const AgentControls = memo(function AgentControls({
   const {
     providers: agentModelSelectorProviders,
     selectProviderAndModel: handleSelectProviderAndModel,
+    reviewElement: providerSwitchReview,
   } = useLiveProviderChoices({
     serverId,
     agentId,
@@ -1829,6 +1830,7 @@ export const AgentControls = memo(function AgentControls({
     <>
       {commandCenterRegistration}
       {profileEditor.element}
+      {providerSwitchReview}
       <ToolbarAgentControls
         provider={agent.provider}
         modelSelectorProviders={agentModelSelectorProviders}

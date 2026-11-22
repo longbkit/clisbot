@@ -1,0 +1,1116 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`permission carry over the whole catalog > the carry table for every provider pair 1`] = `
+"| From | Mode | To | Starts in | Why |
+| --- | --- | --- | --- | --- |
+| claude | plan | codex | plan | equivalent |
+| claude | plan | copilot | https://agentclientprotocol.com/protocol/session-modes#plan | equivalent |
+| claude | plan | opencode | plan | equivalent |
+| claude | plan | pi | — choose — | noModes |
+| claude | plan | omp | — choose — | planUnavailable |
+| claude | plan | mock | — choose — | planUnavailable |
+| claude | plan | mock-slow | — choose — | planUnavailable |
+| claude | plan | codex (no Plan offered) | — choose — | planUnavailable |
+| claude | plan | my-claude (extends claude) | plan | equivalent |
+| claude | plan | omp-a (extends omp) | — choose — | planUnavailable |
+| claude | plan | omp-b (extends omp, reversed) | — choose — | planUnavailable |
+| claude | plan | acp-dynamic | — choose — | planUnavailable |
+| claude | plan | acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | equivalent |
+| claude | plan | no-modes | — choose — | noModes |
+| claude | plan | unattended-only | — choose — | planUnavailable |
+| claude | default | codex | — choose — | noEquivalent |
+| claude | default | copilot | — choose — | noEquivalent |
+| claude | default | opencode | — choose — | noEquivalent |
+| claude | default | pi | — choose — | noModes |
+| claude | default | omp | ask | equivalent |
+| claude | default | mock | — choose — | noEquivalent |
+| claude | default | mock-slow | — choose — | noEquivalent |
+| claude | default | codex (no Plan offered) | — choose — | noEquivalent |
+| claude | default | my-claude (extends claude) | default | equivalent |
+| claude | default | omp-a (extends omp) | ask | equivalent |
+| claude | default | omp-b (extends omp, reversed) | ask | equivalent |
+| claude | default | acp-dynamic | — choose — | noEquivalent |
+| claude | default | acp-standard | — choose — | noEquivalent |
+| claude | default | no-modes | — choose — | noModes |
+| claude | default | unattended-only | — choose — | noEquivalent |
+| claude | acceptEdits | codex | — choose — | noEquivalent |
+| claude | acceptEdits | copilot | — choose — | noEquivalent |
+| claude | acceptEdits | opencode | — choose — | noEquivalent |
+| claude | acceptEdits | pi | — choose — | noModes |
+| claude | acceptEdits | omp | — choose — | noEquivalent |
+| claude | acceptEdits | mock | — choose — | noEquivalent |
+| claude | acceptEdits | mock-slow | — choose — | noEquivalent |
+| claude | acceptEdits | codex (no Plan offered) | — choose — | noEquivalent |
+| claude | acceptEdits | my-claude (extends claude) | acceptEdits | equivalent |
+| claude | acceptEdits | omp-a (extends omp) | — choose — | noEquivalent |
+| claude | acceptEdits | omp-b (extends omp, reversed) | — choose — | noEquivalent |
+| claude | acceptEdits | acp-dynamic | — choose — | noEquivalent |
+| claude | acceptEdits | acp-standard | — choose — | noEquivalent |
+| claude | acceptEdits | no-modes | — choose — | noModes |
+| claude | acceptEdits | unattended-only | — choose — | noEquivalent |
+| claude | auto | codex | — choose — | noEquivalent |
+| claude | auto | copilot | — choose — | noEquivalent |
+| claude | auto | opencode | — choose — | noEquivalent |
+| claude | auto | pi | — choose — | noModes |
+| claude | auto | omp | — choose — | noEquivalent |
+| claude | auto | mock | — choose — | noEquivalent |
+| claude | auto | mock-slow | — choose — | noEquivalent |
+| claude | auto | codex (no Plan offered) | — choose — | noEquivalent |
+| claude | auto | my-claude (extends claude) | auto | equivalent |
+| claude | auto | omp-a (extends omp) | — choose — | noEquivalent |
+| claude | auto | omp-b (extends omp, reversed) | — choose — | noEquivalent |
+| claude | auto | acp-dynamic | — choose — | noEquivalent |
+| claude | auto | acp-standard | — choose — | noEquivalent |
+| claude | auto | no-modes | — choose — | noModes |
+| claude | auto | unattended-only | — choose — | noEquivalent |
+| claude | bypassPermissions | codex | full-access | equivalent |
+| claude | bypassPermissions | copilot | allow-all | equivalent |
+| claude | bypassPermissions | opencode | — choose — | noEquivalent |
+| claude | bypassPermissions | pi | — choose — | noModes |
+| claude | bypassPermissions | omp | full | equivalent |
+| claude | bypassPermissions | mock | — choose — | noEquivalent |
+| claude | bypassPermissions | mock-slow | — choose — | noEquivalent |
+| claude | bypassPermissions | codex (no Plan offered) | full-access | equivalent |
+| claude | bypassPermissions | my-claude (extends claude) | bypassPermissions | equivalent |
+| claude | bypassPermissions | omp-a (extends omp) | full | equivalent |
+| claude | bypassPermissions | omp-b (extends omp, reversed) | full | equivalent |
+| claude | bypassPermissions | acp-dynamic | unattended | equivalent |
+| claude | bypassPermissions | acp-standard | — choose — | noEquivalent |
+| claude | bypassPermissions | no-modes | — choose — | noModes |
+| claude | bypassPermissions | unattended-only | run | equivalent |
+| claude | full-auto-accept | codex | full-auto-accept | equivalent |
+| claude | full-auto-accept | copilot | full-auto-accept | equivalent |
+| claude | full-auto-accept | opencode | full-auto-accept | equivalent |
+| claude | full-auto-accept | pi | — choose — | noModes |
+| claude | full-auto-accept | omp | full-auto-accept | equivalent |
+| claude | full-auto-accept | mock | full-auto-accept | equivalent |
+| claude | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| claude | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| claude | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| claude | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| claude | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| claude | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| claude | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| claude | full-auto-accept | no-modes | — choose — | noModes |
+| claude | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| claude | (none) | codex | — choose — | noSourceMode |
+| claude | (none) | copilot | — choose — | noSourceMode |
+| claude | (none) | opencode | — choose — | noSourceMode |
+| claude | (none) | pi | — choose — | noModes |
+| claude | (none) | omp | — choose — | noSourceMode |
+| claude | (none) | mock | — choose — | noSourceMode |
+| claude | (none) | mock-slow | — choose — | noSourceMode |
+| claude | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| claude | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| claude | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| claude | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| claude | (none) | acp-dynamic | — choose — | noSourceMode |
+| claude | (none) | acp-standard | — choose — | noSourceMode |
+| claude | (none) | no-modes | — choose — | noModes |
+| claude | (none) | unattended-only | — choose — | noSourceMode |
+| codex | plan | claude | plan | equivalent |
+| codex | plan | copilot | https://agentclientprotocol.com/protocol/session-modes#plan | equivalent |
+| codex | plan | opencode | plan | equivalent |
+| codex | plan | pi | — choose — | noModes |
+| codex | plan | omp | — choose — | planUnavailable |
+| codex | plan | mock | — choose — | planUnavailable |
+| codex | plan | mock-slow | — choose — | planUnavailable |
+| codex | plan | codex (no Plan offered) | — choose — | planUnavailable |
+| codex | plan | my-claude (extends claude) | plan | equivalent |
+| codex | plan | omp-a (extends omp) | — choose — | planUnavailable |
+| codex | plan | omp-b (extends omp, reversed) | — choose — | planUnavailable |
+| codex | plan | acp-dynamic | — choose — | planUnavailable |
+| codex | plan | acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | equivalent |
+| codex | plan | no-modes | — choose — | noModes |
+| codex | plan | unattended-only | — choose — | planUnavailable |
+| codex | auto | claude | — choose — | noEquivalent |
+| codex | auto | copilot | — choose — | noEquivalent |
+| codex | auto | opencode | — choose — | noEquivalent |
+| codex | auto | pi | — choose — | noModes |
+| codex | auto | omp | — choose — | noEquivalent |
+| codex | auto | mock | — choose — | noEquivalent |
+| codex | auto | mock-slow | — choose — | noEquivalent |
+| codex | auto | codex (no Plan offered) | auto | equivalent |
+| codex | auto | my-claude (extends claude) | — choose — | noEquivalent |
+| codex | auto | omp-a (extends omp) | — choose — | noEquivalent |
+| codex | auto | omp-b (extends omp, reversed) | — choose — | noEquivalent |
+| codex | auto | acp-dynamic | — choose — | noEquivalent |
+| codex | auto | acp-standard | — choose — | noEquivalent |
+| codex | auto | no-modes | — choose — | noModes |
+| codex | auto | unattended-only | — choose — | noEquivalent |
+| codex | auto-review | claude | — choose — | noEquivalent |
+| codex | auto-review | copilot | — choose — | noEquivalent |
+| codex | auto-review | opencode | — choose — | noEquivalent |
+| codex | auto-review | pi | — choose — | noModes |
+| codex | auto-review | omp | — choose — | noEquivalent |
+| codex | auto-review | mock | — choose — | noEquivalent |
+| codex | auto-review | mock-slow | — choose — | noEquivalent |
+| codex | auto-review | codex (no Plan offered) | auto-review | equivalent |
+| codex | auto-review | my-claude (extends claude) | — choose — | noEquivalent |
+| codex | auto-review | omp-a (extends omp) | — choose — | noEquivalent |
+| codex | auto-review | omp-b (extends omp, reversed) | — choose — | noEquivalent |
+| codex | auto-review | acp-dynamic | — choose — | noEquivalent |
+| codex | auto-review | acp-standard | — choose — | noEquivalent |
+| codex | auto-review | no-modes | — choose — | noModes |
+| codex | auto-review | unattended-only | — choose — | noEquivalent |
+| codex | full-access | claude | bypassPermissions | equivalent |
+| codex | full-access | copilot | allow-all | equivalent |
+| codex | full-access | opencode | — choose — | noEquivalent |
+| codex | full-access | pi | — choose — | noModes |
+| codex | full-access | omp | full | equivalent |
+| codex | full-access | mock | — choose — | noEquivalent |
+| codex | full-access | mock-slow | — choose — | noEquivalent |
+| codex | full-access | codex (no Plan offered) | full-access | equivalent |
+| codex | full-access | my-claude (extends claude) | bypassPermissions | equivalent |
+| codex | full-access | omp-a (extends omp) | full | equivalent |
+| codex | full-access | omp-b (extends omp, reversed) | full | equivalent |
+| codex | full-access | acp-dynamic | unattended | equivalent |
+| codex | full-access | acp-standard | — choose — | noEquivalent |
+| codex | full-access | no-modes | — choose — | noModes |
+| codex | full-access | unattended-only | run | equivalent |
+| codex | full-auto-accept | claude | full-auto-accept | equivalent |
+| codex | full-auto-accept | copilot | full-auto-accept | equivalent |
+| codex | full-auto-accept | opencode | full-auto-accept | equivalent |
+| codex | full-auto-accept | pi | — choose — | noModes |
+| codex | full-auto-accept | omp | full-auto-accept | equivalent |
+| codex | full-auto-accept | mock | full-auto-accept | equivalent |
+| codex | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| codex | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| codex | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| codex | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| codex | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| codex | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| codex | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| codex | full-auto-accept | no-modes | — choose — | noModes |
+| codex | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| codex | (none) | claude | — choose — | noSourceMode |
+| codex | (none) | copilot | — choose — | noSourceMode |
+| codex | (none) | opencode | — choose — | noSourceMode |
+| codex | (none) | pi | — choose — | noModes |
+| codex | (none) | omp | — choose — | noSourceMode |
+| codex | (none) | mock | — choose — | noSourceMode |
+| codex | (none) | mock-slow | — choose — | noSourceMode |
+| codex | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| codex | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| codex | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| codex | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| codex | (none) | acp-dynamic | — choose — | noSourceMode |
+| codex | (none) | acp-standard | — choose — | noSourceMode |
+| codex | (none) | no-modes | — choose — | noModes |
+| codex | (none) | unattended-only | — choose — | noSourceMode |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | claude | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | codex | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | opencode | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | pi | — choose — | noModes |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | omp | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | mock | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | mock-slow | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | codex (no Plan offered) | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | my-claude (extends claude) | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | omp-a (extends omp) | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | omp-b (extends omp, reversed) | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | acp-dynamic | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | acp-standard | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | no-modes | — choose — | noModes |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#agent | unattended-only | — choose — | noEquivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | claude | plan | equivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | codex | plan | equivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | opencode | plan | equivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | pi | — choose — | noModes |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | omp | — choose — | planUnavailable |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | mock | — choose — | planUnavailable |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | mock-slow | — choose — | planUnavailable |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | codex (no Plan offered) | — choose — | planUnavailable |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | my-claude (extends claude) | plan | equivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | omp-a (extends omp) | — choose — | planUnavailable |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | omp-b (extends omp, reversed) | — choose — | planUnavailable |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | acp-dynamic | — choose — | planUnavailable |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | equivalent |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | no-modes | — choose — | noModes |
+| copilot | https://agentclientprotocol.com/protocol/session-modes#plan | unattended-only | — choose — | planUnavailable |
+| copilot | allow-all | claude | bypassPermissions | equivalent |
+| copilot | allow-all | codex | full-access | equivalent |
+| copilot | allow-all | opencode | — choose — | noEquivalent |
+| copilot | allow-all | pi | — choose — | noModes |
+| copilot | allow-all | omp | full | equivalent |
+| copilot | allow-all | mock | — choose — | noEquivalent |
+| copilot | allow-all | mock-slow | — choose — | noEquivalent |
+| copilot | allow-all | codex (no Plan offered) | full-access | equivalent |
+| copilot | allow-all | my-claude (extends claude) | bypassPermissions | equivalent |
+| copilot | allow-all | omp-a (extends omp) | full | equivalent |
+| copilot | allow-all | omp-b (extends omp, reversed) | full | equivalent |
+| copilot | allow-all | acp-dynamic | unattended | equivalent |
+| copilot | allow-all | acp-standard | — choose — | noEquivalent |
+| copilot | allow-all | no-modes | — choose — | noModes |
+| copilot | allow-all | unattended-only | run | equivalent |
+| copilot | full-auto-accept | claude | full-auto-accept | equivalent |
+| copilot | full-auto-accept | codex | full-auto-accept | equivalent |
+| copilot | full-auto-accept | opencode | full-auto-accept | equivalent |
+| copilot | full-auto-accept | pi | — choose — | noModes |
+| copilot | full-auto-accept | omp | full-auto-accept | equivalent |
+| copilot | full-auto-accept | mock | full-auto-accept | equivalent |
+| copilot | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| copilot | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| copilot | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| copilot | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| copilot | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| copilot | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| copilot | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| copilot | full-auto-accept | no-modes | — choose — | noModes |
+| copilot | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| copilot | (none) | claude | — choose — | noSourceMode |
+| copilot | (none) | codex | — choose — | noSourceMode |
+| copilot | (none) | opencode | — choose — | noSourceMode |
+| copilot | (none) | pi | — choose — | noModes |
+| copilot | (none) | omp | — choose — | noSourceMode |
+| copilot | (none) | mock | — choose — | noSourceMode |
+| copilot | (none) | mock-slow | — choose — | noSourceMode |
+| copilot | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| copilot | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| copilot | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| copilot | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| copilot | (none) | acp-dynamic | — choose — | noSourceMode |
+| copilot | (none) | acp-standard | — choose — | noSourceMode |
+| copilot | (none) | no-modes | — choose — | noModes |
+| copilot | (none) | unattended-only | — choose — | noSourceMode |
+| opencode | build | claude | — choose — | noEquivalent |
+| opencode | build | codex | — choose — | noEquivalent |
+| opencode | build | copilot | — choose — | noEquivalent |
+| opencode | build | pi | — choose — | noModes |
+| opencode | build | omp | — choose — | noEquivalent |
+| opencode | build | mock | — choose — | noEquivalent |
+| opencode | build | mock-slow | — choose — | noEquivalent |
+| opencode | build | codex (no Plan offered) | — choose — | noEquivalent |
+| opencode | build | my-claude (extends claude) | — choose — | noEquivalent |
+| opencode | build | omp-a (extends omp) | — choose — | noEquivalent |
+| opencode | build | omp-b (extends omp, reversed) | — choose — | noEquivalent |
+| opencode | build | acp-dynamic | — choose — | noEquivalent |
+| opencode | build | acp-standard | — choose — | noEquivalent |
+| opencode | build | no-modes | — choose — | noModes |
+| opencode | build | unattended-only | — choose — | noEquivalent |
+| opencode | plan | claude | plan | equivalent |
+| opencode | plan | codex | plan | equivalent |
+| opencode | plan | copilot | https://agentclientprotocol.com/protocol/session-modes#plan | equivalent |
+| opencode | plan | pi | — choose — | noModes |
+| opencode | plan | omp | — choose — | planUnavailable |
+| opencode | plan | mock | — choose — | planUnavailable |
+| opencode | plan | mock-slow | — choose — | planUnavailable |
+| opencode | plan | codex (no Plan offered) | — choose — | planUnavailable |
+| opencode | plan | my-claude (extends claude) | plan | equivalent |
+| opencode | plan | omp-a (extends omp) | — choose — | planUnavailable |
+| opencode | plan | omp-b (extends omp, reversed) | — choose — | planUnavailable |
+| opencode | plan | acp-dynamic | — choose — | planUnavailable |
+| opencode | plan | acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | equivalent |
+| opencode | plan | no-modes | — choose — | noModes |
+| opencode | plan | unattended-only | — choose — | planUnavailable |
+| opencode | full-auto-accept | claude | full-auto-accept | equivalent |
+| opencode | full-auto-accept | codex | full-auto-accept | equivalent |
+| opencode | full-auto-accept | copilot | full-auto-accept | equivalent |
+| opencode | full-auto-accept | pi | — choose — | noModes |
+| opencode | full-auto-accept | omp | full-auto-accept | equivalent |
+| opencode | full-auto-accept | mock | full-auto-accept | equivalent |
+| opencode | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| opencode | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| opencode | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| opencode | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| opencode | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| opencode | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| opencode | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| opencode | full-auto-accept | no-modes | — choose — | noModes |
+| opencode | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| opencode | (none) | claude | — choose — | noSourceMode |
+| opencode | (none) | codex | — choose — | noSourceMode |
+| opencode | (none) | copilot | — choose — | noSourceMode |
+| opencode | (none) | pi | — choose — | noModes |
+| opencode | (none) | omp | — choose — | noSourceMode |
+| opencode | (none) | mock | — choose — | noSourceMode |
+| opencode | (none) | mock-slow | — choose — | noSourceMode |
+| opencode | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| opencode | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| opencode | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| opencode | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| opencode | (none) | acp-dynamic | — choose — | noSourceMode |
+| opencode | (none) | acp-standard | — choose — | noSourceMode |
+| opencode | (none) | no-modes | — choose — | noModes |
+| opencode | (none) | unattended-only | — choose — | noSourceMode |
+| pi | full-auto-accept | claude | full-auto-accept | equivalent |
+| pi | full-auto-accept | codex | full-auto-accept | equivalent |
+| pi | full-auto-accept | copilot | full-auto-accept | equivalent |
+| pi | full-auto-accept | opencode | full-auto-accept | equivalent |
+| pi | full-auto-accept | omp | full-auto-accept | equivalent |
+| pi | full-auto-accept | mock | full-auto-accept | equivalent |
+| pi | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| pi | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| pi | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| pi | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| pi | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| pi | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| pi | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| pi | full-auto-accept | no-modes | — choose — | noModes |
+| pi | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| pi | (none) | claude | — choose — | noSourceMode |
+| pi | (none) | codex | — choose — | noSourceMode |
+| pi | (none) | copilot | — choose — | noSourceMode |
+| pi | (none) | opencode | — choose — | noSourceMode |
+| pi | (none) | omp | — choose — | noSourceMode |
+| pi | (none) | mock | — choose — | noSourceMode |
+| pi | (none) | mock-slow | — choose — | noSourceMode |
+| pi | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| pi | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| pi | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| pi | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| pi | (none) | acp-dynamic | — choose — | noSourceMode |
+| pi | (none) | acp-standard | — choose — | noSourceMode |
+| pi | (none) | no-modes | — choose — | noModes |
+| pi | (none) | unattended-only | — choose — | noSourceMode |
+| omp | full | claude | bypassPermissions | equivalent |
+| omp | full | codex | full-access | equivalent |
+| omp | full | copilot | allow-all | equivalent |
+| omp | full | opencode | — choose — | noEquivalent |
+| omp | full | pi | — choose — | noModes |
+| omp | full | mock | — choose — | noEquivalent |
+| omp | full | mock-slow | — choose — | noEquivalent |
+| omp | full | codex (no Plan offered) | full-access | equivalent |
+| omp | full | my-claude (extends claude) | bypassPermissions | equivalent |
+| omp | full | omp-a (extends omp) | full | equivalent |
+| omp | full | omp-b (extends omp, reversed) | full | equivalent |
+| omp | full | acp-dynamic | unattended | equivalent |
+| omp | full | acp-standard | — choose — | noEquivalent |
+| omp | full | no-modes | — choose — | noModes |
+| omp | full | unattended-only | run | equivalent |
+| omp | write | claude | — choose — | noEquivalent |
+| omp | write | codex | — choose — | noEquivalent |
+| omp | write | copilot | — choose — | noEquivalent |
+| omp | write | opencode | — choose — | noEquivalent |
+| omp | write | pi | — choose — | noModes |
+| omp | write | mock | — choose — | noEquivalent |
+| omp | write | mock-slow | — choose — | noEquivalent |
+| omp | write | codex (no Plan offered) | — choose — | noEquivalent |
+| omp | write | my-claude (extends claude) | — choose — | noEquivalent |
+| omp | write | omp-a (extends omp) | write | equivalent |
+| omp | write | omp-b (extends omp, reversed) | write | equivalent |
+| omp | write | acp-dynamic | — choose — | noEquivalent |
+| omp | write | acp-standard | — choose — | noEquivalent |
+| omp | write | no-modes | — choose — | noModes |
+| omp | write | unattended-only | — choose — | noEquivalent |
+| omp | ask | claude | default | equivalent |
+| omp | ask | codex | — choose — | noEquivalent |
+| omp | ask | copilot | — choose — | noEquivalent |
+| omp | ask | opencode | — choose — | noEquivalent |
+| omp | ask | pi | — choose — | noModes |
+| omp | ask | mock | — choose — | noEquivalent |
+| omp | ask | mock-slow | — choose — | noEquivalent |
+| omp | ask | codex (no Plan offered) | — choose — | noEquivalent |
+| omp | ask | my-claude (extends claude) | default | equivalent |
+| omp | ask | omp-a (extends omp) | ask | equivalent |
+| omp | ask | omp-b (extends omp, reversed) | ask | equivalent |
+| omp | ask | acp-dynamic | — choose — | noEquivalent |
+| omp | ask | acp-standard | — choose — | noEquivalent |
+| omp | ask | no-modes | — choose — | noModes |
+| omp | ask | unattended-only | — choose — | noEquivalent |
+| omp | full-auto-accept | claude | full-auto-accept | equivalent |
+| omp | full-auto-accept | codex | full-auto-accept | equivalent |
+| omp | full-auto-accept | copilot | full-auto-accept | equivalent |
+| omp | full-auto-accept | opencode | full-auto-accept | equivalent |
+| omp | full-auto-accept | pi | — choose — | noModes |
+| omp | full-auto-accept | mock | full-auto-accept | equivalent |
+| omp | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| omp | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| omp | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| omp | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| omp | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| omp | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| omp | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| omp | full-auto-accept | no-modes | — choose — | noModes |
+| omp | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| omp | (none) | claude | — choose — | noSourceMode |
+| omp | (none) | codex | — choose — | noSourceMode |
+| omp | (none) | copilot | — choose — | noSourceMode |
+| omp | (none) | opencode | — choose — | noSourceMode |
+| omp | (none) | pi | — choose — | noModes |
+| omp | (none) | mock | — choose — | noSourceMode |
+| omp | (none) | mock-slow | — choose — | noSourceMode |
+| omp | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| omp | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| omp | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| omp | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| omp | (none) | acp-dynamic | — choose — | noSourceMode |
+| omp | (none) | acp-standard | — choose — | noSourceMode |
+| omp | (none) | no-modes | — choose — | noModes |
+| omp | (none) | unattended-only | — choose — | noSourceMode |
+| mock | load-test | claude | — choose — | unknownSource |
+| mock | load-test | codex | — choose — | unknownSource |
+| mock | load-test | copilot | — choose — | unknownSource |
+| mock | load-test | opencode | — choose — | unknownSource |
+| mock | load-test | pi | — choose — | noModes |
+| mock | load-test | omp | — choose — | unknownSource |
+| mock | load-test | mock-slow | — choose — | unknownSource |
+| mock | load-test | codex (no Plan offered) | — choose — | unknownSource |
+| mock | load-test | my-claude (extends claude) | — choose — | unknownSource |
+| mock | load-test | omp-a (extends omp) | — choose — | unknownSource |
+| mock | load-test | omp-b (extends omp, reversed) | — choose — | unknownSource |
+| mock | load-test | acp-dynamic | — choose — | unknownSource |
+| mock | load-test | acp-standard | — choose — | unknownSource |
+| mock | load-test | no-modes | — choose — | noModes |
+| mock | load-test | unattended-only | — choose — | unknownSource |
+| mock | approval-test | claude | — choose — | unknownSource |
+| mock | approval-test | codex | — choose — | unknownSource |
+| mock | approval-test | copilot | — choose — | unknownSource |
+| mock | approval-test | opencode | — choose — | unknownSource |
+| mock | approval-test | pi | — choose — | noModes |
+| mock | approval-test | omp | — choose — | unknownSource |
+| mock | approval-test | mock-slow | — choose — | unknownSource |
+| mock | approval-test | codex (no Plan offered) | — choose — | unknownSource |
+| mock | approval-test | my-claude (extends claude) | — choose — | unknownSource |
+| mock | approval-test | omp-a (extends omp) | — choose — | unknownSource |
+| mock | approval-test | omp-b (extends omp, reversed) | — choose — | unknownSource |
+| mock | approval-test | acp-dynamic | — choose — | unknownSource |
+| mock | approval-test | acp-standard | — choose — | unknownSource |
+| mock | approval-test | no-modes | — choose — | noModes |
+| mock | approval-test | unattended-only | — choose — | unknownSource |
+| mock | full-auto-accept | claude | full-auto-accept | equivalent |
+| mock | full-auto-accept | codex | full-auto-accept | equivalent |
+| mock | full-auto-accept | copilot | full-auto-accept | equivalent |
+| mock | full-auto-accept | opencode | full-auto-accept | equivalent |
+| mock | full-auto-accept | pi | — choose — | noModes |
+| mock | full-auto-accept | omp | full-auto-accept | equivalent |
+| mock | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| mock | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| mock | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| mock | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| mock | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| mock | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| mock | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| mock | full-auto-accept | no-modes | — choose — | noModes |
+| mock | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| mock | (none) | claude | — choose — | noSourceMode |
+| mock | (none) | codex | — choose — | noSourceMode |
+| mock | (none) | copilot | — choose — | noSourceMode |
+| mock | (none) | opencode | — choose — | noSourceMode |
+| mock | (none) | pi | — choose — | noModes |
+| mock | (none) | omp | — choose — | noSourceMode |
+| mock | (none) | mock-slow | — choose — | noSourceMode |
+| mock | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| mock | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| mock | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| mock | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| mock | (none) | acp-dynamic | — choose — | noSourceMode |
+| mock | (none) | acp-standard | — choose — | noSourceMode |
+| mock | (none) | no-modes | — choose — | noModes |
+| mock | (none) | unattended-only | — choose — | noSourceMode |
+| mock-slow | default | claude | — choose — | unknownSource |
+| mock-slow | default | codex | — choose — | unknownSource |
+| mock-slow | default | copilot | — choose — | unknownSource |
+| mock-slow | default | opencode | — choose — | unknownSource |
+| mock-slow | default | pi | — choose — | noModes |
+| mock-slow | default | omp | — choose — | unknownSource |
+| mock-slow | default | mock | — choose — | unknownSource |
+| mock-slow | default | codex (no Plan offered) | — choose — | unknownSource |
+| mock-slow | default | my-claude (extends claude) | — choose — | unknownSource |
+| mock-slow | default | omp-a (extends omp) | — choose — | unknownSource |
+| mock-slow | default | omp-b (extends omp, reversed) | — choose — | unknownSource |
+| mock-slow | default | acp-dynamic | — choose — | unknownSource |
+| mock-slow | default | acp-standard | — choose — | unknownSource |
+| mock-slow | default | no-modes | — choose — | noModes |
+| mock-slow | default | unattended-only | — choose — | unknownSource |
+| mock-slow | full-auto-accept | claude | full-auto-accept | equivalent |
+| mock-slow | full-auto-accept | codex | full-auto-accept | equivalent |
+| mock-slow | full-auto-accept | copilot | full-auto-accept | equivalent |
+| mock-slow | full-auto-accept | opencode | full-auto-accept | equivalent |
+| mock-slow | full-auto-accept | pi | — choose — | noModes |
+| mock-slow | full-auto-accept | omp | full-auto-accept | equivalent |
+| mock-slow | full-auto-accept | mock | full-auto-accept | equivalent |
+| mock-slow | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| mock-slow | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| mock-slow | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| mock-slow | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| mock-slow | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| mock-slow | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| mock-slow | full-auto-accept | no-modes | — choose — | noModes |
+| mock-slow | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| mock-slow | (none) | claude | — choose — | noSourceMode |
+| mock-slow | (none) | codex | — choose — | noSourceMode |
+| mock-slow | (none) | copilot | — choose — | noSourceMode |
+| mock-slow | (none) | opencode | — choose — | noSourceMode |
+| mock-slow | (none) | pi | — choose — | noModes |
+| mock-slow | (none) | omp | — choose — | noSourceMode |
+| mock-slow | (none) | mock | — choose — | noSourceMode |
+| mock-slow | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| mock-slow | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| mock-slow | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| mock-slow | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| mock-slow | (none) | acp-dynamic | — choose — | noSourceMode |
+| mock-slow | (none) | acp-standard | — choose — | noSourceMode |
+| mock-slow | (none) | no-modes | — choose — | noModes |
+| mock-slow | (none) | unattended-only | — choose — | noSourceMode |
+| codex (no Plan offered) | auto | claude | — choose — | noEquivalent |
+| codex (no Plan offered) | auto | codex | auto | equivalent |
+| codex (no Plan offered) | auto | copilot | — choose — | noEquivalent |
+| codex (no Plan offered) | auto | opencode | — choose — | noEquivalent |
+| codex (no Plan offered) | auto | pi | — choose — | noModes |
+| codex (no Plan offered) | auto | omp | — choose — | noEquivalent |
+| codex (no Plan offered) | auto | mock | — choose — | noEquivalent |
+| codex (no Plan offered) | auto | mock-slow | — choose — | noEquivalent |
+| codex (no Plan offered) | auto | my-claude (extends claude) | — choose — | noEquivalent |
+| codex (no Plan offered) | auto | omp-a (extends omp) | — choose — | noEquivalent |
+| codex (no Plan offered) | auto | omp-b (extends omp, reversed) | — choose — | noEquivalent |
+| codex (no Plan offered) | auto | acp-dynamic | — choose — | noEquivalent |
+| codex (no Plan offered) | auto | acp-standard | — choose — | noEquivalent |
+| codex (no Plan offered) | auto | no-modes | — choose — | noModes |
+| codex (no Plan offered) | auto | unattended-only | — choose — | noEquivalent |
+| codex (no Plan offered) | auto-review | claude | — choose — | noEquivalent |
+| codex (no Plan offered) | auto-review | codex | auto-review | equivalent |
+| codex (no Plan offered) | auto-review | copilot | — choose — | noEquivalent |
+| codex (no Plan offered) | auto-review | opencode | — choose — | noEquivalent |
+| codex (no Plan offered) | auto-review | pi | — choose — | noModes |
+| codex (no Plan offered) | auto-review | omp | — choose — | noEquivalent |
+| codex (no Plan offered) | auto-review | mock | — choose — | noEquivalent |
+| codex (no Plan offered) | auto-review | mock-slow | — choose — | noEquivalent |
+| codex (no Plan offered) | auto-review | my-claude (extends claude) | — choose — | noEquivalent |
+| codex (no Plan offered) | auto-review | omp-a (extends omp) | — choose — | noEquivalent |
+| codex (no Plan offered) | auto-review | omp-b (extends omp, reversed) | — choose — | noEquivalent |
+| codex (no Plan offered) | auto-review | acp-dynamic | — choose — | noEquivalent |
+| codex (no Plan offered) | auto-review | acp-standard | — choose — | noEquivalent |
+| codex (no Plan offered) | auto-review | no-modes | — choose — | noModes |
+| codex (no Plan offered) | auto-review | unattended-only | — choose — | noEquivalent |
+| codex (no Plan offered) | full-access | claude | bypassPermissions | equivalent |
+| codex (no Plan offered) | full-access | codex | full-access | equivalent |
+| codex (no Plan offered) | full-access | copilot | allow-all | equivalent |
+| codex (no Plan offered) | full-access | opencode | — choose — | noEquivalent |
+| codex (no Plan offered) | full-access | pi | — choose — | noModes |
+| codex (no Plan offered) | full-access | omp | full | equivalent |
+| codex (no Plan offered) | full-access | mock | — choose — | noEquivalent |
+| codex (no Plan offered) | full-access | mock-slow | — choose — | noEquivalent |
+| codex (no Plan offered) | full-access | my-claude (extends claude) | bypassPermissions | equivalent |
+| codex (no Plan offered) | full-access | omp-a (extends omp) | full | equivalent |
+| codex (no Plan offered) | full-access | omp-b (extends omp, reversed) | full | equivalent |
+| codex (no Plan offered) | full-access | acp-dynamic | unattended | equivalent |
+| codex (no Plan offered) | full-access | acp-standard | — choose — | noEquivalent |
+| codex (no Plan offered) | full-access | no-modes | — choose — | noModes |
+| codex (no Plan offered) | full-access | unattended-only | run | equivalent |
+| codex (no Plan offered) | full-auto-accept | claude | full-auto-accept | equivalent |
+| codex (no Plan offered) | full-auto-accept | codex | full-auto-accept | equivalent |
+| codex (no Plan offered) | full-auto-accept | copilot | full-auto-accept | equivalent |
+| codex (no Plan offered) | full-auto-accept | opencode | full-auto-accept | equivalent |
+| codex (no Plan offered) | full-auto-accept | pi | — choose — | noModes |
+| codex (no Plan offered) | full-auto-accept | omp | full-auto-accept | equivalent |
+| codex (no Plan offered) | full-auto-accept | mock | full-auto-accept | equivalent |
+| codex (no Plan offered) | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| codex (no Plan offered) | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| codex (no Plan offered) | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| codex (no Plan offered) | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| codex (no Plan offered) | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| codex (no Plan offered) | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| codex (no Plan offered) | full-auto-accept | no-modes | — choose — | noModes |
+| codex (no Plan offered) | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| codex (no Plan offered) | (none) | claude | — choose — | noSourceMode |
+| codex (no Plan offered) | (none) | codex | — choose — | noSourceMode |
+| codex (no Plan offered) | (none) | copilot | — choose — | noSourceMode |
+| codex (no Plan offered) | (none) | opencode | — choose — | noSourceMode |
+| codex (no Plan offered) | (none) | pi | — choose — | noModes |
+| codex (no Plan offered) | (none) | omp | — choose — | noSourceMode |
+| codex (no Plan offered) | (none) | mock | — choose — | noSourceMode |
+| codex (no Plan offered) | (none) | mock-slow | — choose — | noSourceMode |
+| codex (no Plan offered) | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| codex (no Plan offered) | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| codex (no Plan offered) | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| codex (no Plan offered) | (none) | acp-dynamic | — choose — | noSourceMode |
+| codex (no Plan offered) | (none) | acp-standard | — choose — | noSourceMode |
+| codex (no Plan offered) | (none) | no-modes | — choose — | noModes |
+| codex (no Plan offered) | (none) | unattended-only | — choose — | noSourceMode |
+| my-claude (extends claude) | plan | claude | plan | equivalent |
+| my-claude (extends claude) | plan | codex | plan | equivalent |
+| my-claude (extends claude) | plan | copilot | https://agentclientprotocol.com/protocol/session-modes#plan | equivalent |
+| my-claude (extends claude) | plan | opencode | plan | equivalent |
+| my-claude (extends claude) | plan | pi | — choose — | noModes |
+| my-claude (extends claude) | plan | omp | — choose — | planUnavailable |
+| my-claude (extends claude) | plan | mock | — choose — | planUnavailable |
+| my-claude (extends claude) | plan | mock-slow | — choose — | planUnavailable |
+| my-claude (extends claude) | plan | codex (no Plan offered) | — choose — | planUnavailable |
+| my-claude (extends claude) | plan | omp-a (extends omp) | — choose — | planUnavailable |
+| my-claude (extends claude) | plan | omp-b (extends omp, reversed) | — choose — | planUnavailable |
+| my-claude (extends claude) | plan | acp-dynamic | — choose — | planUnavailable |
+| my-claude (extends claude) | plan | acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | equivalent |
+| my-claude (extends claude) | plan | no-modes | — choose — | noModes |
+| my-claude (extends claude) | plan | unattended-only | — choose — | planUnavailable |
+| my-claude (extends claude) | default | claude | default | equivalent |
+| my-claude (extends claude) | default | codex | — choose — | noEquivalent |
+| my-claude (extends claude) | default | copilot | — choose — | noEquivalent |
+| my-claude (extends claude) | default | opencode | — choose — | noEquivalent |
+| my-claude (extends claude) | default | pi | — choose — | noModes |
+| my-claude (extends claude) | default | omp | ask | equivalent |
+| my-claude (extends claude) | default | mock | — choose — | noEquivalent |
+| my-claude (extends claude) | default | mock-slow | — choose — | noEquivalent |
+| my-claude (extends claude) | default | codex (no Plan offered) | — choose — | noEquivalent |
+| my-claude (extends claude) | default | omp-a (extends omp) | ask | equivalent |
+| my-claude (extends claude) | default | omp-b (extends omp, reversed) | ask | equivalent |
+| my-claude (extends claude) | default | acp-dynamic | — choose — | noEquivalent |
+| my-claude (extends claude) | default | acp-standard | — choose — | noEquivalent |
+| my-claude (extends claude) | default | no-modes | — choose — | noModes |
+| my-claude (extends claude) | default | unattended-only | — choose — | noEquivalent |
+| my-claude (extends claude) | acceptEdits | claude | acceptEdits | equivalent |
+| my-claude (extends claude) | acceptEdits | codex | — choose — | noEquivalent |
+| my-claude (extends claude) | acceptEdits | copilot | — choose — | noEquivalent |
+| my-claude (extends claude) | acceptEdits | opencode | — choose — | noEquivalent |
+| my-claude (extends claude) | acceptEdits | pi | — choose — | noModes |
+| my-claude (extends claude) | acceptEdits | omp | — choose — | noEquivalent |
+| my-claude (extends claude) | acceptEdits | mock | — choose — | noEquivalent |
+| my-claude (extends claude) | acceptEdits | mock-slow | — choose — | noEquivalent |
+| my-claude (extends claude) | acceptEdits | codex (no Plan offered) | — choose — | noEquivalent |
+| my-claude (extends claude) | acceptEdits | omp-a (extends omp) | — choose — | noEquivalent |
+| my-claude (extends claude) | acceptEdits | omp-b (extends omp, reversed) | — choose — | noEquivalent |
+| my-claude (extends claude) | acceptEdits | acp-dynamic | — choose — | noEquivalent |
+| my-claude (extends claude) | acceptEdits | acp-standard | — choose — | noEquivalent |
+| my-claude (extends claude) | acceptEdits | no-modes | — choose — | noModes |
+| my-claude (extends claude) | acceptEdits | unattended-only | — choose — | noEquivalent |
+| my-claude (extends claude) | auto | claude | auto | equivalent |
+| my-claude (extends claude) | auto | codex | — choose — | noEquivalent |
+| my-claude (extends claude) | auto | copilot | — choose — | noEquivalent |
+| my-claude (extends claude) | auto | opencode | — choose — | noEquivalent |
+| my-claude (extends claude) | auto | pi | — choose — | noModes |
+| my-claude (extends claude) | auto | omp | — choose — | noEquivalent |
+| my-claude (extends claude) | auto | mock | — choose — | noEquivalent |
+| my-claude (extends claude) | auto | mock-slow | — choose — | noEquivalent |
+| my-claude (extends claude) | auto | codex (no Plan offered) | — choose — | noEquivalent |
+| my-claude (extends claude) | auto | omp-a (extends omp) | — choose — | noEquivalent |
+| my-claude (extends claude) | auto | omp-b (extends omp, reversed) | — choose — | noEquivalent |
+| my-claude (extends claude) | auto | acp-dynamic | — choose — | noEquivalent |
+| my-claude (extends claude) | auto | acp-standard | — choose — | noEquivalent |
+| my-claude (extends claude) | auto | no-modes | — choose — | noModes |
+| my-claude (extends claude) | auto | unattended-only | — choose — | noEquivalent |
+| my-claude (extends claude) | bypassPermissions | claude | bypassPermissions | equivalent |
+| my-claude (extends claude) | bypassPermissions | codex | full-access | equivalent |
+| my-claude (extends claude) | bypassPermissions | copilot | allow-all | equivalent |
+| my-claude (extends claude) | bypassPermissions | opencode | — choose — | noEquivalent |
+| my-claude (extends claude) | bypassPermissions | pi | — choose — | noModes |
+| my-claude (extends claude) | bypassPermissions | omp | full | equivalent |
+| my-claude (extends claude) | bypassPermissions | mock | — choose — | noEquivalent |
+| my-claude (extends claude) | bypassPermissions | mock-slow | — choose — | noEquivalent |
+| my-claude (extends claude) | bypassPermissions | codex (no Plan offered) | full-access | equivalent |
+| my-claude (extends claude) | bypassPermissions | omp-a (extends omp) | full | equivalent |
+| my-claude (extends claude) | bypassPermissions | omp-b (extends omp, reversed) | full | equivalent |
+| my-claude (extends claude) | bypassPermissions | acp-dynamic | unattended | equivalent |
+| my-claude (extends claude) | bypassPermissions | acp-standard | — choose — | noEquivalent |
+| my-claude (extends claude) | bypassPermissions | no-modes | — choose — | noModes |
+| my-claude (extends claude) | bypassPermissions | unattended-only | run | equivalent |
+| my-claude (extends claude) | full-auto-accept | claude | full-auto-accept | equivalent |
+| my-claude (extends claude) | full-auto-accept | codex | full-auto-accept | equivalent |
+| my-claude (extends claude) | full-auto-accept | copilot | full-auto-accept | equivalent |
+| my-claude (extends claude) | full-auto-accept | opencode | full-auto-accept | equivalent |
+| my-claude (extends claude) | full-auto-accept | pi | — choose — | noModes |
+| my-claude (extends claude) | full-auto-accept | omp | full-auto-accept | equivalent |
+| my-claude (extends claude) | full-auto-accept | mock | full-auto-accept | equivalent |
+| my-claude (extends claude) | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| my-claude (extends claude) | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| my-claude (extends claude) | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| my-claude (extends claude) | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| my-claude (extends claude) | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| my-claude (extends claude) | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| my-claude (extends claude) | full-auto-accept | no-modes | — choose — | noModes |
+| my-claude (extends claude) | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| my-claude (extends claude) | (none) | claude | — choose — | noSourceMode |
+| my-claude (extends claude) | (none) | codex | — choose — | noSourceMode |
+| my-claude (extends claude) | (none) | copilot | — choose — | noSourceMode |
+| my-claude (extends claude) | (none) | opencode | — choose — | noSourceMode |
+| my-claude (extends claude) | (none) | pi | — choose — | noModes |
+| my-claude (extends claude) | (none) | omp | — choose — | noSourceMode |
+| my-claude (extends claude) | (none) | mock | — choose — | noSourceMode |
+| my-claude (extends claude) | (none) | mock-slow | — choose — | noSourceMode |
+| my-claude (extends claude) | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| my-claude (extends claude) | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| my-claude (extends claude) | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| my-claude (extends claude) | (none) | acp-dynamic | — choose — | noSourceMode |
+| my-claude (extends claude) | (none) | acp-standard | — choose — | noSourceMode |
+| my-claude (extends claude) | (none) | no-modes | — choose — | noModes |
+| my-claude (extends claude) | (none) | unattended-only | — choose — | noSourceMode |
+| omp-a (extends omp) | full | claude | bypassPermissions | equivalent |
+| omp-a (extends omp) | full | codex | full-access | equivalent |
+| omp-a (extends omp) | full | copilot | allow-all | equivalent |
+| omp-a (extends omp) | full | opencode | — choose — | noEquivalent |
+| omp-a (extends omp) | full | pi | — choose — | noModes |
+| omp-a (extends omp) | full | omp | full | equivalent |
+| omp-a (extends omp) | full | mock | — choose — | noEquivalent |
+| omp-a (extends omp) | full | mock-slow | — choose — | noEquivalent |
+| omp-a (extends omp) | full | codex (no Plan offered) | full-access | equivalent |
+| omp-a (extends omp) | full | my-claude (extends claude) | bypassPermissions | equivalent |
+| omp-a (extends omp) | full | omp-b (extends omp, reversed) | full | equivalent |
+| omp-a (extends omp) | full | acp-dynamic | unattended | equivalent |
+| omp-a (extends omp) | full | acp-standard | — choose — | noEquivalent |
+| omp-a (extends omp) | full | no-modes | — choose — | noModes |
+| omp-a (extends omp) | full | unattended-only | run | equivalent |
+| omp-a (extends omp) | write | claude | — choose — | noEquivalent |
+| omp-a (extends omp) | write | codex | — choose — | noEquivalent |
+| omp-a (extends omp) | write | copilot | — choose — | noEquivalent |
+| omp-a (extends omp) | write | opencode | — choose — | noEquivalent |
+| omp-a (extends omp) | write | pi | — choose — | noModes |
+| omp-a (extends omp) | write | omp | write | equivalent |
+| omp-a (extends omp) | write | mock | — choose — | noEquivalent |
+| omp-a (extends omp) | write | mock-slow | — choose — | noEquivalent |
+| omp-a (extends omp) | write | codex (no Plan offered) | — choose — | noEquivalent |
+| omp-a (extends omp) | write | my-claude (extends claude) | — choose — | noEquivalent |
+| omp-a (extends omp) | write | omp-b (extends omp, reversed) | write | equivalent |
+| omp-a (extends omp) | write | acp-dynamic | — choose — | noEquivalent |
+| omp-a (extends omp) | write | acp-standard | — choose — | noEquivalent |
+| omp-a (extends omp) | write | no-modes | — choose — | noModes |
+| omp-a (extends omp) | write | unattended-only | — choose — | noEquivalent |
+| omp-a (extends omp) | ask | claude | default | equivalent |
+| omp-a (extends omp) | ask | codex | — choose — | noEquivalent |
+| omp-a (extends omp) | ask | copilot | — choose — | noEquivalent |
+| omp-a (extends omp) | ask | opencode | — choose — | noEquivalent |
+| omp-a (extends omp) | ask | pi | — choose — | noModes |
+| omp-a (extends omp) | ask | omp | ask | equivalent |
+| omp-a (extends omp) | ask | mock | — choose — | noEquivalent |
+| omp-a (extends omp) | ask | mock-slow | — choose — | noEquivalent |
+| omp-a (extends omp) | ask | codex (no Plan offered) | — choose — | noEquivalent |
+| omp-a (extends omp) | ask | my-claude (extends claude) | default | equivalent |
+| omp-a (extends omp) | ask | omp-b (extends omp, reversed) | ask | equivalent |
+| omp-a (extends omp) | ask | acp-dynamic | — choose — | noEquivalent |
+| omp-a (extends omp) | ask | acp-standard | — choose — | noEquivalent |
+| omp-a (extends omp) | ask | no-modes | — choose — | noModes |
+| omp-a (extends omp) | ask | unattended-only | — choose — | noEquivalent |
+| omp-a (extends omp) | full-auto-accept | claude | full-auto-accept | equivalent |
+| omp-a (extends omp) | full-auto-accept | codex | full-auto-accept | equivalent |
+| omp-a (extends omp) | full-auto-accept | copilot | full-auto-accept | equivalent |
+| omp-a (extends omp) | full-auto-accept | opencode | full-auto-accept | equivalent |
+| omp-a (extends omp) | full-auto-accept | pi | — choose — | noModes |
+| omp-a (extends omp) | full-auto-accept | omp | full-auto-accept | equivalent |
+| omp-a (extends omp) | full-auto-accept | mock | full-auto-accept | equivalent |
+| omp-a (extends omp) | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| omp-a (extends omp) | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| omp-a (extends omp) | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| omp-a (extends omp) | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| omp-a (extends omp) | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| omp-a (extends omp) | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| omp-a (extends omp) | full-auto-accept | no-modes | — choose — | noModes |
+| omp-a (extends omp) | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| omp-a (extends omp) | (none) | claude | — choose — | noSourceMode |
+| omp-a (extends omp) | (none) | codex | — choose — | noSourceMode |
+| omp-a (extends omp) | (none) | copilot | — choose — | noSourceMode |
+| omp-a (extends omp) | (none) | opencode | — choose — | noSourceMode |
+| omp-a (extends omp) | (none) | pi | — choose — | noModes |
+| omp-a (extends omp) | (none) | omp | — choose — | noSourceMode |
+| omp-a (extends omp) | (none) | mock | — choose — | noSourceMode |
+| omp-a (extends omp) | (none) | mock-slow | — choose — | noSourceMode |
+| omp-a (extends omp) | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| omp-a (extends omp) | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| omp-a (extends omp) | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| omp-a (extends omp) | (none) | acp-dynamic | — choose — | noSourceMode |
+| omp-a (extends omp) | (none) | acp-standard | — choose — | noSourceMode |
+| omp-a (extends omp) | (none) | no-modes | — choose — | noModes |
+| omp-a (extends omp) | (none) | unattended-only | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | ask | claude | default | equivalent |
+| omp-b (extends omp, reversed) | ask | codex | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | ask | copilot | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | ask | opencode | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | ask | pi | — choose — | noModes |
+| omp-b (extends omp, reversed) | ask | omp | ask | equivalent |
+| omp-b (extends omp, reversed) | ask | mock | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | ask | mock-slow | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | ask | codex (no Plan offered) | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | ask | my-claude (extends claude) | default | equivalent |
+| omp-b (extends omp, reversed) | ask | omp-a (extends omp) | ask | equivalent |
+| omp-b (extends omp, reversed) | ask | acp-dynamic | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | ask | acp-standard | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | ask | no-modes | — choose — | noModes |
+| omp-b (extends omp, reversed) | ask | unattended-only | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | write | claude | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | write | codex | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | write | copilot | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | write | opencode | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | write | pi | — choose — | noModes |
+| omp-b (extends omp, reversed) | write | omp | write | equivalent |
+| omp-b (extends omp, reversed) | write | mock | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | write | mock-slow | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | write | codex (no Plan offered) | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | write | my-claude (extends claude) | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | write | omp-a (extends omp) | write | equivalent |
+| omp-b (extends omp, reversed) | write | acp-dynamic | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | write | acp-standard | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | write | no-modes | — choose — | noModes |
+| omp-b (extends omp, reversed) | write | unattended-only | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | full | claude | bypassPermissions | equivalent |
+| omp-b (extends omp, reversed) | full | codex | full-access | equivalent |
+| omp-b (extends omp, reversed) | full | copilot | allow-all | equivalent |
+| omp-b (extends omp, reversed) | full | opencode | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | full | pi | — choose — | noModes |
+| omp-b (extends omp, reversed) | full | omp | full | equivalent |
+| omp-b (extends omp, reversed) | full | mock | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | full | mock-slow | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | full | codex (no Plan offered) | full-access | equivalent |
+| omp-b (extends omp, reversed) | full | my-claude (extends claude) | bypassPermissions | equivalent |
+| omp-b (extends omp, reversed) | full | omp-a (extends omp) | full | equivalent |
+| omp-b (extends omp, reversed) | full | acp-dynamic | unattended | equivalent |
+| omp-b (extends omp, reversed) | full | acp-standard | — choose — | noEquivalent |
+| omp-b (extends omp, reversed) | full | no-modes | — choose — | noModes |
+| omp-b (extends omp, reversed) | full | unattended-only | run | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | claude | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | codex | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | copilot | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | opencode | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | pi | — choose — | noModes |
+| omp-b (extends omp, reversed) | full-auto-accept | omp | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | mock | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | full-auto-accept | no-modes | — choose — | noModes |
+| omp-b (extends omp, reversed) | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| omp-b (extends omp, reversed) | (none) | claude | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | (none) | codex | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | (none) | copilot | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | (none) | opencode | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | (none) | pi | — choose — | noModes |
+| omp-b (extends omp, reversed) | (none) | omp | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | (none) | mock | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | (none) | mock-slow | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | (none) | acp-dynamic | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | (none) | acp-standard | — choose — | noSourceMode |
+| omp-b (extends omp, reversed) | (none) | no-modes | — choose — | noModes |
+| omp-b (extends omp, reversed) | (none) | unattended-only | — choose — | noSourceMode |
+| acp-dynamic | careful | claude | — choose — | unknownSource |
+| acp-dynamic | careful | codex | — choose — | unknownSource |
+| acp-dynamic | careful | copilot | — choose — | unknownSource |
+| acp-dynamic | careful | opencode | — choose — | unknownSource |
+| acp-dynamic | careful | pi | — choose — | noModes |
+| acp-dynamic | careful | omp | — choose — | unknownSource |
+| acp-dynamic | careful | mock | — choose — | unknownSource |
+| acp-dynamic | careful | mock-slow | — choose — | unknownSource |
+| acp-dynamic | careful | codex (no Plan offered) | — choose — | unknownSource |
+| acp-dynamic | careful | my-claude (extends claude) | — choose — | unknownSource |
+| acp-dynamic | careful | omp-a (extends omp) | — choose — | unknownSource |
+| acp-dynamic | careful | omp-b (extends omp, reversed) | — choose — | unknownSource |
+| acp-dynamic | careful | acp-standard | — choose — | unknownSource |
+| acp-dynamic | careful | no-modes | — choose — | noModes |
+| acp-dynamic | careful | unattended-only | — choose — | unknownSource |
+| acp-dynamic | foo#plan | claude | — choose — | unknownSource |
+| acp-dynamic | foo#plan | codex | — choose — | unknownSource |
+| acp-dynamic | foo#plan | copilot | — choose — | unknownSource |
+| acp-dynamic | foo#plan | opencode | — choose — | unknownSource |
+| acp-dynamic | foo#plan | pi | — choose — | noModes |
+| acp-dynamic | foo#plan | omp | — choose — | unknownSource |
+| acp-dynamic | foo#plan | mock | — choose — | unknownSource |
+| acp-dynamic | foo#plan | mock-slow | — choose — | unknownSource |
+| acp-dynamic | foo#plan | codex (no Plan offered) | — choose — | unknownSource |
+| acp-dynamic | foo#plan | my-claude (extends claude) | — choose — | unknownSource |
+| acp-dynamic | foo#plan | omp-a (extends omp) | — choose — | unknownSource |
+| acp-dynamic | foo#plan | omp-b (extends omp, reversed) | — choose — | unknownSource |
+| acp-dynamic | foo#plan | acp-standard | — choose — | unknownSource |
+| acp-dynamic | foo#plan | no-modes | — choose — | noModes |
+| acp-dynamic | foo#plan | unattended-only | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | claude | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | codex | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | copilot | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | opencode | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | pi | — choose — | noModes |
+| acp-dynamic | https://example.com/modes#plan | omp | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | mock | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | mock-slow | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | codex (no Plan offered) | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | my-claude (extends claude) | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | omp-a (extends omp) | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | omp-b (extends omp, reversed) | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | acp-standard | — choose — | unknownSource |
+| acp-dynamic | https://example.com/modes#plan | no-modes | — choose — | noModes |
+| acp-dynamic | https://example.com/modes#plan | unattended-only | — choose — | unknownSource |
+| acp-dynamic | yolo | claude | — choose — | unknownSource |
+| acp-dynamic | yolo | codex | — choose — | unknownSource |
+| acp-dynamic | yolo | copilot | — choose — | unknownSource |
+| acp-dynamic | yolo | opencode | — choose — | unknownSource |
+| acp-dynamic | yolo | pi | — choose — | noModes |
+| acp-dynamic | yolo | omp | — choose — | unknownSource |
+| acp-dynamic | yolo | mock | — choose — | unknownSource |
+| acp-dynamic | yolo | mock-slow | — choose — | unknownSource |
+| acp-dynamic | yolo | codex (no Plan offered) | — choose — | unknownSource |
+| acp-dynamic | yolo | my-claude (extends claude) | — choose — | unknownSource |
+| acp-dynamic | yolo | omp-a (extends omp) | — choose — | unknownSource |
+| acp-dynamic | yolo | omp-b (extends omp, reversed) | — choose — | unknownSource |
+| acp-dynamic | yolo | acp-standard | — choose — | unknownSource |
+| acp-dynamic | yolo | no-modes | — choose — | noModes |
+| acp-dynamic | yolo | unattended-only | — choose — | unknownSource |
+| acp-dynamic | unattended | claude | bypassPermissions | equivalent |
+| acp-dynamic | unattended | codex | full-access | equivalent |
+| acp-dynamic | unattended | copilot | allow-all | equivalent |
+| acp-dynamic | unattended | opencode | — choose — | noEquivalent |
+| acp-dynamic | unattended | pi | — choose — | noModes |
+| acp-dynamic | unattended | omp | full | equivalent |
+| acp-dynamic | unattended | mock | — choose — | noEquivalent |
+| acp-dynamic | unattended | mock-slow | — choose — | noEquivalent |
+| acp-dynamic | unattended | codex (no Plan offered) | full-access | equivalent |
+| acp-dynamic | unattended | my-claude (extends claude) | bypassPermissions | equivalent |
+| acp-dynamic | unattended | omp-a (extends omp) | full | equivalent |
+| acp-dynamic | unattended | omp-b (extends omp, reversed) | full | equivalent |
+| acp-dynamic | unattended | acp-standard | — choose — | noEquivalent |
+| acp-dynamic | unattended | no-modes | — choose — | noModes |
+| acp-dynamic | unattended | unattended-only | run | equivalent |
+| acp-dynamic | full-auto-accept | claude | full-auto-accept | equivalent |
+| acp-dynamic | full-auto-accept | codex | full-auto-accept | equivalent |
+| acp-dynamic | full-auto-accept | copilot | full-auto-accept | equivalent |
+| acp-dynamic | full-auto-accept | opencode | full-auto-accept | equivalent |
+| acp-dynamic | full-auto-accept | pi | — choose — | noModes |
+| acp-dynamic | full-auto-accept | omp | full-auto-accept | equivalent |
+| acp-dynamic | full-auto-accept | mock | full-auto-accept | equivalent |
+| acp-dynamic | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| acp-dynamic | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| acp-dynamic | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| acp-dynamic | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| acp-dynamic | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| acp-dynamic | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| acp-dynamic | full-auto-accept | no-modes | — choose — | noModes |
+| acp-dynamic | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| acp-dynamic | (none) | claude | — choose — | noSourceMode |
+| acp-dynamic | (none) | codex | — choose — | noSourceMode |
+| acp-dynamic | (none) | copilot | — choose — | noSourceMode |
+| acp-dynamic | (none) | opencode | — choose — | noSourceMode |
+| acp-dynamic | (none) | pi | — choose — | noModes |
+| acp-dynamic | (none) | omp | — choose — | noSourceMode |
+| acp-dynamic | (none) | mock | — choose — | noSourceMode |
+| acp-dynamic | (none) | mock-slow | — choose — | noSourceMode |
+| acp-dynamic | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| acp-dynamic | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| acp-dynamic | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| acp-dynamic | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| acp-dynamic | (none) | acp-standard | — choose — | noSourceMode |
+| acp-dynamic | (none) | no-modes | — choose — | noModes |
+| acp-dynamic | (none) | unattended-only | — choose — | noSourceMode |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | claude | plan | equivalent |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | codex | plan | equivalent |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | copilot | https://agentclientprotocol.com/protocol/session-modes#plan | equivalent |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | opencode | plan | equivalent |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | pi | — choose — | noModes |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | omp | — choose — | planUnavailable |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | mock | — choose — | planUnavailable |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | mock-slow | — choose — | planUnavailable |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | codex (no Plan offered) | — choose — | planUnavailable |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | my-claude (extends claude) | plan | equivalent |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | omp-a (extends omp) | — choose — | planUnavailable |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | omp-b (extends omp, reversed) | — choose — | planUnavailable |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | acp-dynamic | — choose — | planUnavailable |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | no-modes | — choose — | noModes |
+| acp-standard | https://agentclientprotocol.com/protocol/session-modes#plan | unattended-only | — choose — | planUnavailable |
+| acp-standard | work | claude | — choose — | unknownSource |
+| acp-standard | work | codex | — choose — | unknownSource |
+| acp-standard | work | copilot | — choose — | unknownSource |
+| acp-standard | work | opencode | — choose — | unknownSource |
+| acp-standard | work | pi | — choose — | noModes |
+| acp-standard | work | omp | — choose — | unknownSource |
+| acp-standard | work | mock | — choose — | unknownSource |
+| acp-standard | work | mock-slow | — choose — | unknownSource |
+| acp-standard | work | codex (no Plan offered) | — choose — | unknownSource |
+| acp-standard | work | my-claude (extends claude) | — choose — | unknownSource |
+| acp-standard | work | omp-a (extends omp) | — choose — | unknownSource |
+| acp-standard | work | omp-b (extends omp, reversed) | — choose — | unknownSource |
+| acp-standard | work | acp-dynamic | — choose — | unknownSource |
+| acp-standard | work | no-modes | — choose — | noModes |
+| acp-standard | work | unattended-only | — choose — | unknownSource |
+| acp-standard | full-auto-accept | claude | full-auto-accept | equivalent |
+| acp-standard | full-auto-accept | codex | full-auto-accept | equivalent |
+| acp-standard | full-auto-accept | copilot | full-auto-accept | equivalent |
+| acp-standard | full-auto-accept | opencode | full-auto-accept | equivalent |
+| acp-standard | full-auto-accept | pi | — choose — | noModes |
+| acp-standard | full-auto-accept | omp | full-auto-accept | equivalent |
+| acp-standard | full-auto-accept | mock | full-auto-accept | equivalent |
+| acp-standard | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| acp-standard | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| acp-standard | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| acp-standard | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| acp-standard | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| acp-standard | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| acp-standard | full-auto-accept | no-modes | — choose — | noModes |
+| acp-standard | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| acp-standard | (none) | claude | — choose — | noSourceMode |
+| acp-standard | (none) | codex | — choose — | noSourceMode |
+| acp-standard | (none) | copilot | — choose — | noSourceMode |
+| acp-standard | (none) | opencode | — choose — | noSourceMode |
+| acp-standard | (none) | pi | — choose — | noModes |
+| acp-standard | (none) | omp | — choose — | noSourceMode |
+| acp-standard | (none) | mock | — choose — | noSourceMode |
+| acp-standard | (none) | mock-slow | — choose — | noSourceMode |
+| acp-standard | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| acp-standard | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| acp-standard | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| acp-standard | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| acp-standard | (none) | acp-dynamic | — choose — | noSourceMode |
+| acp-standard | (none) | no-modes | — choose — | noModes |
+| acp-standard | (none) | unattended-only | — choose — | noSourceMode |
+| no-modes | full-auto-accept | claude | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | codex | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | copilot | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | opencode | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | pi | — choose — | noModes |
+| no-modes | full-auto-accept | omp | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | mock | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| no-modes | full-auto-accept | unattended-only | full-auto-accept | equivalent |
+| no-modes | (none) | claude | — choose — | noSourceMode |
+| no-modes | (none) | codex | — choose — | noSourceMode |
+| no-modes | (none) | copilot | — choose — | noSourceMode |
+| no-modes | (none) | opencode | — choose — | noSourceMode |
+| no-modes | (none) | pi | — choose — | noModes |
+| no-modes | (none) | omp | — choose — | noSourceMode |
+| no-modes | (none) | mock | — choose — | noSourceMode |
+| no-modes | (none) | mock-slow | — choose — | noSourceMode |
+| no-modes | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| no-modes | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| no-modes | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| no-modes | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| no-modes | (none) | acp-dynamic | — choose — | noSourceMode |
+| no-modes | (none) | acp-standard | — choose — | noSourceMode |
+| no-modes | (none) | unattended-only | — choose — | noSourceMode |
+| unattended-only | run | claude | bypassPermissions | equivalent |
+| unattended-only | run | codex | full-access | equivalent |
+| unattended-only | run | copilot | allow-all | equivalent |
+| unattended-only | run | opencode | — choose — | noEquivalent |
+| unattended-only | run | pi | — choose — | noModes |
+| unattended-only | run | omp | full | equivalent |
+| unattended-only | run | mock | — choose — | noEquivalent |
+| unattended-only | run | mock-slow | — choose — | noEquivalent |
+| unattended-only | run | codex (no Plan offered) | full-access | equivalent |
+| unattended-only | run | my-claude (extends claude) | bypassPermissions | equivalent |
+| unattended-only | run | omp-a (extends omp) | full | equivalent |
+| unattended-only | run | omp-b (extends omp, reversed) | full | equivalent |
+| unattended-only | run | acp-dynamic | unattended | equivalent |
+| unattended-only | run | acp-standard | — choose — | noEquivalent |
+| unattended-only | run | no-modes | — choose — | noModes |
+| unattended-only | full-auto-accept | claude | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | codex | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | copilot | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | opencode | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | pi | — choose — | noModes |
+| unattended-only | full-auto-accept | omp | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | mock | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | mock-slow | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | codex (no Plan offered) | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | my-claude (extends claude) | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | omp-a (extends omp) | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | omp-b (extends omp, reversed) | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | acp-dynamic | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | acp-standard | full-auto-accept | equivalent |
+| unattended-only | full-auto-accept | no-modes | — choose — | noModes |
+| unattended-only | (none) | claude | — choose — | noSourceMode |
+| unattended-only | (none) | codex | — choose — | noSourceMode |
+| unattended-only | (none) | copilot | — choose — | noSourceMode |
+| unattended-only | (none) | opencode | — choose — | noSourceMode |
+| unattended-only | (none) | pi | — choose — | noModes |
+| unattended-only | (none) | omp | — choose — | noSourceMode |
+| unattended-only | (none) | mock | — choose — | noSourceMode |
+| unattended-only | (none) | mock-slow | — choose — | noSourceMode |
+| unattended-only | (none) | codex (no Plan offered) | — choose — | noSourceMode |
+| unattended-only | (none) | my-claude (extends claude) | — choose — | noSourceMode |
+| unattended-only | (none) | omp-a (extends omp) | — choose — | noSourceMode |
+| unattended-only | (none) | omp-b (extends omp, reversed) | — choose — | noSourceMode |
+| unattended-only | (none) | acp-dynamic | — choose — | noSourceMode |
+| unattended-only | (none) | acp-standard | — choose — | noSourceMode |
+| unattended-only | (none) | no-modes | — choose — | noModes |"
+`;

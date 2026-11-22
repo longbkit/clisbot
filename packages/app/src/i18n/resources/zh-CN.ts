@@ -213,15 +213,32 @@ export const zhCN: TranslationResources = {
       freshChatSession: "开始新会话；此聊天的历史记录会保留",
     },
     providerSwitch: {
+      permissionHeading: "新会话中的权限",
+      providerDefault: "提供商自身默认",
+      unknownMode: "未报告模式",
+      chooseBelow: "请在下方选择",
+      chatHistory:
+        "你的下一条消息会在新提供商上开始新会话并带上这段对话。之前的会话保留在 Cowork 中，聊天记录保留在这里。",
+      workHistory:
+        "会在新提供商上打开一个附带这段对话的新标签页；在你发送前不会发送任何内容。此会话保持不变。",
+      reasons: {
+        equivalent: "保持相同权限：{{mode}}。",
+        fullAutoToNoPrompt:
+          "此 Host 无法在这里使用完全自动接受；将以批准范围更小的 {{mode}} 无提示运行。",
+        toAskEachTool: "没有权限相同的模式；将以 {{mode}} 在每个工具前询问。",
+        planUnavailable: "此提供商没有计划模式。请选择允许的程度。",
+        noEquivalent: "没有权限相同的模式。请选择允许的程度。",
+        ambiguous: "有多个权限不同的模式可能匹配。请选择一个。",
+        unknownSource: "Clisbot 无法判断当前模式允许什么。请为新会话选择权限。",
+        noSourceMode: "当前模式未报告。请为新会话选择权限。",
+        noModes: "此提供商没有权限模式，将按自身默认运行。确认以继续。",
+      },
       newSessionTag: "新会话",
       title: "切换到 {{provider}}？",
-      workMessage:
-        "{{provider}} 无法继续这个 {{current}} 会话。将在新标签页中开始一个新会话，并把这段对话复制为上下文。此会话保持不变。",
-      chatMessage:
-        "{{provider}} 无法继续这个 {{current}} 会话。机器人将在 {{provider}} 上开始新会话，你的下一条消息会把这段对话作为上下文带过去。之前的会话保留在 Cowork 中，聊天记录保留在这里。",
       confirm: "开始新会话",
       cancel: "取消",
       hostNeedsUpdate: "请更新此 Host 以切换提供商；没有任何更改。",
+      modeDiffers: "新会话以 {{mode}} 模式启动，而不是所选模式。继续前请检查。",
       failed: "无法切换提供商；没有任何更改。",
     },
     github: {

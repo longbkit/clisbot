@@ -1387,6 +1387,63 @@ describe("provider switch (chat.session.fork)", () => {
     expect(withoutCarry.forkCarry("cht_f", alpha.id)).toBeNull();
   });
 
+  test("the new session's reported mode is stated, and a different one is called out", async () => {
+    const { h } = await forked();
+    h.liveAgents.set("agent-bot_a-2", {
+      lifecycle: "idle",
+      pendingPermissions: new Map(),
+      inFlightPermissionResponses: new Set(),
+      currentModeId: "default",
+      config: {},
+    } as never);
+    const result = await h.engine.forkSession({
+      chatId: "cht_f",
+      botId: alpha.id,
+      launch: { ...claude, modeId: "bypassPermissions" },
+      expectedAgentId: "agent-bot_a-1",
+    });
+    expect(result.launchedMode).toBe("default");
+    expect(h.createInputs.at(-1)).toMatchObject({ mode: "bypassPermissions" });
+    expect((await h.lines("cht_f")).at(-1)?.text).toContain(
+      "in mode default, not the bypassPermissions that was chosen",
+    );
+    // A repeat with another mode is not the same confirmation.
+    await expect(
+      h.engine.forkSession({
+        chatId: "cht_f",
+        botId: alpha.id,
+        launch: { ...claude, modeId: "plan" },
+        expectedAgentId: "agent-bot_a-1",
+      }),
+    ).rejects.toThrow("changed since you chose");
+    const repeat = await h.engine.forkSession({
+      chatId: "cht_f",
+      botId: alpha.id,
+      launch: { ...claude, modeId: "bypassPermissions" },
+      expectedAgentId: "agent-bot_a-1",
+    });
+    expect(repeat).toEqual({ agentId: "agent-bot_a-2", launchedMode: "default" });
+  });
+
+  test("Full auto-accept run by the daemon is reported as Full auto-accept", async () => {
+    const { h } = await forked();
+    h.liveAgents.set("agent-bot_a-2", {
+      lifecycle: "idle",
+      pendingPermissions: new Map(),
+      inFlightPermissionResponses: new Set(),
+      currentModeId: "bypassPermissions",
+      config: { fullAutoAccept: true },
+    } as never);
+    const result = await h.engine.forkSession({
+      chatId: "cht_f",
+      botId: alpha.id,
+      launch: { ...claude, modeId: "full-auto-accept" },
+      expectedAgentId: "agent-bot_a-1",
+    });
+    expect(result.launchedMode).toBe("full-auto-accept");
+    expect((await h.lines("cht_f")).at(-1)?.text).toContain("in mode full-auto-accept.");
+  });
+
   test("a Host without session forks refuses", async () => {
     const h = await harness();
     await h.store.create({ id: "cht_n", botIds: [alpha.id] });

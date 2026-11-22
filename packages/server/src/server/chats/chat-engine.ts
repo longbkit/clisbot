@@ -25,7 +25,13 @@ import {
 } from "./chat-record.js";
 import type { ChatStore } from "./chat-store.js";
 import type { BotLaunchDefaults } from "@clisbot/protocol/bots/types";
-import { assertForkable, forkNotice, repeatedFork, type SessionForks } from "./session-fork.js";
+import {
+  assertForkable,
+  forkNotice,
+  launchedModeOf,
+  repeatedFork,
+  type SessionForks,
+} from "./session-fork.js";
 import { renderChatPrompt, sessionTitleFor } from "./context-prompt.js";
 import { KeyedSerialQueue } from "./keyed-queue.js";
 import {
@@ -382,7 +388,7 @@ export class ChatEngine implements TurnTrackerHost {
     launch: BotLaunchDefaults;
     expectedAgentId: string | null;
     actor?: SessionActor;
-  }): Promise<{ agentId: string }> {
+  }): Promise<{ agentId: string; launchedMode?: string | null }> {
     const { chatId, botId, launch, actor } = input;
     return this.changeIdleParticipant(chatId, botId, async (fromAgentId) => {
       const forks = this.deps.sessionForks;
@@ -390,7 +396,11 @@ export class ChatEngine implements TurnTrackerHost {
       const chat = await this.deps.store.require(chatId);
       const owed = this.deps.store.forkCarry(chatId, botId);
       const repeated = repeatedFork(chat, owed, botId, launch, input.expectedAgentId);
-      if (repeated) return { agentId: repeated };
+      if (repeated)
+        return {
+          agentId: repeated,
+          launchedMode: launchedModeOf(this.deps.agentManager.getAgent(repeated)),
+        };
       const bot = await this.deps.bots.get(botId);
       if (!bot) throw new Error(`Bot ${botId} is not in chat ${chatId}`);
       assertForkable(chat, bot, launch);
@@ -415,8 +425,12 @@ export class ChatEngine implements TurnTrackerHost {
         fromAgentId,
       );
       if (fromAgentId) this.tracker.unwatch(fromAgentId);
-      await this.appendSystem(chatId, forkNotice(bot, launch, carry !== null));
-      return { agentId: session.agentId };
+      const launchedMode = launchedModeOf(this.deps.agentManager.getAgent(session.agentId));
+      await this.appendSystem(
+        chatId,
+        forkNotice({ bot, launch, carries: carry !== null, launchedMode }),
+      );
+      return { agentId: session.agentId, launchedMode };
     });
   }
 

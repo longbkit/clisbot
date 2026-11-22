@@ -215,16 +215,36 @@ export const ja: TranslationResources = {
       freshChatSession: "新しいセッションを開始します。このチャットの履歴は残ります",
     },
     providerSwitch: {
+      permissionHeading: "新しいセッションの権限",
+      providerDefault: "プロバイダーの既定",
+      unknownMode: "モード不明",
+      chooseBelow: "下から選択",
+      chatHistory:
+        "次のメッセージで新しいプロバイダーの新しいセッションが始まり、この会話が引き継がれます。以前のセッションは Cowork に、チャット履歴はここに残ります。",
+      workHistory:
+        "この会話を添付した新しいタブが新しいプロバイダーで開きます。送信するまで何も送られません。このセッションはそのまま残ります。",
+      reasons: {
+        equivalent: "同じ権限を保ちます: {{mode}}。",
+        fullAutoToNoPrompt:
+          "この Host ではここで完全自動承認を使えないため、承認範囲の狭い {{mode}} で確認なしに実行します。",
+        toAskEachTool: "同じ権限のモードがないため、{{mode}} でツールごとに確認します。",
+        planUnavailable: "このプロバイダーには計画モードがありません。権限を選んでください。",
+        noEquivalent: "同じ権限のモードがありません。権限を選んでください。",
+        ambiguous: "権限の異なる複数のモードが該当します。1 つ選んでください。",
+        unknownSource:
+          "Clisbot は現在のモードの権限を判断できません。新しいセッションの権限を選んでください。",
+        noSourceMode: "現在のモードが報告されていません。新しいセッションの権限を選んでください。",
+        noModes:
+          "このプロバイダーには権限モードがなく、独自の既定で動作します。確認して続行してください。",
+      },
       newSessionTag: "新しいセッション",
       title: "{{provider}} に切り替えますか？",
-      workMessage:
-        "{{provider}} はこの {{current}} のセッションを続けられません。この会話をコンテキストとして引き継いだ新しいセッションが新しいタブで始まります。このセッションはそのまま残ります。",
-      chatMessage:
-        "{{provider}} はこの {{current}} のセッションを続けられません。ボットは {{provider}} で新しいセッションを始め、次のメッセージでこの会話をコンテキストとして渡します。以前のセッションは Cowork に、チャットの履歴はここに残ります。",
       confirm: "新しいセッションを開始",
       cancel: "キャンセル",
       hostNeedsUpdate:
         "プロバイダーを切り替えるにはこの Host を更新してください。何も変更されていません。",
+      modeDiffers:
+        "新しいセッションは選んだモードではなく {{mode}} で始まりました。続ける前に確認してください。",
       failed: "プロバイダーを切り替えられませんでした。何も変更されていません。",
     },
     github: {

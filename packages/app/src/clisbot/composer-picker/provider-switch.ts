@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useRef } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getBotIdFromLabels } from "@clisbot/protocol/bots/labels";
+import { FULL_AUTO_ACCEPT_MODE_ID } from "@clisbot/protocol/full-auto-accept";
 import { useToast } from "@/contexts/toast-context";
 import {
   buildSelectableProviderSelectorProviders,
@@ -9,9 +10,17 @@ import {
 import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { useForkAgent } from "@/hooks/use-fork-agent";
 import { useHostFeature } from "@/runtime/host-features";
-import { useSessionStore } from "@/stores/session-store";
-import { confirmDialog } from "@/utils/confirm-dialog";
+import { useSessionStore, type Agent } from "@/stores/session-store";
 import { toErrorMessage } from "@/utils/error-messages";
+import { isProviderAutoAcceptOn, resolveAgentModes, resolveComposerModeId } from "./mode-options";
+import {
+  permissionScopeOf,
+  resolvePermissionCarry,
+  type PermissionOption,
+} from "./permission-carry";
+import { resolveModeLabelKey } from "./mode-options";
+import { ProviderSwitchReview, type ProviderSwitchReviewInput } from "./provider-switch-review";
+import { useFullAutoAcceptOffered } from "./use-draft-mode-control";
 
 /**
  * Where a live session's provider switch goes (docs/features/bots-and-chats/README.md, "Switching
@@ -30,8 +39,130 @@ interface ProviderSwitchInput {
   serverId: string;
   agentId: string;
   target: ProviderSwitchTarget | undefined;
-  /** The provider names the dialog shows. */
-  providerLabel: (providerId: string) => string;
+  /** The Host's providers: labels, models and the modes each one reports. */
+  entries: ProviderSnapshotEntry[] | undefined;
+}
+
+/** A provider's mode family: a custom provider reads as the built-in it extends. */
+function familyOf(entries: ProviderSnapshotEntry[] | undefined, provider: string): string {
+  return entries?.find((entry) => entry.provider === provider)?.baseProvider ?? provider;
+}
+
+function describe(
+  entries: ProviderSnapshotEntry[] | undefined,
+  provider: string,
+  model?: string | null,
+) {
+  const entry = entries?.find((candidate) => candidate.provider === provider);
+  const modelLabel = entry?.models?.find((candidate) => candidate.id === model)?.label ?? model;
+  const label = entry?.label ?? provider;
+  return modelLabel ? `${label} · ${modelLabel}` : label;
+}
+
+/**
+ * The review for one switch: what the session runs in now (Full auto-accept when it is on, the
+ * mode the provider reports otherwise) carried to the target's Host-reported modes.
+ */
+export function buildSwitchReview(input: {
+  agent: Pick<
+    Agent,
+    | "provider"
+    | "model"
+    | "currentModeId"
+    | "fullAutoAccept"
+    | "features"
+    | "availableModes"
+    | "runtimeInfo"
+  >;
+  entries: ProviderSnapshotEntry[] | undefined;
+  provider: string;
+  modelId: string;
+  fullAutoAcceptSupported: boolean;
+  history: "chat" | "work";
+}): ProviderSwitchReviewInput {
+  const { agent, entries, provider } = input;
+  const sourceEntry = entries?.find((entry) => entry.provider === agent.provider);
+  const providerAutoAccept =
+    input.fullAutoAcceptSupported && isProviderAutoAcceptOn(agent.features);
+  const sourceModeId = resolveComposerModeId(
+    agent.currentModeId ?? agent.runtimeInfo?.modeId ?? null,
+    input.fullAutoAcceptSupported && agent.fullAutoAccept === true,
+    providerAutoAccept,
+  );
+  const sourceFamily = familyOf(entries, agent.provider);
+  const sourceModes = resolveAgentModes(agent.availableModes ?? [], sourceEntry?.modes);
+  const carry = resolvePermissionCarry({
+    sourceFamily,
+    sourceModeId,
+    sourceModes,
+    targetFamily: familyOf(entries, provider),
+    targetModes: entries?.find((entry) => entry.provider === provider)?.modes ?? [],
+    fullAutoAcceptSupported: input.fullAutoAcceptSupported,
+  });
+  return {
+    from: describe(entries, agent.provider, agent.model ?? agent.runtimeInfo?.model),
+    to: describe(entries, provider, input.modelId),
+    fromPermission: sourceModeId ? sourceOption(sourceFamily, sourceModeId, sourceModes) : null,
+    carry,
+    history: input.history,
+  };
+}
+
+/** The session's current mode as the review names it: the app's label, else the provider's. */
+function sourceOption(
+  family: string,
+  modeId: string,
+  modes: readonly { id: string; label: string; isUnattended?: boolean }[],
+): PermissionOption {
+  const mode = modes.find((entry) => entry.id === modeId);
+  return {
+    modeId,
+    label: modeId === FULL_AUTO_ACCEPT_MODE_ID ? "Full auto-accept" : (mode?.label ?? modeId),
+    labelKey: resolveModeLabelKey(family, modeId),
+    scope: permissionScopeOf(family, mode ?? { id: modeId }),
+  };
+}
+
+interface PendingReview {
+  id: number;
+  input: ProviderSwitchReviewInput;
+  resolve: (option: PermissionOption | null) => void;
+}
+
+/**
+ * One review at a time: a second request while one is open answers null at once, and closing,
+ * cancelling or unmounting answers null. Only Start new session answers with the chosen option.
+ */
+function useSwitchReview() {
+  const [pending, setPending] = useState<PendingReview | null>(null);
+  const current = useRef<PendingReview | null>(null);
+  const nextId = useRef(0);
+  const settle = useCallback((option: PermissionOption | null) => {
+    const request = current.current;
+    if (!request) return;
+    current.current = null;
+    setPending(null);
+    request.resolve(option);
+  }, []);
+  useEffect(() => () => settle(null), [settle]);
+  const open = useCallback((input: ProviderSwitchReviewInput) => {
+    if (current.current) return Promise.resolve(null);
+    return new Promise<PermissionOption | null>((resolve) => {
+      const request = { id: ++nextId.current, input, resolve };
+      current.current = request;
+      setPending(request);
+    });
+  }, []);
+  const cancel = useCallback(() => settle(null), [settle]);
+  const element = pending
+    ? createElement(ProviderSwitchReview, {
+        key: pending.id,
+        input: pending.input,
+        onCancel: cancel,
+        onConfirm: settle,
+      })
+    : null;
+  return { open, element };
 }
 
 /**
@@ -40,13 +171,15 @@ interface ProviderSwitchInput {
  * instead of ignoring the pick. Returns null where other providers are not offered.
  */
 export function useProviderSwitch(input: ProviderSwitchInput) {
-  const { serverId, agentId, target, providerLabel } = input;
+  const { serverId, agentId, target, entries } = input;
   const { t } = useTranslation();
   const toast = useToast();
   const client = useSessionStore((state) => state.sessions[serverId]?.client ?? null);
   const chatSupported = useHostFeature(serverId, "chatProviderFork");
   const workSupported = useHostFeature(serverId, "agentForkContext");
+  const fullAutoAcceptSupported = useFullAutoAcceptOffered(serverId);
   const fork = useForkAgent({ serverId, toast });
+  const review = useSwitchReview();
   const inFlight = useRef(false);
   const kind = target?.kind;
 
@@ -60,27 +193,22 @@ export function useProviderSwitch(input: ProviderSwitchInput) {
       }
       const agent = useSessionStore.getState().sessions[serverId]?.agents?.get(agentId);
       if (!agent) return;
-      const confirmed = await confirmDialog({
-        title: t("composer.providerSwitch.title", { provider: providerLabel(provider) }),
-        message: t(
-          target.kind === "chat"
-            ? "composer.providerSwitch.chatMessage"
-            : "composer.providerSwitch.workMessage",
-          { provider: providerLabel(provider), current: providerLabel(agent.provider) },
-        ),
-        confirmLabel: t("composer.providerSwitch.confirm"),
-        cancelLabel: t("composer.providerSwitch.cancel"),
-      });
-      if (!confirmed) return;
+      const option = await review.open(
+        buildSwitchReview({
+          agent,
+          entries,
+          provider,
+          modelId,
+          fullAutoAcceptSupported,
+          history: target.kind === "chat" ? "chat" : "work",
+        }),
+      );
+      if (!option) return;
+      const modeId = option.modeId;
       if (target.kind === "workspace") {
         const workspaceId = target.workspaceId ?? agent.workspaceId;
-        await fork({
-          agentId,
-          agent,
-          workspaceId,
-          target: "tab",
-          launch: { provider, model: modelId },
-        });
+        const launch = { provider, model: modelId, modeId };
+        await fork({ agentId, agent, workspaceId, target: "tab", launch });
         return;
       }
       const botId = getBotIdFromLabels(agent.labels);
@@ -88,17 +216,23 @@ export function useProviderSwitch(input: ProviderSwitchInput) {
       const result = await client.forkChatSession({
         chatId: target.chatId,
         botId,
-        launch: { provider, model: modelId },
+        launch: { provider, model: modelId, ...(modeId ? { modeId } : {}) },
         expectedAgentId: agentId,
       });
       if (result.error) throw new Error(result.error);
+      // The new session reports what it runs in; say so when it is not what was chosen.
+      const launched = result.launchedMode;
+      if (modeId && launched && launched !== modeId)
+        toast.error(t("composer.providerSwitch.modeDiffers", { mode: launched }));
     },
     [
       agentId,
       chatSupported,
       client,
+      entries,
       fork,
-      providerLabel,
+      fullAutoAcceptSupported,
+      review,
       serverId,
       t,
       target,
@@ -122,7 +256,10 @@ export function useProviderSwitch(input: ProviderSwitchInput) {
     [run, t, toast],
   );
 
-  return kind && kind !== "unavailable" ? switchProvider : null;
+  return {
+    switchProvider: kind && kind !== "unavailable" ? switchProvider : null,
+    reviewElement: review.element,
+  };
 }
 
 /**
@@ -163,15 +300,11 @@ export function useLiveProviderChoices(input: {
 }) {
   const { entries, ownProviders, ownProviderId, selectModel } = input;
   const { t } = useTranslation();
-  const providerLabel = useCallback(
-    (id: string) => entries?.find((entry) => entry.provider === id)?.label ?? id,
-    [entries],
-  );
-  const switchProvider = useProviderSwitch({
+  const { switchProvider, reviewElement } = useProviderSwitch({
     serverId: input.serverId,
     agentId: input.agentId,
     target: input.target,
-    providerLabel,
+    entries,
   });
   const providers = useMemo(
     () =>
@@ -195,5 +328,5 @@ export function useLiveProviderChoices(input: {
     },
     [ownProviderId, selectModel, switchProvider],
   );
-  return { providers, selectProviderAndModel };
+  return { providers, selectProviderAndModel, reviewElement };
 }

@@ -213,15 +213,33 @@ export const ko: TranslationResources = {
       freshChatSession: "새 세션을 시작합니다. 이 채팅 기록은 유지됩니다",
     },
     providerSwitch: {
+      permissionHeading: "새 세션의 권한",
+      providerDefault: "제공자 기본값",
+      unknownMode: "보고된 모드 없음",
+      chooseBelow: "아래에서 선택",
+      chatHistory:
+        "다음 메시지가 새 제공자에서 새 세션을 시작하고 이 대화를 함께 전달합니다. 이전 세션은 Cowork에, 채팅 기록은 여기에 남습니다.",
+      workHistory:
+        "이 대화를 첨부한 새 탭이 새 제공자에서 열립니다. 보내기 전에는 아무것도 전송되지 않습니다. 이 세션은 그대로 남습니다.",
+      reasons: {
+        equivalent: "같은 권한을 유지합니다: {{mode}}.",
+        fullAutoToNoPrompt:
+          "이 Host에서는 여기서 완전 자동 수락을 쓸 수 없어 더 적게 승인하는 {{mode}}에서 묻지 않고 실행합니다.",
+        toAskEachTool: "같은 권한의 모드가 없어 {{mode}}에서 도구마다 묻습니다.",
+        planUnavailable: "이 제공자에는 계획 모드가 없습니다. 권한을 선택하세요.",
+        noEquivalent: "같은 권한의 모드가 없습니다. 권한을 선택하세요.",
+        ambiguous: "권한이 다른 여러 모드가 해당될 수 있습니다. 하나를 선택하세요.",
+        unknownSource: "Clisbot이 현재 모드의 권한을 알 수 없습니다. 새 세션의 권한을 선택하세요.",
+        noSourceMode: "현재 모드가 보고되지 않았습니다. 새 세션의 권한을 선택하세요.",
+        noModes: "이 제공자에는 권한 모드가 없어 자체 기본값으로 실행됩니다. 확인하여 계속하세요.",
+      },
       newSessionTag: "새 세션",
       title: "{{provider}}(으)로 전환할까요?",
-      workMessage:
-        "{{provider}}는 이 {{current}} 세션을 이어갈 수 없습니다. 이 대화를 컨텍스트로 복사한 새 세션이 새 탭에서 시작됩니다. 이 세션은 그대로 남습니다.",
-      chatMessage:
-        "{{provider}}는 이 {{current}} 세션을 이어갈 수 없습니다. 봇이 {{provider}}에서 새 세션을 시작하고, 다음 메시지에 이 대화가 컨텍스트로 함께 전달됩니다. 이전 세션은 Cowork에 남고 채팅 기록은 여기에 남습니다.",
       confirm: "새 세션 시작",
       cancel: "취소",
       hostNeedsUpdate: "제공자를 바꾸려면 이 Host를 업데이트하세요. 변경된 내용은 없습니다.",
+      modeDiffers:
+        "새 세션이 선택한 모드가 아닌 {{mode}} 모드로 시작했습니다. 계속하기 전에 확인하세요.",
       failed: "제공자를 바꾸지 못했습니다. 변경된 내용은 없습니다.",
     },
     github: {

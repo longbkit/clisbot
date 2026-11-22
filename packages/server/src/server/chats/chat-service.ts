@@ -112,7 +112,7 @@ export interface ChatService {
     launch: BotLaunchDefaults;
     expectedAgentId: string | null;
     actor?: SessionActor;
-  }): Promise<{ chat: ChatPayload; agentId: string }>;
+  }): Promise<{ chat: ChatPayload; agentId: string; launchedMode: string | null }>;
   /** Stop all (plans/group-discussion.md): ends the discussion and interrupts running turns. */
   stopDiscussion(chatId: string): Promise<boolean>;
 }
@@ -385,8 +385,9 @@ function chatWrites({
     newSession: (chatId, botId) => engine.newSession(chatId, botId),
     forkCarrySource: (chatId, botId) => store.forkCarry(chatId, botId)?.sourceAgentId ?? null,
     forkSession: async (input) => {
-      const { agentId } = await engine.forkSession(input);
-      return { chat: await engine.payload(await store.require(input.chatId)), agentId };
+      const { agentId, launchedMode } = await engine.forkSession(input);
+      const chat = await engine.payload(await store.require(input.chatId));
+      return { chat, agentId, launchedMode: launchedMode ?? null };
     },
     stopDiscussion: (chatId) => engine.stopDiscussion(chatId),
   };

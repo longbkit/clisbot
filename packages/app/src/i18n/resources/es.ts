@@ -216,15 +216,36 @@ export const es: TranslationResources = {
       freshChatSession: "Inicia una sesión nueva; el historial de este chat se conserva",
     },
     providerSwitch: {
+      permissionHeading: "Permiso en la sesión nueva",
+      providerDefault: "Predeterminado del proveedor",
+      unknownMode: "Modo no informado",
+      chooseBelow: "elige abajo",
+      chatHistory:
+        "Tu próximo mensaje inicia una sesión nueva en el nuevo proveedor y lleva esta conversación. La sesión anterior queda en Cowork y el historial del chat sigue aquí.",
+      workHistory:
+        "Se abre una pestaña nueva en el nuevo proveedor con esta conversación adjunta; no se envía nada hasta que envíes. Esta sesión queda como está.",
+      reasons: {
+        equivalent: "Mantiene el mismo permiso: {{mode}}.",
+        fullAutoToNoPrompt:
+          "Este Host no puede usar Aceptación automática total aquí; funciona sin preguntar en {{mode}}, que aprueba menos.",
+        toAskEachTool:
+          "Ningún modo permite lo mismo; preguntará antes de cada herramienta en {{mode}}.",
+        planUnavailable: "Este proveedor no tiene modo de plan. Elige cuánto puede hacer.",
+        noEquivalent: "Ningún modo permite lo mismo. Elige cuánto puede hacer.",
+        ambiguous: "Varios modos podrían coincidir con permisos distintos. Elige uno.",
+        unknownSource:
+          "Clisbot no sabe qué permite el modo actual. Elige cuánto puede hacer la sesión nueva.",
+        noSourceMode: "No se informa el modo actual. Elige cuánto puede hacer la sesión nueva.",
+        noModes:
+          "Este proveedor no tiene modos de permiso; usa su propio predeterminado. Confirma para continuar.",
+      },
       newSessionTag: "sesión nueva",
       title: "¿Cambiar a {{provider}}?",
-      workMessage:
-        "{{provider}} no puede continuar esta sesión de {{current}}. Se abre una sesión nueva en otra pestaña con esta conversación como contexto. Esta sesión se queda como está.",
-      chatMessage:
-        "{{provider}} no puede continuar esta sesión de {{current}}. El bot empieza una sesión nueva en {{provider}} y tu próximo mensaje lleva esta conversación como contexto. La sesión anterior queda en Cowork y el historial del chat sigue aquí.",
       confirm: "Iniciar sesión nueva",
       cancel: "Cancelar",
       hostNeedsUpdate: "Actualiza este Host para cambiar de proveedor; no se cambió nada.",
+      modeDiffers:
+        "La sesión nueva empezó en el modo {{mode}}, no en el elegido. Revísalo antes de seguir.",
       failed: "No se pudo cambiar de proveedor; no se cambió nada.",
     },
     github: {

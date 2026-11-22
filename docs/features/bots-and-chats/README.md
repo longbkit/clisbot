@@ -252,6 +252,32 @@ sends nothing. The old session is never changed.
   not receive the carry.
 - **Work session**: the turn footer's fork (`agent.fork_context`) opens a draft tab on the chosen
   provider and model with the conversation attached; nothing is sent until the person sends.
+- **Permission** (`composer-picker/permission-carry.ts`): the new session keeps the person's
+  autonomy choice only where the target has the same rights, and never gets more on its own.
+  Visual mode groups are not rights: Claude Always ask, Codex workspace Default and OMP Write
+  approval share an icon but not a scope. In order:
+  1. Clisbot Full auto-accept stays Full auto-accept where the Host offers it; a provider's own
+     no-prompt mode never becomes Full auto-accept.
+  2. The same native mode id in the same family (a custom provider's `baseProvider`) is kept.
+  3. Across families only these scopes match: plan (`plan` in Claude, Codex and OpenCode, and the
+     ACP standard plan URI), strict per-tool asking (Claude `default`, OMP `ask`) and no-prompt
+     (Claude `bypassPermissions`, Codex `full-access`, Copilot `allow-all`, OMP `full`, or a mode
+     the provider declares `isUnattended`).
+  4. With no match, Full auto-accept falls to the no-prompt mode, then strict asking; no-prompt
+     falls to strict asking.
+  5. Otherwise the person picks, with nothing preselected: plan without a plan, modes with rights
+     of their own (Codex `auto`/`auto-review`, Claude `acceptEdits`/`auto`, OMP `write`, OpenCode
+     `build`, Copilot `agent`) across families, unknown or unreported modes, a target without
+     modes, or several target modes of one scope. Names, colours and id suffixes never count.
+     The full table over every provider pair is the test snapshot
+     `composer-picker/__snapshots__/permission-carry.test.ts.snap`. The chosen mode goes to the
+     launch on both paths; a chat fork reports the mode the new session runs in, the chat notice
+     states it, and the app warns when it differs from the choice.
+- **Review** (`provider-switch-review.tsx`): one in-app step on every platform, an
+  `AdaptiveModalSheet` (a sheet on phones, a dialog on wide screens): from and to with each side's
+  permission, the permission options with the reason, what happens to the history, then Cancel
+  and Start new session (disabled until a permission is chosen). Close, Escape, Back and a
+  dismissed sheet change nothing; a second pick while it is open opens nothing.
 - A Host without the feature says it needs an update; the pick is never silently dropped.
 
 ### D8. No turn serialization per bot

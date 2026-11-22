@@ -214,15 +214,35 @@ export const vi: TranslationResources = {
       freshChatSession: "Bắt đầu phiên mới; lịch sử trò chuyện này vẫn được giữ",
     },
     providerSwitch: {
+      permissionHeading: "Quyền trong phiên mới",
+      providerDefault: "Mặc định của nhà cung cấp",
+      unknownMode: "Chưa rõ chế độ",
+      chooseBelow: "chọn bên dưới",
+      chatHistory:
+        "Tin nhắn tiếp theo của bạn bắt đầu phiên mới trên nhà cung cấp mới, mang theo cuộc trò chuyện này. Phiên trước vẫn ở Cowork và lịch sử trò chuyện vẫn ở đây.",
+      workHistory:
+        "Một tab mới mở trên nhà cung cấp mới, kèm cuộc trò chuyện này; chưa gửi gì cho đến khi bạn gửi. Phiên hiện tại giữ nguyên.",
+      reasons: {
+        equivalent: "Giữ nguyên quyền: {{mode}}.",
+        fullAutoToNoPrompt:
+          "Host này không dùng được Tự động chấp nhận hoàn toàn ở đây; chạy không hỏi với {{mode}}, ít quyền hơn.",
+        toAskEachTool: "Không có chế độ cho cùng quyền; sẽ hỏi trước mỗi công cụ với {{mode}}.",
+        planUnavailable: "Nhà cung cấp này không có chế độ lập kế hoạch. Hãy chọn mức quyền.",
+        noEquivalent: "Không có chế độ cho cùng quyền. Hãy chọn mức quyền.",
+        ambiguous: "Có vài chế độ có thể khớp nhưng quyền khác nhau. Hãy chọn một.",
+        unknownSource:
+          "Clisbot không biết chế độ hiện tại cho phép những gì. Hãy chọn mức quyền cho phiên mới.",
+        noSourceMode: "Chế độ hiện tại chưa được báo. Hãy chọn mức quyền cho phiên mới.",
+        noModes:
+          "Nhà cung cấp này không có chế độ quyền; chạy theo mặc định riêng. Xác nhận để tiếp tục.",
+      },
       newSessionTag: "phiên mới",
       title: "Chuyển sang {{provider}}?",
-      workMessage:
-        "{{provider}} không thể tiếp tục phiên {{current}} này. Một phiên mới mở trong tab mới, mang theo cuộc trò chuyện này làm ngữ cảnh. Phiên hiện tại giữ nguyên.",
-      chatMessage:
-        "{{provider}} không thể tiếp tục phiên {{current}} này. Bot bắt đầu phiên mới trên {{provider}}, và tin nhắn tiếp theo của bạn mang theo cuộc trò chuyện này làm ngữ cảnh. Phiên trước vẫn ở Cowork và lịch sử trò chuyện vẫn ở đây.",
       confirm: "Bắt đầu phiên mới",
       cancel: "Hủy",
       hostNeedsUpdate: "Cập nhật Host này để đổi nhà cung cấp; chưa có gì thay đổi.",
+      modeDiffers:
+        "Phiên mới bắt đầu ở chế độ {{mode}}, không phải chế độ đã chọn. Hãy kiểm tra trước khi tiếp tục.",
       failed: "Không thể đổi nhà cung cấp; chưa có gì thay đổi.",
     },
     github: {

@@ -222,6 +222,8 @@ export const ChatSessionForkResponseSchema = z.object({
     chat: ChatPayloadSchema.nullable(),
     /** The new session; null when the fork failed and nothing changed. */
     agentId: z.string().nullable(),
+    /** The mode the new session reports after create (Full auto-accept when the daemon runs it). */
+    launchedMode: z.string().nullable().optional(),
     error: z.string().nullable(),
     errorCode: z.string().optional(),
   }),

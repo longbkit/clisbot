@@ -217,15 +217,38 @@ export const fr: TranslationResources = {
       freshChatSession: "Démarrer une nouvelle session ; l’historique de ce chat est conservé",
     },
     providerSwitch: {
+      permissionHeading: "Autorisation dans la nouvelle session",
+      providerDefault: "Valeur par défaut du fournisseur",
+      unknownMode: "Mode non indiqué",
+      chooseBelow: "choisissez ci-dessous",
+      chatHistory:
+        "Votre prochain message démarre une nouvelle session sur le nouveau fournisseur et transmet cette conversation. La session précédente reste dans Cowork et l’historique du chat reste ici.",
+      workHistory:
+        "Un nouvel onglet s’ouvre sur le nouveau fournisseur avec cette conversation jointe ; rien n’est envoyé avant que vous envoyiez. Cette session reste telle quelle.",
+      reasons: {
+        equivalent: "Garde la même autorisation : {{mode}}.",
+        fullAutoToNoPrompt:
+          "Cet hôte ne peut pas utiliser l’acceptation automatique totale ici ; exécution sans demande en {{mode}}, qui approuve moins.",
+        toAskEachTool:
+          "Aucun mode n’autorise la même chose ; il demandera avant chaque outil en {{mode}}.",
+        planUnavailable: "Ce fournisseur n’a pas de mode plan. Choisissez ce qu’il peut faire.",
+        noEquivalent: "Aucun mode n’autorise la même chose. Choisissez ce qu’il peut faire.",
+        ambiguous:
+          "Plusieurs modes peuvent correspondre, avec des droits différents. Choisissez-en un.",
+        unknownSource:
+          "Clisbot ne sait pas ce que le mode actuel autorise. Choisissez ce que la nouvelle session peut faire.",
+        noSourceMode:
+          "Le mode actuel n’est pas indiqué. Choisissez ce que la nouvelle session peut faire.",
+        noModes:
+          "Ce fournisseur n’a pas de modes d’autorisation ; il utilise sa propre valeur par défaut. Confirmez pour continuer.",
+      },
       newSessionTag: "nouvelle session",
       title: "Passer à {{provider}} ?",
-      workMessage:
-        "{{provider}} ne peut pas poursuivre cette session {{current}}. Une nouvelle session s’ouvre dans un nouvel onglet avec cette conversation comme contexte. Cette session reste telle quelle.",
-      chatMessage:
-        "{{provider}} ne peut pas poursuivre cette session {{current}}. Le bot démarre une nouvelle session sur {{provider}} et votre prochain message transmet cette conversation comme contexte. La session précédente reste dans Cowork et l’historique du chat reste ici.",
       confirm: "Démarrer une nouvelle session",
       cancel: "Annuler",
       hostNeedsUpdate: "Mettez à jour cet hôte pour changer de fournisseur ; rien n’a été modifié.",
+      modeDiffers:
+        "La nouvelle session a démarré en mode {{mode}}, pas celui choisi. Vérifiez avant de continuer.",
       failed: "Impossible de changer de fournisseur ; rien n’a été modifié.",
     },
     github: {

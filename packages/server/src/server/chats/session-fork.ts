@@ -12,6 +12,7 @@ import { ensureAgentLoaded } from "../agent/agent-loading.js";
 import type { AgentManager } from "../agent/agent-manager.js";
 import type { AgentStorage } from "../agent/agent-storage.js";
 import { formatProviderModel } from "../agent/create-agent/create.js";
+import { FULL_AUTO_ACCEPT_MODE_ID } from "@clisbot/protocol/full-auto-accept";
 import type { ForkCarryInput } from "./bot-sessions.js";
 import type { ForkCarry } from "./fork-carry-store.js";
 import { chatKindOf, type ChatBot, type StoredChat } from "./chat-record.js";
@@ -72,15 +73,43 @@ export function repeatedFork(
   if (!participant || participant.agentId === expectedAgentId) return null;
   const sameLaunch =
     chat.launch?.provider === launch.provider &&
-    (chat.launch?.model ?? null) === (launch.model ?? null);
+    (chat.launch?.model ?? null) === (launch.model ?? null) &&
+    (chat.launch?.modeId ?? null) === (launch.modeId ?? null);
   const fromExpected = expectedAgentId === null || carry?.previousAgentId === expectedAgentId;
   if (sameLaunch && fromExpected && participant.agentId) return participant.agentId;
   throw new Error(STALE_CONFIRMATION);
 }
 
-export function forkNotice(bot: ChatBot, launch: BotLaunchDefaults, carries: boolean): string {
+/**
+ * The mode the new session reports after create: Full auto-accept when the daemon runs it, else
+ * the provider's current mode. Null when the session reports none yet.
+ */
+export function launchedModeOf(
+  agent: { currentModeId: string | null; config: { fullAutoAccept?: boolean } } | null,
+): string | null {
+  if (!agent) return null;
+  return agent.config.fullAutoAccept ? FULL_AUTO_ACCEPT_MODE_ID : agent.currentModeId;
+}
+
+export function forkNotice(input: {
+  bot: ChatBot;
+  launch: BotLaunchDefaults;
+  carries: boolean;
+  /** What the new session reports it runs in. */
+  launchedMode: string | null;
+}): string {
+  const { bot, launch } = input;
   const target = formatProviderModel(launch.provider, launch.model);
-  return carries
-    ? `${bot.displayName} moved to ${target} in a new session. The earlier conversation goes with the next message; the previous session stays in Cowork.`
-    : `${bot.displayName} moved to ${target} in a new session.`;
+  const mode = modeLine(launch.modeId ?? null, input.launchedMode);
+  const carry = input.carries
+    ? " The earlier conversation goes with the next message; the previous session stays in Cowork."
+    : "";
+  return `${bot.displayName} moved to ${target} in a new session${mode}.${carry}`;
+}
+
+function modeLine(requested: string | null, launched: string | null): string {
+  if (!launched) return requested ? ` (asked for mode ${requested})` : "";
+  if (requested && requested !== launched)
+    return ` in mode ${launched}, not the ${requested} that was chosen`;
+  return ` in mode ${launched}`;
 }

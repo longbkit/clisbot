@@ -59,7 +59,7 @@ export interface ForkAgentRequest {
    * from the model picker). Mode, effort and features belong to the source's provider, so they
    * reset to the new provider's defaults.
    */
-  launch?: { provider: string; model: string };
+  launch?: { provider: string; model: string; modeId: string | null };
 }
 
 export interface UseForkAgentInput {
@@ -101,7 +101,7 @@ function buildForkDraftSetup(
     return {
       provider: launch.provider,
       cwd: agent.cwd,
-      modeId: null,
+      modeId: launch.modeId,
       model: launch.model,
       thinkingOptionId: null,
       featureValues: {},

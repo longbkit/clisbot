@@ -210,15 +210,35 @@ export const en = {
       freshChatSession: "Start a fresh session; this chat's history stays",
     },
     providerSwitch: {
+      permissionHeading: "Permission in the new session",
+      providerDefault: "Provider's own default",
+      unknownMode: "Mode not reported",
+      chooseBelow: "choose below",
+      chatHistory:
+        "Your next message starts a new session on the new provider and carries this conversation. The previous session stays in Cowork, and this chat's history stays here.",
+      workHistory:
+        "A new tab opens on the new provider with this conversation attached; nothing is sent until you send. This session stays as it is.",
+      reasons: {
+        equivalent: "Keeps the same permission: {{mode}}.",
+        fullAutoToNoPrompt:
+          "This Host can't use Full auto-accept here; it runs without prompts in {{mode}}, which approves less.",
+        toAskEachTool: "No mode here allows the same; it asks before each tool in {{mode}}.",
+        planUnavailable: "This provider has no plan mode. Choose how much it may do.",
+        noEquivalent: "No mode here allows the same. Choose how much it may do.",
+        ambiguous: "Several modes here could match, with different rights. Choose one.",
+        unknownSource:
+          "Clisbot can't tell what the current mode allows. Choose how much the new session may do.",
+        noSourceMode: "The current mode isn't reported. Choose how much the new session may do.",
+        noModes:
+          "This provider has no permission modes; it runs with its own default. Confirm to continue.",
+      },
       newSessionTag: "new session",
       title: "Switch to {{provider}}?",
-      workMessage:
-        "{{provider}} can't continue this {{current}} session. A new session starts in a new tab with this conversation copied in as context. This session stays as it is.",
-      chatMessage:
-        "{{provider}} can't continue this {{current}} session. The bot starts a new session on {{provider}}, and your next message carries this conversation as context. The previous session stays in Cowork and this chat's history stays here.",
       confirm: "Start new session",
       cancel: "Cancel",
       hostNeedsUpdate: "Update this Host to switch provider; nothing was changed.",
+      modeDiffers:
+        "The new session started in mode {{mode}}, not the one chosen. Check it before you continue.",
       failed: "Could not switch provider; nothing was changed.",
     },
     github: {
