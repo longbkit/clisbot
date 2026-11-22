@@ -20,6 +20,8 @@ export interface ComposerPickerControlsProps {
   providers: readonly ProviderSelectorProvider[];
   selectedModelId: string;
   onPickModel: (provider: string, modelId: string) => void;
+  /** A pick from another provider closes the panel first (it opens a switch review). */
+  closeOnProviderChange?: boolean;
   thinkingOptions: readonly ReasoningOption[];
   selectedThinkingOptionId: string | undefined;
   onSelectThinking: (thinkingOptionId: string) => void;
@@ -117,6 +119,21 @@ function usePickModelWithEffort(props: ComposerPickerControlsProps) {
   );
 }
 
+/**
+ * In a live session another provider's model opens the switch review: the panel closes before it,
+ * so only one overlay is ever open and none is left over the new draft afterwards.
+ */
+function useClosingOnProviderChange(props: ComposerPickerControlsProps, close: () => void) {
+  const { closeOnProviderChange, onPickModel, provider } = props;
+  return useCallback(
+    (nextProvider: string, modelId: string) => {
+      if (closeOnProviderChange && nextProvider !== provider) close();
+      onPickModel(nextProvider, modelId);
+    },
+    [close, closeOnProviderChange, onPickModel, provider],
+  );
+}
+
 /** The composer bar's two controls: the Model chip, which opens the panel, and Mode. */
 export function ComposerPickerControls(props: ComposerPickerControlsProps) {
   const anchorRef = useRef<View>(null);
@@ -125,7 +142,6 @@ export function ComposerPickerControls(props: ComposerPickerControlsProps) {
   const [open, setOpen] = useState(false);
   const fullAutoAcceptSupported = useHostFeature(props.serverId, "fullAutoAccept");
   const labels = useChipLabels(props);
-  const pickModelWithEffort = usePickModelWithEffort(props);
   const { onOpen, onClose } = props;
   const panelFeatures = useMemo(
     () => resolvePanelFeatures(props.features ?? [], { fullAutoAcceptSupported }),
@@ -144,6 +160,8 @@ export function ComposerPickerControls(props: ComposerPickerControlsProps) {
   // The profile editor and Host settings are surfaces of their own; they open once the panel
   // has closed.
   const close = useCallback(() => handleOpenChange(false), [handleOpenChange]);
+  const pickModel = useClosingOnProviderChange(props, close);
+  const pickModelWithEffort = usePickModelWithEffort({ ...props, onPickModel: pickModel });
   const createProfile = useClosingFirst(close, props.onCreateProfile);
   const editProfiles = useClosingFirst(close, props.onEditProfiles);
   const editProfile = useClosingFirst(close, props.onEditProfile);
@@ -193,7 +211,7 @@ export function ComposerPickerControls(props: ComposerPickerControlsProps) {
         selectedProvider={props.provider}
         selectedModelId={props.selectedModelId}
         serverId={props.serverId}
-        onPickModel={props.onPickModel}
+        onPickModel={pickModel}
         onPickModelWithEffort={pickModelWithEffort}
         reasoning={reasoning}
         speed={panelFeatures.speed}

@@ -69,7 +69,7 @@ export function buildComposerModeOptions(
 ): AgentMode[] {
   if (!fullAutoAcceptSupported || modes.length === 0) return [...modes];
   const own = modes.filter((mode) => mode.id !== FULL_AUTO_ACCEPT_MODE_ID);
-  return [...own, { id: FULL_AUTO_ACCEPT_MODE_ID, label: "Full auto-accept" }];
+  return [...own, { id: FULL_AUTO_ACCEPT_MODE_ID, label: "Clisbot Full auto-accept" }];
 }
 
 /**

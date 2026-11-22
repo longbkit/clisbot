@@ -182,10 +182,13 @@ test("Codex Full access → Claude: both sides and permissions are shown; Bypass
   await pick("claude");
   expect(text("provider-switch-from")).toBe("Codex · Codex Model");
   expect(text("provider-switch-from-permission")).toBe(
-    "composer.picker.modeLabels.codexFullAccess",
+    "composer.picker.modeLabels.codexFullAccess (Full access)",
   );
   expect(text("provider-switch-to")).toBe("Claude · Claude Model");
-  expect(text("provider-switch-to-permission")).toBe("composer.picker.modeLabels.claudeBypass");
+  // The mocked `t` returns keys; the real names are checked in provider-switch-names.test.tsx.
+  expect(text("provider-switch-to-permission")).toContain(
+    "composer.picker.modeLabels.claudeBypass",
+  );
   expect(checked("bypassPermissions")).toBe("true");
   expect(checked(FULL_AUTO_ACCEPT_MODE_ID)).toBe("false");
   expect(text("provider-switch-reason")).toContain("reasons.equivalent");

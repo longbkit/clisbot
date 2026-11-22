@@ -138,6 +138,18 @@ The settings row shows two agent controls besides the Tools chip and the context
   (bypass, full access), checklist (Plan) and double check (Full auto-accept)
   (`mode-options.ts`, `mode-presentation.ts`). Known modes are named and described in the app's
   language; any other mode keeps the daemon's label.
+- **Mode names.** Known native modes read in the common agent vocabulary, kept as English product
+  names in Vietnamese too (other languages keep their translations, with Clisbot before the
+  overlay's name): Plan mode (a mode with the id `plan`, and ACP's standard plan mode), Edit
+  mode (Claude Accept file edits), Auto review (Codex), and Full auto-accept for each
+  provider's own no-prompt mode (Claude Bypass, Codex Full access, Copilot Allow all, OMP
+  Full access). Clisbot's overlay reads **Clisbot Full auto-accept**, so the two never share a
+  name. Under a shared name the provider's own name stays beside it, muted, wherever it says
+  something the shared name does not (`resolveProviderModeName`). Ask and default modes keep
+  their own names (Always ask, Default permissions, Write approval), and a mode Clisbot does not
+  know keeps the provider's name whatever its id, label or color suggests. The Mode picker, its
+  chip and the provider-switch review all use these names. Names are display only: mode ids and
+  the permission rules are unchanged.
 
 When the row is short of room (`resolveComposerControlDensity`) the effort leaves the chip
 first, then the Mode label; a phone always shows the mode as its icon.
@@ -146,7 +158,9 @@ first, then the Mode label; a phone always shows the mode as its icon.
 
 The chip opens one panel for every other option: a `Combobox` with custom children, so it is an
 anchored popover on desktop and tablet and a bottom sheet on a phone. Picking anything leaves it
-open; Escape, a click outside, or the sheet's close and drag-down close it.
+open; Escape, a click outside, or the sheet's close and drag-down close it. The exception is a live
+session's pick from another provider: that opens the provider-switch review, so the panel closes
+first and only one overlay is ever open (`closesOnProviderChange`).
 
 | Part      | Desktop                                             | Phone                                  |
 | --------- | --------------------------------------------------- | -------------------------------------- |

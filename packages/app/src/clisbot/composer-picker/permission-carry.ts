@@ -103,7 +103,7 @@ function targetOptions(input: PermissionCarryInput): PermissionOption[] {
   if (input.fullAutoAcceptSupported && own.length > 0)
     options.push({
       modeId: FULL_AUTO_ACCEPT_MODE_ID,
-      label: "Full auto-accept",
+      label: "Clisbot Full auto-accept",
       labelKey: "fullAutoAccept",
       scope: "fullAutoAccept",
     });

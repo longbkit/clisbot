@@ -147,6 +147,11 @@ export interface ControlledAgentControlsProps {
   modeControl?: AgentModeControlValue | null;
   modelSelectorServerId?: string | null;
   isCompactLayout?: boolean;
+  /**
+   * Picking another provider's model opens a review of its own (a live session's switch), so the
+   * model panel closes first rather than staying open behind it.
+   */
+  closesOnProviderChange?: boolean;
 }
 
 export interface DraftAgentControlsProps {
@@ -1857,6 +1862,7 @@ export const AgentControls = memo(function AgentControls({
         modeControl={modeControl}
         modelSelectorServerId={serverId}
         isCompactLayout={isCompactLayout}
+        closesOnProviderChange
       />
     </>
   );

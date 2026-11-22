@@ -180,7 +180,7 @@ test("desktop: one chip opens every option and stays open while you pick", async
 
     await page.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
-    await expect(mode).toHaveText("Full auto-accept");
+    await expect(mode).toHaveText("Clisbot Full auto-accept");
   } finally {
     await workspace.cleanup();
   }

@@ -151,6 +151,7 @@ export function PickerAgentControls({
   modeControl,
   modelSelectorServerId = null,
   isCompactLayout,
+  closesOnProviderChange = false,
 }: ControlledAgentControlsProps) {
   const isCompactFormFactor = useIsCompactFormFactor();
   const isCompact = isCompactLayout ?? isCompactFormFactor;
@@ -203,6 +204,7 @@ export function PickerAgentControls({
           providers={providers}
           selectedModelId={selectedModelId ?? ""}
           onPickModel={handlePickModel}
+          closeOnProviderChange={closesOnProviderChange}
           thinkingOptions={formattedThinkingOptions}
           selectedThinkingOptionId={selectedThinkingOptionId}
           onSelectThinking={handleThinkingSelect}

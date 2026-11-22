@@ -6,6 +6,7 @@ import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
 import { Button } from "@/components/ui/button";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { resolveProviderModeName } from "./mode-presentation";
 import type { PermissionCarry, PermissionOption } from "./permission-carry";
 
 /**
@@ -29,21 +30,36 @@ export function optionTestId(option: PermissionOption): string {
   return `provider-switch-permission-${option.modeId ?? "provider-default"}`;
 }
 
-function useOptionLabel() {
+interface OptionName {
+  label: string;
+  /** The provider's own name under a shared name (`resolveProviderModeName`). */
+  providerName: string | undefined;
+}
+
+/** The same names as the Mode picker: the shared name, and the provider's own beside it. */
+function useOptionName() {
   const { t } = useTranslation();
   return useCallback(
-    (option: PermissionOption | undefined) => {
-      if (!option) return "";
-      if (option.modeId === null) return t("composer.providerSwitch.providerDefault");
-      return option.labelKey ? t(`composer.picker.modeLabels.${option.labelKey}`) : option.label;
+    (option: PermissionOption | undefined): OptionName => {
+      if (!option) return { label: "", providerName: undefined };
+      if (option.modeId === null)
+        return { label: t("composer.providerSwitch.providerDefault"), providerName: undefined };
+      if (!option.labelKey) return { label: option.label, providerName: undefined };
+      const label = t(`composer.picker.modeLabels.${option.labelKey}`);
+      const mode = { id: option.modeId, label: option.label };
+      return { label, providerName: resolveProviderModeName(option.labelKey, mode, label) };
     },
     [t],
   );
 }
 
+function withProviderName(name: OptionName): string {
+  return name.providerName ? `${name.label} (${name.providerName})` : name.label;
+}
+
 function PermissionRow(props: {
   option: PermissionOption;
-  label: string;
+  name: OptionName;
   selected: boolean;
   onSelect: (option: PermissionOption) => void;
 }) {
@@ -55,13 +71,23 @@ function PermissionRow(props: {
       accessibilityRole="radio"
       accessibilityState={accessibilityState}
       aria-checked={props.selected}
-      accessibilityLabel={props.label}
+      accessibilityLabel={withProviderName(props.name)}
       onPress={select}
       style={[styles.row, props.selected && styles.rowSelected]}
       testID={optionTestId(option)}
     >
       <View style={[styles.radio, props.selected && styles.radioSelected]} />
-      <Text style={styles.rowLabel}>{props.label}</Text>
+      <Text style={styles.rowLabel}>
+        {props.name.label}
+        {props.name.providerName ? (
+          <Text
+            style={styles.providerName}
+            testID={`provider-switch-provider-name-${option.modeId ?? "provider-default"}`}
+          >
+            {`  ${props.name.providerName}`}
+          </Text>
+        ) : null}
+      </Text>
     </PressHighlight>
   );
 }
@@ -72,10 +98,10 @@ function ReviewBody(props: {
   onSelect: (option: PermissionOption) => void;
 }) {
   const { t } = useTranslation();
-  const label = useOptionLabel();
+  const name = useOptionName();
   const { input, selected } = props;
   const reason = t(`composer.providerSwitch.reasons.${input.carry.reason}`, {
-    mode: label(input.carry.selected),
+    mode: withProviderName(name(input.carry.selected)),
   });
   return (
     <View style={styles.body}>
@@ -84,14 +110,14 @@ function ReviewBody(props: {
         {" · "}
         <Text testID="provider-switch-from-permission">
           {input.fromPermission
-            ? label(input.fromPermission)
+            ? withProviderName(name(input.fromPermission))
             : t("composer.providerSwitch.unknownMode")}
         </Text>
         {"  →  "}
         <Text testID="provider-switch-to">{input.to}</Text>
         {" · "}
         <Text testID="provider-switch-to-permission">
-          {selected ? label(selected) : t("composer.providerSwitch.chooseBelow")}
+          {selected ? withProviderName(name(selected)) : t("composer.providerSwitch.chooseBelow")}
         </Text>
       </Text>
       <Text style={styles.heading}>{t("composer.providerSwitch.permissionHeading")}</Text>
@@ -103,7 +129,7 @@ function ReviewBody(props: {
           <PermissionRow
             key={option.modeId ?? "provider-default"}
             option={option}
-            label={label(option)}
+            name={name(option)}
             selected={selected === option}
             onSelect={props.onSelect}
           />
@@ -203,7 +229,8 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.foregroundMuted,
   },
   radioSelected: { borderWidth: 5, borderColor: theme.colors.accent },
-  rowLabel: { color: theme.colors.foreground, fontSize: theme.fontSize.base },
+  rowLabel: { flex: 1, color: theme.colors.foreground, fontSize: theme.fontSize.base },
+  providerName: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
   actions: { flex: 1, flexDirection: "row", gap: theme.spacing[2] },
   action: { flex: 1 },
   compactActions: { flexDirection: "column" },

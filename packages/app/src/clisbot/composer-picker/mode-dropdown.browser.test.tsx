@@ -41,7 +41,10 @@ beforeAll(async () => {
   vi.stubGlobal("React", React);
   await i18n.changeLanguage("en");
 });
-afterEach(() => cleanup());
+afterEach(async () => {
+  cleanup();
+  await i18n.changeLanguage("en");
+});
 
 function mount(showLabel: boolean, onSelectMode = vi.fn()) {
   render(
@@ -66,7 +69,7 @@ function mount(showLabel: boolean, onSelectMode = vi.fn()) {
 it("shows the mode's name beside its icon when there is room", async () => {
   await page.viewport(1280, 900);
   mount(true);
-  expect((await screen.findByTestId("mode-control")).textContent).toBe("Full access");
+  expect((await screen.findByTestId("mode-control")).textContent).toBe("Full auto-accept");
 });
 
 it("collapses to the icon and still names the mode for assistive tech", async () => {
@@ -74,20 +77,44 @@ it("collapses to the icon and still names the mode for assistive tech", async ()
   mount(false);
   const trigger = await screen.findByTestId("mode-control");
   expect(trigger.textContent).toBe("");
-  expect(trigger.getAttribute("aria-label")).toBe("Select agent mode (Full access)");
+  expect(trigger.getAttribute("aria-label")).toBe("Select agent mode (Full auto-accept)");
 });
 
-it("lists Plan, the permissions and Full auto-accept, each with one line on what it does", async () => {
+it("lists Plan mode, the permissions and Clisbot Full auto-accept, each with one line on what it does", async () => {
   await page.viewport(1280, 900);
   const onSelectMode = mount(true);
   await userEvent.click(await screen.findByTestId("mode-control"));
   const fullAuto = await screen.findByTestId("mode-option-full-auto-accept");
-  expect(fullAuto.textContent).toContain("Full auto-accept");
+  expect(fullAuto.textContent).toContain("Clisbot Full auto-accept");
   expect(fullAuto.textContent).toContain("Questions still wait for you.");
-  expect((await screen.findByTestId("mode-option-plan")).textContent).toContain("Plan");
+  expect(screen.queryByTestId("mode-provider-name-full-auto-accept")).toBeNull();
+  const plan = await screen.findByTestId("mode-option-plan");
+  expect(plan.textContent).toContain("Plan mode");
+  expect(screen.queryByTestId("mode-provider-name-plan")).toBeNull();
   expect((await screen.findByTestId("mode-option-auto")).textContent).toContain(
     "Default permissions",
   );
+  // Codex's own Full access is Full auto-accept with the provider's name beside it, not Clisbot's.
+  const native = await screen.findByTestId("mode-option-full-access");
+  expect(native.textContent).toContain("Full auto-accept");
+  expect(native.textContent).not.toContain("Clisbot");
+  expect((await screen.findByTestId("mode-provider-name-full-access")).textContent?.trim()).toBe(
+    "Full access",
+  );
+  expect(native.getAttribute("aria-label")).toBe("Full auto-accept, Full access");
   await userEvent.click(fullAuto);
   expect(onSelectMode).toHaveBeenCalledWith("full-auto-accept");
+});
+
+it("keeps the product names in Vietnamese and translates what each one does", async () => {
+  await page.viewport(1280, 900);
+  await i18n.changeLanguage("vi");
+  mount(true);
+  expect((await screen.findByTestId("mode-control")).textContent).toBe("Full auto-accept");
+  await userEvent.click(await screen.findByTestId("mode-control"));
+  const fullAuto = await screen.findByTestId("mode-option-full-auto-accept");
+  expect(fullAuto.textContent).toContain("Clisbot Full auto-accept");
+  expect(fullAuto.textContent).toContain("Câu hỏi vẫn chờ bạn trả lời.");
+  expect((await screen.findByTestId("mode-option-plan")).textContent).toContain("Plan mode");
+  expect((await screen.findByTestId("mode-option-auto")).textContent).toContain("Quyền mặc định");
 });

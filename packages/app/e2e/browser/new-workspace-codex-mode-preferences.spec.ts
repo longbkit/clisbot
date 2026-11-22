@@ -124,9 +124,9 @@ test.describe("New workspace Codex mode preferences", () => {
         page.getByRole("button", { name: "Select agent mode (Default permissions)" }),
       ).toBeVisible({ timeout: 30_000 });
       await expectThinkingOptionsFit(page);
-      await selectMode(page, "Full access");
+      await selectMode(page, "Full auto-accept");
       await expect(
-        page.getByRole("button", { name: "Select agent mode (Full access)" }),
+        page.getByRole("button", { name: "Select agent mode (Full auto-accept)" }),
       ).toBeVisible();
 
       await submitNewWorkspacePrompt(page, "Keep Codex full access selected globally.");
@@ -171,9 +171,9 @@ test.describe("New workspace Codex mode preferences", () => {
         page.getByRole("button", { name: "Select agent mode (Default permissions)" }),
       ).toBeVisible({ timeout: 30_000 });
 
-      await selectMode(page, "Full access");
+      await selectMode(page, "Full auto-accept");
       await expect(
-        page.getByRole("button", { name: "Select agent mode (Full access)" }),
+        page.getByRole("button", { name: "Select agent mode (Full auto-accept)" }),
       ).toBeVisible({ timeout: 30_000 });
 
       await openGlobalNewWorkspaceComposer(page);
@@ -183,7 +183,7 @@ test.describe("New workspace Codex mode preferences", () => {
       });
 
       await expect(
-        page.getByRole("button", { name: "Select agent mode (Full access)" }),
+        page.getByRole("button", { name: "Select agent mode (Full auto-accept)" }),
       ).toBeVisible({ timeout: 30_000 });
     } finally {
       await seeded.cleanup();

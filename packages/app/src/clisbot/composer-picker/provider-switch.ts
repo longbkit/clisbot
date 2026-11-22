@@ -117,7 +117,8 @@ function sourceOption(
   const mode = modes.find((entry) => entry.id === modeId);
   return {
     modeId,
-    label: modeId === FULL_AUTO_ACCEPT_MODE_ID ? "Full auto-accept" : (mode?.label ?? modeId),
+    label:
+      modeId === FULL_AUTO_ACCEPT_MODE_ID ? "Clisbot Full auto-accept" : (mode?.label ?? modeId),
     labelKey: resolveModeLabelKey(family, modeId),
     scope: permissionScopeOf(family, mode ?? { id: modeId }),
   };

@@ -1,0 +1,71 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mode names over the whole catalog > en 1`] = `
+"| en | claude | plan | Plan mode |  |
+| en | claude | default | Always ask |  |
+| en | claude | acceptEdits | Edit mode | Accept file edits |
+| en | claude | auto | Auto mode |  |
+| en | claude | bypassPermissions | Full auto-accept | Bypass |
+| en | claude | full-auto-accept | Clisbot Full auto-accept |  |
+| en | codex | plan | Plan mode |  |
+| en | codex | auto | Default permissions |  |
+| en | codex | auto-review | Auto review |  |
+| en | codex | full-access | Full auto-accept | Full access |
+| en | codex | full-auto-accept | Clisbot Full auto-accept |  |
+| en | copilot | https://agentclientprotocol.com/protocol/session-modes#agent | Agent |  |
+| en | copilot | https://agentclientprotocol.com/protocol/session-modes#plan | Plan mode |  |
+| en | copilot | allow-all | Full auto-accept | Allow all |
+| en | copilot | full-auto-accept | Clisbot Full auto-accept |  |
+| en | opencode | build | Build |  |
+| en | opencode | plan | Plan mode |  |
+| en | opencode | full-auto-accept | Clisbot Full auto-accept |  |
+| en | omp | full | Full auto-accept | Full access |
+| en | omp | write | Write approval |  |
+| en | omp | ask | Always ask |  |
+| en | omp | full-auto-accept | Clisbot Full auto-accept |  |
+| en | mock | load-test | Load test |  |
+| en | mock | approval-test | Approval test |  |
+| en | mock | full-auto-accept | Clisbot Full auto-accept |  |
+| en | mock-slow | default | Default |  |
+| en | mock-slow | full-auto-accept | Clisbot Full auto-accept |  |
+| en | acme-acp | careful | Careful |  |
+| en | acme-acp | foo#plan | Plan-ish |  |
+| en | acme-acp | yolo | Bypass everything |  |
+| en | acme-acp | unattended | Unattended |  |
+| en | acme-acp | full-auto-accept | Clisbot Full auto-accept |  |"
+`;
+
+exports[`mode names over the whole catalog > vi 1`] = `
+"| vi | claude | plan | Plan mode |  |
+| vi | claude | default | Luôn hỏi |  |
+| vi | claude | acceptEdits | Edit mode | Accept file edits |
+| vi | claude | auto | Chế độ tự động |  |
+| vi | claude | bypassPermissions | Full auto-accept | Bypass |
+| vi | claude | full-auto-accept | Clisbot Full auto-accept |  |
+| vi | codex | plan | Plan mode |  |
+| vi | codex | auto | Quyền mặc định |  |
+| vi | codex | auto-review | Auto review |  |
+| vi | codex | full-access | Full auto-accept | Full access |
+| vi | codex | full-auto-accept | Clisbot Full auto-accept |  |
+| vi | copilot | https://agentclientprotocol.com/protocol/session-modes#agent | Agent |  |
+| vi | copilot | https://agentclientprotocol.com/protocol/session-modes#plan | Plan mode |  |
+| vi | copilot | allow-all | Full auto-accept | Allow all |
+| vi | copilot | full-auto-accept | Clisbot Full auto-accept |  |
+| vi | opencode | build | Build |  |
+| vi | opencode | plan | Plan mode |  |
+| vi | opencode | full-auto-accept | Clisbot Full auto-accept |  |
+| vi | omp | full | Full auto-accept | Full access |
+| vi | omp | write | Duyệt khi ghi |  |
+| vi | omp | ask | Luôn hỏi |  |
+| vi | omp | full-auto-accept | Clisbot Full auto-accept |  |
+| vi | mock | load-test | Load test |  |
+| vi | mock | approval-test | Approval test |  |
+| vi | mock | full-auto-accept | Clisbot Full auto-accept |  |
+| vi | mock-slow | default | Default |  |
+| vi | mock-slow | full-auto-accept | Clisbot Full auto-accept |  |
+| vi | acme-acp | careful | Careful |  |
+| vi | acme-acp | foo#plan | Plan-ish |  |
+| vi | acme-acp | yolo | Bypass everything |  |
+| vi | acme-acp | unattended | Unattended |  |
+| vi | acme-acp | full-auto-accept | Clisbot Full auto-accept |  |"
+`;

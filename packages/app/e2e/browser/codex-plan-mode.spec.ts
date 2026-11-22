@@ -65,23 +65,27 @@ test("Codex offers Plan inside the Mode list and no Plan toggle", async ({ page 
     });
     await openAgentRoute(page, { workspaceId: workspace.workspaceId, agentId: agent.id });
 
-    let popup = await openModePicker(page, "Full access");
-    const options = popup.getByText(/^(Plan|Default permissions|Auto-review|Full access)$/);
-    await expect(options).toHaveText(["Plan", "Default permissions", "Auto-review", "Full access"]);
+    // Known Codex modes read in the common vocabulary; Full access stays beside its shared name.
+    let popup = await openModePicker(page, "Full auto-accept");
+    await expect(popup.getByTestId("mode-option-plan")).toContainText("Plan mode");
+    await expect(popup.getByTestId("mode-option-auto")).toContainText("Default permissions");
+    await expect(popup.getByTestId("mode-option-auto-review")).toContainText("Auto review");
+    await expect(popup.getByTestId("mode-option-full-access")).toContainText("Full auto-accept");
+    await expect(popup.getByTestId("mode-provider-name-full-access")).toHaveText(/Full access/);
     await expect(page.getByRole("switch", { name: /plan/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Toggle plan mode/i })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath("codex-mode-list-with-plan.png") });
 
-    await popup.getByText("Plan", { exact: true }).click({ force: true });
+    await popup.getByTestId("mode-option-plan").click({ force: true });
     await expect(
-      page.getByRole("button", { name: "Select agent mode (Plan)", exact: true }),
+      page.getByRole("button", { name: "Select agent mode (Plan mode)", exact: true }),
     ).toBeVisible();
     await expect.poll(() => agentModeId(agent.id)).toBe("plan");
 
-    popup = await openModePicker(page, "Plan");
-    await popup.getByText("Full access", { exact: true }).click({ force: true });
+    popup = await openModePicker(page, "Plan mode");
+    await popup.getByTestId("mode-option-full-access").click({ force: true });
     await expect(
-      page.getByRole("button", { name: "Select agent mode (Full access)", exact: true }),
+      page.getByRole("button", { name: "Select agent mode (Full auto-accept)", exact: true }),
     ).toBeVisible();
     await expect.poll(() => agentModeId(agent.id)).toBe("full-access");
   } finally {

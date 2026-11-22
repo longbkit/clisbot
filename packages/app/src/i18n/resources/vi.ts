@@ -225,7 +225,7 @@ export const vi: TranslationResources = {
       reasons: {
         equivalent: "Giữ nguyên quyền: {{mode}}.",
         fullAutoToNoPrompt:
-          "Host này không dùng được Tự động chấp nhận hoàn toàn ở đây; chạy không hỏi với {{mode}}, ít quyền hơn.",
+          "Host này không dùng được Clisbot Full auto-accept ở đây; dùng {{mode}} của chính provider, ít quyền hơn.",
         toAskEachTool: "Không có chế độ cho cùng quyền; sẽ hỏi trước mỗi công cụ với {{mode}}.",
         planUnavailable: "Nhà cung cấp này không có chế độ lập kế hoạch. Hãy chọn mức quyền.",
         noEquivalent: "Không có chế độ cho cùng quyền. Hãy chọn mức quyền.",

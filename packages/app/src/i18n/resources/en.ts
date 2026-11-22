@@ -221,7 +221,7 @@ export const en = {
       reasons: {
         equivalent: "Keeps the same permission: {{mode}}.",
         fullAutoToNoPrompt:
-          "This Host can't use Full auto-accept here; it runs without prompts in {{mode}}, which approves less.",
+          "This Host can't use Clisbot Full auto-accept here; it uses the provider's own {{mode}} instead, which approves less.",
         toAskEachTool: "No mode here allows the same; it asks before each tool in {{mode}}.",
         planUnavailable: "This provider has no plan mode. Choose how much it may do.",
         noEquivalent: "No mode here allows the same. Choose how much it may do.",

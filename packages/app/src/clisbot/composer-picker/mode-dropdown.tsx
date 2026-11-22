@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
-import type { View } from "react-native";
+import { Text, type View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { FULL_AUTO_ACCEPT_MODE_ID } from "@clisbot/protocol/full-auto-accept";
 import type { AgentMode } from "@clisbot/protocol/agent-types";
@@ -37,9 +37,24 @@ function ModeOptionRow(props: {
   const Icon = props.presentation.icon;
   const touch = useTouchRows();
   const leading = useMemo(() => <Icon size={16} color={styles.optionIcon.color} />, [Icon]);
+  const { label, providerName } = props.presentation;
+  const labelContent = useMemo(
+    () =>
+      providerName ? (
+        <>
+          {label}
+          <Text style={styles.providerName} testID={`mode-provider-name-${props.option.id}`}>
+            {`  ${providerName}`}
+          </Text>
+        </>
+      ) : undefined,
+    [label, props.option.id, providerName],
+  );
   return (
     <ComboboxItem
-      label={props.presentation.label}
+      label={label}
+      labelContent={labelContent}
+      accessibilityLabel={providerName ? `${label}, ${providerName}` : undefined}
       description={props.presentation.description}
       descriptionLayout="stacked"
       selected={props.selected}
@@ -157,5 +172,8 @@ export function ModeDropdown(props: ModeDropdownProps) {
 const styles = StyleSheet.create((theme) => ({
   optionIcon: {
     color: theme.colors.foreground,
+  },
+  providerName: {
+    color: theme.colors.foregroundMuted,
   },
 }));
