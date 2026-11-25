@@ -515,7 +515,9 @@ it("bounds fork history to 100,000 characters while preserving the newest messag
   expect(result.attachment.text.length).toBeLessThanOrEqual(100_000);
   expect(result.attachment.text).toContain("[Earlier chat history omitted]");
   expect(result.attachment.text).toContain("[Assistant] Latest answer.");
-  expect(result.attachment.text).not.toContain("old-message");
+  // The message that crosses the budget keeps its beginning and end as an excerpt.
+  expect(result.attachment.text).toContain("[User] old-message");
+  expect(result.attachment.text).toContain("[Message truncated]");
   expect(result.attachment.text).not.toContain("Beyond the selected checkpoint.");
   expect(result.attachment.text).toMatch(/^<chat-history-summary>\n/);
   expect(result.attachment.text).toMatch(/\n<\/chat-history-summary>$/);

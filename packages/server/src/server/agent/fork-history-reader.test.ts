@@ -226,6 +226,23 @@ describe("readAgentForkContext on durable storage", () => {
     expect(text).toContain("[Earlier chat history omitted]");
   });
 
+  it("keeps an excerpt of a giant message followed by a short reply instead of dropping it", async () => {
+    const giant = `START-MARKER Bắt đầu ${"phân tích 結果 🚀 ".repeat(240_000)} END-MARKER`;
+    const { fetch } = await storeWith([
+      at(1, { type: "user_message", text: "older question" }, "t0"),
+      at(2, { type: "user_message", text: giant }, "t1"),
+      at(3, { type: "assistant_message", text: "Done", messageId: "done" }, "t1"),
+    ]);
+    const { text } = (await readAgentForkContext({ fetch })).attachment;
+    expectWellFormed(text);
+    expect(Buffer.byteLength(text)).toBeGreaterThan(95_000);
+    expect(text).toContain("[Earlier chat history omitted]");
+    expect(text).toContain("[User] START-MARKER Bắt đầu");
+    expect(text).toContain("[Message truncated]");
+    expect(text).toContain("END-MARKER\n[Assistant] Done");
+    expect(text).not.toContain("older question");
+  });
+
   it("truncates one oversized multibyte message on character boundaries", async () => {
     const huge = "Bắt đầu. " + "中文🙂".repeat(200_000) + " Kết thúc.";
     const { fetch } = await storeWith([at(1, { type: "assistant_message", text: huge })]);

@@ -19,6 +19,8 @@ const MAX_FORK_CONTEXT_BYTES = 100_000;
 const MAX_FORK_METADATA_BYTES = 1_000;
 const FORK_HISTORY_OMITTED = "[Earlier chat history omitted]\n";
 const FORK_MESSAGE_TRUNCATED = "\n[Message truncated]\n";
+/** Room below this is too small for a useful excerpt of the entry that crosses the budget. */
+const MIN_FORK_EXCERPT_BYTES = 2_000;
 
 interface ActivityCuratorOptions {
   maxItems?: number;
@@ -357,10 +359,13 @@ function fitForkContextEntries(
   let remaining = budget - utf8Bytes(FORK_HISTORY_OMITTED);
   for (let index = entries.length - 1; index >= 0; index--) {
     const text = entries[index]!.text;
-    const size = utf8Bytes(text) + (selected.length > 0 ? 1 : 0);
+    const separator = selected.length > 0 ? 1 : 0;
+    const size = utf8Bytes(text) + separator;
     if (size > remaining) {
-      if (selected.length === 0) {
-        const available = remaining - utf8Bytes(FORK_MESSAGE_TRUNCATED);
+      // The entry that crosses the budget is often the long message the work happened in.
+      // Keep its beginning and end in the room left instead of dropping it for a short reply.
+      const available = remaining - separator - utf8Bytes(FORK_MESSAGE_TRUNCATED);
+      if (selected.length === 0 || available >= MIN_FORK_EXCERPT_BYTES) {
         const head = Math.ceil(available / 2);
         selected.push(
           utf8Head(text, head) + FORK_MESSAGE_TRUNCATED + utf8Tail(text, available - head),
