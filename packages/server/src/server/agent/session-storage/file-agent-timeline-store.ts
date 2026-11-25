@@ -64,6 +64,40 @@ function selectRowRange(
   return { start, end };
 }
 
+const PAGE_BUDGET_ERROR = "Session page exceeds byte budget; request a smaller page";
+
+/**
+ * Reads a selected row range. A bounded page whose rows exceed the page byte budget (one record
+ * may be up to twice a page) narrows toward its cursor edge, down to a single record, and the
+ * caller sees `hasOlder`/`hasNewer` for the rest. A whole-history read (`limit: 0`) never
+ * narrows: returning part of it would silently drop history, so it fails as before.
+ */
+async function readBoundedRange(
+  timeline: TimelineStream,
+  range: { start: number; end: number },
+  forward: boolean,
+  whole: boolean,
+) {
+  let { start, end } = range;
+  if (end < start) return { start, end, entries: [] };
+  for (;;) {
+    try {
+      return { start, end, entries: await timeline.read(start, end) };
+    } catch (error) {
+      if (
+        whole ||
+        start === end ||
+        !(error instanceof Error) ||
+        error.message !== PAGE_BUDGET_ERROR
+      )
+        throw error;
+      const half = Math.floor((end - start) / 2);
+      if (forward) end = start + half;
+      else start = end - half;
+    }
+  }
+}
+
 /**
  * Durable session storage: one `events.jsonl` per session holds the timeline, the
  * submission ledger and the permission history; one `events.index.json` holds every
@@ -300,11 +334,14 @@ export class FileAgentTimelineStore implements AgentTimelineStore {
       state.minSeq > 0 &&
       options.cursor.seq < state.minSeq - 1;
     const reset = staleCursor || gap;
-    const { start, end } = selectRowRange(state, direction, reset, options);
-    const rows =
-      state.maxSeq === 0 || end < start
-        ? []
-        : (await timeline.read(start, end)).map((entry) => entry.value);
+    const selected = selectRowRange(state, direction, reset, options);
+    const { start, end, entries } = await readBoundedRange(
+      timeline,
+      selected,
+      !reset && direction === "after",
+      options?.limit === 0,
+    );
+    const rows = entries.map((entry) => entry.value);
     return {
       epoch: state.epoch,
       direction,

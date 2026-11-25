@@ -249,7 +249,10 @@ describe("file timeline", () => {
     const cold = SessionEventLog.for(directory);
     expect((await cold.state("timeline")).maxSeq).toBe(3);
     expect(await cold.read("timeline", 3, 3)).toEqual([{ seq: 3, value: "after" }]);
-    await expect(cold.read("timeline", 2, 2)).rejects.toThrow("byte budget");
+    // One supported record larger than a page reads on its own; a page holding it does not.
+    const big = await cold.read<string>("timeline", 2, 2);
+    expect(big.map((entry) => entry.value.length)).toEqual([9 * 1024 * 1024]);
+    await expect(cold.read("timeline", 1, 3)).rejects.toThrow("byte budget");
   });
 
   it("does not recreate a removed log after a concurrent cold load", async () => {

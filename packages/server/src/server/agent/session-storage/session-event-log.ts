@@ -22,7 +22,11 @@ import {
   type SessionEventIndex,
   type SessionMessageAnchor,
 } from "./session-event-index.js";
-import { scanSessionEventLines, SessionIndexScanLimitError } from "./session-event-scan.js";
+import {
+  INDEX_SCAN_LINE_BYTES,
+  scanSessionEventLines,
+  SessionIndexScanLimitError,
+} from "./session-event-scan.js";
 import { upgradeToolIndex } from "./session-event-index-upgrade.js";
 import { withSessionLogWriteIo } from "./session-storage-io.js";
 
@@ -392,7 +396,12 @@ export class SessionEventLog {
     }
     if (!wanted.length) return [];
     const bytes = wanted.reduce((total, item) => total + item.pointer.length, 0);
-    if (bytes > SESSION_STORAGE_LIMITS.readPageBytes)
+    // One record may be larger than a page: anything the index scan accepted is a supported
+    // record and must stay readable on its own, or the session cannot be opened or forked.
+    // A page of several records keeps the page budget, so a caller pages down to one record.
+    if (wanted.length === 1 && bytes > INDEX_SCAN_LINE_BYTES)
+      throw new Error("Session record exceeds its byte budget and cannot be read");
+    if (wanted.length > 1 && bytes > SESSION_STORAGE_LIMITS.readPageBytes)
       throw new Error("Session page exceeds byte budget; request a smaller page");
     const handle = await fs.open(this.eventPath, "r").catch((error: unknown) => {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;

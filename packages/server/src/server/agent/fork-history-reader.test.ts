@@ -335,3 +335,33 @@ describe("checkpoint safety matches the whole-history read", () => {
     expect(result).toEqual({ reference: "accepted", paged: "accepted" });
   });
 });
+
+describe("a single record larger than a storage page", () => {
+  it("opens, pages and forks around a 9 MiB record", async () => {
+    const huge = `START of record ${"x".repeat(9 * 1024 * 1024)} END of record`;
+    const rows = [
+      at(1, { type: "user_message", text: "before" }, "t"),
+      at(2, { type: "user_message", text: huge, messageId: "u" }, "t"),
+      at(3, { type: "assistant_message", text: "Done.", messageId: "done" }, "t"),
+    ];
+    const { store, fetch } = await storeWith(rows);
+    // A bounded page holding the record narrows toward its cursor edge instead of failing.
+    const tail = await store.fetchCommitted("agent", { direction: "tail", limit: 40 });
+    expect(tail.rows.map((row) => row.seq)).toEqual([3]);
+    expect(tail.hasOlder).toBe(true);
+    const older = await store.fetchCommitted("agent", {
+      direction: "before",
+      cursor: { epoch: tail.epoch, seq: 3 },
+      limit: 40,
+    });
+    expect(older.rows.map((row) => row.seq)).toEqual([2]);
+    // The whole-history read still refuses rather than returning part of it.
+    await expect(fetch({ direction: "tail", limit: 0 })).rejects.toThrow("byte budget");
+
+    const { text } = (await readAgentForkContext({ fetch })).attachment;
+    expectWellFormed(text);
+    expect(Buffer.byteLength(text)).toBe(100_000);
+    expect(text).toContain("[User] START of record");
+    expect(text).toContain("END of record\n[Assistant] Done.");
+  });
+});
