@@ -1,3 +1,9 @@
+import {
+  driftedFromChosenModel,
+  modelPinSettings,
+  refusalFallbackOutcome,
+  refusalNoFallbackNotice,
+} from "./model-pin.js";
 import { validateProviderOptions } from "../../provider-options.js";
 import type { ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -2358,6 +2364,8 @@ class ClaudeAgentSession implements AgentSession {
   private cachedRuntimeInfo: AgentRuntimeInfo | null = null;
   private lastOptionsModel: string | null = null;
   private lastRuntimeModel: string | null = null;
+  /** Claude Code moved off the chosen model on its own; set it again before the next send. */
+  private chosenModelDrifted = false;
   private compacting = false;
   private compactionMarkerOpen = false;
   private queryPumpPromise: Promise<void> | null = null;
@@ -2555,6 +2563,7 @@ class ClaudeAgentSession implements AgentSession {
       if (!this.input) {
         throw new Error("Claude session input stream not initialized");
       }
+      await this.restoreChosenModel();
       this.activeForegroundQuery = this.query;
       this.activeForegroundInput = this.input;
       this.startQueryPump();
@@ -2736,8 +2745,9 @@ class ClaudeAgentSession implements AgentSession {
     const normalizedModelId =
       typeof modelId === "string" && modelId.trim().length > 0 ? modelId.trim() : null;
     const activeQuery = await this.ensureQuery();
-    await activeQuery.setModel(normalizedModelId ?? undefined);
+    await this.switchModelKeepingPin(activeQuery, normalizedModelId);
     this.config.model = normalizedModelId ?? undefined;
+    this.chosenModelDrifted = false;
     this.reconcileThinkingOptionForModel(normalizedModelId);
     if (!claudeModelSupportsFastMode(this.config.model) && this.config.featureValues?.fast_mode) {
       await this.applyFastModeFeature(false, activeQuery);
@@ -2750,6 +2760,48 @@ class ClaudeAgentSession implements AgentSession {
     this.cachedRuntimeInfo = null;
     // Model change affects persistence metadata, so invalidate cached handle.
     this.persistence = null;
+  }
+
+  /**
+   * Changes the model and the model pin together (model-pin.ts). The pin goes first, so a
+   * refused pin changes nothing; a refused model puts the pin back. Returning to the provider
+   * default clears the pin (null) instead of forcing a value, so the user's own Claude settings
+   * decide again. If the pin cannot be put back, the next launch rebuilds it from the config.
+   */
+  private async switchModelKeepingPin(query: Query, model: string | null): Promise<void> {
+    const pinned = (value: string | null | undefined) =>
+      Object.keys(modelPinSettings(value)).length > 0;
+    const before = pinned(this.config.model);
+    const after = pinned(model);
+    const pin = (on: boolean) => query.applyFlagSettings({ switchModelsOnFlag: on ? false : null });
+    if (before !== after) await pin(after);
+    try {
+      await query.setModel(model ?? undefined);
+    } catch (error) {
+      if (before !== after)
+        await pin(before).catch(() => {
+          this.queryRestartNeeded = true;
+        });
+      throw error;
+    }
+  }
+
+  /**
+   * Sets the chosen model again after Claude Code moved the session off it (see model-pin.ts).
+   * A failure fails the turn visibly rather than sending it to a model nobody chose.
+   */
+  private async restoreChosenModel(): Promise<void> {
+    if (!this.chosenModelDrifted || !this.config.model || !this.query) return;
+    await this.query.setModel(this.config.model);
+    this.chosenModelDrifted = false;
+    this.lastOptionsModel = this.config.model;
+    this.lastRuntimeModel = null;
+    this.cachedRuntimeInfo = null;
+    this.notifySubscribers({
+      type: "model_changed",
+      provider: "claude",
+      runtimeInfo: await this.getRuntimeInfo(),
+    });
   }
 
   private reconcileThinkingOptionForModel(modelId: string | null): void {
@@ -3716,11 +3768,18 @@ class ClaudeAgentSession implements AgentSession {
     // Internal agents do daemon work such as naming a branch, so the user's and
     // project's hooks must not run for them.
     const disableAllHooks = this.config.internal === true;
-    if (fastMode === null && !input.ultracode && !disableAllHooks) {
+    const modelPin = modelPinSettings(this.config.model);
+    if (
+      fastMode === null &&
+      !input.ultracode &&
+      !disableAllHooks &&
+      Object.keys(modelPin).length === 0
+    ) {
       return {};
     }
     return {
       settings: mergeClaudeSettings(providerOptions.settings, {
+        ...modelPin,
         ...(fastMode === null ? {} : { fastMode }),
         ...(input.ultracode ? { ultracode: true } : {}),
         ...(disableAllHooks ? { disableAllHooks: true } : {}),
@@ -4697,6 +4756,18 @@ class ClaudeAgentSession implements AgentSession {
           item: sessionUpdate.notice,
         });
       }
+      if (driftedFromChosenModel(this.config.model, message.model)) {
+        this.chosenModelDrifted = true;
+        events.push({
+          type: "timeline",
+          provider: "claude",
+          item: {
+            type: "notification",
+            level: "warning",
+            message: `Claude Code is running this session on ${message.model}, not the chosen ${this.config.model}. Your next message goes to ${this.config.model} again.`,
+          },
+        });
+      }
       if (sessionUpdate.threadStartedSessionId) {
         events.push({
           type: "thread_started",
@@ -4760,6 +4831,39 @@ class ClaudeAgentSession implements AgentSession {
     if (message.subtype === "task_progress") {
       return;
     }
+    if (message.subtype === "model_refusal_fallback") {
+      this.appendRefusalFallbackEvents(message, events);
+      return;
+    }
+    if (message.subtype === "model_refusal_no_fallback") {
+      events.push({ type: "timeline", provider: "claude", item: refusalNoFallbackNotice(message) });
+    }
+  }
+
+  /** Claude Code retried a refused turn on another model; say so and show what answered. */
+  private appendRefusalFallbackEvents(
+    message: Extract<SDKMessage, { type: "system"; subtype: "model_refusal_fallback" }>,
+    events: AgentStreamEvent[],
+  ): void {
+    const outcome = refusalFallbackOutcome(message, this.config.model);
+    events.push({ type: "timeline", provider: "claude", item: outcome.notice });
+    if (!outcome.sessionModel) return;
+    this.lastOptionsModel =
+      normalizeClaudeRuntimeModelId(outcome.sessionModel) ?? outcome.sessionModel;
+    this.lastRuntimeModel = outcome.sessionModel;
+    this.cachedRuntimeInfo = null;
+    this.chosenModelDrifted = driftedFromChosenModel(this.config.model, outcome.sessionModel);
+    events.push({
+      type: "model_changed",
+      provider: "claude",
+      runtimeInfo: {
+        provider: "claude",
+        sessionId: this.claudeSessionId,
+        model: this.lastOptionsModel,
+        modeId: this.currentMode ?? null,
+        extra: { runtimeModel: outcome.sessionModel },
+      },
+    });
   }
 
   private appendTaskNotificationEvents(

@@ -154,6 +154,17 @@ The settings row shows two agent controls besides the Tools chip and the context
 When the row is short of room (`resolveComposerControlDensity`) the effort leaves the chip
 first, then the Mode label; a phone always shows the mode as its icon.
 
+## A chosen Claude model stays chosen
+
+Claude Code retries a refused turn on another model and keeps the whole session there
+(`model_refusal_fallback`, scope `session`). A session chosen as Opus 5.5 answered as Opus 4.8
+from then on, with no switch anyone made. A Claude session with a chosen model now launches
+with the flag setting `switchModelsOnFlag: false`, so Claude Code ends a flagged turn as a
+refusal and keeps the model. Returning to the provider default clears that flag setting, so the
+user's own Claude settings decide again. If Claude Code still moves the session, the timeline
+says so, the label shows the model that answered, and the chosen model is set again before the
+next message. Nothing is retried. Code: `packages/server/src/server/agent/providers/claude/model-pin.ts`.
+
 ## The panel
 
 The chip opens one panel for every other option: a `Combobox` with custom children, so it is an

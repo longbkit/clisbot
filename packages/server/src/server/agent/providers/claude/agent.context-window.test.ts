@@ -71,6 +71,7 @@ function contextQuery({
       setModel: async (value: string) => {
         model = value;
       },
+      applyFlagSettings: async () => undefined,
       setPermissionMode: async () => undefined,
       supportedModels: async () => [],
       supportedCommands: async () => [],

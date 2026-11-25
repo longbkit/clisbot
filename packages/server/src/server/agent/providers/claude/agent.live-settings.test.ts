@@ -72,6 +72,7 @@ class ForegroundQuery {
   }
   async setPermissionMode() {}
   async setModel() {}
+  async applyFlagSettings() {}
   async supportedCommands() {
     return [];
   }
