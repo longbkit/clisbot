@@ -10,9 +10,15 @@ import { projectTimelineRows, selectItemsByProjectedLimit } from "./timeline-pro
 const DEFAULT_MAX_ITEMS = 0;
 const MAX_TOOL_INPUT_CHARS = 400;
 const MAX_TOOL_SUMMARY_CHARS = 200;
-const MAX_FORK_CONTEXT_CHARS = 100_000;
-const MAX_FORK_METADATA_CHARS = 1_000;
+/**
+ * Fork history is measured in UTF-8 bytes, the unit the attachment is serialized, stored and
+ * delivered in. A character count let CJK or emoji history reach three to four times the
+ * intended size on the wire and in the provider prompt.
+ */
+const MAX_FORK_CONTEXT_BYTES = 100_000;
+const MAX_FORK_METADATA_BYTES = 1_000;
 const FORK_HISTORY_OMITTED = "[Earlier chat history omitted]\n";
+const FORK_MESSAGE_TRUNCATED = "\n[Message truncated]\n";
 
 interface ActivityCuratorOptions {
   maxItems?: number;
@@ -291,7 +297,7 @@ function selectForkContextRows(input: {
 
 function trimContextMetadata(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
-  return trimmed ? trimmed.slice(0, MAX_FORK_METADATA_CHARS) : null;
+  return trimmed ? utf8Head(trimmed, MAX_FORK_METADATA_BYTES) : null;
 }
 
 function buildForkContextText(input: {
@@ -311,28 +317,61 @@ function buildForkContextText(input: {
   return `<chat-history-summary>\n${header.join("\n")}\n\n${input.body}\n</chat-history-summary>`;
 }
 
-function fitForkContextEntries(entries: ActivityEntry[], budget: number): string {
-  const length = entries.reduce((total, entry) => total + entry.text.length + 1, -1);
-  if (length <= budget) return entries.map((entry) => entry.text).join("\n");
+function utf8Bytes(text: string): number {
+  return Buffer.byteLength(text, "utf8");
+}
+
+/** The longest prefix within `bytes`, never cutting a character in two. */
+function utf8Head(text: string, bytes: number): string {
+  const encoded = Buffer.from(text, "utf8");
+  if (encoded.length <= bytes) return text;
+  let end = Math.max(0, bytes);
+  while (end > 0 && (encoded[end]! & 0xc0) === 0x80) end--;
+  return encoded.subarray(0, end).toString("utf8");
+}
+
+/** The longest suffix within `bytes`, never cutting a character in two. */
+function utf8Tail(text: string, bytes: number): string {
+  const encoded = Buffer.from(text, "utf8");
+  if (encoded.length <= bytes) return text;
+  let start = encoded.length - Math.max(0, bytes);
+  while (start < encoded.length && (encoded[start]! & 0xc0) === 0x80) start++;
+  return encoded.subarray(start).toString("utf8");
+}
+
+/**
+ * Keeps the newest entries that fit `budget` bytes. `olderOmitted` says the caller already left
+ * older history unread, so the omission marker is shown even when every read entry fits.
+ */
+function fitForkContextEntries(
+  entries: ActivityEntry[],
+  budget: number,
+  olderOmitted: boolean,
+): { body: string; truncated: boolean } {
+  const joined = entries.map((entry) => entry.text).join("\n");
+  const marker = olderOmitted ? FORK_HISTORY_OMITTED : "";
+  if (utf8Bytes(marker) + utf8Bytes(joined) <= budget)
+    return { body: marker + joined, truncated: false };
 
   const selected: string[] = [];
-  let remaining = budget - FORK_HISTORY_OMITTED.length;
+  let remaining = budget - utf8Bytes(FORK_HISTORY_OMITTED);
   for (let index = entries.length - 1; index >= 0; index--) {
     const text = entries[index]!.text;
-    const size = text.length + (selected.length > 0 ? 1 : 0);
+    const size = utf8Bytes(text) + (selected.length > 0 ? 1 : 0);
     if (size > remaining) {
       if (selected.length === 0) {
-        const marker = "\n[Message truncated]\n";
-        const available = remaining - marker.length;
+        const available = remaining - utf8Bytes(FORK_MESSAGE_TRUNCATED);
         const head = Math.ceil(available / 2);
-        selected.push(text.slice(0, head) + marker + text.slice(-(available - head)));
+        selected.push(
+          utf8Head(text, head) + FORK_MESSAGE_TRUNCATED + utf8Tail(text, available - head),
+        );
       }
       break;
     }
     selected.push(text);
     remaining -= size;
   }
-  return FORK_HISTORY_OMITTED + selected.toReversed().join("\n");
+  return { body: FORK_HISTORY_OMITTED + selected.toReversed().join("\n"), truncated: true };
 }
 
 export function buildAgentForkContextAttachment(input: {
@@ -342,9 +381,13 @@ export function buildAgentForkContextAttachment(input: {
   boundaryMessageId?: string | null;
   agentTitle?: string | null;
   cwd?: string | null;
+  /** Older history was deliberately left unread (see `readForkHistoryRows`). */
+  olderOmitted?: boolean;
 }): {
   attachment: TextAgentAttachment;
   itemCount: number;
+  /** Some read history did not fit the byte budget; reading more cannot add to the result. */
+  truncated: boolean;
   boundaryCursor: { epoch: string; seq: number } | null;
   boundaryMessageId: string | null;
 } {
@@ -360,9 +403,17 @@ export function buildAgentForkContextAttachment(input: {
     includeExternalToolInput: false,
   });
   const metadata = { agentTitle: input.agentTitle, cwd: input.cwd };
-  const budget = MAX_FORK_CONTEXT_CHARS - buildForkContextText({ body: "", ...metadata }).length;
-  const body =
-    entries.length > 0 ? fitForkContextEntries(entries, budget) : "No chat history to display.";
+  const budget =
+    MAX_FORK_CONTEXT_BYTES - utf8Bytes(buildForkContextText({ body: "", ...metadata }));
+  const olderOmitted = input.olderOmitted ?? false;
+  const fitted =
+    entries.length > 0
+      ? fitForkContextEntries(entries, budget, olderOmitted)
+      : {
+          body: olderOmitted ? FORK_HISTORY_OMITTED.trimEnd() : "No chat history to display.",
+          truncated: false,
+        };
+  const body = fitted.body;
   return {
     attachment: {
       type: "text",
@@ -379,6 +430,7 @@ export function buildAgentForkContextAttachment(input: {
       }),
     },
     itemCount: selected.items.length,
+    truncated: fitted.truncated,
     boundaryCursor: selected.boundaryCursor,
     boundaryMessageId: selected.boundaryMessageId,
   };

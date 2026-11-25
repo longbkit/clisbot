@@ -163,7 +163,11 @@ import {
 import { buildStoredAgentPayload, toAgentPayload } from "./agent/agent-projections.js";
 import { assertPluginTimelineDataSize } from "./agent/agent-timeline-content.js";
 import { parsePluginClientId } from "./plugins/plugin-session-identity.js";
-import { buildAgentForkContextAttachment } from "./agent/activity-curator.js";
+import {
+  AdaptiveTimelinePager,
+  ForkTimelineChangedError,
+  readAgentForkContext,
+} from "./agent/fork-history-reader.js";
 import { buildAgentPrompt } from "./agent/prompt-attachments.js";
 import type { StructuredGenerationDaemonConfig } from "./agent/structured-generation-providers.js";
 import {
@@ -1061,15 +1065,20 @@ export class Session {
         if (!record) throw new Error("Fork source not found");
         const directory = await this.agentStorage.getSessionDirectory(source.agentId);
         const manager = this.agentManager;
+        // Pages shrink to fit the session page byte budget; a long history never needs one read.
+        const pager = new AdaptiveTimelinePager(
+          (fetchOptions) => manager.fetchTimelineForRead(source.agentId, fetchOptions),
+          source.epoch,
+        );
         const messageIds = (async function* () {
           let seq = 0;
           while (seq < source.seq) {
-            const page = await manager.fetchTimelineForRead(source.agentId, {
-              direction: "after",
-              cursor: { epoch: source.epoch, seq },
-              limit: 256,
+            const page = await pager.read("after", seq).catch((error: unknown) => {
+              throw error instanceof ForkTimelineChangedError
+                ? new Error("Fork source timeline changed; prepare the fork again")
+                : error;
             });
-            if (page.epoch !== source.epoch || page.reset || source.seq > page.window.maxSeq)
+            if (source.seq > page.window.maxSeq)
               throw new Error("Fork source timeline changed; prepare the fork again");
             if (!page.rows.length) throw new Error("Fork source timeline is incomplete");
             for (const row of page.rows) {
@@ -9468,19 +9477,13 @@ export class Session {
         logger: this.sessionLogger,
       });
       const agentPayload = await this.buildAgentPayload(snapshot);
-      const timeline = await this.agentManager.fetchTimelineForRead(msg.agentId, {
-        direction: "tail",
-        limit: 0,
-      });
-      const forkContext = buildAgentForkContextAttachment({
-        rows: timeline.rows,
+      const forkContext = await readAgentForkContext({
+        fetch: (options) => this.agentManager.fetchTimelineForRead(msg.agentId, options),
         ...(this.agentManager.sessionStorageEnabled &&
         this.supports(CLIENT_CAPS.agentSessionStorage)
-          ? { sourceSession: { agentId: msg.agentId, epoch: timeline.epoch } }
+          ? { sourceAgentId: msg.agentId }
           : {}),
-        cursorBoundary: msg.boundaryCursor
-          ? { timelineEpoch: timeline.epoch, cursor: msg.boundaryCursor }
-          : null,
+        boundaryCursor: msg.boundaryCursor ?? null,
         boundaryMessageId: msg.boundaryMessageId,
         agentTitle: agentPayload.title,
         cwd: snapshot.cwd,

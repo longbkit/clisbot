@@ -7,7 +7,7 @@
 // switch before that keeps the first carry.
 import type { BotLaunchDefaults } from "@clisbot/protocol/bots/types";
 import type { Logger } from "pino";
-import { buildAgentForkContextAttachment } from "../agent/activity-curator.js";
+import { readAgentForkContext } from "../agent/fork-history-reader.js";
 import { ensureAgentLoaded } from "../agent/agent-loading.js";
 import type { AgentManager } from "../agent/agent-manager.js";
 import type { AgentStorage } from "../agent/agent-storage.js";
@@ -34,16 +34,13 @@ export function createSessionForks(deps: {
   return {
     async contextOf(agentId) {
       const snapshot = await ensureAgentLoaded(agentId, { agentManager, agentStorage, logger });
-      const timeline = await agentManager.fetchTimelineForRead(agentId, {
-        direction: "tail",
-        limit: 0,
-      });
       const record = await agentStorage.get(agentId);
-      return buildAgentForkContextAttachment({
-        rows: timeline.rows,
+      const context = await readAgentForkContext({
+        fetch: (options) => agentManager.fetchTimelineForRead(agentId, options),
         agentTitle: record?.title ?? null,
         cwd: snapshot.cwd,
-      }).attachment;
+      });
+      return context.attachment;
     },
   };
 }
