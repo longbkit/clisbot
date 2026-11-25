@@ -177,3 +177,36 @@ describe("selectHostBadges", () => {
     expect(badges.size).toBe(0);
   });
 });
+
+describe("selectHostBadges for session lines", () => {
+  const hosts = [
+    host("local", "Mac Studio"),
+    host("remote", "Mac Studio"),
+    host("icon", "Build box", { color: "none", badgeDisplay: "icon" }),
+    host("hidden", "Quiet box", { color: "none", badgeDisplay: "hidden" }),
+  ];
+
+  it("names every Host nobody chose for, the local one included, and keeps explicit choices", () => {
+    const badges = selectHostBadges({
+      hosts,
+      localServerId: "local",
+      localHostResolutionPending: true,
+      unchosenDisplay: "name",
+      enabled: true,
+    });
+    expect(badges.get("local")).toMatchObject({ label: "Mac Studio", showLabel: true });
+    expect(badges.get("remote")).toMatchObject({ label: "Mac Studio", showLabel: true });
+    expect(badges.get("icon")).toMatchObject({ showLabel: false });
+    expect(badges.has("hidden")).toBe(false);
+  });
+
+  it("shows nothing when the Host item is off, and workspace rows keep hiding the local Host", () => {
+    expect(
+      selectHostBadges({ hosts, localServerId: "local", unchosenDisplay: "name", enabled: false })
+        .size,
+    ).toBe(0);
+    expect(selectHostBadges({ hosts, localServerId: "local", enabled: true }).has("local")).toBe(
+      false,
+    );
+  });
+});

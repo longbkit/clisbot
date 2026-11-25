@@ -1,3 +1,4 @@
+import { SessionLineHostBadgesProvider } from "@/clisbot/workspace-sessions/session-line-host";
 import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
 import { sidebarLeadingColumnWidth } from "@/components/sidebar/row-geometry";
 import type { PinRow } from "@/clisbot/bots/sidebar/use-pinned-rows";
@@ -2250,9 +2251,8 @@ export function SidebarWorkspaceList({
   // "off", `shouldShowSidebarHostLabels` is the selected-scope "there is only one host so it says
   // nothing", and each host's own `badgeDisplay` decides name vs icon vs hidden. Turning the
   // item off here removes the badge everywhere; leaving it on defers to the per-host setting.
-  const hostBadgeByServerId = useHostBadges({
-    enabled: rowItems.host && shouldShowSidebarHostLabels(selectedHostIds),
-  });
+  const hostBadgesEnabled = rowItems.host && shouldShowSidebarHostLabels(selectedHostIds);
+  const hostBadgeByServerId = useHostBadges({ enabled: hostBadgesEnabled });
   const serverIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
   const supportsMultiplicityByServerId = useHostFeatureMap(serverIds, "workspaceMultiplicity");
   const supportsPinningByServerId = useHostFeatureMap(serverIds, "workspacePinning");
@@ -2383,7 +2383,13 @@ export function SidebarWorkspaceList({
       />
     );
 
-  return <WorkspaceSessionsAutoCollapseProvider>{content}</WorkspaceSessionsAutoCollapseProvider>;
+  return (
+    <WorkspaceSessionsAutoCollapseProvider>
+      <SessionLineHostBadgesProvider enabled={hostBadgesEnabled}>
+        {content}
+      </SessionLineHostBadgesProvider>
+    </WorkspaceSessionsAutoCollapseProvider>
+  );
 }
 
 /**

@@ -47,6 +47,7 @@ import type { StatusBucket } from "@/hooks/sidebar-status-view-model";
 import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
 import { SidebarFilterEmptyState } from "@/components/sidebar/empty-states";
 import type { HostBadgeModel } from "@/hosts/appearance";
+import { useSessionLineHostBadge } from "@/clisbot/workspace-sessions/session-line-host";
 import { isWeb as platformIsWeb, isNative as platformIsNative } from "@/constants/platform";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { StyleSheet } from "react-native-unistyles";
@@ -686,6 +687,7 @@ export const StatusSessionRow = memo(function StatusSessionRow({
   onWorkspacePress?: (destination?: string) => void;
 }) {
   const { workspace } = item;
+  const hostBadge = useSessionLineHostBadge(workspace.serverId);
   const activeWorkspaceSelection = useSidebarWorkspaceSelection();
   const selected =
     activeWorkspaceSelection?.serverId === workspace.serverId &&
@@ -701,6 +703,7 @@ export const StatusSessionRow = memo(function StatusSessionRow({
       <StatusSessionLine
         workspace={workspace}
         session={item.session}
+        hostBadge={hostBadge}
         placement={inGroup ? "statusGroup" : "topLevel"}
         workspaceSelected={selected}
         menuActions={actions}

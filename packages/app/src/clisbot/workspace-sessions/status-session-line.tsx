@@ -8,6 +8,7 @@ import {
   type SidebarWorkspaceMenuProps,
 } from "@/components/sidebar/sidebar-workspace-menu";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
+import type { HostBadgeModel } from "@/hosts/appearance";
 import { useSidebarWorkspaceSessions, useWorkspaceShownAgents } from "./model";
 import type { WorkspaceSessionItem } from "./select-sessions";
 import { useProjectAbove } from "./project-above";
@@ -34,6 +35,8 @@ export type SidebarWorkspaceMenuActions = Omit<
 interface StatusSessionLineProps {
   workspace: SidebarWorkspaceEntry;
   session: WorkspaceSessionItem;
+  /** The host badge its workspace row would show; null when the Host item is off or hidden. */
+  hostBadge: HostBadgeModel | null;
   /** Under a group header, or flush in a list that has none. */
   placement: Extract<SessionLinePlacement, "statusGroup" | "topLevel">;
   /** The workspace is the one open; only then can one of its sessions be the selected line. */
@@ -56,6 +59,7 @@ interface StatusSessionLineProps {
 export const StatusSessionLine = memo(function StatusSessionLine({
   workspace,
   session,
+  hostBadge,
   placement,
   workspaceSelected,
   menuActions,
@@ -120,6 +124,7 @@ export const StatusSessionLine = memo(function StatusSessionLine({
         details={details}
         placement={placement}
         workspaceLabel={workspace.name}
+        hostBadge={hostBadge}
         projectLabel={projectAbove ? workspace.projectName : undefined}
         badgeNumber={badgeNumber}
         renderActions={renderActions}

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useHosts } from "@/runtime/host-runtime";
 import { useLocalDaemonServerId, useLocalDaemonServerIdState } from "@/hooks/use-is-local-daemon";
-import { selectHostBadges, type HostBadgeModel } from "@/hosts/appearance";
+import { selectHostBadges, type HostBadgeDisplay, type HostBadgeModel } from "@/hosts/appearance";
 
 /**
  * Every host's badge, resolved from the three things that decide one: the host registry, which
@@ -11,8 +11,11 @@ import { selectHostBadges, type HostBadgeModel } from "@/hosts/appearance";
  */
 export function useHostBadges({
   enabled,
+  unchosenDisplay,
 }: {
   enabled: boolean;
+  /** See `resolveHostBadgeDisplay`; omit for the per-host default. */
+  unchosenDisplay?: HostBadgeDisplay;
 }): ReadonlyMap<string, HostBadgeModel> {
   const hosts = useHosts();
   const localServerId = useLocalDaemonServerId();
@@ -23,8 +26,9 @@ export function useHostBadges({
         hosts,
         localServerId,
         localHostResolutionPending: localDaemon.status !== "resolved",
+        unchosenDisplay,
         enabled,
       }),
-    [hosts, localDaemon.status, localServerId, enabled],
+    [hosts, localDaemon.status, localServerId, enabled, unchosenDisplay],
   );
 }

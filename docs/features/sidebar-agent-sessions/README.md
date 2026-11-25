@@ -65,9 +65,11 @@ Only facts that differ from one session to the next. Anything that comes from th
 
 | Offered for a session                                     | Not offered — the workspace row already shows it                  |
 | --------------------------------------------------------- | ----------------------------------------------------------------- |
-| Model                                                     | Branch, Project, Host                                             |
+| Model                                                     | Branch, Project                                                   |
 | Created user, Updated user, Channels (session authorship) | Pull request, Checks, Services, Diff stats                        |
 | Created time, Updated time (authorship), Last activity    | Labels (a workspace property), title source (a workspace setting) |
+
+A session line that takes its workspace row's place (the session groupings and Pinned) also shows the **Host** under Display > Show > Host, first on the line and held at its width so a narrow rail shortens the other items before it: with no row above it, nothing else says which machine the session runs on. A Host nobody chose a badge for shows its name there, the local one included, so two Hosts with the same session titles can be told apart; a Host set to icon or hidden keeps that, and one selected Host shows none (`session-line-host.tsx`). Workspace rows keep hiding the local Host by default.
 
 User, channel, Updated time and the metadata status only appear on hosts that can read session storage. Model, Created time and Last activity come from the agent record and show on any host. The items are drawn by the same component as the workspace row (`SessionMetadataLine`), so they look and behave the same. A user name and a channel there are text, not controls: in the sidebar the row owns the press. The profile is a press away from the person's message inside the session; the channel's ids, which the workspace row used to show in a menu, are not shown in the sidebar at all.
 

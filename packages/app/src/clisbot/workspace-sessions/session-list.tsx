@@ -20,6 +20,8 @@ import { useTranslation } from "react-i18next";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { SessionMetadataLine } from "@/clisbot/session-storage/workspace-metadata-row";
+import { HostBadge } from "@/hosts/host-badge";
+import type { HostBadgeModel } from "@/hosts/appearance";
 import { useProviderIcon } from "@/components/provider-icons";
 import { isWeb } from "@/constants/platform";
 import type { WorkspaceTabPresentation } from "@/screens/workspace/workspace-tab-presentation";
@@ -171,6 +173,8 @@ export interface WorkspaceSessionRowProps {
   placement: SessionLinePlacement;
   /** Names the workspace on a line that has no workspace row above it. */
   workspaceLabel?: string;
+  /** The host badge of the workspace row this line stands in for; it has no row above to show it. */
+  hostBadge?: HostBadgeModel | null;
   /** Names the project above the title, on a line that has no project header above it. */
   projectLabel?: string;
   /** The shortcut number, in Last activity's place while its modifier is held. */
@@ -192,6 +196,7 @@ export const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
   details,
   placement,
   workspaceLabel,
+  hostBadge = null,
   projectLabel,
   badgeNumber = null,
   renderActions,
@@ -264,6 +269,7 @@ export const WorkspaceSessionRow = memo(function WorkspaceSessionRow({
                 details={details}
                 wide={wide}
                 workspaceLabel={workspaceLabel === label ? undefined : workspaceLabel}
+                hostBadge={hostBadge}
               />
             </>
           )}
@@ -369,16 +375,26 @@ function SessionDetailLine({
   details,
   wide,
   workspaceLabel,
+  hostBadge,
 }: {
   serverId: string;
   session: WorkspaceSessionItem;
   details: SidebarWorkspaceSessionDetails;
   wide: boolean;
   workspaceLabel?: string;
+  hostBadge: HostBadgeModel | null;
 }): ReactElement | null {
   const { agent } = session;
   const leadingItems = useMemo(() => {
     const items: ReactElement[] = [];
+    // First, and held at its own width up to a cap: with sessions on several machines the Host
+    // is what tells two lines apart, so on a narrow rail the other items give way before it.
+    if (hostBadge)
+      items.push(
+        <View key="host" style={styles.hostSlot}>
+          <HostBadge badge={hostBadge} />
+        </View>,
+      );
     if (workspaceLabel) {
       items.push(
         <Text key="workspace" style={styles.detailText} numberOfLines={1}>
@@ -394,7 +410,7 @@ function SessionDetailLine({
       );
     }
     return items;
-  }, [workspaceLabel, details.model, agent.model]);
+  }, [workspaceLabel, hostBadge, details.model, agent.model]);
   return (
     <SessionMetadataLine
       serverId={serverId}
@@ -491,6 +507,11 @@ const styles = StyleSheet.create((theme) => ({
   detailText: {
     color: theme.colors.foregroundExtraMuted,
     fontSize: theme.fontSize.sm,
+  },
+  hostSlot: {
+    flexShrink: 0,
+    maxWidth: "60%",
+    minWidth: 0,
   },
 }));
 
