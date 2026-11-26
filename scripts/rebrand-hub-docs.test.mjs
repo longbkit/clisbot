@@ -88,3 +88,62 @@ test("applies the same publication guard after self-hosting deployment transform
     /Review upstream hosted Hub publication claims/,
   );
 });
+
+test("ports the v0.17.4 hosted-default precedence and reference links in English and Chinese", () => {
+  const cases = [
+    [
+      "public-docs/cli.md",
+      "- Origin precedence: explicit `[url]` or `--hub`, then `CLISBOT_HUB_URL`, then the active stored login, then `__UPSTREAM_HOSTED_HUB__`.",
+    ],
+    [
+      "public-docs/cli.zh-CN.md",
+      "- 地址优先级：显式 `[url]` 或 `--hub`、`CLISBOT_HUB_URL`、当前已保存的登录，最后是 `__UPSTREAM_HOSTED_HUB__`。",
+    ],
+    [
+      "public-docs/hub/daemons.md",
+      "Origin precedence is explicit `[origin]` or `--hub`, then `CLISBOT_HUB_URL`, then the active stored login, then `__UPSTREAM_HOSTED_HUB__`. An explicit `--api-key <secret>` wins.",
+    ],
+    [
+      "public-docs/hub/daemons.zh-CN.md",
+      "地址优先级为显式 `[origin]` 或 `--hub`、然后是 `CLISBOT_HUB_URL`、再是当前已保存的登录、最后是 `__UPSTREAM_HOSTED_HUB__`。",
+    ],
+    [
+      "public-docs/hub/configuration/index.md",
+      "1. Explicit command origin or `--hub`\n2. `CLISBOT_HUB_URL`\n3. Active stored CLI login\n4. `__UPSTREAM_HOSTED_HUB__`\n",
+    ],
+    [
+      "public-docs/hub/configuration/index.zh-CN.md",
+      "2. `CLISBOT_HUB_URL`\n3. 当前已保存的 CLI 登录\n4. `__UPSTREAM_HOSTED_HUB__`\n",
+    ],
+    [
+      "public-docs/hub/api.md",
+      "## API reference\n\n- [Interactive API reference](__UPSTREAM_HOSTED_HUB__/api/reference)\n- [OpenAPI 3.1 document](__UPSTREAM_HOSTED_HUB__/api/openapi.json)\n\nA self-hosted Hub serves the same `/api/reference` and `/api/openapi.json` endpoints on its own origin.\n",
+    ],
+    [
+      "public-docs/hub/api.zh-CN.md",
+      "- [交互式 API 参考](__UPSTREAM_HOSTED_HUB__/api/reference)\n- [OpenAPI 3.1 文档](__UPSTREAM_HOSTED_HUB__/api/openapi.json)\n\n自托管 Hub 在自己的地址下提供相同的 `/api/reference` 和 `/api/openapi.json` 端点。\n",
+    ],
+    [
+      "public-docs/hub/index.md",
+      "[Hosted Hub](/docs/hub/hosted) manages the server and provider apps for you. Create a free account at [hub.clisbot.com](__UPSTREAM_HOSTED_HUB__) with no card and no expiry.\n",
+    ],
+    [
+      "public-docs/hub/index.zh-CN.md",
+      "[托管 Hub](/docs/hub/hosted) 为你运维服务器和 Provider 应用。前往 [hub.clisbot.com](__UPSTREAM_HOSTED_HUB__) 创建免费账号，无需绑卡，也不会过期。\n",
+    ],
+  ];
+  for (const [path, before] of cases) {
+    for (const host of ["hub.paseo.sh", "hub.clisbot.com"]) {
+      const actual = rebrandHubDocs(
+        path,
+        before.replaceAll("__UPSTREAM_HOSTED_HUB__", `https://${host}`),
+      );
+      assert.doesNotMatch(
+        actual,
+        /hub\.(paseo\.sh|clisbot\.com)|\/docs\/hub\/hosted/,
+        `${path} via ${host}`,
+      );
+      assert.equal(rebrandHubDocs(path, actual), actual);
+    }
+  }
+});

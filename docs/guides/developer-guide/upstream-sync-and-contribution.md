@@ -326,6 +326,14 @@ sides; rebuild the kit only when the artwork changes. The manifest covers known
 consumers, so look at image paths the release adds. Coverage baseline:
 [branding audit](../../audits/2026-09-30-clisbot-branding/README.md).
 
+Since v0.17 upstream keeps canonical marks and lockups in `assets/brand/` and the
+website renders them through `components/clisbot-brand.tsx`.
+[`brand-assets.mjs`](../../../scripts/branding/brand-assets.mjs) regenerates that
+folder from the kit: the filled Flow mark, plus Manrope Bold lockups in the
+lowercase wordmark style. It switches the component and its test from stroked to
+filled marks, and replaces `build.mjs` so it cannot redraw upstream artwork. It
+stops when the component's render or parse code changes shape.
+
 ## Tags
 
 Both upstreams publish `v*` tags into the same namespace as our fork, and the

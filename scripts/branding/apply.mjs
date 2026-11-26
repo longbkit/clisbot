@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { parseArgs } from "node:util";
 import { kitRoot } from "./artwork.mjs";
 import { sourcePatches } from "./source-patches.mjs";
+import { brandAssetConsumers, brandAssetFiles } from "./brand-assets.mjs";
 
 const { values } = parseArgs({
   options: {
@@ -46,6 +47,15 @@ for (const entry of manifest.installs) {
   if (createHash("sha256").update(bytes).digest("hex") !== hashes.get(entry.artifact))
     throw new Error(`Artifact changed after export: ${entry.artifact}; regenerate the kit.`);
   plan(entry.target, bytes);
+}
+
+// Upstream's canonical brand folder (v0.17+) is regenerated from the Flow kit.
+if (existsSync(join(root, "assets/brand"))) {
+  for (const file of brandAssetConsumers) {
+    if (!existsSync(join(root, file)))
+      throw new Error(`Branding consumer missing: ${file}; review upstream changes.`);
+  }
+  for (const [file, text] of brandAssetFiles()) plan(file, Buffer.from(text));
 }
 
 // Plan every source edit before writing anything. Unknown upstream logo shapes stop the batch.

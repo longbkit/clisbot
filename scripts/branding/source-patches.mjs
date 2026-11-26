@@ -1,4 +1,5 @@
 import { colors, icon, runtimePath } from "./artwork.mjs";
+import { brandComponent, brandComponentTest } from "./brand-assets.mjs";
 
 const path = runtimePath();
 const smallPath = runtimePath(true);
@@ -70,9 +71,27 @@ function appFavicon(input) {
 const logoFiles = [
   "packages/app/src/components/icons/clisbot-logo.tsx",
   "packages/app/src/screens/startup-splash-screen.tsx",
+];
+
+// Since v0.17 the website mockups render the canonical brand component; they carry no
+// path data of their own, only copy and plate colors.
+const brandedMockups = [
   "packages/website/src/components/mockup/icons.tsx",
   "packages/website/src/components/mockup/mobile/atoms.tsx",
 ];
+
+function mockupCopy(input, file) {
+  if (!input.includes("clisbot-brand")) {
+    throw new Error(`Unrecognized upstream logo in ${file}; review it before applying branding.`);
+  }
+  let text = input
+    .replace("The Clisbot butterfly mark", "The Clisbot Flow mark")
+    .replace("white butterfly on the black app plate", "Ocean Flow on the app plate");
+  if (file.endsWith("mobile/atoms.tsx")) {
+    text = text.replace("bg-black text-white", `bg-[${colors.ocean}] text-[${colors.seafoam}]`);
+  }
+  return text;
+}
 
 export const sourcePatches = new Map(
   logoFiles.map((file) => [
@@ -103,6 +122,13 @@ export const sourcePatches = new Map(
   ]),
 );
 
+for (const file of brandedMockups) sourcePatches.set(file, (input) => mockupCopy(input, file));
+sourcePatches.set("packages/website/src/components/clisbot-brand.tsx", (input) =>
+  brandComponent(input, "packages/website/src/components/clisbot-brand.tsx"),
+);
+sourcePatches.set("packages/website/src/components/clisbot-brand.test.tsx", (input) =>
+  brandComponentTest(input, "packages/website/src/components/clisbot-brand.test.tsx"),
+);
 sourcePatches.set("packages/hub/src/components/app/auth-layout.tsx", hubGlyph);
 sourcePatches.set("packages/hub/src/routes/__root.tsx", hubFavicon);
 sourcePatches.set("packages/app/app.config.js", appConfig);
@@ -121,6 +147,9 @@ sourcePatches.set("packages/website/src/routes/__root.tsx", (s) =>
 );
 sourcePatches.set("packages/website/src/components/mockup/mobile/chat.tsx", (s) =>
   s.replace("Mohameds-MacBook-Pro.l…", "Work-Mac.local"),
+);
+sourcePatches.set("packages/website/src/components/hub-automations/github-mockup.tsx", (s) =>
+  s.replace("<span>getpaseo</span>", "<span>longbkit</span>"),
 );
 sourcePatches.set("packages/website/src/components/mockup/sidebar.tsx", (s) =>
   s.replace("bg-black text-white", `bg-[${colors.ocean}] text-[${colors.seafoam}]`),

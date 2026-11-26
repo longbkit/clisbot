@@ -2,7 +2,42 @@
 // Hub default. Preserve the useful translation while porting reviewed service facts.
 const fixes = new Map(
   Object.entries({
+    // v0.17.4 rewrote these English pages and their translations.
+    "public-docs/cli.md": [
+      [
+        "- Origin precedence: explicit `[url]` or `--hub`, then `CLISBOT_HUB_URL`, then the active stored login, then `__UPSTREAM_HOSTED_HUB__`.",
+        "- Origin precedence: explicit `[url]` or `--hub`, then `CLISBOT_HUB_URL`, then the active stored login. There is no hosted default: with none of these, the command stops and asks for a Hub URL.",
+      ],
+    ],
+    "public-docs/hub/daemons.md": [
+      [
+        "then the active stored login, then `__UPSTREAM_HOSTED_HUB__`.",
+        "then the active stored login; with none of these it stops and asks for a Hub URL.",
+      ],
+    ],
+    "public-docs/hub/configuration/index.md": [
+      [
+        "3. Active stored CLI login\n4. `__UPSTREAM_HOSTED_HUB__`",
+        "3. Active stored CLI login\n\nThere is no hosted default; with none of these the command stops and asks for a Hub URL.",
+      ],
+    ],
+    "public-docs/hub/api.md": [
+      [
+        "- [Interactive API reference](__UPSTREAM_HOSTED_HUB__/api/reference)\n- [OpenAPI 3.1 document](__UPSTREAM_HOSTED_HUB__/api/openapi.json)\n\nA self-hosted Hub serves the same `/api/reference` and `/api/openapi.json` endpoints on its own origin.",
+        "Every Hub serves its own reference on its origin:\n\n- Interactive API reference: `<hub-origin>/api/reference`\n- OpenAPI 3.1 document: `<hub-origin>/api/openapi.json`",
+      ],
+    ],
+    "public-docs/hub/index.md": [
+      [
+        "[Hosted Hub](/docs/hub/hosted) manages the server and provider apps for you. Create a free account at [hub.clisbot.com](__UPSTREAM_HOSTED_HUB__) with no card and no expiry.",
+        "Clisbot does not run a hosted Hub. Run a personal Hub on your own machine or a Hub your team deploys.",
+      ],
+    ],
     "public-docs/hub/index.zh-CN.md": [
+      [
+        "[托管 Hub](/docs/hub/hosted) 为你运维服务器和 Provider 应用。前往 [hub.clisbot.com](__UPSTREAM_HOSTED_HUB__) 创建免费账号，无需绑卡，也不会过期。",
+        "Clisbot 不运营托管 Hub。请在自己的机器上运行个人 Hub，或使用团队自行部署的 Hub。",
+      ],
       [
         "[托管 Hub](/docs/hub/hosted) 使用相同的触发器、daemon 和活动模型。[创建免费账号](__UPSTREAM_HOSTED_HUB__)，无需绑卡，也不会过期。",
         "Clisbot 不运营托管 Hub。请在自己的机器上运行个人 Hub，或使用团队自行部署的 Hub；参见[自托管](/docs/hub/self-hosting)。",
@@ -10,11 +45,19 @@ const fixes = new Map(
     ],
     "public-docs/cli.zh-CN.md": [
       [
+        "- 地址优先级：显式 `[url]` 或 `--hub`、`CLISBOT_HUB_URL`、当前已保存的登录，最后是 `__UPSTREAM_HOSTED_HUB__`。",
+        "- 地址优先级：显式 `[url]` 或 `--hub`、`CLISBOT_HUB_URL`、当前已保存的登录。没有托管版默认地址；都未设置时，命令会停止并要求提供 Hub URL。",
+      ],
+      [
         "每个命令在执行 Hub 或 daemon 工作之前，都会解析并规范化它的目标。地址的优先级依次为：显式的命令地址或 `--hub`、`CLISBOT_HUB_URL`、当前保存的登录地址，最后是托管版默认地址 `__UPSTREAM_HOSTED_HUB__`。托管版默认地址从不会覆盖当前的登录。凭据的优先级依次为：`--api-key <secret>`、`CLISBOT_HUB_API_KEY`，然后是与解析出的地址完全匹配的已保存登录。保存的凭据从不会发送到其他地址。通过参数或环境变量传入的 API 密钥不会被保存。",
         "在远程 Hub 管理中，地址的优先级依次为：显式的命令地址或 `--hub`、`CLISBOT_HUB_URL`、当前保存的登录地址。没有托管版默认地址；都未设置时，命令会停止并要求提供 Hub URL。凭据的优先级依次为：`--api-key <secret>`、`CLISBOT_HUB_API_KEY`，然后是与解析出的地址完全匹配的已保存登录。保存的凭据从不会发送到其他地址。通过参数或环境变量传入的 API 密钥不会被保存。",
       ],
     ],
     "public-docs/hub/api.zh-CN.md": [
+      [
+        "- [交互式 API 参考](__UPSTREAM_HOSTED_HUB__/api/reference)\n- [OpenAPI 3.1 文档](__UPSTREAM_HOSTED_HUB__/api/openapi.json)\n\n自托管 Hub 在自己的地址下提供相同的 `/api/reference` 和 `/api/openapi.json` 端点。",
+        "每个 Hub 都在自己的地址上提供参考文档：\n\n- 交互式 API 参考：`<hub-origin>/api/reference`\n- OpenAPI 3.1 文档：`<hub-origin>/api/openapi.json`",
+      ],
       [
         "- [交互式 API 参考](__UPSTREAM_HOSTED_HUB__/api/reference)\n- [OpenAPI 3.1 文档](__UPSTREAM_HOSTED_HUB__/api/openapi.json)\n\n这些是托管版 Clisbot Hub 的标准参考端点。自托管的 Hub 在它自己的地址上提供相同的 `/api/reference` 和 `/api/openapi.json` 路径。",
         "每个 Hub 都在自己的地址上提供参考文档：\n\n- 交互式 API 参考：`<hub-origin>/api/reference`\n- OpenAPI 3.1 文档：`<hub-origin>/api/openapi.json`",
@@ -26,11 +69,19 @@ const fixes = new Map(
     ],
     "public-docs/hub/daemons.zh-CN.md": [
       [
+        "再是当前已保存的登录、最后是 `__UPSTREAM_HOSTED_HUB__`。",
+        "再是当前已保存的登录；都未设置时会停止并要求提供 Hub URL。",
+      ],
+      [
         "地址的优先级依次为：显式的 `[origin]`、`CLISBOT_HUB_URL`、当前保存的登录，最后是 `__UPSTREAM_HOSTED_HUB__`。显式的 `--api-key <secret>` 优先于环境变量和与地址完全一致的已保存登录。",
         "地址的优先级依次为：显式的 `[origin]`、`CLISBOT_HUB_URL`、当前保存的登录。没有托管版默认地址；都未设置时会停止并要求提供 Hub URL。显式的 `--api-key <secret>` 优先于环境变量和与地址完全一致的已保存登录。",
       ],
     ],
     "public-docs/hub/configuration/index.zh-CN.md": [
+      [
+        "3. 当前已保存的 CLI 登录\n4. `__UPSTREAM_HOSTED_HUB__`",
+        "3. 当前已保存的 CLI 登录\n\n没有托管版默认地址；都未设置时，命令会停止并要求提供 Hub URL。",
+      ],
       [
         "3. 当前保存的登录\n4. `__UPSTREAM_HOSTED_HUB__`",
         "3. 当前保存的登录\n\n没有托管版默认地址；都未设置时，命令会停止并要求提供 Hub URL。",
