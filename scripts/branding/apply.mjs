@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { parseArgs } from "node:util";
 import { kitRoot } from "./artwork.mjs";
-import { sourcePatches } from "./source-patches.mjs";
+import { brandSystemFiles, sourcePatches } from "./source-patches.mjs";
 import { brandAssetConsumers, brandAssetFiles } from "./brand-assets.mjs";
 
 const { values } = parseArgs({
@@ -62,6 +62,7 @@ if (existsSync(join(root, "assets/brand"))) {
 for (const [file, patch] of sourcePatches) {
   if (!existsSync(join(root, file))) {
     if (file.startsWith("packages/hub/") && !existsSync(join(root, "packages/hub"))) continue;
+    if (brandSystemFiles.has(file) && !existsSync(join(root, "assets/brand"))) continue;
     throw new Error(`Branding consumer missing: ${file}; review upstream changes.`);
   }
   const before = readFileSync(join(root, file), "utf8");

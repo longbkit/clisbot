@@ -80,10 +80,33 @@ const brandedMockups = [
   "packages/website/src/components/mockup/mobile/atoms.tsx",
 ];
 
-function mockupCopy(input, file) {
-  if (!input.includes("clisbot-brand")) {
-    throw new Error(`Unrecognized upstream logo in ${file}; review it before applying branding.`);
+function legacyLogo(input, file) {
+  let text = logoSource(input, file);
+  text = text
+    .replaceAll("BUTTERFLY_D", "CLISBOT_MARK_D")
+    .replaceAll("butterfly", "Flow")
+    .replace("brand swirl", "workspace and chat mark");
+  if (file.endsWith("mobile/atoms.tsx")) {
+    text = text.replace(
+      'transform="translate(350,350) scale(1.05) translate(-350,-350)" ',
+      'fillRule="evenodd" ',
+    );
+    text = text.replace("bg-black text-white", `bg-[${colors.ocean}] text-[${colors.seafoam}]`);
+    text = text.replace("white Flow on the black app plate", "Ocean Flow on the app plate");
+  } else if (file.endsWith("startup-splash-screen.tsx")) {
+    text = text.replace("<path fill='black' d=", "<path fill-rule='evenodd' fill='black' d=");
+  } else if (file.endsWith("clisbot-logo.tsx")) {
+    if (!text.includes('fillRule="evenodd"'))
+      text = text.replace("<Path\n", '<Path\n        fillRule="evenodd"\n');
+  } else {
+    text = text.replace(`<path d="${path}"`, `<path fillRule="evenodd" d="${path}"`);
   }
+  return text;
+}
+
+function mockupCopy(input, file) {
+  // Releases before v0.17 drew the mark inline in these mockups.
+  if (!input.includes("clisbot-brand")) return legacyLogo(input, file);
   let text = input
     .replace("The Clisbot butterfly mark", "The Clisbot Flow mark")
     .replace("white butterfly on the black app plate", "Ocean Flow on the app plate");
@@ -94,33 +117,14 @@ function mockupCopy(input, file) {
 }
 
 export const sourcePatches = new Map(
-  logoFiles.map((file) => [
-    file,
-    (input) => {
-      let text = logoSource(input, file);
-      text = text
-        .replaceAll("BUTTERFLY_D", "CLISBOT_MARK_D")
-        .replaceAll("butterfly", "Flow")
-        .replace("brand swirl", "workspace and chat mark");
-      if (file.endsWith("mobile/atoms.tsx")) {
-        text = text.replace(
-          'transform="translate(350,350) scale(1.05) translate(-350,-350)" ',
-          'fillRule="evenodd" ',
-        );
-        text = text.replace("bg-black text-white", `bg-[${colors.ocean}] text-[${colors.seafoam}]`);
-        text = text.replace("white Flow on the black app plate", "Ocean Flow on the app plate");
-      } else if (file.endsWith("startup-splash-screen.tsx")) {
-        text = text.replace("<path fill='black' d=", "<path fill-rule='evenodd' fill='black' d=");
-      } else if (file.endsWith("clisbot-logo.tsx")) {
-        if (!text.includes('fillRule="evenodd"'))
-          text = text.replace("<Path\n", '<Path\n        fillRule="evenodd"\n');
-      } else {
-        text = text.replace(`<path d="${path}"`, `<path fillRule="evenodd" d="${path}"`);
-      }
-      return text;
-    },
-  ]),
+  logoFiles.map((file) => [file, (input) => legacyLogo(input, file)]),
 );
+
+// Consumers of upstream's canonical brand folder exist only from v0.17.
+export const brandSystemFiles = new Set([
+  "packages/website/src/components/clisbot-brand.tsx",
+  "packages/website/src/components/clisbot-brand.test.tsx",
+]);
 
 for (const file of brandedMockups) sourcePatches.set(file, (input) => mockupCopy(input, file));
 sourcePatches.set("packages/website/src/components/clisbot-brand.tsx", (input) =>
