@@ -175,14 +175,14 @@ describe("PiCliRuntime", () => {
 
     await runtime.startSession({
       cwd: "/workspace/project",
-      mcpConfigPath: "/tmp/paseo-pi-mcp/mcp.json",
+      mcpConfigPath: "/tmp/clisbot-pi-mcp/mcp.json",
     });
 
     expect(launches).toEqual([
       expect.objectContaining({
         cwd: "/workspace/project",
-        mcpConfigPath: "/tmp/paseo-pi-mcp/mcp.json",
-        argv: ["pi", "--mode", "rpc", "--mcp-config", "/tmp/paseo-pi-mcp/mcp.json"],
+        mcpConfigPath: "/tmp/clisbot-pi-mcp/mcp.json",
+        argv: ["pi", "--mode", "rpc", "--mcp-config", "/tmp/clisbot-pi-mcp/mcp.json"],
       }),
     ]);
   });
@@ -604,12 +604,12 @@ test("reads complete persisted history instead of compacted RPC context", async 
     await writeFile(
       file,
       contents +
-        '\n{"type":"custom","id":"rewind","parentId":"old-answer","customType":"paseo_rewind"}',
+        '\n{"type":"custom","id":"rewind","parentId":"old-answer","customType":"clisbot_rewind"}',
     );
     expect((await runtime.getHistory()).userEntries.map((entry) => entry.id)).toEqual(["old-user"]);
     await writeFile(
       file,
-      contents + '\n{"type":"custom","id":"rewind","parentId":null,"customType":"paseo_rewind"}',
+      contents + '\n{"type":"custom","id":"rewind","parentId":null,"customType":"clisbot_rewind"}',
     );
     expect((await runtime.getHistory()).messages).toEqual([]);
     await writeFile(file, contents + '\n{"type":"custom","id":"bad","parentId":"missing"}');

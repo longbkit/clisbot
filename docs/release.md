@@ -73,7 +73,7 @@ npm dist-tags are independent pointers:
   newest stable.
 - A stable release publishes to `latest`. Move `beta` to it as well when the stable version is
   newer than the version `beta` points to, which covers promotions and direct stable releases, so
-  `@getpaseo/cli@beta` users never sit behind stable. A stable hotfix on an older line leaves
+  `@clisbot/cli@beta` users never sit behind stable. A stable hotfix on an older line leaves
   `beta` on the active newer beta.
 
 ## Release base and source
@@ -91,7 +91,7 @@ base plus any approved cherry-picks, and every source, diff, and CI check uses i
 An explicit user instruction can select another base.
 
 1. Fetch `origin` with tags and resolve the base to one commit.
-2. Create the release workspace through Paseo MCP on a new branch from the base, named
+2. Create the release workspace through Clisbot MCP on a new branch from the base, named
    `release/vX.Y.Z` or `release/vX.Y.Z-beta.N` for the version being cut. `release:push` refuses
    `main` and any branch outside `release/*`.
 3. Cherry-pick the approved commits in their `main` order with `git cherry-pick -x`, so each
@@ -178,7 +178,7 @@ hunks from the release base:
 
 Commit, open the PR into `main`, and merge once its checks pass. After the reconcile PR merges and
 the release completes, delete the remote release branch (`git push origin --delete release/vX.Y.Z`
-or `release/vX.Y.Z-beta.N`). The tag is the record of shipped source; Paseo maintains no release
+or `release/vX.Y.Z-beta.N`). The tag is the record of shipped source; Clisbot maintains no release
 track besides `main`.
 
 ## ACP catalog updates
@@ -212,7 +212,7 @@ version:
 The release agent selects patch or minor during preparation and presents the
 target version with the changelog for approval. Agents never select a major
 version autonomously. A major release requires an explicit user instruction and
-approval; Paseo remains on major version zero until that deliberate decision.
+approval; Clisbot remains on major version zero until that deliberate decision.
 
 Version bumps are never used to retry a failed build. Retry the existing version
 as described in **Fixing a failed release build**.
@@ -241,10 +241,10 @@ npm run release:ship
 
 `release:ship` runs `scripts/publish-release-packages.mjs` and `scripts/push-current-release-tag.mjs`:
 
-- Publishes all seven `@getpaseo/*` packages in dependency order, skips versions already on npm,
+- Publishes all seven `@clisbot/*` packages in dependency order, skips versions already on npm,
   retries transient 429/5xx/network errors, and waits until each version is visible on npm before
   continuing.
-- Checks `npm view @getpaseo/cli dist-tags` and moves npm's `beta` dist-tag to the new stable
+- Checks `npm view @clisbot/cli dist-tags` and moves npm's `beta` dist-tag to the new stable
   version across all seven packages whenever the stable version is newer than `beta` (leaving
   `beta` untouched during a stable hotfix on an older line).
 - Refuses non-`release/*` branches, tags `HEAD` with `vX.Y.Z`, and pushes the tag. Because `HEAD`
@@ -252,11 +252,11 @@ npm run release:ship
 
 The tag push triggers `Desktop Release`, `Android APK Release`, `Docker`, and `Release Notes Sync` on GitHub Actions. The workflows create the GitHub Release as a draft while builds and release-note sync run. EAS picks up the same tag via the EAS GitHub app and starts the iOS + Android store builds in parallel (see "Mobile builds (EAS)" below) — there is no mobile-release workflow under `.github/workflows`.
 
-Verify `npm view @getpaseo/cli dist-tags` shows `latest` at the shipped version, and `beta` at the shipped version or an active newer beta, before considering the stable release complete.
+Verify `npm view @clisbot/cli dist-tags` shows `latest` at the shipped version, and `beta` at the shipped version or an active newer beta, before considering the stable release complete.
 
-The Docker workflow builds images from the checked-out source tree on `main` as non-publishing checks (cancelling superseded `main` runs). Stable `vX.Y.Z` tag pushes publish `ghcr.io/getpaseo/paseo:X.Y.Z` and `ghcr.io/getpaseo/paseo:latest`; beta `vX.Y.Z-beta.N` tag pushes publish only `ghcr.io/getpaseo/paseo:X.Y.Z-beta.N` and never move `latest`.
+The Docker workflow builds images from the checked-out source tree on `main` as non-publishing checks (cancelling superseded `main` runs). Stable `vX.Y.Z` tag pushes publish `ghcr.io/longbkit/clisbot:X.Y.Z` and `ghcr.io/longbkit/clisbot:latest`; beta `vX.Y.Z-beta.N` tag pushes publish only `ghcr.io/longbkit/clisbot:X.Y.Z-beta.N` and never move `latest`.
 
-The production relay is the Elixir service in [getpaseo/paseo-relay](https://github.com/getpaseo/paseo-relay), with its own deployment process. Paseo releases and pushes to this repository do not deploy it. The Cloudflare relay code and workflow in this repository are legacy and are not used in production.
+The production relay is the Elixir service in [getpaseo/paseo-relay](https://github.com/getpaseo/paseo-relay), with its own deployment process. Clisbot releases and pushes to this repository do not deploy it. The Cloudflare relay code and workflow in this repository are legacy and are not used in production.
 
 **Stable means stable.** If the user says "stable" or "ship stable", do not ask whether they want a beta first. They picked stable; treat it as a direct stable release. Only run the beta flow when the user explicitly says "beta".
 
@@ -298,9 +298,9 @@ npm run release:ship
 ```
 
 - Beta tags are published GitHub prereleases like `v0.1.41-beta.1`
-- Betas publish npm packages with `--tag beta`, so `npm install @getpaseo/cli@beta` opts in while plain `npm install @getpaseo/cli` stays on `latest`
-- The user-facing beta instructions, including the public TestFlight join link for the `Paseo Beta` group, live in `public-docs/updates.md` and its `zh-CN` pair. Update them when a beta path is added or removed.
-- Betas publish desktop assets and APKs for testing. They also build iOS, upload it to TestFlight, add it to the `Paseo Beta` external group, and submit it for Beta App Review. They do not submit mobile builds to the production stores.
+- Betas publish npm packages with `--tag beta`, so `npm install @clisbot/cli@beta` opts in while plain `npm install @clisbot/cli` stays on `latest`
+- The user-facing beta instructions, including the public TestFlight join link for the `Clisbot Beta` group, live in `public-docs/updates.md` and its `zh-CN` pair. Update them when a beta path is added or removed.
+- Betas publish desktop assets and APKs for testing. They also build iOS, upload it to TestFlight, add it to the `Clisbot Beta` external group, and submit it for Beta App Review. They do not submit mobile builds to the production stores.
 - `release:prep:promote` + `release:ship` creates a fresh stable tag like `v0.1.41`; the final release never reuses the beta tag
 - Desktop assets now come from the Electron package at `packages/desktop`
 - Require the Linux artifact CI checks with both restricted and usable user namespaces to pass before publication; see [packaged desktop smoke](testing.md#packaged-desktop-smoke). Keep the installed-package and AppImage checks together.
@@ -419,12 +419,12 @@ macOS 13 maps to Darwin 22. The two values use different version domains; do not
 iOS and Android store builds are not in `.github/workflows`. They are triggered by the EAS GitHub app the moment the `v*` tag is pushed:
 
 - **Android (Play Store)** — EAS builds with profile `production` and auto-submits to the Play Store via `eas submit` (EAS-managed credentials). A Fastlane lane then replaces the store screenshots.
-- **iOS (TestFlight + App Store)** — EAS builds with profile `production`, uploads once through a `testflight` job, distributes the build to the `Paseo Beta` external group with Beta App Review submission, and a Fastlane lane uploads the store screenshots and submits that same build for App Store review.
+- **iOS (TestFlight + App Store)** — EAS builds with profile `production`, uploads once through a `testflight` job, distributes the build to the `Clisbot Beta` external group with Beta App Review submission, and a Fastlane lane uploads the store screenshots and submits that same build for App Store review.
 - **Android APK (GitHub Release asset)** — separate, via `.github/workflows/android-apk-release.yml`. This is the only Android-related workflow that lives in this repo.
 
 EAS uses the local app version source. `packages/app/app.config.js` derives the native version from the package version. Android `versionCode` is `major * 1_000_000 + minor * 1_000 + patch`. iOS reserves 1,000 build slots per app version: beta `N` uses slot `N`, and stable uses slot `999`. For example, `0.2.6-beta.2` appears in App Store Connect as version `0.2.6` build `2006002`; stable uses build `2006999`. Rebuilding the same tag produces the same native build number; if a store has already accepted a binary and you need a different binary, cut the next beta or patch instead of relying on EAS remote auto-increment.
 
-Stable tags run `Release Mobile`; beta tags run `Release iOS Beta`. Both distribute to the persistent `Paseo Beta` external group and submit for Beta App Review, so testers receive stable releases as well as betas. Testers, the group, and required TestFlight test information are managed once in App Store Connect.
+Stable tags run `Release Mobile`; beta tags run `Release iOS Beta`. Both distribute to the persistent `Clisbot Beta` external group and submit for Beta App Review, so testers receive stable releases as well as betas. Testers, the group, and required TestFlight test information are managed once in App Store Connect.
 
 Stable iOS releases use one binary for two Apple review paths: Beta App Review for external TestFlight distribution and App Store review. [Apple says](https://developer.apple.com/help/app-store-connect/test-a-beta-version/invite-external-testers) the first submitted build requires a full TestFlight review; later builds for the same version might not. Do not assume a stable patch skips review.
 
@@ -479,7 +479,7 @@ Once a build is `FINISHED`, EAS still has release-critical work to do: Android m
 For the `Release Mobile` EAS workflow, these jobs must pass:
 
 - `build_ios` — iOS binary built
-- `distribute_ios` — iOS binary uploaded once, added to `Paseo Beta`, and submitted for Beta App Review
+- `distribute_ios` — iOS binary uploaded once, added to `Clisbot Beta`, and submitted for Beta App Review
 - `submit_ios_for_review` — iOS build submitted for App Store review via Fastlane
 - `build_android` — Android store binary built
 - `submit_android` — Android binary submitted to the Play Store
@@ -520,14 +520,14 @@ delete the remote release branch (`git push origin --delete release/vX.Y.Z` or
 Pattern:
 
 ```jsonc
-// mcp__paseo__create_heartbeat arguments
+// mcp__clisbot__create_heartbeat arguments
 {
   "name": "vX.Y.Z release babysit heartbeat",
   "cron": "*/10 * * * *",
   "timezone": "UTC",
   "maxRuns": 120,
   "expiresIn": "24h",
-  "prompt": "Resume the vX.Y.Z release babysit for commit <sha>. Check npm tags; CI and Desktop Packages on release/vX.Y.Z; every tag-triggered GitHub Actions run; the published GitHub Release body, expected desktop/APK assets, and channel manifests; the Docker image; the matching EAS workflow; and the reconcile PR into main. Completion requires every applicable checklist item. For stable, require build_ios, distribute_ios (Paseo Beta external distribution and Beta App Review submission), submit_ios_for_review, build_android, and submit_android to succeed. For beta, require the beta TestFlight distribution and Beta App Review path. If work is pending, wait for the next heartbeat. If a failure can be retried safely for the same version, follow the failed-release procedure; otherwise report the blocker. When every applicable completion-checklist item passes and the reconcile PR is merged, delete origin/release/vX.Y.Z, delete THIS heartbeat, report shipped, and stop.",
+  "prompt": "Resume the vX.Y.Z release babysit for commit <sha>. Check npm tags; CI and Desktop Packages on release/vX.Y.Z; every tag-triggered GitHub Actions run; the published GitHub Release body, expected desktop/APK assets, and channel manifests; the Docker image; the matching EAS workflow; and the reconcile PR into main. Completion requires every applicable checklist item. For stable, require build_ios, distribute_ios (Clisbot Beta external distribution and Beta App Review submission), submit_ios_for_review, build_android, and submit_android to succeed. For beta, require the beta TestFlight distribution and Beta App Review path. If work is pending, wait for the next heartbeat. If a failure can be retried safely for the same version, follow the failed-release procedure; otherwise report the blocker. When every applicable completion-checklist item passes and the reconcile PR is merged, delete origin/release/vX.Y.Z, delete THIS heartbeat, report shipped, and stop.",
 }
 ```
 
@@ -542,7 +542,7 @@ The GitHub Release body is populated automatically by the `Release Notes Sync` w
 
 - The website download page defaults to GitHub's latest published **stable** release.
 - A published beta prerelease is offered behind the Stable/Beta switch on `/download` (`?channel=beta`), never as the default. The switch only appears while the newest prerelease leads stable on its core version, so promoting `X.Y.Z-beta.N` to `X.Y.Z` retires the beta channel from the page until the next beta line opens.
-- Homebrew, the Play Store, and `app.paseo.sh` have no beta. The Beta view drops those rows, and the whole Web section, rather than showing an inert "stable only" placeholder. The iOS row swaps the App Store pill for the public TestFlight link (`testFlightBetaUrl` in `packages/website/src/downloads.tsx`). When another surface gains a beta path, add its row back in `packages/website/src/routes/{-$locale}/download.tsx`.
+- Homebrew, the Play Store, and `app.clisbot.com` have no beta. The Beta view drops those rows, and the whole Web section, rather than showing an inert "stable only" placeholder. The iOS row swaps the App Store pill for the public TestFlight link (`testFlightBetaUrl` in `packages/website/src/downloads.tsx`). When another surface gains a beta path, add its row back in `packages/website/src/routes/{-$locale}/download.tsx`.
 - The default download target only moves when you publish the final stable release tag like `v0.1.41`.
 - The public `/changelog` page renders `CHANGELOG.md` as-is, so the in-flight `-beta.N` entry shows there once it lands on `main` — that's intended, it's where beta users check what's coming. Only the **default download target** stays pinned to the latest stable; the download links read GitHub's releases API, not the changelog, so a `-beta.N` heading on top never affects them.
 - The download page's "What's new" link deep-links the **minor group** anchor (`/changelog#release-0.3`), not the exact entry: the beta entry is renamed on each beta and on promotion, so the minor group remains the durable target. A version with no entry in the bundled changelog — a tag whose changelog commit hasn't redeployed the site yet — links the plain `/changelog` instead of a dead anchor.
@@ -561,13 +561,13 @@ and EAS mobile release builds. Use the Docker workflow dispatch instead:
 ```bash
 gh workflow run docker.yml \
   --ref main \
-  -f paseo_version=X.Y.Z-beta.N \
+  -f clisbot_version=X.Y.Z-beta.N \
   -f publish=true
 ```
 
-This replaces `ghcr.io/getpaseo/paseo:X.Y.Z-beta.N` in place without touching
+This replaces `ghcr.io/longbkit/clisbot:X.Y.Z-beta.N` in place without touching
 desktop, APK, or EAS release builders. The Docker exception is safe because the
-dispatch runs from `--ref main` and uses the explicit `paseo_version`; it does
+dispatch runs from `--ref main` and uses the explicit `clisbot_version`; it does
 not check out or move the `v*` release tag.
 
 To retry a failed non-Docker release workflow, push a retry tag on the commit
@@ -615,12 +615,12 @@ If you decide to publish a release without working desktop builds, inspect its
 assets first, then publish it manually:
 
 ```bash
-RELEASE_LOOKUP=$(node scripts/github-release.mjs --repo getpaseo/paseo --tag vX.Y.Z)
+RELEASE_LOOKUP=$(node scripts/github-release.mjs --repo longbkit/clisbot --tag vX.Y.Z)
 gh release view "$RELEASE_LOOKUP" --json isDraft,isPrerelease,assets
 gh release edit "$RELEASE_LOOKUP" --tag vX.Y.Z --draft=false
 
 # Keep a beta marked as a prerelease:
-RELEASE_LOOKUP=$(node scripts/github-release.mjs --repo getpaseo/paseo --tag vX.Y.Z-beta.N)
+RELEASE_LOOKUP=$(node scripts/github-release.mjs --repo longbkit/clisbot --tag vX.Y.Z-beta.N)
 gh release edit "$RELEASE_LOOKUP" --tag vX.Y.Z-beta.N --draft=false --prerelease
 ```
 
@@ -629,7 +629,7 @@ intentionally unavailable to desktop updater clients.
 
 ## Notes
 
-- `version:all:*` bumps root, syncs workspace versions and `@getpaseo/*` dependency versions, and
+- `version:all:*` bumps root, syncs workspace versions and `@clisbot/*` dependency versions, and
   commits `chore(release): cut <version>` without creating a tag. `release:push` creates and pushes
   the tag atomically after release-branch CI passes.
 - `release:push` refuses `main` and any branch outside `release/*`.
@@ -668,7 +668,7 @@ Older prerelease bodies on GitHub keep the notes they were synced with; `Release
 
 ## Changelog translations
 
-`CHANGELOG.zh-CN.md` holds the Chinese notes for `paseo.sh/zh-CN/changelog`. Only the website reads it; the app's **What's new** sheet, GitHub release bodies and F-Droid read `CHANGELOG.md`.
+`CHANGELOG.zh-CN.md` holds the Chinese notes for `clisbot.com/zh-CN/changelog`. Only the website reads it; the app's **What's new** sheet, GitHub release bodies and F-Droid read `CHANGELOG.md`.
 
 - The release agent writes the Chinese entry in the changelog commit, after the English entry is approved. Every beta that rewrites the English entry rewrites the Chinese one too, and promotion renames both. `packages/website/e2e/i18n.spec.ts` fails CI on the release commit when any entry has no current translation.
 - A translated entry uses the English heading unchanged: `## X.Y.Z - YYYY-MM-DD`. The website uses it only while the version and date both match the English entry. Otherwise it shows that release whole in English under a notice. Delete Chinese entries whose English entry was renamed.
@@ -682,13 +682,13 @@ Older prerelease bodies on GitHub keep the notes they were synced with; `Release
 
 ## Changelog wording
 
-The changelog is shown on the Paseo homepage. Each bullet is a compact factual record of
+The changelog is shown on the Clisbot homepage. Each bullet is a compact factual record of
 product behavior that changed.
 
 - **Name the exact change.** Prefer `Added <capability>`, `Removed <behavior>`,
   `Changed <behavior>`, or `Fixed <failure> when <condition>`.
 - **Keep the scope exact.** A conditional bug is not a general reliability problem. Do not
-  broaden one failure into claims that Paseo is now faster, smoother, responsive, or reliable.
+  broaden one failure into claims that Clisbot is now faster, smoother, responsive, or reliable.
 - **Use concrete product and runtime terms.** Git polling, persisted cache, provider catalog,
   and WebSocket reconnects can identify the affected behavior. Component names, internal
   modules, code symbols, and implementation techniques cannot: omit `WorkingIndicator`,
@@ -700,7 +700,7 @@ product behavior that changed.
 
 | Avoid                                                        | Write                                                 |
 | ------------------------------------------------------------ | ----------------------------------------------------- |
-| Paseo stays responsive with many idle Git workspaces         | Removed periodic Git polling for idle workspaces      |
+| Clisbot stays responsive with many idle Git workspaces       | Removed periodic Git polling for idle workspaces      |
 | Incompatible saved app data no longer crashes after upgrades | Fixed crash when persisted cache was incompatible     |
 | Splitting layouts no longer remounts the active agent        | Fixed scroll position resetting when splitting a pane |
 | Mobile model selector is faster and more straightforward     | Added search to the mobile model selector             |
@@ -718,7 +718,7 @@ claims a general improvement, rewrite it with the concrete change.
 An entry announces what changed. Product docs own setup, navigation, migration and edge cases, and the PR link leads to the rest. These rules apply to highlights and section bullets.
 
 - **No instructions.** Cut setup steps, click paths, configuration keys, flags and migration notes. "Open a provider's settings from Settings, setup, or the model picker" is a click path. "Existing goose settings and sessions carry over to the bundled plugin" is a migration note.
-- **One warning for a breaking requirement.** When the update stops something working until the user acts, state the requirement in one short sentence after the announcement, and link the product doc that has the steps: "Requires [Antigravity CLI 1.5.0 or later](https://paseo.sh/docs/supported-providers/antigravity)." Nothing else earns a second sentence.
+- **One warning for a breaking requirement.** When the update stops something working until the user acts, state the requirement in one short sentence after the announcement, and link the product doc that has the steps: "Requires [Antigravity CLI 1.5.0 or later](https://clisbot.com/docs/supported-providers/antigravity)." Nothing else earns a second sentence.
 - **No hedges or exception clauses.** Cut "when needed", "for eligible models", "on hosts where…", "except…", "with a hint shown when…" and "across common install shapes". Keep the condition that triggers a fixed failure, as in `Fixed <failure> when <condition>`.
 - **The shorter bullet is still true.** When a change reaches only some providers, platforms or file types, name what it covers in the sentence's own words: "update supported CLIs" where one provider has no update command, "Markdown previews and source views" where HTML previews on iOS are left out, "by default" where an explicit interrupt still replaces the turn. Do not widen the claim to remove a clause.
 - **State the outcome and stop.** Say what the user gets. Leave out queues, snapshots, caches, timeouts, LAN/WAN topology, TLS handshakes and IPC.
@@ -730,7 +730,7 @@ Each row is from the first draft of 0.17.1:
 | Open a provider's settings from Settings, setup, or the model picker to update supported CLIs and watch their output                                                                                                                                      | Update supported CLIs from the app                                                                |
 | Use Antigravity CLI 1.5.0 or later on the daemon host, and include `acp` if you override its command                                                                                                                                                      | Requires Antigravity CLI 1.5.0 or later                                                           |
 | Reports and notifications from other agents arrive in order when the current turn ends instead of interrupting it. An interrupt or your own prompt carries earlier queued messages in the same turn, and Stop holds queued messages until the next prompt | By default, messages from other agents wait for the current turn to end                           |
-| Changed worktree teardown to keep the worktree when the command exceeds one minute or the `worktree.teardownTimeoutMs` limit in `paseo.json`                                                                                                              | Changed worktree teardown to keep the worktree when the command times out                         |
+| Changed worktree teardown to keep the worktree when the command exceeds one minute or the `worktree.teardownTimeoutMs` limit in `clisbot.json`                                                                                                            | Changed worktree teardown to keep the worktree when the command times out                         |
 | Fixed file views losing their scroll position when switching Preview and Source, except HTML previews on iOS                                                                                                                                              | Fixed Markdown previews and source views losing their scroll position when switching between them |
 
 Section bullets also follow these limits:
@@ -751,7 +751,7 @@ reader who stops after the highlights should have missed nothing they would ask 
 ```markdown
 ## 0.16.0 - 2026-11-20
 
-- **Undo workspace archive:** Restore an archived workspace with Undo or Cmd/Ctrl+Z. ([#8904](https://github.com/getpaseo/paseo/pull/8904))
+- **Undo workspace archive:** Restore an archived workspace with Undo or Cmd/Ctrl+Z. ([#8904](https://github.com/longbkit/clisbot/pull/8904))
 
 ### Added
 ```
@@ -759,10 +759,10 @@ reader who stops after the highlights should have missed nothing they would ask 
 - **The lead-in names what is new in four words at most.** Bold it, colon inside the bold. A reader
   who sees only the bold words should know what this release added or changed. A category lead-in
   such as `**Polish:**` gathers several related changes.
-- **The lead-in is not a place or something Paseo already had.** A device, screen or area names
-  where the change landed. A feature name that was true of the last release hides the news: Paseo
+- **The lead-in is not a place or something Clisbot already had.** A device, screen or area names
+  where the change landed. A feature name that was true of the last release hides the news: Clisbot
   already had keyboard shortcuts, so the lead-in says they now work on mobile.
-- **One short sentence says the plain thing.** Write what a user would tell a friend: Paseo now
+- **One short sentence says the plain thing.** Write what a user would tell a friend: Clisbot now
   shows the background tasks an agent is running. Leave out the conditions and mechanics that make
   it true. A second sentence is only for a
   [breaking requirement](#changelog-conciseness).
@@ -787,7 +787,7 @@ reader who stops after the highlights should have missed nothing they would ask 
 | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
 | `**iPad and touch screens:**`                                                              | `**Touch-sized tablet controls:**`                                                  |
 | `**Hardware keyboard shortcuts:**`                                                         | `**Keyboard shortcuts on mobile:**`                                                 |
-| When an agent ends its turn while shells it started are still running, a pill lists them   | Paseo now shows the background tasks an agent is running                            |
+| When an agent ends its turn while shells it started are still running, a pill lists them   | Clisbot now shows the background tasks an agent is running                          |
 | A diff no longer waits 4 to 40 seconds behind worktree scans                               | Opening Changes shows the file tree right away, and diffs load about 6 times sooner |
 | The same shortcuts as desktop: command center, file picker, new workspace, workspace jumps | The same shortcuts as desktop, including your custom bindings                       |
 
@@ -798,15 +798,15 @@ new?" without its description, and each must outrank the one below it.
 
 Every changelog bullet must credit contributors and link to the PR(s) that delivered the change. This is not one-PR-per-line — a single bullet describes a user-facing change and may reference multiple PRs.
 
-Format: append `([#123](https://github.com/getpaseo/paseo/pull/123) by [@user](https://github.com/user))` at the end of each bullet. For changes spanning multiple PRs or contributors:
+Format: append `([#123](https://github.com/longbkit/clisbot/pull/123) by [@user](https://github.com/user))` at the end of each bullet. For changes spanning multiple PRs or contributors:
 
 ```markdown
-- Voice mode now works on tablets with proper microphone permissions. ([#210](https://github.com/getpaseo/paseo/pull/210), [#215](https://github.com/getpaseo/paseo/pull/215) by [@alice](https://github.com/alice), [@bob](https://github.com/bob))
+- Voice mode now works on tablets with proper microphone permissions. ([#210](https://github.com/longbkit/clisbot/pull/210), [#215](https://github.com/longbkit/clisbot/pull/215) by [@alice](https://github.com/alice), [@bob](https://github.com/bob))
 ```
 
 Rules:
 
-- **Always link the PR number** as `[#N](https://github.com/getpaseo/paseo/pull/N)`.
+- **Always link the PR number** as `[#N](https://github.com/longbkit/clisbot/pull/N)`.
 - **Always link the contributor's GitHub profile** as `[@user](https://github.com/user)`.
 - **One bullet = one user-facing change**, regardless of how many PRs went into it. Group related PRs on the same bullet.
 - **De-duplicate contributors.** If the same person authored multiple PRs in one bullet, list them once.
@@ -920,7 +920,7 @@ Every entry covers `previous stable release → release source`: first beta, lat
 - [ ] GitHub `Release Notes Sync` is green and the release body matches the stable changelog entry
 - [ ] EAS `Release Mobile` workflow for the same tag is green
 - [ ] EAS iOS `build_ios` completes for the same tag
-- [ ] EAS iOS `distribute_ios` succeeds, uploading the binary once, distributing it to `Paseo Beta`, and submitting it for Beta App Review
+- [ ] EAS iOS `distribute_ios` succeeds, uploading the binary once, distributing it to `Clisbot Beta`, and submitting it for Beta App Review
 - [ ] EAS iOS `submit_ios_for_review` succeeds, putting the build into App Store review
 - [ ] EAS Android `build_android` completes for the same tag
 - [ ] EAS Android `submit_android` succeeds, putting the build on its Play Store track

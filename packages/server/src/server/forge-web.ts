@@ -1,5 +1,5 @@
-import { forgeWebHost } from "@getpaseo/protocol/git-remote";
-import type { ForgeWeb } from "@getpaseo/protocol/messages";
+import { forgeWebHost } from "@clisbot/protocol/git-remote";
+import type { ForgeWeb } from "@clisbot/protocol/messages";
 import type { ForgeResolution } from "../services/forge-resolver.js";
 
 // A failed reference-repository lookup (signed out, network down, rate limit) is retried after this long.

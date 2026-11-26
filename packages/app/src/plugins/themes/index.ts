@@ -1,5 +1,5 @@
-import type { PluginMessage } from "@getpaseo/plugin/client";
-import { isPluginMessage } from "@getpaseo/plugin/client/host";
+import type { PluginMessage } from "@clisbot/plugin/client";
+import { isPluginMessage } from "@clisbot/plugin/client/host";
 import { useMemo } from "react";
 import { z } from "zod";
 import type { PluginThemeContribution } from "../types";

@@ -1,6 +1,6 @@
 import type { Command } from "commander";
-import type { AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { AgentPermissionRequest } from "@clisbot/protocol/agent-types";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import { connectToDaemon } from "../../utils/client.js";
 import type { CommandOptions, ListResult, OutputSchema, CommandError } from "../../output/index.js";
 

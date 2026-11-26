@@ -1,4 +1,4 @@
-import type { PluginIcon } from "@getpaseo/plugin/client";
+import type { PluginIcon } from "@clisbot/plugin/client";
 import type { InstalledPlugin } from "../types";
 
 /** One workspace row badge item, coalesced across every host that contributes it. */

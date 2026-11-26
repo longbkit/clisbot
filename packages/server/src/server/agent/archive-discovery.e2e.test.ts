@@ -6,18 +6,15 @@ import { expect, test } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { z } from "zod";
-import {
-  AgentListItemPayloadSchema,
-  AgentSnapshotPayloadSchema,
-} from "@getpaseo/protocol/messages";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { AgentListItemPayloadSchema, AgentSnapshotPayloadSchema } from "@clisbot/protocol/messages";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import { createTestAgentClients } from "../test-utils/fake-agent-client.js";
 import { CodexAppServerAgentClient } from "./providers/codex-app-server-agent.js";
 import { ClaudeAgentClient } from "./providers/claude/agent.js";
 
 // Opt in to the same workflow with the installed providers instead of test clients.
-const real = process.env.PASEO_ARCHIVE_REAL === "1";
+const real = process.env.CLISBOT_ARCHIVE_REAL === "1";
 const StatusSchema = z.object({ snapshot: AgentSnapshotPayloadSchema });
 const ListSchema = z.object({ agents: z.array(AgentListItemPayloadSchema) });
 
@@ -26,7 +23,7 @@ test.each(["codex", "claude"] as const)(
   async (provider) => {
     const cwd = await mkdtemp(path.join(os.tmpdir(), "archive-discovery-"));
     const logger = pino({ level: "silent" });
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: real
         ? {
             [provider]:

@@ -1,14 +1,14 @@
 import { resolve } from "node:path";
 import { getCheckoutSnapshotFacts, setCheckoutBaseBranch } from "../../../utils/checkout-git.js";
 import {
-  readPaseoWorktreeMetadata,
-  setPaseoWorktreeBaseRef,
+  readClisbotWorktreeMetadata,
+  setClisbotWorktreeBaseRef,
 } from "../../../utils/worktree-metadata.js";
 import type { WorkspaceRegistry } from "../../workspace-registry.js";
 import type { WorkspaceGitService } from "../../workspace-git-service.js";
 
 interface Dependencies {
-  paseoHome: string;
+  clisbotHome: string;
   worktreesRoot?: string;
   workspaceRegistry: WorkspaceRegistry;
   workspaceGitService: WorkspaceGitService;
@@ -39,12 +39,12 @@ export function createWorkspaceBaseBranchService(deps: Dependencies) {
     const workspace = await deps.workspaceRegistry.get(input.workspaceId);
     if (!workspace || workspace.archivedAt) throw new Error("Workspace is unavailable");
     const facts = await getCheckoutSnapshotFacts(workspace.cwd, {
-      paseoHome: deps.paseoHome,
+      clisbotHome: deps.clisbotHome,
       worktreesRoot: deps.worktreesRoot,
     });
     if (!facts.isGit) throw new Error("Workspace is not a Git checkout");
-    if (!facts.paseoWorktree.isPaseoOwnedWorktree)
-      throw new Error("Workspace is not a Paseo worktree");
+    if (!facts.clisbotWorktree.isClisbotOwnedWorktree)
+      throw new Error("Workspace is not a Clisbot worktree");
     const root = resolve(facts.worktreeRoot);
     return withCheckoutLock(root, async () => {
       const current = await deps.workspaceRegistry.get(input.workspaceId);
@@ -56,11 +56,11 @@ export function createWorkspaceBaseBranchService(deps: Dependencies) {
           resolve(record.worktreeRoot ?? record.cwd) === root,
       );
       await deps.workspaceGitService.getSnapshot(root);
-      const metadata = await readPaseoWorktreeMetadata(root);
+      const metadata = await readClisbotWorktreeMetadata(root);
       const baseRef = await setCheckoutBaseBranch({
         cwd: root,
         baseRef: input.baseRef,
-        context: { paseoHome: deps.paseoHome, worktreesRoot: deps.worktreesRoot },
+        context: { clisbotHome: deps.clisbotHome, worktreesRoot: deps.worktreesRoot },
       });
       const updatedAt = new Date().toISOString();
       try {
@@ -73,7 +73,7 @@ export function createWorkspaceBaseBranchService(deps: Dependencies) {
         }
       } catch (error) {
         if (metadata)
-          await setPaseoWorktreeBaseRef({
+          await setClisbotWorktreeBaseRef({
             worktreeRoot: root,
             baseRef: metadata.baseRef ?? metadata.baseRefName,
           });

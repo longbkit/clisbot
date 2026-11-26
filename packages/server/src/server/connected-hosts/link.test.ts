@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "vitest";
 import { DaemonLinkEndpoint, type VirtualHostSocket } from "./index.js";
 import { SessionDelivery } from "../session/owned-subscriptions/index.js";
-import type { SessionInboundMessage, SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { SessionInboundMessage, SessionOutboundMessage } from "@clisbot/protocol/messages";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {

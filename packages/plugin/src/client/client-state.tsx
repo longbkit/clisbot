@@ -34,7 +34,7 @@ export function usePluginClientStateSource(): PluginClientStateSource | null {
 }
 
 /** Shared selection semantics for host surfaces and plugin entities. */
-export function usePaseoSelector<Entity, Selection>(
+export function useClisbotSelector<Entity, Selection>(
   source: { subscribe(listener: () => void): () => void },
   read: () => Entity,
   selector: (entity: Entity) => Selection,
@@ -84,7 +84,7 @@ function createEntityHook<Ref, Entity>(
       return entity !== null && selector ? selector(entity) : entity;
     }
     const equality = equals ?? (selector ? shallowEqual : Object.is);
-    return usePaseoSelector(source, () => read(source, ref), select, equality);
+    return useClisbotSelector(source, () => read(source, ref), select, equality);
   }
   return useEntity;
 }
@@ -119,7 +119,7 @@ function createCollectionHook<Snapshot extends { readonly ref: unknown; readonly
   ): readonly Snapshot["ref"][] | readonly Group<Snapshot["ref"]>[] {
     const source = useStateSource(terminals);
     const project = useMemo(() => createCollectionQuery<Snapshot>(), []);
-    return usePaseoSelector(
+    return useClisbotSelector(
       source,
       () => read(source, query),
       (snapshots) => project(snapshots, query),

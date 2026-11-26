@@ -31,7 +31,7 @@ Hub verifies the installation, saves it under **Integrations**, and opens the ou
 Invite the bot to each channel it watches or posts to:
 
 ```text
-/invite @Paseo
+/invite @Clisbot
 ```
 
 Socket Mode holds one live connection in the Hub process. Run one Hub process for Socket Mode and keep it running because events that arrive while Hub is stopped are missed.
@@ -46,10 +46,10 @@ Choose **Webhooks** when Slack sends events to a public Hub. Open Hub at its [pu
 
 Slack calls these Hub URLs:
 
-| Provider setting | Hub URL                                               |
-| ---------------- | ----------------------------------------------------- |
-| Redirect URL     | `<PASEO_HUB_APP_URL>/api/integrations/slack/callback` |
-| Request URL      | `<PASEO_HUB_APP_URL>/api/integrations/slack/events`   |
+| Provider setting | Hub URL                                                 |
+| ---------------- | ------------------------------------------------------- |
+| Redirect URL     | `<CLISBOT_HUB_APP_URL>/api/integrations/slack/callback` |
+| Request URL      | `<CLISBOT_HUB_APP_URL>/api/integrations/slack/events`   |
 
 ## Configure from environment
 

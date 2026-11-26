@@ -25,7 +25,7 @@ const listPlugins = vi.fn(async () => [
     path: "/plugins/legacy-plugin",
     enabled: true,
     status: "failed" as const,
-    error: "This plugin was made for an older version of Paseo",
+    error: "This plugin was made for an older version of Clisbot",
   },
 ]);
 const getPluginLogs = vi.fn(async () => [
@@ -120,7 +120,7 @@ describe("plugin management commands", () => {
     expect(output).toContain("REVISION");
     expect(output).not.toContain("LATEST");
     expect(output).toContain("1557a34c91e2");
-    expect(output).toContain("This plugin was made for an older version of Paseo");
+    expect(output).toContain("This plugin was made for an older version of Clisbot");
   });
 
   it("filters the shared ls and status command by plugin ID", async () => {
@@ -284,7 +284,7 @@ import type {
   PluginUpdatePreview,
   PluginUpdateProposal,
   PluginUpdateResult,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 function reviewFixture(answer = true, outcome: "update" | "installed-newer" = "update") {
   const proposal: PluginUpdateProposal = {
     id: "review",

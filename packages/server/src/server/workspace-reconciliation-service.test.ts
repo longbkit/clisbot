@@ -10,7 +10,7 @@ import {
   createTestLogger,
   deferred,
 } from "./test-fixtures/reconciliation-registries.js";
-import type { ProjectCheckoutLitePayload } from "@getpaseo/protocol/messages";
+import type { ProjectCheckoutLitePayload } from "@clisbot/protocol/messages";
 import type pino from "pino";
 import { afterAll, beforeAll, afterEach, describe, expect, test } from "vitest";
 import {
@@ -94,7 +94,7 @@ function createWorkspaceGitServiceStub(
           currentBranch: null,
           remoteUrl: null,
           worktreeRoot: null,
-          isPaseoOwnedWorktree: false,
+          isClisbotOwnedWorktree: false,
           mainRepoRoot: null,
         };
       }
@@ -104,7 +104,7 @@ function createWorkspaceGitServiceStub(
         currentBranch: metadata.currentBranch ?? metadata.workspaceDisplayName,
         remoteUrl: metadata.gitRemote ?? null,
         worktreeRoot: null,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       };
     },
@@ -121,7 +121,7 @@ function createCheckout(
     currentBranch: null,
     remoteUrl: null,
     worktreeRoot: null,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     mainRepoRoot: null,
     ...overrides,
   };
@@ -676,7 +676,7 @@ describe("WorkspaceReconciliationService", () => {
         displayName: "feature",
         branch: "feature",
         worktreeRoot: worktreeCwd,
-        isPaseoOwnedWorktree: true,
+        isClisbotOwnedWorktree: true,
         mainRepoRoot: projectRoot,
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -716,7 +716,7 @@ describe("WorkspaceReconciliationService", () => {
       kind: "worktree",
       branch: "feature",
       worktreeRoot: worktreeCwd,
-      isPaseoOwnedWorktree: true,
+      isClisbotOwnedWorktree: true,
       mainRepoRoot: projectRoot,
     });
   });
@@ -1230,7 +1230,7 @@ describe("WorkspaceReconciliationService", () => {
       branch: null,
       worktreeRoot: null,
       baseBranch: null,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       mainRepoRoot: null,
       metadata: {},
       createdAt: timestamp,
@@ -1351,8 +1351,8 @@ describe("WorkspaceReconciliationService", () => {
   test("keeps legacy duplicate projects and workspace membership intact", async () => {
     const repoDir = createTempGitRepo("reconcile-duplicate-project-");
     tempDirs.push(repoDir);
-    const canonicalWorktreeDir = path.join(repoDir, ".paseo", "worktrees", "focused-bat");
-    const duplicateWorktreeDir = path.join(repoDir, ".paseo", "worktrees", "gigantic-blowfish");
+    const canonicalWorktreeDir = path.join(repoDir, ".clisbot", "worktrees", "focused-bat");
+    const duplicateWorktreeDir = path.join(repoDir, ".clisbot", "worktrees", "gigantic-blowfish");
     mkdirSync(canonicalWorktreeDir, { recursive: true });
     mkdirSync(duplicateWorktreeDir, { recursive: true });
     const { projects, workspaces, projectRegistry, workspaceRegistry } = createTestRegistries();
@@ -2048,7 +2048,7 @@ describe("WorkspaceReconciliationService", () => {
       createCheckout(rootPath, {
         isGit: true,
         worktreeRoot: rootPath,
-        isPaseoOwnedWorktree: true,
+        isClisbotOwnedWorktree: true,
         mainRepoRoot: "/tmp/main-repo",
       }),
     );
@@ -2097,14 +2097,14 @@ describe("WorkspaceReconciliationService", () => {
         directory: rootPath,
         fields: {
           worktreeRoot: rootPath,
-          isPaseoOwnedWorktree: true,
+          isClisbotOwnedWorktree: true,
           mainRepoRoot: "/tmp/main-repo",
         },
       },
     ]);
     expect(workspaces.get("w1")).toMatchObject({
       worktreeRoot: rootPath,
-      isPaseoOwnedWorktree: true,
+      isClisbotOwnedWorktree: true,
       mainRepoRoot: "/tmp/main-repo",
     });
   });

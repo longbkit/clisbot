@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { useComposer } from "@getpaseo/plugin/client";
-import { Action, Select, Toggle } from "@getpaseo/plugin/client/ui";
+import { useComposer } from "@clisbot/plugin/client";
+import { Action, Select, Toggle } from "@clisbot/plugin/client/ui";
 
 type ContextLength = "short" | "long";
 

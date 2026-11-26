@@ -1,4 +1,4 @@
-import type { AcpTransformer } from "@getpaseo/plugin/server/acp";
+import type { AcpTransformer } from "@clisbot/plugin/server/acp";
 import { z } from "zod";
 
 // Hoplite provisions a cloud workspace before the first agent output of a run and reports each

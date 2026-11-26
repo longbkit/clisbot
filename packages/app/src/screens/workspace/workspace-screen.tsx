@@ -23,8 +23,8 @@ import {
 } from "@/composer/editing-session";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SheetHostScope } from "@/components/ui/isolated-bottom-sheet-modal";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
-import { getOpenAgentTabLabel } from "@getpaseo/protocol/agent-labels";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
+import { getOpenAgentTabLabel } from "@clisbot/protocol/agent-labels";
 import {
   memo,
   useCallback,
@@ -211,7 +211,7 @@ import { supportsDesktopPaneSplits, useIsCompactFormFactor } from "@/constants/l
 import { getIsElectron, isNative, isWeb } from "@/constants/platform";
 import { buildHostRootRoute, buildSettingsHostRoute } from "@/utils/host-routes";
 import { useWorkspaceTerminals } from "@/screens/workspace/terminals/use-workspace-terminals";
-import type { TerminalProfile } from "@getpaseo/protocol/messages";
+import type { TerminalProfile } from "@clisbot/protocol/messages";
 import {
   WorkspaceHeaderMenuDesktop,
   WorkspaceHeaderMenuMobile,
@@ -431,9 +431,9 @@ export const WorkspaceScreen = memo(function WorkspaceScreen({
   ensurePanelsRegistered();
   const navigationFocused = useIsFocused();
   useEffect(() => {
-    traceInstant("paseo.workspace.mount", { serverId, workspaceId });
+    traceInstant("clisbot.workspace.mount", { serverId, workspaceId });
     return () => {
-      traceInstant("paseo.workspace.unmount", { serverId, workspaceId });
+      traceInstant("clisbot.workspace.unmount", { serverId, workspaceId });
     };
   }, [serverId, workspaceId]);
   return (

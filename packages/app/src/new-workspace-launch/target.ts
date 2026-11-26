@@ -1,4 +1,4 @@
-import type { TerminalProfile } from "@getpaseo/protocol/messages";
+import type { TerminalProfile } from "@clisbot/protocol/messages";
 import type { LaunchTarget } from "@/create-agent-preferences/preferences";
 
 export type { LaunchTarget };

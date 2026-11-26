@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { defineAgentTool, type PluginServerContext } from "@getpaseo/plugin/server";
+import { defineAgentTool, type PluginServerContext } from "@clisbot/plugin/server";
 
 const appendWorkspaceNote = defineAgentTool({
   name: "append_workspace_note",

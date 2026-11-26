@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { AgentProvider } from "@getpaseo/protocol/agent-types";
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { AgentProvider } from "@clisbot/protocol/agent-types";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import equal from "fast-deep-equal";
 import { normalizeWorkspacePath } from "@/utils/workspace-identity";
 

@@ -124,7 +124,7 @@ test("the awaitable physical send rejects callback errors", async () => {
 test("ordinary frames expose a paused real socket's backlog and terminate at the physical backstop", async () => {
   const { once } = await import("node:events");
   const { WebSocket, WebSocketServer } = await import("ws");
-  const { ChunkedTransport } = await import("@getpaseo/protocol/chunked-transport");
+  const { ChunkedTransport } = await import("@clisbot/protocol/chunked-transport");
   const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
   await once(server, "listening");
   const connected = once(server, "connection");
@@ -174,7 +174,7 @@ test("ordinary frames expose a paused real socket's backlog and terminate at the
 test("an awaited framing failure terminates its real socket immediately", async () => {
   const { once } = await import("node:events");
   const { WebSocket, WebSocketServer } = await import("ws");
-  const { ChunkedTransport } = await import("@getpaseo/protocol/chunked-transport");
+  const { ChunkedTransport } = await import("@clisbot/protocol/chunked-transport");
   const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
   await once(server, "listening");
   const connected = once(server, "connection");

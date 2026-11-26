@@ -25,7 +25,7 @@ function initMessage(): Record<string, unknown> {
   };
 }
 
-/** Claude Code echoes the user message back under the uuid Paseo minted for it. */
+/** Claude Code echoes the user message back under the uuid Clisbot minted for it. */
 function userEcho(uuid: string): Record<string, unknown> {
   return {
     type: "user",
@@ -96,7 +96,7 @@ function failedResult(): Record<string, unknown> {
 
 interface Conversation {
   queryFactory: ReturnType<typeof vi.fn>;
-  /** The uuid Paseo minted for each prompt, in the order the turns ran. */
+  /** The uuid Clisbot minted for each prompt, in the order the turns ran. */
   userMessageIds: string[];
 }
 
@@ -284,7 +284,7 @@ describe("Claude rewind to a message steered into a running turn", () => {
     try {
       await runTurns(session, 1);
       // A steered message opens no turn: Claude Code records it as a queued_command attachment
-      // under the uuid Paseo minted for it, hung off the entry it was read after.
+      // under the uuid Clisbot minted for it, hung off the entry it was read after.
       const projectDir = await claudeProjectDir(process.cwd(), { configDir });
       mkdirSync(projectDir, { recursive: true });
       const entries = [

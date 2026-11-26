@@ -44,24 +44,24 @@ async function openBrokenStartup(page: Page) {
       JSON.stringify({ state: { layoutByWorkspace: {} }, version: 1 }),
     );
     localStorage.setItem(
-      "paseo:last-workspace-route-selection",
+      "clisbot:last-workspace-route-selection",
       JSON.stringify({ serverId: "fixture-host", workspaceId: "broken" }),
     );
   });
   await page.goto(appUrl);
-  await expect(page.getByText("Paseo ran into a problem.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Clisbot ran into a problem.", { exact: true })).toBeVisible();
 }
 async function readSavedWorkspaceState(page: Page) {
   return page.evaluate(() => ({
     layout: localStorage.getItem("workspace-layout-state"),
-    selection: localStorage.getItem("paseo:last-workspace-route-selection"),
+    selection: localStorage.getItem("clisbot:last-workspace-route-selection"),
   }));
 }
 async function reloadToPicker(page: Page) {
   await page.getByRole("button", { name: "Reload", exact: true }).click();
   await expect(page).toHaveURL(`${appUrl}/open-project`);
   await expect(page.getByText("Project picker", { exact: true })).toBeVisible();
-  await expect(page.getByText("Paseo ran into a problem.", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Clisbot ran into a problem.", { exact: true })).toHaveCount(0);
 }
 async function openHealthyWorkspace(page: Page) {
   await page.getByRole("link", { name: "Open healthy workspace" }).click();
@@ -69,7 +69,7 @@ async function openHealthyWorkspace(page: Page) {
 }
 async function breakCurrentWorkspace(page: Page) {
   await page.getByRole("button", { name: "Break this workspace" }).click();
-  await expect(page.getByText("Paseo ran into a problem.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Clisbot ran into a problem.", { exact: true })).toBeVisible();
 }
 async function captureRecoveryScreen(page: Page, testInfo: TestInfo, name: string) {
   const path = testInfo.outputPath(`${name}.png`);

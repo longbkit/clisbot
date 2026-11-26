@@ -97,7 +97,7 @@ describe("daemon web UI route module", () => {
   let publicDir: string;
 
   beforeEach(async () => {
-    tempRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-web-ui-"));
+    tempRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-web-ui-"));
     distDir = path.join(tempRoot, "dist");
     publicDir = path.join(tempRoot, "public");
     await mkdir(path.join(distDir, "_expo", "static", "js", "web"), { recursive: true });
@@ -151,7 +151,7 @@ describe("daemon web UI route module", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toBe("text/html; charset=utf-8");
-    expect(res.body).toContain("window.__PASEO_INITIAL_DAEMON_CONNECTION__");
+    expect(res.body).toContain("window.__CLISBOT_INITIAL_DAEMON_CONNECTION__");
     expect(res.body).toContain('"listen":"localhost:');
     expect(res.body).toContain('"useTls":false');
     expect(res.body).toContain('"label":"test-label"');
@@ -162,7 +162,7 @@ describe("daemon web UI route module", () => {
 
     const res = await request(app, "GET", "/index.html");
 
-    expect(res.body).toMatch(/window\.__PASEO_INITIAL_DAEMON_CONNECTION__.*<\/head>/);
+    expect(res.body).toMatch(/window\.__CLISBOT_INITIAL_DAEMON_CONNECTION__.*<\/head>/);
   });
 
   test("escapes the injected host hint for inline script safety", async () => {
@@ -183,7 +183,7 @@ describe("daemon web UI route module", () => {
     const res = await request(app, "GET", "/h/some-server-id/agent/123");
 
     expect(res.status).toBe(200);
-    expect(res.body).toContain("window.__PASEO_INITIAL_DAEMON_CONNECTION__");
+    expect(res.body).toContain("window.__CLISBOT_INITIAL_DAEMON_CONNECTION__");
     expect(res.body).toContain("app");
   });
 

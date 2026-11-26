@@ -52,10 +52,10 @@ function renderAnchor(link: { url: string; sourceType?: "markdown" | "text" | "i
 it("marks a link it recognized from a path for selection copy", () => {
   const anchor = renderAnchor({ url: LINK_TEXT, sourceType: "text" });
   expect(anchor.getAttribute("href")).toBe(LINK_TEXT);
-  expect(anchor.getAttribute("data-paseo-markdown-recognized-link")).toBe("true");
+  expect(anchor.getAttribute("data-clisbot-markdown-recognized-link")).toBe("true");
 });
 
 it("leaves an authored link wrapped", () => {
   const anchor = renderAnchor({ url: "https://example.test/doc", sourceType: "markdown" });
-  expect(anchor.hasAttribute("data-paseo-markdown-recognized-link")).toBe(false);
+  expect(anchor.hasAttribute("data-clisbot-markdown-recognized-link")).toBe(false);
 });

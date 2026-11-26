@@ -1,11 +1,11 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "vitest";
-import type { AgentSnapshotPayload, SessionOutboundMessage } from "@getpaseo/protocol/messages";
-import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+import type { AgentSnapshotPayload, SessionOutboundMessage } from "@clisbot/protocol/messages";
+import { PARENT_AGENT_ID_LABEL } from "@clisbot/protocol/agent-labels";
 
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
 const CREATED_AT = "2026-11-04T08:00:00.000Z";
 const UPDATED_AT = "2026-11-04T09:00:00.000Z";
@@ -20,12 +20,12 @@ test.each([false, true])(
   "parent archive preserves a stored survivor for subscribers (filtered=%s)",
   async (filtered) => {
     const fixture = seedFixture();
-    let daemon: TestPaseoDaemon | null = null;
+    let daemon: TestClisbotDaemon | null = null;
     let observer: DaemonClient | null = null;
     let actor: DaemonClient | null = null;
     try {
-      daemon = await createTestPaseoDaemon({
-        paseoHomeRoot: fixture.paseoHomeRoot,
+      daemon = await createTestClisbotDaemon({
+        clisbotHomeRoot: fixture.clisbotHomeRoot,
         staticDir: fixture.staticDir,
         cleanup: false,
       });
@@ -86,14 +86,14 @@ function seedFixture() {
   const root = mkdtempSync(path.join(artifacts, "archive-detach-"));
   const parentCwd = path.join(root, "parent");
   const childCwd = path.join(root, "child");
-  const paseoHomeRoot = path.join(root, "home");
+  const clisbotHomeRoot = path.join(root, "home");
   const staticDir = path.join(root, "static");
   mkdirSync(staticDir);
   mkdirSync(parentCwd);
   mkdirSync(childCwd);
-  const paseoHome = path.join(paseoHomeRoot, ".paseo");
-  const projectsDir = path.join(paseoHome, "projects");
-  const agentsDir = path.join(paseoHome, "agents");
+  const clisbotHome = path.join(clisbotHomeRoot, ".clisbot");
+  const projectsDir = path.join(clisbotHome, "projects");
+  const agentsDir = path.join(clisbotHome, "agents");
   mkdirSync(projectsDir, { recursive: true });
   mkdirSync(agentsDir, { recursive: true });
   const project = (projectId: string, rootPath: string) => ({
@@ -154,7 +154,7 @@ function seedFixture() {
     path.join(agentsDir, "child-manual.json"),
     agent("child-manual", childCwd, "ws-child", { [PARENT_AGENT_ID_LABEL]: "parent" }),
   );
-  return { paseoHomeRoot, staticDir, cleanupPaths: [root] };
+  return { clisbotHomeRoot, staticDir, cleanupPaths: [root] };
 }
 
 function writeJson(filePath: string, value: unknown): void {

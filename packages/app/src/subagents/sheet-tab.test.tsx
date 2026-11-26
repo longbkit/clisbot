@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { parentAddressLabels } from "@getpaseo/protocol/agent-labels";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { parentAddressLabels } from "@clisbot/protocol/agent-labels";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useSessionStore, type Agent } from "@/stores/session-store";

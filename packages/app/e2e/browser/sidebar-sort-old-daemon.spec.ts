@@ -44,8 +44,8 @@ async function openPublishedHost(
     nowIso: new Date().toISOString(),
   });
   await page.addInitScript((seededHost) => {
-    localStorage.setItem("@paseo:e2e", "1");
-    localStorage.setItem("@paseo:daemon-registry", JSON.stringify([seededHost]));
+    localStorage.setItem("@clisbot:e2e", "1");
+    localStorage.setItem("@clisbot:daemon-registry", JSON.stringify([seededHost]));
     localStorage.setItem(
       "sidebar-view",
       JSON.stringify({ version: 8, state: { groupMode: "project", workspaceSort: "lastPrompt" } }),

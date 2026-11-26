@@ -1,5 +1,5 @@
-import type { AcpToolCallSnapshot, AcpTransformer } from "@getpaseo/plugin/server/acp";
-import type { ProviderToolCallDetail } from "@getpaseo/plugin/server/provider";
+import type { AcpToolCallSnapshot, AcpTransformer } from "@clisbot/plugin/server/acp";
+import type { ProviderToolCallDetail } from "@clisbot/plugin/server/provider";
 import { z } from "zod";
 
 const shellInput = z.object({ CommandLine: z.string() });
@@ -68,8 +68,8 @@ function mapMcpCall(
 ): AcpToolCallSnapshot {
   const qualifiedName = wireName.slice("mcp_".length);
   // The wire uses the same separator inside names and between the server and tool.
-  // Paseo's own server can also appear when replaying with MCP disabled.
-  const matchingServers = [...new Set([...serverNames, "paseo"])].filter((name) =>
+  // Clisbot's own server can also appear when replaying with MCP disabled.
+  const matchingServers = [...new Set([...serverNames, "clisbot"])].filter((name) =>
     qualifiedName.startsWith(`${name}_`),
   );
   const server = matchingServers.length === 1 ? matchingServers[0] : undefined;

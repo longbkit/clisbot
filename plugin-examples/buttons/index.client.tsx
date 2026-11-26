@@ -1,4 +1,4 @@
-import type { PluginAgentCommandContext, PluginClientContext } from "@getpaseo/plugin/client";
+import type { PluginAgentCommandContext, PluginClientContext } from "@clisbot/plugin/client";
 import { createButtonExamples, type ButtonMode } from "./client/examples";
 
 export default function contribute(client: PluginClientContext) {

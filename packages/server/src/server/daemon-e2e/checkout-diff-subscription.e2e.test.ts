@@ -193,7 +193,7 @@ test.skipIf(process.platform !== "linux")(
         head: { kind: "worktree" },
         mergeBase: true,
       });
-      let current: import("@getpaseo/client").DiffState | undefined;
+      let current: import("@clisbot/client").DiffState | undefined;
       const unsubscribe = changes.subscribe({
         snapshot: (state) => {
           current = state;

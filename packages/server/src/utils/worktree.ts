@@ -11,35 +11,35 @@ import {
   buildStringCommandShellInvocation,
   createStringCommandShellEnv,
 } from "./string-command-shell.js";
-import { readPaseoConfig } from "./paseo-config-file.js";
+import { readClisbotConfig } from "./clisbot-config-file.js";
 export {
-  PaseoConfigRawSchema,
-  PaseoLifecycleCommandRawSchema,
-  PaseoScriptEntryRawSchema,
-  PaseoWorktreeConfigRawSchema,
-  PaseoConfigSchema,
-  type PaseoConfig,
-  type PaseoConfigRaw,
-} from "@getpaseo/protocol/paseo-config-schema";
-import { type PaseoConfig } from "@getpaseo/protocol/paseo-config-schema";
+  ClisbotConfigRawSchema,
+  ClisbotLifecycleCommandRawSchema,
+  ClisbotScriptEntryRawSchema,
+  ClisbotWorktreeConfigRawSchema,
+  ClisbotConfigSchema,
+  type ClisbotConfig,
+  type ClisbotConfigRaw,
+} from "@clisbot/protocol/clisbot-config-schema";
+import { type ClisbotConfig } from "@clisbot/protocol/clisbot-config-schema";
 import {
-  createPaseoWorktreeChangeRequestHint,
-  hasPaseoWorktreeMetadata,
-  findPaseoWorktreeRootForCwd,
+  createClisbotWorktreeChangeRequestHint,
+  hasClisbotWorktreeMetadata,
+  findClisbotWorktreeRootForCwd,
   normalizeBaseRefName,
   isQualifiedRef,
-  type PaseoWorktreeChangeRequestHint,
-  readPaseoWorktreeMetadata,
-  readPaseoWorktreeRuntimePort,
-  writePaseoWorktreeMetadata,
-  writePaseoWorktreeRuntimeMetadata,
+  type ClisbotWorktreeChangeRequestHint,
+  readClisbotWorktreeMetadata,
+  readClisbotWorktreeRuntimePort,
+  writeClisbotWorktreeMetadata,
+  writeClisbotWorktreeRuntimeMetadata,
 } from "./worktree-metadata.js";
 import { runWithRepositoryRoot } from "./git-repository-discovery.js";
 import { runGitCommand } from "./run-git-command.js";
 import { getCurrentBranch, resolveRepositoryDefaultBranch } from "./checkout-git.js";
 import { spawnProcess } from "./spawn.js";
-import { resolvePaseoHome } from "../server/paseo-home.js";
-import { createExternalProcessEnv } from "../server/paseo-env.js";
+import { resolveClisbotHome } from "../server/clisbot-home.js";
+import { createExternalProcessEnv } from "../server/clisbot-env.js";
 import { parseGitRevParsePath, resolveGitRevParsePath } from "./git-rev-parse-path.js";
 import {
   createRealpathAwarePathMatcher,
@@ -53,7 +53,7 @@ import { terminateWithTreeKill } from "./tree-kill.js";
 import { validateWorktreePath } from "./worktree-path.js";
 import type { PluginWorktreeManagerRuntime } from "../server/plugins/runtime.js";
 
-export { slugify, validateBranchSlug } from "@getpaseo/protocol/branch-slug";
+export { slugify, validateBranchSlug } from "@clisbot/protocol/branch-slug";
 
 const execFileAsync = promisify(execFile);
 const READ_ONLY_GIT_ENV = {
@@ -72,11 +72,11 @@ export interface CreatedWorktree extends WorktreeConfig {
 
 export interface WorktreeRuntimeEnv {
   [key: string]: string;
-  PASEO_SOURCE_CHECKOUT_PATH: string;
-  PASEO_ROOT_PATH: string;
-  PASEO_WORKTREE_PATH: string;
-  PASEO_BRANCH_NAME: string;
-  PASEO_WORKTREE_PORT: string;
+  CLISBOT_SOURCE_CHECKOUT_PATH: string;
+  CLISBOT_ROOT_PATH: string;
+  CLISBOT_WORKTREE_PATH: string;
+  CLISBOT_BRANCH_NAME: string;
+  CLISBOT_WORKTREE_PORT: string;
 }
 
 export interface WorktreeSetupCommandResult {
@@ -152,7 +152,7 @@ export class WorktreeSetupError extends Error {
 
 export type WorktreeTeardownCommandResult = WorktreeSetupCommandResult;
 
-// paseo.json can change this with worktree.teardownTimeoutMs. Archive waits for teardown before it
+// clisbot.json can change this with worktree.teardownTimeoutMs. Archive waits for teardown before it
 // answers, and the app stops waiting for an archive answer after 60 seconds
 // (DEFAULT_SESSION_RPC_TIMEOUT_MS in the client). A teardown that runs to this limit, or to a longer
 // one, answers after the app has reported the archive as failed.
@@ -169,26 +169,26 @@ export class WorktreeTeardownError extends Error {
   }
 }
 
-export interface PaseoWorktreeInfo {
+export interface ClisbotWorktreeInfo {
   path: string;
   createdAt: string;
   branchName?: string;
   head?: string;
 }
 
-export interface PaseoWorktreeOwnership {
+export interface ClisbotWorktreeOwnership {
   allowed: boolean;
   repoRoot?: string;
   worktreeRoot?: string;
   worktreePath?: string;
 }
 
-export interface PaseoWorktreeOwnershipOptions extends WorktreeRootOptions {
+export interface ClisbotWorktreeOwnershipOptions extends WorktreeRootOptions {
   knownGitCommonDir?: string | null;
 }
 
 export interface WorktreeRootOptions {
-  paseoHome?: string;
+  clisbotHome?: string;
   worktreesRoot?: string;
 }
 
@@ -245,7 +245,7 @@ export interface CreateWorktreeOptions {
   worktreeSlug: string;
   source: WorktreeSource;
   preparedBranchOff?: PreparedWorktreeBranchOff;
-  paseoHome?: string;
+  clisbotHome?: string;
   worktreesRoot?: string;
   worktreePath?: string;
 }
@@ -282,34 +282,34 @@ export class InvalidGitBranchNameError extends Error {
   }
 }
 
-export { readPaseoConfig, type ReadPaseoConfigResult } from "./paseo-config-file.js";
+export { readClisbotConfig, type ReadClisbotConfigResult } from "./clisbot-config-file.js";
 
-export function paseoConfigParseError(failure: { configPath: string; error: unknown }): Error {
+export function clisbotConfigParseError(failure: { configPath: string; error: unknown }): Error {
   const detail = failure.error instanceof Error ? failure.error.message : String(failure.error);
-  return new Error(`Failed to parse paseo.json at ${failure.configPath}: ${detail}`, {
+  return new Error(`Failed to parse clisbot.json at ${failure.configPath}: ${detail}`, {
     cause: failure.error,
   });
 }
 
-async function readPaseoConfigOrThrow(repoRoot: string): Promise<PaseoConfig | null> {
-  const result = await readPaseoConfig(repoRoot);
+async function readClisbotConfigOrThrow(repoRoot: string): Promise<ClisbotConfig | null> {
+  const result = await readClisbotConfig(repoRoot);
   if (!result.ok) {
-    throw paseoConfigParseError(result);
+    throw clisbotConfigParseError(result);
   }
   return result.config;
 }
 
 export async function getWorktreeSetupCommands(repoRoot: string): Promise<string[]> {
-  return (await readPaseoConfigOrThrow(repoRoot))?.worktree?.setup ?? [];
+  return (await readClisbotConfigOrThrow(repoRoot))?.worktree?.setup ?? [];
 }
 
 export async function getWorktreeTeardownCommands(repoRoot: string): Promise<string[]> {
-  return (await readPaseoConfigOrThrow(repoRoot))?.worktree?.teardown ?? [];
+  return (await readClisbotConfigOrThrow(repoRoot))?.worktree?.teardown ?? [];
 }
 
 export async function getWorktreeTeardownTimeoutMs(repoRoot: string): Promise<number> {
   return (
-    (await readPaseoConfigOrThrow(repoRoot))?.worktree?.teardownTimeoutMs ??
+    (await readClisbotConfigOrThrow(repoRoot))?.worktree?.teardownTimeoutMs ??
     DEFAULT_WORKTREE_TEARDOWN_TIMEOUT_MS
   );
 }
@@ -317,7 +317,7 @@ export async function getWorktreeTeardownTimeoutMs(repoRoot: string): Promise<nu
 export async function getWorktreeTerminalSpecs(
   repoRoot: string,
 ): Promise<WorktreeTerminalConfig[]> {
-  const terminals = (await readPaseoConfigOrThrow(repoRoot))?.worktree?.terminals;
+  const terminals = (await readClisbotConfigOrThrow(repoRoot))?.worktree?.terminals;
   if (!Array.isArray(terminals) || terminals.length === 0) {
     return [];
   }
@@ -350,7 +350,7 @@ export async function getWorktreeTerminalSpecs(
   return specs;
 }
 
-export function getScriptConfigs(config: PaseoConfig | null): Map<string, ScriptConfig> {
+export function getScriptConfigs(config: ClisbotConfig | null): Map<string, ScriptConfig> {
   const scripts = config?.scripts;
   if (!scripts || typeof scripts !== "object") {
     return new Map();
@@ -679,7 +679,7 @@ export async function runWorktreeSetupCommands(options: {
   signal?: AbortSignal;
   onEvent?: (event: WorktreeSetupCommandProgressEvent) => void;
 }): Promise<WorktreeSetupCommandResult[]> {
-  // Read paseo.json from the worktree (it will have the same content as the source repo)
+  // Read clisbot.json from the worktree (it will have the same content as the source repo)
   const setupCommands = await getWorktreeSetupCommands(options.worktreePath);
   if (setupCommands.length === 0) {
     return [];
@@ -750,12 +750,12 @@ export async function resolveWorktreeRuntimeEnv(options: {
   const branchName =
     options.branchName ?? (await resolveBranchNameForWorktreePath(options.worktreePath));
 
-  let worktreePort = await readPaseoWorktreeRuntimePort(options.worktreePath);
+  let worktreePort = await readClisbotWorktreeRuntimePort(options.worktreePath);
   if (worktreePort === null) {
     worktreePort = await getAvailablePort();
-    const metadata = await readPaseoWorktreeMetadata(options.worktreePath);
+    const metadata = await readClisbotWorktreeMetadata(options.worktreePath);
     if (metadata) {
-      await writePaseoWorktreeRuntimeMetadata(options.worktreePath, { worktreePort });
+      await writeClisbotWorktreeRuntimeMetadata(options.worktreePath, { worktreePort });
     }
   } else {
     await assertPortAvailable(worktreePort);
@@ -765,12 +765,12 @@ export async function resolveWorktreeRuntimeEnv(options: {
     // Source checkout path is the original git repo root (shared across worktrees), not the
     // worktree itself. This allows setup scripts to copy local files (e.g. .env) from the
     // source checkout.
-    PASEO_SOURCE_CHECKOUT_PATH: repoRootPath,
+    CLISBOT_SOURCE_CHECKOUT_PATH: repoRootPath,
     // Backward-compatible alias.
-    PASEO_ROOT_PATH: repoRootPath,
-    PASEO_WORKTREE_PATH: options.worktreePath,
-    PASEO_BRANCH_NAME: branchName,
-    PASEO_WORKTREE_PORT: String(worktreePort),
+    CLISBOT_ROOT_PATH: repoRootPath,
+    CLISBOT_WORKTREE_PATH: options.worktreePath,
+    CLISBOT_BRANCH_NAME: branchName,
+    CLISBOT_WORKTREE_PORT: String(worktreePort),
   };
 }
 
@@ -793,19 +793,19 @@ export async function runWorktreeTeardownCommands(options: {
     options.repoRootPath ?? (await inferRepoRootPathFromWorktreePath(options.worktreePath));
   const branchName =
     options.branchName ?? (await resolveBranchNameForWorktreePath(options.worktreePath));
-  const worktreePort = await readPaseoWorktreeRuntimePort(options.worktreePath);
+  const worktreePort = await readClisbotWorktreeRuntimePort(options.worktreePath);
 
   const teardownEnv: NodeJS.ProcessEnv = createStringCommandShellEnv(
     createExternalProcessEnv(process.env, {
       // Source checkout path is the original git repo root (shared across worktrees), not the
       // worktree itself. This allows lifecycle scripts to copy or clean resources using paths
       // from the source checkout.
-      PASEO_SOURCE_CHECKOUT_PATH: repoRootPath,
+      CLISBOT_SOURCE_CHECKOUT_PATH: repoRootPath,
       // Backward-compatible alias.
-      PASEO_ROOT_PATH: repoRootPath,
-      PASEO_WORKTREE_PATH: options.worktreePath,
-      PASEO_BRANCH_NAME: branchName,
-      ...(worktreePort !== null ? { PASEO_WORKTREE_PORT: String(worktreePort) } : {}),
+      CLISBOT_ROOT_PATH: repoRootPath,
+      CLISBOT_WORKTREE_PATH: options.worktreePath,
+      CLISBOT_BRANCH_NAME: branchName,
+      ...(worktreePort !== null ? { CLISBOT_WORKTREE_PORT: String(worktreePort) } : {}),
     }),
   );
 
@@ -837,12 +837,12 @@ export async function runWorktreeTeardownCommands(options: {
   return results;
 }
 
-export async function seedPaseoConfigFile(options: {
+export async function seedClisbotConfigFile(options: {
   sourceCwd: string;
   targetCwd: string;
 }): Promise<void> {
-  const sourceConfigPath = join(options.sourceCwd, "paseo.json");
-  const targetConfigPath = join(options.targetCwd, "paseo.json");
+  const sourceConfigPath = join(options.sourceCwd, "clisbot.json");
+  const targetConfigPath = join(options.targetCwd, "clisbot.json");
   await copyFile(sourceConfigPath, targetConfigPath, fsConstants.COPYFILE_EXCL).catch((error) => {
     const code = (error as NodeJS.ErrnoException).code;
     if (code !== "EEXIST" && code !== "ENOENT") throw error;
@@ -888,26 +888,26 @@ export async function deriveWorktreeProjectHash(cwd: string): Promise<string> {
   }
 }
 
-export function resolvePaseoWorktreesBaseRoot(options?: WorktreeRootOptions): string {
+export function resolveClisbotWorktreesBaseRoot(options?: WorktreeRootOptions): string {
   if (options?.worktreesRoot) {
     const expandedRoot = expandTilde(options.worktreesRoot);
     if (isAbsolute(expandedRoot)) {
       return resolve(expandedRoot);
     }
-    const home = options.paseoHome ? resolve(options.paseoHome) : resolvePaseoHome();
+    const home = options.clisbotHome ? resolve(options.clisbotHome) : resolveClisbotHome();
     return resolve(home, expandedRoot);
   }
 
-  const home = options?.paseoHome ? resolve(options.paseoHome) : resolvePaseoHome();
+  const home = options?.clisbotHome ? resolve(options.clisbotHome) : resolveClisbotHome();
   return join(home, "worktrees");
 }
 
-export async function getPaseoWorktreesRoot(
+export async function getClisbotWorktreesRoot(
   cwd: string,
-  paseoHome?: string,
+  clisbotHome?: string,
   worktreesRoot?: string,
 ): Promise<string> {
-  const baseRoot = resolvePaseoWorktreesBaseRoot({ paseoHome, worktreesRoot });
+  const baseRoot = resolveClisbotWorktreesBaseRoot({ clisbotHome, worktreesRoot });
   const projectHash = await deriveWorktreeProjectHash(cwd);
   return join(baseRoot, projectHash);
 }
@@ -915,10 +915,10 @@ export async function getPaseoWorktreesRoot(
 export async function computeWorktreePath(
   cwd: string,
   slug: string,
-  paseoHome?: string,
+  clisbotHome?: string,
   worktreesRoot?: string,
 ): Promise<string> {
-  const projectWorktreesRoot = await getPaseoWorktreesRoot(cwd, paseoHome, worktreesRoot);
+  const projectWorktreesRoot = await getClisbotWorktreesRoot(cwd, clisbotHome, worktreesRoot);
   return join(projectWorktreesRoot, slug);
 }
 
@@ -997,10 +997,10 @@ async function resolveRepoRootFromGitCommonDir(commonDir: string): Promise<strin
     : normalizedCommonDir;
 }
 
-export async function isPaseoOwnedWorktreeCwd(
+export async function isClisbotOwnedWorktreeCwd(
   cwd: string,
-  options?: PaseoWorktreeOwnershipOptions,
-): Promise<PaseoWorktreeOwnership> {
+  options?: ClisbotWorktreeOwnershipOptions,
+): Promise<ClisbotWorktreeOwnership> {
   const resolvedCwd = await normalizePathForOwnership(cwd);
 
   // repoRoot is best-effort: git may be unreachable from the worktree (e.g. a
@@ -1020,7 +1020,7 @@ export async function isPaseoOwnedWorktreeCwd(
 
   // Worktrees placed at plugin-chosen paths are
   // proven by the marker createWorktree writes unconditionally: a
-  // paseo/worktree.json in the worktree's git admin dir, with the path
+  // clisbot/worktree.json in the worktree's git admin dir, with the path
   // still registered in the repo's `git worktree list`. The marker alone
   // is not proof — it lives in a git admin dir a user can copy into a
   // hand-made directory that git does not know about.
@@ -1036,11 +1036,11 @@ export async function isPaseoOwnedWorktreeCwd(
     }
   }
 
-  const worktreesBaseRoot = resolvePaseoWorktreesBaseRoot(options);
+  const worktreesBaseRoot = resolveClisbotWorktreesBaseRoot(options);
   const relativePath = await getOwnershipRelativePath(worktreesBaseRoot, resolvedCwd);
 
   // Ownership is defined by the path living under <worktrees-root>/<hash>/<slug>[/...].
-  // The <hash>/<slug> prefix is Paseo-private — nothing else writes there — so the
+  // The <hash>/<slug> prefix is Clisbot-private — nothing else writes there — so the
   // path shape alone is sufficient proof of ownership, even when git has already
   // forgotten about the worktree.
   if (relativePath !== null) {
@@ -1068,7 +1068,7 @@ async function resolveMetadataOwnedWorktree(
   repoRoot: string | undefined,
 ): Promise<{ worktreePath: string; worktreeRoot: string } | null> {
   try {
-    const root = await findPaseoWorktreeRootForCwd(cwd);
+    const root = await findClisbotWorktreeRootForCwd(cwd);
     if (!root) return null;
     const candidate = await normalizePathForOwnership(root);
     if (repoRoot !== undefined && candidate === (await normalizePathForOwnership(repoRoot)))
@@ -1085,9 +1085,9 @@ async function resolveMetadataOwnedWorktree(
   }
 }
 
-type ParsedPaseoWorktreeInfo = Omit<PaseoWorktreeInfo, "createdAt">;
+type ParsedClisbotWorktreeInfo = Omit<ClisbotWorktreeInfo, "createdAt">;
 
-interface ParsedWorktreeEntry extends ParsedPaseoWorktreeInfo {
+interface ParsedWorktreeEntry extends ParsedClisbotWorktreeInfo {
   /** A bare repository or a worktree whose directory is gone; nothing can work there. */
   unusable?: true;
 }
@@ -1192,7 +1192,7 @@ export interface GitWorktree {
 /**
  * Every usable worktree of the repository `cwd` is in. The main worktree comes first; the rest
  * follow in no meaningful order.
- * Unlike `listPaseoWorktrees`, ownership plays no part.
+ * Unlike `listClisbotWorktrees`, ownership plays no part.
  */
 export async function listGitWorktrees({ cwd }: { cwd: string }): Promise<GitWorktree[]> {
   const { entries } = await readGitWorktreeEntries(cwd);
@@ -1218,35 +1218,35 @@ export async function listGitWorktrees({ cwd }: { cwd: string }): Promise<GitWor
   return worktrees;
 }
 
-export interface ListPaseoWorktreesOptions {
+export interface ListClisbotWorktreesOptions {
   cwd: string;
-  paseoHome?: string;
+  clisbotHome?: string;
   worktreesRoot?: string;
 }
 
-export function listPaseoWorktrees(
-  options: ListPaseoWorktreesOptions,
-): Promise<PaseoWorktreeInfo[]> {
-  return runWithRepositoryRoot(options.cwd, () => listPaseoWorktreesAtRepositoryRoot(options));
+export function listClisbotWorktrees(
+  options: ListClisbotWorktreesOptions,
+): Promise<ClisbotWorktreeInfo[]> {
+  return runWithRepositoryRoot(options.cwd, () => listClisbotWorktreesAtRepositoryRoot(options));
 }
 
-async function listPaseoWorktreesAtRepositoryRoot({
+async function listClisbotWorktreesAtRepositoryRoot({
   cwd,
-  paseoHome,
+  clisbotHome,
   worktreesRoot,
-}: ListPaseoWorktreesOptions): Promise<PaseoWorktreeInfo[]> {
-  const projectWorktreesRoot = await getPaseoWorktreesRoot(cwd, paseoHome, worktreesRoot);
+}: ListClisbotWorktreesOptions): Promise<ClisbotWorktreeInfo[]> {
+  const projectWorktreesRoot = await getClisbotWorktreesRoot(cwd, clisbotHome, worktreesRoot);
   const { entries } = await readGitWorktreeEntries(cwd);
 
   const mainCheckoutPath = await resolveRepoRootFromGitCommonDir(await getGitCommonDir(cwd));
   const roots = await ownershipPathVariants(projectWorktreesRoot);
-  const worktrees: PaseoWorktreeInfo[] = [];
+  const worktrees: ClisbotWorktreeInfo[] = [];
   // Inspect foreign paths sequentially; a large worktree list must not consume the FS pool.
   for (const { unusable: _unusable, ...entry } of entries) {
     const path = await normalizePathForOwnership(entry.path);
     if (
       !roots.some((root) => getRelativePathInsideRoot(root, path) !== null) &&
-      !(path !== mainCheckoutPath && (await hasPaseoWorktreeMetadata(path)))
+      !(path !== mainCheckoutPath && (await hasClisbotWorktreeMetadata(path)))
     )
       continue;
     worktrees.push({ ...entry, path, createdAt: await resolveWorktreeCreatedAtIso(path) });
@@ -1269,13 +1269,13 @@ async function listExactGitWorktreePaths(cwd: string): Promise<Set<string> | nul
   return paths;
 }
 
-export interface DeletePaseoWorktreeOptions {
+export interface DeleteClisbotWorktreeOptions {
   cwd: string | null;
   worktreePath?: string;
   teardownCwds?: string[];
   worktreeSlug?: string;
   worktreesRoot?: string;
-  paseoHome?: string;
+  clisbotHome?: string;
   worktreesBaseRoot?: string;
   // The caller has a workspace registry record backing worktreePath (the
   // record's cwd is this path). Registry membership is an ownership proof
@@ -1304,7 +1304,7 @@ async function assertWorktreeBelongsToRepo(cwd: string, worktreePath: string): P
     return;
   }
   if ((await getOwnershipRelativePath(callerRepoRoot, targetRepoRoot)) !== "") {
-    throw new Error("Refusing to delete non-Paseo worktree");
+    throw new Error("Refusing to delete non-Clisbot worktree");
   }
 }
 
@@ -1334,18 +1334,18 @@ export async function readWorktreeHeadReference(worktreePath: string): Promise<s
   }
 }
 
-export function deletePaseoWorktree(options: DeletePaseoWorktreeOptions): Promise<void> {
-  const operation = () => deletePaseoWorktreeAtRepositoryRoot(options);
+export function deleteClisbotWorktree(options: DeleteClisbotWorktreeOptions): Promise<void> {
+  const operation = () => deleteClisbotWorktreeAtRepositoryRoot(options);
   return options.cwd ? runWithRepositoryRoot(options.cwd, operation) : operation();
 }
 
-async function deletePaseoWorktreeAtRepositoryRoot({
+async function deleteClisbotWorktreeAtRepositoryRoot({
   cwd,
   worktreePath,
   teardownCwds,
   worktreeSlug,
   worktreesRoot,
-  paseoHome,
+  clisbotHome,
   worktreesBaseRoot,
   registryProven,
   worktreeManagers,
@@ -1353,7 +1353,7 @@ async function deletePaseoWorktreeAtRepositoryRoot({
   removeReason = "archive",
   untrusted = false,
   signal,
-}: DeletePaseoWorktreeOptions): Promise<void> {
+}: DeleteClisbotWorktreeOptions): Promise<void> {
   if (!worktreePath && !worktreeSlug) {
     throw new Error("worktreePath or worktreeSlug is required");
   }
@@ -1365,18 +1365,18 @@ async function deletePaseoWorktreeAtRepositoryRoot({
   if (worktreesRoot) {
     resolvedWorktreesRoot = worktreesRoot;
   } else if (cwd) {
-    resolvedWorktreesRoot = await getPaseoWorktreesRoot(cwd, paseoHome, worktreesBaseRoot);
+    resolvedWorktreesRoot = await getClisbotWorktreesRoot(cwd, clisbotHome, worktreesBaseRoot);
   } else {
-    throw new Error("cwd or worktreesRoot is required to delete a Paseo worktree");
+    throw new Error("cwd or worktreesRoot is required to delete a Clisbot worktree");
   }
 
   const requestedPath = worktreePath ?? join(resolvedWorktreesRoot, worktreeSlug!);
-  const ownership = await isPaseoOwnedWorktreeCwd(requestedPath, {
-    paseoHome,
+  const ownership = await isClisbotOwnedWorktreeCwd(requestedPath, {
+    clisbotHome,
     worktreesRoot: worktreesBaseRoot,
   });
   // Deletion is gated on the ownership proof set (legacy shape, the
-  // paseo/worktree.json marker verified against `git worktree list`, or a
+  // clisbot/worktree.json marker verified against `git worktree list`, or a
   // caller-asserted registry record), not on living under the per-project
   // hashed root: plugin-placed worktrees live anywhere.
   let resolvedWorktree: string;
@@ -1385,7 +1385,7 @@ async function deletePaseoWorktreeAtRepositoryRoot({
   } else if (ownership.allowed && ownership.worktreePath) {
     resolvedWorktree = ownership.worktreePath;
   } else {
-    throw new Error("Refusing to delete non-Paseo worktree");
+    throw new Error("Refusing to delete non-Clisbot worktree");
   }
 
   if (cwd) {
@@ -1503,7 +1503,7 @@ async function prepareAndTryPluginWorktreeRemove(options: {
   const effectiveManagerPluginId =
     worktreeManagerPluginId !== undefined
       ? worktreeManagerPluginId
-      : ((await readPaseoWorktreeMetadata(resolvedWorktree).catch(() => null))
+      : ((await readClisbotWorktreeMetadata(resolvedWorktree).catch(() => null))
           ?.worktreeManagerPluginId ?? null);
   if (effectiveManagerPluginId) {
     await assertNoNestedLinkedWorktrees(resolvedWorktree);
@@ -1513,7 +1513,7 @@ async function prepareAndTryPluginWorktreeRemove(options: {
     : null;
   const commit = await readWorktreeHead(resolvedWorktree);
   if (commit) {
-    await runGitCommand(["update-ref", `refs/paseo/kept-commits/${commit}`, commit], {
+    await runGitCommand(["update-ref", `refs/clisbot/kept-commits/${commit}`, commit], {
       cwd: resolvedWorktree,
     });
   }
@@ -1542,13 +1542,13 @@ async function prepareAndTryPluginWorktreeRemove(options: {
   return true;
 }
 
-export async function rollbackCreatedPaseoWorktree(
-  options: DeletePaseoWorktreeOptions,
+export async function rollbackCreatedClisbotWorktree(
+  options: DeleteClisbotWorktreeOptions,
   cause: unknown,
 ): Promise<never> {
   let cleanupError: unknown;
   try {
-    await deletePaseoWorktree(options);
+    await deleteClisbotWorktree(options);
   } catch (error) {
     cleanupError = error;
   }
@@ -1653,10 +1653,10 @@ async function readLocalBranchTip(cwd: string, branchName: string): Promise<stri
 
 /** Resolve the default placement once, before presenting it to creation hooks. */
 export async function resolveDefaultWorktreePath(
-  options: Pick<CreateWorktreeOptions, "cwd" | "paseoHome" | "worktreesRoot" | "worktreeSlug">,
+  options: Pick<CreateWorktreeOptions, "cwd" | "clisbotHome" | "worktreesRoot" | "worktreeSlug">,
 ): Promise<string> {
   const original = join(
-    await getPaseoWorktreesRoot(options.cwd, options.paseoHome, options.worktreesRoot),
+    await getClisbotWorktreesRoot(options.cwd, options.clisbotHome, options.worktreesRoot),
     options.worktreeSlug,
   );
   let candidate = original;
@@ -1685,7 +1685,7 @@ async function createWorktreeAtRepositoryRoot({
   source,
   preparedBranchOff,
   worktreeSlug,
-  paseoHome,
+  clisbotHome,
   worktreesRoot,
   worktreePath: explicitWorktreePath,
 }: CreateWorktreeOptions): Promise<
@@ -1711,7 +1711,7 @@ async function createWorktreeAtRepositoryRoot({
   try {
     let worktreePath =
       explicitWorktreePath ??
-      (await resolveDefaultWorktreePath({ cwd, paseoHome, worktreesRoot, worktreeSlug }));
+      (await resolveDefaultWorktreePath({ cwd, clisbotHome, worktreesRoot, worktreeSlug }));
     await mkdir(dirname(worktreePath), { recursive: true });
 
     // Primitive owner for `git worktree add`; callers route through createWorktreeCore.
@@ -1725,7 +1725,7 @@ async function createWorktreeAtRepositoryRoot({
       await applyWorktreeRemotePlan(cwd, sourcePlan.branchName, sourcePlan);
     }
 
-    await writePaseoWorktreeMetadata(worktreePath, {
+    await writeClisbotWorktreeMetadata(worktreePath, {
       baseRefName: sourcePlan.metadataBaseRefName,
       ...(sourcePlan.metadataBaseRef ? { baseRef: sourcePlan.metadataBaseRef } : {}),
       ...(sourcePlan.changeRequestLookupTarget
@@ -1733,7 +1733,7 @@ async function createWorktreeAtRepositoryRoot({
         : {}),
     });
 
-    await seedPaseoConfigFile({ sourceCwd: cwd, targetCwd: worktreePath });
+    await seedClisbotConfigFile({ sourceCwd: cwd, targetCwd: worktreePath });
 
     return {
       branchName: sourcePlan.branchName,
@@ -1771,7 +1771,7 @@ export interface RunPluginWorktreeManagerCheckoutOptions<
   operation: "create" | "restore";
   preferredPluginId?: string;
   untrusted: boolean;
-  paseoHome?: string;
+  clisbotHome?: string;
   worktreesBaseRoot?: string;
   worktreeManagers?: Pick<PluginWorktreeManagerRuntime, "hasWorktreeManager" | "removeWorktree">;
   run: (context: {
@@ -1812,7 +1812,7 @@ async function runPluginWorktreeManagerCheckoutAtRepositoryRoot(
     operation,
     preferredPluginId,
     untrusted,
-    paseoHome,
+    clisbotHome,
     worktreesBaseRoot,
     worktreeManagers,
     run,
@@ -1863,7 +1863,7 @@ async function runPluginWorktreeManagerCheckoutAtRepositoryRoot(
         worktreeManagers,
         worktreeManagerPluginId: managed.pluginId,
         untrusted,
-        paseoHome,
+        clisbotHome,
         worktreesBaseRoot,
       },
       error,
@@ -1875,7 +1875,7 @@ async function runPluginWorktreeManagerCheckoutAtRepositoryRoot(
  * Roll back a newly created worktree that failed adoption or path verification.
  * Only touches a directory that was absent from `existingWorktreePaths` and
  * shares the source repository's Git common dir; preserves rollback failures
- * alongside the adoption error via `rollbackCreatedPaseoWorktree`.
+ * alongside the adoption error via `rollbackCreatedClisbotWorktree`.
  */
 async function cleanupFailedPluginWorktree(
   options: {
@@ -1885,7 +1885,7 @@ async function cleanupFailedPluginWorktree(
     worktreeManagers?: Pick<PluginWorktreeManagerRuntime, "removeWorktree">;
     worktreeManagerPluginId: string;
     untrusted?: boolean;
-    paseoHome?: string;
+    clisbotHome?: string;
     worktreesBaseRoot?: string;
   },
   cause: unknown,
@@ -1897,7 +1897,7 @@ async function cleanupFailedPluginWorktree(
     worktreeManagers,
     worktreeManagerPluginId,
     untrusted,
-    paseoHome,
+    clisbotHome,
     worktreesBaseRoot,
   } = options;
   let rootPath: string;
@@ -1929,12 +1929,12 @@ async function cleanupFailedPluginWorktree(
   ) {
     throw cause;
   }
-  return rollbackCreatedPaseoWorktree(
+  return rollbackCreatedClisbotWorktree(
     {
       cwd,
       worktreePath: rootPath,
       teardownCwds: [],
-      paseoHome,
+      clisbotHome,
       worktreesBaseRoot,
       registryProven: true,
       worktreeManagers,
@@ -1979,7 +1979,7 @@ async function assertNonOverlappingWorktreePath(input: {
 
 /**
  * Verify and adopt a worktree created or restored by a worktree manager plugin.
- * Paseo validates Git worktree postconditions and writes `paseo/worktree.json`
+ * Clisbot validates Git worktree postconditions and writes `clisbot/worktree.json`
  * so diffs, PR/MR lookup hints, listing, ownership, and removal continue to work.
  */
 async function adoptPluginWorktree(
@@ -2058,7 +2058,7 @@ async function adoptPluginWorktree(
   }
 
   const metadata = await resolveWorktreeMetadata({ cwd, source, branchName });
-  await writePaseoWorktreeMetadata(normalizedPath, {
+  await writeClisbotWorktreeMetadata(normalizedPath, {
     baseRefName: metadata.metadataBaseRefName,
     ...(metadata.metadataBaseRef ? { baseRef: metadata.metadataBaseRef } : {}),
     ...(metadata.changeRequestLookupTarget
@@ -2066,7 +2066,7 @@ async function adoptPluginWorktree(
       : {}),
     worktreeManagerPluginId,
   });
-  await seedPaseoConfigFile({ sourceCwd: cwd, targetCwd: normalizedPath });
+  await seedClisbotConfigFile({ sourceCwd: cwd, targetCwd: normalizedPath });
 
   return {
     branchName,
@@ -2077,7 +2077,7 @@ async function adoptPluginWorktree(
 }
 
 /**
- * Fetch the remote change-request head once into `refs/paseo/change-requests/<n>` so both the
+ * Fetch the remote change-request head once into `refs/clisbot/change-requests/<n>` so both the
  * worktree manager (via `request.headSha`) and adoption verification agree on one commit.
  */
 async function fetchChangeRequestHeadSha(
@@ -2086,7 +2086,7 @@ async function fetchChangeRequestHeadSha(
 ): Promise<string> {
   const changeRequestNumber =
     source.kind === "checkout-github-pr" ? source.githubPrNumber : source.changeRequestNumber;
-  const destination = `refs/paseo/change-requests/${changeRequestNumber}`;
+  const destination = `refs/clisbot/change-requests/${changeRequestNumber}`;
   await fetchFirstAvailableRef({
     cwd,
     destination,
@@ -2185,10 +2185,10 @@ async function tryResolveExactBaseRef(cwd: string, ref: string): Promise<string 
 
 function branchChangeRequestHint(
   branchName: string | null,
-): { changeRequestLookupTarget: PaseoWorktreeChangeRequestHint } | Record<string, never> {
+): { changeRequestLookupTarget: ClisbotWorktreeChangeRequestHint } | Record<string, never> {
   if (!branchName) return {};
   return {
-    changeRequestLookupTarget: createPaseoWorktreeChangeRequestHint({
+    changeRequestLookupTarget: createClisbotWorktreeChangeRequestHint({
       headRef: branchName,
       localBranchName: branchName,
     }),
@@ -2198,7 +2198,7 @@ function branchChangeRequestHint(
 interface ResolvedWorktreeMetadata {
   metadataBaseRefName: string;
   metadataBaseRef?: string;
-  changeRequestLookupTarget?: PaseoWorktreeChangeRequestHint;
+  changeRequestLookupTarget?: ClisbotWorktreeChangeRequestHint;
 }
 
 function resolveChangeRequestMetadata(
@@ -2209,7 +2209,7 @@ function resolveChangeRequestMetadata(
     source.kind === "checkout-github-pr" ? source.githubPrNumber : source.changeRequestNumber;
   return {
     metadataBaseRefName: normalizeRequiredBaseBranch(source.baseRefName),
-    changeRequestLookupTarget: createPaseoWorktreeChangeRequestHint({
+    changeRequestLookupTarget: createClisbotWorktreeChangeRequestHint({
       headRef: source.headRef,
       ...(source.headRepositoryOwner ? { headRepositoryOwner: source.headRepositoryOwner } : {}),
       changeRequestNumber,
@@ -2286,7 +2286,7 @@ interface WorktreeSourcePlan {
   // upstream — so comparisons and actions read the ref and the UI reads the name.
   metadataBaseRefName: string;
   metadataBaseRef?: string;
-  changeRequestLookupTarget?: PaseoWorktreeChangeRequestHint;
+  changeRequestLookupTarget?: ClisbotWorktreeChangeRequestHint;
   addArguments: string[];
   pushRemote?: {
     name: string;
@@ -2497,7 +2497,7 @@ async function resolveChangeRequestRemotePlan(
   const remotePlan: Pick<WorktreeSourcePlan, "pushRemote" | "trackingRemote"> = {};
   if (source.pushRemoteUrl) {
     remotePlan.pushRemote = {
-      name: `paseo-pr-${changeRequestNumber}`,
+      name: `clisbot-pr-${changeRequestNumber}`,
       url: source.pushRemoteUrl,
       headRef: source.headRef,
       track: true,
@@ -2506,7 +2506,7 @@ async function resolveChangeRequestRemotePlan(
     const originUrl = await getWorktreeRemotePushUrl(cwd, "origin");
     if (originUrl) {
       remotePlan.pushRemote = {
-        name: `paseo-pr-${changeRequestNumber}`,
+        name: `clisbot-pr-${changeRequestNumber}`,
         url: originUrl,
         headRef: source.headRef,
         track: false,
@@ -2722,10 +2722,10 @@ async function validateGitBranchName(cwd: string, branchName: string): Promise<v
 function normalizeRequiredBaseBranch(baseBranch: string): string {
   const normalizedBaseBranch = normalizeBaseRefName(baseBranch);
   if (!normalizedBaseBranch) {
-    throw new Error("Base branch is required when creating a Paseo worktree");
+    throw new Error("Base branch is required when creating a Clisbot worktree");
   }
   if (normalizedBaseBranch === "HEAD") {
-    throw new Error("Base branch cannot be HEAD when creating a Paseo worktree");
+    throw new Error("Base branch cannot be HEAD when creating a Clisbot worktree");
   }
   return normalizedBaseBranch;
 }

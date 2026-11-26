@@ -1,4 +1,4 @@
-import type { ProviderUpdateCheck } from "@getpaseo/plugin/server/provider";
+import type { ProviderUpdateCheck } from "@clisbot/plugin/server/provider";
 import type { AgentClientInstallation } from "../agent-sdk-types.js";
 import {
   checkProviderLaunchAvailable,

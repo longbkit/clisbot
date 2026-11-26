@@ -4,7 +4,7 @@ import { reloadWhenRendererExits } from "./renderer-recovery.js";
 
 class Contents extends EventEmitter {
   reloads = 0;
-  url = "paseo://app/";
+  url = "clisbot://app/";
   getURL() {
     return this.url;
   }

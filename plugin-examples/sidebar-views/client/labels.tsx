@@ -2,12 +2,12 @@ import { useMutation } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import {
-  usePaseo,
+  useClisbot,
   useSettings,
   useWorkspaces,
   type WorkspaceRef,
   type PluginSidebarViewProps,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 import { folders } from "../shared/preferences";
 import { Heading, WorkspaceRow } from "./rows";
 interface Move {
@@ -43,7 +43,7 @@ function Movable({
   );
 }
 export function Labels(view: PluginSidebarViewProps) {
-  const paseo = usePaseo();
+  const clisbot = useClisbot();
   const settings = useSettings(folders);
   const [selected, select] = useState<Move | null>(null);
   const groups = useWorkspaces({
@@ -58,7 +58,7 @@ export function Labels(view: PluginSidebarViewProps) {
   const move = useMutation({
     mutationFn: async (destination: string | null) => {
       if (!selected) return;
-      const workspace = paseo.workspaces.ref(selected.reference);
+      const workspace = clisbot.workspaces.ref(selected.reference);
       // Add first: if adding fails the workspace keeps its original folder.
       if (destination && destination !== selected.from)
         await workspace.setLabel(destination, { assigned: true });

@@ -3,7 +3,7 @@ import {
   type SettingsDefinition,
   type RpcOutput,
   type RpcInput,
-} from "@getpaseo/plugin";
+} from "@clisbot/plugin";
 import { z } from "zod";
 
 interface DeviceStorage {
@@ -24,7 +24,7 @@ export function createDeviceSettings(storage: DeviceStorage) {
     return result;
   }
   return function settings(installationId: string, definition: SettingsDefinition) {
-    const key = `@paseo:plugin-device-settings:${installationId}/${definition.id}`;
+    const key = `@clisbot:plugin-device-settings:${installationId}/${definition.id}`;
     async function read(): Promise<ReadResult> {
       const raw = await storage.getItem(key);
       let revision = raw ?? "missing";

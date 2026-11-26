@@ -7,7 +7,7 @@ import { createTestLogger } from "../../test-utils/test-logger.js";
 import { OpenCodeV2AgentClient } from "../agent/providers/opencode/v2/agent.js";
 import { V2Harness } from "../agent/providers/opencode/test-utils/v2-harness.js";
 import { createTestAgentClients } from "../test-utils/fake-agent-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 
 async function createQuestionHarness() {
@@ -42,9 +42,9 @@ async function createQuestionHarness() {
     logger: createTestLogger(),
     runtime: runtime.runtime,
   });
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: { ...createTestAgentClients(), opencode: provider },
-    paseoHomeRoot: path.join(root, "daemon"),
+    clisbotHomeRoot: path.join(root, "daemon"),
     staticDir: path.join(root, "static"),
     cleanup: false,
   });

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, expect, onTestFinished, test } from "vitest";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
 // Windows does not preserve trailing spaces in folder names.
 const testOnPosix = test.skipIf(process.platform === "win32");
@@ -14,7 +14,7 @@ let repoDir: string;
 let projectId: string;
 
 beforeEach(async () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "paseo-project-path-spaces-")));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "clisbot-project-path-spaces-")));
   onTestFinished(() => rmSync(root, { recursive: true, force: true }));
   repoDir = join(root, "repo ");
   execFileSync("git", ["init", "-b", "main", repoDir], { stdio: "pipe" });
@@ -22,9 +22,9 @@ beforeEach(async () => {
     "git",
     [
       "-c",
-      "user.name=Paseo Test",
+      "user.name=Clisbot Test",
       "-c",
-      "user.email=test@getpaseo.local",
+      "user.email=test@clisbot.local",
       "-c",
       "commit.gpgsign=false",
       "commit",
@@ -34,7 +34,7 @@ beforeEach(async () => {
     ],
     { cwd: repoDir, stdio: "pipe" },
   );
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   onTestFinished(() => daemon.close());
   client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   const testClient = client;

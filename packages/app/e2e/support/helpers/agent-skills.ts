@@ -3,8 +3,8 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import os from "node:os";
 import path from "node:path";
 import { expect, type Dialog, type Page } from "@playwright/test";
-import type { DaemonClient as InternalDaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { AgentSkillSelection } from "@getpaseo/protocol/messages";
+import type { DaemonClient as InternalDaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { AgentSkillSelection } from "@clisbot/protocol/messages";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
 import { gotoAppShell, openSettings } from "./app";
 import { connectDaemonClient } from "./daemon-client-loader";
@@ -45,7 +45,7 @@ export interface AgentSkillsSandbox {
 }
 
 export async function startAgentSkillsSandbox(): Promise<AgentSkillsSandbox> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-agent-skills-e2e-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-agent-skills-e2e-"));
   const home = path.join(root, "home");
   await mkdir(home, { recursive: true });
   const daemon = await startIsolatedHostDaemon(`agent-skills-${randomUUID()}`, {

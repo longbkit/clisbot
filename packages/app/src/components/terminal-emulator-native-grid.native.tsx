@@ -16,7 +16,7 @@ import {
   TerminalInputModeTracker,
   terminalInputModeStatesEqual,
   type TerminalInputModeState,
-} from "@getpaseo/protocol/terminal-input-mode";
+} from "@clisbot/protocol/terminal-input-mode";
 import type { TerminalEmulatorHandle, TerminalEmulatorProps } from "./terminal-emulator-contract";
 import {
   createNativeHeadlessTerminal,

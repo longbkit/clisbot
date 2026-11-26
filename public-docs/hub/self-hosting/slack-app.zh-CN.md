@@ -29,7 +29,7 @@ Hub 会验证安装、将其保存在 **Integrations** 下，并建立出站 Soc
 将机器人邀请到它要监听或发送消息的每个频道：
 
 ```text
-/invite @Paseo
+/invite @Clisbot
 ```
 
 Socket Mode 在 Hub 进程内维持一条实时连接。请仅运行一个 Hub 进程并保持运行，因为停止期间到达的事件会丢失。
@@ -44,10 +44,10 @@ Socket Mode 在 Hub 进程内维持一条实时连接。请仅运行一个 Hub �
 
 Slack 会调用这些 Hub URL：
 
-| Provider 设置 | Hub URL                                               |
-| ------------- | ----------------------------------------------------- |
-| Redirect URL  | `<PASEO_HUB_APP_URL>/api/integrations/slack/callback` |
-| Request URL   | `<PASEO_HUB_APP_URL>/api/integrations/slack/events`   |
+| Provider 设置 | Hub URL                                                 |
+| ------------- | ------------------------------------------------------- |
+| Redirect URL  | `<CLISBOT_HUB_APP_URL>/api/integrations/slack/callback` |
+| Request URL   | `<CLISBOT_HUB_APP_URL>/api/integrations/slack/events`   |
 
 ## 通过环境变量配置 {#configure-from-environment}
 

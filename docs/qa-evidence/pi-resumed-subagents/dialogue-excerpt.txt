@@ -10,7 +10,7 @@ Original session file: <QA_ROOT>/pi/sessions/<QA_WORKSPACE>/2026-11-10T04-08-20-
 Use the stored session context as background. Answer the orchestrator's follow-up below. Do not assume the original child session is still running.
 
 Follow-up:
-Run bash sleep 45 then printf PASEO_DESKTOP_B_OBSERVE; do not read or write files
+Run bash sleep 45 then printf CLISBOT_DESKTOP_B_OBSERVE; do not read or write files
 Show more
 12:17 PM
 QA #9200 — Pi resume A→B→C

@@ -1,5 +1,5 @@
 import { basename, dirname, join } from "node:path";
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 
 export default function contribute(server: PluginServerContext) {
   return server.addHook("worktree.create.before", async ({ request }) => ({

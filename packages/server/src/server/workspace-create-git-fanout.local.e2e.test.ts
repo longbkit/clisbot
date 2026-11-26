@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, expect, test } from "vitest";
-import type { WorkspaceDescriptorPayload } from "@getpaseo/protocol/messages";
+import type { WorkspaceDescriptorPayload } from "@clisbot/protocol/messages";
 
 import { DaemonClient } from "./test-utils/daemon-client.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "./test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
 import { getWorkspaceGitSelfHealPhaseMs } from "./workspace-git-service.js";
 import {
   configureGitProcessPolicy,
@@ -21,9 +21,9 @@ import { resolveGitProcessPolicy } from "../utils/git-process-scheduler.js";
 
 const SIBLING_COUNT = 100;
 const CREATED_AT = "2026-08-07T00:00:00.000Z";
-const originalMaxProcessesPerSecond = process.env.PASEO_GIT_MAX_PROCESSES_PER_SECOND;
+const originalMaxProcessesPerSecond = process.env.CLISBOT_GIT_MAX_PROCESSES_PER_SECOND;
 
-let daemon: TestPaseoDaemon | null = null;
+let daemon: TestClisbotDaemon | null = null;
 let client: DaemonClient | null = null;
 const cleanupPaths: string[] = [];
 
@@ -36,9 +36,9 @@ afterEach(async () => {
     rmSync(path, { recursive: true, force: true });
   }
   if (originalMaxProcessesPerSecond === undefined) {
-    delete process.env.PASEO_GIT_MAX_PROCESSES_PER_SECOND;
+    delete process.env.CLISBOT_GIT_MAX_PROCESSES_PER_SECOND;
   } else {
-    process.env.PASEO_GIT_MAX_PROCESSES_PER_SECOND = originalMaxProcessesPerSecond;
+    process.env.CLISBOT_GIT_MAX_PROCESSES_PER_SECOND = originalMaxProcessesPerSecond;
   }
   configureGitProcessPolicy(resolveGitProcessPolicy({ env: process.env }));
 });
@@ -57,16 +57,16 @@ function git(cwd: string, ...args: string[]): string {
 
 function seedFixture(siblingCount = SIBLING_COUNT): {
   repoRoot: string;
-  paseoHomeRoot: string;
+  clisbotHomeRoot: string;
   projectId: string;
   siblingWorktrees: string[];
 } {
-  const fixtureRoot = mkdtempSync(join(tmpdir(), "paseo-workspace-create-fanout-"));
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "clisbot-workspace-create-fanout-"));
   cleanupPaths.push(fixtureRoot);
   const repoRoot = join(fixtureRoot, "repo");
   const worktreesRoot = join(fixtureRoot, "siblings");
-  const paseoHomeRoot = join(fixtureRoot, "home");
-  const projectsDir = join(paseoHomeRoot, ".paseo", "projects");
+  const clisbotHomeRoot = join(fixtureRoot, "home");
+  const projectsDir = join(clisbotHomeRoot, ".clisbot", "projects");
   mkdirSync(repoRoot, { recursive: true });
   mkdirSync(worktreesRoot, { recursive: true });
   mkdirSync(projectsDir, { recursive: true });
@@ -102,7 +102,7 @@ function seedFixture(siblingCount = SIBLING_COUNT): {
       branch,
       worktreeRoot: cwd,
       baseBranch: "main",
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       mainRepoRoot: repoRoot,
       createdAt: CREATED_AT,
       updatedAt: CREATED_AT,
@@ -130,13 +130,13 @@ function seedFixture(siblingCount = SIBLING_COUNT): {
     ]),
   );
   writeFileSync(join(projectsDir, "workspaces.json"), JSON.stringify(workspaces));
-  return { repoRoot, paseoHomeRoot, projectId, siblingWorktrees };
+  return { repoRoot, clisbotHomeRoot, projectId, siblingWorktrees };
 }
 
 async function startObservedFixture(siblingCount: number): Promise<ReturnType<typeof seedFixture>> {
   const fixture = seedFixture(siblingCount);
-  daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: fixture.paseoHomeRoot,
+  daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: fixture.clisbotHomeRoot,
     cleanup: false,
     mcpEnabled: false,
   });
@@ -616,8 +616,8 @@ test("records the Git command ledger for repository metadata business rules", as
 test("workspace archive is admitted while 52 sibling observations hydrate", async () => {
   configureGitProcessPolicy({ maxProcessConcurrency: 8, maxProcessesPerSecond: 64 });
   const fixture = seedFixture(52);
-  daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: fixture.paseoHomeRoot,
+  daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: fixture.clisbotHomeRoot,
     cleanup: false,
     mcpEnabled: false,
   });
@@ -655,11 +655,11 @@ test("workspace archive is admitted while 52 sibling observations hydrate", asyn
 }, 180_000);
 
 test("workspace create is admitted while 100 sibling observations hydrate", async () => {
-  process.env.PASEO_GIT_MAX_PROCESSES_PER_SECOND = "64";
+  process.env.CLISBOT_GIT_MAX_PROCESSES_PER_SECOND = "64";
   configureGitProcessPolicy({ maxProcessConcurrency: 8, maxProcessesPerSecond: 64 });
   const fixture = seedFixture();
-  daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: fixture.paseoHomeRoot,
+  daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: fixture.clisbotHomeRoot,
     cleanup: false,
     mcpEnabled: false,
   });

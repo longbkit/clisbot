@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { DaemonClient as InternalDaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient as InternalDaemonClient } from "@clisbot/client/internal/daemon-client";
 import { expect, test as base, type Page } from "../fixtures";
 import { gotoAppShell, openSettings } from "./app";
 import { connectDaemonClient } from "./daemon-client-loader";
@@ -14,7 +14,7 @@ const PROVIDER_NAME = "Update failure";
 const FAILURE = "The updater could not write to the install directory";
 
 /** The direct provider example with an installation whose updater always fails. */
-const SERVER_SOURCE = `import type { PluginServerContext } from "@getpaseo/plugin/server";
+const SERVER_SOURCE = `import type { PluginServerContext } from "@clisbot/plugin/server";
 import { createDirectExampleProvider } from "./server/provider";
 
 export default function contribute(server: PluginServerContext) {
@@ -62,7 +62,7 @@ export const test = base.extend<{ providerUpdateFailure: ProviderUpdateFailure }
     try {
       const previous = await client.getDaemonConfig();
       await writeFile(
-        path.join(plugin.directory, "paseo-plugin.json"),
+        path.join(plugin.directory, "clisbot-plugin.json"),
         JSON.stringify({ id: PLUGIN_ID, requirements: pluginRequirements }),
       );
       await writeFile(path.join(plugin.directory, "index.server.ts"), SERVER_SOURCE);

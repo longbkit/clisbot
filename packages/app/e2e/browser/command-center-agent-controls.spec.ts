@@ -39,7 +39,7 @@ import { seedWorkspace } from "../support/helpers/seed-client";
 import { closeMobileAgentSidebar, openMobileAgentSidebar } from "../support/helpers/sidebar";
 import { buildSchedulesRoute } from "@/utils/host-routes";
 
-const CREATE_AGENT_PREFERENCES_KEY = "@paseo:create-agent-preferences";
+const CREATE_AGENT_PREFERENCES_KEY = "@clisbot:create-agent-preferences";
 
 async function seedMockDraftPreferences(page: import("@playwright/test").Page): Promise<void> {
   await page.addInitScript(

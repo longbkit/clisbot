@@ -10,7 +10,7 @@ test("retries a failing asset and keeps its siblings", async () => {
   const exitCodes = { "a.dmg": [1, 1, 0], "b.zip": [0] };
 
   const exitCode = await uploadWithRetry(
-    { release: "rel", files: ["a.dmg", "b.zip"], repo: "getpaseo/paseo" },
+    { release: "rel", files: ["a.dmg", "b.zip"], repo: "longbkit/clisbot" },
     {
       sleep: noSleep,
       upload: ({ file }) => {
@@ -28,7 +28,7 @@ test("gives up after the attempt limit and reports failure", async () => {
   let calls = 0;
 
   const exitCode = await uploadWithRetry(
-    { release: "rel", files: ["a.dmg", "b.zip"], repo: "getpaseo/paseo" },
+    { release: "rel", files: ["a.dmg", "b.zip"], repo: "longbkit/clisbot" },
     {
       attempts: 3,
       sleep: noSleep,
@@ -46,9 +46,9 @@ test("gives up after the attempt limit and reports failure", async () => {
 
 test("collects release files and skips manifests", () => {
   const files = collectAssets("/release", {
-    readDir: () => ["Paseo.dmg", "beta-mac.yml", "Paseo.zip", "nested"],
+    readDir: () => ["Clisbot.dmg", "beta-mac.yml", "Clisbot.zip", "nested"],
     stat: (file) => ({ isFile: () => !file.endsWith("nested") }),
   });
 
-  assert.deepEqual(files, ["/release/Paseo.dmg", "/release/Paseo.zip"]);
+  assert.deepEqual(files, ["/release/Clisbot.dmg", "/release/Clisbot.zip"]);
 });

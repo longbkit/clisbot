@@ -60,7 +60,7 @@ export class OpenCodeV2AgentClient implements AgentClient {
   private readonly connections = new Map<string, V2Connection>();
   constructor(private readonly options: V2AgentOptions) {
     const bridge = options.bridge;
-    this.capabilities = { ...V2_CAPABILITIES, supportsNativePaseoTools: Boolean(bridge) };
+    this.capabilities = { ...V2_CAPABILITIES, supportsNativeClisbotTools: Boolean(bridge) };
     this.runtime =
       options.runtime ??
       new V2Runtime({
@@ -89,7 +89,7 @@ export class OpenCodeV2AgentClient implements AgentClient {
         waitForLocationReady({ client: connection.client, location, signal: request.signal }),
       );
       if (options.force)
-        await activity("paseo.bridge.refresh", () =>
+        await activity("clisbot.bridge.refresh", () =>
           connection.refreshLocation(location.directory, request.signal),
         );
       const [models, agents, providers] = await Promise.all([
@@ -183,7 +183,7 @@ export class OpenCodeV2AgentClient implements AgentClient {
     const unbind = bridge?.bindSession({
       sessionId: info.id,
       env: launch?.env ?? {},
-      tools: launch?.paseoTools,
+      tools: launch?.clisbotTools,
     });
     const bound = new Map<string, () => void>();
     const bindChild = (childId: string) => {
@@ -192,7 +192,7 @@ export class OpenCodeV2AgentClient implements AgentClient {
       const childUnbind = bridge?.bindSession({
         sessionId: childId,
         env: launch?.env ?? {},
-        tools: launch?.paseoTools,
+        tools: launch?.clisbotTools,
       });
       if (childUnbind) bound.set(childId, childUnbind);
     };

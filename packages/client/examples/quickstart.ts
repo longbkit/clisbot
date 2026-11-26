@@ -1,6 +1,6 @@
-import { createPaseoClient } from "@getpaseo/client";
+import { createClisbotClient } from "@clisbot/client";
 
-const client = createPaseoClient({ url: "ws://127.0.0.1:6767/ws" });
+const client = createClisbotClient({ url: "ws://127.0.0.1:6868/ws" });
 
 await client.connect();
 

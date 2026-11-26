@@ -8,7 +8,7 @@ import { loadConfig } from "./config.js";
 const roots: string[] = [];
 
 async function createHome(config: object = {}): Promise<string> {
-  const home = await mkdtemp(path.join(os.tmpdir(), "paseo-config-git-"));
+  const home = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-git-"));
   roots.push(home);
   await writeFile(path.join(home, "config.json"), JSON.stringify(config));
   return home;
@@ -57,8 +57,8 @@ describe("daemon Git process config", () => {
     expect(
       loadConfig(home, {
         env: {
-          PASEO_GIT_MAX_PROCESSES_PER_SECOND: "12",
-          PASEO_GIT_MAX_PROCESS_CONCURRENCY: "6",
+          CLISBOT_GIT_MAX_PROCESSES_PER_SECOND: "12",
+          CLISBOT_GIT_MAX_PROCESS_CONCURRENCY: "6",
         },
       }).git,
     ).toEqual({
@@ -67,21 +67,21 @@ describe("daemon Git process config", () => {
     });
   });
 
-  test("accepts legacy PASEO_GIT_CONCURRENCY below the renamed variable", async () => {
+  test("accepts legacy CLISBOT_GIT_CONCURRENCY below the renamed variable", async () => {
     const home = await createHome();
 
     expect(
       loadConfig(home, {
         env: {
-          PASEO_GIT_CONCURRENCY: "3",
+          CLISBOT_GIT_CONCURRENCY: "3",
         },
       }).git?.maxProcessConcurrency,
     ).toBe(3);
     expect(
       loadConfig(home, {
         env: {
-          PASEO_GIT_CONCURRENCY: "3",
-          PASEO_GIT_MAX_PROCESS_CONCURRENCY: "7",
+          CLISBOT_GIT_CONCURRENCY: "3",
+          CLISBOT_GIT_MAX_PROCESS_CONCURRENCY: "7",
         },
       }).git?.maxProcessConcurrency,
     ).toBe(7);

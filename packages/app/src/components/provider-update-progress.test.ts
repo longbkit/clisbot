@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ProviderInstallationUpdateProgress } from "@getpaseo/protocol/messages";
+import type { ProviderInstallationUpdateProgress } from "@clisbot/protocol/messages";
 import { applyProviderUpdateProgress } from "./provider-update-progress";
 
 const running = {

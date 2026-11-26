@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { FlatList, Text, View, type ListRenderItem } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { HighlightToken } from "@getpaseo/highlight";
+import type { HighlightToken } from "@clisbot/highlight";
 import { syntaxTokenStyleFor } from "@/styles/syntax-token-styles";
 import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { EditorVisualTheme } from "../editor/extensions.web";

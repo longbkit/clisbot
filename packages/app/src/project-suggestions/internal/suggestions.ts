@@ -1,4 +1,4 @@
-import type { ProjectSuggestion } from "@getpaseo/protocol/messages";
+import type { ProjectSuggestion } from "@clisbot/protocol/messages";
 
 export type { ProjectSuggestion };
 

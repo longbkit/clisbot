@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { ChartNoAxesColumn } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import type { AgentMetric } from "@getpaseo/protocol/agent-types";
+import type { AgentMetric } from "@clisbot/protocol/agent-types";
 import {
   HoverCard,
   HoverCardContent,

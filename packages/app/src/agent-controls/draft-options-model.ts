@@ -2,7 +2,7 @@ import type {
   AgentOptionControl,
   AgentSessionConfig,
   ProviderOptions,
-} from "@getpaseo/protocol/agent-types";
+} from "@clisbot/protocol/agent-types";
 import { withoutLostControls } from "./lost-controls";
 
 /**

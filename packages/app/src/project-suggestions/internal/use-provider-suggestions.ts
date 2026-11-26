@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { useFetchQueries } from "@/data/query";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { useHostFeature } from "@/runtime/host-features";

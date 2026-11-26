@@ -52,13 +52,13 @@ function summarizeTurn(
 }
 
 function hasWork(tools: OverviewSummary): boolean {
-  const { paseoActions, thoughtCount: _thoughtCount, ...counts } = tools;
-  return Object.keys(paseoActions).length > 0 || Object.values(counts).some((count) => count > 0);
+  const { clisbotActions, thoughtCount: _thoughtCount, ...counts } = tools;
+  return Object.keys(clisbotActions).length > 0 || Object.values(counts).some((count) => count > 0);
 }
 
 function hasSameWork(a: OverviewSummary, b: OverviewSummary): boolean {
-  const { paseoActions: actionsA, ...countsA } = a;
-  const { paseoActions: actionsB, ...countsB } = b;
+  const { clisbotActions: actionsA, ...countsA } = a;
+  const { clisbotActions: actionsB, ...countsB } = b;
   return hasSameCounts(countsA, countsB) && hasSameCounts(actionsA, actionsB);
 }
 

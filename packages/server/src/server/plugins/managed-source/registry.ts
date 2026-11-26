@@ -8,8 +8,8 @@ import {
   type PluginRegistries,
   type PluginRegistryIndex,
   type PluginRegistryIdentity,
-} from "@getpaseo/protocol/plugin-registry";
-import type { PluginUpdateTarget } from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/plugin-registry";
+import type { PluginUpdateTarget } from "@clisbot/protocol/messages";
 import { z } from "zod";
 
 // Install reads only these fields; the rest of a published plugin is the directory's display data.
@@ -95,7 +95,7 @@ export async function resolveRegistryPlugin(
 ) {
   const base = new URL(identity.url);
   const headers = registryHeaders(identity.url, options);
-  if (install) headers["X-Paseo-Install"] = "1";
+  if (install) headers["X-Clisbot-Install"] = "1";
   const url = `${identity.url.replace(/\/+$/, "")}/plugins/${identity.id}.json`;
   let response: Response;
   try {

@@ -1,7 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { resolveAgentModelSelection } from "@/composer/agent-controls/utils";
 import { filterSelectableModels } from "@/provider-selection/model-catalog";
 import { buildDraftStoreKey } from "@/stores/draft-keys";

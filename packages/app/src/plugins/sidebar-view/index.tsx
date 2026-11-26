@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { SidebarViewFrame } from "./frame";
-import type { PluginSidebarViewProps } from "@getpaseo/plugin/client";
-import type { PluginTheme } from "@getpaseo/plugin";
+import type { PluginSidebarViewProps } from "@clisbot/plugin/client";
+import type { PluginTheme } from "@clisbot/plugin";
 import { router } from "expo-router";
 import { useMemo, useCallback, type ReactNode } from "react";
 import { Text, View } from "react-native";

@@ -6,7 +6,7 @@ import type {
   PluginButtonRegistration,
   PluginHeaderButtonContribution,
   PluginComposerPillContribution,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 import type { InstalledPlugin } from "../types";
 import {
   requireButtonId,

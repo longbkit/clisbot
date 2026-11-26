@@ -7,7 +7,7 @@ import type {
   BrowserAutomationConsoleLogEntry,
   BrowserAutomationDialogEvent,
   BrowserAutomationExecuteRequest,
-} from "@getpaseo/protocol/browser-automation/rpc-schemas";
+} from "@clisbot/protocol/browser-automation/rpc-schemas";
 import { BrowserSnapshotEngine } from "./snapshot-engine.js";
 import type { BrowserRegistry, TabContents, TabImage } from "./service.js";
 import { executeAutomationCommand } from "./service.js";
@@ -134,7 +134,7 @@ class FakeTab implements TabContents {
     if (code.includes("document.body.innerText")) {
       return this.bodyText;
     }
-    if (code.includes("__PASEO_ARIA_SNAPSHOT__")) {
+    if (code.includes("__CLISBOT_ARIA_SNAPSHOT__")) {
       return JSON.stringify(snapshotResult(this.snapshotNodes));
     }
     if (code.includes("Timed out waiting") || code.includes("performance.now()")) {
@@ -152,7 +152,7 @@ class FakeTab implements TabContents {
     if (code.includes("element.focus({ preventScroll: true })")) {
       return { editable: this.keypressTargetEditable };
     }
-    if (code.includes("__PASEO_BROWSER_EVALUATE__")) {
+    if (code.includes("__CLISBOT_BROWSER_EVALUATE__")) {
       if (this.evaluateScriptThrows) {
         throw new Error(this.evaluateScriptErrorMessage);
       }
@@ -417,7 +417,7 @@ function snapshotResult(nodes: FakeTab["snapshotNodes"]) {
       : [],
   );
   return {
-    marker: "__PASEO_ARIA_SNAPSHOT__",
+    marker: "__CLISBOT_ARIA_SNAPSHOT__",
     root: {
       kind: "role",
       role: "document",
@@ -493,7 +493,7 @@ function browserEvaluatingIn(page: (script: string) => unknown) {
   const browser = new BrowserAutomationHarness();
   const fakeAnswer = browser.tab.executeJavaScript.bind(browser.tab);
   browser.tab.executeJavaScript = async (script: string) => {
-    if (!script.includes("__PASEO_BROWSER_EVALUATE__")) return fakeAnswer(script);
+    if (!script.includes("__CLISBOT_BROWSER_EVALUATE__")) return fakeAnswer(script);
     browser.tab.scripts.push(script);
     return page(script);
   };
@@ -1557,7 +1557,7 @@ describe("executeAutomationCommand", () => {
         truncated: false,
       },
     });
-    expect(containsScript(browser.tab, "__PASEO_BROWSER_EVALUATE__", "() => 42")).toBe(true);
+    expect(containsScript(browser.tab, "__CLISBOT_BROWSER_EVALUATE__", "() => 42")).toBe(true);
   });
 
   test("evaluate returns object JSON from the page context", async () => {
@@ -1605,7 +1605,7 @@ describe("executeAutomationCommand", () => {
         truncated: false,
       },
     });
-    expect(containsScript(browser.tab, '"@e1"', "__PASEO_BROWSER_AUTOMATION__?.resolve")).toBe(
+    expect(containsScript(browser.tab, '"@e1"', "__CLISBOT_BROWSER_AUTOMATION__?.resolve")).toBe(
       true,
     );
   });
@@ -1685,7 +1685,7 @@ describe("executeAutomationCommand", () => {
     });
 
     expect(
-      containsScript(browser.tab, "__PASEO_BROWSER_EVALUATE__", "resultJson.length <= 80000"),
+      containsScript(browser.tab, "__CLISBOT_BROWSER_EVALUATE__", "resultJson.length <= 80000"),
     ).toBe(true);
     expect(containsScript(browser.tab, "resultJson.slice(0, 79000)")).toBe(true);
   });
@@ -1733,14 +1733,14 @@ describe("executeAutomationCommand", () => {
         value: "page value",
         resultJson: "page json",
         userFunction: "page function",
-        __paseoEvaluate: "page wrapper",
+        __clisbotEvaluate: "page wrapper",
         readFunction: "page reader",
       };
       const browser = browserEvaluatingIn(pageRunningInjectedScripts({ allowEval, globals }));
 
       const result = await evaluate(
         browser,
-        "() => [element, args, value, resultJson, userFunction, __paseoEvaluate, readFunction]",
+        "() => [element, args, value, resultJson, userFunction, __clisbotEvaluate, readFunction]",
       );
 
       expect(result).toMatchObject({
@@ -1779,7 +1779,7 @@ describe("executeAutomationCommand", () => {
         ok: false,
         error: { code: "browser_unknown_error", message: expect.stringMatching(/^Unexpected /) },
       });
-      expect(containsScript(browser.tab, "__PASEO_BROWSER_EVALUATE__")).toBe(false);
+      expect(containsScript(browser.tab, "__CLISBOT_BROWSER_EVALUATE__")).toBe(false);
     });
   });
 
@@ -2156,7 +2156,7 @@ describe("executeAutomationCommand", () => {
         command: "Runtime.evaluate",
         params: {
           expression: expect.stringContaining('"@e1"'),
-          objectGroup: "paseo-browser-automation",
+          objectGroup: "clisbot-browser-automation",
           returnByValue: false,
         },
       },
@@ -2203,7 +2203,7 @@ describe("executeAutomationCommand", () => {
         command: "Runtime.evaluate",
         params: {
           expression: expect.stringContaining('"@e1"'),
-          objectGroup: "paseo-browser-automation",
+          objectGroup: "clisbot-browser-automation",
           returnByValue: false,
         },
       },
@@ -2242,7 +2242,7 @@ describe("executeAutomationCommand", () => {
         command: "Runtime.evaluate",
         params: {
           expression: expect.stringContaining('"@e1"'),
-          objectGroup: "paseo-browser-automation",
+          objectGroup: "clisbot-browser-automation",
           returnByValue: false,
         },
       },

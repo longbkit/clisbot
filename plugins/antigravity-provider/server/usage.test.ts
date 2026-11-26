@@ -10,7 +10,7 @@ afterEach(async () => {
 });
 
 it("discovers the resolved account and maps the CLI's quota buckets", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-antigravity-usage-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-antigravity-usage-"));
   directories.push(directory);
   const cli = path.join(directory, "cli.cjs");
   await writeFile(
@@ -87,7 +87,7 @@ it("discovers the resolved account and maps the CLI's quota buckets", async () =
 });
 
 it("uses compact group and period shorthands when multiple groups are reported", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-antigravity-usage-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-antigravity-usage-"));
   directories.push(directory);
   const cli = path.join(directory, "cli.cjs");
   await writeFile(
@@ -123,7 +123,7 @@ it("uses compact group and period shorthands when multiple groups are reported",
 });
 
 it("surfaces CLI errors instead of reporting a successful quota", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-antigravity-usage-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-antigravity-usage-"));
   directories.push(directory);
   const cli = path.join(directory, "cli.cjs");
   await writeFile(
@@ -138,7 +138,7 @@ it("surfaces CLI errors instead of reporting a successful quota", async () => {
 });
 
 it("reports a failed CLI without exposing its stderr", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-antigravity-usage-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-antigravity-usage-"));
   directories.push(directory);
   const cli = path.join(directory, "cli.cjs");
   await writeFile(cli, `process.stderr.write('authentication token=private'); process.exit(1);`);

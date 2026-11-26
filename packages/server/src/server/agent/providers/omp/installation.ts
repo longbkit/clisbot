@@ -1,5 +1,5 @@
 import { stripVTControlCharacters } from "node:util";
-import type { ProviderUpdateCheck } from "@getpaseo/plugin/server/provider";
+import type { ProviderUpdateCheck } from "@clisbot/plugin/server/provider";
 import { execCommand } from "../../../../utils/spawn.js";
 import type { AgentClientInstallation } from "../../agent-sdk-types.js";
 import {

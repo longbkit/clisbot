@@ -22,7 +22,7 @@ import {
   type GitUpstreamState,
 } from "@/git/policy";
 import { deriveMergeCapability } from "@/git/merge-capability";
-import type { CheckoutPrMergeMethod } from "@getpaseo/protocol/messages";
+import type { CheckoutPrMergeMethod } from "@clisbot/protocol/messages";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { useToast } from "@/contexts/toast-context";
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
@@ -133,7 +133,7 @@ interface DerivedGitActionsState {
   hasRemote: boolean;
   hasFirstPushRemote: boolean;
   upstream: GitUpstreamState;
-  isPaseoOwnedWorktree: boolean;
+  isClisbotOwnedWorktree: boolean;
   isOnBaseBranch: boolean;
   canMergeLocally: boolean;
   shouldPromoteArchive: boolean;
@@ -177,7 +177,7 @@ function deriveGitActionsState(args: DeriveGitActionsStateArgs): DerivedGitActio
     baseRef,
   } = args;
   const actionsDisabled = !isGit || Boolean(status?.error) || isStatusLoading;
-  const isPaseoOwnedWorktree = gitStatus?.isPaseoOwnedWorktree ?? false;
+  const isClisbotOwnedWorktree = gitStatus?.isClisbotOwnedWorktree ?? false;
   const isMergedPullRequest = Boolean(prStatus?.isMerged);
   return {
     actionsDisabled,
@@ -186,7 +186,7 @@ function deriveGitActionsState(args: DeriveGitActionsStateArgs): DerivedGitActio
     hasRemote: gitStatus?.hasRemote ?? false,
     hasFirstPushRemote: (gitStatus?.firstPushRemote ?? null) !== null,
     upstream: gitStatus ? readUpstreamState(gitStatus) : "unknown",
-    isPaseoOwnedWorktree,
+    isClisbotOwnedWorktree,
     isOnBaseBranch: isCurrentBranchBase(gitStatus?.currentBranch, baseRef),
     canMergeLocally: canMergeIntoLocalBase(gitStatus?.currentBranch, baseRef),
     shouldPromoteArchive: computeShouldPromoteArchive({
@@ -364,7 +364,7 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     if (!gitStatus?.repoRoot) {
       return null;
     }
-    return `@paseo:changes-ship-default:${gitStatus.repoRoot}`;
+    return `@clisbot:changes-ship-default:${gitStatus.repoRoot}`;
   }, [gitStatus?.repoRoot]);
 
   useEffect(() => {
@@ -676,7 +676,7 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     hasRemote,
     hasFirstPushRemote,
     upstream,
-    isPaseoOwnedWorktree,
+    isClisbotOwnedWorktree,
     isOnBaseBranch,
     canMergeLocally,
     shouldPromoteArchive,
@@ -709,7 +709,7 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
       hasRemote,
       hasFirstPushRemote,
       upstream,
-      isPaseoOwnedWorktree,
+      isClisbotOwnedWorktree,
       isOnBaseBranch,
       canMergeLocally,
       hasUncommittedChanges,
@@ -829,7 +829,7 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     prStatus?.github,
     aheadCount,
     behindBaseCount,
-    isPaseoOwnedWorktree,
+    isClisbotOwnedWorktree,
     isOnBaseBranch,
     canMergeLocally,
     githubFeaturesEnabled,
@@ -1092,7 +1092,7 @@ function translateGitActionUnavailableMessage(
       "workspace.git.actions.unavailable.updateDirty",
     "Merge PR isn't available right now because GitHub isn't connected":
       "workspace.git.actions.unavailable.mergePrNoGithub",
-    "Archive isn't available here because this workspace was not created as a Paseo worktree":
+    "Archive isn't available here because this workspace was not created as a Clisbot worktree":
       "workspace.git.actions.unavailable.archiveNotWorktree",
     "Merge PR isn't available because there isn't a pull request yet":
       "workspace.git.actions.unavailable.mergePrMissing",

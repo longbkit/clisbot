@@ -1,0 +1,4 @@
+{
+  "id": "agent-tools",
+  "requirements": { "clisbot": ">=0.14.0-beta.1" }
+}

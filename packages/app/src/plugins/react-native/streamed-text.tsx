@@ -1,4 +1,4 @@
-import type { StreamedTextProps } from "@getpaseo/plugin/client/ui";
+import type { StreamedTextProps } from "@clisbot/plugin/client/ui";
 import { Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useRevealedText } from "@/hooks/use-revealed-text";

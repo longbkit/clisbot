@@ -6,7 +6,7 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
-const [, , session, metroUrl, serverId, appId = "sh.paseo.debug"] = process.argv;
+const [, , session, metroUrl, serverId, appId = "sh.clisbot.debug"] = process.argv;
 assert(
   session && metroUrl && serverId,
   "Pass the agent-device session, Metro URL and connected host ID",
@@ -77,9 +77,9 @@ ad("cdp", "target", "select", targets[0].split(/\s+/)[0]);
 
 try {
   evaluate(`(${reactNative}).Keyboard.dismiss()`);
-  ad("open", appId, "paseo://settings", "--platform", "android", "--no-test-ime");
+  ad("open", appId, "clisbot://settings", "--platform", "android", "--no-test-ime");
   ad("wait", "text", "Appearance", "5000");
-  ad("open", appId, "paseo://settings/appearance", "--platform", "android", "--no-test-ime");
+  ad("open", appId, "clisbot://settings/appearance", "--platform", "android", "--no-test-ime");
   ad("wait", "text", "Code size", "5000");
   const snapshot = JSON.parse(ad("snapshot", "-i", "--json"));
   const numericFields = snapshot.data.nodes.filter(
@@ -106,7 +106,7 @@ try {
   ad(
     "open",
     appId,
-    `paseo://settings/hosts/${encodeURIComponent(serverId)}/plugins`,
+    `clisbot://settings/hosts/${encodeURIComponent(serverId)}/plugins`,
     "--platform",
     "android",
     "--no-test-ime",

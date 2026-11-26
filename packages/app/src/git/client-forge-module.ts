@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import type { ReactNode } from "react";
 import type { z } from "zod";
-import type { CheckoutPrMergeMethod, CheckoutPrStatusResponse } from "@getpaseo/protocol/messages";
+import type { CheckoutPrMergeMethod, CheckoutPrStatusResponse } from "@clisbot/protocol/messages";
 import type { Theme } from "@/styles/theme";
 import type { Forge } from "@/git/forge";
 import type { PrPaneCheck } from "@/git/pull-request-panel/data";

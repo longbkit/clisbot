@@ -16,7 +16,7 @@ import { FAQItem } from "~/components/faq-item";
 import { HubAutomationsShowcase } from "~/components/hub-automations";
 import { HUB_AGENT_HARNESSES, HubArchitectureDiagram } from "~/components/hub-flow";
 import { ChapterBand, HairlineGrid, PageHeaderBand, SectionOpener } from "~/components/page-frame";
-import { PaseoHubLockup } from "~/components/paseo-brand";
+import { ClisbotHubLockup } from "~/components/clisbot-brand";
 import { SiteFooter } from "~/components/site-footer";
 import {
   billingUnitLabel,
@@ -57,7 +57,7 @@ export const Route = createFileRoute("/{-$locale}/hub")({
   component: Hub,
 });
 
-const HOSTED_HUB_URL = "https://hub.paseo.sh";
+const HOSTED_HUB_URL = "https://hub.clisbot.com";
 
 const LINK_CLASS = "underline hover:text-white/80";
 const PRIMARY_CTA_CLASS =
@@ -110,7 +110,7 @@ function HubHero() {
   return (
     <header className="space-y-6">
       <h1>
-        <PaseoHubLockup size="display" className="h-10 w-auto text-foreground md:h-12" />
+        <ClisbotHubLockup size="display" className="h-10 w-auto text-foreground md:h-12" />
         <span className="sr-only">{t("hub.title")}</span>
       </h1>
       <p className="max-w-2xl text-lg leading-relaxed text-white/70">{t("hub.intro")}</p>
@@ -206,7 +206,7 @@ function AuthoringYamlCard() {
   return (
     <div className="flex flex-col bg-[#0c1110]">
       <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.02] px-5 py-3">
-        <span className="font-mono text-xs text-white/70">.paseo/triggers/slack-help.yml</span>
+        <span className="font-mono text-xs text-white/70">.clisbot/triggers/slack-help.yml</span>
         <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-white/40">
           YAML
         </span>
@@ -231,7 +231,7 @@ function AuthoringYamlCard() {
           {"    Answer with hub.reply, then call hub.finish_execution."}
         </span>
         <span className="block text-emerald-300/80">{"    <user-prompt>"}</span>
-        <span className="block text-emerald-300/80">{"    ${{ paseo.prompt }}"}</span>
+        <span className="block text-emerald-300/80">{"    ${{ clisbot.prompt }}"}</span>
         <span className="block text-emerald-300/80">{"    </user-prompt>"}</span>
         <YamlKey k="outputs" indent={2} />
         <YamlKey k="slack.reply" indent={4} />
@@ -241,12 +241,12 @@ function AuthoringYamlCard() {
       <div className="space-y-1 border-t border-white/[0.08] bg-white/[0.02] px-5 py-3.5 font-mono text-xs text-white/65">
         <div>
           <span className="select-none text-white/30">$ </span>
-          <span className="text-white/90">paseo hub deploy</span>{" "}
+          <span className="text-white/90">clisbot hub deploy</span>{" "}
           <span className="text-sky-300/80">--dry-run</span>
         </div>
         <div>
           <span className="select-none text-white/30">$ </span>
-          <span className="text-white/90">paseo hub deploy</span>
+          <span className="text-white/90">clisbot hub deploy</span>
         </div>
       </div>
     </div>

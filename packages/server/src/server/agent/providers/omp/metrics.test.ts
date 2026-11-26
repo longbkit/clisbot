@@ -10,7 +10,7 @@ import { ompReplyStep, ompSessionMetrics } from "./metrics.js";
 import type { OmpAgentMessage } from "./rpc-types.js";
 import { FakeOmp } from "./test-utils/fake-omp.js";
 
-// The fields OMP records on an assistant message, which Paseo's message schema leaves untyped.
+// The fields OMP records on an assistant message, which Clisbot's message schema leaves untyped.
 function reply(fields: Record<string, unknown> = {}): OmpAgentMessage {
   return {
     role: "assistant",
@@ -191,7 +191,7 @@ describe("OMP metrics through the session", () => {
 
 describe("OMP history metrics", () => {
   async function sessionFile(messages: Record<string, unknown>[]) {
-    const directory = await mkdtemp(join(tmpdir(), "paseo-omp-metrics-"));
+    const directory = await mkdtemp(join(tmpdir(), "clisbot-omp-metrics-"));
     const file = join(directory, "session.jsonl");
     const entries = [
       { type: "session", id: "root", parentId: null },

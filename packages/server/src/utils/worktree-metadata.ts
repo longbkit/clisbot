@@ -17,7 +17,7 @@ const ChangeRequestLookupTargetSchema = z.object({
 // baseRefName is the display name; baseRef is the checkout's current exact base
 // ("refs/remotes/upstream/main"). baseRef is optional because worktrees written before it
 // existed only have the name — there are no migrations, so readers fall back.
-const PaseoWorktreeMetadataV1Schema = z.object({
+const ClisbotWorktreeMetadataV1Schema = z.object({
   version: z.literal(1),
   baseRefName: z.string().min(1),
   baseRef: z.string().min(1).optional(),
@@ -25,7 +25,7 @@ const PaseoWorktreeMetadataV1Schema = z.object({
   worktreeManagerPluginId: z.string().min(1).optional(),
 });
 
-const PaseoWorktreeMetadataV2Schema = z.object({
+const ClisbotWorktreeMetadataV2Schema = z.object({
   version: z.literal(2),
   baseRefName: z.string().min(1),
   baseRef: z.string().min(1).optional(),
@@ -51,24 +51,24 @@ const PaseoWorktreeMetadataV2Schema = z.object({
     .optional(),
 });
 
-const PaseoWorktreeMetadataSchema = z.union([
-  PaseoWorktreeMetadataV1Schema,
-  PaseoWorktreeMetadataV2Schema,
+const ClisbotWorktreeMetadataSchema = z.union([
+  ClisbotWorktreeMetadataV1Schema,
+  ClisbotWorktreeMetadataV2Schema,
 ]);
 
-export type PaseoWorktreeMetadata = z.infer<typeof PaseoWorktreeMetadataSchema>;
-export type PaseoWorktreeChangeRequestHint = z.infer<typeof ChangeRequestLookupTargetSchema>;
+export type ClisbotWorktreeMetadata = z.infer<typeof ClisbotWorktreeMetadataSchema>;
+export type ClisbotWorktreeChangeRequestHint = z.infer<typeof ChangeRequestLookupTargetSchema>;
 
-export function createPaseoWorktreeChangeRequestHint(
-  input: PaseoWorktreeChangeRequestHint,
-): PaseoWorktreeChangeRequestHint {
+export function createClisbotWorktreeChangeRequestHint(
+  input: ClisbotWorktreeChangeRequestHint,
+): ClisbotWorktreeChangeRequestHint {
   return ChangeRequestLookupTargetSchema.parse(input);
 }
 
-export function getPaseoWorktreeChangeRequestHintForBranch(
-  metadata: PaseoWorktreeMetadata | null,
+export function getClisbotWorktreeChangeRequestHintForBranch(
+  metadata: ClisbotWorktreeMetadata | null,
   currentBranch: string,
-): PaseoWorktreeChangeRequestHint | null {
+): ClisbotWorktreeChangeRequestHint | null {
   const target = metadata?.changeRequestLookupTarget;
   if (!target) {
     return null;
@@ -97,19 +97,19 @@ function normalizeLegacyGitHubOwnerForBranch(owner: string): string | null {
   return /^[a-z0-9-]+$/.test(normalized) ? normalized : null;
 }
 
-export async function rebindPaseoWorktreeChangeRequestHint(
+export async function rebindClisbotWorktreeChangeRequestHint(
   worktreeRoot: string,
   previousBranch: string,
   currentBranch: string,
 ): Promise<boolean> {
   return mutateMetadata(worktreeRoot, async (root) => {
     const metadata = await readMetadataFile(root);
-    const target = getPaseoWorktreeChangeRequestHintForBranch(metadata, previousBranch);
+    const target = getClisbotWorktreeChangeRequestHintForBranch(metadata, previousBranch);
     if (!metadata || !target) {
       return false;
     }
 
-    await writePaseoWorktreeMetadataFile(root, {
+    await writeClisbotWorktreeMetadataFile(root, {
       ...metadata,
       changeRequestLookupTarget: {
         ...target,
@@ -125,7 +125,7 @@ export async function rebindPaseoWorktreeChangeRequestHint(
   });
 }
 
-export async function pinPaseoWorktreeBranchIdentityIfMissing(
+export async function pinClisbotWorktreeBranchIdentityIfMissing(
   worktreeRoot: string,
   branch: string,
 ): Promise<boolean> {
@@ -134,11 +134,11 @@ export async function pinPaseoWorktreeBranchIdentityIfMissing(
     if (!metadata || metadata.changeRequestLookupTarget) {
       return false;
     }
-    const target = createPaseoWorktreeChangeRequestHint({
+    const target = createClisbotWorktreeChangeRequestHint({
       headRef: branch,
       localBranchName: branch,
     });
-    await writePaseoWorktreeMetadataFile(root, {
+    await writeClisbotWorktreeMetadataFile(root, {
       ...metadata,
       changeRequestLookupTarget: target,
     });
@@ -167,9 +167,9 @@ async function getGitDirForWorktreeRoot(worktreeRoot: string): Promise<string> {
   return gitPath;
 }
 
-export async function getPaseoWorktreeMetadataPath(worktreeRoot: string): Promise<string> {
+export async function getClisbotWorktreeMetadataPath(worktreeRoot: string): Promise<string> {
   const gitDir = await getGitDirForWorktreeRoot(worktreeRoot);
-  return join(gitDir, "paseo", "worktree.json");
+  return join(gitDir, "clisbot", "worktree.json");
 }
 
 export function isQualifiedRef(ref: string): boolean {
@@ -223,12 +223,12 @@ function assertValidBaseRef(value: string): void {
   }
 }
 
-export async function writePaseoWorktreeMetadata(
+export async function writeClisbotWorktreeMetadata(
   worktreeRoot: string,
   options: {
     baseRefName: string;
     baseRef?: string;
-    changeRequestLookupTarget?: PaseoWorktreeChangeRequestHint;
+    changeRequestLookupTarget?: ClisbotWorktreeChangeRequestHint;
     worktreeManagerPluginId?: string;
   },
 ): Promise<void> {
@@ -240,7 +240,7 @@ export async function writePaseoWorktreeMetadata(
       assertValidBaseRef(baseRef);
     }
 
-    const metadata: PaseoWorktreeMetadata = {
+    const metadata: ClisbotWorktreeMetadata = {
       version: 1,
       baseRefName,
       ...(baseRef ? { baseRef } : {}),
@@ -251,18 +251,18 @@ export async function writePaseoWorktreeMetadata(
         ? { worktreeManagerPluginId: options.worktreeManagerPluginId }
         : {}),
     };
-    await writePaseoWorktreeMetadataFile(root, metadata);
+    await writeClisbotWorktreeMetadataFile(root, metadata);
   });
 }
 
-export async function setPaseoWorktreeBaseRef(input: {
+export async function setClisbotWorktreeBaseRef(input: {
   worktreeRoot: string;
   baseRef: string;
 }): Promise<void> {
   return mutateMetadata(input.worktreeRoot, async (root) => {
     const current = await readMetadataFile(root);
     if (!current) throw new Error("Cannot change base: missing worktree metadata");
-    await writePaseoWorktreeMetadataFile(root, {
+    await writeClisbotWorktreeMetadataFile(root, {
       ...current,
       baseRefName: branchNameFromRef(input.baseRef),
       baseRef: input.baseRef,
@@ -270,7 +270,7 @@ export async function setPaseoWorktreeBaseRef(input: {
   });
 }
 
-export async function writePaseoWorktreeRuntimeMetadata(
+export async function writeClisbotWorktreeRuntimeMetadata(
   worktreeRoot: string,
   options: { worktreePort: number },
 ): Promise<void> {
@@ -284,18 +284,18 @@ export async function writePaseoWorktreeRuntimeMetadata(
       throw new Error("Cannot persist worktree runtime metadata: missing base metadata");
     }
 
-    const next: PaseoWorktreeMetadata = {
+    const next: ClisbotWorktreeMetadata = {
       ...current,
       version: 2,
       runtime: {
         worktreePort: options.worktreePort,
       },
     };
-    await writePaseoWorktreeMetadataFile(root, next);
+    await writeClisbotWorktreeMetadataFile(root, next);
   });
 }
 
-export async function writePaseoWorktreeFirstAgentBranchAutoNameMetadata(
+export async function writeClisbotWorktreeFirstAgentBranchAutoNameMetadata(
   worktreeRoot: string,
   options: { placeholderBranchName: string },
 ): Promise<void> {
@@ -312,7 +312,7 @@ export async function writePaseoWorktreeFirstAgentBranchAutoNameMetadata(
       );
     }
 
-    await writePaseoWorktreeMetadataFile(root, {
+    await writeClisbotWorktreeMetadataFile(root, {
       ...current,
       version: 2,
       firstAgentBranchAutoName: {
@@ -323,10 +323,10 @@ export async function writePaseoWorktreeFirstAgentBranchAutoNameMetadata(
   });
 }
 
-export async function markPaseoWorktreeFirstAgentBranchAutoNameAttempted(
+export async function markClisbotWorktreeFirstAgentBranchAutoNameAttempted(
   worktreeRoot: string,
   options: { attemptedAt?: string } = {},
-): Promise<PaseoWorktreeMetadata | null> {
+): Promise<ClisbotWorktreeMetadata | null> {
   return mutateMetadata(worktreeRoot, async (root) => {
     const current = await readMetadataFile(root);
     if (
@@ -337,7 +337,7 @@ export async function markPaseoWorktreeFirstAgentBranchAutoNameAttempted(
       return current;
     }
 
-    const next: PaseoWorktreeMetadata = {
+    const next: ClisbotWorktreeMetadata = {
       ...current,
       firstAgentBranchAutoName: {
         status: "attempted",
@@ -345,26 +345,26 @@ export async function markPaseoWorktreeFirstAgentBranchAutoNameAttempted(
         attemptedAt: options.attemptedAt ?? new Date().toISOString(),
       },
     };
-    await writePaseoWorktreeMetadataFile(root, next);
+    await writeClisbotWorktreeMetadataFile(root, next);
     return next;
   });
 }
 
-export async function hasPaseoWorktreeMetadata(worktreeRoot: string): Promise<boolean> {
+export async function hasClisbotWorktreeMetadata(worktreeRoot: string): Promise<boolean> {
   try {
-    return (await readPaseoWorktreeMetadata(worktreeRoot)) !== null;
+    return (await readClisbotWorktreeMetadata(worktreeRoot)) !== null;
   } catch {
     return false;
   }
 }
 
 /**
- * Filesystem-only search for a Paseo worktree root at or above cwd: the
+ * Filesystem-only search for a Clisbot worktree root at or above cwd: the
  * first directory containing a .git entry wins, and it only counts when
- * its git admin dir holds the paseo/worktree.json marker. Lets callers
+ * its git admin dir holds the clisbot/worktree.json marker. Lets callers
  * cheaply rule out plain directories before running git ownership checks.
  */
-export async function findPaseoWorktreeRootForCwd(cwd: string): Promise<string | null> {
+export async function findClisbotWorktreeRootForCwd(cwd: string): Promise<string | null> {
   let current = resolve(cwd);
   for (;;) {
     if (
@@ -373,7 +373,7 @@ export async function findPaseoWorktreeRootForCwd(cwd: string): Promise<string |
         () => false,
       )
     ) {
-      return (await hasPaseoWorktreeMetadata(current)) ? current : null;
+      return (await hasClisbotWorktreeMetadata(current)) ? current : null;
     }
     const parent = dirname(current);
     if (parent === current) {
@@ -383,18 +383,18 @@ export async function findPaseoWorktreeRootForCwd(cwd: string): Promise<string |
   }
 }
 
-export async function readPaseoWorktreeMetadata(
+export async function readClisbotWorktreeMetadata(
   worktreeRoot: string,
-): Promise<PaseoWorktreeMetadata | null> {
+): Promise<ClisbotWorktreeMetadata | null> {
   const key = await resolveMetadataIdentity(worktreeRoot);
   await metadataMutations.get(key)?.catch(() => {});
   return metadataIo(() => readMetadataFile(key));
 }
 
-async function readMetadataFile(worktreeRoot: string): Promise<PaseoWorktreeMetadata | null> {
-  const metadataPath = await getPaseoWorktreeMetadataPath(worktreeRoot);
+async function readMetadataFile(worktreeRoot: string): Promise<ClisbotWorktreeMetadata | null> {
+  const metadataPath = await getClisbotWorktreeMetadataPath(worktreeRoot);
   try {
-    return PaseoWorktreeMetadataSchema.parse(JSON.parse(await readBoundedFile(metadataPath)));
+    return ClisbotWorktreeMetadataSchema.parse(JSON.parse(await readBoundedFile(metadataPath)));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
@@ -409,7 +409,7 @@ async function readBoundedFile(path: string): Promise<string> {
     const info = await file.stat();
     const limit = MAX_WORKTREE_METADATA_BYTES;
     if (!info.isFile() || info.size > limit)
-      throw new Error(`Invalid Paseo worktree metadata file: ${path}`);
+      throw new Error(`Invalid Clisbot worktree metadata file: ${path}`);
     const buffer = Buffer.alloc(limit + 1);
     let length = 0;
     while (length < buffer.length) {
@@ -417,24 +417,24 @@ async function readBoundedFile(path: string): Promise<string> {
       if (bytesRead === 0) break;
       length += bytesRead;
     }
-    if (length > limit) throw new Error(`Invalid Paseo worktree metadata file: ${path}`);
+    if (length > limit) throw new Error(`Invalid Clisbot worktree metadata file: ${path}`);
     return buffer.toString("utf8", 0, length);
   } finally {
     await file.close();
   }
 }
 
-export async function requirePaseoWorktreeBaseRefName(worktreeRoot: string): Promise<string> {
-  const metadataPath = await getPaseoWorktreeMetadataPath(worktreeRoot);
-  const metadata = await readPaseoWorktreeMetadata(worktreeRoot);
+export async function requireClisbotWorktreeBaseRefName(worktreeRoot: string): Promise<string> {
+  const metadataPath = await getClisbotWorktreeMetadataPath(worktreeRoot);
+  const metadata = await readClisbotWorktreeMetadata(worktreeRoot);
   if (!metadata) {
-    throw new Error(`Missing Paseo worktree base metadata: ${metadataPath}`);
+    throw new Error(`Missing Clisbot worktree base metadata: ${metadataPath}`);
   }
   return metadata.baseRefName;
 }
 
-export async function readPaseoWorktreeRuntimePort(worktreeRoot: string): Promise<number | null> {
-  const metadata = await readPaseoWorktreeMetadata(worktreeRoot);
+export async function readClisbotWorktreeRuntimePort(worktreeRoot: string): Promise<number | null> {
+  const metadata = await readClisbotWorktreeMetadata(worktreeRoot);
   if (!metadata) {
     return null;
   }
@@ -444,18 +444,18 @@ export async function readPaseoWorktreeRuntimePort(worktreeRoot: string): Promis
   return null;
 }
 
-async function writePaseoWorktreeMetadataFile(
+async function writeClisbotWorktreeMetadataFile(
   worktreeRoot: string,
-  metadata: PaseoWorktreeMetadata,
+  metadata: ClisbotWorktreeMetadata,
 ): Promise<void> {
-  const metadataPath = await getPaseoWorktreeMetadataPath(worktreeRoot);
+  const metadataPath = await getClisbotWorktreeMetadataPath(worktreeRoot);
   const contents = `${JSON.stringify(metadata, null, 2)}\n`;
   if (Buffer.byteLength(contents) > MAX_WORKTREE_METADATA_BYTES) {
-    throw new Error(`Invalid Paseo worktree metadata file: ${metadataPath}`);
+    throw new Error(`Invalid Clisbot worktree metadata file: ${metadataPath}`);
   }
   // Never recreate an archived Git directory while a queued mutation is pending.
   try {
-    await mkdir(join(await getGitDirForWorktreeRoot(worktreeRoot), "paseo"));
+    await mkdir(join(await getGitDirForWorktreeRoot(worktreeRoot), "clisbot"));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
   }

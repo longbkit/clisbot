@@ -1,6 +1,6 @@
 import type { ComposerOptionControls } from "@/agent-controls/option-controls";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import { Keyboard, StyleSheet as RNStyleSheet, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
@@ -30,8 +30,8 @@ import {
   validateDraftSubmission,
 } from "@/composer/draft/workspace-tab-core";
 import { DRAFT_CAPABILITIES } from "@/composer/draft/timeline";
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { WorkspaceComposerAttachment } from "@/attachments/types";
 import {
   useDraftWorkspaceAttachmentScopeKey,

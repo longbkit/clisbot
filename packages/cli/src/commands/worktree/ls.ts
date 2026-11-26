@@ -56,7 +56,7 @@ export async function runLsCommand(
     const agents = agentsPayload.entries.map((entry) => entry.agent);
 
     // Get worktree list from daemon
-    const response = await client.getPaseoWorktreeList({ cwd });
+    const response = await client.getClisbotWorktreeList({ cwd });
 
     await client.close();
 

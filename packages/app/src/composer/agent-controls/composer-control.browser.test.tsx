@@ -2,7 +2,7 @@ import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Scan } from "lucide-react-native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentOptionControl } from "@getpaseo/protocol/agent-types";
+import type { AgentOptionControl } from "@clisbot/protocol/agent-types";
 import type { ToastApi } from "@/components/toast-host";
 import { ToastApiProvider } from "@/contexts/toast-api-context";
 import { ComposerControls, type ComposerControlItem } from "./composer-control";

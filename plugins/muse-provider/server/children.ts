@@ -1,4 +1,4 @@
-import type { ProviderEvent } from "@getpaseo/plugin/server/provider";
+import type { ProviderEvent } from "@clisbot/plugin/server/provider";
 import { MspConnection, type Notification } from "./connection.js";
 import { Timeline } from "./timeline.js";
 import {

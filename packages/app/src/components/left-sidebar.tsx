@@ -113,7 +113,7 @@ type SidebarTheme = ReturnType<typeof useUnistyles>["theme"];
 /** The footer icon line's inset; the overflow layout counts it as space the buttons can't use. */
 const FOOTER_ROW_PADDING = SPACING[2];
 
-const DEV_BUILD_LABEL = process.env.EXPO_PUBLIC_PASEO_DEV_BUILD_LABEL?.trim() || null;
+const DEV_BUILD_LABEL = process.env.EXPO_PUBLIC_CLISBOT_DEV_BUILD_LABEL?.trim() || null;
 
 interface SidebarSharedProps {
   theme: SidebarTheme;

@@ -14,9 +14,9 @@ const entries = [
     value: {
       stable: {
         version: "0.15.0",
-        linuxAppImageAsset: "Paseo-x86_64.AppImage",
-        windowsX64Asset: "Paseo-Setup-0.15.0-x64.exe",
-        windowsArm64Asset: "Paseo-Setup-0.15.0-arm64.exe",
+        linuxAppImageAsset: "Clisbot-x86_64.AppImage",
+        windowsX64Asset: "Clisbot-Setup-0.15.0-x64.exe",
+        windowsArm64Asset: "Clisbot-Setup-0.15.0-arm64.exe",
       },
       beta: null,
     },

@@ -2,8 +2,8 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { defineSettings } from "@getpaseo/plugin";
-import type { PluginSettingsState } from "@getpaseo/plugin/server";
+import { defineSettings } from "@clisbot/plugin";
+import type { PluginSettingsState } from "@clisbot/plugin/server";
 import { z } from "zod";
 import { PluginSettingsStore } from "./index.js";
 

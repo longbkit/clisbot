@@ -15,7 +15,7 @@ on:
     connection: acme-github
     filters:
       repo: acme/project
-      contains: "@paseo"
+      contains: "@clisbot"
       from_users: [maintainer]
 run:
   target:
@@ -23,7 +23,7 @@ run:
     cwd: /workspace/project
     worktree:
       mode: branch-off
-      newBranch: trigger-${{ paseo.execution.id }}
+      newBranch: trigger-${{ clisbot.execution.id }}
       base: origin/main
   agent:
     provider: codex
@@ -41,7 +41,7 @@ run:
     Reply with the PR link using reply, then call finish_execution.
 
     <user-prompt>
-    ${{ paseo.prompt }}
+    ${{ clisbot.prompt }}
     </user-prompt>
 ```
 
@@ -83,7 +83,7 @@ run:
 ```yaml
 run:
   env:
-    SOME_TOKEN: "${{ paseo.connections.some-connection.token }}"
+    SOME_TOKEN: "${{ clisbot.connections.some-connection.token }}"
 ```
 
 Hub 会在准备 Agent 环境时解析该表达式。主机与权限边界见 [Hub 安全](/docs/hub/security)。

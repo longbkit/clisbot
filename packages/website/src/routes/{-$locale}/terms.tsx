@@ -9,7 +9,7 @@ export const Route = createFileRoute("/{-$locale}/terms")({
     const locale = routeLocale(params);
     const document = getLegalDocument("terms", locale);
     return pageMeta({
-      title: `${document.title} - Paseo`,
+      title: `${document.title} - Clisbot`,
       description: document.description,
       path: "/terms",
       locale,

@@ -1,12 +1,12 @@
 ---
 title: 浏览器自动化
-description: 在 Paseo 中给 Agent 一个真实的浏览器，用来打开页面、点击、输入并验证它们的工作。
+description: 在 Clisbot 中给 Agent 一个真实的浏览器，用来打开页面、点击、输入并验证它们的工作。
 nav: 概览
 ---
 
 # 浏览器自动化 {#browser-automation}
 
-Paseo 中的 Agent 可以操作真实的浏览器标签页，也就是你在 Paseo 桌面应用中看到的那些标签页。Agent 可以打开你的开发服务器、读取页面、点击走完一个流程、填写表单并截图，全程不离开你的机器。
+Clisbot 中的 Agent 可以操作真实的浏览器标签页，也就是你在 Clisbot 桌面应用中看到的那些标签页。Agent 可以打开你的开发服务器、读取页面、点击走完一个流程、填写表单并截图，全程不离开你的机器。
 
 这让前端工作形成了闭环：Agent 不再告诉你“这个改动应该能用”，而是打开页面亲自检查。
 
@@ -24,7 +24,7 @@ Paseo 中的 Agent 可以操作真实的浏览器标签页，也就是你在 Pas
 浏览器工具默认关闭。按主机开启：
 
 - **在应用中**：打开 **设置 → 你的主机 → Agents**，开启 **Browser tools**。
-- **在 `config.json` 中**（`~/.paseo/config.json`）：
+- **在 `config.json` 中**（`~/.clisbot/config.json`）：
 
 ```json
 {
@@ -36,13 +36,13 @@ Paseo 中的 Agent 可以操作真实的浏览器标签页，也就是你在 Pas
 }
 ```
 
-这些工具属于 [Paseo MCP 工具集](/docs/mcp)，因此同一页面上的 **启用 Paseo tools** 也必须开启，Agent 才能获得它们。已有的 Agent 可能需要重新加载才能获得新工具。
+这些工具属于 [Clisbot MCP 工具集](/docs/mcp)，因此同一页面上的 **启用 Clisbot tools** 也必须开启，Agent 才能获得它们。已有的 Agent 可能需要重新加载才能获得新工具。
 
-> 浏览器工具允许 Agent 访问和控制 Paseo 浏览器标签页，包括已登录的浏览器状态。只为你信任的 Agent 启用。
+> 浏览器工具允许 Agent 访问和控制 Clisbot 浏览器标签页，包括已登录的浏览器状态。只为你信任的 Agent 启用。
 
 ## 目前仅限桌面端 {#desktop-only-for-now}
 
-浏览器标签页由 Paseo 桌面应用承载。daemon 本身不运行浏览器：它把工具调用路由到已连接的桌面应用，没有已连接的桌面应用时返回错误。通信协议与宿主无关，因此以后其他宿主也可以承载同样的工具。
+浏览器标签页由 Clisbot 桌面应用承载。daemon 本身不运行浏览器：它把工具调用路由到已连接的桌面应用，没有已连接的桌面应用时返回错误。通信协议与宿主无关，因此以后其他宿主也可以承载同样的工具。
 
 ## Agent 如何看到页面 {#how-an-agent-sees-a-page}
 
@@ -75,6 +75,6 @@ agent ──MCP──▶ daemon (broker) ──▶ browser host (desktop app) �
 
 - 导航仅限 `http(s)` URL。
 - 文件上传只能引用 Agent 工作区内的文件。
-- 标签页共享你在 Paseo 中使用的浏览器配置，包括 cookie 和登录状态。这正是登录后测试能够工作的原因，也是该功能需要按主机手动开启的原因。
+- 标签页共享你在 Clisbot 中使用的浏览器配置，包括 cookie 和登录状态。这正是登录后测试能够工作的原因，也是该功能需要按主机手动开启的原因。
 
 完整的工具列表见[工具参考](/docs/browser-tools)。

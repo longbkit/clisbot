@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import { buildDocsNavTree, getDoc, getDocs } from "~/docs";
 import { splitLocalePath, useLocale, useLocalizePath } from "~/i18n";
 import { LanguageSelector } from "~/components/language-selector";
-import { PaseoLockup } from "~/components/paseo-brand";
+import { ClisbotLockup } from "~/components/clisbot-brand";
 import "~/styles.css";
 
 export const Route = createFileRoute("/{-$locale}/docs")({
@@ -38,10 +38,10 @@ function DocsLayout() {
         <div className="flex items-center justify-between p-4">
           <Link
             to={localize("/")}
-            aria-label="Paseo"
+            aria-label="Clisbot"
             className="inline-flex items-center text-foreground"
           >
-            <PaseoLockup className="h-[22px] w-auto" />
+            <ClisbotLockup className="h-[22px] w-auto" />
           </Link>
           <div className="flex items-center gap-3">
             <LanguageSelector />
@@ -69,10 +69,10 @@ function DocsLayout() {
           <div className="flex items-center justify-between gap-3 mb-8">
             <Link
               to={localize("/")}
-              aria-label="Paseo"
+              aria-label="Clisbot"
               className="inline-flex items-center text-foreground"
             >
-              <PaseoLockup className="h-[22px] w-auto" />
+              <ClisbotLockup className="h-[22px] w-auto" />
             </Link>
             <LanguageSelector />
           </div>

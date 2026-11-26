@@ -1,6 +1,6 @@
 import React, { createContext, useContext, type ReactNode } from "react";
 import invariant from "tiny-invariant";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import type { WorkspaceFileOpenRequest } from "@/workspace/file-open";
 import type { OpenInSidePaneSource } from "@/workspace-tabs/open-beside";

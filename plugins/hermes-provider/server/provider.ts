@@ -1,5 +1,5 @@
-import { runAcpProvider } from "@getpaseo/plugin/server/acp";
-import type { ProviderRegistration } from "@getpaseo/plugin/server/provider";
+import { runAcpProvider } from "@clisbot/plugin/server/acp";
+import type { ProviderRegistration } from "@clisbot/plugin/server/provider";
 import { legacyModes } from "./legacy-modes.js";
 import { terminalCommand } from "./terminal-command.js";
 

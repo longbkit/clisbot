@@ -8,7 +8,7 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
 // Runs the real `codex` binary against a local Responses endpoint standing in
 // for a custom provider's OPENAI_BASE_URL, so no login is needed.
@@ -99,7 +99,7 @@ describe("Codex custom provider archive", () => {
     const { baseUrl, server } = await startResponsesEndpoint();
     cleanups.push(() => closeServer(server));
 
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       logger: createTestLogger(),
       pluginsEnabled: false,
       providerOverrides: {

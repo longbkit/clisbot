@@ -1,7 +1,7 @@
-import type { DiffState, OwnedSubscription, SubscriptionObserver } from "@getpaseo/client";
+import type { DiffState, OwnedSubscription, SubscriptionObserver } from "@clisbot/client";
 import { QueryClient, QueryObserver, skipToken } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
-import type { MutableDaemonConfig, SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { MutableDaemonConfig, SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { deriveCheckoutDiffResult, type CheckoutDiffSnapshot } from "@/git/diff-snapshot";
 import { shareCheckoutDiff } from "@/git/diff-sharing";
 import { checkoutDiffQueryKey } from "@/git/query-keys";

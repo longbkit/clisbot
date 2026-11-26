@@ -1,4 +1,4 @@
-import type { AgentMetric } from "@getpaseo/protocol/agent-types";
+import type { AgentMetric } from "@clisbot/protocol/agent-types";
 import type { TurnTiming } from "@/timeline/turn-time";
 import type { StreamItem } from "@/types/stream";
 import { getAssistantMessageSpacing, getGapBetweenStreamItems } from "./spacing";

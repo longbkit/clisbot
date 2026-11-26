@@ -9,9 +9,9 @@ import type { Logger } from "pino";
 import { writeFileAtomic } from "../../../atomic-file.js";
 import {
   addModelVisibleStructuredContent,
-  serializePaseoToolInputParameters,
-} from "../../tools/paseo-tool-serialization.js";
-import { PaseoToolInputError, type PaseoToolCatalog } from "../../tools/types.js";
+  serializeClisbotToolInputParameters,
+} from "../../tools/clisbot-tool-serialization.js";
+import { ClisbotToolInputError, type ClisbotToolCatalog } from "../../tools/types.js";
 
 const INTERNAL_PREFIX = "/_internal/opencode";
 const MAX_REQUEST_BYTES = 1024 * 1024;
@@ -28,14 +28,14 @@ class OpenCodeBridgeClientError extends Error {
 }
 
 interface OpenCodeBridgeOptions {
-  paseoHome: string;
+  clisbotHome: string;
   logger: Logger;
   port?: number;
 }
 
 interface OpenCodeSessionBinding {
   env: Record<string, string>;
-  tools?: PaseoToolCatalog;
+  tools?: ClisbotToolCatalog;
 }
 
 interface BindOpenCodeSessionInput extends OpenCodeSessionBinding {
@@ -53,7 +53,7 @@ interface OpenCodeConfig {
 }
 
 export class OpenCodeBridge {
-  private readonly paseoHome: string;
+  private readonly clisbotHome: string;
   private readonly logger: Logger;
   private readonly port: number;
   private readonly token = randomBytes(32).toString("hex");
@@ -62,10 +62,10 @@ export class OpenCodeBridge {
   private baseUrl: string | null = null;
   private pluginUrl: string | null = null;
   private v2PluginUrl: string | null = null;
-  private manifestCatalog: Pick<PaseoToolCatalog, "tools"> | null = null;
+  private manifestCatalog: Pick<ClisbotToolCatalog, "tools"> | null = null;
 
   constructor(options: OpenCodeBridgeOptions) {
-    this.paseoHome = options.paseoHome;
+    this.clisbotHome = options.clisbotHome;
     this.logger = options.logger.child({ module: "agent", component: "opencode-bridge" });
     this.port = options.port ?? 0;
   }
@@ -92,13 +92,13 @@ export class OpenCodeBridge {
     this.baseUrl = `http://127.0.0.1:${address.port}`;
   }
 
-  setManifestCatalog(catalog: Pick<PaseoToolCatalog, "tools"> | null): void {
+  setManifestCatalog(catalog: Pick<ClisbotToolCatalog, "tools"> | null): void {
     this.manifestCatalog = catalog;
   }
 
   bindSession(input: BindOpenCodeSessionInput): () => void {
     if (this.sessions.has(input.sessionId))
-      throw new Error(`OpenCode session ${input.sessionId} is already bound to a Paseo agent`);
+      throw new Error(`OpenCode session ${input.sessionId} is already bound to a Clisbot agent`);
     const binding: OpenCodeSessionBinding = {
       env: { ...input.env },
       ...(input.tools ? { tools: input.tools } : {}),
@@ -121,7 +121,7 @@ export class OpenCodeBridge {
     const plugins = config.plugin ?? [];
     const withoutBridge = plugins.filter((entry) => {
       const specifier = Array.isArray(entry) ? entry[0] : entry;
-      return !specifier.includes("/paseo-") || !specifier.endsWith(".mjs");
+      return !specifier.includes("/clisbot-") || !specifier.endsWith(".mjs");
     });
     return {
       ...env,
@@ -150,10 +150,10 @@ export class OpenCodeBridge {
   }
 
   private async materializePlugin(version: 1 | 2 = 1): Promise<string> {
-    if (version === 2) return materializeOpenCodeV2Plugin(this.paseoHome);
+    if (version === 2) return materializeOpenCodeV2Plugin(this.clisbotHome);
     const artifact = await loadOpenCodeBridgePluginArtifact(import.meta.url);
     const digest = createHash("sha256").update(artifact).digest("hex");
-    const destination = path.join(this.paseoHome, "runtime", "opencode", `paseo-${digest}.mjs`);
+    const destination = path.join(this.clisbotHome, "runtime", "opencode", `clisbot-${digest}.mjs`);
     await writeFileAtomic(destination, artifact);
     return pathToFileURL(destination).href;
   }
@@ -178,7 +178,7 @@ export class OpenCodeBridge {
       if (request.method === "GET" && contextMatch) {
         const binding = this.sessions.get(decodeURIComponent(contextMatch[1]));
         if (!binding) {
-          sendJson(response, 404, { error: "OpenCode session is not bound to a Paseo agent" });
+          sendJson(response, 404, { error: "OpenCode session is not bound to a Clisbot agent" });
           return;
         }
         sendJson(response, 200, {
@@ -213,7 +213,7 @@ export class OpenCodeBridge {
             error: error.message,
             ...(error.details === undefined ? {} : { details: error.details }),
           });
-        } else if (error instanceof PaseoToolInputError) {
+        } else if (error instanceof ClisbotToolInputError) {
           sendJson(
             response,
             error.status,
@@ -231,11 +231,14 @@ export class OpenCodeBridge {
   }
 
   private serializeManifest(sessionId: string | null): Array<Record<string, unknown>> {
-    let catalog: Pick<PaseoToolCatalog, "tools"> | null | undefined = this.manifestCatalog;
+    let catalog: Pick<ClisbotToolCatalog, "tools"> | null | undefined = this.manifestCatalog;
     if (sessionId !== null) {
       const binding = this.sessions.get(sessionId);
       if (!binding) {
-        throw new OpenCodeBridgeClientError(404, "OpenCode session is not bound to a Paseo agent");
+        throw new OpenCodeBridgeClientError(
+          404,
+          "OpenCode session is not bound to a Clisbot agent",
+        );
       }
       catalog = binding.tools;
     }
@@ -244,7 +247,7 @@ export class OpenCodeBridge {
       const definition: Record<string, unknown> = {
         name: tool.name,
         description: tool.description,
-        inputSchema: serializePaseoToolInputParameters(tool),
+        inputSchema: serializeClisbotToolInputParameters(tool),
       };
       if (tool.title) definition.title = tool.title;
       return definition;
@@ -259,15 +262,15 @@ export class OpenCodeBridge {
   }): Promise<void> {
     const binding = this.sessions.get(input.sessionId);
     if (!binding) {
-      sendJson(input.response, 404, { error: "OpenCode session is not bound to a Paseo agent" });
+      sendJson(input.response, 404, { error: "OpenCode session is not bound to a Clisbot agent" });
       return;
     }
     if (!binding.tools) {
-      sendJson(input.response, 403, { error: "Paseo tools are disabled for this session" });
+      sendJson(input.response, 403, { error: "Clisbot tools are disabled for this session" });
       return;
     }
     if (!binding.tools.getTool(input.toolName)) {
-      throw new OpenCodeBridgeClientError(404, `Paseo tool not found: ${input.toolName}`);
+      throw new OpenCodeBridgeClientError(404, `Clisbot tool not found: ${input.toolName}`);
     }
     const body = await readJsonBody(input.request);
     const controller = new AbortController();
@@ -291,18 +294,18 @@ export class OpenCodeBridge {
   }
 }
 
-export async function materializeOpenCodeV2Plugin(paseoHome: string): Promise<string> {
+export async function materializeOpenCodeV2Plugin(clisbotHome: string): Promise<string> {
   const artifact = await loadOpenCodeBridgePluginArtifact(import.meta.url, undefined, 2);
   const digest = createHash("sha256").update(artifact).digest("hex");
   // V2 ignores configured file paths; it loads a package directory's server entry point.
-  const directory = path.join(paseoHome, "runtime", "opencode", `paseo-v2-${digest}`);
+  const directory = path.join(clisbotHome, "runtime", "opencode", `clisbot-v2-${digest}`);
   await writeFileAtomic(path.join(directory, "server.js"), artifact);
   const state = await readFile(new URL("./v2/state.mjs", import.meta.url));
   await writeFileAtomic(path.join(directory, "state.mjs"), state);
   await writeFileAtomic(
     path.join(directory, "package.json"),
     JSON.stringify({
-      name: "paseo-opencode-bridge",
+      name: "clisbot-opencode-bridge",
       private: true,
       type: "module",
       exports: { "./server": "./server.js" },

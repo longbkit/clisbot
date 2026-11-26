@@ -1,4 +1,4 @@
-import type { ProviderOptions } from "@getpaseo/protocol/agent-types";
+import type { ProviderOptions } from "@clisbot/protocol/agent-types";
 import { mapCustomMessageToToolCall } from "../custom-message.js";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -42,7 +42,7 @@ import {
   type SteerResult,
   type ToolCallDetail,
 } from "../../agent-sdk-types.js";
-import type { PaseoToolCatalog } from "../../tools/types.js";
+import type { ClisbotToolCatalog } from "../../tools/types.js";
 import { importSessionFromPersistence } from "../../provider-session-import.js";
 import { runProviderRefreshActivity } from "../../provider-refresh-deadline.js";
 import { runProviderTurn } from "../provider-runner.js";
@@ -458,7 +458,7 @@ function withOmpCapabilities(): AgentCapabilityFlags {
   return {
     ...OMP_CORE_CAPABILITIES,
     supportsMcpServers: true,
-    supportsNativePaseoTools: true,
+    supportsNativeClisbotTools: true,
   };
 }
 
@@ -1968,7 +1968,7 @@ export class OmpAgentSession implements AgentSession {
           return;
         }
         // A state request is processed after OMP's RPC loop becomes promptable,
-        // so do not advertise Paseo idle until it reports that transition.
+        // so do not advertise Clisbot idle until it reports that transition.
         void this.completeTurnAfterProviderIdle(turnId, terminalMessages);
         return;
       }
@@ -2352,9 +2352,9 @@ export class OmpAgentClient implements AgentClient {
     this.runtime = options.runtime;
   }
 
-  private async configureNativePaseoTools(
+  private async configureNativeClisbotTools(
     runtimeSession: OmpRuntimeSession,
-    catalog: PaseoToolCatalog | undefined,
+    catalog: ClisbotToolCatalog | undefined,
     config: AgentSessionConfig,
     launchEnv?: NodeJS.ProcessEnv,
   ): Promise<OmpHostToolRouter | undefined> {
@@ -2413,9 +2413,9 @@ export class OmpAgentClient implements AgentClient {
     );
     let hostTools: OmpHostToolRouter | undefined;
     try {
-      hostTools = await this.configureNativePaseoTools(
+      hostTools = await this.configureNativeClisbotTools(
         runtimeSession,
-        launchContext?.paseoTools,
+        launchContext?.clisbotTools,
         config,
         startInput.env,
       );
@@ -2483,9 +2483,9 @@ export class OmpAgentClient implements AgentClient {
     ).startSession(startInput);
     let hostTools: OmpHostToolRouter | undefined;
     try {
-      hostTools = await this.configureNativePaseoTools(
+      hostTools = await this.configureNativeClisbotTools(
         runtimeSession,
-        launchContext?.paseoTools,
+        launchContext?.clisbotTools,
         resumeConfig.config,
         startInput.env,
       );
@@ -2562,9 +2562,9 @@ export class OmpAgentClient implements AgentClient {
       });
       let hostTools: OmpHostToolRouter | undefined;
       try {
-        hostTools = await this.configureNativePaseoTools(
+        hostTools = await this.configureNativeClisbotTools(
           next,
-          launchContext?.paseoTools,
+          launchContext?.clisbotTools,
           config,
           startInput.env,
         );

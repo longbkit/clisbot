@@ -64,7 +64,7 @@ describe("OMP ask RPC UI", () => {
     });
     startAsk(omp, true);
   });
-  test("answers the multi-select loop from one Paseo question", async () => {
+  test("answers the multi-select loop from one Clisbot question", async () => {
     const omp = new OmpHarness();
     await omp.start();
     startAsk(omp, true);

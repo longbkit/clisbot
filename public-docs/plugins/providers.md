@@ -1,6 +1,6 @@
 ---
 title: Build a provider plugin
-description: Add a coding agent to Paseo directly or adapt an ACP agent.
+description: Add a coding agent to Clisbot directly or adapt an ACP agent.
 nav: Provider plugins
 order: 46
 category: Plugins
@@ -8,10 +8,10 @@ category: Plugins
 
 # Build a provider plugin
 
-Start with the [plugin quickstart](/docs/plugins) if you have not built a Paseo plugin before.
+Start with the [plugin quickstart](/docs/plugins) if you have not built a Clisbot plugin before.
 
-A provider plugin connects a coding agent to Paseo without adding it to Paseo core. [Publish the plugin](/docs/plugins/publishing) on npm or in a Git repository so users can
-install it with `paseo plugin install`.
+A provider plugin connects a coding agent to Clisbot without adding it to Clisbot core. [Publish the plugin](/docs/plugins/publishing) on npm or in a Git repository so users can
+install it with `clisbot plugin install`.
 
 Choose one implementation path:
 
@@ -22,9 +22,9 @@ Choose one implementation path:
 
 The examples are:
 
-- [`provider-direct`](https://github.com/getpaseo/paseo/tree/main/plugin-examples/provider-direct): sessions, option controls, prompts, persistence, child sessions, and a provider-owned timeline renderer;
-- [`provider-acp-transformer`](https://github.com/getpaseo/paseo/tree/main/plugin-examples/provider-acp-transformer): an ACP command template with a Zod-validated vendor edit transformer. Replace `example-acp --stdio` with an installed ACP agent before loading it;
-- [`inline-thinking`](https://github.com/getpaseo/paseo/tree/main/plugin-examples/inline-thinking): a renderer-only plugin that does not implement a provider.
+- [`provider-direct`](https://github.com/longbkit/clisbot/tree/main/plugin-examples/provider-direct): sessions, option controls, prompts, persistence, child sessions, and a provider-owned timeline renderer;
+- [`provider-acp-transformer`](https://github.com/longbkit/clisbot/tree/main/plugin-examples/provider-acp-transformer): an ACP command template with a Zod-validated vendor edit transformer. Replace `example-acp --stdio` with an installed ACP agent before loading it;
+- [`inline-thinking`](https://github.com/longbkit/clisbot/tree/main/plugin-examples/inline-thinking): a renderer-only plugin that does not implement a provider.
 
 ## Register a direct provider
 
@@ -32,7 +32,7 @@ Add a server entry:
 
 ```ts
 // index.server.ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { createProvider } from "./server/provider";
 
 export default function contribute(server: PluginServerContext) {
@@ -47,7 +47,7 @@ export default function contribute(server: PluginServerContext) {
 import {
   negotiateProviderCapabilities,
   type ProviderRegistration,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 
 const supported = ["prompt.message"] as const;
 
@@ -75,7 +75,7 @@ to `ProviderEvent` objects before publishing it.
 
 ## Launch the provider CLI
 
-Use `spawnProcess` and `execCommand` from `@getpaseo/plugin/server` for process transports
+Use `spawnProcess` and `execCommand` from `@clisbot/plugin/server` for process transports
 and CLI probes. Both handle Windows `.cmd`/`.bat` launchers and quote shell arguments.
 Raw Node `spawn` and `execFile` reject those launchers on Windows.
 
@@ -86,7 +86,7 @@ shutdown; use `terminateProcess(child)` for a forced stop. It kills the process 
 including the CLI behind a command-script launcher. Bound your final wait for closed streams.
 
 ```ts
-import { spawnProcess, execCommand } from "@getpaseo/plugin/server";
+import { spawnProcess, execCommand } from "@clisbot/plugin/server";
 
 const child = spawnProcess(launch.command, [...launch.args, "serve"], {
   env: launch.env,
@@ -101,7 +101,7 @@ const { stdout } = await execCommand(launch.command, [...launch.args, "--version
 
 ## Return models, modes, and thinking options
 
-Paseo requests the catalog before creating a session. Return the choices needed by the agent form:
+Clisbot requests the catalog before creating a session. Return the choices needed by the agent form:
 
 ```ts
 if (input.type === "catalog") {
@@ -224,7 +224,7 @@ emit({ type: "session.turn", sessionId, turnId, state: "completed" });
 ```
 
 Publish exactly one `session.prompt_result` for each `clientMessageId`. Copy `clientMessageId` onto
-the user timeline item so Paseo replaces its optimistic message. Every started turn needs one
+the user timeline item so Clisbot replaces its optimistic message. Every started turn needs one
 terminal `completed`, `failed`, or `canceled` event.
 
 At this point the provider is usable: users can select a model, open a session, send a message, and
@@ -232,13 +232,13 @@ see the response.
 
 ## Add composer controls for provider options
 
-`providerOptions` is the provider's own configuration: one record of JSON values that Paseo
+`providerOptions` is the provider's own configuration: one record of JSON values that Clisbot
 stores per agent and hands to `session.open`. It includes the defaults a user set in `config.json`
 for your provider. Validate every key you read.
 
 Add `controls` only when users should see and change some of those options in the composer. A
 control draws one top-level key of `providerOptions` as a toggle or a select. It holds no value:
-Paseo reads the value from `providerOptions`. Publish the controls and the values you run with in
+Clisbot reads the value from `providerOptions`. Publish the controls and the values you run with in
 `session.config`:
 
 ```ts
@@ -270,7 +270,7 @@ emit({
 ```
 
 `icon` is a Lucide icon name. `defaultValue` is what a control shows for a key that has no value.
-Paseo stores every value you report when a session opens or a change is applied, including values
+Clisbot stores every value you report when a session opens or a change is applied, including values
 at the default and values nobody set. The same controls appear in the New workspace screen, in draft
 tabs, and on running agents. Offer a control only for a key you can change on a running session.
 The provider may change its controls at runtime, including after a model change.
@@ -281,38 +281,38 @@ that changed, whether or not they have a control. Apply every key and publish th
 every key as it was when you cannot apply one, for example a key you read only when a session
 opens. A
 value of `null` returns that key to the provider's default. Publish what the session ended up
-with, not a copy of the request: Paseo stores your published values so the stored options match
+with, not a copy of the request: Clisbot stores your published values so the stored options match
 what runs.
 
 If the provider changes an option on its own, for example a model switch turns Fast off, publish
-a new `session.config` with the new values. Paseo stores them and does not set the old ones
+a new `session.config` with the new values. Clisbot stores them and does not set the old ones
 back.
 
 Not every option needs a control. A provider-specific token budget, for example, belongs in
 `providerOptions` and is not a dedicated prompt field. It is delivered in `session.open`, a caller
 can change it on a running agent, and your `session.configure` handler decides whether it can
-apply it live. Report it in `providerOptions` so Paseo stores what runs.
+apply it live. Report it in `providerOptions` so Clisbot stores what runs.
 
 ## Add persistence and replay
 
 Advertise `session.persistence` when a native session can be reopened. Open a new native session
 when `session.open.persistence` is absent. Resume the identified native session when it is present.
-Return an opaque persistence value in `session.opened` or `session.persistence`; Paseo stores it
+Return an opaque persistence value in `session.opened` or `session.persistence`; Clisbot stores it
 without inspecting it.
 
 When `history` is `"replay"`, publish the native session's existing `timeline.item` snapshots before
 `session.ready`. Use `history: "skip"` to open without replaying old rows.
 
-Paseo refreshes an agent by closing its current provider session and opening it again with current
+Clisbot refreshes an agent by closing its current provider session and opening it again with current
 configuration and persistence. Re-read credentials, environment, global configuration, and MCP
 servers during `session.open`. There is no separate reload operation.
 
 Conversation and combined rewind require a core-restored session with persistence. After a
-successful rewind, Paseo closes the session and reopens its latest persistence value with
+successful rewind, Clisbot closes the session and reopens its latest persistence value with
 `history: "replay"`. Publish the retained native branch before `session.ready`, including its
 children. File-only rewind keeps the current session and conversation history.
 
-Use `restoration: "core"` when Paseo can reopen a session from persistence. A provider-owned child
+Use `restoration: "core"` when Clisbot can reopen a session from persistence. A provider-owned child
 uses `restoration: "parent"`; emit it as another `session.opened` event with `parentSessionId` and
 recreate it while restoring the parent.
 
@@ -328,12 +328,12 @@ All user input arrives through `session.prompt`:
 Publish `session.commands` to add structured commands to the composer. A command can start a normal
 turn or finish as a side effect with a `completed` prompt result.
 
-Advertise only capabilities you implement. If steering is unsupported, omit `prompt.steer`; Paseo
+Advertise only capabilities you implement. If steering is unsupported, omit `prompt.steer`; Clisbot
 can replace the active turn instead.
 
 ## Permit idle runtime cleanup
 
-Paseo can release an idle resumable session after one hour when its daemon baseline allows cleanup.
+Clisbot can release an idle resumable session after one hour when its daemon baseline allows cleanup.
 Add a provider-owned veto by advertising `session.can_stop_runtime` on the connection and the
 session's `session.opened` capabilities. Without this capability, the same baseline and one-hour
 idle period apply, and the plugin receives no safety request.
@@ -369,10 +369,10 @@ queued completion reports, or pending autonomous replies. This query must not st
 session. Return `false` while work remains. A rejected query, invalid response, or timeout also
 keeps the runtime alive. Never respond with `request.completed` for this query.
 
-Paseo always checks foreground work, permissions, queued deliveries, lifecycle operations,
+Clisbot always checks foreground work, permissions, queued deliveries, lifecycle operations,
 working managed/native descendants, and outstanding local or remote finish subscriptions for the
 caller. Subscription protection lasts through registration, recovery and notification dispatch
-acknowledgment. A positive provider response never overrides these blockers. Paseo rechecks
+acknowledgment. A positive provider response never overrides these blockers. Clisbot rechecks
 activity before the existing `session.close` operation. After protected work finishes, a fresh
 one-hour idle period starts. The saved provider persistence must resume the same conversation.
 The host setting `agents.idleRuntimeCleanup: false` disables collection for every provider.
@@ -380,7 +380,7 @@ The host setting `agents.idleRuntimeCleanup: false` disables collection for ever
 ## Publish timeline items
 
 Publish complete snapshots through `timeline.item`. Reuse an item `id` when updating streamed text,
-a running tool, or a todo list. Paseo derives the live delta and keeps the normal timeline.
+a running tool, or a todo list. Clisbot derives the live delta and keeps the normal timeline.
 
 Built-in item types cover user and assistant messages, reasoning, tools, todos, errors,
 notifications, and compaction. Use a plugin item when your provider has a presentation that those
@@ -404,7 +404,7 @@ emit({
 Register the renderer independently in `index.client.tsx`:
 
 ```tsx
-import type { PluginClientContext } from "@getpaseo/plugin/client";
+import type { PluginClientContext } from "@clisbot/plugin/client";
 import { z } from "zod";
 import { ReviewVerdict } from "./client/review-verdict";
 
@@ -429,10 +429,10 @@ daemon timeline append. A renderer does not require a provider implementation.
 
 ## Report metrics
 
-Report what your provider measured as `label` and `value` pairs. Paseo shows each value as given,
+Report what your provider measured as `label` and `value` pairs. Clisbot shows each value as given,
 so format it for reading: `12.4s`, not `12431`. You choose which metrics make sense for your agent.
 
-Add `metrics` to the `completed` turn event. Paseo shows them from the footer of that turn:
+Add `metrics` to the `completed` turn event. Clisbot shows them from the footer of that turn:
 
 ```ts
 emit({
@@ -449,7 +449,7 @@ emit({
 });
 ```
 
-Publish `session.metrics` for totals that cover the whole session. Paseo shows them in the context
+Publish `session.metrics` for totals that cover the whole session. Clisbot shows them in the context
 window details. Each event replaces the previous list, and an empty list clears it. Add
 `session.metrics` to your supported capabilities and publish the event only when it was negotiated:
 
@@ -466,14 +466,14 @@ if (capabilities.includes("session.metrics")) {
 }
 ```
 
-A Paseo from before session metrics does not offer the capability and closes a connection that
+A Clisbot from before session metrics does not offer the capability and closes a connection that
 sends the event. It ignores `metrics` on a turn, so turn metrics need no check.
 
 Set `tone` to `"ok"`, `"warning"`, or `"danger"` to color a value. When a completed turn has no
-`Model` metric, Paseo adds the session's model.
+`Model` metric, Clisbot adds the session's model.
 
 When `history` is `"replay"`, publish each old turn's `completed` event after that turn's items.
-Paseo puts the metrics back on the turn's footer.
+Clisbot puts the metrics back on the turn's footer.
 
 ## Report installation and updates
 
@@ -494,11 +494,11 @@ This `example-agent` prints its version, asks `self-update --check --json` for t
 updater installs, and updates with `self-update`:
 
 ```ts
-import { execCommand, spawnProcess, terminateProcess } from "@getpaseo/plugin/server";
+import { execCommand, spawnProcess, terminateProcess } from "@clisbot/plugin/server";
 import type {
   ProviderInstallation,
   ProviderInstallationLaunch,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 
 async function run(launch: ProviderInstallationLaunch, args: string[], signal: AbortSignal) {
   const { stdout } = await execCommand(launch.command, [...launch.args, ...args], {
@@ -567,7 +567,7 @@ export function createProvider(): ProviderRegistration {
 }
 ```
 
-Each callback receives the launch a session would use. When `launch.resolved` is `false`, Paseo did
+Each callback receives the launch a session would use. When `launch.resolved` is `false`, Clisbot did
 not find the executable and `command` is the configured name, so report `not_installed` without
 running it. `launch` is absent when the registration declares no `command`. `checkForUpdates` runs
 only after `inspect` reports the CLI installed, and receives the `version` it reported as
@@ -576,13 +576,13 @@ spread `runAcpProvider()` into the registration and add `installation` beside it
 update probes with the launch's arguments before your session subcommand, such as `hoplite
 --version` for a provider that runs `hoplite acp`.
 
-Paseo treats versions as text. It shows `version` and `versions` as written and never parses
+Clisbot treats versions as text. It shows `version` and `versions` as written and never parses
 them, so your check decides what counts as newer. Ask the source your CLI's own updater asks, and
 leave `checkForUpdates` out when you cannot. A check that returns `unknown`, throws, or misses its
 deadline shows **Couldn't check for updates** with your message and never shows **Up to date**.
 
-`update` runs only when a user selects **Update**, and Paseo runs one update per provider at a
-time. Pass the updater's output to `report` unchanged; Paseo keeps the last 65,536 characters. Paseo adds no
+`update` runs only when a user selects **Update**, and Clisbot runs one update per provider at a
+time. Pass the updater's output to `report` unchanged; Clisbot keeps the last 65,536 characters. Clisbot adds no
 verification of its own, so the update does what your command does in a terminal. Return
 `succeeded` with a message that says when the new version takes effect, or `failed` with the reason.
 A failed update shows until the user refreshes the provider. Without `update`, **Update instructions** opens `updateUrl` instead.
@@ -590,10 +590,10 @@ A failed update shows until the user refreshes the provider. Without `update`, *
 **Update** and **Update instructions** appear whenever `inspect` reports the CLI installed. The
 check only says what it knows beside them, so declare `update` even when you cannot check.
 
-Paseo calls `inspect` when the settings open and keeps the answer for 30 seconds. It keeps a
+Clisbot calls `inspect` when the settings open and keeps the answer for 30 seconds. It keeps a
 `current` or `available` answer from `checkForUpdates` for an hour while `inspect` reports the same
-version, so a CLI updated outside Paseo is checked again once the inspection expires. `inspect` must answer within 20 seconds and `checkForUpdates` within 25.
-`update` has no deadline. `signal` aborts when Paseo stops waiting or the daemon stops.
+version, so a CLI updated outside Clisbot is checked again once the inspection expires. `inspect` must answer within 20 seconds and `checkForUpdates` within 25.
+`update` has no deadline. `signal` aborts when Clisbot stops waiting or the daemon stops.
 See the [`installation` reference](/docs/plugins/reference#provider-installation) for every field.
 
 ## Help users fix problems
@@ -608,7 +608,7 @@ export function createProvider(): ProviderRegistration {
     id: "example-agent",
     label: "Example Agent",
     command: ["example-agent"],
-    docsUrl: "https://example.com/docs/paseo#troubleshooting",
+    docsUrl: "https://example.com/docs/clisbot#troubleshooting",
     async status({ launch }) {
       if (!launch) return { available: false, diagnostic: "example-agent has no command" };
       return { available: true, diagnostic: `Profile: ${launch.env.EXAMPLE_PROFILE ?? "default"}` };
@@ -621,19 +621,19 @@ export function createProvider(): ProviderRegistration {
 ```
 
 **Docs** opens `docsUrl`. **Diagnostic report** shows the command, the path of the executable and
-the version that Paseo found, then your `Profile` row. Report what the CLI reads from its
+the version that Clisbot found, then your `Profile` row. Report what the CLI reads from its
 environment, such as the account, the profile, or the configuration file in use. Those differ
 between the daemon and the user's terminal, and the user cannot see them from the app.
 See the [troubleshooting reference](/docs/plugins/reference#provider-troubleshooting) for the rows
-that Paseo writes and for the rules of `status`.
+that Clisbot writes and for the rules of `status`.
 
 ## Adapt an ACP agent
 
 Use the ACP shim when the agent already speaks ACP:
 
 ```ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
-import { runAcpProvider } from "@getpaseo/plugin/server/acp";
+import type { PluginServerContext } from "@clisbot/plugin/server";
+import { runAcpProvider } from "@clisbot/plugin/server/acp";
 
 export default function contribute(server: PluginServerContext) {
   server.registerProvider(
@@ -652,7 +652,7 @@ The shim owns the ACP process, capability mapping, session lifecycle, prompts, p
 timeline conversion. Do not copy that machinery into the plugin.
 
 Use `transformers` for vendor differences ACP cannot describe. The
-[goose model transformer](https://github.com/getpaseo/paseo/blob/main/plugins/goose-provider/server/models.ts)
+[goose model transformer](https://github.com/longbkit/clisbot/blob/main/plugins/goose-provider/server/models.ts)
 uses `context.request` to read the agent's model inventory and `config` to prefix session model IDs
 with the active provider. See the [ACP adapter reference](/docs/plugins/reference#providers).
 
@@ -660,7 +660,7 @@ Validate vendor payloads with
 Zod and leave malformed or unrelated values unchanged:
 
 ```ts
-import type { AcpTransformer } from "@getpaseo/plugin/server/acp";
+import type { AcpTransformer } from "@clisbot/plugin/server/acp";
 import { z } from "zod";
 
 const editSchema = z.object({
@@ -687,7 +687,7 @@ export const vendorEdits: AcpTransformer = {
 };
 ```
 
-Paseo builds a standard tool card from each call's ACP `kind`: Shell for `execute`, Read for `read`,
+Clisbot builds a standard tool card from each call's ACP `kind`: Shell for `execute`, Read for `read`,
 Edit for `edit` and `delete`, Search for `search`, and Fetch for `fetch`. The card reads the call's
 `input` (ACP `rawInput`), `output` (`rawOutput`), `content`, and `locations`. A call of another kind
 shows its raw input and output, or its text content when the agent sends neither.
@@ -698,27 +698,27 @@ contents. Return `{ type: "unknown", input, output }` to show the raw values.
 
 `toolCall` runs on every update of a call, with the updates merged so far. An update that sends
 `content` replaces the earlier content, as ACP defines. When an agent sends a value only in an
-early update, read it from `context.previous`, the call as Paseo last presented it. The
-[Hermes terminal transformer](https://github.com/getpaseo/paseo/blob/main/plugins/hermes-provider/server/terminal-command.ts)
+early update, read it from `context.previous`, the call as Clisbot last presented it. The
+[Hermes terminal transformer](https://github.com/longbkit/clisbot/blob/main/plugins/hermes-provider/server/terminal-command.ts)
 keeps the command from Hermes's first update this way.
 
 Use `sessionOpen` when an ACP agent needs extension metadata on `session/new` or `session/load`.
 The hook receives the system prompt and the agent capabilities' `_meta` from `initialize`.
 Return `metadata` to add fields to the session request's `_meta`.
 If your plugin previously saved a different persistence format, return its native `sessionId`.
-Paseo gives its own saved session ID precedence and writes the ACP persistence format after opening.
+Clisbot gives its own saved session ID precedence and writes the ACP persistence format after opening.
 
 A `configure` transformer can inspect the agent's current choices with `catalog()` and pass a
 translated change to `apply(change)`. Applying a change this way uses the shared ACP configuration
 mapping and skips the transformers for that change.
 
 Set `acpOptions.loadReplayQuietPeriodMs` for an agent that streams history after its `session/load`
-response. Paseo publishes the session as ready once that interval passes without a history update.
+response. Clisbot publishes the session as ready once that interval passes without a history update.
 Non-history state and metadata updates (such as commands, configuration, mode, usage, and session
 info) do not extend the wait.
 
 Set `acpOptions.autoAcceptMode` to offer an unattended mode backed by a specific native mode.
-The adapter selects an unambiguous ACP `allow_once` action without opening a Paseo approval.
+The adapter selects an unambiguous ACP `allow_once` action without opening a Clisbot approval.
 Set `default: true` to make this the default for new sessions. The adapter requires an idle
 session without pending approvals before it switches to or from this mode.
 

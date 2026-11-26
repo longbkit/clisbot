@@ -2,7 +2,7 @@ import path from "node:path";
 import { expect, test, type Page } from "../support/fixtures";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { openAgentRoute } from "../support/helpers/mock-agent";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
 
 // This fixture catalog advertises Ultrafast on Sol; another model offers Fast only.

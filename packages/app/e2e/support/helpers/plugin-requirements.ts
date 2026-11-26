@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { spawnTsx, killProcessTree } from "./spawn-node";
 import { expect, test as base, type Page } from "../fixtures";
 import { connectDaemonClient } from "./daemon-client-loader";
@@ -24,7 +24,7 @@ export const test = base.extend<{
 }>({
   requirementHost: async ({ e2eWorker }, provide) => {
     void e2eWorker;
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-requirement-ui-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-requirement-ui-"));
     await writeRequirements(directory, "^99.0.0");
     await writeFile(
       path.join(directory, "index.client.ts"),
@@ -86,10 +86,10 @@ export const test = base.extend<{
   },
 });
 
-async function writeRequirements(directory: string, paseo: string) {
+async function writeRequirements(directory: string, clisbot: string) {
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
-    JSON.stringify({ id: PLUGIN_ID, requirements: { paseo } }),
+    path.join(directory, "clisbot-plugin.json"),
+    JSON.stringify({ id: PLUGIN_ID, requirements: { clisbot } }),
   );
 }
 
@@ -104,12 +104,12 @@ export async function openRequirementHost(page: Page, host: { serverId: string; 
 export async function expectAppMismatch(page: Page) {
   await expectPluginFailed(page, PLUGIN_ID);
   await expect(
-    page.getByText(/Plugin "requirements-example" requires Paseo \^99.0.0. Your app is/),
+    page.getByText(/Plugin "requirements-example" requires Clisbot \^99.0.0. Your app is/),
   ).toBeVisible();
 }
 
 export async function correctRequirementAndReload(page: Page, directory: string) {
-  await writeRequirements(directory, pluginRequirements.paseo);
+  await writeRequirements(directory, pluginRequirements.clisbot);
   await reloadRequirementsPlugin(page);
   await backToPlugins(page, PLUGIN_ID);
   await expectPluginHealthy(page, PLUGIN_ID);

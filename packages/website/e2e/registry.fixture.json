@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "registry": {
-    "name": "Paseo plugins",
-    "url": "https://plugins.paseo.sh"
+    "name": "Clisbot plugins",
+    "url": "https://plugins.clisbot.com"
   },
   "generatedAt": "2026-10-04T15:55:47.882Z",
   "featured": [
@@ -62,7 +62,7 @@
     {
       "id": "alhassanaraouf/base2tone",
       "name": "Base2Tone",
-      "description": "Base2Tone theme for Paseo, ported from the Obsidian theme deathau/Base2Tone-For-Obsidian.md.",
+      "description": "Base2Tone theme for Clisbot, ported from the Obsidian theme deathau/Base2Tone-For-Obsidian.md.",
       "artifact": {
         "kind": "npm",
         "package": "@alhassanaraouf/paseo-base2tone-theme",
@@ -88,12 +88,12 @@
       "publishedAt": "2026-09-24T00:00:00.000Z",
       "updatedAt": "2026-09-24T00:00:00.000Z",
       "installs": 0,
-      "readme": "# Base2Tone\n\n## Behavior\n\nBase2Tone theme for Paseo, ported from the Obsidian theme deathau/Base2Tone-For-Obsidian.md."
+      "readme": "# Base2Tone\n\n## Behavior\n\nBase2Tone theme for Clisbot, ported from the Obsidian theme deathau/Base2Tone-For-Obsidian.md."
     },
     {
       "id": "dorasto/sayr",
       "name": "Sayr",
-      "description": "A paseo plugin for viewing and managing your Sayr tasks",
+      "description": "A clisbot plugin for viewing and managing your Sayr tasks",
       "artifact": {
         "kind": "npm",
         "package": "@sayrio/paseo-plugin",
@@ -121,12 +121,12 @@
       "publishedAt": "2026-09-22T00:00:00.000Z",
       "updatedAt": "2026-09-22T00:00:00.000Z",
       "installs": 0,
-      "readme": "# Sayr\n\n## Behavior\n\nA paseo plugin for viewing and managing your Sayr tasks"
+      "readme": "# Sayr\n\n## Behavior\n\nA clisbot plugin for viewing and managing your Sayr tasks"
     },
     {
       "id": "gpambrozio/github-board",
       "name": "GitHub Board",
-      "description": "Paseo plugin: a GitHub sidebar board of your issues, draft and open pull requests, and discussions",
+      "description": "Clisbot plugin: a GitHub sidebar board of your issues, draft and open pull requests, and discussions",
       "artifact": {
         "kind": "npm",
         "package": "@gpambrozio/paseo-github-board",
@@ -154,12 +154,12 @@
       "publishedAt": "2026-09-19T00:00:00.000Z",
       "updatedAt": "2026-09-19T00:00:00.000Z",
       "installs": 0,
-      "readme": "# GitHub Board\n\n## Behavior\n\nPaseo plugin: a GitHub sidebar board of your issues, draft and open pull requests, and discussions"
+      "readme": "# GitHub Board\n\n## Behavior\n\nClisbot plugin: a GitHub sidebar board of your issues, draft and open pull requests, and discussions"
     },
     {
       "id": "gpambrozio/herald",
       "name": "Herald",
-      "description": "Paseo plugin: speaks one sentence when an agent needs you, and lists everything waiting in a sidebar panel",
+      "description": "Clisbot plugin: speaks one sentence when an agent needs you, and lists everything waiting in a sidebar panel",
       "artifact": {
         "kind": "npm",
         "package": "@gpambrozio/paseo-herald",
@@ -187,18 +187,18 @@
       "publishedAt": "2026-09-19T00:00:00.000Z",
       "updatedAt": "2026-09-19T00:00:00.000Z",
       "installs": 0,
-      "readme": "# Herald\n\n## Behavior\n\nPaseo plugin: speaks one sentence when an agent needs you, and lists everything waiting in a sidebar panel",
+      "readme": "# Herald\n\n## Behavior\n\nClisbot plugin: speaks one sentence when an agent needs you, and lists everything waiting in a sidebar panel",
       "translations": {
         "zh-CN": {
           "name": "传令官",
-          "description": "Paseo 插件：当 Agent 需要你时朗读一句话，并在侧边栏列出所有等待中的事项"
+          "description": "Clisbot 插件：当 Agent 需要你时朗读一句话，并在侧边栏列出所有等待中的事项"
         }
       }
     },
     {
       "id": "gpambrozio/launchd-jobs",
       "name": "launchd Jobs",
-      "description": "Paseo plugin: schedule shell commands on your Mac through launchd, from a sidebar panel",
+      "description": "Clisbot plugin: schedule shell commands on your Mac through launchd, from a sidebar panel",
       "artifact": {
         "kind": "npm",
         "package": "@gpambrozio/paseo-launchd-jobs",
@@ -225,12 +225,12 @@
       "publishedAt": "2026-09-19T00:00:00.000Z",
       "updatedAt": "2026-09-19T00:00:00.000Z",
       "installs": 0,
-      "readme": "# launchd Jobs\n\n## Behavior\n\nPaseo plugin: schedule shell commands on your Mac through launchd, from a sidebar panel"
+      "readme": "# launchd Jobs\n\n## Behavior\n\nClisbot plugin: schedule shell commands on your Mac through launchd, from a sidebar panel"
     },
     {
       "id": "gpambrozio/model-pricing",
       "name": "Model Pricing",
-      "description": "Paseo plugin: a sidebar table of what every model costs, across Anthropic, OpenAI, Fireworks AI, Ollama Cloud and OpenRouter",
+      "description": "Clisbot plugin: a sidebar table of what every model costs, across Anthropic, OpenAI, Fireworks AI, Ollama Cloud and OpenRouter",
       "artifact": {
         "kind": "npm",
         "package": "@gpambrozio/paseo-model-pricing",
@@ -257,12 +257,12 @@
       "publishedAt": "2026-09-19T00:00:00.000Z",
       "updatedAt": "2026-09-19T00:00:00.000Z",
       "installs": 0,
-      "readme": "# Model Pricing\n\n## Behavior\n\nPaseo plugin: a sidebar table of what every model costs, across Anthropic, OpenAI, Fireworks AI, Ollama Cloud and OpenRouter"
+      "readme": "# Model Pricing\n\n## Behavior\n\nClisbot plugin: a sidebar table of what every model costs, across Anthropic, OpenAI, Fireworks AI, Ollama Cloud and OpenRouter"
     },
     {
       "id": "gpambrozio/skills",
       "name": "Skills",
-      "description": "Paseo plugin: lists the skills an agent can use, shows where each comes from, renders its SKILL.md, and invokes it",
+      "description": "Clisbot plugin: lists the skills an agent can use, shows where each comes from, renders its SKILL.md, and invokes it",
       "artifact": {
         "kind": "npm",
         "package": "@gpambrozio/paseo-skills",
@@ -287,15 +287,15 @@
       "publishedAt": "2026-09-19T00:00:00.000Z",
       "updatedAt": "2026-09-19T00:00:00.000Z",
       "installs": 0,
-      "readme": "# Skills\n\n## Behavior\n\nPaseo plugin: lists the skills an agent can use, shows where each comes from, renders its SKILL.md, and invokes it"
+      "readme": "# Skills\n\n## Behavior\n\nClisbot plugin: lists the skills an agent can use, shows where each comes from, renders its SKILL.md, and invokes it"
     },
     {
       "id": "hungcuong9125/prompt-kit",
       "name": "PromptKit",
-      "description": "PromptKit - rewrite and transform prompts directly from the Paseo composer.",
+      "description": "PromptKit - rewrite and transform prompts directly from the Clisbot composer.",
       "artifact": {
         "kind": "npm",
-        "package": "paseo-prompt-kit",
+        "package": "clisbot-prompt-kit",
         "version": "0.6.0",
         "resolved": "https://registry.npmjs.org/paseo-prompt-kit/-/paseo-prompt-kit-0.6.0.tgz",
         "integrity": "sha512-eiagOY1OokDx2iihfe3Vjh2dgKKP6IsBKbJYbfhM+TXw3aU7duV/rs/TUnBSeeWAk0cEsVg2Jd+EkeaPM8IJdA=="
@@ -319,12 +319,12 @@
       "publishedAt": "2026-09-22T00:00:00.000Z",
       "updatedAt": "2026-09-22T00:00:00.000Z",
       "installs": 0,
-      "readme": "# PromptKit\n\n## Behavior\n\nPromptKit - rewrite and transform prompts directly from the Paseo composer."
+      "readme": "# PromptKit\n\n## Behavior\n\nPromptKit - rewrite and transform prompts directly from the Clisbot composer."
     },
     {
       "id": "omercnet/agent-monitor",
       "name": "Agent Monitor",
-      "description": "A Paseo plugin that provides a host-wide agent triage roster.",
+      "description": "A Clisbot plugin that provides a host-wide agent triage roster.",
       "artifact": {
         "kind": "npm",
         "package": "@omercnet/paseo-agent-monitor",
@@ -352,12 +352,12 @@
       "publishedAt": "2026-09-17T00:00:00.000Z",
       "updatedAt": "2026-09-17T00:00:00.000Z",
       "installs": 0,
-      "readme": "# Agent Monitor\n\n## Behavior\n\nA Paseo plugin that provides a host-wide agent triage roster."
+      "readme": "# Agent Monitor\n\n## Behavior\n\nA Clisbot plugin that provides a host-wide agent triage roster."
     },
     {
       "id": "omercnet/beads",
       "name": "Beads",
-      "description": "A dependency-aware Beads work queue for each Paseo workspace.",
+      "description": "A dependency-aware Beads work queue for each Clisbot workspace.",
       "artifact": {
         "kind": "npm",
         "package": "@omercnet/paseo-beads",
@@ -385,12 +385,12 @@
       "publishedAt": "2026-09-17T00:00:00.000Z",
       "updatedAt": "2026-09-17T00:00:00.000Z",
       "installs": 0,
-      "readme": "# Beads\n\n## Behavior\n\nA dependency-aware Beads work queue for each Paseo workspace."
+      "readme": "# Beads\n\n## Behavior\n\nA dependency-aware Beads work queue for each Clisbot workspace."
     },
     {
       "id": "omercnet/dracula",
       "name": "Dracula",
-      "description": "Dracula Classic and Alucard Classic themes for Paseo.",
+      "description": "Dracula Classic and Alucard Classic themes for Clisbot.",
       "artifact": {
         "kind": "npm",
         "package": "@omercnet/paseo-dracula",
@@ -419,20 +419,20 @@
       "publishedAt": "2026-09-17T00:00:00.000Z",
       "updatedAt": "2026-09-17T00:00:00.000Z",
       "installs": 0,
-      "readme": "# Dracula\n\n## Behavior\n\nDracula Classic and Alucard Classic themes for Paseo.",
+      "readme": "# Dracula\n\n## Behavior\n\nDracula Classic and Alucard Classic themes for Clisbot.",
       "translations": {
         "zh-CN": {
-          "description": "适用于 Paseo 的 Dracula Classic 和 Alucard Classic 深色主题。"
+          "description": "适用于 Clisbot 的 Dracula Classic 和 Alucard Classic 深色主题。"
         }
       },
       "overviewTranslations": {
-        "zh-CN": "# Dracula\n\n## 行为\n\n适用于 Paseo 的 Dracula Classic 和 Alucard Classic 主题。"
+        "zh-CN": "# Dracula\n\n## 行为\n\n适用于 Clisbot 的 Dracula Classic 和 Alucard Classic 主题。"
       }
     },
     {
       "id": "omercnet/fresh-worktrees",
       "name": "Fresh Worktrees",
-      "description": "Fast-forwards clean local base branches before Paseo creates branch-off worktrees",
+      "description": "Fast-forwards clean local base branches before Clisbot creates branch-off worktrees",
       "artifact": {
         "kind": "npm",
         "package": "@omercnet/paseo-fresh-worktrees",
@@ -460,12 +460,12 @@
       "publishedAt": "2026-09-18T00:00:00.000Z",
       "updatedAt": "2026-09-18T00:00:00.000Z",
       "installs": 0,
-      "readme": "# Fresh Worktrees\n\n## Behavior\n\nFast-forwards clean local base branches before Paseo creates branch-off worktrees"
+      "readme": "# Fresh Worktrees\n\n## Behavior\n\nFast-forwards clean local base branches before Clisbot creates branch-off worktrees"
     },
     {
       "id": "omercnet/omp",
       "name": "OMP",
-      "description": "Paseo integration for OMP, including its direct provider and workspace tooling.",
+      "description": "Clisbot integration for OMP, including its direct provider and workspace tooling.",
       "artifact": {
         "kind": "npm",
         "package": "@omercnet/paseo-omp",
@@ -493,12 +493,12 @@
       "publishedAt": "2026-09-17T00:00:00.000Z",
       "updatedAt": "2026-10-03T09:00:00.000Z",
       "installs": 0,
-      "readme": "# OMP\n\n## Behavior\n\nPaseo integration for OMP, including its direct provider and workspace tooling."
+      "readme": "# OMP\n\n## Behavior\n\nClisbot integration for OMP, including its direct provider and workspace tooling."
     },
     {
       "id": "omercnet/pr-radar",
       "name": "PR Radar",
-      "description": "A viewer-aware delivery queue for pull requests linked to Paseo workspaces.",
+      "description": "A viewer-aware delivery queue for pull requests linked to Clisbot workspaces.",
       "artifact": {
         "kind": "npm",
         "package": "@omercnet/paseo-pr-radar",
@@ -523,12 +523,12 @@
       "publishedAt": "2026-09-17T00:00:00.000Z",
       "updatedAt": "2026-09-17T00:00:00.000Z",
       "installs": 0,
-      "readme": "# PR Radar\n\n## Behavior\n\nA viewer-aware delivery queue for pull requests linked to Paseo workspaces."
+      "readme": "# PR Radar\n\n## Behavior\n\nA viewer-aware delivery queue for pull requests linked to Clisbot workspaces."
     },
     {
       "id": "omercnet/shared-browser",
       "name": "Shared Browser",
-      "description": "One real Chromium session per Paseo workspace, shared live across every connected client.",
+      "description": "One real Chromium session per Clisbot workspace, shared live across every connected client.",
       "artifact": {
         "kind": "npm",
         "package": "@omercnet/paseo-shared-browser",
@@ -556,12 +556,12 @@
       "publishedAt": "2026-09-18T00:00:00.000Z",
       "updatedAt": "2026-09-18T00:00:00.000Z",
       "installs": 0,
-      "readme": "# Shared Browser\n\n## Behavior\n\nOne real Chromium session per Paseo workspace, shared live across every connected client."
+      "readme": "# Shared Browser\n\n## Behavior\n\nOne real Chromium session per Clisbot workspace, shared live across every connected client."
     },
     {
       "id": "omercnet/tell-agent",
       "name": "Tell Agent",
-      "description": "Send messages to agents in other workspaces on the same Paseo host.",
+      "description": "Send messages to agents in other workspaces on the same Clisbot host.",
       "artifact": {
         "kind": "npm",
         "package": "@omercnet/paseo-tell-agent",
@@ -586,15 +586,15 @@
       "publishedAt": "2026-09-17T00:00:00.000Z",
       "updatedAt": "2026-09-17T00:00:00.000Z",
       "installs": 0,
-      "readme": "# Tell Agent\n\n## Behavior\n\nSend messages to agents in other workspaces on the same Paseo host."
+      "readme": "# Tell Agent\n\n## Behavior\n\nSend messages to agents in other workspaces on the same Clisbot host."
     },
     {
       "id": "tomgrin10/defer",
       "name": "Defer",
-      "description": "Defer messages to Paseo coding agents until a chosen time or usage-window reset.",
+      "description": "Defer messages to Clisbot coding agents until a chosen time or usage-window reset.",
       "artifact": {
         "kind": "npm",
-        "package": "paseo-defer",
+        "package": "clisbot-defer",
         "version": "2.1.9",
         "resolved": "https://registry.npmjs.org/paseo-defer/-/paseo-defer-2.1.9.tgz",
         "integrity": "sha512-xBBf4TUC8zkTh9WMzQRRDt0alRAYPRCmUdBnBI1ZEkatUFC4i9MxFHgaTY939xij99dASM/261IWqctcKsQppQ=="
@@ -617,15 +617,15 @@
       "publishedAt": "2026-09-22T00:00:00.000Z",
       "updatedAt": "2026-10-03T15:00:00.000Z",
       "installs": 0,
-      "readme": "# Defer\n\n## Behavior\n\nDefer messages to Paseo coding agents until a chosen time or usage-window reset."
+      "readme": "# Defer\n\n## Behavior\n\nDefer messages to Clisbot coding agents until a chosen time or usage-window reset."
     },
     {
       "id": "tomgrin10/graphite",
       "name": "Graphite",
-      "description": "Workspace-native Graphite stack status and PR action radar for Paseo. <p align=\"center\">   <picture>     <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://raw.githubusercontent.com/xpufx/paseo/main/plugins/slash/docs/screenshots/slash-logo-for-dark-bg.png\">     <source media=\"(prefers-color-scheme: light)\" srcset",
+      "description": "Workspace-native Graphite stack status and PR action radar for Clisbot. <p align=\"center\">   <picture>     <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://raw.githubusercontent.com/xpufx/paseo/main/plugins/slash/docs/screenshots/slash-logo-for-dark-bg.png\">     <source media=\"(prefers-color-scheme: light)\" srcset",
       "artifact": {
         "kind": "npm",
-        "package": "paseo-graphite",
+        "package": "clisbot-graphite",
         "version": "0.2.4",
         "resolved": "https://registry.npmjs.org/paseo-graphite/-/paseo-graphite-0.2.4.tgz",
         "integrity": "sha512-aAFvh+118c5mmSQ3sTsDKO8Is7g1ZU8m2+0fisr8nFrgPMu0m2mokPJnM/LaIqQc3Zaaak1chB6M6k0dWOPeIA=="
@@ -646,7 +646,7 @@
       "publishedAt": "2026-09-22T00:00:00.000Z",
       "updatedAt": "2026-09-22T00:00:00.000Z",
       "installs": 0,
-      "readme": "# Graphite\n\n## Behavior\n\nWorkspace-native Graphite stack status and PR action radar for Paseo."
+      "readme": "# Graphite\n\n## Behavior\n\nWorkspace-native Graphite stack status and PR action radar for Clisbot."
     }
   ]
 }

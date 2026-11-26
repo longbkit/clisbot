@@ -8,16 +8,16 @@ import type {
   JsonValue,
   ProviderOptions,
   ToolPolicy,
-} from "@getpaseo/protocol/agent-types";
-import type { AgentMessage } from "@getpaseo/protocol/agent-message";
-import type { AgentAttachment, ProviderInstallationInspection } from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/agent-types";
+import type { AgentMessage } from "@clisbot/protocol/agent-message";
+import type { AgentAttachment, ProviderInstallationInspection } from "@clisbot/protocol/messages";
 import type {
   ProviderInspection,
   ProviderUpdateCheck,
   ProviderUpdateReport,
   ProviderUpdateResult,
-} from "@getpaseo/plugin/server/provider";
-import type { PaseoToolCatalog } from "./tools/types.js";
+} from "@clisbot/plugin/server/provider";
+import type { ClisbotToolCatalog } from "./tools/types.js";
 
 export type {
   AgentMetric,
@@ -183,7 +183,7 @@ export interface AgentCapabilityFlags {
   supportsSessionListing?: boolean;
   supportsDynamicModes: boolean;
   supportsMcpServers: boolean;
-  supportsNativePaseoTools?: boolean;
+  supportsNativeClisbotTools?: boolean;
   supportsReasoningStream: boolean;
   supportsToolInvocations: boolean;
   supportsRewindConversation?: boolean;
@@ -676,10 +676,10 @@ export interface AgentLaunchContext {
   agentId?: string;
   env?: Record<string, string>;
   /**
-   * Runtime-only internal Paseo tools. This must never be persisted into
+   * Runtime-only internal Clisbot tools. This must never be persisted into
    * AgentSessionConfig; providers may adapt it to their native tool surface.
    */
-  paseoTools?: PaseoToolCatalog;
+  clisbotTools?: ClisbotToolCatalog;
 }
 
 export interface AgentCreateSessionOptions {
@@ -715,7 +715,7 @@ export interface AgentPermissionResult {
 }
 
 export interface AgentUsageSession {
-  launch?: import("@getpaseo/plugin/server/provider").ProviderLaunch;
+  launch?: import("@clisbot/plugin/server/provider").ProviderLaunch;
   provider: string;
   model?: string;
   env: Record<string, string>;
@@ -844,7 +844,7 @@ export interface AgentDraftControls {
 }
 
 export interface AgentClientInstallationContext {
-  /** Aborted when Paseo stops waiting for the result. */
+  /** Aborted when Clisbot stops waiting for the result. */
   signal: AbortSignal;
 }
 
@@ -878,7 +878,7 @@ export interface AgentClientDiagnosticContext {
 
 export interface AgentClient {
   resolveUsageLaunch?(): Promise<
-    import("@getpaseo/plugin/server/provider").ProviderLaunch | undefined
+    import("@clisbot/plugin/server/provider").ProviderLaunch | undefined
   >;
   readonly provider: AgentProvider;
   readonly capabilities: AgentCapabilityFlags;
@@ -950,12 +950,12 @@ export interface AgentClient {
   readonly installation?: AgentClientInstallation;
   /**
    * Archive a durable native session (best-effort). Runtime release belongs to AgentSession.close().
-   * Called when Paseo archives an agent so the provider's own UI reflects the same state.
+   * Called when Clisbot archives an agent so the provider's own UI reflects the same state.
    */
   archiveNativeSession?(handle: AgentPersistenceHandle): Promise<void>;
   /**
    * Unarchive a durable native session in the provider.
-   * Called before Paseo clears its archived flag so provider resume can succeed.
+   * Called before Clisbot clears its archived flag so provider resume can succeed.
    */
   unarchiveNativeSession?(handle: AgentPersistenceHandle): Promise<void>;
   /**

@@ -894,7 +894,7 @@ test.describe("New workspace flow", () => {
 
   test("existing worktree starts the first agent in the chosen worktree", async ({ page }) => {
     const tempRepo = await createTempGitRepo("existing-worktree-");
-    // Made with git, not Paseo: the list holds every git worktree of the repository.
+    // Made with git, not Clisbot: the list holds every git worktree of the repository.
     const worktreePath = path.join(tempRepo.path, "manual-worktree");
     execSync(`git worktree add -b e2e/manual ${JSON.stringify(worktreePath)}`, {
       cwd: tempRepo.path,

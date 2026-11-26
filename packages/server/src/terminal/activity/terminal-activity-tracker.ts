@@ -1,7 +1,7 @@
 import type {
   TerminalActivityAttentionReason,
   TerminalActivityState,
-} from "@getpaseo/protocol/terminal-activity";
+} from "@clisbot/protocol/terminal-activity";
 
 export interface TerminalActivitySnapshot {
   state: TerminalActivityState | null;

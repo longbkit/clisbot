@@ -1,7 +1,7 @@
-import type { PaseoTerminal } from "@getpaseo/client";
+import type { ClisbotTerminal } from "@clisbot/client";
 import type { OutputSchema } from "../../output/index.js";
 
-export type TerminalRow = PaseoTerminal;
+export type TerminalRow = ClisbotTerminal;
 
 export interface TerminalKillRow {
   terminalId: string;

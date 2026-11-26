@@ -1,7 +1,7 @@
 import type { WorkspaceFileComposerAttachment } from "./types";
 import { isWorkspaceFileComposerAttachment } from "./workspace-file";
 
-export const WORKSPACE_FILE_DRAG_MIME = "application/x-paseo-workspace-file+json";
+export const WORKSPACE_FILE_DRAG_MIME = "application/x-clisbot-workspace-file+json";
 
 export interface WorkspaceFileDragPayload {
   version: 1;

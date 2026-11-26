@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { UsageReportEntry } from "@getpaseo/protocol/messages";
+import type { UsageReportEntry } from "@clisbot/protocol/messages";
 import { expect, type Locator, type Page } from "@playwright/test";
 import { connectNewWorkspaceDaemonClient } from "./new-workspace";
 import { pluginRequirements } from "./plugin-fixture";
@@ -10,7 +10,7 @@ import { waitForSettledPosition } from "./sheet-layout";
 
 /** Real usage-source plugin; its long report makes the Usage modal scroll. */
 export async function installTallUsageSource() {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-tall-usage-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-tall-usage-"));
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previous = await client.getDaemonConfig();
   const cleanup = async () => {
@@ -24,7 +24,7 @@ export async function installTallUsageSource() {
   };
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({
         id: "tall-usage",
         requirements: pluginRequirements,

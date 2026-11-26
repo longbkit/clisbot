@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { connectToDaemon } from "../../utils/client.js";
-import type { AgentDeepLinkTarget } from "@getpaseo/protocol/agent-deep-link";
+import type { AgentDeepLinkTarget } from "@clisbot/protocol/agent-deep-link";
 import { openDesktopWithAgent } from "../open.js";
 import type {
   CommandError,
@@ -26,7 +26,7 @@ const openAgentSchema: OutputSchema<OpenAgentResult> = {
 
 export function addOpenOptions(command: Command): Command {
   return command
-    .description("Open an existing agent in Paseo Desktop")
+    .description("Open an existing agent in Clisbot Desktop")
     .argument("<agent-id>", "Existing agent ID")
     .option("--server <server-id>", "Server ID (defaults to the local daemon)");
 }
@@ -64,7 +64,7 @@ async function resolveAgentTarget(
       const error: CommandError = {
         code: "AGENT_NOT_FOUND",
         message: `Agent not found: ${agentId}`,
-        details: 'Use "paseo ls" to list available agents',
+        details: 'Use "clisbot ls" to list available agents',
       };
       throw error;
     }

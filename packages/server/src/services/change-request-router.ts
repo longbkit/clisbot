@@ -1,4 +1,4 @@
-import { normalizeHost } from "@getpaseo/protocol/git-remote";
+import { normalizeHost } from "@clisbot/protocol/git-remote";
 import type { ChangeRequestSource } from "./change-request-source.js";
 import type { ForgeResolver } from "./forge-resolver.js";
 

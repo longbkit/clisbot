@@ -1,0 +1,4 @@
+{
+  "id": "sidebar-views",
+  "requirements": { "clisbot": ">=0.16.0" }
+}

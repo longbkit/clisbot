@@ -5,7 +5,7 @@ import {
   createProviderEnvSpec,
   type ProviderRuntimeSettings,
 } from "../../provider-launch-config.js";
-import { buildSelfNodeCommand, createExternalProcessEnv } from "../../../paseo-env.js";
+import { buildSelfNodeCommand, createExternalProcessEnv } from "../../../clisbot-env.js";
 import { spawnProcess } from "../../../../utils/spawn.js";
 
 // Keep the raw SDK query import in this module only. Claude process launch behavior

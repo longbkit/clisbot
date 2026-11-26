@@ -47,7 +47,7 @@ export async function verifySubagentFixture(
   const client = new PiRpcAgentClient({ logger: pino({ level: "silent" }), runtime: pi });
   const session = await client.createSession({
     provider: "pi",
-    cwd: "/tmp/paseo-pi-subagent-fixture",
+    cwd: "/tmp/clisbot-pi-subagent-fixture",
   });
   const live: AgentStreamEvent[] = [];
   session.subscribe((event) => live.push(event));

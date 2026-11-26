@@ -14,7 +14,7 @@ async function installDesktopHost(
   host: (typeof CUSTOM_CHROME_HOSTS)[number],
 ): Promise<void> {
   await page.addInitScript((desktopHost) => {
-    window.paseoDesktop = {
+    window.clisbotDesktop = {
       ...desktopHost,
       events: { on: () => () => {} },
       invoke: async (command: string) => {

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import type { LocalSpeechModel } from "@getpaseo/protocol/speech/rpc-schemas";
+import type { LocalSpeechModel } from "@clisbot/protocol/speech/rpc-schemas";
 import { useFetchQuery } from "@/data/query";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { isLocalModelBusy } from "./voice-settings";

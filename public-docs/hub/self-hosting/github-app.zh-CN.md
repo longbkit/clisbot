@@ -14,16 +14,16 @@ nav: GitHub App
 
 仓库访问和 App 安装不需要 webhook。GitHub 事件触发器需要[公开 HTTPS 地址](/docs/hub/self-hosting#public-addresses)，以便 GitHub 投递 webhook。
 
-在本地 HTTP Hub 上，**Apps → GitHub** 允许你配置仓库访问，并将事件 webhook 标记为不可用。设置 `PASEO_HUB_APP_URL` 后，通过公开 HTTPS 地址重新打开 Hub 即可添加 webhook 密钥和事件。
+在本地 HTTP Hub 上，**Apps → GitHub** 允许你配置仓库访问，并将事件 webhook 标记为不可用。设置 `CLISBOT_HUB_APP_URL` 后，通过公开 HTTPS 地址重新打开 Hub 即可添加 webhook 密钥和事件。
 
 GitHub 会调用这些 Hub URL：
 
-| 设置         | Hub URL                                                |
-| ------------ | ------------------------------------------------------ |
-| Homepage URL | `<PASEO_HUB_APP_URL>`                                  |
-| Callback URL | `<PASEO_HUB_APP_URL>/api/integrations/github/callback` |
-| Setup URL    | `<PASEO_HUB_APP_URL>/api/integrations/github/setup`    |
-| Webhook URL  | `<PASEO_HUB_APP_URL>/webhook`                          |
+| 设置         | Hub URL                                                  |
+| ------------ | -------------------------------------------------------- |
+| Homepage URL | `<CLISBOT_HUB_APP_URL>`                                  |
+| Callback URL | `<CLISBOT_HUB_APP_URL>/api/integrations/github/callback` |
+| Setup URL    | `<CLISBOT_HUB_APP_URL>/api/integrations/github/setup`    |
+| Webhook URL  | `<CLISBOT_HUB_APP_URL>/webhook`                          |
 
 保持 GitHub SSL 验证开启。
 

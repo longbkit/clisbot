@@ -11,7 +11,7 @@ import { OmpAgentClient } from "./omp/agent.js";
 import { OpenCodeRuntimeClient } from "./opencode/runtime-client.js";
 import { PiRpcAgentClient } from "./pi/agent.js";
 import type { LatestReleaseLookup } from "./release-check.js";
-import type { ProviderUpdateReport } from "@getpaseo/plugin/server/provider";
+import type { ProviderUpdateReport } from "@clisbot/plugin/server/provider";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -20,7 +20,7 @@ afterEach(async () => {
 
 /** A command that prints `banner` for `--version`, the way the real CLI does. */
 async function versionCommand(banner: string): Promise<[string, string]> {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-update-check-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-update-check-"));
   roots.push(root);
   const script = path.join(root, "cli.mjs");
   await fs.writeFile(script, `console.log(${JSON.stringify(banner)});\n`);
@@ -36,7 +36,7 @@ async function updaterCommand(input: {
   stderr: string;
   exitCode: number;
 }): Promise<{ argv: [string, string]; recordedArgs: () => Promise<string[]> }> {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-updater-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-updater-"));
   roots.push(root);
   const script = path.join(root, "cli.mjs");
   const record = path.join(root, "args.json");
@@ -222,7 +222,7 @@ test("Claude Code is inconclusive when a wrapper command hides its version", asy
  * a CLI answers both its version and its update check.
  */
 async function cliCommand(input: { banner: string; rest: string }): Promise<[string, string]> {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-cli-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-cli-"));
   roots.push(root);
   const script = path.join(root, "cli.mjs");
   await fs.writeFile(
@@ -258,7 +258,7 @@ const selfUpdatingClis = [
     version: "1.19.5",
     updateArgs: ["upgrade"],
     // OpenCode runs one server for every agent, which keeps the old version until restarted.
-    successMessage: expect.stringContaining("Restart the Paseo daemon"),
+    successMessage: expect.stringContaining("Restart the Clisbot daemon"),
     client: (argv: [string, string]) =>
       new OpenCodeRuntimeClient(createTestLogger(), { command: { mode: "replace", argv } }),
   },
@@ -305,7 +305,7 @@ describe.each(selfUpdatingClis)("$name installation", (cli) => {
   });
 
   test("is not installed when the command is missing", async () => {
-    const client = cli.client(["/nonexistent/paseo-cli", "--flag"]);
+    const client = cli.client(["/nonexistent/clisbot-cli", "--flag"]);
     await expect(inspect(client)).resolves.toEqual({ status: "not_installed" });
     await expect(runUpdate(client)).resolves.toMatchObject({
       result: { status: "failed", message: `${cli.name} is not installed` },
@@ -315,7 +315,7 @@ describe.each(selfUpdatingClis)("$name installation", (cli) => {
 
 // The agent spawn looks the bare command up on the provider's PATH, so the installation does too.
 test("Copilot reports the copy on the provider's PATH", async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-provider-path-"));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-provider-path-"));
   roots.push(dir);
   if (process.platform === "win32") {
     await fs.writeFile(

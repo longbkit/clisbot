@@ -5,13 +5,13 @@ import { useTranslation } from "react-i18next";
 import { Image, ScrollView, Text, View } from "react-native";
 import { AttachmentLightbox, type ImageLightboxSource } from "@/components/attachment-lightbox";
 import { StyleSheet } from "react-native-unistyles";
-import type { PluginListItem, PluginUpdatePreview } from "@getpaseo/protocol/messages";
-import { formatPluginInstallation } from "@getpaseo/protocol/plugin-source-reference";
+import type { PluginListItem, PluginUpdatePreview } from "@clisbot/protocol/messages";
+import { formatPluginInstallation } from "@clisbot/protocol/plugin-source-reference";
 import type {
   PluginListingIndex,
   PluginListing,
   PluginListingDetail,
-} from "@getpaseo/protocol/plugin-registry";
+} from "@clisbot/protocol/plugin-registry";
 import { MarkdownRenderer } from "@/components/markdown/renderer";
 import {
   SettingsBackLink,

@@ -1,5 +1,5 @@
 import { createContext, useContext, type ComponentType, type ReactNode } from "react";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import type { PluginHostProps } from "./contracts.js";
 
 /**
@@ -22,7 +22,7 @@ export interface PluginNewWorkspace {
     | { readonly type: "change-request"; readonly number: number }
     | null;
   /**
-   * The name of the branch a new worktree is created on; `null` lets Paseo pick one. It is kept
+   * The name of the branch a new worktree is created on; `null` lets Clisbot pick one. It is kept
    * while isolation is local or the base is a change request. It names the new branch of any
    * worktree that cuts one, from the default base or a chosen branch, and does not apply to a
    * worktree that checks out an existing branch or change request.
@@ -34,7 +34,7 @@ export interface PluginNewWorkspace {
   setIsolation(isolation: "local" | "worktree"): Promise<void>;
   /**
    * Starts the workspace from a branch. `name` is any ref the Base picker offers, such as
-   * `refs/remotes/origin/main`, or a bare branch name, which Paseo resolves the way it does for
+   * `refs/remotes/origin/main`, or a bare branch name, which Clisbot resolves the way it does for
    * a branch name it is given anywhere else. Rejects while no project is chosen.
    */
   setBaseRef(ref: { type: "branch"; name: string }): Promise<void>;

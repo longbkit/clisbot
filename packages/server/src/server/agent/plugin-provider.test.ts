@@ -6,14 +6,14 @@ import { createIdleRuntimeCleanup } from "./idle-runtime-cleanup/index.js";
 import { relative } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { runAcpProvider, type AcpStreamMessage } from "@getpaseo/plugin/server/acp";
+import { runAcpProvider, type AcpStreamMessage } from "@clisbot/plugin/server/acp";
 import type {
   ProviderConnection,
   ProviderLaunch,
   ProviderEvent,
   ProviderInput,
   ProviderRegistration,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 import { sendPreparedPromptToAgent } from "./agent-prompt.js";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { describe, expect, test } from "vitest";
@@ -22,7 +22,7 @@ import type { AgentClient, AgentStreamEvent } from "./agent-sdk-types.js";
 import { toStoredAgentRecord } from "./agent-projections.js";
 import { AgentManager } from "./agent-manager.js";
 import { buildProviderRegistry } from "./provider-registry.js";
-import { ProviderOverrideSchema } from "@getpaseo/protocol/provider-config";
+import { ProviderOverrideSchema } from "@clisbot/protocol/provider-config";
 import { PluginAgentClientRegistry } from "./plugin-provider.js";
 import {
   isStaleProviderSessionError,
@@ -2637,11 +2637,11 @@ describe("plugin provider launch and status", () => {
     registry.replace([registration]);
     try {
       const definition = registry.definitions()[registration.id]!;
-      const client = definition.createClient(logger, { env: { PATH: "/paseo-nonexistent-bin" } });
+      const client = definition.createClient(logger, { env: { PATH: "/clisbot-nonexistent-bin" } });
       expect(await client.isAvailable()).toBe(false);
       const report = (await client.getDiagnostic!(NO_INSTALLATION)).diagnostic.split("\n");
       expect(report[0]).toBe("Plugin direct");
-      expect(report).toContain("  Daemon PATH: /paseo-nonexistent-bin");
+      expect(report).toContain("  Daemon PATH: /clisbot-nonexistent-bin");
       expect(report.slice(-2)).toEqual([
         "  Resolved path: not found",
         "  Error: node not found on PATH",
@@ -2662,19 +2662,19 @@ describe("plugin provider launch and status", () => {
         {
           env: {
             SESSION_TOKEN: "session",
-            PASEO_AGENT_ID: "agent",
+            CLISBOT_AGENT_ID: "agent",
             CLAUDECODE: "parent",
-            PASEO_NODE_ENV: "development",
+            CLISBOT_NODE_ENV: "development",
           },
         },
       );
       const input = harness.inputs.find((value) => value.type === "session.open");
       expect(input).toMatchObject({
-        config: { env: { SESSION_TOKEN: "session", PASEO_AGENT_ID: "agent" } },
+        config: { env: { SESSION_TOKEN: "session", CLISBOT_AGENT_ID: "agent" } },
       });
       if (input?.type !== "session.open") throw new Error("Expected session.open");
       expect(input.config.env).not.toHaveProperty("CLAUDECODE");
-      expect(input.config.env).not.toHaveProperty("PASEO_NODE_ENV");
+      expect(input.config.env).not.toHaveProperty("CLISBOT_NODE_ENV");
     } finally {
       await registry.shutdown();
     }
@@ -2774,7 +2774,7 @@ describe("plugin provider launch and status", () => {
     const harness = createProviderHarness();
     const registration: ProviderRegistration = {
       ...harness.registration,
-      command: ["paseo-nonexistent-provider-executable"],
+      command: ["clisbot-nonexistent-provider-executable"],
     };
     const registry = new PluginAgentClientRegistry(createTestLogger());
     registry.replace([registration]);
@@ -2782,11 +2782,11 @@ describe("plugin provider launch and status", () => {
       const client = registry.clients()[registration.id]!;
       expect(await client.isAvailable()).toBe(false);
       const report = (await client.getDiagnostic!(NO_INSTALLATION)).diagnostic.split("\n");
-      expect(report).toContain("  Configured command: paseo-nonexistent-provider-executable");
+      expect(report).toContain("  Configured command: clisbot-nonexistent-provider-executable");
       expect(report).toContain("  PATH matches: none");
       expect(report.slice(-2)).toEqual([
         "  Resolved path: not found",
-        "  Error: paseo-nonexistent-provider-executable not found on PATH",
+        "  Error: clisbot-nonexistent-provider-executable not found on PATH",
       ]);
       expect(harness.inputs).toEqual([]);
     } finally {
@@ -2841,7 +2841,7 @@ describe("plugin provider launch and status", () => {
             env: { PLUGIN_SETTING: "custom" },
           });
           expect(launch!.env).not.toHaveProperty("CLAUDECODE");
-          expect(launch!.env).not.toHaveProperty("PASEO_NODE_ENV");
+          expect(launch!.env).not.toHaveProperty("CLISBOT_NODE_ENV");
         }
         expect(launches[0]).toEqual(launches[1]);
         expect(launches[1]).toEqual(launches[2]);
@@ -3094,7 +3094,7 @@ test.each(["goose", "hermes"])(
 
 test("preserves a deferred ACP background job on steer and cancels it on explicit Stop through AgentManager", async () => {
   const logger = createTestLogger();
-  const home = await mkdtemp(join(tmpdir(), "paseo-acp-deferred-daemon-"));
+  const home = await mkdtemp(join(tmpdir(), "clisbot-acp-deferred-daemon-"));
   const storage = new AgentStorage(join(home, "agents"), logger);
   let cancelCount = 0;
   let promptCount = 0;
@@ -3350,7 +3350,7 @@ test("preserves a deferred ACP background job on steer and cancels it on explici
 
 test("reopens cleanly for mode changes and follow-up sends initiated while Stop is closing a slow ACP process", async () => {
   const logger = createTestLogger();
-  const home = await mkdtemp(join(tmpdir(), "paseo-acp-slow-stop-"));
+  const home = await mkdtemp(join(tmpdir(), "clisbot-acp-slow-stop-"));
   const storage = new AgentStorage(join(home, "agents"), logger);
   const script = join(home, "slow-stop-agent.cjs");
   const { writeFile } = await import("node:fs/promises");

@@ -281,7 +281,7 @@ test.describe("Workspace archive undo", () => {
   test("opening the workspace while its undo is still running keeps its tabs", async ({ page }) => {
     const teardown = createGatedTeardown();
     const repo = await createTempGitRepo("archive-undo-tabs-", {
-      paseoConfig: teardown.paseoConfig,
+      clisbotConfig: teardown.clisbotConfig,
     });
     const seedClient = await connectSeedClient();
     try {
@@ -321,7 +321,7 @@ test.describe("Workspace archive undo", () => {
   test("archives a restored workspace while its undo is queued", async ({ page }) => {
     const teardown = createGatedTeardown();
     const repo = await createTempGitRepo("archive-undo-archive-", {
-      paseoConfig: teardown.paseoConfig,
+      clisbotConfig: teardown.clisbotConfig,
     });
 
     try {

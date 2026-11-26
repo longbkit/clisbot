@@ -1,4 +1,4 @@
-import type { TerminalActivityState } from "@getpaseo/protocol/terminal-activity";
+import type { TerminalActivityState } from "@clisbot/protocol/terminal-activity";
 import type { CaptureTerminalLinesResult } from "./terminal-capture.js";
 import type {
   TerminalActivityListener,
@@ -13,21 +13,21 @@ import type { DaemonTerminalManager } from "./worker-terminal-manager.js";
 // every new terminal, and one draining a previous worker protocol, which keeps serving the
 // terminals it already runs and is let go once its last one exits. With no current worker (two
 // were already running), the first terminal created after one exits starts one. A worker from a
-// newer Paseo
+// newer Clisbot
 // is not driven at all: the service then refuses terminal requests with
 // TerminalWorkerIncompatibleError instead of serving a partial view.
 
 export class TerminalWorkerIncompatibleError extends Error {
   readonly code = "terminal_worker_incompatible";
-  readonly paseoVersion: string;
+  readonly clisbotVersion: string;
   readonly protocolVersion: unknown;
 
-  constructor(input: { paseoVersion: string; protocolVersion: unknown }) {
+  constructor(input: { clisbotVersion: string; protocolVersion: unknown }) {
     super(
-      `Terminals are held by a newer Paseo (v${input.paseoVersion}, worker protocol ${String(input.protocolVersion)}). Update Paseo to v${input.paseoVersion} or later to use them, or run \`paseo daemon stop\` to close them.`,
+      `Terminals are held by a newer Clisbot (v${input.clisbotVersion}, worker protocol ${String(input.protocolVersion)}). Update Clisbot to v${input.clisbotVersion} or later to use them, or run \`clisbot daemon stop\` to close them.`,
     );
     this.name = "TerminalWorkerIncompatibleError";
-    this.paseoVersion = input.paseoVersion;
+    this.clisbotVersion = input.clisbotVersion;
     this.protocolVersion = input.protocolVersion;
   }
 }
@@ -52,7 +52,7 @@ export interface TerminalWorkerPoolMember {
 export interface TerminalWorkerPoolOptions {
   current: TerminalWorkerPoolMember | null;
   draining: TerminalWorkerPoolMember[];
-  /** Set when a worker from a newer Paseo holds this home's terminals. */
+  /** Set when a worker from a newer Clisbot holds this home's terminals. */
   incompatible: TerminalWorkerIncompatibleError | null;
   /**
    * Starts a current worker when there is none. Throws NoTerminalWorkerAvailableError, saying

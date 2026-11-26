@@ -9,8 +9,8 @@ import {
   type DiffFrame,
   type DiffBegin,
   type DiffBody,
-} from "@getpaseo/protocol/binary-frames/index";
-import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/binary-frames/index";
+import type { ParsedDiffFile } from "@clisbot/protocol/messages";
 import {
   CHECKOUT_DIFF_MAX_STRUCTURED_BYTES,
   resolveCheckoutDiffBase,
@@ -43,10 +43,10 @@ export interface CheckoutDiffSubscription {
 // Old clients receive the same JSON snapshot while the shared engine owns reads and observation.
 export class CheckoutDiffManager {
   readonly streams: DiffSubscriptions;
-  private readonly paseoHome: string;
+  private readonly clisbotHome: string;
   constructor(options: {
     logger: pino.Logger;
-    paseoHome: string;
+    clisbotHome: string;
     workspaceGitService: Pick<WorkspaceGitService, "requestWorkingTreeWatch">;
     workspaceRuntimeStore: WorkspaceRuntimeStore;
   }) {
@@ -54,7 +54,7 @@ export class CheckoutDiffManager {
       options.workspaceGitService,
       options.logger.child({ module: "checkout-diff" }),
     );
-    this.paseoHome = options.paseoHome;
+    this.clisbotHome = options.clisbotHome;
   }
   readCommitFile(input: CommitFileRead) {
     return this.streams.readCommitFile(input);
@@ -131,7 +131,7 @@ export class CheckoutDiffManager {
     };
     try {
       const baseRef = await resolveCheckoutDiffBase(cwd, params.compare, {
-        paseoHome: this.paseoHome,
+        clisbotHome: this.clisbotHome,
       });
       if (!baseRef) return { initial: { cwd, files: [], error: null }, unsubscribe() {} };
       const subscription = await this.streams.subscribe(
@@ -141,7 +141,7 @@ export class CheckoutDiffManager {
           checkoutBase:
             params.compare.mode === "uncommitted"
               ? undefined
-              : { compare: params.compare, paseoHome: this.paseoHome },
+              : { compare: params.compare, clisbotHome: this.clisbotHome },
           head:
             params.compare.mode === "base" ? { kind: "rev", rev: "HEAD" } : { kind: "worktree" },
           mergeBase: params.compare.mode !== "uncommitted",

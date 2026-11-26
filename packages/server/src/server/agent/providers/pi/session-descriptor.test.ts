@@ -18,7 +18,7 @@ async function writeSession(root: string, lines: unknown[]): Promise<string> {
 }
 
 test("Pi cwd filtering continues past the global candidate overscan", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-pi-session-cwd-limit-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-pi-session-cwd-limit-"));
   const sessionsDir = path.join(root, "sessions");
   const requestedCwd = path.join(root, "requested");
   const otherCwd = path.join(root, "other");
@@ -64,7 +64,7 @@ test("Pi cwd filtering continues past the global candidate overscan", async () =
 });
 
 test("Pi import config preserves the latest recorded model and thinking level", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-pi-session-model-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-pi-session-model-"));
   const cwd = path.join(root, "repo");
   const sessionFile = await writeSession(root, [
     {
@@ -126,7 +126,7 @@ test("Pi import config preserves the latest recorded model and thinking level", 
 });
 
 test("Pi import config can infer model from assistant messages", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-pi-session-message-model-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-pi-session-message-model-"));
   const cwd = path.join(root, "repo");
   const sessionFile = await writeSession(root, [
     {
@@ -166,7 +166,7 @@ test("Pi import config can infer model from assistant messages", async () => {
 });
 
 test("Pi import config preserves thinking before a later model in large sessions", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-pi-session-large-thinking-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-pi-session-large-thinking-"));
   const cwd = path.join(root, "repo");
   const fillerMessages = Array.from({ length: 2_100 }, (_, index) => ({
     type: "message",
@@ -222,7 +222,7 @@ test("Pi import config preserves thinking before a later model in large sessions
 });
 
 test("a Pi session copy names the new cwd in its header and keeps every later byte", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-pi-session-copy-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-pi-session-copy-"));
   onTestFinished(() => rm(root, { recursive: true, force: true }));
   const header = {
     type: "session",
@@ -255,7 +255,7 @@ test("a Pi session copy names the new cwd in its header and keeps every later by
 });
 
 test("a Pi session copy refuses a file without a session header", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-pi-session-copy-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-pi-session-copy-"));
   onTestFinished(() => rm(root, { recursive: true, force: true }));
   const sourceFile = path.join(root, "source.jsonl");
   await writeFile(sourceFile, `${JSON.stringify({ type: "message", id: "entry-1" })}\n`);
@@ -281,7 +281,7 @@ const COPY_HEADER = {
 };
 
 async function copySessionContent(content: string): Promise<Buffer> {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-pi-session-copy-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-pi-session-copy-"));
   onTestFinished(() => rm(root, { recursive: true, force: true }));
   const sourceFile = path.join(root, "source.jsonl");
   const targetFile = path.join(root, "copy.jsonl");
@@ -306,7 +306,7 @@ test.each([
 });
 
 test("a Pi session copy reports a missing session file", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-pi-session-copy-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-pi-session-copy-"));
   onTestFinished(() => rm(root, { recursive: true, force: true }));
   const sourceFile = path.join(root, "missing.jsonl");
 

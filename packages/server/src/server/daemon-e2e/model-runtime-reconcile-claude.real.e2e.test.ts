@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import pino from "pino";
 
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import { canRunRealProvider, createRealProviderClients } from "./real-provider-test-config.js";
 
@@ -28,7 +28,7 @@ describe("daemon E2E (real claude) - runtime model reconciliation", () => {
   test("normalizes runtime model to a model ID exposed by the provider catalog", async () => {
     const logger = pino({ level: "silent" });
     const cwd = tmpCwd();
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: createRealProviderClients(["claude"], logger),
       logger,
     });

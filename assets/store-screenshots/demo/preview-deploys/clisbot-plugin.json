@@ -1,0 +1,4 @@
+{
+  "id": "preview-deploys",
+  "requirements": { "clisbot": ">=0.8.0" }
+}

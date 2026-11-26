@@ -1,5 +1,5 @@
 import { seedSessionHosts } from "@/test/seed-session";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Agent } from "@/stores/session-store";

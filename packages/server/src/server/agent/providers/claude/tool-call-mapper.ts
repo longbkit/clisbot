@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { ToolCallTimelineItem } from "../../agent-sdk-types.js";
-import { isSpeakToolName } from "@getpaseo/protocol/tool-name-normalization";
+import { isSpeakToolName } from "@clisbot/protocol/tool-name-normalization";
 import { deriveClaudeToolDetail } from "./tool-call-detail-parser.js";
 
 interface MapperParams {

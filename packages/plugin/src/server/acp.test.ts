@@ -9,8 +9,8 @@ import {
 } from "@agentclientprotocol/sdk";
 import type { ProviderConnection, ProviderEvent, ProviderInput } from "./provider.js";
 import { afterEach, describe, expect, it } from "vitest";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
-import { AgentTimelineItemPayloadSchema } from "@getpaseo/protocol/messages";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
+import { AgentTimelineItemPayloadSchema } from "@clisbot/protocol/messages";
 import { runAcpProvider, type AcpStreamMessage } from "./acp.js";
 
 const temporaryDirectories: string[] = [];
@@ -22,7 +22,7 @@ afterEach(async () => {
 });
 
 async function fakeAcp(source: string): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-acp-test-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-acp-test-"));
   temporaryDirectories.push(directory);
   const executable = path.join(directory, "agent.cjs");
   await writeFile(executable, source, "utf8");
@@ -525,7 +525,7 @@ describe("runAcpProvider", () => {
   });
 
   it("fails session open without emitting session.ready or leaking the session when the ACP process crashes mid-replay", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "paseo-acp-crash-replay-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "clisbot-acp-crash-replay-"));
     const script = path.join(dir, "crash-replay-agent.mjs");
     await writeFile(
       script,
@@ -601,7 +601,7 @@ describe("runAcpProvider", () => {
   });
 
   it("keeps a multi-read tool result started during an event-loop stall past the quiet period", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "paseo-acp-large-stall-replay-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "clisbot-acp-large-stall-replay-"));
     const script = path.join(dir, "large-stall-agent.mjs");
     const outputBytes = 256 * 1024;
     await writeFile(
@@ -919,7 +919,7 @@ describe("runAcpProvider", () => {
 
   it("spawns the daemon-resolved launch for probes, catalogues, listing, and sessions", async () => {
     const executable = await fakeAcp(`
-if (process.env.LAUNCH_TOKEN !== "resolved" || process.env.CLAUDECODE || process.env.PASEO_NODE_ENV) process.exit(1);
+if (process.env.LAUNCH_TOKEN !== "resolved" || process.env.CLAUDECODE || process.env.CLISBOT_NODE_ENV) process.exit(1);
 const readline = require("node:readline");
 const lines = readline.createInterface({ input: process.stdin });
 const send = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
@@ -4819,7 +4819,7 @@ describe("deferTurnOnRunningTools", () => {
   });
 
   it("terminates a command-backed ACP child process when an interrupted steer retires the session", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "paseo-acp-wedged-steer-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "clisbot-acp-wedged-steer-"));
     const pidFile = path.join(dir, "session.pid");
     const script = path.join(dir, "wedged-agent.cjs");
     await writeFile(
@@ -6080,7 +6080,7 @@ describe("deferTurnOnRunningTools", () => {
   });
 
   it("waits for process exit and emits terminal events once across overlapping interrupts", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "paseo-acp-overlap-interrupt-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "clisbot-acp-overlap-interrupt-"));
     temporaryDirectories.push(dir);
     const scriptPath = path.join(dir, "slow-exit-acp.mjs");
     const pidFile = path.join(dir, "child.pid");
@@ -6370,7 +6370,7 @@ describe("deferTurnOnRunningTools", () => {
   });
 
   it("tears down a deferred ACP child when stdin stalls behind a large steer", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "paseo-acp-stalled-stdin-"));
+    const dir = await mkdtemp(path.join(tmpdir(), "clisbot-acp-stalled-stdin-"));
     temporaryDirectories.push(dir);
     const scriptPath = path.join(dir, "stalled-stdin-acp.mjs");
     const pidFile = path.join(dir, "child.pid");

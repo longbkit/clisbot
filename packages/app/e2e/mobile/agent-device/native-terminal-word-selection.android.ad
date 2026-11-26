@@ -3,7 +3,7 @@
 # Coordinates target the first half of 문 on a 1080x1920 phone at default
 # code size. Override WORD_X/WORD_Y for other device geometry.
 context platform=android timeout=30000 retries=0
-env APP_ID=sh.paseo.debug
+env APP_ID=sh.clisbot.debug
 env WORD_X=105
 env WORD_Y=251
 

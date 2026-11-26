@@ -1,12 +1,12 @@
 ---
 title: 在 SDK 中使用工作区
-description: 把目录打开为 Paseo 工作区，在其中放置 Agent，跟踪改动并归档。
+description: 把目录打开为 Clisbot 工作区，在其中放置 Agent，跟踪改动并归档。
 nav: 工作区
 ---
 
 # 在 SDK 中使用工作区 {#workspaces-with-the-sdk}
 
-当集成需要在 Paseo 应用中为某个任务相关的 Agent、终端、浏览器和文件提供一个持久的位置时，请使用工作区。
+当集成需要在 Clisbot 应用中为某个任务相关的 Agent、终端、浏览器和文件提供一个持久的位置时，请使用工作区。
 
 ## 打开目录 {#open-a-directory}
 
@@ -33,7 +33,7 @@ const workspace = await client.workspaces.create({
 });
 ```
 
-当并行工作需要隔离的检出时，创建一个由 Paseo 管理的 worktree：
+当并行工作需要隔离的检出时，创建一个由 Clisbot 管理的 worktree：
 
 ```ts
 const workspace = await client.workspaces.create({

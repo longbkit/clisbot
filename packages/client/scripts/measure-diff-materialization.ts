@@ -1,8 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { performance } from "node:perf_hooks";
-import { decodeDiffFrame } from "@getpaseo/protocol/binary-frames/index";
-import { validateWSOutboundMessage } from "@getpaseo/protocol/validation/ws-outbound";
+import { decodeDiffFrame } from "@clisbot/protocol/binary-frames/index";
+import { validateWSOutboundMessage } from "@clisbot/protocol/validation/ws-outbound";
 import { DiffStream } from "../src/diff/stream.js";
 const artifacts = resolve(import.meta.dirname, "../../../.artifacts/diff-subscription");
 const results = [];

@@ -1,5 +1,5 @@
 import equal from "fast-deep-equal";
-import type { FetchAgentsEntry } from "@getpaseo/client/internal/daemon-client";
+import type { FetchAgentsEntry } from "@clisbot/client/internal/daemon-client";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { acceptAgentDirectoryUpdate } from "@/utils/agent-directory-update-policy";
 import { buildAgentDirectoryState, type AgentDirectoryDelta } from "@/utils/agent-directory-sync";

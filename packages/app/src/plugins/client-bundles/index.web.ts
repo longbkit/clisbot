@@ -1,6 +1,6 @@
 import { createPluginClientBundleStore } from "./store";
 
-const DATABASE_NAME = "paseo-plugin-client-bundles";
+const DATABASE_NAME = "clisbot-plugin-client-bundles";
 const STORE_NAME = "bundles";
 let opening: Promise<IDBDatabase> | undefined;
 

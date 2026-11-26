@@ -11,12 +11,12 @@ export interface FilePanelSettingsRow<Candidate> {
   selectorKey: string;
   /** Every known panel for the key, coalesced across hosts, in resolver order. */
   candidates: readonly Candidate[];
-  /** The remembered panel, which may be on no connected host; null means Paseo asks on open. */
+  /** The remembered panel, which may be on no connected host; null means Clisbot asks on open. */
   associatedPanelId: string | null;
 }
 
 /**
- * The keys worth configuring: every key where Paseo would ask, and every key that has an
+ * The keys worth configuring: every key where Clisbot would ask, and every key that has an
  * association, so a remembered choice can always be changed or forgotten. A panel installed on
  * several hosts is one candidate.
  */

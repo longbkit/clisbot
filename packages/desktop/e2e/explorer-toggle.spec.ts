@@ -9,7 +9,7 @@ function explorerSidebar(page: Page) {
 async function useDesktopWindowChrome(page: Page, mode: "native-mac" | "custom-windows") {
   await page.addInitScript((windowChromeMode) => {
     Object.assign(window, {
-      paseoDesktop: {
+      clisbotDesktop: {
         platform: windowChromeMode === "native-mac" ? "darwin" : "win32",
         windowChromeMode,
         invoke: async () => null,

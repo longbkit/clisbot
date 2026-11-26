@@ -34,7 +34,7 @@ function createFacts(cwd: string): CheckoutSnapshotFacts {
     remoteUrl: null,
     absoluteGitDir: path.join(cwd, ".git"),
     gitCommonDir: path.join(cwd, ".git"),
-    paseoWorktree: { isPaseoOwnedWorktree: false },
+    clisbotWorktree: { isClisbotOwnedWorktree: false },
     storedBaseRef: null,
     resolvedBaseRef: "main",
     mainRepoRoot: null,
@@ -60,7 +60,7 @@ function createStatus(cwd: string): CheckoutStatusGit {
     behindOfOrigin: null,
     hasRemote: false,
     remoteUrl: null,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
   };
 }
 
@@ -83,7 +83,7 @@ test.each([false, true])(
     const release = Promise.withResolvers<void>();
     const service = new WorkspaceGitServiceImpl({
       logger: pino({ enabled: false }),
-      paseoHome: path.join(root, "home"),
+      clisbotHome: path.join(root, "home"),
       deps: {
         getCheckoutStatus: async (...args) => {
           entered.resolve();
@@ -116,12 +116,12 @@ test.each([false, true])(
 );
 
 test("a fresh checkout read makes a newly initialized repository available to cached readers", async () => {
-  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-checkout-init-")));
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-checkout-init-")));
   const repo = path.join(root, "repo");
   mkdirSync(repo);
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(root, "home"),
+    clisbotHome: path.join(root, "home"),
   });
   cleanup.push(async () => {
     await service.dispose();
@@ -137,7 +137,7 @@ test("a fresh checkout read makes a newly initialized repository available to ca
 }, 30_000);
 
 test("recursive observation updates tracked state and prunes ignored storms", async () => {
-  const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-git-observation-")));
+  const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-git-observation-")));
   const repoDir = path.join(tempDir, "repo");
   const trackedPath = path.join(repoDir, "src", "tracked.txt");
   const ignoredDir = path.join(repoDir, "build");
@@ -245,7 +245,7 @@ test("recursive observation updates tracked state and prunes ignored storms", as
   });
   const service = new WorkspaceGitServiceImpl({
     logger: createLogger(),
-    paseoHome: path.join(tempDir, "paseo-home"),
+    clisbotHome: path.join(tempDir, "clisbot-home"),
     fileObserver,
     deps: {
       getCheckoutSnapshotFacts,
@@ -458,7 +458,7 @@ test("recursive observation updates tracked state and prunes ignored storms", as
 }, 30_000);
 
 test("a late Git-ignored tree is pruned while tracked changes still notify consumers", async () => {
-  const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-real-ignore-")));
+  const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-real-ignore-")));
   const repoDir = path.join(tempDir, "repo");
   mkdirSync(repoDir);
   const git = (...args: string[]) =>
@@ -503,7 +503,7 @@ test("a late Git-ignored tree is pruned while tracked changes still notify consu
   };
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(tempDir, "home"),
+    clisbotHome: path.join(tempDir, "home"),
     fileObserver,
   });
   let subscription: Awaited<ReturnType<typeof service.requestWorkingTreeWatch>> | undefined;
@@ -560,7 +560,7 @@ test("Git refresh, command tracing and 10,000 ignored alias events do no synchro
     import pino from 'pino';
     import { WorkspaceGitServiceImpl } from './packages/server/src/server/workspace-git-service.ts';
     import { runGitCommand } from './packages/server/src/utils/run-git-command.ts';
-    import { writePaseoWorktreeMetadata } from './packages/server/src/utils/worktree-metadata.ts';
+    import { writeClisbotWorktreeMetadata } from './packages/server/src/utils/worktree-metadata.ts';
     const root = await mkdtemp(join(tmpdir(), 'git-async-contract-'));
     const home = join(root, 'home');
     const repo = join(root, 'repo');
@@ -573,7 +573,7 @@ test("Git refresh, command tracing and 10,000 ignored alias events do no synchro
     });
     let callback;
     let notifications = 0;
-    const service = new WorkspaceGitServiceImpl({ logger, paseoHome: home, deps: {
+    const service = new WorkspaceGitServiceImpl({ logger, clisbotHome: home, deps: {
       subscribe: async (_root, onChange) => {
         callback = onChange;
         return { updateIgnore: async () => {}, unsubscribe: async () => {} };
@@ -585,7 +585,7 @@ test("Git refresh, command tracing and 10,000 ignored alias events do no synchro
       await runGitCommand(['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '--allow-empty', '-m', 'base'], { cwd: repo });
       await mkdir(join(home, 'worktrees', 'project'), { recursive: true });
       await runGitCommand(['worktree', 'add', '-b', 'topic', worktree], { cwd: repo });
-      await writePaseoWorktreeMetadata(worktree, { baseRefName: 'main' });
+      await writeClisbotWorktreeMetadata(worktree, { baseRefName: 'main' });
       await writeFile(join(worktree, '.gitignore'), 'ignored/\\n');
       await mkdir(join(worktree, 'ignored'));
       await writeFile(join(worktree, 'ignored', 'noise'), 'noise');
@@ -646,7 +646,7 @@ test("Git refresh, command tracing and 10,000 ignored alias events do no synchro
       await marker('REFRESH_START');
       const snapshot = await service.getSnapshot(worktree);
       assert.equal(snapshot.git.isGit, true);
-      assert.equal(snapshot.git.isPaseoOwnedWorktree, true);
+      assert.equal(snapshot.git.isClisbotOwnedWorktree, true);
       await runGitCommand(['status', '--porcelain'], { cwd: alias, logger });
       await marker('REFRESH_END');
       subscription.unsubscribe();
@@ -688,13 +688,13 @@ test("Git refresh, command tracing and 10,000 ignored alias events do no synchro
 
 test("Git event identity preserves Windows namespace, case and subtree boundaries", async () => {
   const { GitObservationPaths } = await import("./git-observation-paths.js");
-  const paths = await GitObservationPaths.create("C:\\paseo-observation-contract");
-  const accept = paths.createEventFilter(["C:\\paseo-observation-contract\\Build"]);
-  expect(paths.relative("\\\\?\\C:\\PASEO-OBSERVATION-CONTRACT\\refs\\heads\\MixedCase")).toBe(
+  const paths = await GitObservationPaths.create("C:\\clisbot-observation-contract");
+  const accept = paths.createEventFilter(["C:\\clisbot-observation-contract\\Build"]);
+  expect(paths.relative("\\\\?\\C:\\CLISBOT-OBSERVATION-CONTRACT\\refs\\heads\\MixedCase")).toBe(
     "refs/heads/MixedCase",
   );
-  expect(accept("\\\\?\\C:\\paseo-observation-contract\\build\\noise")).toBe(false);
-  expect(accept("C:\\paseo-observation-contract\\BuildSibling\\file")).toBe(true);
+  expect(accept("\\\\?\\C:\\clisbot-observation-contract\\build\\noise")).toBe(false);
+  expect(accept("C:\\clisbot-observation-contract\\BuildSibling\\file")).toBe(true);
 });
 
 test("concurrent alias requests establish one working-tree subscription", async () => {
@@ -707,7 +707,7 @@ test("concurrent alias requests establish one working-tree subscription", async 
   let subscriptions = 0;
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(root, "home"),
+    clisbotHome: path.join(root, "home"),
     deps: {
       subscribe: async () => {
         subscriptions++;
@@ -788,8 +788,8 @@ test.skipIf(process.platform !== "linux")(
     }
     const trace = path.join(root, "git.jsonl");
     writeFileSync(trace, "");
-    const previousTrace = process.env.PASEO_GIT_TRACE_FILE;
-    process.env.PASEO_GIT_TRACE_FILE = trace;
+    const previousTrace = process.env.CLISBOT_GIT_TRACE_FILE;
+    process.env.CLISBOT_GIT_TRACE_FILE = trace;
     let degraded = false;
     let suspended = false;
     const logger = pino(
@@ -807,7 +807,7 @@ test.skipIf(process.platform !== "linux")(
         },
       },
     );
-    const service = new WorkspaceGitServiceImpl({ logger, paseoHome: path.join(root, "home") });
+    const service = new WorkspaceGitServiceImpl({ logger, clisbotHome: path.join(root, "home") });
     const subscription = service.registerWorkspace({ cwd }, () => {});
     const commandCount = async () => {
       await flushGitCommandTrace();
@@ -860,8 +860,8 @@ test.skipIf(process.platform !== "linux")(
       await service.dispose();
       // The diagnostic sink outlives Git commands and owns writes into this fixture.
       await flushGitCommandTrace();
-      if (previousTrace === undefined) delete process.env.PASEO_GIT_TRACE_FILE;
-      else process.env.PASEO_GIT_TRACE_FILE = previousTrace;
+      if (previousTrace === undefined) delete process.env.CLISBOT_GIT_TRACE_FILE;
+      else process.env.CLISBOT_GIT_TRACE_FILE = previousTrace;
       rmSync(root, { recursive: true, force: true });
     }
   },
@@ -869,7 +869,7 @@ test.skipIf(process.platform !== "linux")(
 );
 
 test("observation-driven refreshes run their Git work in the background lane", async () => {
-  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-git-priority-")));
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-git-priority-")));
   const repo = path.join(root, "repo");
   mkdirSync(repo);
   const git = (...args: string[]) =>
@@ -882,7 +882,7 @@ test("observation-driven refreshes run their Git work in the background lane", a
   git("commit", "-m", "base");
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(root, "home"),
+    clisbotHome: path.join(root, "home"),
   });
   const heads: Array<string | null> = [];
   const subscription = service.registerWorkspace({ cwd: repo }, (snapshot) => {
@@ -934,7 +934,7 @@ test("observation-driven refreshes run their Git work in the background lane", a
 }, 30_000);
 
 test("an edit made before the working-tree watcher starts still reaches the cached snapshot", async () => {
-  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-git-coverage-gap-")));
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-git-coverage-gap-")));
   const repo = path.join(root, "repo");
   const trackedPath = path.join(repo, "src", "tracked.txt");
   mkdirSync(path.dirname(trackedPath), { recursive: true });
@@ -950,7 +950,7 @@ test("an edit made before the working-tree watcher starts still reaches the cach
   const workingTreeWatchGate = Promise.withResolvers<void>();
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(root, "home"),
+    clisbotHome: path.join(root, "home"),
     deps: {
       subscribe: async (directory, callback, options) => {
         if (directory === repo) await workingTreeWatchGate.promise;
@@ -979,7 +979,7 @@ test("an edit made before the working-tree watcher starts still reaches the cach
 }, 30_000);
 
 test("a branch switch made before the Git metadata watcher starts still reaches the cached snapshot", async () => {
-  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-git-metadata-gap-")));
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-git-metadata-gap-")));
   const repo = path.join(root, "repo");
   mkdirSync(repo);
   const git = (...args: string[]) =>
@@ -994,7 +994,7 @@ test("a branch switch made before the Git metadata watcher starts still reaches 
   const metadataWatchGate = Promise.withResolvers<void>();
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(root, "home"),
+    clisbotHome: path.join(root, "home"),
     deps: {
       subscribe: async (directory, callback, options) => {
         if (directory !== repo) await metadataWatchGate.promise;
@@ -1024,7 +1024,7 @@ test("a branch switch made before the Git metadata watcher starts still reaches 
 }, 30_000);
 
 function createCheckoutWithOrigin(origin: string): string {
-  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-forge-web-")));
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-forge-web-")));
   const repo = path.join(root, "repo");
   mkdirSync(repo);
   const git = (...args: string[]) =>
@@ -1062,7 +1062,7 @@ async function snapshotOf(
 ) {
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(path.dirname(repo), "home"),
+    clisbotHome: path.join(path.dirname(repo), "home"),
     deps,
   });
   cleanup.push(() => service.dispose());
@@ -1151,7 +1151,7 @@ test("changing the origin remote publishes the new remote's web location, not th
   const repo = createCheckoutWithOrigin("git@github.com:fork-owner/repo.git");
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(path.dirname(repo), "home"),
+    clisbotHome: path.join(path.dirname(repo), "home"),
     deps: {
       resolveSshHostname: async (host) => (host === "github.com-work" ? "github.com" : null),
       forgeOverrides: {
@@ -1237,7 +1237,7 @@ test("a failed parent lookup is retried by the pull request status poll, keeping
   });
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(path.dirname(repo), "home"),
+    clisbotHome: path.join(path.dirname(repo), "home"),
     deps: {
       now: () => new Date(nowMs),
       // Observing the workspace starts a background fetch of origin. A real one would run ssh
@@ -1285,7 +1285,7 @@ test("a successful parent lookup is reused across forced refreshes of the same r
   let repositoryViews = 0;
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(path.dirname(repo), "home"),
+    clisbotHome: path.join(path.dirname(repo), "home"),
     deps: {
       forgeOverrides: {
         github: createGitHubService({
@@ -1353,7 +1353,7 @@ test("a parent lookup that finishes during a refresh keeps its answer", async ()
   let repositoryViews = 0;
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(path.dirname(repo), "home"),
+    clisbotHome: path.join(path.dirname(repo), "home"),
     deps: {
       forgeOverrides: {
         github: createGitHubService({
@@ -1417,7 +1417,7 @@ test("disposal waits for a background parent lookup", async () => {
   const releaseLookup = Promise.withResolvers<void>();
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(path.dirname(repo), "home"),
+    clisbotHome: path.join(path.dirname(repo), "home"),
     deps: {
       forgeOverrides: {
         github: createGitHubService({
@@ -1472,7 +1472,7 @@ test("the first snapshot publishes git state and pull request status without wai
   const pullRequestStatusLoaded = Promise.withResolvers<void>();
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(path.dirname(repo), "home"),
+    clisbotHome: path.join(path.dirname(repo), "home"),
     deps: {
       forgeOverrides: {
         github: createGitHubService({
@@ -1545,7 +1545,7 @@ test("a failed parent lookup is not repeated by forced refreshes before the retr
   let lookups = 0;
   const service = new WorkspaceGitServiceImpl({
     logger: pino({ enabled: false }),
-    paseoHome: path.join(path.dirname(repo), "home"),
+    clisbotHome: path.join(path.dirname(repo), "home"),
     deps: {
       forgeOverrides: {
         github: createGitHubService({

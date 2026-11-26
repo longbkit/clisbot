@@ -67,7 +67,7 @@ export function ChatFind({
   const root = useRef<HTMLDivElement>(null);
   const bindings = useRef({ viewportRef, revealLoadedMessage, visibleMessageIds });
   bindings.current = { viewportRef, revealLoadedMessage, visibleMessageIds };
-  const [highlightName] = useState(() => `paseo-chat-find-${++nextHighlightId}`);
+  const [highlightName] = useState(() => `clisbot-chat-find-${++nextHighlightId}`);
   const { isInteractive } = usePaneFocus();
   const active = useRetainedPanelActive();
   const model = useMemo(

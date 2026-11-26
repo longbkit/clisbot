@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { readPiTranscript, type PiTranscript } from "./transcript.js";
-import { createExternalProcessEnv } from "../../../paseo-env.js";
+import { createExternalProcessEnv } from "../../../clisbot-env.js";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import type { Logger } from "pino";
 

@@ -1,6 +1,6 @@
 import type { ProjectIconCacheStorage } from "./icon-cache";
 
-const DATABASE_NAME = "paseo-project-icon-cache";
+const DATABASE_NAME = "clisbot-project-icon-cache";
 const STORE_NAME = "key-value";
 
 let databasePromise: Promise<IDBDatabase> | null = null;

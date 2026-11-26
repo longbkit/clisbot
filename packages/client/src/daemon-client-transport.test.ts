@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, test, vi } from "vitest";
 import { WebSocketServer, type WebSocket as ServerSocket } from "ws";
-import { exportPublicKey, generateKeyPair } from "@getpaseo/relay/e2ee";
+import { exportPublicKey, generateKeyPair } from "@clisbot/relay/e2ee";
 import { DaemonClient } from "./daemon-client.js";
 import { defaultWebSocketFactory } from "./daemon-client-websocket-transport.js";
 import {
@@ -82,12 +82,12 @@ describe("daemon-client transport helpers", () => {
     createWebSocketTransportFactory(socketFactory)({
       url: "ws://example.test",
       headers: { Authorization: "Bearer shared-secret" },
-      protocols: ["paseo.bearer.shared-secret"],
+      protocols: ["clisbot.bearer.shared-secret"],
     });
 
     expect(socketFactory).toHaveBeenCalledWith("ws://example.test", {
       headers: { Authorization: "Bearer shared-secret" },
-      protocols: ["paseo.bearer.shared-secret"],
+      protocols: ["clisbot.bearer.shared-secret"],
     });
   });
 

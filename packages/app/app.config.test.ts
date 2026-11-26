@@ -13,7 +13,7 @@ interface ManifestEntry {
   $: Record<string, string>;
 }
 
-const originalFdroidFlag = process.env.PASEO_FDROID_BUILD;
+const originalFdroidFlag = process.env.CLISBOT_FDROID_BUILD;
 
 async function resolveAndroidManifest() {
   const { exp } = await getPrebuildConfigAsync(__dirname, { platforms: ["android"] });
@@ -29,9 +29,9 @@ async function resolveAndroidManifest() {
 describe("Android app config", () => {
   afterEach(() => {
     if (originalFdroidFlag === undefined) {
-      delete process.env.PASEO_FDROID_BUILD;
+      delete process.env.CLISBOT_FDROID_BUILD;
     } else {
-      process.env.PASEO_FDROID_BUILD = originalFdroidFlag;
+      process.env.CLISBOT_FDROID_BUILD = originalFdroidFlag;
     }
   });
 
@@ -41,7 +41,7 @@ describe("Android app config", () => {
   ])(
     "%s build installs on devices without a camera",
     async (_build, fdroidFlag) => {
-      process.env.PASEO_FDROID_BUILD = fdroidFlag;
+      process.env.CLISBOT_FDROID_BUILD = fdroidFlag;
       const manifest = await resolveAndroidManifest();
       const permissions = (manifest["uses-permission"] ?? []).map(
         (entry: ManifestEntry) => entry.$["android:name"],
@@ -72,7 +72,7 @@ it("allows all orientations on iPhone and iPad", async () => {
   const { mkdtemp, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
-  const root = await mkdtemp(join(tmpdir(), "paseo-ios-config-"));
+  const root = await mkdtemp(join(tmpdir(), "clisbot-ios-config-"));
   try {
     const { exp } = await getPrebuildConfigAsync(__dirname, { platforms: ["ios"] });
     await compileModsAsync(exp, {
@@ -100,12 +100,12 @@ describe("hardware keyboard scene integration", () => {
   it("installs observation after Expo creates the scene window and is idempotent", () => {
     const {
       configureHardwareKeyboardAppDelegate,
-    } = require("./modules/paseo-hardware-keyboard/app.plugin.js");
+    } = require("./modules/clisbot-hardware-keyboard/app.plugin.js");
     const source =
       "import Expo\nclass Scene {\n  super.scene(scene, willConnectTo: session, options: connectionOptions)\n}\n";
     const configured = configureHardwareKeyboardAppDelegate(source);
-    expect(configured).toContain("import PaseoHardwareKeyboard");
-    expect(configured).toContain("PaseoHardwareKeyboardWindow.observing(window)");
+    expect(configured).toContain("import ClisbotHardwareKeyboard");
+    expect(configured).toContain("ClisbotHardwareKeyboardWindow.observing(window)");
     expect(configured.indexOf("super.scene")).toBeLessThan(
       configured.indexOf(".observing(window)"),
     );

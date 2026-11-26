@@ -116,7 +116,7 @@ export function getRealProviderRuntimeSettings(provider: RealProvider): Provider
         },
       };
     case "opencode": {
-      const root = mkdtempSync(path.join(tmpdir(), "paseo-real-opencode-"));
+      const root = mkdtempSync(path.join(tmpdir(), "clisbot-real-opencode-"));
       return {
         env: {
           OPENROUTER_API_KEY: apiKey,

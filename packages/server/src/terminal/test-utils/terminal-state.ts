@@ -1,4 +1,4 @@
-import type { TerminalState } from "@getpaseo/protocol/messages";
+import type { TerminalState } from "@clisbot/protocol/messages";
 import { createHeadlessTerminal } from "../headless-terminal.js";
 import type { LocalTerminalSession } from "../terminal.js";
 

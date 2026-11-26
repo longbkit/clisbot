@@ -1,4 +1,4 @@
-import type { PluginFilePanelProps } from "@getpaseo/plugin/client";
+import type { PluginFilePanelProps } from "@clisbot/plugin/client";
 import { PluginInstallationProvider } from "@/plugins/installation-provider";
 import { SurfaceErrorBoundary } from "@/plugins/surface-error-boundary";
 import type { PluginFilePanel } from "./panels";

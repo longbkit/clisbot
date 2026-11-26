@@ -1,9 +1,9 @@
-export const PASEO_BROWSER_PROFILE_PARTITION = "persist:paseo-browser";
+export const CLISBOT_BROWSER_PROFILE_PARTITION = "persist:clisbot-browser";
 const LEGACY_BROWSER_ID_PATTERN =
   /^(?:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\d{13,}-[0-9a-f]+)$/i;
 const MAX_LEGACY_BROWSER_PROFILES = 1000;
 
-const PASEO_BROWSER_STORAGE_TYPES = [
+const CLISBOT_BROWSER_STORAGE_TYPES = [
   "cookies",
   "filesystem",
   "indexdb",
@@ -15,7 +15,7 @@ const PASEO_BROWSER_STORAGE_TYPES = [
 
 interface BrowserProfileSession {
   clearStorageData(options: {
-    storages: Array<(typeof PASEO_BROWSER_STORAGE_TYPES)[number]>;
+    storages: Array<(typeof CLISBOT_BROWSER_STORAGE_TYPES)[number]>;
   }): Promise<void>;
   clearCache(): Promise<void>;
   clearAuthCache(): Promise<void>;
@@ -47,11 +47,11 @@ interface ElectronSessions {
   fromPartition(partition: string): BrowserProfileSession;
 }
 
-export function getPaseoBrowserProfileSession(sessions: ElectronSessions): BrowserProfileSession {
-  return sessions.fromPartition(PASEO_BROWSER_PROFILE_PARTITION);
+export function getClisbotBrowserProfileSession(sessions: ElectronSessions): BrowserProfileSession {
+  return sessions.fromPartition(CLISBOT_BROWSER_PROFILE_PARTITION);
 }
 
-export function readLegacyPaseoBrowserIds(input: unknown): string[] {
+export function readLegacyClisbotBrowserIds(input: unknown): string[] {
   if (!Array.isArray(input)) {
     return [];
   }
@@ -67,30 +67,30 @@ export function readLegacyPaseoBrowserIds(input: unknown): string[] {
   return [...browserIds];
 }
 
-export function getPaseoBrowserProfileSessions(
+export function getClisbotBrowserProfileSessions(
   sessions: ElectronSessions,
   legacyBrowserIds: string[],
 ): [BrowserProfileSession, ...BrowserProfileSession[]] {
   return [
-    getPaseoBrowserProfileSession(sessions),
+    getClisbotBrowserProfileSession(sessions),
     // COMPAT(browserProfile): added in v0.1.108; remove after 2027-01-15.
     ...legacyBrowserIds.map((browserId) =>
-      sessions.fromPartition(`${PASEO_BROWSER_PROFILE_PARTITION}-${browserId}`),
+      sessions.fromPartition(`${CLISBOT_BROWSER_PROFILE_PARTITION}-${browserId}`),
     ),
   ];
 }
 
-export function getLegacyPaseoBrowserProfileSession(
+export function getLegacyClisbotBrowserProfileSession(
   sessions: ElectronSessions,
   browserId: string,
 ): BrowserProfileSession | null {
-  const [legacyBrowserId] = readLegacyPaseoBrowserIds([browserId]);
+  const [legacyBrowserId] = readLegacyClisbotBrowserIds([browserId]);
   return legacyBrowserId
-    ? sessions.fromPartition(`${PASEO_BROWSER_PROFILE_PARTITION}-${legacyBrowserId}`)
+    ? sessions.fromPartition(`${CLISBOT_BROWSER_PROFILE_PARTITION}-${legacyBrowserId}`)
     : null;
 }
 
-export function listPaseoBrowserProfileGuests(
+export function listClisbotBrowserProfileGuests(
   input: ListBrowserProfileGuestsInput,
 ): BrowserProfileGuest[] {
   return input.webContents.filter(
@@ -101,10 +101,10 @@ export function listPaseoBrowserProfileGuests(
   );
 }
 
-export async function clearPaseoBrowserProfile(input: ClearBrowserProfileInput): Promise<void> {
+export async function clearClisbotBrowserProfile(input: ClearBrowserProfileInput): Promise<void> {
   await Promise.all(
     input.profileSessions.flatMap((profileSession) => [
-      profileSession.clearStorageData({ storages: [...PASEO_BROWSER_STORAGE_TYPES] }),
+      profileSession.clearStorageData({ storages: [...CLISBOT_BROWSER_STORAGE_TYPES] }),
       profileSession.clearCache(),
       profileSession.clearAuthCache(),
     ]),

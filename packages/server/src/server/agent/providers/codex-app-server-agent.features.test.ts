@@ -7,7 +7,7 @@ import { describe, expect, test, vi } from "vitest";
 import { AgentManager } from "../agent-manager.js";
 import { toAgentPayload } from "../agent-projections.js";
 import { AgentStorage } from "../agent-storage.js";
-import { featuresFromControls } from "@getpaseo/protocol/option-controls";
+import { featuresFromControls } from "@clisbot/protocol/option-controls";
 import { convertLegacyOptions } from "../option-controls.js";
 import type {
   AgentClient,
@@ -187,9 +187,9 @@ describe("Codex MCP startup logging", () => {
           method: "mcpServer/startupStatus/updated",
           params: {
             threadId: "thread-1",
-            name: "paseo",
+            name: "clisbot",
             status: "failed",
-            error: `MCP client for \`paseo\` failed to start: MCP startup failed: handshaking with MCP server failed: Send message error Transport [test] error: unexpected server response: HTTP 502: ${responseBody}`,
+            error: `MCP client for \`clisbot\` failed to start: MCP startup failed: handshaking with MCP server failed: Send message error Transport [test] error: unexpected server response: HTTP 502: ${responseBody}`,
             failureReason: null,
           },
         }) + "\n",
@@ -201,7 +201,7 @@ describe("Codex MCP startup logging", () => {
         expect.objectContaining({
           level: 40,
           msg: "Codex MCP server startup failed",
-          serverName: "paseo",
+          serverName: "clisbot",
           status: "failed",
           error: "HTTP 502",
           sessionId: "thread-1",
@@ -226,7 +226,7 @@ describe("Codex MCP startup logging", () => {
             method: "mcpServer/startupStatus/updated",
             params: {
               threadId: "thread-1",
-              name: "paseo",
+              name: "clisbot",
               status,
               error: null,
               failureReason: null,
@@ -238,7 +238,7 @@ describe("Codex MCP startup logging", () => {
       await processed;
 
       expect(capture.entries.filter((entry) => (entry.level ?? 0) >= 40)).toEqual([]);
-      expect(capture.entries.filter((entry) => entry.serverName === "paseo")).toEqual(
+      expect(capture.entries.filter((entry) => entry.serverName === "clisbot")).toEqual(
         statuses.map((status) => expect.objectContaining({ level: 20, status })),
       );
     } finally {
@@ -287,7 +287,7 @@ describe("Codex app-server provider controls", () => {
     }
   });
 
-  test("new models and service tiers work without a Paseo catalog update", async () => {
+  test("new models and service tiers work without a Clisbot catalog update", async () => {
     const { session, appServer } = await createConnectedSession(
       { model: "future-codex-model" },
       {

@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { PluginListItem } from "@getpaseo/protocol/messages";
+import type { PluginListItem } from "@clisbot/protocol/messages";
 import { useToast } from "@/contexts/toast-api-context";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { pluginDisplayName, pluginListQueryKey } from "@/plugins/plugin-list";

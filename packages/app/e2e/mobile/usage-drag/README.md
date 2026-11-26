@@ -10,7 +10,7 @@ Open Usage with two cards that fit without scrolling. Run:
 ANDROID_SERIAL=emulator-5580 node packages/app/e2e/mobile/usage-drag/android.mjs
 ```
 
-Set `PASEO_DEVICE_SESSION` to reuse your Agent Device session. The test holds the first handle, moves within its slot, drops it, then swipes the sheet body. It asserts sheet movement while the finger is still down: after release, the sheet can snap back to its starting position.
+Set `CLISBOT_DEVICE_SESSION` to reuse your Agent Device session. The test holds the first handle, moves within its slot, drops it, then swipes the sheet body. It asserts sheet movement while the finger is still down: after release, the sheet can snap back to its starting position.
 
 ## Old-order frame
 

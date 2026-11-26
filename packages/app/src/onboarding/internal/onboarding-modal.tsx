@@ -4,7 +4,7 @@ import { Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Check } from "lucide-react-native";
 import { AdaptiveModalSheet, SheetFooter } from "@/components/adaptive-modal-sheet";
-import { PaseoLogo } from "@/components/icons/paseo-logo";
+import { ClisbotLogo } from "@/components/icons/clisbot-logo";
 import { Button } from "@/components/ui/button";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import { ScrollView } from "@/components/ui/scroll-view";
@@ -67,7 +67,7 @@ export function OnboardingModal({ model, state }: { model: OnboardingModel; stat
   const compactHeader = useMemo(
     () => ({
       title: t("onboarding.setup.title"),
-      leading: <PaseoLogo size={LOGO_SIZE} />,
+      leading: <ClisbotLogo size={LOGO_SIZE} />,
       subtitle: (
         <Text style={styles.stepCounter}>
           {t("onboarding.setup.stepCounter", {
@@ -198,7 +198,7 @@ function StepRail({
   return (
     <View style={styles.rail}>
       <View style={styles.railBrand}>
-        <PaseoLogo size={LOGO_SIZE} />
+        <ClisbotLogo size={LOGO_SIZE} />
         <Text style={styles.railTitle} numberOfLines={1}>
           {t("onboarding.setup.title")}
         </Text>

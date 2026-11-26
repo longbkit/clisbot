@@ -4,10 +4,10 @@
 
 Controlled by `APP_VARIANT` in `packages/app/app.config.js` (vanilla Expo, no custom Gradle plugin):
 
-| Variant       | App name    | Package ID       |
-| ------------- | ----------- | ---------------- |
-| `production`  | Paseo       | `sh.paseo`       |
-| `development` | Paseo Debug | `sh.paseo.debug` |
+| Variant       | App name      | Package ID         |
+| ------------- | ------------- | ------------------ |
+| `production`  | Clisbot       | `sh.clisbot`       |
+| `development` | Clisbot Debug | `sh.clisbot.debug` |
 
 EAS profiles: `development`, `production`, and `production-apk` in `packages/app/eas.json`.
 
@@ -43,8 +43,8 @@ mise install        # java 21 + android-sdk 21.0 command-line tools
 sdkmanager --licenses
 sdkmanager "platform-tools" "emulator" "platforms;android-35" "build-tools;35.0.0" \
            "system-images;android-35;google_apis;arm64-v8a"
-avdmanager create avd -n paseo -k "system-images;android-35;google_apis;arm64-v8a" -d pixel_7
-emulator @paseo     # start it; leave running
+avdmanager create avd -n clisbot -k "system-images;android-35;google_apis;arm64-v8a" -d pixel_7
+emulator @clisbot     # start it; leave running
 ```
 
 On an Intel Mac, use the `x86_64` system image:
@@ -53,8 +53,8 @@ On an Intel Mac, use the `x86_64` system image:
 sdkmanager --licenses
 sdkmanager "platform-tools" "emulator" "platforms;android-35" "build-tools;35.0.0" \
            "system-images;android-35;google_apis;x86_64"
-avdmanager create avd -n paseo -k "system-images;android-35;google_apis;x86_64" -d pixel_7
-emulator @paseo     # start it; leave running
+avdmanager create avd -n clisbot -k "system-images;android-35;google_apis;x86_64" -d pixel_7
+emulator @clisbot     # start it; leave running
 ```
 
 Gradle auto-fetches the platform/build-tools it needs once licenses are accepted, so adjust `android-35` only if it asks for a different level.
@@ -98,11 +98,11 @@ npm run dev:android     # Build/install the debug app and start development
 npm run dev:ios         # Build/install the iOS development app
 ```
 
-`build:apk` writes `artifacts/paseo-dogfood-universal.apk`; `build:apk:arm64` writes
-`artifacts/paseo-dogfood-arm64.apk`. Neither command launches or installs on a device. Both enable
-`PASEO_WATCHDOG_BUILD=1`, the production React profiling renderer, and Android's shell-profileable
-flag. These builds keep the production package ID (`sh.paseo`) and release optimizations. Use this APK for
-personal dogfooding. Android system-trace spans require the separate `PASEO_PROFILE_BUILD=1` flag;
+`build:apk` writes `artifacts/clisbot-dogfood-universal.apk`; `build:apk:arm64` writes
+`artifacts/clisbot-dogfood-arm64.apk`. Neither command launches or installs on a device. Both enable
+`CLISBOT_WATCHDOG_BUILD=1`, the production React profiling renderer, and Android's shell-profileable
+flag. These builds keep the production package ID (`sh.clisbot`) and release optimizations. Use this APK for
+personal dogfooding. Android system-trace spans require the separate `CLISBOT_PROFILE_BUILD=1` flag;
 watchdog recording does not send duplicate spans to that sink by default. Normal store/release
 workflows leave diagnostics disabled.
 
@@ -110,18 +110,18 @@ The older `android`, `android:development`, and `ios` commands remain aliases fo
 `android:production` still builds and installs a release through Expo; use `build:apk` when you
 need an artifact. `android:clear` removes the generated Android project.
 
-Run `npm run test:android --workspace=@getpaseo/app` explicitly with a local Android toolchain to prebuild Android and run native module unit tests. Ordinary CI does not prebuild Android or run these tests.
+Run `npm run test:android --workspace=@clisbot/app` explicitly with a local Android toolchain to prebuild Android and run native module unit tests. Ordinary CI does not prebuild Android or run these tests.
 
 With an emulator or device connected, run the hardware keyboard's window-dispatch regression tests
 from `packages/app/android`:
 
 ```bash
-./gradlew :paseo-hardware-keyboard:connectedDebugAndroidTest --no-daemon --max-workers=2 -Dorg.gradle.parallel=false
+./gradlew :clisbot-hardware-keyboard:connectedDebugAndroidTest --no-daemon --max-workers=2 -Dorg.gradle.parallel=false
 ```
 
 These check terminal arrow ownership, held-key repeats and modifiers, and ordinary text-field editing.
 
-Run the terminal module's tests the same way with `:paseo-terminal:connectedDebugAndroidTest`. Besides
+Run the terminal module's tests the same way with `:clisbot-terminal:connectedDebugAndroidTest`. Besides
 row layout, they check that the terminal input asks the keyboard not to learn what is typed
 (`IME_FLAG_NO_PERSONALIZED_LEARNING`), so passwords typed at a prompt stay out of Gboard's
 suggestions in other apps. React Native's TextInput has no prop for that flag, and it replaces
@@ -130,14 +130,14 @@ suggestions in other apps. React Native's TextInput has no prop for that flag, a
 Run the display density regression tests the same way:
 
 ```bash
-./gradlew :paseo-display-metrics:connectedDebugAndroidTest --no-daemon --max-workers=2 -Dorg.gradle.parallel=false
+./gradlew :clisbot-display-metrics:connectedDebugAndroidTest --no-daemon --max-workers=2 -Dorg.gradle.parallel=false
 ```
 
 These check that React Native sizes text at the window's density when the window is on another display, such as Samsung DeX.
 
 ### Diagnostic logs without ADB
 
-In a dogfood build, open Android's Files app → Downloads → **Paseo diagnostics** and share all
+In a dogfood build, open Android's Files app → Downloads → **Clisbot diagnostics** and share all
 retained `.jsonl` files. No app screen, storage permission, or attached debugger is required.
 The recorder retains eight files of about 5 MiB each across reconnects and app restarts. Rotation
 replaces the oldest files, so collect them soon after reproducing a freeze. Uninstall/reinstall
@@ -166,32 +166,32 @@ of activity. Storage failure stops recording rather than blocking the app.
 For an ordinary release APK with system trace markers only:
 
 ```bash
-PASEO_PROFILE_BUILD=1 npm run android:production
+CLISBOT_PROFILE_BUILD=1 npm run android:production
 ```
 
-Those markers emit only while a system trace records `sh.paseo` (`perfetto -a sh.paseo ...`);
+Those markers emit only while a system trace records `sh.clisbot` (`perfetto -a sh.clisbot ...`);
 they do not produce Downloads files.
 
 ## Running on an emulator against a worktree daemon
 
-`npm run android` builds and installs the dev client, but two connections have to reach your Mac from inside the emulator — Metro (the JS bundle) and the Paseo daemon — and **the emulator does not share the host's loopback**: `localhost` inside the emulator is the emulator itself. Reach the host at `10.0.2.2` (the standard AVD's host alias) for both:
+`npm run android` builds and installs the dev client, but two connections have to reach your Mac from inside the emulator — Metro (the JS bundle) and the Clisbot daemon — and **the emulator does not share the host's loopback**: `localhost` inside the emulator is the emulator itself. Reach the host at `10.0.2.2` (the standard AVD's host alias) for both:
 
 ```bash
 REACT_NATIVE_PACKAGER_HOSTNAME=10.0.2.2 \
-  EXPO_PUBLIC_LOCAL_DAEMON=10.0.2.2:$PASEO_SERVICE_DAEMON_PORT \
+  EXPO_PUBLIC_LOCAL_DAEMON=10.0.2.2:$CLISBOT_SERVICE_DAEMON_PORT \
   npm run android
 ```
 
 - **`REACT_NATIVE_PACKAGER_HOSTNAME=10.0.2.2`** — without it, Expo bakes your Mac's LAN IP into the dev client's Metro URL, which the emulator can't route to, and the app dies with `Failed to connect to /<lan-ip>:8081` before any JS loads.
-- **`EXPO_PUBLIC_LOCAL_DAEMON=10.0.2.2:<port>`** — the client's daemon endpoint (`packages/app/src/runtime/host-runtime.ts`); when unset it defaults to `localhost:6767`, the production daemon. Use `$PASEO_SERVICE_DAEMON_PORT` for a worktree daemon running as a Paseo service, or `6768` for a standalone `npm run dev:server`. It is inlined into the JS bundle at Metro bundle time, so set it on the build command and clear the Metro cache (`npx expo start -c`) if a change doesn't take.
+- **`EXPO_PUBLIC_LOCAL_DAEMON=10.0.2.2:<port>`** — the client's daemon endpoint (`packages/app/src/runtime/host-runtime.ts`); when unset it defaults to `localhost:6868`, the production daemon. Use `$CLISBOT_SERVICE_DAEMON_PORT` for a worktree daemon running as a Clisbot service, or `6869` for a standalone `npm run dev:server`. It is inlined into the JS bundle at Metro bundle time, so set it on the build command and clear the Metro cache (`npx expo start -c`) if a change doesn't take.
 
 **Alternative — `adb reverse` + `localhost`** (if `10.0.2.2` misbehaves):
 
 ```bash
 adb reverse tcp:8081 tcp:8081
-adb reverse tcp:$PASEO_SERVICE_DAEMON_PORT tcp:$PASEO_SERVICE_DAEMON_PORT
+adb reverse tcp:$CLISBOT_SERVICE_DAEMON_PORT tcp:$CLISBOT_SERVICE_DAEMON_PORT
 REACT_NATIVE_PACKAGER_HOSTNAME=localhost \
-  EXPO_PUBLIC_LOCAL_DAEMON=localhost:$PASEO_SERVICE_DAEMON_PORT \
+  EXPO_PUBLIC_LOCAL_DAEMON=localhost:$CLISBOT_SERVICE_DAEMON_PORT \
   npm run android
 ```
 
@@ -199,7 +199,7 @@ This is the Android counterpart of the iOS local-simulator flow in [development.
 
 ## Scroll view corrections
 
-`modules/paseo-scroll` replaces React Native's vertical scroll view with `PaseoScrollView`, which
+`modules/clisbot-scroll` replaces React Native's vertical scroll view with `ClisbotScrollView`, which
 keeps React Native's scroll manager interface and corrects how the chat timeline holds its position.
 [agent-stream-disclosure.md](agent-stream-disclosure.md#scroll-view-corrections) lists the
 corrections and the React Native issues they work around. Its instrumentation tests run the scroll
@@ -207,7 +207,7 @@ view in a real window, mounting through React Native's own mounting manager and 
 
 ```bash
 cd packages/app/android
-./gradlew :paseo-scroll:connectedDebugAndroidTest --no-daemon --max-workers=2 -Dorg.gradle.parallel=false
+./gradlew :clisbot-scroll:connectedDebugAndroidTest --no-daemon --max-workers=2 -Dorg.gradle.parallel=false
 ```
 
 Register this package before React Native's core package through its Expo config plugin. Normal
@@ -216,13 +216,13 @@ not change the shipped scroll view. Keep this behavior in the app's compiled nat
 
 ## F-Droid / source-only Android builds
 
-F-Droid builds should set `PASEO_FDROID_BUILD=1` when running Expo prebuild:
+F-Droid builds should set `CLISBOT_FDROID_BUILD=1` when running Expo prebuild:
 
 ```bash
 cd packages/app
-PASEO_FDROID_BUILD=1 APP_VARIANT=production npx expo prebuild --platform android --clean --non-interactive
+CLISBOT_FDROID_BUILD=1 APP_VARIANT=production npx expo prebuild --platform android --clean --non-interactive
 cd android
-PASEO_FDROID_BUILD=1 ./gradlew assembleRelease --no-daemon --max-workers=1 -Dorg.gradle.parallel=false
+CLISBOT_FDROID_BUILD=1 ./gradlew assembleRelease --no-daemon --max-workers=1 -Dorg.gradle.parallel=false
 ```
 
 The flag must be present for both prebuild and Gradle because Gradle starts Metro for the release bundle. Keep the source build serial and daemon-free as shown above: compiling every Expo module can exhaust memory when Gradle workers run in parallel. The profile enables source-built Expo modules, excludes the proprietary camera, Firebase notification, and Expo development-client native modules, disables Gradle dependency metadata, and substitutes JavaScript stubs for camera and notifications. The resulting app supports direct and pasted-link pairing but not QR scanning or push notifications.
@@ -230,14 +230,14 @@ The flag must be present for both prebuild and Gradle because Gradle starts Metr
 For a single-ABI APK, pass React Native's architecture property to Gradle:
 
 ```bash
-PASEO_FDROID_BUILD=1 ./gradlew assembleRelease \
+CLISBOT_FDROID_BUILD=1 ./gradlew assembleRelease \
   -PreactNativeArchitectures=arm64-v8a \
   --no-daemon --max-workers=1 -Dorg.gradle.parallel=false
 ```
 
 Supported values are `armeabi-v7a`, `arm64-v8a`, `x86`, and `x86_64`. The F-Droid profile filters native libraries to that ABI and changes the APK version code to `baseVersionCode * 10 + abiSuffix`, where the suffixes are ordered `1` through `4` in that same sequence. F-Droid metadata should use four build blocks with `VercodeOperation` entries `10 * %c + 1` through `10 * %c + 4` and pass the matching `reactNativeArchitectures` value in each build command. Builds without a single architecture keep the base version code.
 
-Keep the excluded npm packages installed. Normal builds use them, while the F-Droid profile removes only their Android native modules and config plugins. Paseo always applies `expo-gradle-jvmargs` with `-Xmx4096m` and `-XX:MaxMetaspaceSize=1024m` so local Expo prebuilds have enough Gradle heap whether they use precompiled AARs or source-built Expo modules.
+Keep the excluded npm packages installed. Normal builds use them, while the F-Droid profile removes only their Android native modules and config plugins. Clisbot always applies `expo-gradle-jvmargs` with `-Xmx4096m` and `-XX:MaxMetaspaceSize=1024m` so local Expo prebuilds have enough Gradle heap whether they use precompiled AARs or source-built Expo modules.
 
 The EAS `production-apk` profile uses the large Android resource class. Release builds compile the native ABIs and run Hermes bundling in the same Gradle invocation; the default worker can exhaust its remaining memory and kill Hermes with exit code 137 even when Gradle's own heap is correctly sized.
 

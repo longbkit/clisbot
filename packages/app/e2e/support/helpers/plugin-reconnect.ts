@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
-import { settingsRpc } from "@getpaseo/plugin";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { settingsRpc } from "@clisbot/plugin";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { z } from "zod";
 import { expect, type Page } from "../fixtures";
 import { gotoAppShell } from "./app";
@@ -14,7 +14,7 @@ const PLUGIN_ID = "retained-plugin-e2e";
 export function retainedPluginSource(version: string) {
   return `import { useState } from "react";
 import { Text, View, TextInput, Pressable } from "react-native";
-import { useSettings } from "@getpaseo/plugin/client";
+import { useSettings } from "@clisbot/plugin/client";
 import { preferences } from "./shared/preferences";
 function Preferences({ color }) {
   const settings = useSettings(preferences);
@@ -61,7 +61,7 @@ async function createProbe(page: Page) {
   let catalogCount = 0;
   try {
     await writeFile(
-      path.join(example.directory, "paseo-plugin.json"),
+      path.join(example.directory, "clisbot-plugin.json"),
       JSON.stringify({ id: PLUGIN_ID, requirements: pluginRequirements }),
     );
     await writeFile(clientEntry, retainedPluginSource("one"));

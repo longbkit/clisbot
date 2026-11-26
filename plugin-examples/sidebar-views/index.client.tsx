@@ -1,4 +1,4 @@
-import type { PluginClientContext } from "@getpaseo/plugin/client";
+import type { PluginClientContext } from "@clisbot/plugin/client";
 import { Workspaces } from "./client/workspaces";
 import { Agents } from "./client/agents";
 import { Nested } from "./client/nested";

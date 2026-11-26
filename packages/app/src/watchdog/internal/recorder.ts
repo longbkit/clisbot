@@ -1,4 +1,4 @@
-import type { DaemonClientTrace } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClientTrace } from "@clisbot/client/internal/daemon-client";
 
 type Fields = Record<string, string>;
 interface RenderSample {

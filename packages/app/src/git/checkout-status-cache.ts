@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { CheckoutStatusResponse, CheckoutStatusUpdate } from "@getpaseo/protocol/messages";
+import type { CheckoutStatusResponse, CheckoutStatusUpdate } from "@clisbot/protocol/messages";
 import equal from "fast-deep-equal/es6";
 import {
   checkoutCommitsQueryKey,

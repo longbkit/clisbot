@@ -5,7 +5,7 @@ import { isAbsolutePath } from "@/utils/path";
 export function createNativeFileAttachmentStore() {
   return createLocalFileAttachmentStore({
     storageType: "native-file",
-    baseDirectoryName: "paseo-native-attachments",
+    baseDirectoryName: "clisbot-native-attachments",
     fileSystem: createExpoAttachmentFileSystem(),
     resolvePreviewUrl: async (attachment) => {
       if (attachment.storageKey.startsWith("file://")) {

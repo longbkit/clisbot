@@ -1,7 +1,7 @@
 import type {
   BrowserAutomationErrorCode,
   BrowserAutomationExecuteResponse,
-} from "@getpaseo/protocol/browser-automation/rpc-schemas";
+} from "@clisbot/protocol/browser-automation/rpc-schemas";
 
 export interface BrowserHostTarget {
   readonly browserHostId: string;

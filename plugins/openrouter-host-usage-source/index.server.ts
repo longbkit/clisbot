@@ -1,4 +1,4 @@
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { discover, fetchUsage, inputSchema } from "./server/usage.js";
 
 export default function contribute(server: PluginServerContext) {

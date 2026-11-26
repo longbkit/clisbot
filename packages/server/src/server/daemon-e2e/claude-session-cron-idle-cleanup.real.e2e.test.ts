@@ -23,7 +23,7 @@ describe("real claude: idle runtime cleanup and session crons", () => {
   test("a runtime holding a session-only cron is kept until the cron is deleted", async () => {
     const logger = pino({ level: "silent" });
     const client = createRealProviderClient("claude", logger);
-    const cwd = mkdtempSync(path.join(tmpdir(), "paseo-claude-session-cron-"));
+    const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-claude-session-cron-"));
     const session = await client.createSession({
       cwd,
       ...getRealProviderConfig("claude"),
@@ -56,7 +56,7 @@ describe("real claude: idle runtime cleanup and session crons", () => {
   test("a turn interrupted after it creates a session-only cron keeps the runtime", async () => {
     const logger = pino({ level: "silent" });
     const client = createRealProviderClient("claude", logger);
-    const cwd = mkdtempSync(path.join(tmpdir(), "paseo-claude-session-cron-"));
+    const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-claude-session-cron-"));
     const session = await client.createSession({
       cwd,
       ...getRealProviderConfig("claude"),

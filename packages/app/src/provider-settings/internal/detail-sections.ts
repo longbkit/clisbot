@@ -1,4 +1,4 @@
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import type { ProviderInstallationState } from "@/components/provider-installation-section";
 
 export interface DetailSections {

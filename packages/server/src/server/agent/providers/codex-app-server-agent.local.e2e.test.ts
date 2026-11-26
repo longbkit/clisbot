@@ -276,7 +276,7 @@ describe("Codex app-server provider (local e2e)", () => {
           ),
         );
         expect(server.requestBodies.at(-1)).toContain("old snapshot");
-        expect(server.requestBodies.at(-1)).not.toContain("paseo_instruction_snapshot");
+        expect(server.requestBodies.at(-1)).not.toContain("clisbot_instruction_snapshot");
         handle = await run(
           await client.resumeSession(
             handle,
@@ -285,7 +285,7 @@ describe("Codex app-server provider (local e2e)", () => {
           ),
         );
         expect(server.requestBodies.at(-1)).toContain("new snapshot");
-        expect(server.requestBodies.at(-1)?.match(/paseo_instruction_snapshot/g)).toHaveLength(2);
+        expect(server.requestBodies.at(-1)?.match(/clisbot_instruction_snapshot/g)).toHaveLength(2);
         handle = await run(
           await client.resumeSession(
             handle,
@@ -293,7 +293,7 @@ describe("Codex app-server provider (local e2e)", () => {
             launch,
           ),
         );
-        expect(server.requestBodies.at(-1)?.match(/paseo_instruction_snapshot/g)).toHaveLength(2);
+        expect(server.requestBodies.at(-1)?.match(/clisbot_instruction_snapshot/g)).toHaveLength(2);
         await run(
           await client.resumeSession(
             handle,
@@ -302,7 +302,7 @@ describe("Codex app-server provider (local e2e)", () => {
           ),
         );
         expect(server.requestBodies.at(-1)).toContain('\\"instructions\\":\\"\\"');
-        expect(server.requestBodies.at(-1)?.match(/paseo_instruction_snapshot/g)).toHaveLength(4);
+        expect(server.requestBodies.at(-1)?.match(/clisbot_instruction_snapshot/g)).toHaveLength(4);
       } finally {
         await server.close();
         rmSync(cwd, { recursive: true, force: true });

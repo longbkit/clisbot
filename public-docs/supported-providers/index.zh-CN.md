@@ -1,16 +1,16 @@
 ---
 title: 支持的 Provider
-description: Paseo 可以启动的所有编程 Agent，包括原生支持的 Provider 和通过 ACP 运行的 Agent。
+description: Clisbot 可以启动的所有编程 Agent，包括原生支持的 Provider 和通过 ACP 运行的 Agent。
 nav: 支持的 Provider
 ---
 
 # 支持的 Provider {#supported-providers}
 
-Paseo 运行由你在 daemon 主机上安装并登录的编程 Agent。关于 Paseo 如何管理 Provider，请参见 [Provider](/docs/providers)。要添加这里未列出的 Agent，请参见[自定义 Provider](/docs/custom-providers)。
+Clisbot 运行由你在 daemon 主机上安装并登录的编程 Agent。关于 Clisbot 如何管理 Provider，请参见 [Provider](/docs/providers)。要添加这里未列出的 Agent，请参见[自定义 Provider](/docs/custom-providers)。
 
 ## 原生支持 {#native-support}
 
-Paseo 为以下每个 Agent 都提供了集成。大多数 Agent 在你安装并登录 CLI 后会自动出现在 Paseo 中。打开对应 Provider 的页面可查看安装步骤和默认设置。
+Clisbot 为以下每个 Agent 都提供了集成。大多数 Agent 在你安装并登录 CLI 后会自动出现在 Clisbot 中。打开对应 Provider 的页面可查看安装步骤和默认设置。
 
 - [Antigravity](/docs/supported-providers/antigravity)：通过你已安装的 `agy` CLI 经由 ACP 运行。
 - [Claude Code](/docs/supported-providers/claude-code)：Anthropic 的编程 Agent。
@@ -25,12 +25,12 @@ Paseo 为以下每个 Agent 都提供了集成。大多数 Agent 在你安装并
 
 ## 通过 ACP 运行的更多 Agent {#more-agents-through-acp}
 
-Paseo 可以运行任何使用 [Agent Client Protocol](https://agentclientprotocol.com)（ACP）的 Agent。应用内目录列出了以下 Agent。
+Clisbot 可以运行任何使用 [Agent Client Protocol](https://agentclientprotocol.com)（ACP）的 Agent。应用内目录列出了以下 Agent。
 
 从目录添加其中一个：
 
 1. 如果该 Agent 不是通过 `npx` 或 `uvx` 启动的，请先在 daemon 主机上安装它的 CLI。
-2. 在 Paseo 中打开 **设置 → Hosts → 你的主机 → Providers**。
+2. 在 Clisbot 中打开 **设置 → Hosts → 你的主机 → Providers**。
 3. 选择 **+ Provider**，找到该 Agent，然后选择 **添加**。
 
 通过 `npx` 或 `uvx` 启动的条目只需要 daemon 主机上有该工具。如果缺少 CLI，Provider 页面会显示 **未安装**，选择 **安装** 会打开它的安装说明。
@@ -55,9 +55,9 @@ Paseo 可以运行任何使用 [Agent Client Protocol](https://agentclientprotoc
 - [Gajae Code](https://gajae-code.com)：订阅制编程 Agent，采用先规划再修改的工作流。
 - [Gemini CLI](https://geminicli.com)：Google 官方的 Gemini CLI。
 - [GLM Agent](https://github.com/stefandevo/glm-acp-agent)：智谱 AI 的 GLM 编程 Agent。
-- [goose](https://block.github.io/goose/)：Block 的本地开源 AI Agent。如果 goose 支持发现模型清单，Paseo 会列出 goose 中所有已配置 Provider 的模型。
+- [goose](https://block.github.io/goose/)：Block 的本地开源 AI Agent。如果 goose 支持发现模型清单，Clisbot 会列出 goose 中所有已配置 Provider 的模型。
 - [Grok](https://docs.x.ai/build/overview)：xAI 的 Grok Build Agent 编程 CLI。
-- [Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/features/acp)：Nous Research 的自我改进型 Agent。Paseo 会显示每次终端调用的完整命令。
+- [Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/features/acp)：Nous Research 的自我改进型 Agent。Clisbot 会显示每次终端调用的完整命令。
 - [Junie](https://junie.jetbrains.com/docs/junie-cli-acp.html)：JetBrains 的编程 Agent。
 - [Kilo Code](https://kilo.ai/docs/code-with-ai/platforms/cli)：开源编程 Agent。
 - [Kimi Code CLI](https://github.com/MoonshotAI/kimi-code)：月之暗面的编程助手。

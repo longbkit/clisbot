@@ -13,7 +13,7 @@ import {
 } from "./check.mjs";
 import { fixtureOutput } from "./fixture.mjs";
 
-// Renders the fixture in a real Paseo terminal and checks the screenshot with `check.mjs`, then
+// Renders the fixture in a real Clisbot terminal and checks the screenshot with `check.mjs`, then
 // selects one cell of a conjunct and checks a second screenshot.
 //
 // Preconditions: the app runs the build being verified against a daemon on the same host as
@@ -22,26 +22,26 @@ import { fixtureOutput } from "./fixture.mjs";
 //   PLATFORM=android ANDROID_SERIAL=emulator-5554 node e2e/mobile/terminal-rendering/render.mjs
 //   PLATFORM=ios IOS_DEVICE="iPhone 17" node e2e/mobile/terminal-rendering/render.mjs
 const platform = process.env.PLATFORM ?? "android";
-const appId = process.env.PASEO_TERMINAL_RENDERING_APP_ID ?? "sh.paseo.debug";
-const label = process.env.PASEO_TERMINAL_RENDERING_LABEL ?? "run";
+const appId = process.env.CLISBOT_TERMINAL_RENDERING_APP_ID ?? "sh.clisbot.debug";
+const label = process.env.CLISBOT_TERMINAL_RENDERING_LABEL ?? "run";
 const session = process.env.AGENT_DEVICE_SESSION ?? `terminal-rendering-${platform}`;
 const artifacts = resolve(
-  process.env.PASEO_TERMINAL_RENDERING_ARTIFACTS ??
-    resolve(homedir(), ".paseo/artifacts/terminal-rendering", platform),
+  process.env.CLISBOT_TERMINAL_RENDERING_ARTIFACTS ??
+    resolve(homedir(), ".clisbot/artifacts/terminal-rendering", platform),
   label,
 );
-const fixtureDir = process.env.PASEO_TERMINAL_RENDERING_FIXTURE_DIR ?? tmpdir();
+const fixtureDir = process.env.CLISBOT_TERMINAL_RENDERING_FIXTURE_DIR ?? tmpdir();
 // iOS simulators screenshot at one pixel per point unless asked; glyph identity needs the
 // device's real density. Android screenshots are always in device pixels.
 const screenshotArgs =
   platform === "ios"
-    ? ["--pixel-density", process.env.PASEO_TERMINAL_RENDERING_PIXEL_DENSITY ?? "3"]
+    ? ["--pixel-density", process.env.CLISBOT_TERMINAL_RENDERING_PIXEL_DENSITY ?? "3"]
     : [];
 const env = {
   ...process.env,
   AGENT_DEVICE_STATE_DIR:
     process.env.AGENT_DEVICE_STATE_DIR ??
-    resolve(homedir(), ".paseo/artifacts/terminal-rendering/device-state"),
+    resolve(homedir(), ".clisbot/artifacts/terminal-rendering/device-state"),
 };
 mkdirSync(artifacts, { recursive: true });
 
@@ -118,8 +118,8 @@ assert.ok(hasControl("terminal-keyboard-toggle"), "Open a terminal first");
 if (!hasControl("terminal-key-enter")) pressControl("terminal-keyboard-toggle");
 
 const size = await terminalSize();
-const fixturePath = resolve(fixtureDir, "paseo-terminal-rendering.txt");
-const scriptPath = resolve(fixtureDir, "paseo-terminal-rendering.sh");
+const fixturePath = resolve(fixtureDir, "clisbot-terminal-rendering.txt");
+const scriptPath = resolve(fixtureDir, "clisbot-terminal-rendering.sh");
 writeFileSync(fixturePath, fixtureOutput(size.columns));
 writeFileSync(scriptPath, `printf '\\033[2J\\033[3J\\033[H'; cat '${fixturePath}'; sleep 120\n`);
 await runCommand(`sh ${scriptPath}`);

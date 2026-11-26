@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState, type ReactElement, type RefObject } from "react";
 import { View } from "react-native";
 import { withUnistyles } from "react-native-unistyles";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { PluginAttachmentItem, PluginSerializableIcon } from "@getpaseo/plugin";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { PluginAttachmentItem, PluginSerializableIcon } from "@clisbot/plugin";
 import type { PluginAttachmentSourceContribution } from "../types";
-import { searchPluginAttachments } from "@getpaseo/plugin/client/host";
+import { searchPluginAttachments } from "@clisbot/plugin/client/host";
 import type { UserComposerAttachment } from "@/attachments/types";
 import type { AttachmentMenuItem } from "@/composer/input/input";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";

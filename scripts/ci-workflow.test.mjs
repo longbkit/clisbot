@@ -189,12 +189,12 @@ test("focused contracts stay inside existing required checks", () => {
   assert.doesNotMatch(changes, /Install dependencies|npm run build/);
 
   assert.match(server, /test:hub-cli-contract/);
-  assert.match(server, /npm run test --workspace=@getpaseo\/server/);
+  assert.match(server, /npm run test --workspace=@clisbot\/server/);
   assert.ok(!jobs.has("hub-cli-contract"));
 
   assert.match(desktop, /test:e2e:renderer/);
   assert.match(desktop, /test:e2e:browser-tabs/);
-  assert.match(desktop, /npm run test --workspace=@getpaseo\/desktop/);
+  assert.match(desktop, /npm run test --workspace=@clisbot\/desktop/);
   assert.ok(!jobs.has("desktop-browser-bridge"));
   assert.ok(!jobs.has("playwright-desktop"));
 });
@@ -203,7 +203,7 @@ test("ordinary CI keeps app tests without prebuilding Android modules", () => {
   const source = readFileSync(ciWorkflowPath, "utf8");
   const app = jobBlocks(source).get("app-tests").join("\n");
   assert.match(app, /npm run build:app-deps/);
-  assert.match(app, /npm run test --workspace=@getpaseo\/app/);
+  assert.match(app, /npm run test --workspace=@clisbot\/app/);
   assert.doesNotMatch(source, /test:android|expo prebuild|gradlew|actions\/setup-java/);
 });
 
@@ -322,7 +322,7 @@ test("browser and desktop tests have exclusive, directory-owned suites", () => {
   for (const path of browserSpecs) {
     assert.doesNotMatch(
       readFileSync(new URL(path, repoRoot), "utf8"),
-      /paseoDesktop|injectDesktopBridge/,
+      /clisbotDesktop|injectDesktopBridge/,
     );
   }
   for (const path of desktopSpecs) {
@@ -376,7 +376,7 @@ test("packaging runs on main without allocating pull-request runners", () => {
   const docker = readFileSync(dockerWorkflowPath, "utf8");
   assert.match(
     docker,
-    /group: docker-\$\{\{ github\.workflow \}\}-\$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.publish == 'true' && format\('publish-\{0\}', inputs\.paseo_version \|\| github\.run_id\) \|\| github\.ref \}\}/,
+    /group: docker-\$\{\{ github\.workflow \}\}-\$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.publish == 'true' && format\('publish-\{0\}', inputs\.clisbot_version \|\| github\.run_id\) \|\| github\.ref \}\}/,
     "manual Docker release retries use their own concurrency group so main pushes never cancel them",
   );
   assert.match(
@@ -420,7 +420,7 @@ test("stable iOS releases upload once and distribute to external testers before 
   const [distributionId, distributionLines] = uploads[0];
   const distribution = distributionLines.join("\n");
   assert.match(distribution, /^    type: testflight$/m);
-  assert.match(distribution, /external_groups:\s*\n\s+- Paseo Beta/);
+  assert.match(distribution, /external_groups:\s*\n\s+- Clisbot Beta/);
   assert.match(distribution, /^      submit_beta_review: true$/m);
 
   const review = jobs.get("submit_ios_for_review").join("\n");
@@ -451,7 +451,7 @@ test("eight Playwright shards share two-worker coverage", () => {
   const weights = /PWTEST_SHARD_WEIGHTS: "([\d:]+)"/.exec(shared)[1].split(":").map(Number);
   assert.equal(weights.length, 8);
   assert.ok(weights.every((weight) => weight > 0));
-  assert.match(shared, /npm run test:e2e --workspace=@getpaseo\/app -- --shard=/);
+  assert.match(shared, /npm run test:e2e --workspace=@clisbot\/app -- --shard=/);
 
   // No fan-in result job: a gate needs its own runner and under contention it
   // queued 8m08s behind the last shard. Required checks name the shards directly.
@@ -468,17 +468,17 @@ test("quality preserves commands and routes each domain independently after fail
       "npx --yes lockfile-lint --path package-lock.json --type npm --allowed-hosts npm --validate-https --validate-integrity",
       "npm audit signatures",
       "npm run lint",
-      "node --test scripts/oxlint/paseo-plugin.test.mjs",
+      "node --test scripts/oxlint/clisbot-plugin.test.mjs",
     ],
-    relay: ["npm run build:relay", "npm run test --workspace=@getpaseo/relay"],
+    relay: ["npm run build:relay", "npm run test --workspace=@clisbot/relay"],
     sdk: [
       "npm run build:relay && npm run build:client",
       "npm run build:plugin",
-      "npm run test --workspace=@getpaseo/plugin",
-      "npm run test --workspace=@getpaseo/protocol",
-      "npm run test --workspace=@getpaseo/client",
-      "npm run test --workspace=@getpaseo/highlight",
-      "npm run typecheck:examples --workspace=@getpaseo/client",
+      "npm run test --workspace=@clisbot/plugin",
+      "npm run test --workspace=@clisbot/protocol",
+      "npm run test --workspace=@clisbot/client",
+      "npm run test --workspace=@clisbot/highlight",
+      "npm run typecheck:examples --workspace=@clisbot/client",
     ],
   };
   const checks = [...quality.matchAll(/        if: \$\{\{ (.+) \}\}\n        run: (.+)/g)];
@@ -523,10 +523,10 @@ test("Windows units and integration run independently with complete routed cover
   const ubuntu = jobs.get("server-tests-ubuntu").join("\n");
   const windows = jobs.get("server-tests-windows").join("\n");
   const integration = jobs.get("server-integration-windows").join("\n");
-  assert.match(ubuntu, /run: npm run test --workspace=@getpaseo\/server/);
-  assert.match(windows, /run: npm run test:unit --workspace=@getpaseo\/server/);
+  assert.match(ubuntu, /run: npm run test --workspace=@clisbot\/server/);
+  assert.match(windows, /run: npm run test:unit --workspace=@clisbot\/server/);
   assert.doesNotMatch(windows, /run: npm run test(?: |:integration)/);
-  assert.match(integration, /run: npm run test:integration --workspace=@getpaseo\/server/);
+  assert.match(integration, /run: npm run test:integration --workspace=@clisbot\/server/);
   assert.doesNotMatch(integration, /test:unit|server_plugin_tests|server_hub_contract/);
   for (const job of [windows, integration]) {
     assert.match(job, /^    needs: changes$/m, "both phases become eligible independently");
@@ -548,8 +548,8 @@ test("Windows units and integration run independently with complete routed cover
   }
   assert.match(windows, /- \*server_plugin_tests/);
   assert.match(windows, /- \*server_hub_contract/);
-  assert.match(ubuntu, /run: npm run test --workspace=@getpaseo\/builtin-plugins/);
-  assert.match(ubuntu, /run: npm run test:hub-cli-contract --workspace=@getpaseo\/server/);
+  assert.match(ubuntu, /run: npm run test --workspace=@clisbot\/builtin-plugins/);
+  assert.match(ubuntu, /run: npm run test:hub-cli-contract --workspace=@clisbot\/server/);
 
   const scripts = JSON.parse(
     readFileSync(new URL("packages/server/package.json", repoRoot), "utf8"),
@@ -643,9 +643,9 @@ test("macOS release xcrun wrapper retries transient stapling and notarization fa
     {
       name: "stapler success",
       steps: [{ code: 0, output: "stapled" }],
-      args: ["stapler", "staple", "-v", "Paseo signed.app"],
+      args: ["stapler", "staple", "-v", "Clisbot signed.app"],
       expected: 0,
-      expectedCalls: [["stapler", "staple", "-v", "Paseo signed.app"]],
+      expectedCalls: [["stapler", "staple", "-v", "Clisbot signed.app"]],
       expectPattern: /stapled/,
     },
     {
@@ -654,11 +654,11 @@ test("macOS release xcrun wrapper retries transient stapling and notarization fa
         { code: 68, output: networkLostError },
         { code: 0, output: "stapled" },
       ],
-      args: ["stapler", "staple", "-v", "Paseo signed.app"],
+      args: ["stapler", "staple", "-v", "Clisbot signed.app"],
       expected: 0,
       expectedCalls: [
-        ["stapler", "staple", "-v", "Paseo signed.app"],
-        ["stapler", "staple", "-v", "Paseo signed.app"],
+        ["stapler", "staple", "-v", "Clisbot signed.app"],
+        ["stapler", "staple", "-v", "Clisbot signed.app"],
       ],
       expectPattern: /stapled/,
     },
@@ -670,22 +670,22 @@ test("macOS release xcrun wrapper retries transient stapling and notarization fa
         { code: 68, output: networkLostError },
         { code: 68, output: networkLostError },
       ],
-      args: ["stapler", "staple", "-v", "Paseo signed.app"],
+      args: ["stapler", "staple", "-v", "Clisbot signed.app"],
       expected: 68,
       expectedCalls: Array.from({ length: 4 }, () => [
         "stapler",
         "staple",
         "-v",
-        "Paseo signed.app",
+        "Clisbot signed.app",
       ]),
       expectPattern: /network connection was lost/,
     },
     {
       name: "stapler non-network error is not retried",
       steps: [{ code: 68, output: "ticket not found" }],
-      args: ["stapler", "staple", "-v", "Paseo signed.app"],
+      args: ["stapler", "staple", "-v", "Clisbot signed.app"],
       expected: 68,
-      expectedCalls: [["stapler", "staple", "-v", "Paseo signed.app"]],
+      expectedCalls: [["stapler", "staple", "-v", "Clisbot signed.app"]],
       expectPattern: /ticket not found/,
     },
     {
@@ -698,7 +698,7 @@ test("macOS release xcrun wrapper retries transient stapling and notarization fa
       args: [
         "notarytool",
         "submit",
-        "/tmp/Paseo.zip",
+        "/tmp/Clisbot.zip",
         "--apple-id",
         "id",
         "--password",
@@ -714,7 +714,7 @@ test("macOS release xcrun wrapper retries transient stapling and notarization fa
         [
           "notarytool",
           "submit",
-          "/tmp/Paseo.zip",
+          "/tmp/Clisbot.zip",
           "--apple-id",
           "id",
           "--password",
@@ -763,7 +763,7 @@ test("macOS release xcrun wrapper retries transient stapling and notarization fa
       args: [
         "notarytool",
         "submit",
-        "/tmp/Paseo.zip",
+        "/tmp/Clisbot.zip",
         "--apple-id",
         "id",
         "--wait",
@@ -775,7 +775,7 @@ test("macOS release xcrun wrapper retries transient stapling and notarization fa
         [
           "notarytool",
           "submit",
-          "/tmp/Paseo.zip",
+          "/tmp/Clisbot.zip",
           "--apple-id",
           "id",
           "--wait",
@@ -785,7 +785,7 @@ test("macOS release xcrun wrapper retries transient stapling and notarization fa
         [
           "notarytool",
           "submit",
-          "/tmp/Paseo.zip",
+          "/tmp/Clisbot.zip",
           "--apple-id",
           "id",
           "--wait",
@@ -801,7 +801,7 @@ test("macOS release xcrun wrapper retries transient stapling and notarization fa
       args: [
         "notarytool",
         "submit",
-        "/tmp/Paseo.zip",
+        "/tmp/Clisbot.zip",
         "--apple-id",
         "id",
         "--wait",
@@ -813,7 +813,7 @@ test("macOS release xcrun wrapper retries transient stapling and notarization fa
         [
           "notarytool",
           "submit",
-          "/tmp/Paseo.zip",
+          "/tmp/Clisbot.zip",
           "--apple-id",
           "id",
           "--wait",
@@ -829,7 +829,7 @@ test("macOS release xcrun wrapper retries transient stapling and notarization fa
       args: [
         "notarytool",
         "submit",
-        "/tmp/Paseo.zip",
+        "/tmp/Clisbot.zip",
         "--apple-id",
         "id",
         "--wait",
@@ -841,7 +841,7 @@ test("macOS release xcrun wrapper retries transient stapling and notarization fa
         [
           "notarytool",
           "submit",
-          "/tmp/Paseo.zip",
+          "/tmp/Clisbot.zip",
           "--apple-id",
           "id",
           "--wait",
@@ -880,7 +880,7 @@ process.exit(next.code);
           encoding: "utf8",
           env: {
             ...process.env,
-            PASEO_REAL_XCRUN: realXcrun,
+            CLISBOT_REAL_XCRUN: realXcrun,
             XCRUN_STATE: statePath,
             PATH: `${directory}:${process.env.PATH}`,
           },

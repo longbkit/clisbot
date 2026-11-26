@@ -10,39 +10,39 @@ import {
   type FileObserverSubscription,
 } from "../src/server/file-observer/index.js";
 
-const DIRECTORY_COUNT = readPositiveInteger("PASEO_WATCH_BENCH_DIRS", 500);
-const ROOT_COUNT = readPositiveInteger("PASEO_WATCH_BENCH_ROOTS", 1);
-const IGNORED_FILE_COUNT = readPositiveInteger("PASEO_WATCH_BENCH_IGNORED_FILES", 2_000);
-const PREEXISTING_FILE_COUNT = readPositiveInteger("PASEO_WATCH_BENCH_PREEXISTING_FILES", 1_000);
-const EDIT_COUNT = readPositiveInteger("PASEO_WATCH_BENCH_EDITS", 100);
-const SUSTAINED_EDIT_COUNT = readPositiveInteger("PASEO_WATCH_BENCH_SUSTAINED_EDITS", 20);
+const DIRECTORY_COUNT = readPositiveInteger("CLISBOT_WATCH_BENCH_DIRS", 500);
+const ROOT_COUNT = readPositiveInteger("CLISBOT_WATCH_BENCH_ROOTS", 1);
+const IGNORED_FILE_COUNT = readPositiveInteger("CLISBOT_WATCH_BENCH_IGNORED_FILES", 2_000);
+const PREEXISTING_FILE_COUNT = readPositiveInteger("CLISBOT_WATCH_BENCH_PREEXISTING_FILES", 1_000);
+const EDIT_COUNT = readPositiveInteger("CLISBOT_WATCH_BENCH_EDITS", 100);
+const SUSTAINED_EDIT_COUNT = readPositiveInteger("CLISBOT_WATCH_BENCH_SUSTAINED_EDITS", 20);
 const SUSTAINED_EDIT_INTERVAL_MS = readPositiveInteger(
-  "PASEO_WATCH_BENCH_SUSTAINED_INTERVAL_MS",
+  "CLISBOT_WATCH_BENCH_SUSTAINED_INTERVAL_MS",
   500,
 );
-const REPETITIONS = readPositiveInteger("PASEO_WATCH_BENCH_REPETITIONS", 1);
+const REPETITIONS = readPositiveInteger("CLISBOT_WATCH_BENCH_REPETITIONS", 1);
 const MODE = resolveMode();
-const LATE_IGNORED_DIRS = readPositiveInteger("PASEO_WATCH_BENCH_LATE_IGNORED_DIRS", 2_000);
-const LATE_IGNORED_FILES = readPositiveInteger("PASEO_WATCH_BENCH_LATE_IGNORED_FILES", 20_000);
+const LATE_IGNORED_DIRS = readPositiveInteger("CLISBOT_WATCH_BENCH_LATE_IGNORED_DIRS", 2_000);
+const LATE_IGNORED_FILES = readPositiveInteger("CLISBOT_WATCH_BENCH_LATE_IGNORED_FILES", 20_000);
 // directory-churn mode exercises removeSubtree/reconcileSubtree/paths.collapse
 // in packages/server/src/server/file-observer/internal/native-recursive.ts,
 // which the healthy and late-ignored fixtures never touch: they only
 // mkdir/writeFile, and every delete happens after unsubscribe.
-const CHURN_DIRECTORY_COUNT = readPositiveInteger("PASEO_WATCH_BENCH_CHURN_DIRECTORIES", 20_000);
+const CHURN_DIRECTORY_COUNT = readPositiveInteger("CLISBOT_WATCH_BENCH_CHURN_DIRECTORIES", 20_000);
 const CHURN_FILES_PER_DIRECTORY = readPositiveInteger(
-  "PASEO_WATCH_BENCH_CHURN_FILES_PER_DIRECTORY",
+  "CLISBOT_WATCH_BENCH_CHURN_FILES_PER_DIRECTORY",
   3,
 );
-const CHURN_ROUNDS = readPositiveInteger("PASEO_WATCH_BENCH_CHURN_ROUNDS", 3);
+const CHURN_ROUNDS = readPositiveInteger("CLISBOT_WATCH_BENCH_CHURN_ROUNDS", 3);
 const CHURN_DIRECTORIES_PER_ROUND = readPositiveInteger(
-  "PASEO_WATCH_BENCH_CHURN_DIRECTORIES_PER_ROUND",
+  "CLISBOT_WATCH_BENCH_CHURN_DIRECTORIES_PER_ROUND",
   500,
 );
 // Sustained rename churn (the production symptom this mode approximates) can
 // leave a single reconciliation running for minutes once the tracked set is
 // large; give it room to finish instead of calling that a timeout failure.
 const CHURN_SETTLE_TIMEOUT_MS = readPositiveInteger(
-  "PASEO_WATCH_BENCH_CHURN_SETTLE_TIMEOUT_MS",
+  "CLISBOT_WATCH_BENCH_CHURN_SETTLE_TIMEOUT_MS",
   300_000,
 );
 // Sequential `await`-per-entry construction lets the observer's pending
@@ -67,7 +67,7 @@ const execFileAsync = promisify(execFile);
 type BenchMode = "healthy" | "late-ignored" | "directory-churn";
 
 function resolveMode(): BenchMode {
-  const raw = process.env.PASEO_WATCH_BENCH_MODE;
+  const raw = process.env.CLISBOT_WATCH_BENCH_MODE;
   if (raw === "late-ignored") return "late-ignored";
   if (raw === "directory-churn") return "directory-churn";
   return "healthy";
@@ -160,7 +160,7 @@ async function measureInChild(run: number): Promise<Measurement> {
 }
 
 async function measure(run: number): Promise<Measurement> {
-  const base = await mkdtemp(join(tmpdir(), "paseo-watch-"));
+  const base = await mkdtemp(join(tmpdir(), "clisbot-watch-"));
   const observer = createFileObserver();
   const roots: FixtureRoot[] = [];
   for (let rootIndex = 0; rootIndex < ROOT_COUNT; rootIndex += 1) {
@@ -411,14 +411,14 @@ async function measureDirectoryChurn(run: number): Promise<Measurement> {
   const totalChurnTargets = CHURN_ROUNDS * CHURN_DIRECTORIES_PER_ROUND;
   if (totalChurnTargets > CHURN_DIRECTORY_COUNT) {
     throw new Error(
-      `PASEO_WATCH_BENCH_CHURN_ROUNDS (${CHURN_ROUNDS}) * ` +
-        `PASEO_WATCH_BENCH_CHURN_DIRECTORIES_PER_ROUND (${CHURN_DIRECTORIES_PER_ROUND}) = ` +
-        `${totalChurnTargets} must not exceed PASEO_WATCH_BENCH_CHURN_DIRECTORIES ` +
+      `CLISBOT_WATCH_BENCH_CHURN_ROUNDS (${CHURN_ROUNDS}) * ` +
+        `CLISBOT_WATCH_BENCH_CHURN_DIRECTORIES_PER_ROUND (${CHURN_DIRECTORIES_PER_ROUND}) = ` +
+        `${totalChurnTargets} must not exceed CLISBOT_WATCH_BENCH_CHURN_DIRECTORIES ` +
         `(${CHURN_DIRECTORY_COUNT})`,
     );
   }
 
-  const base = await mkdtemp(join(tmpdir(), "paseo-watch-churn-"));
+  const base = await mkdtemp(join(tmpdir(), "clisbot-watch-churn-"));
   const root = join(base, "root");
   await mkdir(root, { recursive: true });
   const observer = createFileObserver();

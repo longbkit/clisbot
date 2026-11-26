@@ -12,7 +12,7 @@ import {
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-export function seedPaseoHome(source, target) {
+export function seedClisbotHome(source, target) {
   if (!existsSync(source)) {
     console.log(`  Seed:    skipped (${source} missing)`);
     return;
@@ -23,7 +23,7 @@ export function seedPaseoHome(source, target) {
     return;
   }
 
-  if (process.env.PASEO_DEV_RESET_HOME !== "1" && hasEntries(target)) {
+  if (process.env.CLISBOT_DEV_RESET_HOME !== "1" && hasEntries(target)) {
     console.log(`  Seed:    skipped (${target} already has data)`);
     return;
   }
@@ -33,7 +33,7 @@ export function seedPaseoHome(source, target) {
     ? JSON.parse(readFileSync(configPath, "utf8").replace(/^\uFEFF/, ""))
     : { version: 1 };
 
-  if (process.env.PASEO_DEV_RESET_HOME === "1") {
+  if (process.env.CLISBOT_DEV_RESET_HOME === "1") {
     rmSync(target, { recursive: true, force: true });
   }
 
@@ -80,5 +80,5 @@ function isDirectory(path) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
-  seedPaseoHome(process.argv[2], process.argv[3]);
+  seedClisbotHome(process.argv[2], process.argv[3]);
 }

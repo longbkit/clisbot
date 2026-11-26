@@ -43,7 +43,7 @@ describe("resolveWorkspaceMapKeyByIdentity", () => {
         "workspace-1",
         createWorkspace({
           id: "workspace-1",
-          workspaceDirectory: "/repo/.paseo/worktrees/feature",
+          workspaceDirectory: "/repo/.clisbot/worktrees/feature",
         }),
       ],
     ]);

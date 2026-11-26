@@ -1,5 +1,5 @@
 import type pino from "pino";
-import { getErrorMessage } from "@getpaseo/protocol/error-utils";
+import { getErrorMessage } from "@clisbot/protocol/error-utils";
 import {
   checkoutResolvedBranch,
   type CheckoutExistingBranchResult,

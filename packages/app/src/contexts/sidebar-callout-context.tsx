@@ -34,7 +34,7 @@ export interface SidebarCalloutsApi {
   clear: () => void;
 }
 
-const DISMISSED_CALLOUTS_STORAGE_KEY = "@paseo:sidebar-callout-dismissals";
+const DISMISSED_CALLOUTS_STORAGE_KEY = "@clisbot:sidebar-callout-dismissals";
 
 const SidebarCalloutApiContext = createContext<SidebarCalloutsApi | null>(null);
 const SidebarCalloutStateContext = createContext<SidebarCalloutEntry | null>(null);

@@ -1,13 +1,13 @@
-import { defineRpc } from "@getpaseo/plugin";
-import { createPaseoApi } from "@getpaseo/client";
-import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { PluginTranslationRuntime } from "@getpaseo/plugin/client/host";
+import { defineRpc } from "@clisbot/plugin";
+import { createClisbotApi } from "@clisbot/client";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import { PluginTranslationRuntime } from "@clisbot/plugin/client/host";
 import { QueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { providersSnapshotQueryRoot } from "@/data/providers-snapshot";
 import { queryClient } from "@/data/query-client";
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { useDraftStore } from "@/stores/draft-store";
 import { useSessionStore, type Agent, type WorkspaceDescriptor } from "@/stores/session-store";
 import { createPluginClientStateSource } from "../client-state/source";
@@ -27,7 +27,7 @@ function plugin(): InstalledPlugin {
     locale: "en",
     i18n: new PluginTranslationRuntime({ getLocale: () => "en", subscribe: () => () => {} }),
     queryClient: new QueryClient(),
-    paseo: createPaseoApi(
+    clisbot: createClisbotApi(
       new DaemonClient({
         url: "ws://127.0.0.1:1",
         clientId: "plugin-composer-test",

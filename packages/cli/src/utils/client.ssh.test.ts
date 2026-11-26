@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveSshFailureDetail } from "../ssh/ssh-tunnel.js";
-import { parseHostTarget } from "@getpaseo/client/node";
+import { parseHostTarget } from "@clisbot/client/node";
 
 describe("CLI SSH transport", () => {
   it("surfaces SSH stderr before the child exit event settles", () => {

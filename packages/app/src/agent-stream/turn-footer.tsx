@@ -1,4 +1,4 @@
-import type { AgentMetric } from "@getpaseo/protocol/agent-types";
+import type { AgentMetric } from "@clisbot/protocol/agent-types";
 import React, { memo, useCallback, useMemo, type ReactNode } from "react";
 import { View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";

@@ -1,5 +1,5 @@
 import { isTurnTrigger, isTurnBoundary } from "@/agent-stream/turn-membership";
-import type { ToolCallDetail } from "@getpaseo/protocol/agent-types";
+import type { ToolCallDetail } from "@clisbot/protocol/agent-types";
 import type { StreamItem, ToolCallItem, ThoughtItem } from "@/types/stream";
 
 export interface ToolCallDescriptor {

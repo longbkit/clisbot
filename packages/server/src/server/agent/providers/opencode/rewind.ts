@@ -17,7 +17,7 @@ export async function revertOpenCodeConversationAndFiles(input: {
   messageId: string;
 }): Promise<void> {
   // OpenCode keeps unrevert available only until a later prompt triggers its cleanup,
-  // which permanently drops reverted messages. Paseo v1 only exposes revert.
+  // which permanently drops reverted messages. Clisbot v1 only exposes revert.
   const response = await input.client.session.revert({
     sessionID: input.sessionId,
     directory: input.cwd,

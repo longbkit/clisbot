@@ -2,10 +2,10 @@ import { setTimeout as pause } from "node:timers/promises";
 import { HostObservationError } from "../host-operations/index.js";
 import { randomUUID } from "node:crypto";
 import type { Logger } from "pino";
-import type { WaitForFinishResult } from "@getpaseo/client/internal/daemon-client";
+import type { WaitForFinishResult } from "@clisbot/client/internal/daemon-client";
 import type { FinishObservationResult } from "./internal/observation-buffer.js";
 import type { AgentMessageDelivery } from "../agent-messages/index.js";
-import { getParentAddressFromLabels } from "@getpaseo/protocol/agent-labels";
+import { getParentAddressFromLabels } from "@clisbot/protocol/agent-labels";
 import {
   formatFinishNotificationBody,
   finishNotificationEvents,

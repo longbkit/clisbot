@@ -18,7 +18,7 @@ When a trigger uses a custom RFC 5545 RRULE that does not match a preset, the fo
 
 ## Author a schedule in YAML
 
-Save this as `.paseo/triggers/daily-ci-digest.yml` and deploy with `paseo hub deploy`:
+Save this as `.clisbot/triggers/daily-ci-digest.yml` and deploy with `clisbot hub deploy`:
 
 ```yaml
 name: daily-ci-digest
@@ -50,12 +50,12 @@ run:
   prompt: |
     Analyze the last 24 hours of CI failures, post a short digest to C01234567 with slack_post,
     and call finish_execution.
-    Schedule context: ${{ paseo.context }}
+    Schedule context: ${{ clisbot.context }}
 ```
 
 `schedule.tick` accepts no `connection` or `filters`. A trigger that includes `schedule.tick` cannot declare a `required: true` input because scheduled ticks supply no invocation arguments.
 
-Set `run.background: true` to create a background Paseo workspace that stays hidden from default workspace lists. Set `run.auto_archive: true` (the default) to archive the workspace when the run finishes.
+Set `run.background: true` to create a background Clisbot workspace that stays hidden from default workspace lists. Set `run.auto_archive: true` (the default) to archive the workspace when the run finishes.
 
 ## Recurrence rules
 
@@ -82,5 +82,5 @@ Set `run.background: true` to create a background Paseo workspace that stays hid
 - Hub evaluates schedules against the selected timezone's local wall clock, skipping times jumped by daylight saving and running repeated times once at their earlier occurrence. Use `UTC` for fixed elapsed-time intervals across daylight saving.
 - While a scheduled run is still active, Hub skips newly due occurrences for that trigger instead of stacking parallel runs. Once the active run completes or fails, the next future occurrence resumes. Separate triggers can still run at the same time on the same daemon.
 - After Hub downtime, Hub dispatches one catch-up run for the earliest missed occurrence and then advances to the next future occurrence. It does not replay every missed tick.
-- Include `${{ paseo.context }}` in `run.prompt` to pass `schedule.trigger_id`, `schedule.scheduled_at` (UTC), and `schedule.timezone`.
-- Hub schedules are independent of daemon-native schedules configured in Paseo.
+- Include `${{ clisbot.context }}` in `run.prompt` to pass `schedule.trigger_id`, `schedule.scheduled_at` (UTC), and `schedule.timezone`.
+- Hub schedules are independent of daemon-native schedules configured in Clisbot.

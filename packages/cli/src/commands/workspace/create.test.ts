@@ -10,7 +10,7 @@ describe("workspace create source", () => {
   });
 
   it("resolves a relative path against the directory the command runs in", () => {
-    const daemonTarget = { kind: "instance" as const, home: "/tmp/paseo-home" };
+    const daemonTarget = { kind: "instance" as const, home: "/tmp/clisbot-home" };
     expect(buildWorkspaceSource({ daemonTarget, isolation: "local", path: "." })).toEqual({
       kind: "directory",
       path: process.cwd(),
@@ -25,7 +25,7 @@ describe("workspace create source", () => {
   });
 
   it("sends a relative path to an explicit daemon endpoint as written", () => {
-    const daemonTarget = { kind: "endpoint" as const, host: "other-box:6767" };
+    const daemonTarget = { kind: "endpoint" as const, host: "other-box:6868" };
     expect(buildWorkspaceSource({ daemonTarget, isolation: "local", path: "repo" })).toEqual({
       kind: "directory",
       path: "repo",
@@ -40,7 +40,7 @@ describe("workspace create source", () => {
   });
 
   it("leaves a home-relative path for the daemon to expand", () => {
-    const daemonTarget = { kind: "instance" as const, home: "/tmp/paseo-home" };
+    const daemonTarget = { kind: "instance" as const, home: "/tmp/clisbot-home" };
     expect(buildWorkspaceSource({ daemonTarget, isolation: "local", path: "~/repo" })).toEqual({
       kind: "directory",
       path: "~/repo",

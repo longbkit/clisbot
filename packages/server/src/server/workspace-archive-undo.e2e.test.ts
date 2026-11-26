@@ -51,14 +51,14 @@ function createRepoWithGatedTeardown(): GatedRepo {
   const teardownStartedPath = path.join(tempRoot, "teardown-started");
   const releasePath = path.join(tempRoot, "release-teardown");
   execFileSync("git", ["init", "-b", "main", repoDir], { stdio: "pipe" });
-  git(repoDir, ["config", "user.email", "test@getpaseo.local"]);
-  git(repoDir, ["config", "user.name", "Paseo Test"]);
+  git(repoDir, ["config", "user.email", "test@clisbot.local"]);
+  git(repoDir, ["config", "user.name", "Clisbot Test"]);
   const teardown = `node -e "const fs=require('fs');fs.writeFileSync('${teardownStartedPath}','started');const timer=setInterval(()=>{if(fs.existsSync('${releasePath}'))clearInterval(timer)},20)"`;
   writeFileSync(
-    path.join(repoDir, "paseo.json"),
+    path.join(repoDir, "clisbot.json"),
     JSON.stringify({ worktree: { teardown: [teardown] } }),
   );
-  git(repoDir, ["add", "paseo.json"]);
+  git(repoDir, ["add", "clisbot.json"]);
   git(repoDir, ["-c", "commit.gpgsign=false", "commit", "-m", "gated teardown"]);
   return {
     repoDir,
@@ -141,10 +141,10 @@ test.skipIf(process.platform === "win32")(
     const repoDir = path.join(tempRoot, "repo");
     const pidFile = path.join(tempRoot, "sleep.pid");
     execFileSync("git", ["init", "-b", "main", repoDir], { stdio: "pipe" });
-    git(repoDir, ["config", "user.email", "test@getpaseo.local"]);
-    git(repoDir, ["config", "user.name", "Paseo Test"]);
+    git(repoDir, ["config", "user.email", "test@clisbot.local"]);
+    git(repoDir, ["config", "user.name", "Clisbot Test"]);
     writeFileSync(
-      path.join(repoDir, "paseo.json"),
+      path.join(repoDir, "clisbot.json"),
       JSON.stringify({
         worktree: {
           teardown: `sleep 600 & echo $! > ${JSON.stringify(pidFile)}; wait`,
@@ -152,7 +152,7 @@ test.skipIf(process.platform === "win32")(
         },
       }),
     );
-    git(repoDir, ["add", "paseo.json"]);
+    git(repoDir, ["add", "clisbot.json"]);
     git(repoDir, ["-c", "commit.gpgsign=false", "commit", "-m", "hanging teardown"]);
     const { workspaceId, directory, agentId } = await createWorktreeWorkspaceWithAgent(
       repoDir,
@@ -389,7 +389,7 @@ test.each(["restore", "undo", "reopen", "refresh", "legacy"] as const)(
     ]);
     await ctx.cleanup();
     ctx = await createDaemonTestContext({
-      paseoHomeRoot: path.join(tempRoot, "home"),
+      clisbotHomeRoot: path.join(tempRoot, "home"),
       cleanup: false,
     });
     const created = await ctx.client.createWorkspace({
@@ -418,7 +418,7 @@ test.each(["restore", "undo", "reopen", "refresh", "legacy"] as const)(
     }
     await ctx.cleanup();
     ctx = await createDaemonTestContext({
-      paseoHomeRoot: path.join(tempRoot, "home"),
+      clisbotHomeRoot: path.join(tempRoot, "home"),
       cleanup: false,
     });
     expect(await isAgentArchived(a.id)).toBe(true);

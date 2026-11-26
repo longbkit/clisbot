@@ -1,4 +1,4 @@
-import type { ProviderError, ProviderLaunch } from "@getpaseo/plugin/server/provider";
+import type { ProviderError, ProviderLaunch } from "@clisbot/plugin/server/provider";
 import path from "node:path";
 
 export class MuseError extends Error {

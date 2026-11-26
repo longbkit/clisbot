@@ -13,7 +13,7 @@ describe("pull request panel", () => {
       getPullRequestIdentity({
         forge: "github",
         number: 42,
-        url: "https://github.com/getpaseo/paseo/pull/42",
+        url: "https://github.com/longbkit/clisbot/pull/42",
         title: "PR panel",
         state: "open",
         baseRefName: "main",
@@ -23,7 +23,7 @@ describe("pull request panel", () => {
         mergeable: "MERGEABLE",
         checks: [],
       }),
-    ).toBe("url:https://github.com/getpaseo/paseo/pull/42");
+    ).toBe("url:https://github.com/longbkit/clisbot/pull/42");
   });
 
   it("does not manufacture an identity while detection has no result", () => {

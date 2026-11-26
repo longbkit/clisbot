@@ -9,7 +9,7 @@ import pino from "pino";
 import { OpenCodeAgentClient } from "../agent/providers/opencode-agent.js";
 import { OpenCodeServerManager } from "../agent/providers/opencode/server-manager.js";
 import { terminateWithTreeKill } from "../../utils/tree-kill.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 
 const PINNED_OPENCODE_VERSION = "1.18.9";
@@ -21,7 +21,7 @@ const COMMAND_TIMEOUT_MS = 180_000;
 interface RuntimePaths {
   root: string;
   home: string;
-  paseoHomeRoot: string;
+  clisbotHomeRoot: string;
   xdgConfig: string;
   xdgData: string;
   xdgCache: string;
@@ -45,7 +45,7 @@ interface CommandInput {
 
 export interface OpenCodeOmoRealRuntime {
   client: DaemonClient;
-  daemon: TestPaseoDaemon;
+  daemon: TestClisbotDaemon;
   model: string;
   workspace: string;
   artifacts: string;
@@ -55,8 +55,8 @@ export interface OpenCodeOmoRealRuntime {
 export async function createOpenCodeOmoRealRuntime(): Promise<OpenCodeOmoRealRuntime> {
   const paths = createRuntimePaths();
   const openCodeVersion =
-    process.env.PASEO_REAL_OPENCODE_VERSION?.trim() || PINNED_OPENCODE_VERSION;
-  const omoVersion = process.env.PASEO_REAL_OMO_VERSION?.trim() || PINNED_OMO_VERSION;
+    process.env.CLISBOT_REAL_OPENCODE_VERSION?.trim() || PINNED_OPENCODE_VERSION;
+  const omoVersion = process.env.CLISBOT_REAL_OMO_VERSION?.trim() || PINNED_OMO_VERSION;
   const openRouterApiKey = process.env.OPENROUTER_API_KEY?.trim() || null;
   const model = resolveModel(openRouterApiKey);
   const secrets = collectEnvironmentSecrets(openRouterApiKey);
@@ -137,24 +137,24 @@ export async function createOpenCodeOmoRealRuntime(): Promise<OpenCodeOmoRealRun
   if (model === NO_AUTH_MODEL) {
     await runCommand({
       command: openCodeCommand,
-      args: ["run", "--model", model, "Reply with exactly: PASEO_BIG_PICKLE_PROBE_OK"],
+      args: ["run", "--model", model, "Reply with exactly: CLISBOT_BIG_PICKLE_PROBE_OK"],
       cwd: paths.workspace,
       env: runtimeEnv,
       artifactName: "big-pickle-probe.log",
       artifacts: paths.artifacts,
       secrets,
-      requiredOutput: "PASEO_BIG_PICKLE_PROBE_OK",
+      requiredOutput: "CLISBOT_BIG_PICKLE_PROBE_OK",
     });
   }
 
-  const previousPaseoHome = process.env.PASEO_HOME;
+  const previousClisbotHome = process.env.CLISBOT_HOME;
   let traceDestination: ReturnType<typeof pino.destination> | null = null;
   let closeTrace: (() => void) | null = null;
   let serverManager: OpenCodeServerManager | null = null;
-  let daemon: TestPaseoDaemon | null = null;
+  let daemon: TestClisbotDaemon | null = null;
   let client: DaemonClient | null = null;
   try {
-    process.env.PASEO_HOME = path.join(paths.paseoHomeRoot, ".paseo");
+    process.env.CLISBOT_HOME = path.join(paths.clisbotHomeRoot, ".clisbot");
     traceDestination = pino.destination({
       dest: path.join(paths.artifacts, "daemon.log"),
       sync: true,
@@ -178,10 +178,10 @@ export async function createOpenCodeOmoRealRuntime(): Promise<OpenCodeOmoRealRun
       resolveHomeDir: () => paths.home,
     });
     const openCodeClient = new OpenCodeAgentClient(logger, runtimeSettings, { serverManager });
-    daemon = await createTestPaseoDaemon({
+    daemon = await createTestClisbotDaemon({
       agentClients: { opencode: openCodeClient },
       logger,
-      paseoHomeRoot: paths.paseoHomeRoot,
+      clisbotHomeRoot: paths.clisbotHomeRoot,
       staticDir: path.join(paths.root, "static"),
       cleanup: false,
     });
@@ -205,7 +205,7 @@ export async function createOpenCodeOmoRealRuntime(): Promise<OpenCodeOmoRealRun
             rmSync(paths.root, { recursive: true, force: true });
           }
         } finally {
-          restoreEnvironment("PASEO_HOME", previousPaseoHome);
+          restoreEnvironment("CLISBOT_HOME", previousClisbotHome);
         }
       },
     };
@@ -220,18 +220,18 @@ export async function createOpenCodeOmoRealRuntime(): Promise<OpenCodeOmoRealRun
         traceDestination?.end();
       }
     } finally {
-      restoreEnvironment("PASEO_HOME", previousPaseoHome);
+      restoreEnvironment("CLISBOT_HOME", previousClisbotHome);
     }
     throw withArtifactLocation(error, paths.artifacts);
   }
 }
 
 function createRuntimePaths(): RuntimePaths {
-  const root = mkdtempSync(path.join(tmpdir(), "paseo-real-opencode-omo-"));
+  const root = mkdtempSync(path.join(tmpdir(), "clisbot-real-opencode-omo-"));
   const paths: RuntimePaths = {
     root,
     home: path.join(root, "home"),
-    paseoHomeRoot: path.join(root, "paseo-home"),
+    clisbotHomeRoot: path.join(root, "clisbot-home"),
     xdgConfig: path.join(root, "xdg", "config"),
     xdgData: path.join(root, "xdg", "data"),
     xdgCache: path.join(root, "xdg", "cache"),
@@ -253,7 +253,7 @@ function createRuntimePaths(): RuntimePaths {
 }
 
 function resolveModel(openRouterApiKey: string | null): string {
-  const explicitModel = process.env.PASEO_REAL_OPENCODE_MODEL?.trim();
+  const explicitModel = process.env.CLISBOT_REAL_OPENCODE_MODEL?.trim();
   if (explicitModel) {
     return explicitModel;
   }
@@ -273,7 +273,7 @@ function buildRuntimeEnv(paths: RuntimePaths, openRouterApiKey: string | null): 
     SSL_CERT_DIR: process.env.SSL_CERT_DIR,
     HOME: paths.home,
     ...(process.platform === "win32" ? resolveWindowsHomeEnv(paths.home, paths.temporary) : {}),
-    PASEO_HOME: path.join(paths.paseoHomeRoot, ".paseo"),
+    CLISBOT_HOME: path.join(paths.clisbotHomeRoot, ".clisbot"),
     XDG_CONFIG_HOME: paths.xdgConfig,
     XDG_DATA_HOME: paths.xdgData,
     XDG_CACHE_HOME: paths.xdgCache,

@@ -10,7 +10,7 @@ import {
   type ProviderPersistence,
   type ProviderRegistration,
   type ProviderSessionConfig,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 import { randomUUID } from "node:crypto";
 import { providerResultKind } from "../shared/provider-result.js";
 
@@ -33,7 +33,7 @@ const VOICES = [
   { value: "direct", label: "Direct" },
 ];
 
-// Which option keys get a composer control. The control holds no value: Paseo reads it from
+// Which option keys get a composer control. The control holds no value: Clisbot reads it from
 // `providerOptions`, in a draft as well as on a running session.
 const CONTROLS: ProviderOptionControl[] = [
   { type: "toggle", key: "concise", label: "Concise responses", icon: "Zap" },
@@ -60,7 +60,7 @@ export function createDirectExampleProvider(): ProviderRegistration {
   return {
     id: "direct-example",
     label: "Direct provider example",
-    description: "A complete provider implemented directly against Paseo's provider boundary",
+    description: "A complete provider implemented directly against Clisbot's provider boundary",
     icon: "icon.svg",
     async connect(request) {
       if (!request.versions.includes(1)) throw new Error("Provider protocol version 1 is required");
@@ -338,7 +338,7 @@ function promptSession(
     sessionId: input.sessionId,
     persistence: session.persistence,
   });
-  // Values are formatted here: Paseo shows each one as given.
+  // Values are formatted here: Clisbot shows each one as given.
   state.emit({
     type: "session.turn",
     sessionId: input.sessionId,
@@ -349,7 +349,7 @@ function promptSession(
       { label: "Reply", value: `${reply.length} characters` },
     ],
   });
-  // An older Paseo does not offer session metrics and rejects the event.
+  // An older Clisbot does not offer session metrics and rejects the event.
   if (state.capabilities.includes("session.metrics")) {
     state.emit({
       type: "session.metrics",
@@ -447,7 +447,7 @@ function configState(session: ExampleSession): ProviderConfigState {
     modes: [{ id: "build", label: "Build" }],
     thinkingOptions: [],
     controls: CONTROLS,
-    // What the session ended up with, so Paseo stores what runs.
+    // What the session ended up with, so Clisbot stores what runs.
     providerOptions: { ...session.options },
   };
 }

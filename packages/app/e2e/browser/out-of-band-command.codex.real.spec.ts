@@ -11,7 +11,7 @@ test.describe("Codex out-of-band commands", () => {
   test("settles the submitted row when a goal command completes without a turn", async ({
     page,
   }) => {
-    const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-codex-command-")));
+    const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-codex-command-")));
     let handle: AgentHandle | undefined;
 
     try {

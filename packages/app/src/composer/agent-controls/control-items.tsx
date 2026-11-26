@@ -2,7 +2,7 @@ import { useId, useMemo } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { DensityIcon } from "@/components/ui/density-icon";
-import type { AgentOptionControl, ProviderOptions } from "@getpaseo/protocol/agent-types";
+import type { AgentOptionControl, ProviderOptions } from "@clisbot/protocol/agent-types";
 import { getAgentFeatureIcon, ThinkingIcon } from "@/agent-controls/icons";
 import {
   getControlTooltip,

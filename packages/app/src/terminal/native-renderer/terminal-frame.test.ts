@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 
-import graphemeRows from "../../../modules/paseo-terminal/android/src/androidTest/assets/grapheme-rows.json";
-import { PASEO_TERMINAL_STYLE_FLAGS } from "../../../modules/paseo-terminal/contract";
-import { encodeTerminalFrame } from "../../../modules/paseo-terminal/frame-encoding";
+import graphemeRows from "../../../modules/clisbot-terminal/android/src/androidTest/assets/grapheme-rows.json";
+import { CLISBOT_TERMINAL_STYLE_FLAGS } from "../../../modules/clisbot-terminal/contract";
+import { encodeTerminalFrame } from "../../../modules/clisbot-terminal/frame-encoding";
 import {
   createTerminalCellStyleResolver,
   DEFAULT_TERMINAL_THEME,
@@ -124,7 +124,7 @@ describe("native terminal frame", () => {
       1,
       FOREGROUND,
       0,
-      PASEO_TERMINAL_STYLE_FLAGS.bold | PASEO_TERMINAL_STYLE_FLAGS.underline,
+      CLISBOT_TERMINAL_STYLE_FLAGS.bold | CLISBOT_TERMINAL_STYLE_FLAGS.underline,
     ]);
   });
 
@@ -140,7 +140,7 @@ describe("native terminal frame", () => {
       1,
       (((Math.round(255 * 0.65) & 0xff) << 24) | (FOREGROUND & 0xffffff)) >>> 0,
       0,
-      PASEO_TERMINAL_STYLE_FLAGS.dim,
+      CLISBOT_TERMINAL_STYLE_FLAGS.dim,
     ]);
   });
 

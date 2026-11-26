@@ -4,7 +4,7 @@ import {
   useWorkspaces,
   type ProjectRef,
   type PluginSidebarViewProps,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 import { Heading, ProjectHeading, WorkspaceRow } from "./rows";
 function Project({ reference, view }: { reference: ProjectRef; view: PluginSidebarViewProps }) {
   const workspaces = useWorkspaces({

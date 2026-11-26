@@ -51,8 +51,8 @@ describe("provider documentation", () => {
   );
 
   it.each([
-    ["en", "https://paseo.sh/docs"],
-    ["zh-CN", "https://paseo.sh/zh-CN/docs"],
+    ["en", "https://clisbot.com/docs"],
+    ["zh-CN", "https://clisbot.com/zh-CN/docs"],
   ] as const)(
     "lists each provider page in the %s llms.txt, in sidebar order",
     (locale, docsUrl) => {

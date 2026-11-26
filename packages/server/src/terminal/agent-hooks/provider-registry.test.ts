@@ -40,7 +40,7 @@ function createWarningLogger(): WarningLogger {
 
 describe("terminal agent hook provider registry", () => {
   it("continues installing provider hooks after one provider fails", () => {
-    const root = createTempDir("paseo-agent-hook-registry-");
+    const root = createTempDir("clisbot-agent-hook-registry-");
     const badClaudeConfigDir = join(root, "not-a-directory");
     const codexHome = join(root, "codex");
     const opencodeConfigDir = join(root, "opencode");
@@ -59,10 +59,12 @@ describe("terminal agent hook provider registry", () => {
 
     expect(results.map((result) => result.configPath)).toEqual([
       join(codexHome, "hooks.json"),
-      join(opencodeConfigDir, "plugins", "paseo-terminal-activity.js"),
+      join(opencodeConfigDir, "plugins", "clisbot-terminal-activity.js"),
     ]);
     expect(existsSync(join(codexHome, "hooks.json"))).toBe(true);
-    expect(existsSync(join(opencodeConfigDir, "plugins", "paseo-terminal-activity.js"))).toBe(true);
+    expect(existsSync(join(opencodeConfigDir, "plugins", "clisbot-terminal-activity.js"))).toBe(
+      true,
+    );
     expect(logger.entries).toEqual([
       {
         bindings: expect.objectContaining({ err: expect.any(Error), provider: "claude" }),

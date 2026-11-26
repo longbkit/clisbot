@@ -107,7 +107,7 @@ test.describe("Project picker search", () => {
     await chooseAddProjectMethod(page, "directory-search");
 
     const input = addProjectFlowInput(page);
-    await input.fill("paseo-loading-state-no-match");
+    await input.fill("clisbot-loading-state-no-match");
 
     await expect(page.getByText("Start typing a path", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Loading...", { exact: true })).toBeVisible();

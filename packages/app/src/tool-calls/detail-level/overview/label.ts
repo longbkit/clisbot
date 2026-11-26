@@ -39,7 +39,7 @@ export function useOverviewSummaryLabel(
         parts.push(t(`${key}.${count === 1 ? "one" : "other"}`, { count }));
       }
     }
-    for (const [action, count] of Object.entries(summary.paseoActions)) {
+    for (const [action, count] of Object.entries(summary.clisbotActions)) {
       parts.push(
         count === 1 ? action.toLocaleLowerCase() : `${action.toLocaleLowerCase()} ×${count}`,
       );

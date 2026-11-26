@@ -7,7 +7,7 @@ import { expect, test } from "vitest";
 // Regression for #3905. Real Codex, synthetic on-disk history, no model turns.
 // Opt in because the oversized cases need approximately 2 GiB of memory and over
 // 1 GiB of temporary storage.
-const enabled = process.env.PASEO_CODEX_HISTORY_STRING_LIMIT_REPRO === "1";
+const enabled = process.env.CLISBOT_CODEX_HISTORY_STRING_LIMIT_REPRO === "1";
 const script = fileURLToPath(
   new URL("../../../../scripts/reproduce-codex-history-string-limit.mts", import.meta.url),
 );

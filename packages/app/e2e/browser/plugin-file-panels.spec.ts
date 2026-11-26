@@ -21,13 +21,13 @@ import {
   PluginFileConflictError,
   useFileBytes,
   useFileUrl,
-  usePaseo,
+  useClisbot,
   useWorkspace,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { DocumentFrame, Loading } from "@getpaseo/plugin/client/ui";
+import { DocumentFrame, Loading } from "@clisbot/plugin/client/ui";
 function Pdf({ file, workspaceId }) {
-  usePaseo();
+  useClisbot();
   useQueryClient();
   const workspace = useWorkspace(workspaceId, value => ({ id: value.id }));
   const bytes = useFileBytes(file);
@@ -81,7 +81,7 @@ async function openWorkspaceFile(page: Page, name: string) {
 }
 async function associateMarkdownWithPlugin(page: Page) {
   await page.evaluate(() => {
-    const key = "@paseo:app-settings";
+    const key = "@clisbot:app-settings";
     const settings = JSON.parse(localStorage.getItem(key) ?? "{}");
     settings.filePanelAssociations = { "ext:md": "plugin:file-panel-e2e/markdown" };
     localStorage.setItem(key, JSON.stringify(settings));
@@ -91,11 +91,11 @@ async function associateMarkdownWithPlugin(page: Page) {
 async function editMarkdownThroughPlugin(page: Page) {
   await page.getByRole("button", { name: "Edit Markdown through plugin", exact: true }).click();
 }
-/** Opens the tab with Paseo's Markdown panel from "Open with…" and shows its Source view. */
+/** Opens the tab with Clisbot's Markdown panel from "Open with…" and shows its Source view. */
 async function openBuiltinMarkdownSource(page: Page, name: string) {
   await page.getByTestId(`workspace-tab-file_${name}`).first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Open with…" }).hover();
-  await page.getByRole("menuitem", { name: "Markdown — Paseo" }).click();
+  await page.getByRole("menuitem", { name: "Markdown — Clisbot" }).click();
   await page
     .getByTestId("file-preview-mode")
     .filter({ visible: true })
@@ -107,7 +107,7 @@ test("directory plugins render PDF bytes and write Markdown through the file han
   page,
 }, testInfo) => {
   test.setTimeout(120_000);
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-file-panels-plugin-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-file-panels-plugin-"));
   const workspace = await seedWorkspace({
     repoPrefix: "file-panels-",
     repo: {
@@ -121,7 +121,7 @@ test("directory plugins render PDF bytes and write Markdown through the file han
   const previousConfig = await client.getDaemonConfig();
   await writeFile(path.join(workspace.repoPath, "report.pdf"), PDF);
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id: PLUGIN_ID, requirements: pluginRequirements }),
   );
   await writeFile(path.join(directory, "index.client.tsx"), SOURCE);
@@ -151,7 +151,7 @@ test("directory plugins render PDF bytes and write Markdown through the file han
     await page.screenshot({ path: pdfScreenshot });
     await testInfo.attach("plugin-pdf-web", { path: pdfScreenshot, contentType: "image/png" });
 
-    // A plugin panel claiming a text file competes with Source, so Paseo asks over the plugin.
+    // A plugin panel claiming a text file competes with Source, so Clisbot asks over the plugin.
     await openWorkspaceFile(page, "bytes.txt");
     await expect(page.getByText("Open .txt files with", { exact: true })).toBeVisible();
     await page.keyboard.press("Escape");

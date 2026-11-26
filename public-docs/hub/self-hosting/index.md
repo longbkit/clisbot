@@ -11,28 +11,28 @@ category: Hub
 The shortest path to a local Hub is one command:
 
 ```sh
-npx @getpaseo/hub
+npx @clisbot/hub
 ```
 
-Open <http://localhost:3000>. A fresh Hub creates its embedded database and authentication secret, then guides you through creating the operator account and setting up the GitHub, Linear, Slack, or Discord apps you need.
+Open <http://localhost:6870>. A fresh Hub creates its embedded database and authentication secret, then guides you through creating the operator account and setting up the GitHub, Linear, Slack, or Discord apps you need.
 
 Follow the [quickstart](/docs/hub/quickstart) to connect Slack over Socket Mode and run your first trigger without a public server.
 
 ## Local data
 
-Without `DATABASE_URL`, Hub stores an embedded PGlite database and its generated authentication secret under `$XDG_DATA_HOME/paseo-hub`. If `XDG_DATA_HOME` is not set to an absolute path, Hub uses `~/.local/share/paseo-hub`. Both survive restarts.
+Without `DATABASE_URL`, Hub stores an embedded PGlite database and its generated authentication secret under `$XDG_DATA_HOME/clisbot-hub`. If `XDG_DATA_HOME` is not set to an absolute path, Hub uses `~/.local/share/clisbot-hub`. Both survive restarts.
 
-Set a custom directory with `PASEO_HUB_DATA_DIR`:
+Set a custom directory with `CLISBOT_HUB_DATA_DIR`:
 
 ```sh
-PASEO_HUB_DATA_DIR=/path/to/paseo-hub-data npx @getpaseo/hub
+CLISBOT_HUB_DATA_DIR=/path/to/clisbot-hub-data npx @clisbot/hub
 ```
 
 Embedded mode supports one Hub process per data directory and fits a personal or single-process Hub. Back up the whole data directory before upgrading or moving it.
 
 ## Public addresses
 
-Hub defaults to `http://localhost:3000`. That address is enough for the dashboard, daemons, Slack Socket Mode, Discord gateway, and schedules.
+Hub defaults to `http://localhost:6870`. That address is enough for the dashboard, daemons, Slack Socket Mode, Discord gateway, and schedules.
 
 A public HTTPS address is required for:
 
@@ -40,12 +40,12 @@ A public HTTPS address is required for:
 - Linear OAuth callbacks and webhooks
 - Slack Webhooks transport (Socket Mode does not need HTTPS)
 - Inbound webhook triggers (`/webhooks/wh_...`)
-- **Open in Paseo** links appended to conversation replies
+- **Open in Clisbot** links appended to conversation replies
 
 Set your public HTTPS origin before starting Hub:
 
 ```sh
-PASEO_HUB_APP_URL=https://hub.example.com npx @getpaseo/hub
+CLISBOT_HUB_APP_URL=https://hub.example.com npx @clisbot/hub
 ```
 
 If you change the public origin later, update callback and webhook URLs in your provider apps. The **Apps** page generates URLs for the origin Hub is currently using.
@@ -55,13 +55,13 @@ If you change the public origin later, update callback and webhook URLs in your 
 Set `DATABASE_URL` to use PostgreSQL instead of the embedded database:
 
 ```sh
-DATABASE_URL=postgres://paseo:password@localhost:5432/paseo_hub \
-  npx @getpaseo/hub
+DATABASE_URL=postgres://clisbot:password@localhost:5432/clisbot_hub \
+  npx @clisbot/hub
 ```
 
 Use PostgreSQL for a durable server deployment, multiple Hub processes, or standard database backups. Migrations run automatically at startup, and Hub refuses to listen if a migration fails.
 
-The database also stores Hub's generated authentication secret. Set `PASEO_HUB_AUTH_SECRET` only when your platform injects that secret from an external secret store.
+The database also stores Hub's generated authentication secret. Set `CLISBOT_HUB_AUTH_SECRET` only when your platform injects that secret from an external secret store.
 
 While set, Hub uses the override without replacing the stored secret. Changing the active secret signs dashboard users out, while running executions keep their existing credentials until they end.
 
@@ -115,35 +115,35 @@ Read the setup guide for each provider:
 Browser setup is the default for a fresh database. For an unattended deployment, create the first operator from environment variables instead:
 
 ```dotenv
-PASEO_BOOTSTRAP_ORGANIZATION=My organization
-PASEO_BOOTSTRAP_OWNER_EMAIL=me@example.com
-PASEO_BOOTSTRAP_OWNER_PASSWORD=replace-with-a-temporary-password
+CLISBOT_BOOTSTRAP_ORGANIZATION=My organization
+CLISBOT_BOOTSTRAP_OWNER_EMAIL=me@example.com
+CLISBOT_BOOTSTRAP_OWNER_PASSWORD=replace-with-a-temporary-password
 ```
 
-The password must be at least 12 characters. Sign in once, replace the password in the dashboard, and remove `PASEO_BOOTSTRAP_OWNER_PASSWORD`. Hub keeps the account and organization.
+The password must be at least 12 characters. Sign in once, replace the password in the dashboard, and remove `CLISBOT_BOOTSTRAP_OWNER_PASSWORD`. Hub keeps the account and organization.
 
 ## Docker Compose
 
 The Hub repository includes a Compose stack for Hub and PostgreSQL:
 
 ```sh
-git clone https://github.com/getpaseo/hub.git
-cd hub
+git clone https://github.com/longbkit/clisbot.git
+cd clisbot/packages/hub
 cp .env.example .env
 docker compose up -d
 ```
 
-Open <http://localhost:3000> and complete browser setup. For a public deployment, set `PASEO_HUB_APP_URL` and any reverse-proxy settings in `.env` before starting the stack.
+Open <http://localhost:6870> and complete browser setup. For a public deployment, set `CLISBOT_HUB_APP_URL` and any reverse-proxy settings in `.env` before starting the stack.
 
-The stack publishes Hub on port `3000` and stores PostgreSQL data in a named volume. The published container image is `ghcr.io/getpaseo/hub:latest`.
+The stack publishes Hub on port `6870` and stores PostgreSQL data in a named volume. The published container image is `ghcr.io/longbkit/clisbot:latest`.
 
 ### HTTPS with Caddy
 
-Compose serves plain HTTP on port `3000`. Run Caddy on the same host to terminate TLS:
+Compose serves plain HTTP on port `6870`. Run Caddy on the same host to terminate TLS:
 
 ```caddyfile
 hub.example.com {
-  reverse_proxy 127.0.0.1:3000
+  reverse_proxy 127.0.0.1:6870
 }
 ```
 
@@ -152,19 +152,19 @@ Point `hub.example.com` at the host and open ports `80` and `443`. Caddy [obtain
 Set these values in `.env`:
 
 ```dotenv
-PASEO_HUB_APP_URL=https://hub.example.com
-PASEO_HUB_TRUSTED_CLIENT_IP_HEADER=x-forwarded-for
+CLISBOT_HUB_APP_URL=https://hub.example.com
+CLISBOT_HUB_TRUSTED_CLIENT_IP_HEADER=x-forwarded-for
 ```
 
-To keep port `3000` off the public interface, change the `hub` port in `compose.yml` to `"127.0.0.1:3000:3000"`.
+To keep port `6870` off the public interface, change the `hub` port in `compose.yml` to `"127.0.0.1:6870:6870"`.
 
 ## Fly
 
 Clone the repository and create an app and database under names you control:
 
 ```sh
-git clone https://github.com/getpaseo/hub.git
-cd hub
+git clone https://github.com/longbkit/clisbot.git
+cd clisbot/packages/hub
 fly apps create your-hub
 fly postgres create --name your-hub-db
 fly postgres attach your-hub-db -a your-hub
@@ -174,7 +174,7 @@ Deploy the Dockerfile and give Hub its public origin:
 
 ```sh
 fly deploy -a your-hub \
-  -e PASEO_HUB_APP_URL=https://your-hub.fly.dev
+  -e CLISBOT_HUB_APP_URL=https://your-hub.fly.dev
 ```
 
 Open the Fly URL and complete browser setup, or set the [bootstrap environment](#bootstrap-from-environment) before deploying.

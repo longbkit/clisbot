@@ -1,4 +1,4 @@
-import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
+import type { ParsedDiffFile } from "@clisbot/protocol/messages";
 import { buildDiffTree, flattenDiffTree } from "@/git/diff-tree";
 
 // The Changes tree is the single ordering authority: `sortTree` (diff-tree.ts)

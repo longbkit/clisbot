@@ -52,13 +52,13 @@ describe("terminal worker frames", () => {
 
 describe("terminal worker authentication", () => {
   it("closes a connection with the wrong secret and accepts the record's secret", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "tw-auth-"));
-    temporaryDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "tw-auth-"));
+    temporaryDirs.push(clisbotHome);
     const { record, recordPath } = await launchTerminalWorker({
-      paseoHome,
-      paseoVersion: "0.0.0-test",
+      clisbotHome,
+      clisbotVersion: "0.0.0-test",
     });
-    expect(recordPath).toBe(terminalWorkerRecordPath(paseoHome, record.pid));
+    expect(recordPath).toBe(terminalWorkerRecordPath(clisbotHome, record.pid));
     if (!isPlatform("win32")) {
       expect(statSync(recordPath).mode & 0o777).toBe(0o600);
       expect(statSync(record.socketPath).mode & 0o777).toBe(0o600);
@@ -125,7 +125,7 @@ it("bounds a stalled framed writer to one chunk and resumes in order", async () 
 // worker. A refused answer retires the record, so it must hold for a Windows named pipe too.
 describe("terminal worker socket probe", () => {
   function socketPath(): string {
-    if (isPlatform("win32")) return `\\\\.\\pipe\\paseo-tw-probe-${randomUUID()}`;
+    if (isPlatform("win32")) return `\\\\.\\pipe\\clisbot-tw-probe-${randomUUID()}`;
     const directory = mkdtempSync(path.join(tmpdir(), "tw-probe-"));
     temporaryDirs.push(directory);
     return path.join(directory, "w.sock");

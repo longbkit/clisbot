@@ -3,8 +3,8 @@ import { Trans, useTranslation } from "react-i18next";
 import {
   MockupStageWindow,
   MockupStep,
-  OpenInPaseoChip,
-  PaseoBotAvatar,
+  OpenInClisbotChip,
+  ClisbotBotAvatar,
   type SourceMockupProps,
   WindowTrafficLights,
 } from "./shared";
@@ -88,7 +88,7 @@ function WebhookCurlBlock() {
           <span className="select-none text-accent-text">$ </span>
           <span className="text-white">curl</span> <span className="text-sky-300/90">-X POST</span>{" "}
           <span className="text-emerald-300/90">
-            https://hub.paseo.sh/webhooks/
+            https://hub.clisbot.com/webhooks/
             <wbr />
             {WEBHOOK_ID}
           </span>{" "}
@@ -142,10 +142,10 @@ function WebhookRunCard() {
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.07] pb-2.5">
         <div className="flex items-center gap-2">
-          <PaseoBotAvatar size="sm" />
+          <ClisbotBotAvatar size="sm" />
           <div>
             <div className="flex items-center gap-1.5 text-[12.5px]">
-              <span className="font-semibold text-white/95">paseo-bot</span>
+              <span className="font-semibold text-white/95">clisbot-bot</span>
               <span className="font-mono text-[11px] text-white/45">{RUN_ID.slice(0, 8)}…</span>
             </div>
             <p className="text-[11px] text-white/55">{t("hub.demo.webhooks.runMeta")}</p>
@@ -179,7 +179,7 @@ function WebhookRunCard() {
       </ul>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.07] pt-2.5">
-        <OpenInPaseoChip variant="brand" />
+        <OpenInClisbotChip variant="brand" />
         <span className="font-mono text-[11px] text-white/45">
           {t("hub.demo.webhooks.triggeredBy")}
         </span>

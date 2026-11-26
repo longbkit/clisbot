@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook } from "@testing-library/react";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
 import { seedSessionWorkspaces } from "@/test/seed-session";

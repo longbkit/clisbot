@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import type { AgentModelDefinition } from "@getpaseo/protocol/agent-types";
-import type { ProviderProfileModel } from "@getpaseo/protocol/provider-config";
-import { compareMatchScores, scoreTextFields } from "@getpaseo/protocol/search/text-match";
+import type { AgentModelDefinition } from "@clisbot/protocol/agent-types";
+import type { ProviderProfileModel } from "@clisbot/protocol/provider-config";
+import { compareMatchScores, scoreTextFields } from "@clisbot/protocol/search/text-match";
 import {
   AdaptiveModalSheet,
   AdaptiveTextInput,

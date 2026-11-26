@@ -1408,7 +1408,7 @@ describe("Gitea-family ChangeRequestSource polling", () => {
       });
       const watches = createChangeRequestWatches({
         router: createChangeRequestRouter({ forgeResolver }),
-        paseoHome: home,
+        clisbotHome: home,
         logger: pino({ enabled: false }),
         isActive: async () => true,
         messages: () => messages,

@@ -8,23 +8,23 @@ category: Hub
 
 # Hub public API
 
-The Hub public API lets scripts and CI pipelines manage triggers, webhook secrets, manual runs, and daemon enrollment for one organization. Set `PASEO_HUB_URL` to your Hub origin, such as `https://hub.example.com`.
+The Hub public API lets scripts and CI pipelines manage triggers, webhook secrets, manual runs, and daemon enrollment for one organization. Set `CLISBOT_HUB_URL` to your Hub origin, such as `https://hub.example.com`.
 
 ## API reference
 
-- [Interactive API reference](https://hub.paseo.sh/api/reference)
-- [OpenAPI 3.1 document](https://hub.paseo.sh/api/openapi.json)
+Every Hub serves its own reference on its origin:
 
-A self-hosted Hub serves the same `/api/reference` and `/api/openapi.json` endpoints on its own origin.
+- Interactive API reference: `<hub-origin>/api/reference`
+- OpenAPI 3.1 document: `<hub-origin>/api/openapi.json`
 
 ## Authentication
 
-For interactive CLI access, run `paseo hub login [origin]`. Paseo stores a revocable organization credential under `PASEO_HOME` for that exact origin.
+For interactive CLI access, run `clisbot hub login [origin]`. Clisbot stores a revocable organization credential under `CLISBOT_HOME` for that exact origin.
 
 For automation, create an organization API key in Hub under **Settings → API keys**. Send either credential as a Bearer token:
 
 ```http
-Authorization: Bearer paseo_pk_...
+Authorization: Bearer clisbot_pk_...
 Content-Type: application/json
 ```
 
@@ -44,10 +44,10 @@ API errors return RFC 9457 `application/problem+json` with an `X-Request-ID` hea
 
 ```json
 {
-  "type": "https://paseo.sh/problems/unauthorized",
+  "type": "https://clisbot.com/problems/unauthorized",
   "title": "Authentication required",
   "status": 401,
-  "detail": "Provide an active Paseo organization credential in the Authorization: Bearer header.",
+  "detail": "Provide an active Clisbot organization credential in the Authorization: Bearer header.",
   "code": "unauthorized",
   "requestId": "5e967c44-fc22-4f6d-8fc5-1bbff33121af"
 }
@@ -65,7 +65,7 @@ A valid credential missing the required scope returns `403` in the same format.
 
 ```json
 {
-  "yaml": "name: manual-task\nenabled: true\non:\n  manual.run: {}\nrun:\n  target: { daemon: my-macbook, cwd: /workspace }\n  agent: { provider: codex, mode: full-access }\n  prompt: |\n    Complete the task and call finish_execution.\n    ${{ paseo.prompt }}\n  max_runtime: 1h\n  idle_timeout: 5m\n"
+  "yaml": "name: manual-task\nenabled: true\non:\n  manual.run: {}\nrun:\n  target: { daemon: my-macbook, cwd: /workspace }\n  agent: { provider: codex, mode: full-access }\n  prompt: |\n    Complete the task and call finish_execution.\n    ${{ clisbot.prompt }}\n  max_runtime: 1h\n  idle_timeout: 5m\n"
 }
 ```
 
@@ -81,7 +81,7 @@ Both endpoints ask the target daemon to validate `run.agent`, so that daemon mus
 }
 ```
 
-Invalid YAML, unknown integrations, or rejected agent settings return `422` with field issues. `paseo hub deploy --dry-run` and `paseo hub deploy` call these endpoints for `.paseo/triggers/*.yml`.
+Invalid YAML, unknown integrations, or rejected agent settings return `422` with field issues. `clisbot hub deploy --dry-run` and `clisbot hub deploy` call these endpoints for `.clisbot/triggers/*.yml`.
 
 ## Webhook secrets
 
@@ -142,8 +142,8 @@ On success, Hub returns `200`:
 Example:
 
 ```bash
-curl --fail-with-body -sS -X POST "$PASEO_HUB_URL/api/v1/manual-runs" \
-  -H "Authorization: Bearer $PASEO_HUB_API_KEY" \
+curl --fail-with-body -sS -X POST "$CLISBOT_HUB_URL/api/v1/manual-runs" \
+  -H "Authorization: Bearer $CLISBOT_HUB_API_KEY" \
   -H "Content-Type: application/json" \
   --data '{
     "projectSlug": "default",
@@ -160,8 +160,8 @@ curl --fail-with-body -sS -X POST "$PASEO_HUB_URL/api/v1/manual-runs" \
 
 ```bash
 curl --fail-with-body -sS -X POST \
-  "$PASEO_HUB_URL/api/v1/daemons/enrollment-tokens" \
-  -H "Authorization: Bearer $PASEO_HUB_API_KEY"
+  "$CLISBOT_HUB_URL/api/v1/daemons/enrollment-tokens" \
+  -H "Authorization: Bearer $CLISBOT_HUB_API_KEY"
 ```
 
 Response (`201`):
@@ -173,7 +173,7 @@ Response (`201`):
 }
 ```
 
-`paseo hub connect [origin]` calls this endpoint automatically and exchanges the token for the daemon's own long-lived relationship credential. Revoking the API key immediately blocks new API calls and expires any unconsumed enrollment tokens it issued.
+`clisbot hub connect [origin]` calls this endpoint automatically and exchanges the token for the daemon's own long-lived relationship credential. Revoking the API key immediately blocks new API calls and expires any unconsumed enrollment tokens it issued.
 
 ## Keys and audit trails
 

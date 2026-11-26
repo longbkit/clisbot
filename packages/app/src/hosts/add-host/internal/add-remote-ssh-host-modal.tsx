@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Eye, EyeOff, Terminal } from "lucide-react-native";
-import { parseSshTransportUri } from "@getpaseo/protocol/ssh-transport";
+import { parseSshTransportUri } from "@clisbot/protocol/ssh-transport";
 import type { HostProfile } from "@/types/host-connection";
 import { useHostMutations, useHosts } from "@/runtime/host-runtime";
 import { Button } from "@/components/ui/button";

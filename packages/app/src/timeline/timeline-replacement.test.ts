@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { requestTimelineReplacement } from "./timeline-replacement";
 
 describe("requestTimelineReplacement", () => {

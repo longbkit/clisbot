@@ -1,0 +1,4 @@
+{
+  "id": "button-examples",
+  "requirements": { "clisbot": ">=0.8.0" }
+}

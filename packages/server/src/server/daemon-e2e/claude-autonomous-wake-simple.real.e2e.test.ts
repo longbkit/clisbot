@@ -5,7 +5,7 @@ import path from "node:path";
 import pino from "pino";
 
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import {
   canRunRealProvider,
   createRealProviderClients,
@@ -36,7 +36,7 @@ describe("daemon E2E (real claude) - autonomous wake simple", () => {
   test("hello + background sleep returns idle, then wakes once on completion", async () => {
     const logger = pino({ level: "silent" });
     const cwd = tmpCwd();
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: createRealProviderClients(["claude"], logger),
       logger,
     });

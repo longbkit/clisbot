@@ -6,7 +6,7 @@ import pino from "pino";
 
 import { ClaudeAgentClient } from "../agent/providers/claude/agent.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { canRunRealProvider, getRealProviderConfig } from "./real-provider-test-config.js";
 
 function tmpCwd(): string {
@@ -69,7 +69,7 @@ describe("daemon E2E (real claude) - steer during compaction", () => {
   test("a steered message waits for a running /compact instead of cancelling it", async () => {
     const logger = pino({ level: "silent" });
     const cwd = tmpCwd();
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: { claude: new ClaudeAgentClient({ logger }) },
       logger,
     });

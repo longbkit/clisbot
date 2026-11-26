@@ -4,14 +4,14 @@ import {
   isGitHubHost,
   parseGitHubRemoteIdentity,
   parseGitRemoteLocation,
-} from "@getpaseo/protocol/git-remote";
-import { pluginOverviewUrl } from "@getpaseo/protocol/plugin-overview";
+} from "@clisbot/protocol/git-remote";
+import { pluginOverviewUrl } from "@clisbot/protocol/plugin-overview";
 import {
   pluginMediaKind,
   type PublishedPluginDetailSchema,
   type PublishedPluginSchema,
-} from "@getpaseo/protocol/plugin-registry";
-import { scoreTextFields } from "@getpaseo/protocol/search/text-match";
+} from "@clisbot/protocol/plugin-registry";
+import { scoreTextFields } from "@clisbot/protocol/search/text-match";
 import { DEFAULT_LOCALE, type Locale } from "~/i18n";
 import type { LocalizedMarkdown } from "~/markdown-content";
 import { CATEGORIES, type CategorySlug } from "./categories";
@@ -77,7 +77,7 @@ export function getPluginsByAuthor(plugins: Plugin[], owner: string): Plugin[] {
   return plugins.filter((plugin) => pluginOwner(plugin) === owner);
 }
 export function installCommand(plugin: Plugin): string {
-  return `paseo plugin add ${plugin.id}`;
+  return `clisbot plugin add ${plugin.id}`;
 }
 export function pluginVersion(plugin: Plugin): string {
   return plugin.artifact.kind === "npm"

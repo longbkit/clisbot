@@ -6,7 +6,7 @@ import { expect, test } from "vitest";
 import { selectOpenCodeService } from "./service-selection.js";
 
 test("selects the registered service with its credential and ignores stale registration", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-service-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-service-"));
   const file = path.join(directory, "service.json");
   let requests = 0;
   const server = createServer((request, response) => {

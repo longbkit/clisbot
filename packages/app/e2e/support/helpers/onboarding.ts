@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, type Locator, type Page } from "@playwright/test";
-import type { DaemonClient as InternalDaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient as InternalDaemonClient } from "@clisbot/client/internal/daemon-client";
 import { addProjectFlow, addProjectFlowInput, chooseAddProjectMethod } from "./add-project-flow";
 import { connectDaemonClient } from "./daemon-client-loader";
 import { buildCreateAgentPreferences, buildSeededHost } from "./daemon-registry";
@@ -19,15 +19,15 @@ export async function openAppAsNewUser(
     endpoint: `127.0.0.1:${host.port}`,
     nowIso: new Date().toISOString(),
   });
-  await page.route(/:6767\b/, (route) => route.abort());
-  await page.routeWebSocket(/:6767\b/, async (webSocket) => {
+  await page.route(/:(6767|6768|6868|6869)\b/, (route) => route.abort());
+  await page.routeWebSocket(/:(6767|6768|6868|6869)\b/, async (webSocket) => {
     await webSocket.close({ code: 1008, reason: "Blocked developer daemon during e2e." });
   });
   await page.addInitScript(
     ({ registryHost, preferences }) => {
-      localStorage.setItem("@paseo:e2e", "1");
-      localStorage.setItem("@paseo:daemon-registry", JSON.stringify([registryHost]));
-      localStorage.setItem("@paseo:create-agent-preferences", JSON.stringify(preferences));
+      localStorage.setItem("@clisbot:e2e", "1");
+      localStorage.setItem("@clisbot:daemon-registry", JSON.stringify([registryHost]));
+      localStorage.setItem("@clisbot:create-agent-preferences", JSON.stringify(preferences));
     },
     { registryHost: seededHost, preferences: buildCreateAgentPreferences() },
   );
@@ -137,12 +137,12 @@ export async function goToSetupStep(page: Page, label: string): Promise<void> {
   await setupModal(page).getByRole("tab", { name: label, exact: true }).click();
 }
 
-export function paseoToolsSwitch(scope: Page | Locator): Locator {
-  return scope.getByRole("switch", { name: "Inject Paseo tools", exact: true });
+export function clisbotToolsSwitch(scope: Page | Locator): Locator {
+  return scope.getByRole("switch", { name: "Inject Clisbot tools", exact: true });
 }
 
-/** Whether the host gives its agents Paseo tools, read from the host itself. */
-export async function hostGivesAgentsPaseoTools(host: { port: number }): Promise<boolean> {
+/** Whether the host gives its agents Clisbot tools, read from the host itself. */
+export async function hostGivesAgentsClisbotTools(host: { port: number }): Promise<boolean> {
   const client = await connectDaemonClient<
     Pick<InternalDaemonClient, "connect" | "close" | "getDaemonConfig">
   >({ clientIdPrefix: "app-e2e-onboarding", port: host.port });
@@ -175,8 +175,8 @@ export async function closeRelayPairing(pairing: Locator): Promise<void> {
 export async function openTailscaleDocsFromSetup(page: Page): Promise<string> {
   await page
     .context()
-    .route("https://paseo.sh/**", (route) =>
-      route.fulfill({ contentType: "text/html", body: "<title>Paseo docs</title>" }),
+    .route("https://clisbot.com/**", (route) =>
+      route.fulfill({ contentType: "text/html", body: "<title>Clisbot docs</title>" }),
     );
   const popup = page.waitForEvent("popup");
   await setupModal(page).getByRole("link", { name: "Tailscale, Docs", exact: true }).click();
@@ -209,7 +209,7 @@ export async function startSetupHost(
 ): Promise<SetupHost> {
   const serverId = `srv_onboarding_${label}_${randomUUID().replaceAll("-", "").slice(0, 8)}`;
   const claudeConfigDir = await seedClaudeHistory(options.claudeSessionsIn ?? []);
-  const home = await mkdtemp(path.join(tmpdir(), "paseo-onboarding-home-"));
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-onboarding-home-"));
   const daemon = await startIsolatedHostDaemon(serverId, {
     config: claudeOnlyConfig({ withBrokenProvider: options.withBrokenProvider ?? false }),
     environment: { ...process.env, HOME: home, CLAUDE_CONFIG_DIR: claudeConfigDir },
@@ -228,7 +228,7 @@ export async function startSetupHost(
 
 /** Writes one recent Claude session per folder into a fresh CLAUDE_CONFIG_DIR. */
 async function seedClaudeHistory(cwds: readonly string[]): Promise<string> {
-  const configDir = await mkdtemp(path.join(tmpdir(), "paseo-onboarding-claude-"));
+  const configDir = await mkdtemp(path.join(tmpdir(), "clisbot-onboarding-claude-"));
   const newest = Date.now() - 60_000;
   for (const [index, cwd] of cwds.entries()) {
     const sessionId = `onboarding-session-${index + 1}`;

@@ -151,7 +151,7 @@ describe("edxeth/pi-subagents adapter", () => {
   });
 
   test("a resume gets its own run and reads the retained child session", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "paseo-edxeth-resume-"));
+    const dir = await mkdtemp(join(tmpdir(), "clisbot-edxeth-resume-"));
     const file = join(dir, "child.jsonl");
     const host = createPiExtensionHost();
     try {
@@ -257,7 +257,7 @@ describe("edxeth/pi-subagents adapter", () => {
     { mode: "background", statuses: ["running", "running", "completed"] },
   ])("settles the captured $mode run live and on replay", async ({ mode, statuses }) => {
     const fixture = readSubagentFixture(new URL(`./fixtures/${mode}.json`, import.meta.url), {
-      from: `/tmp/paseo-edxeth-fixture/${mode}/child-session.jsonl`,
+      from: `/tmp/clisbot-edxeth-fixture/${mode}/child-session.jsonl`,
       to: fileURLToPath(new URL(`./fixtures/${mode}-child-session.jsonl`, import.meta.url)),
     });
     const events = await verifySubagentFixture(fixture);
@@ -271,7 +271,7 @@ describe("edxeth/pi-subagents adapter", () => {
     "restores a completed %s child and its transcript to the consumer store",
     async (mode) => {
       const fixture = readSubagentFixture(new URL(`./fixtures/${mode}.json`, import.meta.url), {
-        from: `/tmp/paseo-edxeth-fixture/${mode}/child-session.jsonl`,
+        from: `/tmp/clisbot-edxeth-fixture/${mode}/child-session.jsonl`,
         to: fileURLToPath(new URL(`./fixtures/${mode}-child-session.jsonl`, import.meta.url)),
       });
       const store = new ProviderSubagentStore();
@@ -285,7 +285,7 @@ describe("edxeth/pi-subagents adapter", () => {
         expect.objectContaining({
           item: expect.objectContaining({
             type: "assistant_message",
-            text: mode === "foreground" ? "PASEO_EDXETH_UPSTREAM_OK" : "PASEO_EDXETH_LEAN_OK",
+            text: mode === "foreground" ? "CLISBOT_EDXETH_UPSTREAM_OK" : "CLISBOT_EDXETH_LEAN_OK",
           }),
         }),
       );

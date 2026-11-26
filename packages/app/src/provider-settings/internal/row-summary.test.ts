@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ProviderInstallationUpdate } from "@getpaseo/protocol/messages";
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { ProviderInstallationUpdate } from "@clisbot/protocol/messages";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import type { ProviderInstallationRead } from "@/components/provider-installation";
 import { readRowSummary } from "./row-summary";
 

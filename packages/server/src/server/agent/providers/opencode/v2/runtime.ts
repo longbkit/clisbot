@@ -1,5 +1,5 @@
 import { decorateOpenCodeV2Env, materializeOpenCodeV2Plugin } from "../bridge.js";
-import { resolvePaseoHome } from "../../../../paseo-home.js";
+import { resolveClisbotHome } from "../../../../clisbot-home.js";
 import { OpenCode } from "@opencode/client";
 import type { V2Api } from "./api.js";
 import { randomBytes } from "node:crypto";
@@ -136,11 +136,13 @@ export class V2Runtime {
   }
 
   private assertBridgePort(): void {
-    const port = this.options.settings?.env?.PASEO_OPENCODE_BRIDGE_PORT;
+    const port = this.options.settings?.env?.CLISBOT_OPENCODE_BRIDGE_PORT;
     if (!port || !this.options.bridge) return;
     const actual = new URL(this.options.bridge.sharedV2Connection().baseUrl).port;
     if (Number(port) !== Number(actual))
-      throw new Error("PASEO_OPENCODE_BRIDGE_PORT changed; restart Paseo to apply the bridge port");
+      throw new Error(
+        "CLISBOT_OPENCODE_BRIDGE_PORT changed; restart Clisbot to apply the bridge port",
+      );
   }
 
   private assertSharedConfiguration(
@@ -148,10 +150,10 @@ export class V2Runtime {
     selection: OpenCodeServiceSelection,
   ): void {
     const connectionEnv = new Set([
-      "PASEO_OPENCODE_SERVER_URL",
-      "PASEO_OPENCODE_SERVER_PASSWORD",
-      "PASEO_OPENCODE_BRIDGE_URL",
-      "PASEO_OPENCODE_BRIDGE_PORT",
+      "CLISBOT_OPENCODE_SERVER_URL",
+      "CLISBOT_OPENCODE_SERVER_PASSWORD",
+      "CLISBOT_OPENCODE_BRIDGE_URL",
+      "CLISBOT_OPENCODE_BRIDGE_PORT",
     ]);
     if (selection.kind === "discovered") {
       connectionEnv.add("XDG_CONFIG_HOME");
@@ -247,7 +249,7 @@ export class V2Runtime {
     const bridge = this.options.bridge;
     const plugin = bridge
       ? await bridge.materializeV2Plugin()
-      : await materializeOpenCodeV2Plugin(resolvePaseoHome());
+      : await materializeOpenCodeV2Plugin(resolveClisbotHome());
     const globalConfig = openCodeConfigDirectory({ ...globalThis.process.env, ...configured });
     const managed = await hasManagedBridge(globalConfig);
     if (managed && bridge)

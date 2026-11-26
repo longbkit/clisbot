@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SiteShell } from "~/components/site-shell";
-import { SponsorPaseoSection, SponsorSpotSection } from "~/components/sponsorship";
+import { SponsorClisbotSection, SponsorSpotSection } from "~/components/sponsorship";
 import { getTranslator, routeLocale } from "~/i18n";
 import { pageMeta } from "~/meta";
 
@@ -22,7 +22,7 @@ function Sponsor() {
   return (
     <SiteShell width="default">
       <div className="space-y-24">
-        <SponsorPaseoSection />
+        <SponsorClisbotSection />
         <SponsorSpotSection />
       </div>
     </SiteShell>

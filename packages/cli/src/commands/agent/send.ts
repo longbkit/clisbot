@@ -1,8 +1,8 @@
 import { type Command, Option } from "commander";
-import type { AgentActiveTurnBehavior } from "@getpaseo/protocol/messages";
+import type { AgentActiveTurnBehavior } from "@clisbot/protocol/messages";
 import { collectMultiple } from "../../utils/command-options.js";
 import { connectToDaemon } from "../../utils/client.js";
-import type { AgentMessageReceipt } from "@getpaseo/client/internal/daemon-client";
+import type { AgentMessageReceipt } from "@clisbot/client/internal/daemon-client";
 import type {
   CommandOptions,
   SingleResult,
@@ -50,7 +50,7 @@ export function addSendOptions(cmd: Command): Command {
     .addOption(
       new Option(
         "--behavior <behavior>",
-        "Leave out unless the message cannot wait. From an agent (PASEO_AGENT_ID set): queue (default) waits for the running turn to end, steer joins it, interrupt replaces it. From a person: interrupt (default) or steer",
+        "Leave out unless the message cannot wait. From an agent (CLISBOT_AGENT_ID set): queue (default) waits for the running turn to end, steer joins it, interrupt replaces it. From a person: interrupt (default) or steer",
       ).choices(["queue", "steer", "interrupt"]),
     )
     .option("--no-wait", "Return immediately without waiting for completion");
@@ -132,7 +132,7 @@ async function resolvePromptInput(options: {
       code: "MISSING_PROMPT",
       message: "A prompt is required",
       details:
-        "Usage: paseo agent send [options] <id> [prompt] | --prompt <text> | --prompt-file <path>",
+        "Usage: clisbot agent send [options] <id> [prompt] | --prompt <text> | --prompt-file <path>",
     };
     throw error;
   }
@@ -200,7 +200,7 @@ export async function runSendCommand(
     const error: CommandError = {
       code: "MISSING_AGENT_ID",
       message: "Agent ID is required",
-      details: "Usage: paseo agent send [options] <id> [prompt]",
+      details: "Usage: clisbot agent send [options] <id> [prompt]",
     };
     throw error;
   }
@@ -218,7 +218,7 @@ export async function runSendCommand(
     const images =
       options.image && options.image.length > 0 ? await readImageFiles(options.image) : undefined;
 
-    const sourceAgentId = process.env.PASEO_AGENT_ID?.trim() || undefined;
+    const sourceAgentId = process.env.CLISBOT_AGENT_ID?.trim() || undefined;
     // Send the message
     const receipt = await client.sendAgentMessage(agentIdArg, promptInput, {
       images,

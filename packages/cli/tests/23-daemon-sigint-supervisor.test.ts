@@ -8,24 +8,24 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { WebSocket } from "ws";
-import { DaemonClient, type WebSocketLike } from "@getpaseo/client/internal/daemon-client";
-import { readDaemonInstance } from "@getpaseo/server/daemon-control";
-import { runLocalPaseo } from "./helpers/local-cli.ts";
+import { DaemonClient, type WebSocketLike } from "@clisbot/client/internal/daemon-client";
+import { readDaemonInstance } from "@clisbot/server/daemon-control";
+import { runLocalClisbot } from "./helpers/local-cli.ts";
 import { getAvailablePort } from "./helpers/network.ts";
 
-const paseoHome = await mkdtemp(join(tmpdir(), "paseo-sigint-supervisor-"));
-const cwd = join(paseoHome, "workspace");
-const eventsPath = join(paseoHome, "acp-events.jsonl");
+const clisbotHome = await mkdtemp(join(tmpdir(), "clisbot-sigint-supervisor-"));
+const cwd = join(clisbotHome, "workspace");
+const eventsPath = join(clisbotHome, "acp-events.jsonl");
 const resumePrompt = "Continue the interrupted test.";
 const watchDependencies = process.argv.includes("--dev-watch");
 const env = {
-  PASEO_HOME: paseoHome,
-  PASEO_NODE_INSPECT: "0",
-  PASEO_RELAY_ENABLED: "false",
-  PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: "0",
-  PASEO_DICTATION_ENABLED: "0",
-  PASEO_VOICE_MODE_ENABLED: "0",
-  PASEO_LOG_FORMAT: "json",
+  CLISBOT_HOME: clisbotHome,
+  CLISBOT_NODE_INSPECT: "0",
+  CLISBOT_RELAY_ENABLED: "false",
+  CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD: "0",
+  CLISBOT_DICTATION_ENABLED: "0",
+  CLISBOT_VOICE_MODE_ENABLED: "0",
+  CLISBOT_LOG_FORMAT: "json",
 };
 
 type AcpEvent =
@@ -65,12 +65,12 @@ async function startSupervisor() {
       cwd: join(import.meta.dirname, watchDependencies ? "../../.." : ".."),
       env: {
         ...Object.fromEntries(
-          Object.entries(process.env).filter(([key]) => !key.startsWith("PASEO_")),
+          Object.entries(process.env).filter(([key]) => !key.startsWith("CLISBOT_")),
         ),
-        HOME: paseoHome,
-        USERPROFILE: paseoHome,
+        HOME: clisbotHome,
+        USERPROFILE: clisbotHome,
         ...env,
-        PASEO_LISTEN: host,
+        CLISBOT_LISTEN: host,
         CI: "true",
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -84,7 +84,7 @@ async function startSupervisor() {
     clientId: "sigint-supervisor-test",
     appVersion: "0.17.0-beta.1",
     localCredential: async () =>
-      (await readFile(join(paseoHome, "local-credential"), "utf8")).trim(),
+      (await readFile(join(clisbotHome, "local-credential"), "utf8")).trim(),
     webSocketFactory: (url, options) => new WebSocket(url, options) as unknown as WebSocketLike,
     reconnect: { enabled: false },
   });
@@ -102,7 +102,7 @@ async function startSupervisor() {
     await Promise.race([
       waitFor(
         async () => {
-          const instance = await readDaemonInstance(paseoHome);
+          const instance = await readDaemonInstance(clisbotHome);
           if (instance?.listen === host) return instance;
         },
         "supervisor did not publish its owned endpoint",
@@ -140,9 +140,9 @@ async function interruptForeground(daemon: Awaited<ReturnType<typeof startSuperv
     assert.deepEqual(exit, [0, null], daemon.output());
   }
   await waitFor(async () => {
-    if (!(await readDaemonInstance(paseoHome))) return true;
+    if (!(await readDaemonInstance(clisbotHome))) return true;
   }, "supervisor did not release its PID lock");
-  const log = await readFile(join(paseoHome, "daemon.log"), "utf8");
+  const log = await readFile(join(clisbotHome, "daemon.log"), "utf8");
   assert(!log.includes("Forcing shutdown - HTTP server didn't close in time"), log.slice(-4000));
   return log;
 }
@@ -152,7 +152,7 @@ try {
   await mkdir(cwd);
   const provider = join(import.meta.dirname, "helpers", "supervisor-acp.cjs");
   await writeFile(
-    join(paseoHome, "config.json"),
+    join(clisbotHome, "config.json"),
     JSON.stringify({
       version: 1,
       agents: {
@@ -234,8 +234,8 @@ try {
   throw error;
 } finally {
   await daemon?.client.close();
-  if (await readDaemonInstance(paseoHome)) {
-    await runLocalPaseo(["daemon", "stop", "--home", paseoHome, "--force"], env);
+  if (await readDaemonInstance(clisbotHome)) {
+    await runLocalClisbot(["daemon", "stop", "--home", clisbotHome, "--force"], env);
   }
-  await rm(paseoHome, { recursive: true, force: true });
+  await rm(clisbotHome, { recursive: true, force: true });
 }

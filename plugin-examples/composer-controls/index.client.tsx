@@ -1,4 +1,4 @@
-import type { PluginClientContext } from "@getpaseo/plugin/client";
+import type { PluginClientContext } from "@clisbot/plugin/client";
 import { Checklist, ContextLength, PlanFirst, REVIEW_KEY, ReviewFlag } from "./client/controls";
 import { ComposerTools } from "./client/panel";
 

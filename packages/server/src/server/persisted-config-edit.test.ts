@@ -10,7 +10,7 @@ import {
 } from "./persisted-config.js";
 
 test("configuration edits validate before writing and preserve unrelated settings", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-config-edit-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-config-edit-"));
   const home = path.join(root, "home");
   try {
     expect(readPersistedConfig(home)).toEqual({});
@@ -45,7 +45,7 @@ test("configuration edits validate before writing and preserve unrelated setting
 });
 
 test("configuration paths edit fields inside speech provider variants", async () => {
-  const home = await mkdtemp(path.join(tmpdir(), "paseo-speech-edit-"));
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-speech-edit-"));
   try {
     editPersistedConfig(home, "features.voiceMode.stt", { value: { provider: "openai" } });
     editPersistedConfig(home, "features.voiceMode.stt.apiKey", { value: "site-secret" });

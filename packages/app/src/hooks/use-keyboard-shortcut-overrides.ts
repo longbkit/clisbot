@@ -8,7 +8,7 @@ import {
 } from "@/keyboard/shortcut-override-store";
 import { readValidatedJson } from "@/storage/validated-storage";
 
-const STORAGE_KEY = "@paseo:keyboard-shortcut-overrides";
+const STORAGE_KEY = "@clisbot:keyboard-shortcut-overrides";
 const QUERY_KEY = ["keyboard-shortcut-overrides"];
 
 const EMPTY_OVERRIDES: ShortcutOverrides = {};

@@ -18,7 +18,7 @@ import { runGitCommand } from "./run-git-command.js";
 const tempDirs: string[] = [];
 
 function makeTempRepo(): string {
-  const repo = mkdtempSync(path.join(tmpdir(), "paseo-git-fsmonitor-"));
+  const repo = mkdtempSync(path.join(tmpdir(), "clisbot-git-fsmonitor-"));
   tempDirs.push(repo);
   return repo;
 }
@@ -65,7 +65,7 @@ function git(args: string[], cwd?: string): string {
 }
 
 function makeTempDir(): string {
-  const dir = realpathSync.native(mkdtempSync(path.join(tmpdir(), "paseo-git-discovery-")));
+  const dir = realpathSync.native(mkdtempSync(path.join(tmpdir(), "clisbot-git-discovery-")));
   tempDirs.push(dir);
   return dir;
 }

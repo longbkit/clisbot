@@ -2,7 +2,7 @@ import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, parse, resolve } from "node:path";
 import pLimit from "p-limit";
-import type { ProjectSuggestion, ProjectSuggestionsRequest } from "@getpaseo/protocol/messages";
+import type { ProjectSuggestion, ProjectSuggestionsRequest } from "@clisbot/protocol/messages";
 import type { AgentManager, ManagedImportableProviderSession } from "./agent/agent-manager.js";
 import { isMetadataGenerationSession } from "./agent/import-sessions.js";
 import type { WorkspaceGitService } from "./workspace-git-service.js";

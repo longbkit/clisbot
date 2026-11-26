@@ -4,7 +4,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { expect, test } from "vitest";
 import type { AgentPromptInput } from "../agent/agent-sdk-types.js";
-import type { PaseoToolCatalog } from "../agent/tools/types.js";
+import type { ClisbotToolCatalog } from "../agent/tools/types.js";
 import { createTestAgentClient } from "../test-utils/fake-agent-client.js";
 import { createDaemonTestContext } from "../test-utils/index.js";
 import { githubWatchFixture } from "./test-utils/github-watch-fixture.js";
@@ -41,7 +41,7 @@ test("GitHub PR watches batch with child messages and survive restart", async ({
     path.join(root, name),
   );
   const turns: { cwd: string; text: string; at: number }[] = [];
-  const catalogs = new Map<string, PaseoToolCatalog>();
+  const catalogs = new Map<string, ClisbotToolCatalog>();
   const holdForDelivery = holdTurn();
   const holdForUnsubscribe = holdTurn();
 
@@ -59,7 +59,7 @@ test("GitHub PR watches batch with child messages and survive restart", async ({
   // Use the real catalog that AgentManager passes to native-tool providers.
   const startDaemon = () =>
     createDaemonTestContext({
-      paseoHomeRoot: root,
+      clisbotHomeRoot: root,
       staticDir: path.join(root, "static"),
       cleanup: false,
       mcpEnabled: true,
@@ -67,9 +67,9 @@ test("GitHub PR watches batch with child messages and survive restart", async ({
       agentClients: {
         claude: {
           ...provider,
-          capabilities: { ...provider.capabilities, supportsNativePaseoTools: true },
+          capabilities: { ...provider.capabilities, supportsNativeClisbotTools: true },
           createSession(config, launchContext) {
-            if (launchContext?.paseoTools) catalogs.set(config.cwd, launchContext.paseoTools);
+            if (launchContext?.clisbotTools) catalogs.set(config.cwd, launchContext.clisbotTools);
             return provider.createSession(config, launchContext);
           },
           resumeSession: provider.resumeSession.bind(provider),
@@ -85,7 +85,7 @@ test("GitHub PR watches batch with child messages and survive restart", async ({
 
   const updates = (cwd: string) =>
     turns.filter(
-      (turn) => turn.cwd === cwd && turn.text.includes("Paseo change request update for"),
+      (turn) => turn.cwd === cwd && turn.text.includes("Clisbot change request update for"),
     );
   const busyTurns = (since = 0) =>
     turns
@@ -208,7 +208,7 @@ test("GitHub PR watches batch with child messages and survive restart", async ({
   expect(turns).toEqual([]);
   await verifyBackgroundWork(native);
 
-  async function verifyBackgroundWork(nativeTools: PaseoToolCatalog) {
+  async function verifyBackgroundWork(nativeTools: ClisbotToolCatalog) {
     const idleWork = await client.listAgentBackgroundWork(idle.id);
     const busyWork = await client.listAgentBackgroundWork(busy.id);
     const descriptions = all.map(description).sort();
@@ -364,7 +364,7 @@ test("GitHub PR watches batch with child messages and survive restart", async ({
   expect(nextTurn).toContain(review.inline);
   expect(nextTurn).toContain(page101);
   expect(nextTurn).toContain(`Check failed on ${failed.head.sha}`);
-  const envelopes = nextTurn?.match(/<paseo-system [^>]+>\n[\s\S]*?\n<\/paseo-system>/g);
+  const envelopes = nextTurn?.match(/<clisbot-system [^>]+>\n[\s\S]*?\n<\/clisbot-system>/g);
   const childEnvelope = envelopes?.find((envelope) => envelope.includes(childReport));
   expect(childEnvelope).toContain(`kind="agent-message" source-agent-id="${childId}"`);
   expect(childEnvelope).toContain('source-agent-title="QA child"');
@@ -448,7 +448,9 @@ test("GitHub PR watches batch with child messages and survive restart", async ({
   );
   expect(
     updates(idleDir).every(({ text }) =>
-      text.startsWith(`<paseo-system version="1" kind="change-request-update" source-url="${url}"`),
+      text.startsWith(
+        `<clisbot-system version="1" kind="change-request-update" source-url="${url}"`,
+      ),
     ),
   ).toBe(true);
   expect(busyTurns()).toHaveLength(4);

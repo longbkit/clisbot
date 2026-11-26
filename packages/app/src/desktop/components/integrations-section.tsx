@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { useCliInstall } from "@/desktop/hooks/use-install-status";
 import { SettingsCard, SettingsRow, SettingsSection } from "@/components/settings";
 
-const CLI_DOCS_URL = "https://paseo.sh/docs/cli";
+const CLI_DOCS_URL = "https://clisbot.com/docs/cli";
 
 export function IntegrationsSection() {
   const { t } = useTranslation();
@@ -45,7 +45,7 @@ export function IntegrationsSection() {
   );
 }
 
-/** The `paseo` CLI row: on means installed on this computer. */
+/** The `clisbot` CLI row: on means installed on this computer. */
 export function CommandLineRow({
   value,
   onValueChange,

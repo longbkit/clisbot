@@ -9,7 +9,7 @@ import type { AgentStreamEvent, AgentTimelineItem } from "../../agent-sdk-types.
 import { collectSessionTurnEvents } from "../test-utils/session-stream-adapter.js";
 import { ClaudeAgentClient } from "./agent.js";
 
-const ROOT_PROMPT = `Use Claude Code's native Agent tool exactly once, never Paseo tools, with this complete task:
+const ROOT_PROMPT = `Use Claude Code's native Agent tool exactly once, never Clisbot tools, with this complete task:
 
 Do not use any tools. Reply with exactly this markdown report and nothing else:
 ## HANDBACK_HEADING
@@ -31,7 +31,7 @@ function expectHandbackAsReport(items: AgentTimelineItem[]): void {
 }
 
 test("an auto-mode Claude subagent's handback report shows as its final message", async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-claude-subagent-handback-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-claude-subagent-handback-"));
   const client = new ClaudeAgentClient({ logger: pino({ level: "warn" }) });
   const session = await client.createSession({ provider: "claude", cwd, modeId: "auto" });
   try {

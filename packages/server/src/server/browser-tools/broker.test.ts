@@ -4,8 +4,8 @@ import type {
   BrowserAutomationCommandName,
   BrowserAutomationExecuteRequest,
   BrowserAutomationExecuteResponse,
-} from "@getpaseo/protocol/browser-automation/rpc-schemas";
-import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@getpaseo/protocol/browser-automation/rpc-schemas";
+} from "@clisbot/protocol/browser-automation/rpc-schemas";
+import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@clisbot/protocol/browser-automation/rpc-schemas";
 import { BrowserToolsBroker, type BrowserHostClient } from "./broker.js";
 
 const BROWSER_ID = "11111111-1111-4111-8111-111111111111";

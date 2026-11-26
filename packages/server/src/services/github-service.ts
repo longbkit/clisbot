@@ -12,7 +12,7 @@ import {
   parseGitHubRemoteIdentity,
   parseGitHubRemoteUrl,
   parseGitRemoteLocation,
-} from "@getpaseo/protocol/git-remote";
+} from "@clisbot/protocol/git-remote";
 import { findExecutable } from "../executable-resolution/executable-resolution.js";
 import { runGitCommand } from "../utils/run-git-command.js";
 import {
@@ -752,7 +752,7 @@ type BatchPollPrNode = z.infer<typeof BatchPollPrNodeSchema>;
 type BatchPollRepository = z.infer<typeof BatchPollRepositorySchema>;
 
 const BATCH_PR_STATUS_FRAGMENT = `
-fragment PaseoPollPullRequest on PullRequest {
+fragment ClisbotPollPullRequest on PullRequest {
   number
   url
   title
@@ -820,7 +820,7 @@ function buildBatchPullRequestStatusSelections(entries: GitHubBatchPollEntry[]):
       entry.target.headRef,
     )}, first: ${BATCH_PR_CANDIDATE_LIMIT}, orderBy: {field: CREATED_AT, direction: DESC}) {
       nodes {
-        ...PaseoPollPullRequest
+        ...ClisbotPollPullRequest
       }
     }
   }`,
@@ -888,7 +888,7 @@ function buildBatchPullRequestChecksQuery(
     }
   }`,
   );
-  return `query PaseoBatchPullRequestChecks {
+  return `query ClisbotBatchPullRequestChecks {
   rateLimit {
     limit
     remaining
@@ -1653,7 +1653,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
             });
             if (!current.length) throw new Error("GitHub poll targets were released.");
             const name =
-              current.length === 1 ? current[0]!.query.name : "PaseoMixedPullRequestPoll";
+              current.length === 1 ? current[0]!.query.name : "ClisbotMixedPullRequestPoll";
             const selections = current.flatMap((item) => item.selections);
             const fragments = current.flatMap(({ query }) => query.fragments ?? []).join("\n");
             const graphql = renderGitHubPollQuery(name, selections, fragments);
@@ -1709,7 +1709,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
       const results = await readGitHubChangeRequests(urls, {
         async read(selections) {
           const response = await read({
-            name: "PaseoWatchedChangeRequests",
+            name: "ClisbotWatchedChangeRequests",
             cwd,
             targetCount: selections.length,
             selections: () =>
@@ -1903,7 +1903,7 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
     }
     const selections = buildBatchPullRequestStatusSelections(addressedEntries);
     const document = {
-      name: "PaseoBatchPullRequestStatus",
+      name: "ClisbotBatchPullRequestStatus",
       cwd: firstEntry.target.cwd,
       targetCount: addressedEntries.length,
       selections: () => selections,

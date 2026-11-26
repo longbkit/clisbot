@@ -1,6 +1,6 @@
 ---
 title: Build a sidebar view
-description: Replace the content of Paseo's sidebar with your own React Native view.
+description: Replace the content of Clisbot's sidebar with your own React Native view.
 nav: Sidebar views
 order: 47
 category: Plugins
@@ -8,9 +8,9 @@ category: Plugins
 
 # Build a sidebar view
 
-A sidebar view replaces the content between Paseo's header and footer. You receive theme tokens,
+A sidebar view replaces the content between Clisbot's header and footer. You receive theme tokens,
 active entity refs and navigation methods, then render your own React Native UI. Install the
-[sidebar-views example](https://github.com/getpaseo/paseo/tree/main/plugin-examples/sidebar-views)
+[sidebar-views example](https://github.com/longbkit/clisbot/tree/main/plugin-examples/sidebar-views)
 to try projects, task-based agents, nested agents and label folders.
 
 ## Register a view
@@ -20,8 +20,8 @@ import type {
   PluginClientContext,
   PluginSidebarViewProps,
   WorkspaceRef,
-} from "@getpaseo/plugin/client";
-import { useWorkspaces, useWorkspace } from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
+import { useWorkspaces, useWorkspace } from "@clisbot/plugin/client";
 import { Pressable, ScrollView, Text } from "react-native";
 
 function WorkspaceRow({
@@ -117,7 +117,7 @@ Existing workspace panels can continue passing a host-local string ID to `useWor
 
 Workspace snapshots include `project`, `pinnedAt`, `labels`, `background`, `branch`,
 `lastPromptAt`, `parentAgent` and `createdAt` (null on older hosts). Use `indicator` and the
-localized `indicatorLabel` to display the status Paseo shows. `status` remains the raw daemon
+localized `indicatorLabel` to display the status Clisbot shows. `status` remains the raw daemon
 status. Agent snapshots include their workspace and parent refs, `background`, and
 `backgroundWork.count`. Project snapshots provide
 `displayName`, `rootPath`, `kind` and `iconRevision`.
@@ -137,17 +137,17 @@ changes and reconnects, and releases when its last plugin subscriber leaves.
 
 ## Act on a ref
 
-`usePaseo()` routes ref-based actions to the ref's host:
+`useClisbot()` routes ref-based actions to the ref's host:
 
 ```tsx
-const paseo = usePaseo();
-await paseo.workspaces.ref(workspaceRef).setPinned(true);
-await paseo.workspaces.ref(workspaceRef).setLabel("Later", { assigned: true });
-await paseo.workspaces.ref(workspaceRef).setLabel("Inbox", { assigned: false });
-paseo.projects.ref(projectRef).open();
-await paseo.projects.ref(projectRef).createWorkspace();
-paseo.terminals.ref(terminalRef).focus();
-await paseo.terminals.ref(terminalRef).kill();
+const clisbot = useClisbot();
+await clisbot.workspaces.ref(workspaceRef).setPinned(true);
+await clisbot.workspaces.ref(workspaceRef).setLabel("Later", { assigned: true });
+await clisbot.workspaces.ref(workspaceRef).setLabel("Inbox", { assigned: false });
+clisbot.projects.ref(projectRef).open();
+await clisbot.projects.ref(projectRef).createWorkspace();
+clisbot.terminals.ref(terminalRef).focus();
+await clisbot.terminals.ref(terminalRef).kill();
 ```
 
 Workspace and agent handles retain their existing methods. Assigning a new label creates it;

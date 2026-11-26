@@ -9,8 +9,16 @@ import { fileURLToPath } from "node:url";
 import { WebSocket } from "ws";
 import { DaemonClient } from "../../../../client/dist/daemon-client.js";
 
-const [, , session, daemonUrl, workspaceId, agentId, appId = "sh.paseo.debug", metroPort = "8081"] =
-  process.argv;
+const [
+  ,
+  ,
+  session,
+  daemonUrl,
+  workspaceId,
+  agentId,
+  appId = "sh.clisbot.debug",
+  metroPort = "8081",
+] = process.argv;
 assert(
   session && daemonUrl && workspaceId && agentId,
   "Pass a session, isolated daemon URL, workspace ID, and agent ID",
@@ -18,8 +26,8 @@ assert(
 const url = new URL(daemonUrl);
 assert(["127.0.0.1", "localhost"].includes(url.hostname), "Use an isolated loopback daemon");
 assert(!["", "6767", "6768"].includes(url.port), "Do not use the installed or development daemon");
-const directory = await mkdtemp(path.join(tmpdir(), "paseo-composer-overlay-"));
-const artifacts = process.env.PASEO_OVERLAY_ARTIFACTS_DIR ?? path.join(directory, "evidence");
+const directory = await mkdtemp(path.join(tmpdir(), "clisbot-composer-overlay-"));
+const artifacts = process.env.CLISBOT_OVERLAY_ARTIFACTS_DIR ?? path.join(directory, "evidence");
 await mkdir(artifacts, { recursive: true });
 const pluginId = "composer-overlay-mobile-repro";
 const pillLabel = "Overlay regression pill";
@@ -44,10 +52,10 @@ try {
   previousConfig = (await client.getDaemonConfig()).config;
   await client.patchDaemonConfig({ pluginsEnabled: true });
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({
       id: pluginId,
-      requirements: { paseo: ">=0.11.4" },
+      requirements: { clisbot: ">=0.11.4" },
     }),
   );
   await writeFile(

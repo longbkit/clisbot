@@ -10,7 +10,7 @@ controls appear beside the model and thinking controls.
 | **Plan first**       | `Toggle`  | Sets the provider option `plan_mode` with `composer.setOptions`; enabled for Codex only. |
 | **Insert checklist** | `Action`  | Inserts a task list at the cursor through `composer.insertText`.                         |
 
-Each component calls `useComposer()` and uses the same commands in every composer. Paseo draws the
+Each component calls `useComposer()` and uses the same commands in every composer. Clisbot draws the
 controls inline when the composer has room and as rows in the composer's overflow sheet when it
 does not, including on a phone.
 

@@ -5,7 +5,7 @@ set -euo pipefail
 # `xcrun notarytool submit` without rebuilding the signed macOS app.
 # Compatible with macOS's default bash 3.2.
 
-real_xcrun="${PASEO_REAL_XCRUN:?PASEO_REAL_XCRUN must point to the real xcrun binary}"
+real_xcrun="${CLISBOT_REAL_XCRUN:?CLISBOT_REAL_XCRUN must point to the real xcrun binary}"
 
 is_transient_apple_network_error() {
   local file="$1"

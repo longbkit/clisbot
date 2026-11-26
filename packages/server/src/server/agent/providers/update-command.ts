@@ -1,4 +1,4 @@
-import type { ProviderUpdateResult } from "@getpaseo/plugin/server/provider";
+import type { ProviderUpdateResult } from "@clisbot/plugin/server/provider";
 import { spawnProcess } from "../../../utils/spawn.js";
 import type { AgentClientUpdateContext } from "../agent-sdk-types.js";
 import type { ProviderEnvSpec } from "../provider-launch-config.js";
@@ -11,7 +11,7 @@ export interface UpdateCommand {
   successMessage: string;
 }
 
-/** The success message for a CLI that Paseo starts once per agent. */
+/** The success message for a CLI that Clisbot starts once per agent. */
 export function updatedForNewAgents(name: string): string {
   return `${name} is updated. New agents use the new version; running agents keep theirs until restarted.`;
 }

@@ -2,11 +2,11 @@ import type { RemoteHostId } from "./hosts";
 
 /**
  * A collapsed tool call as the app's timeline shows it. Built-in tools carry a
- * fixed label; Paseo MCP tools name their action, such as "Create agent".
+ * fixed label; Clisbot MCP tools name their action, such as "Create agent".
  */
 export type ToolCall =
   | { kind: "read" | "write" | "shell"; detail: string }
-  | { kind: "paseo"; label: string; detail?: string; host?: RemoteHostId };
+  | { kind: "clisbot"; label: string; detail?: string; host?: RemoteHostId };
 
 /**
  * One step of a scripted scene. Beats play in order, each after the one before it ends.

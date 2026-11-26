@@ -201,7 +201,7 @@ function mapCommandToOption(
       command: entry.command,
       icon: CLIENT_COMMAND_ICONS[entry.command.kind],
       description: context.t(entry.command.descriptionKey),
-      tag: "Paseo",
+      tag: "Clisbot",
     };
   }
   if (entry.source === "plugin") {

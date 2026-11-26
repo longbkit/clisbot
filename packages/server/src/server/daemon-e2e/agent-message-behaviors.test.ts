@@ -1,13 +1,13 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
-import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
+import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
 import { expect, test } from "vitest";
 
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import { OpenCodeV2AgentClient } from "../agent/providers/opencode/v2/agent.js";
 import { V2Harness } from "../agent/providers/opencode/test-utils/v2-harness.js";
 import { createTestAgentClients } from "../test-utils/fake-agent-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 
 /** A recipient whose first turn keeps running until the test ends it. Its provider can steer. */
@@ -27,12 +27,12 @@ async function createWorkingRecipient(options: { olderClient?: boolean } = {}) {
     runtime.prompts.push(input.text);
     if (runtime.prompts.length === 1) runtime.startExecution();
   };
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: {
       ...createTestAgentClients(),
       opencode: new OpenCodeV2AgentClient({ logger: createTestLogger(), runtime: runtime.runtime }),
     },
-    paseoHomeRoot: path.join(root, "daemon"),
+    clisbotHomeRoot: path.join(root, "daemon"),
     staticDir: path.join(root, "static"),
     cleanup: false,
   });

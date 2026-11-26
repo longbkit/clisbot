@@ -396,7 +396,7 @@ async function renderPreview(rows) {
 }
 
 const font = findFont();
-const work = await mkdtemp(path.join(os.tmpdir(), "paseo-store-"));
+const work = await mkdtemp(path.join(os.tmpdir(), "clisbot-store-"));
 const browser = await chromium.launch({ headless: true });
 try {
   const marks = await loadAgentMarks(work);

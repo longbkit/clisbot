@@ -24,7 +24,7 @@ afterEach(() => {
 });
 
 function makeTempDir(): string {
-  const dir = mkdtempSync(path.join(tmpdir(), "paseo-provider-launch-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "clisbot-provider-launch-"));
   tempDirs.push(dir);
   return dir;
 }
@@ -175,11 +175,11 @@ describe("resolveProviderLaunch", () => {
     process.env.PATH = makeTempDir();
 
     const launch = await resolveProviderLaunch({
-      defaultBinary: "paseo-provider-missing",
+      defaultBinary: "clisbot-provider-missing",
     });
 
     expect(launch).toEqual({
-      command: "paseo-provider-missing",
+      command: "clisbot-provider-missing",
       args: [],
       source: "default",
     });
@@ -205,7 +205,7 @@ describe("checkProviderLaunchAvailable", () => {
   test("reports missing override commands as unavailable", async () => {
     process.env.PATH = makeTempDir();
     const launch = await resolveProviderLaunch({
-      commandConfig: { mode: "replace", argv: ["paseo-provider-missing"] },
+      commandConfig: { mode: "replace", argv: ["clisbot-provider-missing"] },
       defaultBinary: "provider",
     });
 

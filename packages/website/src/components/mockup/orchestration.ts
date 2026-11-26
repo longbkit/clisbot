@@ -35,11 +35,11 @@ export const DELEGATED_TASKS: {
 ];
 
 /**
- * The orchestrator's Paseo tool calls, one per delegated task. One call creates the worktree
+ * The orchestrator's Clisbot tool calls, one per delegated task. One call creates the worktree
  * workspace and starts the agent in it.
  */
 const DELEGATION_CALLS: ToolCall[] = DELEGATED_TASKS.map((task) => ({
-  kind: "paseo",
+  kind: "clisbot",
   label: "Create agent",
   detail: `${PROVIDERS[task.provider].name} · ${task.branch}`,
   host: task.host,
@@ -51,7 +51,7 @@ const DELEGATION_CALLS: ToolCall[] = DELEGATED_TASKS.map((task) => ({
  */
 const LOOKUP_CALLS: ToolCall[] = [
   { kind: "shell", detail: "gh issue list --label ready" },
-  { kind: "paseo", label: "List agent profiles" },
+  { kind: "clisbot", label: "List agent profiles" },
 ];
 
 const REQUEST = "Fix the issues labeled ready, one worktree each.";
@@ -59,7 +59,7 @@ const REQUEST = "Fix the issues labeled ready, one worktree each.";
 /**
  * The orchestration scene: the user asks Claude to fix the ready issues, each in a worktree. Claude
  * lists the issues and the user's agent profiles, picks a model for each issue, and puts the one
- * that needs macOS on another machine. It says that Paseo will notify it when the agents finish.
+ * that needs macOS on another machine. It says that Clisbot will notify it when the agents finish.
  * Then the pointer opens the subagents roster.
  */
 export const ORCHESTRATION = script([
@@ -80,7 +80,7 @@ export const ORCHESTRATION = script([
   { kind: "tools", calls: DELEGATION_CALLS },
   {
     kind: "agent",
-    text: "All three are launched. Paseo will notify me when each one finishes.",
+    text: "All three are launched. Clisbot will notify me when each one finishes.",
   },
   // No footer: with it, the transcript and the open roster do not both fit in the pane.
   { kind: "turnEnd" },

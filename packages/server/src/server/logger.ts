@@ -4,7 +4,7 @@ import pino from "pino";
 import pretty from "pino-pretty";
 import { resolveDaemonVersion } from "./daemon-version.js";
 import type { PersistedConfig } from "./persisted-config.js";
-import { resolvePaseoHome } from "./paseo-home.js";
+import { resolveClisbotHome } from "./clisbot-home.js";
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 export type LogFormat = "pretty" | "json";
@@ -29,7 +29,7 @@ interface LegacyLogConfig {
 type LoggerConfigInput = PersistedConfig | LegacyLogConfig | undefined;
 
 interface ResolveLogConfigOptions {
-  paseoHome?: string;
+  clisbotHome?: string;
   file?: boolean;
 }
 
@@ -61,8 +61,8 @@ const REDACT_PATHS = [
   "req.headers.Sec-WebSocket-Protocol",
 ];
 
-function resolveFilePath(paseoHome: string, configuredPath: string | undefined): string {
-  const fallback = path.join(paseoHome, DEFAULT_DAEMON_LOG_FILENAME);
+function resolveFilePath(clisbotHome: string, configuredPath: string | undefined): string {
+  const fallback = path.join(clisbotHome, DEFAULT_DAEMON_LOG_FILENAME);
   if (!configuredPath) {
     return fallback;
   }
@@ -71,7 +71,7 @@ function resolveFilePath(paseoHome: string, configuredPath: string | undefined):
     return configuredPath;
   }
 
-  return path.resolve(paseoHome, configuredPath);
+  return path.resolve(clisbotHome, configuredPath);
 }
 
 function minLogLevel(levels: LogLevel[]): LogLevel {
@@ -86,11 +86,11 @@ function minLogLevel(levels: LogLevel[]): LogLevel {
   return minLevel;
 }
 
-function resolveConfiguredPaseoHome(options: ResolveLogConfigOptions | undefined): string {
-  if (options?.paseoHome) {
-    return options.paseoHome;
+function resolveConfiguredClisbotHome(options: ResolveLogConfigOptions | undefined): string {
+  if (options?.clisbotHome) {
+    return options.clisbotHome;
   }
-  return resolvePaseoHome();
+  return resolveClisbotHome();
 }
 
 function normalizeLoggerConfigInput(config: LoggerConfigInput): PersistedConfig | undefined {
@@ -140,7 +140,7 @@ export function resolveLogConfig(
   options?: ResolveLogConfigOptions,
 ): ResolvedLogConfig {
   const persistedConfig = normalizeLoggerConfigInput(configInput);
-  const paseoHome = resolveConfiguredPaseoHome(options);
+  const clisbotHome = resolveConfiguredClisbotHome(options);
   const persistedLog = persistedConfig?.log;
 
   const { consoleLevel, fileLevel, consoleFormat } = resolveLogLevelsAndFormat(persistedLog);
@@ -148,7 +148,7 @@ export function resolveLogConfig(
     options?.file !== false && persistedLog?.file
       ? {
           level: fileLevel ?? DEFAULT_FILE_LEVEL,
-          path: resolveFilePath(paseoHome, persistedLog.file.path),
+          path: resolveFilePath(clisbotHome, persistedLog.file.path),
         }
       : undefined;
 

@@ -6,7 +6,7 @@ nav: Linear
 
 # Linear 触发器 {#linear-triggers}
 
-根据 Linear issue 活动在你的 Paseo daemon 上启动 Agent，并将回复发布回该 issue。请先在 **Integrations** 下连接 Linear 工作区（自托管 Hub 请先配置 [Linear 应用](/docs/hub/self-hosting/linear-app)）。
+根据 Linear issue 活动在你的 Clisbot daemon 上启动 Agent，并将回复发布回该 issue。请先在 **Integrations** 下连接 Linear 工作区（自托管 Hub 请先配置 [Linear 应用](/docs/hub/self-hosting/linear-app)）。
 
 ## 支持的事件 {#supported-events}
 
@@ -20,7 +20,7 @@ nav: Linear
 
 ## 回复 issue 评论 {#respond-to-issue-comments}
 
-将以下内容保存为 `.paseo/triggers/linear-help.yml`，替换连接 slug 和用户 UUID，并将 `run.target` 设为[已连接的 daemon](/docs/hub/daemons)：
+将以下内容保存为 `.clisbot/triggers/linear-help.yml`，替换连接 slug 和用户 UUID，并将 `run.target` 设为[已连接的 daemon](/docs/hub/daemons)：
 
 ```yaml
 name: linear-help
@@ -29,7 +29,7 @@ on:
     connection: acme-linear
     filters:
       from_users: ["11111111-1111-4111-8111-111111111111"]
-      pattern: "/paseo "
+      pattern: "/clisbot "
 run:
   target:
     daemon: devbox
@@ -44,7 +44,7 @@ run:
     Post one reply using reply, then call finish_execution.
 
     <user-prompt>
-    ${{ paseo.prompt }}
+    ${{ clisbot.prompt }}
     </user-prompt>
   outputs:
     linear.reply:
@@ -55,13 +55,13 @@ run:
 在仓库根目录部署触发器：
 
 ```sh
-paseo hub deploy --dry-run
-paseo hub deploy
+clisbot hub deploy --dry-run
+clisbot hub deploy
 ```
 
-使用允许的 Linear 账号发表一条 issue 评论，例如 `/paseo summarize this request`。Hub 会匹配前缀、在 `devbox` 上运行 Agent，并将回复作为评论发布到该 Linear issue。
+使用允许的 Linear 账号发表一条 issue 评论，例如 `/clisbot summarize this request`。Hub 会匹配前缀、在 `devbox` 上运行 Agent，并将回复作为评论发布到该 Linear issue。
 
-Hub 运行在 HTTPS 下时，回复会附带 **Open in Paseo** 链接。在 [Activity](/docs/hub/activity) 中可以查看运行记录。
+Hub 运行在 HTTPS 下时，回复会附带 **Open in Clisbot** 链接。在 [Activity](/docs/hub/activity) 中可以查看运行记录。
 
 ## 在 issue 进入范围时开始工作 {#start-work-when-an-issue-enters-scope}
 
@@ -85,7 +85,7 @@ run:
     cwd: /workspace/project
     worktree:
       mode: branch-off
-      newBranch: trigger-${{ paseo.execution.id }}
+      newBranch: trigger-${{ clisbot.execution.id }}
       base: origin/main
   agent:
     provider: codex
@@ -101,7 +101,7 @@ run:
   prompt: |
     Implement the Linear issue, open a pull request with gh, and post the PR URL using reply.
     Issue context:
-    ${{ paseo.context }}
+    ${{ clisbot.context }}
     Call finish_execution when done.
 ```
 
@@ -126,6 +126,6 @@ run:
 
 ## 上下文与回复 {#context-and-replies}
 
-在 `run.prompt` 中包含 `${{ paseo.context }}`，即可以 JSON 形式传入 issue 详情（编号、标题、描述、URL、项目、状态、负责人、标签）以及最多 49 条之前的 issue 评论。
+在 `run.prompt` 中包含 `${{ clisbot.context }}`，即可以 JSON 形式传入 issue 详情（编号、标题、描述、URL、项目、状态、负责人、标签）以及最多 49 条之前的 issue 评论。
 
 Linear 触发器会自动授予 `reply` 工具（`linear.reply`），用于在触发运行的 issue 下发表评论。声明 `run.outputs.linear.reply` 可以设置 `max` 或 `required: true`。

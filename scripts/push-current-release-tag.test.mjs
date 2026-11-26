@@ -23,7 +23,7 @@ function createReleaseRepoWithBareRemote(version = "0.17.0-beta.2") {
   git(repo, ["checkout", "-b", `release/v${version}`]);
   writeFileSync(
     path.join(repo, "package.json"),
-    `${JSON.stringify({ name: "paseo", version }, null, 2)}\n`,
+    `${JSON.stringify({ name: "clisbot", version }, null, 2)}\n`,
   );
   git(repo, ["add", "package.json"]);
   git(repo, ["commit", "-q", "-m", `chore(release): cut ${version}`]);

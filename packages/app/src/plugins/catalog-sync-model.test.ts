@@ -2,9 +2,9 @@ import { getPluginClientApi } from "./client-state/api";
 import appPackage from "../../package.json";
 import { afterEach, expect, it } from "vitest";
 import { QueryObserver } from "@tanstack/react-query";
-import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
-import { settingsRpc } from "@getpaseo/plugin";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
+import { settingsRpc } from "@clisbot/plugin";
 import { syncPluginCatalog } from "./catalog-sync-model";
 import { createPluginHosts } from "./hosts";
 import { PluginRegistry } from "./registry";
@@ -105,7 +105,7 @@ function catalog(marker: string): Catalog {
   return [
     {
       id: "reports",
-      requirements: { paseo: `>=${appPackage.version}` },
+      requirements: { clisbot: `>=${appPackage.version}` },
       clientBundle: `(function() { return { default: function(plugin) {
       plugin.addTimelineTransformer({
         id: "report", query: { itemType: "tool_call" },
@@ -140,7 +140,7 @@ function harness() {
           },
           installation.lifetime.signal,
         ),
-        paseo: getPluginClientApi(installation).paseo,
+        clisbot: getPluginClientApi(installation).clisbot,
         i18n: installation.i18n,
         rpc: async () => {
           throw new Error("Unexpected runtime RPC");

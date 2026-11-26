@@ -1,17 +1,17 @@
-import { createPaseoApi, type PaseoApi } from "@getpaseo/client";
-import { createHostClient } from "@getpaseo/client/node";
+import { createClisbotApi, type ClisbotApi } from "@clisbot/client";
+import { createHostClient } from "@clisbot/client/node";
 import { hashSync } from "bcryptjs";
 import { once } from "node:events";
 import {
   decodeTerminalStreamFrame,
   encodeTerminalStreamFrame,
   TerminalStreamOpcode,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@clisbot/protocol/binary-frames/index";
 import {
   getDaemonAuthFailureReason,
   DaemonClient as HostClient,
-} from "@getpaseo/client/internal/daemon-client";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+} from "@clisbot/client/internal/daemon-client";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { describe, expect, test } from "vitest";
 import { withTimeout } from "../../utils/promise-timeout.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
@@ -27,14 +27,14 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 
 import { generateLocalPairingOffer } from "../pairing-offer.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { FILE_EXPLORER_STREAM_CHUNK_BYTES } from "../file-explorer/service.js";
 import {
   createClientChannel,
   openClientSecureChannel,
   type SecureChannel,
   type Transport,
-} from "@getpaseo/relay/e2ee";
+} from "@clisbot/relay/e2ee";
 import {
   deriveSharedKey,
   decrypt,
@@ -42,10 +42,10 @@ import {
   exportPublicKey,
   generateKeyPair,
   importPublicKey,
-} from "@getpaseo/relay";
-import { buildRelayWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
-import { ConnectionOfferSchema } from "@getpaseo/protocol/connection-offer";
-import { WSOutboundMessageSchema } from "@getpaseo/protocol/messages";
+} from "@clisbot/relay";
+import { buildRelayWebSocketUrl } from "@clisbot/protocol/daemon-endpoints";
+import { ConnectionOfferSchema } from "@clisbot/protocol/connection-offer";
+import { WSOutboundMessageSchema } from "@clisbot/protocol/messages";
 
 const nodeMajor = Number((process.versions.node ?? "0").split(".")[0] ?? "0");
 const shouldRunRelayE2e = process.env.FORCE_RELAY_E2E === "1" || nodeMajor < 25;
@@ -63,7 +63,7 @@ function createCapturingLogger() {
 }
 
 async function getPairingOfferUrl(args: {
-  paseoHome: string;
+  clisbotHome: string;
   relayEnabled?: boolean;
   relayEndpoint?: string;
   relayPublicEndpoint?: string;
@@ -71,7 +71,7 @@ async function getPairingOfferUrl(args: {
   appBaseUrl?: string;
 }): Promise<string> {
   const pairing = await generateLocalPairingOffer({
-    paseoHome: args.paseoHome,
+    clisbotHome: args.clisbotHome,
     relayEnabled: args.relayEnabled,
     relayEndpoint: args.relayEndpoint,
     relayPublicEndpoint: args.relayPublicEndpoint,
@@ -321,9 +321,9 @@ async function waitForCapturedLog(
   let relayPort: number;
   let relayProcess: ChildProcess | null = null;
   let relayStdoutLines: string[] = [];
-  // PASEO_RELAY_E2E_PORT points at an already-running relay (for example the
+  // CLISBOT_RELAY_E2E_PORT points at an already-running relay (for example the
   // Elixir relay) so the same daemon/client exchanges run against both.
-  const externalRelayPort = Number(process.env.PASEO_RELAY_E2E_PORT ?? "");
+  const externalRelayPort = Number(process.env.CLISBOT_RELAY_E2E_PORT ?? "");
   const usesExternalRelay = Number.isInteger(externalRelayPort) && externalRelayPort > 0;
 
   const startRelay = async (options: { useLocalRelay?: boolean; port?: number } = {}) => {
@@ -347,7 +347,7 @@ async function waitForCapturedLog(
       "--show-interactive-dev-session=false",
     ];
     if (options.useLocalRelay) {
-      relayArgs.push("--var", "PASEO_RELAY_UPSTREAM:");
+      relayArgs.push("--var", "CLISBOT_RELAY_UPSTREAM:");
     }
     relayProcess = spawn(
       process.execPath,
@@ -403,30 +403,30 @@ async function waitForCapturedLog(
   test.skipIf(usesExternalRelay)(
     "connected hosts route RPC and binary traffic through local E2EE relay and recover scopes",
     async () => {
-      let a: Awaited<ReturnType<typeof createTestPaseoDaemon>> | undefined;
-      let b: Awaited<ReturnType<typeof createTestPaseoDaemon>> | undefined;
+      let a: Awaited<ReturnType<typeof createTestClisbotDaemon>> | undefined;
+      let b: Awaited<ReturnType<typeof createTestClisbotDaemon>> | undefined;
       let origin: ReturnType<typeof createHostClient> | undefined;
-      let api: PaseoApi | undefined;
-      let remote: PaseoApi | undefined;
-      let sibling: PaseoApi | undefined;
+      let api: ClisbotApi | undefined;
+      let remote: ClisbotApi | undefined;
+      let sibling: ClisbotApi | undefined;
       let terminalRoute: Awaited<ReturnType<typeof openConnectedHostTerminal>> | undefined;
       let wire: Awaited<ReturnType<typeof relayWire>> | undefined;
       try {
         await startRelay({ useLocalRelay: true });
         const port = relayPort;
-        b = await createTestPaseoDaemon({
+        b = await createTestClisbotDaemon({
           relayEnabled: true,
           relayEndpoint: `127.0.0.1:${port}`,
           relayUseTls: false,
           relayPublicUseTls: false,
           auth: { password: hashSync("relay-password", 4) },
         });
-        a = await createTestPaseoDaemon();
+        a = await createTestClisbotDaemon();
         origin = createHostClient(`127.0.0.1:${a.port}`, { clientId: crypto.randomUUID() });
         await origin.connect();
-        api = createPaseoApi(origin);
+        api = createClisbotApi(origin);
         const offerUrl = await getPairingOfferUrl({
-          paseoHome: b.paseoHome,
+          clisbotHome: b.clisbotHome,
           relayEnabled: true,
           relayEndpoint: b.config.relayEndpoint,
         });
@@ -522,7 +522,7 @@ async function waitForCapturedLog(
         });
         try {
           await direct.connect();
-          const directApi = createPaseoApi(direct);
+          const directApi = createClisbotApi(direct);
           expect((await directApi.workspaces.list()).entries).toHaveLength(1);
           await directApi.dispose();
         } finally {
@@ -544,11 +544,11 @@ async function waitForCapturedLog(
   );
 
   test("password-protected daemon refuses a relay client without the password", async () => {
-    let daemon: Awaited<ReturnType<typeof createTestPaseoDaemon>> | undefined;
+    let daemon: Awaited<ReturnType<typeof createTestClisbotDaemon>> | undefined;
     const clients: HostClient[] = [];
     try {
       await startRelay({ useLocalRelay: true });
-      daemon = await createTestPaseoDaemon({
+      daemon = await createTestClisbotDaemon({
         relayEnabled: true,
         relayEndpoint: `127.0.0.1:${relayPort}`,
         relayUseTls: false,
@@ -556,7 +556,7 @@ async function waitForCapturedLog(
         auth: { password: hashSync("relay-password", 4) },
       });
       const offerUrl = await getPairingOfferUrl({
-        paseoHome: daemon.paseoHome,
+        clisbotHome: daemon.clisbotHome,
         relayEnabled: true,
         relayEndpoint: daemon.config.relayEndpoint,
       });
@@ -582,7 +582,7 @@ async function waitForCapturedLog(
       await expect(connectOverRelay("wrong-password")).rejects.toThrow("Incorrect password");
 
       await connectOverRelay("relay-password");
-      expect((await createPaseoApi(clients.at(-1)!).workspaces.list()).entries).toEqual([]);
+      expect((await createClisbotApi(clients.at(-1)!).workspaces.list()).entries).toEqual([]);
     } finally {
       try {
         await Promise.all(clients.map((client) => client.close()));
@@ -597,7 +597,7 @@ async function waitForCapturedLog(
     "large messages cross the relay with unpaced upload admission preserved (supportsDrain=%s)",
     async (supportsDrain) => {
       await startRelay({ useLocalRelay: true });
-      const daemon = await createTestPaseoDaemon({
+      const daemon = await createTestClisbotDaemon({
         relayEnabled: true,
         relayEndpoint: `127.0.0.1:${relayPort}`,
         relayUseTls: false,
@@ -606,7 +606,7 @@ async function waitForCapturedLog(
       let client: HostClient | null = null;
       try {
         const offerUrl = await getPairingOfferUrl({
-          paseoHome: daemon.paseoHome,
+          clisbotHome: daemon.clisbotHome,
           relayEnabled: true,
           relayEndpoint: daemon.config.relayEndpoint,
         });
@@ -701,12 +701,12 @@ async function waitForCapturedLog(
   );
 
   test("daemon connects to relay and client ping/pong works through relay", async () => {
-    process.env.PASEO_PRIMARY_LAN_IP = "192.168.1.12";
+    process.env.CLISBOT_PRIMARY_LAN_IP = "192.168.1.12";
 
     const { logger, lines } = createCapturingLogger();
     await startRelay();
 
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       listen: "127.0.0.1",
       logger,
       relayEnabled: true,
@@ -715,7 +715,7 @@ async function waitForCapturedLog(
 
     try {
       const offerUrl = await getPairingOfferUrl({
-        paseoHome: daemon.paseoHome,
+        clisbotHome: daemon.clisbotHome,
         relayEnabled: daemon.config.relayEnabled,
         relayEndpoint: daemon.config.relayEndpoint,
         relayPublicEndpoint: daemon.config.relayPublicEndpoint,
@@ -842,12 +842,12 @@ async function waitForCapturedLog(
   }, 90000);
 
   test("updated client negotiates protected endpoint security through the relay", async () => {
-    process.env.PASEO_PRIMARY_LAN_IP = "192.168.1.12";
+    process.env.CLISBOT_PRIMARY_LAN_IP = "192.168.1.12";
 
     const { logger, lines } = createCapturingLogger();
     await startRelay();
 
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       listen: "127.0.0.1",
       logger,
       relayEnabled: true,
@@ -856,7 +856,7 @@ async function waitForCapturedLog(
 
     try {
       const offerUrl = await getPairingOfferUrl({
-        paseoHome: daemon.paseoHome,
+        clisbotHome: daemon.clisbotHome,
         relayEnabled: daemon.config.relayEnabled,
         relayEndpoint: daemon.config.relayEndpoint,
         relayPublicEndpoint: daemon.config.relayPublicEndpoint,
@@ -897,12 +897,12 @@ async function waitForCapturedLog(
   }, 90000);
 
   test("daemon requiring protected security rejects a legacy relay client and admits an updated one", async () => {
-    process.env.PASEO_PRIMARY_LAN_IP = "192.168.1.12";
+    process.env.CLISBOT_PRIMARY_LAN_IP = "192.168.1.12";
 
     const { logger, lines } = createCapturingLogger();
     await startRelay();
 
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       listen: "127.0.0.1",
       logger,
       relayEnabled: true,
@@ -912,7 +912,7 @@ async function waitForCapturedLog(
 
     try {
       const offerUrl = await getPairingOfferUrl({
-        paseoHome: daemon.paseoHome,
+        clisbotHome: daemon.clisbotHome,
         relayEnabled: daemon.config.relayEnabled,
         relayEndpoint: daemon.config.relayEndpoint,
         relayPublicEndpoint: daemon.config.relayPublicEndpoint,
@@ -1004,12 +1004,12 @@ async function waitForCapturedLog(
   test.skipIf(usesExternalRelay)(
     "daemon closes a relay client that sends an unsupported handshake key",
     async () => {
-      process.env.PASEO_PRIMARY_LAN_IP = "192.168.1.12";
+      process.env.CLISBOT_PRIMARY_LAN_IP = "192.168.1.12";
 
       const { logger, lines } = createCapturingLogger();
       await startRelay({ useLocalRelay: true });
 
-      const daemon = await createTestPaseoDaemon({
+      const daemon = await createTestClisbotDaemon({
         listen: "127.0.0.1",
         logger,
         relayEnabled: true,
@@ -1018,7 +1018,7 @@ async function waitForCapturedLog(
 
       try {
         const offerUrl = await getPairingOfferUrl({
-          paseoHome: daemon.paseoHome,
+          clisbotHome: daemon.clisbotHome,
           relayEnabled: daemon.config.relayEnabled,
           relayEndpoint: daemon.config.relayEndpoint,
           relayPublicEndpoint: daemon.config.relayPublicEndpoint,
@@ -1122,12 +1122,12 @@ async function waitForCapturedLog(
   );
 
   test("daemon keeps relay socket open while idle (no handshake timeout loop)", async () => {
-    process.env.PASEO_PRIMARY_LAN_IP = "192.168.1.12";
+    process.env.CLISBOT_PRIMARY_LAN_IP = "192.168.1.12";
 
     const { logger, lines } = createCapturingLogger();
     await startRelay();
 
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       listen: "127.0.0.1",
       logger,
       relayEnabled: true,
@@ -1136,7 +1136,7 @@ async function waitForCapturedLog(
 
     try {
       const offerUrl = await getPairingOfferUrl({
-        paseoHome: daemon.paseoHome,
+        clisbotHome: daemon.clisbotHome,
         relayEnabled: daemon.config.relayEnabled,
         relayEndpoint: daemon.config.relayEndpoint,
         relayPublicEndpoint: daemon.config.relayPublicEndpoint,
@@ -1268,12 +1268,12 @@ async function waitForCapturedLog(
   }, 90000);
 
   test("daemon accepts a relay client that pipelines app hello after E2EE hello", async () => {
-    process.env.PASEO_PRIMARY_LAN_IP = "192.168.1.12";
+    process.env.CLISBOT_PRIMARY_LAN_IP = "192.168.1.12";
 
     const { logger, lines } = createCapturingLogger();
     await startRelay();
 
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       listen: "127.0.0.1",
       logger,
       relayEnabled: true,
@@ -1282,7 +1282,7 @@ async function waitForCapturedLog(
 
     try {
       const offerUrl = await getPairingOfferUrl({
-        paseoHome: daemon.paseoHome,
+        clisbotHome: daemon.clisbotHome,
         relayEnabled: daemon.config.relayEnabled,
         relayEndpoint: daemon.config.relayEndpoint,
         relayPublicEndpoint: daemon.config.relayPublicEndpoint,
@@ -1408,10 +1408,10 @@ async function waitForCapturedLog(
   }, 90000);
 
   test("reads a workspace file over the E2EE relay session byte-for-byte", async () => {
-    process.env.PASEO_PRIMARY_LAN_IP = "192.168.1.12";
+    process.env.CLISBOT_PRIMARY_LAN_IP = "192.168.1.12";
 
     const { logger, lines } = createCapturingLogger();
-    let daemon: Awaited<ReturnType<typeof createTestPaseoDaemon>> | null = null;
+    let daemon: Awaited<ReturnType<typeof createTestClisbotDaemon>> | null = null;
     let workspaceDir: string | null = null;
     const fileName = "rapport données.bin";
     const source = randomBytes(4 * FILE_EXPLORER_STREAM_CHUNK_BYTES + 123);
@@ -1419,16 +1419,16 @@ async function waitForCapturedLog(
 
     try {
       await startRelay({ useLocalRelay: true });
-      daemon = await createTestPaseoDaemon({
+      daemon = await createTestClisbotDaemon({
         listen: "127.0.0.1",
         logger,
         relayEnabled: true,
         relayEndpoint: `127.0.0.1:${relayPort}`,
       });
-      workspaceDir = await mkdtemp(path.join(os.tmpdir(), "paseo-relay-download-"));
+      workspaceDir = await mkdtemp(path.join(os.tmpdir(), "clisbot-relay-download-"));
       await writeFile(path.join(workspaceDir, fileName), source);
       const offerUrl = await getPairingOfferUrl({
-        paseoHome: daemon.paseoHome,
+        clisbotHome: daemon.clisbotHome,
         relayEnabled: daemon.config.relayEnabled,
         relayEndpoint: daemon.config.relayEndpoint,
         relayPublicEndpoint: daemon.config.relayPublicEndpoint,

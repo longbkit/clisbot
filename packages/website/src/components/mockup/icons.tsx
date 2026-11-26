@@ -1,11 +1,11 @@
 // Exact SVG paths from packages/app/src/components/icons/
 
 import { OpenCodeIcon as OpenCodeBrandIcon, PiIcon as PiBrandIcon } from "../agent-icons";
-import { PaseoMark as CanonicalPaseoMark } from "../paseo-brand";
+import { ClisbotMark as CanonicalClisbotMark } from "../clisbot-brand";
 
-/** The Paseo butterfly mark, drawn as a small sidebar avatar or tool-call mark. */
-export function PaseoMark({ size = 13, className }: { size?: number; className?: string }) {
-  return <CanonicalPaseoMark width={size} height={size} className={className} />;
+/** The Clisbot Flow mark, drawn as a small sidebar avatar or tool-call mark. */
+export function ClisbotMark({ size = 13, className }: { size?: number; className?: string }) {
+  return <CanonicalClisbotMark width={size} height={size} className={className} />;
 }
 
 /** GitHub mark for the toolbar and PR panel. */

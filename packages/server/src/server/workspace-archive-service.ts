@@ -7,9 +7,9 @@ import type { AgentStorage, StoredAgentRecord } from "./agent/agent-storage.js";
 import type { WorkspaceGitService } from "./workspace-git-service.js";
 import type { ForgeService } from "../services/forge-service.js";
 import {
-  deletePaseoWorktree,
+  deleteClisbotWorktree,
   readWorktreeHeadReference,
-  isPaseoOwnedWorktreeCwd,
+  isClisbotOwnedWorktreeCwd,
   runWorktreeTeardownCommands,
   WorktreeTeardownError,
 } from "../utils/worktree.js";
@@ -27,16 +27,16 @@ import type { WorkspaceArchiveOperations } from "./workspace-archive-operations.
 
 export type ActiveWorkspaceRef = Pick<
   PersistedWorkspaceRecord,
-  "workspaceId" | "cwd" | "kind" | "worktreeRoot" | "isPaseoOwnedWorktree" | "mainRepoRoot"
+  "workspaceId" | "cwd" | "kind" | "worktreeRoot" | "isClisbotOwnedWorktree" | "mainRepoRoot"
 > & {
   worktreeManagerPluginId?: string | null;
   untrustedSource?: PersistedWorkspaceRecord["untrustedSource"];
 };
 
 export interface ArchiveDependencies {
-  paseoHome?: string;
+  clisbotHome?: string;
   // Base directory that may hold worktrees across repositories.
-  paseoWorktreesBaseRoot?: string;
+  clisbotWorktreesBaseRoot?: string;
   worktreeManagers?: Pick<PluginWorktreeManagerRuntime, "removeWorktree">;
   workspaceArchiveOperations?: Pick<WorkspaceArchiveOperations, "withCheckout">;
   github: ForgeService;
@@ -115,18 +115,18 @@ export async function requireActiveWorkspaceForArchive(
 
 interface BackingDirectory {
   path: string;
-  isPaseoOwnedWorktree: boolean;
+  isClisbotOwnedWorktree: boolean;
   // True when the directory backs a worktree workspace (or a worktree-scope
-  // archive), so a failed ownership proof means a Paseo worktree directory
+  // archive), so a failed ownership proof means a Clisbot worktree directory
   // is being left behind rather than a user's local checkout being ignored.
-  expectsPaseoOwnership: boolean;
+  expectsClisbotOwnership: boolean;
   // True only when this backing came from a workspace registry record
   // matched to this path (the record is itself an ownership proof, passed
-  // through to deletePaseoWorktree). Disk-derived backings stay false:
+  // through to deleteClisbotWorktree). Disk-derived backings stay false:
   // they must prove ownership on disk.
   registryProven: boolean;
   mainRepoRoot: string | null;
-  paseoWorktreesRoot: string | null;
+  clisbotWorktreesRoot: string | null;
   worktreeManagerPluginId: string | null;
   untrusted: boolean;
 }
@@ -154,14 +154,14 @@ export async function resolveWorkspaceIdAtPath(
 
 export async function resolveWorkspaceBackingPath(
   workspace: ActiveWorkspaceRef,
-  dependencies: Pick<ArchiveDependencies, "paseoHome" | "paseoWorktreesBaseRoot">,
+  dependencies: Pick<ArchiveDependencies, "clisbotHome" | "clisbotWorktreesBaseRoot">,
 ): Promise<string> {
   return (await resolveWorkspaceBackingDirectory(workspace, dependencies)).path;
 }
 
 // Resolves the in-scope record set, tears each down
 // (agents + terminals + record), then removes the backing directory iff it is
-// Paseo-owned AND no active workspace still references it.
+// Clisbot-owned AND no active workspace still references it.
 export async function archiveByScope(
   dependencies: ArchiveDependencies,
   request: ArchiveByScopeRequest,
@@ -357,30 +357,30 @@ async function stopWorkspaceSetups(
 
 async function resolveWorkspaceBackingDirectory(
   workspace: ActiveWorkspaceRef,
-  dependencies: Pick<ArchiveDependencies, "paseoHome" | "paseoWorktreesBaseRoot">,
+  dependencies: Pick<ArchiveDependencies, "clisbotHome" | "clisbotWorktreesBaseRoot">,
 ): Promise<BackingDirectory> {
   const worktreeManagerPluginId = workspace.worktreeManagerPluginId ?? null;
   const untrusted = Boolean(workspace.untrustedSource);
-  if (workspace.isPaseoOwnedWorktree === false) {
+  if (workspace.isClisbotOwnedWorktree === false) {
     return {
       path: resolve(workspace.worktreeRoot ?? workspace.cwd),
-      isPaseoOwnedWorktree: false,
-      expectsPaseoOwnership: false,
+      isClisbotOwnedWorktree: false,
+      expectsClisbotOwnership: false,
       registryProven: false,
       mainRepoRoot: workspace.mainRepoRoot ?? null,
-      paseoWorktreesRoot: null,
+      clisbotWorktreesRoot: null,
       worktreeManagerPluginId,
       untrusted,
     };
   }
-  if (workspace.isPaseoOwnedWorktree && workspace.worktreeRoot && workspace.mainRepoRoot) {
+  if (workspace.isClisbotOwnedWorktree && workspace.worktreeRoot && workspace.mainRepoRoot) {
     return {
       path: resolve(workspace.worktreeRoot),
-      isPaseoOwnedWorktree: true,
-      expectsPaseoOwnership: true,
+      isClisbotOwnedWorktree: true,
+      expectsClisbotOwnership: true,
       registryProven: true,
       mainRepoRoot: workspace.mainRepoRoot,
-      paseoWorktreesRoot: null,
+      clisbotWorktreesRoot: null,
       worktreeManagerPluginId,
       untrusted,
     };
@@ -388,11 +388,11 @@ async function resolveWorkspaceBackingDirectory(
   if (workspace.kind !== "worktree") {
     return {
       path: resolve(workspace.cwd),
-      isPaseoOwnedWorktree: false,
-      expectsPaseoOwnership: false,
+      isClisbotOwnedWorktree: false,
+      expectsClisbotOwnership: false,
       registryProven: false,
       mainRepoRoot: workspace.mainRepoRoot ?? null,
-      paseoWorktreesRoot: null,
+      clisbotWorktreesRoot: null,
       worktreeManagerPluginId,
       untrusted,
     };
@@ -414,20 +414,20 @@ async function resolveWorkspaceBackingDirectory(
 
 async function resolveBackingDirectory(
   cwd: string,
-  dependencies: Pick<ArchiveDependencies, "paseoHome" | "paseoWorktreesBaseRoot">,
+  dependencies: Pick<ArchiveDependencies, "clisbotHome" | "clisbotWorktreesBaseRoot">,
 ): Promise<BackingDirectory> {
   const options = {
-    paseoHome: dependencies.paseoHome,
-    worktreesRoot: dependencies.paseoWorktreesBaseRoot,
+    clisbotHome: dependencies.clisbotHome,
+    worktreesRoot: dependencies.clisbotWorktreesBaseRoot,
   };
-  const ownership = await isPaseoOwnedWorktreeCwd(cwd, options);
+  const ownership = await isClisbotOwnedWorktreeCwd(cwd, options);
   return {
     path: resolve(ownership.allowed && ownership.worktreePath ? ownership.worktreePath : cwd),
-    isPaseoOwnedWorktree: ownership.allowed,
-    expectsPaseoOwnership: true,
+    isClisbotOwnedWorktree: ownership.allowed,
+    expectsClisbotOwnership: true,
     registryProven: false,
     mainRepoRoot: ownership.repoRoot ?? null,
-    paseoWorktreesRoot: ownership.worktreeRoot ?? null,
+    clisbotWorktreesRoot: ownership.worktreeRoot ?? null,
     worktreeManagerPluginId: null,
     untrusted: false,
   };
@@ -489,13 +489,13 @@ async function maybeRemoveDirectory(
   directoryLeftBehind?: { path: string; reason: string };
 }> {
   const backing = target.backing;
-  if (!backing?.isPaseoOwnedWorktree) {
+  if (!backing?.isClisbotOwnedWorktree) {
     // Missing ownership proof for a worktree-backed directory: the record
     // still archives, but the directory is left in place and surfaced.
     // Never delete an unproven directory.
-    if (backing?.expectsPaseoOwnership) {
+    if (backing?.expectsClisbotOwnership) {
       const reason =
-        "no ownership proof (not under the Paseo worktrees root, no paseo/worktree.json marker, no registry record)";
+        "no ownership proof (not under the Clisbot worktrees root, no clisbot/worktree.json marker, no registry record)";
       dependencies.sessionLogger?.warn(
         { targetPath: backing.path, requestId: request.requestId },
         `Worktree directory left in place during archive: ${reason}`,
@@ -559,13 +559,13 @@ async function maybeRemoveDirectory(
   // a workspace whose teardown hooks fired; that beats deleting what the user asked to keep.
   request.checkpoint();
   try {
-    await deletePaseoWorktree({
+    await deleteClisbotWorktree({
       cwd: backing.mainRepoRoot,
       worktreePath: backing.path,
       teardownCwds: [],
-      worktreesRoot: backing.paseoWorktreesRoot ?? undefined,
-      paseoHome: dependencies.paseoHome,
-      worktreesBaseRoot: dependencies.paseoWorktreesBaseRoot,
+      worktreesRoot: backing.clisbotWorktreesRoot ?? undefined,
+      clisbotHome: dependencies.clisbotHome,
+      worktreesBaseRoot: dependencies.clisbotWorktreesBaseRoot,
       registryProven: backing.registryProven,
       worktreeManagers: dependencies.worktreeManagers,
       worktreeManagerPluginId: backing.worktreeManagerPluginId,
@@ -695,7 +695,7 @@ async function isDirectoryUnreferenced(
   activeWorkspaces: ActiveWorkspaceRef[],
   targetDirectory: BackingDirectory,
   archivedWorkspaceIds: ReadonlySet<string>,
-  dependencies: Pick<ArchiveDependencies, "paseoHome" | "paseoWorktreesBaseRoot">,
+  dependencies: Pick<ArchiveDependencies, "clisbotHome" | "clisbotWorktreesBaseRoot">,
 ): Promise<boolean> {
   const target = targetDirectory.path;
   const matchesTarget = createRealpathAwarePathMatcher(target);

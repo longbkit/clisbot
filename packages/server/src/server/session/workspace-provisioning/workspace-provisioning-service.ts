@@ -1,9 +1,9 @@
 import type { WorkspaceArchiveRestoreRequest } from "../../workspace-archive-service.js";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import type { PluginLifecycle } from "../../plugins/lifecycle/index.js";
 import { describeHookWorkspace } from "../../plugins/lifecycle/index.js";
 import { basename, resolve } from "node:path";
-import type { ProjectCheckoutLitePayload } from "@getpaseo/protocol/messages";
+import type { ProjectCheckoutLitePayload } from "@clisbot/protocol/messages";
 import type { Logger } from "pino";
 import {
   generateWorkspaceId,
@@ -18,14 +18,14 @@ import {
   type WorkspaceRegistry,
 } from "../../workspace-registry.js";
 import type { WorkspaceGitService } from "../../workspace-git-service.js";
-import type { CreatePaseoWorktreeWorkflowResult } from "../../worktree-session.js";
+import type { CreateClisbotWorktreeWorkflowResult } from "../../worktree-session.js";
 import { deriveProjectKey } from "../../project-key.js";
 import { areEquivalentPaths, createRealpathAwarePathMatcher } from "../../../utils/path.js";
 import type { UntrustedWorkspaceSource } from "../../workspace-automation-gate.js";
-import { readPaseoWorktreeMetadata } from "../../../utils/worktree-metadata.js";
+import { readClisbotWorktreeMetadata } from "../../../utils/worktree-metadata.js";
 
 export interface ResolveOrCreateWorkspaceIdInput {
-  createdWorktree: CreatePaseoWorktreeWorkflowResult | null;
+  createdWorktree: CreateClisbotWorktreeWorkflowResult | null;
   requestedWorkspaceId?: string;
   cwd: string;
   initialTitle: string | null;
@@ -271,8 +271,8 @@ export function createWorkspaceProvisioningService(deps: {
         await findOrCreateProjectForDirectory(normalizedCwd);
     const create = async () => {
       const baseMetadata =
-        checkout.isGit && checkout.isPaseoOwnedWorktree
-          ? await readPaseoWorktreeMetadata(checkout.worktreeRoot ?? normalizedCwd)
+        checkout.isGit && checkout.isClisbotOwnedWorktree
+          ? await readClisbotWorktreeMetadata(checkout.worktreeRoot ?? normalizedCwd)
           : null;
       const checkoutRoot = checkout.worktreeRoot ?? normalizedCwd;
       const matchesCheckout = createRealpathAwarePathMatcher(checkoutRoot);
@@ -301,7 +301,7 @@ export function createWorkspaceProvisioningService(deps: {
       emitWorkspaceCreated(workspace);
       return workspace;
     };
-    return deps.withCheckoutLock && checkout.isGit && checkout.isPaseoOwnedWorktree
+    return deps.withCheckoutLock && checkout.isGit && checkout.isClisbotOwnedWorktree
       ? deps.withCheckoutLock(checkout.worktreeRoot ?? normalizedCwd, create)
       : create();
   }

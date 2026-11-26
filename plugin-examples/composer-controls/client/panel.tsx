@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useComposers, type PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
+import { useComposers, type PluginWorkspacePanelProps } from "@clisbot/plugin/client";
 import { REVIEW_KEY } from "./controls";
 
 /**

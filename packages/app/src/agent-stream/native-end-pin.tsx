@@ -18,10 +18,10 @@ import {
 // LegendList renders can be flattened away. Absolute positioning keeps it out of the flow.
 //
 // A drag owns the offset from the frame it begins, but the pin stays until JS stops following a
-// round trip later. The scroll view subclasses in `modules/paseo-scroll` recognise the pin by its
+// round trip later. The scroll view subclasses in `modules/clisbot-scroll` recognise the pin by its
 // native ID and skip its correction while the user drags, so a line mounting in those frames grows
 // below the rows under the finger.
-const END_PIN_NATIVE_ID = "paseo-end-pin";
+const END_PIN_NATIVE_ID = "clisbot-end-pin";
 const END_ANCHOR_STYLE: ViewStyle = {
   position: "absolute",
   bottom: 0,

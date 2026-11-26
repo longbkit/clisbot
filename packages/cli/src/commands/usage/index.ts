@@ -1,6 +1,6 @@
 import { Command } from "commander";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { UsageReportEntry } from "@getpaseo/protocol/messages";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { UsageReportEntry } from "@clisbot/protocol/messages";
 import { connectToDaemon, type ConnectOptions } from "../../utils/client.js";
 import { addJsonAndDaemonHostOptions } from "../../utils/command-options.js";
 import { withOutput, type CommandOptions, type CommandResult } from "../../output/index.js";

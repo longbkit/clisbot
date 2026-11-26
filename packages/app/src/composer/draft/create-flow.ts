@@ -9,7 +9,7 @@ import { isActiveCreateFlowForDraft, useCreateFlowStore } from "@/stores/create-
 import { handoffCreatedAgentMessageSubmission } from "@/composer/submission/writer";
 import { useSessionStore } from "@/stores/session-store";
 import { createUserMessage, type UserMessageImageAttachment } from "@/types/stream";
-import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import type { AgentAttachment } from "@clisbot/protocol/messages";
 
 interface CreateAttempt {
   clientMessageId: string;

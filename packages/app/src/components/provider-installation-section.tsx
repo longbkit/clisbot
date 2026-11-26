@@ -6,7 +6,7 @@ import type {
   ProviderInstallation,
   ProviderInstallationUpdate,
   ProviderInstallationUpdateCheck,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "@/components/ui/external-link";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";

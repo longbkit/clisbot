@@ -48,9 +48,9 @@ export class CodexInstructionSnapshot {
       throw new Error("Update Codex to 0.121.0 or newer to apply agent instruction updates.");
     const snapshot = JSON.stringify({ version: 1, instructions: this.instructions ?? "" });
     const text =
-      "This is the complete current set of Paseo-supplied instructions. It supersedes all earlier Paseo-supplied instructions in the conversation, including earlier snapshots. An empty instruction string means there are no current Paseo-supplied instructions. Provider and collaboration instructions remain in effect.\n\n<paseo_instruction_snapshot>" +
+      "This is the complete current set of Clisbot-supplied instructions. It supersedes all earlier Clisbot-supplied instructions in the conversation, including earlier snapshots. An empty instruction string means there are no current Clisbot-supplied instructions. Provider and collaboration instructions remain in effect.\n\n<clisbot_instruction_snapshot>" +
       snapshot +
-      "</paseo_instruction_snapshot>";
+      "</clisbot_instruction_snapshot>";
     try {
       await request("thread/inject_items", {
         threadId,

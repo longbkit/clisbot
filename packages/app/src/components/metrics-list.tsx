@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { AgentMetric } from "@getpaseo/protocol/agent-types";
+import type { AgentMetric } from "@clisbot/protocol/agent-types";
 
 /**
  * Label and value rows a provider reports for a session or a turn. The provider owns the words and

@@ -1,7 +1,7 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { AgentMetric } from "@getpaseo/protocol/agent-types";
+import type { AgentMetric } from "@clisbot/protocol/agent-types";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 import { i18n } from "@/i18n/i18next";

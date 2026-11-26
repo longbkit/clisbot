@@ -6,23 +6,23 @@ nav: 公开 API
 
 # Hub 公开 API {#hub-public-api}
 
-Hub 公开 API 让脚本和 CI 流水线能够管理一个组织的触发器、webhook 密钥、手动运行和 daemon 注册。请将 `PASEO_HUB_URL` 设为你的 Hub 地址，例如 `https://hub.example.com`。
+Hub 公开 API 让脚本和 CI 流水线能够管理一个组织的触发器、webhook 密钥、手动运行和 daemon 注册。请将 `CLISBOT_HUB_URL` 设为你的 Hub 地址，例如 `https://hub.example.com`。
 
 ## API 参考 {#api-reference}
 
-- [交互式 API 参考](https://hub.paseo.sh/api/reference)
-- [OpenAPI 3.1 文档](https://hub.paseo.sh/api/openapi.json)
+每个 Hub 都在自己的地址上提供参考文档：
 
-自托管 Hub 在自己的地址下提供相同的 `/api/reference` 和 `/api/openapi.json` 端点。
+- 交互式 API 参考：`<hub-origin>/api/reference`
+- OpenAPI 3.1 文档：`<hub-origin>/api/openapi.json`
 
 ## 认证 {#authentication}
 
-交互式 CLI 访问请运行 `paseo hub login [origin]`。Paseo 会在 `PASEO_HOME` 下为该精确地址保存一个可撤销的组织凭据。
+交互式 CLI 访问请运行 `clisbot hub login [origin]`。Clisbot 会在 `CLISBOT_HOME` 下为该精确地址保存一个可撤销的组织凭据。
 
 自动化场景请在 Hub 的 **Settings → API keys** 下创建组织 API 密钥。两种凭据都作为 Bearer 令牌发送：
 
 ```http
-Authorization: Bearer paseo_pk_...
+Authorization: Bearer clisbot_pk_...
 Content-Type: application/json
 ```
 
@@ -42,10 +42,10 @@ API 错误返回 RFC 9457 `application/problem+json` 格式并带有 `X-Request-
 
 ```json
 {
-  "type": "https://paseo.sh/problems/unauthorized",
+  "type": "https://clisbot.com/problems/unauthorized",
   "title": "Authentication required",
   "status": 401,
-  "detail": "Provide an active Paseo organization credential in the Authorization: Bearer header.",
+  "detail": "Provide an active Clisbot organization credential in the Authorization: Bearer header.",
   "code": "unauthorized",
   "requestId": "5e967c44-fc22-4f6d-8fc5-1bbff33121af"
 }
@@ -63,7 +63,7 @@ API 错误返回 RFC 9457 `application/problem+json` 格式并带有 `X-Request-
 
 ```json
 {
-  "yaml": "name: manual-task\nenabled: true\non:\n  manual.run: {}\nrun:\n  target: { daemon: my-macbook, cwd: /workspace }\n  agent: { provider: codex, mode: full-access }\n  prompt: |\n    Complete the task and call finish_execution.\n    ${{ paseo.prompt }}\n  max_runtime: 1h\n  idle_timeout: 5m\n"
+  "yaml": "name: manual-task\nenabled: true\non:\n  manual.run: {}\nrun:\n  target: { daemon: my-macbook, cwd: /workspace }\n  agent: { provider: codex, mode: full-access }\n  prompt: |\n    Complete the task and call finish_execution.\n    ${{ clisbot.prompt }}\n  max_runtime: 1h\n  idle_timeout: 5m\n"
 }
 ```
 
@@ -79,7 +79,7 @@ API 错误返回 RFC 9457 `application/problem+json` 格式并带有 `X-Request-
 }
 ```
 
-无效 YAML、未知集成或被拒绝的 Agent 设置会返回 `422` 及字段级错误详情。`paseo hub deploy --dry-run` 和 `paseo hub deploy` 会针对 `.paseo/triggers/*.yml` 调用这两个端点。
+无效 YAML、未知集成或被拒绝的 Agent 设置会返回 `422` 及字段级错误详情。`clisbot hub deploy --dry-run` 和 `clisbot hub deploy` 会针对 `.clisbot/triggers/*.yml` 调用这两个端点。
 
 ## Webhook 密钥 {#webhook-secrets}
 
@@ -140,8 +140,8 @@ API 错误返回 RFC 9457 `application/problem+json` 格式并带有 `X-Request-
 示例：
 
 ```bash
-curl --fail-with-body -sS -X POST "$PASEO_HUB_URL/api/v1/manual-runs" \
-  -H "Authorization: Bearer $PASEO_HUB_API_KEY" \
+curl --fail-with-body -sS -X POST "$CLISBOT_HUB_URL/api/v1/manual-runs" \
+  -H "Authorization: Bearer $CLISBOT_HUB_API_KEY" \
   -H "Content-Type: application/json" \
   --data '{
     "projectSlug": "default",
@@ -158,8 +158,8 @@ curl --fail-with-body -sS -X POST "$PASEO_HUB_URL/api/v1/manual-runs" \
 
 ```bash
 curl --fail-with-body -sS -X POST \
-  "$PASEO_HUB_URL/api/v1/daemons/enrollment-tokens" \
-  -H "Authorization: Bearer $PASEO_HUB_API_KEY"
+  "$CLISBOT_HUB_URL/api/v1/daemons/enrollment-tokens" \
+  -H "Authorization: Bearer $CLISBOT_HUB_API_KEY"
 ```
 
 响应（`201`）：
@@ -171,7 +171,7 @@ curl --fail-with-body -sS -X POST \
 }
 ```
 
-`paseo hub connect [origin]` 会自动调用此端点，并用令牌换取 daemon 自己的长期关系凭据。撤销 API 密钥会立即阻止新的 API 调用，并使该密钥签发的未消耗注册令牌失效。
+`clisbot hub connect [origin]` 会自动调用此端点，并用令牌换取 daemon 自己的长期关系凭据。撤销 API 密钥会立即阻止新的 API 调用，并使该密钥签发的未消耗注册令牌失效。
 
 ## 密钥与审计记录 {#keys-and-audit-trails}
 

@@ -16,7 +16,7 @@ describe("Hub deployment bundle discovery", () => {
   it("discovers the canonical bundle in deterministic path order", async () => {
     const cwd = await canonicalProject();
     await writeFile(
-      path.join(cwd, ".paseo", "workflows", "z-last.yml"),
+      path.join(cwd, ".clisbot", "workflows", "z-last.yml"),
       workflow("z-last", "codex-safe"),
     );
 
@@ -24,16 +24,16 @@ describe("Hub deployment bundle discovery", () => {
       projectSlug: "studio-api",
       workflowCount: 2,
       files: [
-        { path: ".paseo/hub.yml", content: hubResource },
+        { path: ".clisbot/hub.yml", content: hubResource },
         {
-          path: ".paseo/workflows/answer.yml",
-          content: workflow("answer", "${{ paseo.inputs.agent }}", true),
+          path: ".clisbot/workflows/answer.yml",
+          content: workflow("answer", "${{ clisbot.inputs.agent }}", true),
         },
         {
-          path: ".paseo/workflows/partials/safety.md",
-          content: "Keep the request in paseo.prompt and evidence in paseo.context.\n",
+          path: ".clisbot/workflows/partials/safety.md",
+          content: "Keep the request in clisbot.prompt and evidence in clisbot.context.\n",
         },
-        { path: ".paseo/workflows/z-last.yml", content: workflow("z-last", "codex-safe") },
+        { path: ".clisbot/workflows/z-last.yml", content: workflow("z-last", "codex-safe") },
       ],
     });
   });
@@ -42,38 +42,38 @@ describe("Hub deployment bundle discovery", () => {
     {
       name: "missing hub.yml",
       arrange: async (cwd: string) => {
-        await mkdir(path.join(cwd, ".paseo", "workflows"), { recursive: true });
+        await mkdir(path.join(cwd, ".clisbot", "workflows"), { recursive: true });
       },
       code: "HUB_RESOURCE_MISSING",
-      message: ".paseo/hub.yml does not exist",
+      message: ".clisbot/hub.yml does not exist",
     },
     {
       name: "missing workflow directory",
       arrange: async (cwd: string) => {
-        await mkdir(path.join(cwd, ".paseo"), { recursive: true });
-        await writeFile(path.join(cwd, ".paseo", "hub.yml"), hubResource);
+        await mkdir(path.join(cwd, ".clisbot"), { recursive: true });
+        await writeFile(path.join(cwd, ".clisbot", "hub.yml"), hubResource);
       },
       code: "HUB_WORKFLOW_DIRECTORY_MISSING",
-      message: ".paseo/workflows does not exist",
+      message: ".clisbot/workflows does not exist",
     },
     {
       name: "empty workflow directory",
       arrange: async (cwd: string) => {
-        await mkdir(path.join(cwd, ".paseo", "workflows"), { recursive: true });
-        await writeFile(path.join(cwd, ".paseo", "hub.yml"), hubResource);
+        await mkdir(path.join(cwd, ".clisbot", "workflows"), { recursive: true });
+        await writeFile(path.join(cwd, ".clisbot", "hub.yml"), hubResource);
       },
       code: "HUB_WORKFLOW_MISSING",
-      message: ".paseo/workflows must contain at least one direct-child .yml workflow",
+      message: ".clisbot/workflows must contain at least one direct-child .yml workflow",
     },
     {
       name: "unsupported workflow extension",
       arrange: async (cwd: string) => {
-        await mkdir(path.join(cwd, ".paseo", "workflows"), { recursive: true });
-        await writeFile(path.join(cwd, ".paseo", "hub.yml"), hubResource);
-        await writeFile(path.join(cwd, ".paseo", "workflows", "answer.yaml"), "name: answer\n");
+        await mkdir(path.join(cwd, ".clisbot", "workflows"), { recursive: true });
+        await writeFile(path.join(cwd, ".clisbot", "hub.yml"), hubResource);
+        await writeFile(path.join(cwd, ".clisbot", "workflows", "answer.yaml"), "name: answer\n");
       },
       code: "HUB_WORKFLOW_EXTENSION_UNSUPPORTED",
-      message: ".paseo/workflows/answer.yaml must use the .yml extension",
+      message: ".clisbot/workflows/answer.yaml must use the .yml extension",
     },
   ])("rejects $name before contacting Hub", async ({ arrange, code, message }) => {
     const cwd = await temporaryDirectory();
@@ -88,46 +88,46 @@ describe("Hub deployment bundle discovery", () => {
   it("rejects prompt partial traversal with a path-specific diagnostic", async () => {
     const cwd = await canonicalProject();
     await writeFile(
-      path.join(cwd, ".paseo", "workflows", "answer.yml"),
+      path.join(cwd, ".clisbot", "workflows", "answer.yml"),
       workflow("answer", "codex-safe").replace(
-        "      - text: ${{ paseo.prompt }}",
+        "      - text: ${{ clisbot.prompt }}",
         "      - include: ../secret.md",
       ),
     );
 
     await expect(discoverHubBundle({ cwd, project: "studio-api" })).rejects.toMatchObject({
       code: "HUB_PARTIAL_PATH_INVALID",
-      message: expect.stringContaining(".paseo/workflows/answer.yml"),
+      message: expect.stringContaining(".clisbot/workflows/answer.yml"),
     });
   });
 
   it("reports a referenced partial that is missing from the bundle", async () => {
     const cwd = await canonicalProject();
     await writeFile(
-      path.join(cwd, ".paseo", "workflows", "answer.yml"),
+      path.join(cwd, ".clisbot", "workflows", "answer.yml"),
       workflow("answer", "codex-safe").replace(
-        "      - text: ${{ paseo.prompt }}",
+        "      - text: ${{ clisbot.prompt }}",
         "      - include: partials/missing.md",
       ),
     );
 
     await expect(discoverHubBundle({ cwd, project: "studio-api" })).rejects.toMatchObject({
       code: "HUB_BUNDLE_FILE_MISSING",
-      message: expect.stringContaining(".paseo/workflows/partials/missing.md"),
+      message: expect.stringContaining(".clisbot/workflows/partials/missing.md"),
     });
   });
 
   it("rejects nested workflow files instead of discovering a second layout", async () => {
     const cwd = await canonicalProject();
-    await mkdir(path.join(cwd, ".paseo", "workflows", "nested"));
+    await mkdir(path.join(cwd, ".clisbot", "workflows", "nested"));
     await writeFile(
-      path.join(cwd, ".paseo", "workflows", "nested", "other.yml"),
+      path.join(cwd, ".clisbot", "workflows", "nested", "other.yml"),
       workflow("other", "codex-safe"),
     );
 
     await expect(discoverHubBundle({ cwd, project: "studio-api" })).rejects.toMatchObject({
       code: "HUB_WORKFLOW_PATH_UNSUPPORTED",
-      message: expect.stringContaining(".paseo/workflows/nested"),
+      message: expect.stringContaining(".clisbot/workflows/nested"),
     });
   });
 
@@ -135,11 +135,11 @@ describe("Hub deployment bundle discovery", () => {
     const cwd = await canonicalProject();
     const outside = path.join(cwd, "outside.yml");
     await writeFile(outside, workflow("linked", "codex-safe"));
-    await symlink(outside, path.join(cwd, ".paseo", "workflows", "linked.yml"));
+    await symlink(outside, path.join(cwd, ".clisbot", "workflows", "linked.yml"));
 
     await expect(discoverHubBundle({ cwd, project: "studio-api" })).rejects.toMatchObject({
       code: "HUB_BUNDLE_UNSAFE_PATH",
-      message: expect.stringContaining(".paseo/workflows/linked.yml"),
+      message: expect.stringContaining(".clisbot/workflows/linked.yml"),
     });
   });
 
@@ -181,7 +181,7 @@ function workflow(name: string, agent: string, include = false): string {
     `name: ${name}`,
     "on: manual.run",
     "max_runtime: 1h",
-    ...(agent.includes("paseo.inputs")
+    ...(agent.includes("clisbot.inputs")
       ? ["inputs:", "  agent:", "    type: string", "    choices: [codex-safe, claude]"]
       : []),
     "steps:",
@@ -192,29 +192,29 @@ function workflow(name: string, agent: string, include = false): string {
     `    agent: ${agent}`,
     "    prompt:",
     ...(include ? ["      - include: partials/safety.md"] : []),
-    "      - text: ${{ paseo.prompt }}",
+    "      - text: ${{ clisbot.prompt }}",
     "",
   ].join("\n");
 }
 
 async function canonicalProject(): Promise<string> {
   const cwd = await temporaryDirectory();
-  const workflows = path.join(cwd, ".paseo", "workflows");
+  const workflows = path.join(cwd, ".clisbot", "workflows");
   await mkdir(path.join(workflows, "partials"), { recursive: true });
-  await writeFile(path.join(cwd, ".paseo", "hub.yml"), hubResource);
+  await writeFile(path.join(cwd, ".clisbot", "hub.yml"), hubResource);
   await writeFile(
     path.join(workflows, "answer.yml"),
-    workflow("answer", "${{ paseo.inputs.agent }}", true),
+    workflow("answer", "${{ clisbot.inputs.agent }}", true),
   );
   await writeFile(
     path.join(workflows, "partials", "safety.md"),
-    "Keep the request in paseo.prompt and evidence in paseo.context.\n",
+    "Keep the request in clisbot.prompt and evidence in clisbot.context.\n",
   );
   return cwd;
 }
 
 async function temporaryDirectory(): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-hub-bundle-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-hub-bundle-"));
   temporaryDirectories.push(directory);
   return directory;
 }

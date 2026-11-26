@@ -3,7 +3,7 @@ import { PLUGINS_LINKED } from "~/plugins/launch";
 import "~/styles.css";
 import { DiscordIcon, GitHubIcon } from "~/components/brand-icons";
 import { LanguageSelector } from "~/components/language-selector";
-import { PaseoLockup } from "~/components/paseo-brand";
+import { ClisbotLockup } from "~/components/clisbot-brand";
 import { useLocalizePath } from "~/i18n";
 import { useStars } from "~/routes/__root";
 
@@ -17,10 +17,10 @@ export function SiteHeader() {
     <header className="flex flex-col items-center gap-4 md:flex-row md:justify-between">
       <a
         href={localize("/")}
-        aria-label="Paseo"
+        aria-label="Clisbot"
         className="inline-flex items-center text-foreground"
       >
-        <PaseoLockup className="h-[22px] w-auto" />
+        <ClisbotLockup className="h-[22px] w-auto" />
       </a>
       <nav className="flex flex-wrap items-center justify-center gap-4">
         {PLUGINS_LINKED && (
@@ -45,7 +45,7 @@ export function SiteHeader() {
         </a>
         <LanguageSelector />
         <a
-          href="https://discord.gg/jz8T2uahpH"
+          href="https://discord.gg/awGmcmFXC"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Discord"
@@ -54,7 +54,7 @@ export function SiteHeader() {
           <DiscordIcon width="18" height="18" />
         </a>
         <a
-          href="https://github.com/getpaseo/paseo"
+          href="https://github.com/longbkit/clisbot"
           target="_blank"
           rel="noopener noreferrer"
           aria-label={stars ? t("nav.githubStars", { stars }) : "GitHub"}

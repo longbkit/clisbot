@@ -193,8 +193,8 @@ Drop a hunk when the installed LegendList ships its fix.
 
 ### Scroll view corrections
 
-`modules/paseo-scroll` replaces React Native's scroll view on both platforms with a subclass:
-Android's `PaseoScrollView` and iOS's `PaseoScrollViewComponentView`.
+`modules/clisbot-scroll` replaces React Native's scroll view on both platforms with a subclass:
+Android's `ClisbotScrollView` and iOS's `ClisbotScrollViewComponentView`.
 `VisibleContentPositionClampTest` and `SelectableTextTouchTest` cover Android; iOS has no native
 test harness.
 
@@ -212,14 +212,14 @@ subclass keeps the offset. Android keeps a removed view's last frame, so it keep
 React Native 0.88 skips the adjustment for a removed anchor
 ([PR #57294](https://github.com/react/react-native/pull/57294)).
 
-**End pin during a drag.** Both subclasses recognize the pin by its native ID, `paseo-end-pin`,
+**End pin during a drag.** Both subclasses recognize the pin by its native ID, `clisbot-end-pin`,
 and skip its correction while the user drags ([user scroll](#user-scroll)). This one has no React
 Native counterpart; it stays while the timeline uses the pin.
 
 **Touched text (Android).** Chat text is selectable, and Android focuses selectable text when it is
 touched. React Native scrolls a newly focused view fully into view, so tapping a link or a word, or
 long-pressing to select, in a message partly off screen moved the timeline by up to a screen.
-`PaseoScrollView` skips that scroll when the focused view is selectable, non-editable text in touch
+`ClisbotScrollView` skips that scroll when the focused view is selectable, non-editable text in touch
 mode. The text keeps focus, and a streaming reply's new text collapses its selection to the start,
 which asks to reveal the reply's first line; that request is skipped too while nothing is selected.
 A change in the timeline's height, such as the composer below it growing, also reveals the focused

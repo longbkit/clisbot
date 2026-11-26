@@ -4,4 +4,4 @@ Added
 Notes
 - Both models require Claude Code 2.1.321 or newer; Mythos 5.2 appears only when Claude Code advertises access
 
-Full notes: https://paseo.sh/changelog
+Full notes: https://clisbot.com/changelog

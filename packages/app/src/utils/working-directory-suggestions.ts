@@ -1,4 +1,4 @@
-import { scorePathMatch } from "@getpaseo/protocol/search/text-match";
+import { scorePathMatch } from "@clisbot/protocol/search/text-match";
 
 export interface BuildWorkingDirectorySuggestionsInput {
   recommendedPaths: string[];

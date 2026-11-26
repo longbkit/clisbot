@@ -8,7 +8,7 @@ import type { AgentTimelineItem } from "../agent/agent-sdk-types.js";
 import { CodexAppServerAgentClient } from "../agent/providers/codex-app-server-agent.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import { createMessageCollector } from "../test-utils/message-collector.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import type { SessionOutboundMessage } from "../messages.js";
 import { canRunRealProvider } from "./real-provider-test-config.js";
 
@@ -220,7 +220,7 @@ describe("daemon E2E (real codex) - send message during tool call", () => {
   let canRun = false;
   interface SteeringResources {
     cwd: string | null;
-    daemon: Awaited<ReturnType<typeof createTestPaseoDaemon>> | null;
+    daemon: Awaited<ReturnType<typeof createTestClisbotDaemon>> | null;
     client: DaemonClient | null;
     collector: ReturnType<typeof createMessageCollector> | null;
   }
@@ -244,7 +244,7 @@ describe("daemon E2E (real codex) - send message during tool call", () => {
       collector: null,
     };
     try {
-      resources.daemon = await createTestPaseoDaemon({
+      resources.daemon = await createTestClisbotDaemon({
         // Use the installed app-server so this regression exercises the native
         // steering method rather than the broad provider smoke-test path.
         agentClients: { codex: new CodexAppServerAgentClient(logger) },
@@ -386,7 +386,7 @@ describe("daemon E2E (real codex) - send message during tool call", () => {
   test("does not emit an idle agent_update between UI send and the replacement Codex turn", async () => {
     const logger = pino({ level: "silent" });
     const cwd = tmpCwd();
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: { codex: new CodexAppServerAgentClient(logger) },
       logger,
     });
@@ -465,7 +465,7 @@ describe("daemon E2E (real codex) - send message during tool call", () => {
   test("does not emit an idle agent_update when a second prompt is sent 200ms after the first", async () => {
     const logger = pino({ level: "silent" });
     const cwd = tmpCwd();
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: { codex: new CodexAppServerAgentClient(logger) },
       logger,
     });

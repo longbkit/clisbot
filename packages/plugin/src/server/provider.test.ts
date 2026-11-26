@@ -30,7 +30,7 @@ function reviewPrompt(mode: ReviewMode, delivery: Delivery): ProviderInput {
         content: [
           {
             type: "review",
-            mimeType: "application/paseo-review",
+            mimeType: "application/clisbot-review",
             cwd: "/workspace",
             mode,
             baseRef: "main",
@@ -104,18 +104,18 @@ describe("Provider metrics", () => {
     expect(ProviderEventSchema.parse(event)).toEqual(event);
   });
 
-  it("tells a provider whether this Paseo shows session metrics", () => {
+  it("tells a provider whether this Clisbot shows session metrics", () => {
     const supported = ["prompt.message", "session.metrics"] as const;
     expect(
       negotiateProviderCapabilities(["prompt.message", "session.metrics"], supported),
     ).toContain("session.metrics");
-    // A Paseo from before session metrics never offers them.
+    // A Clisbot from before session metrics never offers them.
     expect(negotiateProviderCapabilities(["prompt.message"], supported)).toEqual([
       "prompt.message",
     ]);
   });
 
-  it("refuses a metric whose value is not text Paseo can show as given", () => {
+  it("refuses a metric whose value is not text Clisbot can show as given", () => {
     expect(
       ProviderEventSchema.safeParse({
         type: "session.metrics",

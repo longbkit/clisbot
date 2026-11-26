@@ -2,10 +2,10 @@
 // palette — packages/app/src/styles/identity-colors.ts — surfaced as
 // `--color-mock-tile-*` tokens in styles.css.
 
-import { PaseoMark as CanonicalPaseoMark } from "../../paseo-brand";
+import { ClisbotMark as CanonicalClisbotMark } from "../../clisbot-brand";
 
-export function PaseoMark({ size = 20, className }: { size?: number; className?: string }) {
-  return <CanonicalPaseoMark width={size} height={size} className={className} />;
+export function ClisbotMark({ size = 20, className }: { size?: number; className?: string }) {
+  return <CanonicalClisbotMark width={size} height={size} className={className} />;
 }
 
 /** A hashed identity tile — one letter on a muted identity fill. */
@@ -32,11 +32,11 @@ const TILE_TONE = {
   teal: "bg-mock-tile-teal",
 } as const;
 
-/** The Paseo project tile — white butterfly on the black app plate. */
-export function PaseoTile() {
+/** The Clisbot project tile — Ocean Flow on the app plate. */
+export function ClisbotTile() {
   return (
-    <span className="flex size-[18px] shrink-0 items-center justify-center rounded-[5px] bg-black text-white">
-      <PaseoMark size={14} />
+    <span className="flex size-[18px] shrink-0 items-center justify-center rounded-[5px] bg-[#153B43] text-[#A1DFD4]">
+      <ClisbotMark size={14} />
     </span>
   );
 }

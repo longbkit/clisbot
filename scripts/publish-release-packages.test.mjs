@@ -65,9 +65,9 @@ test("publishes all workspaces in dependency order, waits for propagation, and a
 
 test("skips already-published packages cleanly so partial failures can be rerun", async () => {
   const published = new Set([
-    "@getpaseo/highlight@0.17.0-beta.2",
-    "@getpaseo/relay@0.17.0-beta.2",
-    "@getpaseo/protocol@0.17.0-beta.2",
+    "@clisbot/highlight@0.17.0-beta.2",
+    "@clisbot/relay@0.17.0-beta.2",
+    "@clisbot/protocol@0.17.0-beta.2",
   ]);
   const publishTargets = [];
 
@@ -96,10 +96,10 @@ test("skips already-published packages cleanly so partial failures can be rerun"
   );
 
   assert.deepEqual(publishTargets, [
-    "@getpaseo/client",
-    "@getpaseo/plugin",
-    "@getpaseo/server",
-    "@getpaseo/cli",
+    "@clisbot/client",
+    "@clisbot/plugin",
+    "@clisbot/server",
+    "@clisbot/cli",
   ]);
 });
 
@@ -120,8 +120,8 @@ test("retries transient publish errors, waits for delayed registry propagation, 
           }
           const count = (visibilityChecks.get(spec) ?? 0) + 1;
           visibilityChecks.set(spec, count);
-          // Simulate npm CDN lag on @getpaseo/server for 2 polls before becoming visible.
-          if (spec === "@getpaseo/server@0.17.0-beta.2" && count < 3) {
+          // Simulate npm CDN lag on @clisbot/server for 2 polls before becoming visible.
+          if (spec === "@clisbot/server@0.17.0-beta.2" && count < 3) {
             return fail("npm error code E404");
           }
           return ok(JSON.stringify("0.17.0-beta.2"));
@@ -132,15 +132,15 @@ test("retries transient publish errors, waits for delayed registry propagation, 
             .slice("--workspace=".length);
           const count = (attempts.get(pkg) ?? 0) + 1;
           attempts.set(pkg, count);
-          if (pkg === "@getpaseo/client" && count === 1) {
+          if (pkg === "@clisbot/client" && count === 1) {
             return fail("npm error code E503\n503 Service Unavailable");
           }
-          if (pkg === "@getpaseo/server" && count === 1) {
+          if (pkg === "@clisbot/server" && count === 1) {
             // Timed out after npm accepted the tarball.
             published.add(`${pkg}@0.17.0-beta.2`);
             return fail("npm error code ETIMEDOUT");
           }
-          if (pkg === "@getpaseo/server" && count === 2) {
+          if (pkg === "@clisbot/server" && count === 2) {
             return fail(
               "npm error code E403\nYou cannot publish over the previously published versions: 0.17.0-beta.2.",
             );
@@ -153,9 +153,9 @@ test("retries transient publish errors, waits for delayed registry propagation, 
     },
   );
 
-  assert.equal(attempts.get("@getpaseo/client"), 2);
-  assert.equal(attempts.get("@getpaseo/server"), 2);
-  assert.equal(visibilityChecks.get("@getpaseo/server@0.17.0-beta.2"), 3);
+  assert.equal(attempts.get("@clisbot/client"), 2);
+  assert.equal(attempts.get("@clisbot/server"), 2);
+  assert.equal(visibilityChecks.get("@clisbot/server@0.17.0-beta.2"), 3);
 });
 
 test("does not retry deterministic npm auth errors", async () => {

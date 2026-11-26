@@ -21,7 +21,7 @@ function createSnapshot(
       mainRepoRoot: "/repo",
       currentBranch: "feature",
       remoteUrl: "https://github.com/acme/repo.git",
-      isPaseoOwnedWorktree: true,
+      isClisbotOwnedWorktree: true,
       isDirty: false,
       baseRef: "main",
       aheadBehind: { ahead: 0, behind: 0 },

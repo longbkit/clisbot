@@ -54,7 +54,7 @@ export async function runHubExport(
   };
   const origin = resolveHubOrigin(resolution);
   const credential = resolveHubCredential({ ...resolution, origin });
-  const directory = path.resolve(dependencies.cwd(), directoryInput ?? ".paseo/triggers");
+  const directory = path.resolve(dependencies.cwd(), directoryInput ?? ".clisbot/triggers");
   reportHubProgress(dependencies.reporter, options, `Exporting triggers from ${origin}`);
   const triggers = await dependencies.hub.listTriggers(origin, credential);
   await mkdir(directory, { recursive: true });
@@ -103,8 +103,8 @@ export function addHubExportCommand(parent: Command, dependencies: HubExportDepe
       parent
         .command("export")
         .description("Export active Hub triggers as one YAML file per trigger")
-        .argument("[directory]", "Destination directory", ".paseo/triggers")
-        .option("--hub <origin>", "Paseo Hub origin")
+        .argument("[directory]", "Destination directory", ".clisbot/triggers")
+        .option("--hub <origin>", "Clisbot Hub origin")
         .option("--api-key <secret>", "Organization API key")
         .option("--force", "Replace trigger files with different contents"),
     ),

@@ -36,7 +36,7 @@ describe("resolvePreferredEditorId", () => {
 describe("project editor preferences", () => {
   it("changing one project leaves another project's cached and persisted choice unchanged", async () => {
     await AsyncStorage.clear();
-    await AsyncStorage.setItem("@paseo:preferred-editor", "vscode");
+    await AsyncStorage.setItem("@clisbot:preferred-editor", "vscode");
     const queryClient = new QueryClient();
     const projectA = createPreferredEditorPreference({
       scope: { serverId: "host", projectId: "project-a" },
@@ -56,7 +56,7 @@ describe("project editor preferences", () => {
     queryClient.clear();
     expect(await queryClient.fetchQuery(projectA.queryOptions)).toBe("cursor");
     expect(await queryClient.fetchQuery(projectB.queryOptions)).toBe("vscode");
-    expect(await AsyncStorage.getItem("@paseo:preferred-editor")).toBe("vscode");
+    expect(await AsyncStorage.getItem("@clisbot:preferred-editor")).toBe("vscode");
     queryClient.clear();
   });
   it("shares a choice across workspaces of the same project while isolating hosts", async () => {
@@ -88,7 +88,7 @@ describe("project editor preferences", () => {
 
   it("preserves the previous choice when saving fails", async () => {
     await AsyncStorage.clear();
-    await AsyncStorage.setItem("@paseo:preferred-editor", "vscode");
+    await AsyncStorage.setItem("@clisbot:preferred-editor", "vscode");
     const queryClient = new QueryClient();
     const preference = createPreferredEditorPreference({
       scope: { serverId: "host", projectId: "project" },

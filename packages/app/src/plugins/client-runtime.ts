@@ -1,7 +1,7 @@
 import { createPlayAudio, type AudioEngine } from "@/audio";
 import { getPluginClientApi } from "./client-state/api";
-import type { PluginClientOpenPanelOptions } from "@getpaseo/plugin/client";
-import { subscribePluginRpc } from "@getpaseo/plugin/client/host";
+import type { PluginClientOpenPanelOptions } from "@clisbot/plugin/client";
+import { subscribePluginRpc } from "@clisbot/plugin/client/host";
 import {
   createPluginAgentActionContext,
   createPluginCapabilities,

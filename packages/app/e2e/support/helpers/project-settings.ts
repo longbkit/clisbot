@@ -179,15 +179,15 @@ export async function expectSaveButtonDisabled(page: Page): Promise<void> {
 }
 
 export async function expectUncommittedSetupWarning(page: Page): Promise<void> {
-  const warning = page.getByRole("alert").filter({ hasText: "Commit paseo.json changes" });
-  await expect(warning).toContainText("Commit paseo.json changes");
+  const warning = page.getByRole("alert").filter({ hasText: "Commit clisbot.json changes" });
+  await expect(warning).toContainText("Commit clisbot.json changes");
   await expect(warning).toContainText(
     "New worktrees use the setup script from the base branch you select.",
   );
 }
 
 export async function expectNoUncommittedSetupWarning(page: Page): Promise<void> {
-  const warning = page.getByRole("alert").filter({ hasText: "Commit paseo.json changes" });
+  const warning = page.getByRole("alert").filter({ hasText: "Commit clisbot.json changes" });
   await expect(warning).toHaveCount(0);
 }
 
@@ -244,43 +244,43 @@ export async function removeProjectScript(page: Page, scriptName: string): Promi
 
 // --- File manipulation ---
 
-export async function corruptPaseoConfig(repoPath: string): Promise<void> {
-  await writeFile(path.join(repoPath, "paseo.json"), "{not valid json}");
+export async function corruptClisbotConfig(repoPath: string): Promise<void> {
+  await writeFile(path.join(repoPath, "clisbot.json"), "{not valid json}");
 }
 
-export async function bumpPaseoConfigOnDisk(repoPath: string): Promise<void> {
-  const configPath = path.join(repoPath, "paseo.json");
+export async function bumpClisbotConfigOnDisk(repoPath: string): Promise<void> {
+  const configPath = path.join(repoPath, "clisbot.json");
   const raw = await readFile(configPath, "utf8");
   const config = JSON.parse(raw) as Record<string, unknown>;
   config._bump = Date.now();
   await writeFile(configPath, JSON.stringify(config, null, 2) + "\n");
 }
 
-export async function restorePaseoConfig(
+export async function restoreClisbotConfig(
   repoPath: string,
   config: Record<string, unknown>,
 ): Promise<void> {
-  await writeFile(path.join(repoPath, "paseo.json"), JSON.stringify(config, null, 2) + "\n");
+  await writeFile(path.join(repoPath, "clisbot.json"), JSON.stringify(config, null, 2) + "\n");
 }
 
-export function commitPaseoConfig(repoPath: string): void {
-  execFileSync("git", ["add", "paseo.json"], { cwd: repoPath });
+export function commitClisbotConfig(repoPath: string): void {
+  execFileSync("git", ["add", "clisbot.json"], { cwd: repoPath });
   execFileSync("git", ["commit", "-m", "Update project config"], { cwd: repoPath });
 }
 
 // The daemon writes atomically via a temp file + rename, so blocking writes requires
 // removing write permission from the *directory*, not just the file.
-export async function blockPaseoConfigWrites(repoPath: string): Promise<void> {
+export async function blockClisbotConfigWrites(repoPath: string): Promise<void> {
   await chmod(repoPath, 0o555);
 }
 
-export async function unblockPaseoConfigWrites(repoPath: string): Promise<void> {
+export async function unblockClisbotConfigWrites(repoPath: string): Promise<void> {
   await chmod(repoPath, 0o755);
 }
 
 // --- WebSocket helpers ---
 
-// Proxies all daemon WS traffic transparently, but rejects paseo.json reads
+// Proxies all daemon WS traffic transparently, but rejects clisbot.json reads
 // until the test explicitly allows recovery. Closing the transport leaves the
 // client-side RPC pending across reconnects, so this injects the same correlated
 // rpc_error shape the daemon emits for failed async session requests.

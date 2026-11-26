@@ -18,13 +18,13 @@ import type { ChatColumnRailSurfaceProps, ChatOutlineRailState } from "./index";
 
 export type { ChatColumnRailSurfaceProps, ChatOutlineRailState };
 
-const STYLE_ID = "paseo-chat-column-rail";
+const STYLE_ID = "clisbot-chat-column-rail";
 // React Native Web turns `dataSet={{ chatRailLane: "true" }}` into `data-chat-rail-lane="true"`.
 // When the enclosing pane reserves an outline gutter, every tagged rail consumer receives
 // the same horizontal gutters in the browser's layout pass without re-rendering React subtrees
 // or growing Unistyles' CSS registry.
 const RAIL_RULE =
-  '[data-chat-rail-active="true"] [data-chat-rail-lane="true"]{padding-left:var(--paseo-chat-rail-left)!important;padding-right:var(--paseo-chat-rail-right)!important;}';
+  '[data-chat-rail-active="true"] [data-chat-rail-lane="true"]{padding-left:var(--clisbot-chat-rail-left)!important;padding-right:var(--clisbot-chat-rail-right)!important;}';
 
 const BASE_SURFACE_STYLE: CSSProperties = {
   display: "flex",
@@ -120,8 +120,8 @@ export function ChatColumnRailSurface({ serverId, children }: ChatColumnRailSurf
     });
     return {
       ...BASE_SURFACE_STYLE,
-      "--paseo-chat-rail-left": cssLength(gutters.paddingLeft),
-      "--paseo-chat-rail-right": cssLength(gutters.paddingRight),
+      "--clisbot-chat-rail-left": cssLength(gutters.paddingLeft),
+      "--clisbot-chat-rail-right": cssLength(gutters.paddingRight),
     } as CSSProperties;
   }, [contentMaxWidth, inset]);
 

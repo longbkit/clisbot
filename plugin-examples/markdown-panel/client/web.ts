@@ -1,4 +1,4 @@
-import type { PluginFilePanelProps } from "@getpaseo/plugin/client";
+import type { PluginFilePanelProps } from "@clisbot/plugin/client";
 import type { EditorView, EditorViewConfig } from "@codemirror/view";
 import { Platform } from "react-native";
 

@@ -13,7 +13,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative } from "@/constants/platform";
-import type { AgentMetric } from "@getpaseo/protocol/agent-types";
+import type { AgentMetric } from "@clisbot/protocol/agent-types";
 import { useHostReportsUsage } from "@/usage";
 import type { Theme } from "@/styles/theme";
 import { TOOLBAR_DISC_SIZE, type ToolbarRing } from "@/components/ui/control-geometry";

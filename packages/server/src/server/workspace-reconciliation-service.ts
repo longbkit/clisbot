@@ -2,7 +2,7 @@ import { watch as watchPath } from "node:fs";
 import { stat } from "node:fs/promises";
 import { setImmediate as yieldToLoop } from "node:timers/promises";
 import pLimit from "p-limit";
-import type { ProjectCheckoutLitePayload } from "@getpaseo/protocol/messages";
+import type { ProjectCheckoutLitePayload } from "@clisbot/protocol/messages";
 import type pino from "pino";
 import type {
   ProjectRegistry,
@@ -582,7 +582,7 @@ export class WorkspaceReconciliationService {
         currentBranch: null,
         remoteUrl: null,
         worktreeRoot: null,
-        isPaseoOwnedWorktree: false as const,
+        isClisbotOwnedWorktree: false as const,
         mainRepoRoot: null,
       };
     }

@@ -5,8 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
-import { readPaseoWorktreeMetadata } from "../../utils/worktree-metadata.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
+import { readClisbotWorktreeMetadata } from "../../utils/worktree-metadata.js";
 
 const REPO_ROOT = path.resolve(fileURLToPath(new URL("../../../../..", import.meta.url)));
 const WORKTRUNK_EXAMPLE = path.join(REPO_ROOT, "plugin-examples", "worktrunk");
@@ -108,7 +108,7 @@ if (command === "switch") {
 
 if (command === "remove") {
   const target = path.resolve(args.at(-1));
-  const keptRefs = execFileSync("git", ["for-each-ref", "--format=%(refname)", "refs/paseo/kept-commits"], {
+  const keptRefs = execFileSync("git", ["for-each-ref", "--format=%(refname)", "refs/clisbot/kept-commits"], {
     cwd,
     encoding: "utf8",
     stdio: "pipe",
@@ -146,7 +146,7 @@ process.exit(1);
 }
 
 test("plugin-examples/worktrunk manages create, before-hook chaining, archive with kept-commits, and restore across daemon restarts", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktrunk-example-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktrunk-example-"));
   const repository = await createRepo(path.join(root, "repo"));
   git(repository, ["branch", "release"]);
   const wtLog = path.join(root, "wt-log.jsonl");
@@ -157,8 +157,8 @@ test("plugin-examples/worktrunk manages create, before-hook chaining, archive wi
   const transformPluginDir = path.join(root, "a-branch-transform");
   await mkdir(transformPluginDir);
   await writeFile(
-    path.join(transformPluginDir, "paseo-plugin.json"),
-    JSON.stringify({ id: "a-branch-transform", requirements: { paseo: ">=0.14.0" } }),
+    path.join(transformPluginDir, "clisbot-plugin.json"),
+    JSON.stringify({ id: "a-branch-transform", requirements: { clisbot: ">=0.14.0" } }),
   );
   await writeFile(
     path.join(transformPluginDir, "index.server.ts"),
@@ -171,7 +171,7 @@ export default function contribute(server) {
   });
   const removeAfter = server.addHook("worktree.create.after", async ({ worktree }) => {
     if (worktree.branch === "team/fail-after" && !existsSync(path.join(worktree.sourceCheckout, ".after-fixed"))) {
-      throw new Error("Paseo after-hook failed");
+      throw new Error("Clisbot after-hook failed");
     }
   });
   return () => {
@@ -182,8 +182,8 @@ export default function contribute(server) {
 `,
   );
 
-  let daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: path.join(root, "state"),
+  let daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: path.join(root, "state"),
     cleanup: false,
   });
   let client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
@@ -204,7 +204,7 @@ export default function contribute(server) {
     expect(git(worktreePath, ["branch", "--show-current"])).toBe("team/feat-one");
     expect(await readFile(path.join(worktreePath, ".wt-hook-ran"), "utf8")).toBe("pre-start");
 
-    const metadata = await readPaseoWorktreeMetadata(worktreePath);
+    const metadata = await readClisbotWorktreeMetadata(worktreePath);
     expect(metadata).toMatchObject({
       baseRefName: "release",
       baseRef: "refs/heads/release",
@@ -222,13 +222,13 @@ export default function contribute(server) {
     ).toBeUndefined();
 
     // Checking out a branch already checked out in the main repo causes wt to return
-    // action="existing", so the example declines and Paseo falls back to Git.
+    // action="existing", so the example declines and Clisbot falls back to Git.
     const checkedOutMain = await client.createWorkspace({
       source: { kind: "worktree", cwd: repository, action: "checkout", refName: "main" },
     });
     expect(checkedOutMain.error).toBeNull();
     expect(
-      (await readPaseoWorktreeMetadata(checkedOutMain.workspace!.workspaceDirectory))
+      (await readClisbotWorktreeMetadata(checkedOutMain.workspace!.workspaceDirectory))
         ?.worktreeManagerPluginId,
     ).toBeUndefined();
     await client.archiveWorkspace(checkedOutMain.workspace!.id);
@@ -256,7 +256,7 @@ export default function contribute(server) {
     const rejectedAfter = await client.createWorkspace({
       source: { kind: "worktree", cwd: repository, worktreeSlug: "fail-after" },
     });
-    expect(rejectedAfter.error).toContain("Paseo after-hook failed");
+    expect(rejectedAfter.error).toContain("Clisbot after-hook failed");
     expect(git(repository, ["branch", "--list", "team/fail-after"])).toBe("");
     await writeFile(path.join(repository, ".after-fixed"), "");
     const retriedAfter = await client.createWorkspace({
@@ -267,7 +267,7 @@ export default function contribute(server) {
     expect(git(retriedAfterPath, ["branch", "--show-current"])).toBe("team/fail-after");
     expect(await readFile(path.join(retriedAfterPath, ".wt-hook-ran"), "utf8")).toBe("pre-start");
 
-    // Archive delegates removal to `wt remove` (run from repoRoot) AFTER Paseo writes refs/paseo/kept-commits/*.
+    // Archive delegates removal to `wt remove` (run from repoRoot) AFTER Clisbot writes refs/clisbot/kept-commits/*.
     const archived = await client.archiveWorkspace(workspaceId);
     expect(archived.error).toBeNull();
     await expect(stat(worktreePath)).rejects.toMatchObject({ code: "ENOENT" });
@@ -275,8 +275,8 @@ export default function contribute(server) {
     // Restart daemon and restore: delegates to `wt switch --path <recordedPath> <branch>`.
     await client.close();
     await daemon.close();
-    daemon = await createTestPaseoDaemon({
-      paseoHomeRoot: path.join(root, "state"),
+    daemon = await createTestClisbotDaemon({
+      clisbotHomeRoot: path.join(root, "state"),
       cleanup: false,
       pluginsEnabled: true,
       plugins: {
@@ -290,7 +290,7 @@ export default function contribute(server) {
     await client.restoreWorkspace(workspaceId);
     expect(git(worktreePath, ["branch", "--show-current"])).toBe("team/feat-one");
     expect(await readFile(path.join(worktreePath, ".wt-hook-ran"), "utf8")).toBe("reopen");
-    expect(await readPaseoWorktreeMetadata(worktreePath)).toMatchObject({
+    expect(await readClisbotWorktreeMetadata(worktreePath)).toMatchObject({
       worktreeManagerPluginId: "worktrunk",
       baseRefName: "release",
     });
@@ -368,15 +368,15 @@ export default function contribute(server) {
 }, 60_000);
 
 test("worktree manager supports decline fallback, rollback delegation, and disabled-plugin fallback on archive and restore", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktree-manager-fallback-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktree-manager-fallback-"));
   const repository = await createRepo(path.join(root, "repo"));
   const eventsFile = path.join(root, "events.jsonl");
 
   const pluginDir = path.join(root, "custom-manager");
   await mkdir(pluginDir);
   await writeFile(
-    path.join(pluginDir, "paseo-plugin.json"),
-    JSON.stringify({ id: "custom-manager", requirements: { paseo: ">=0.17.0" } }),
+    path.join(pluginDir, "clisbot-plugin.json"),
+    JSON.stringify({ id: "custom-manager", requirements: { clisbot: ">=0.17.0" } }),
   );
   await writeFile(
     path.join(pluginDir, "index.server.ts"),
@@ -425,8 +425,8 @@ export default function contribute(server) {
 `,
   );
 
-  const daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: path.join(root, "state"),
+  const daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: path.join(root, "state"),
     cleanup: false,
   });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
@@ -435,12 +435,12 @@ export default function contribute(server) {
     await client.patchDaemonConfig({ pluginsEnabled: true });
     expect((await client.installDirectoryPlugin(pluginDir)).status).toBe("running");
 
-    // 1. Declining falls back cleanly to Paseo's built-in git worktree creation.
+    // 1. Declining falls back cleanly to Clisbot's built-in git worktree creation.
     const declined = await client.createWorkspace({
       source: { kind: "worktree", cwd: repository, branchName: "decline-me" },
     });
     expect(declined.error).toBeNull();
-    const declinedMeta = await readPaseoWorktreeMetadata(declined.workspace!.workspaceDirectory);
+    const declinedMeta = await readClisbotWorktreeMetadata(declined.workspace!.workspaceDirectory);
     expect(declinedMeta?.worktreeManagerPluginId).toBeUndefined();
 
     // 2. Failure in worktree.create.after rolls back through the manager's remove(reason: "rollback").
@@ -499,11 +499,11 @@ export default function contribute(server) {
 }, 60_000);
 
 test("worktree manager rejects pre-existing worktrees, detached HEAD, wrong repos, and non-worktree paths without modifying them", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktree-manager-guards-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktree-manager-guards-"));
   const repository = await createRepo(path.join(root, "repo"));
   const otherRepo = await createRepo(path.join(root, "other-repo"));
 
-  // Pre-existing manual worktree the user created outside Paseo.
+  // Pre-existing manual worktree the user created outside Clisbot.
   const existingManual = path.join(root, "manual-existing");
   git(repository, ["worktree", "add", "-b", "manual-branch", existingManual, "main"]);
 
@@ -513,8 +513,8 @@ test("worktree manager rejects pre-existing worktrees, detached HEAD, wrong repo
   const pluginDir = path.join(root, "bad-manager");
   await mkdir(pluginDir);
   await writeFile(
-    path.join(pluginDir, "paseo-plugin.json"),
-    JSON.stringify({ id: "bad-manager", requirements: { paseo: ">=0.17.0" } }),
+    path.join(pluginDir, "clisbot-plugin.json"),
+    JSON.stringify({ id: "bad-manager", requirements: { clisbot: ">=0.17.0" } }),
   );
   await writeFile(
     path.join(pluginDir, "index.server.ts"),
@@ -571,7 +571,7 @@ export default function contribute(server) {
 `,
   );
 
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();
@@ -597,8 +597,8 @@ export default function contribute(server) {
       expect(created.error).toContain(expectedError);
     }
 
-    // The pre-existing manual worktree must stay untouched and un-owned by Paseo.
-    expect(await readPaseoWorktreeMetadata(existingManual)).toBeNull();
+    // The pre-existing manual worktree must stay untouched and un-owned by Clisbot.
+    expect(await readClisbotWorktreeMetadata(existingManual)).toBeNull();
     expect((await stat(existingManual)).isDirectory()).toBe(true);
     // The newly created detached worktree failed adoption and must be rolled back cleanly.
     await expect(stat(path.join(root, "detached-wt"))).rejects.toMatchObject({ code: "ENOENT" });
@@ -635,14 +635,14 @@ export default function contribute(server) {
 }, 60_000);
 
 test("worktree manager rejects duplicate registration and fails removal when the directory remains on disk", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktree-manager-edge-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktree-manager-edge-"));
   const repository = await createRepo(path.join(root, "repo"));
 
   const dupPluginDir = path.join(root, "dup-manager");
   await mkdir(dupPluginDir);
   await writeFile(
-    path.join(dupPluginDir, "paseo-plugin.json"),
-    JSON.stringify({ id: "dup-manager", requirements: { paseo: ">=0.17.0" } }),
+    path.join(dupPluginDir, "clisbot-plugin.json"),
+    JSON.stringify({ id: "dup-manager", requirements: { clisbot: ">=0.17.0" } }),
   );
   await writeFile(
     path.join(dupPluginDir, "index.server.ts"),
@@ -657,8 +657,8 @@ test("worktree manager rejects duplicate registration and fails removal when the
   const leakyRemoveDir = path.join(root, "leaky-remove");
   await mkdir(leakyRemoveDir);
   await writeFile(
-    path.join(leakyRemoveDir, "paseo-plugin.json"),
-    JSON.stringify({ id: "leaky-remove", requirements: { paseo: ">=0.17.0" } }),
+    path.join(leakyRemoveDir, "clisbot-plugin.json"),
+    JSON.stringify({ id: "leaky-remove", requirements: { clisbot: ">=0.17.0" } }),
   );
   await writeFile(
     path.join(leakyRemoveDir, "index.server.ts"),
@@ -685,7 +685,7 @@ export default function contribute(server) {
 `,
   );
 
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();
@@ -715,7 +715,7 @@ export default function contribute(server) {
 }, 60_000);
 
 test("untrusted workspaces pass untrusted=true to worktree manager remove and restore, and worktrunk skips hooks", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktrunk-untrusted-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktrunk-untrusted-"));
   const repository = await createRepo(path.join(root, "repo"));
   const wtLog = path.join(root, "wt-log.jsonl");
   const fakeWt = await createFakeWorktrunkCli(root, wtLog);
@@ -723,8 +723,8 @@ test("untrusted workspaces pass untrusted=true to worktree manager remove and re
   process.env.WORKTRUNK_BIN = fakeWt;
 
   const stateDir = path.join(root, "state");
-  let daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: stateDir,
+  let daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: stateDir,
     cleanup: false,
   });
   let client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
@@ -772,7 +772,7 @@ test("untrusted workspaces pass untrusted=true to worktree manager remove and re
     // Mark the persisted workspace record as originating from an untrusted fork PR and reload daemon.
     await client.close();
     await daemon.close();
-    const workspacesPath = path.join(daemon.paseoHome, "projects", "workspaces.json");
+    const workspacesPath = path.join(daemon.clisbotHome, "projects", "workspaces.json");
     const records = JSON.parse(await readFile(workspacesPath, "utf8")) as Array<
       Record<string, unknown>
     >;
@@ -788,8 +788,8 @@ test("untrusted workspaces pass untrusted=true to worktree manager remove and re
     }
     await writeFile(workspacesPath, JSON.stringify(records, null, 2));
 
-    daemon = await createTestPaseoDaemon({
-      paseoHomeRoot: stateDir,
+    daemon = await createTestClisbotDaemon({
+      clisbotHomeRoot: stateDir,
       cleanup: false,
       pluginsEnabled: true,
       plugins: {
@@ -866,7 +866,7 @@ test("untrusted workspaces pass untrusted=true to worktree manager remove and re
 }, 60_000);
 
 test("concurrent restores across two daemon clients wait for the in-flight manager restore and share its failure", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktree-restore-race-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktree-restore-race-"));
   const repository = await createRepo(path.join(root, "repo"));
   const dirCreatedMarker = path.join(root, "restore-dir-created");
   const releaseMarker = path.join(root, "release-restore");
@@ -875,8 +875,8 @@ test("concurrent restores across two daemon clients wait for the in-flight manag
   const pluginDir = path.join(root, "slow-restore-manager");
   await mkdir(pluginDir);
   await writeFile(
-    path.join(pluginDir, "paseo-plugin.json"),
-    JSON.stringify({ id: "slow-restore-manager", requirements: { paseo: ">=0.17.0" } }),
+    path.join(pluginDir, "clisbot-plugin.json"),
+    JSON.stringify({ id: "slow-restore-manager", requirements: { clisbot: ">=0.17.0" } }),
   );
   await writeFile(
     path.join(pluginDir, "index.server.ts"),
@@ -927,7 +927,7 @@ export default function contribute(server) {
 `,
   );
 
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client1 = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   const client2 = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
@@ -997,7 +997,7 @@ export default function contribute(server) {
 }, 60_000);
 
 test("restore waits for an in-flight CLI worktree archive remove before recreating the checkout", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktree-cli-archive-race-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktree-cli-archive-race-"));
   const repository = await createRepo(path.join(root, "repo"));
   const removeStartedMarker = path.join(root, "remove-started");
   const releaseRemoveMarker = path.join(root, "release-remove");
@@ -1005,8 +1005,8 @@ test("restore waits for an in-flight CLI worktree archive remove before recreati
   const pluginDir = path.join(root, "slow-remove-manager");
   await mkdir(pluginDir);
   await writeFile(
-    path.join(pluginDir, "paseo-plugin.json"),
-    JSON.stringify({ id: "slow-remove-manager", requirements: { paseo: ">=0.17.0" } }),
+    path.join(pluginDir, "clisbot-plugin.json"),
+    JSON.stringify({ id: "slow-remove-manager", requirements: { clisbot: ">=0.17.0" } }),
   );
   await writeFile(
     path.join(pluginDir, "index.server.ts"),
@@ -1050,7 +1050,7 @@ export default function contribute(server) {
 `,
   );
 
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client1 = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   const client2 = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
@@ -1066,7 +1066,7 @@ export default function contribute(server) {
     const worktreePath = created.workspace!.workspaceDirectory;
 
     // Client 1 starts a CLI worktree archive (scope: "worktree"); pause inside manager.remove after the record is archived.
-    const cliArchive = client1.archivePaseoWorktree({ worktreePath, scope: "worktree" });
+    const cliArchive = client1.archiveClisbotWorktree({ worktreePath, scope: "worktree" });
     await expect
       .poll(
         () =>
@@ -1130,7 +1130,7 @@ export default function contribute(server) {
 }, 60_000);
 
 test("git fallback restore clears manager ownership across sibling workspaces sharing a checkout", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktree-sibling-owner-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktree-sibling-owner-"));
   const repository = await createRepo(path.join(root, "repo"));
   await mkdir(path.join(repository, "packages", "sub"), { recursive: true });
   await writeFile(path.join(repository, "packages", "sub", "README.md"), "sub");
@@ -1141,8 +1141,8 @@ test("git fallback restore clears manager ownership across sibling workspaces sh
   const pluginDir = path.join(root, "owner-tracking-manager");
   await mkdir(pluginDir);
   await writeFile(
-    path.join(pluginDir, "paseo-plugin.json"),
-    JSON.stringify({ id: "owner-tracking-manager", requirements: { paseo: ">=0.17.0" } }),
+    path.join(pluginDir, "clisbot-plugin.json"),
+    JSON.stringify({ id: "owner-tracking-manager", requirements: { clisbot: ">=0.17.0" } }),
   );
   await writeFile(
     path.join(pluginDir, "index.server.ts"),
@@ -1173,7 +1173,7 @@ export default function contribute(server) {
 `,
   );
 
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();
@@ -1196,7 +1196,7 @@ export default function contribute(server) {
 
     // Persist the same manager owner on both records, disable the plugin, archive both, and restore via Git fallback.
     await client.disablePlugin("owner-tracking-manager");
-    const archived = await client.archivePaseoWorktree({ worktreePath, scope: "worktree" });
+    const archived = await client.archiveClisbotWorktree({ worktreePath, scope: "worktree" });
     expect(archived.success).toBe(true);
     await expect(stat(worktreePath)).rejects.toMatchObject({ code: "ENOENT" });
 
@@ -1219,7 +1219,7 @@ export default function contribute(server) {
 }, 60_000);
 
 test("undo after a restore queued behind a running archive still cancels before checkout removal", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktree-restore-undo-race-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktree-restore-undo-race-"));
   const repository = await createRepo(path.join(root, "repo"));
   const teardownStartedMarker = path.join(root, "teardown-started");
   const releaseTeardownMarker = path.join(root, "release-teardown");
@@ -1236,17 +1236,17 @@ while (!existsSync(${JSON.stringify(releaseTeardownMarker)})) {
 `,
   );
   await writeFile(
-    path.join(repository, "paseo.json"),
+    path.join(repository, "clisbot.json"),
     JSON.stringify({
       worktree: {
         teardown: [`node "${teardownScript}"`],
       },
     }),
   );
-  git(repository, ["add", "paseo.json"]);
+  git(repository, ["add", "clisbot.json"]);
   git(repository, ["commit", "-m", "add teardown hook"]);
 
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client1 = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   const client2 = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
@@ -1293,15 +1293,15 @@ while (!existsSync(${JSON.stringify(releaseTeardownMarker)})) {
 }, 60_000);
 
 test("worktree manager rejects nested and enclosing secondary worktrees without deleting existing work", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktree-nested-reject-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktree-nested-reject-"));
   const repository = await createRepo(path.join(root, "repo"));
   const worktreesBase = path.join(root, "wt-layout");
 
   const pluginDir = path.join(root, "nested-layout-manager");
   await mkdir(pluginDir);
   await writeFile(
-    path.join(pluginDir, "paseo-plugin.json"),
-    JSON.stringify({ id: "nested-layout-manager", requirements: { paseo: ">=0.17.0" } }),
+    path.join(pluginDir, "clisbot-plugin.json"),
+    JSON.stringify({ id: "nested-layout-manager", requirements: { clisbot: ">=0.17.0" } }),
   );
   await writeFile(
     path.join(pluginDir, "index.server.ts"),
@@ -1354,7 +1354,7 @@ export default function contribute(server) {
 `,
   );
 
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();
@@ -1414,8 +1414,8 @@ async function addNestedGitContent(checkout: string, dependency: string, middle:
 }
 
 test("built-in archive removes the worktree with dependency clones and recursive submodules", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-built-in-archive-"));
-  const daemon = await createTestPaseoDaemon();
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-built-in-archive-"));
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     const repository = await createRepo(path.join(root, "repo"));
@@ -1446,7 +1446,7 @@ test("built-in archive removes the worktree with dependency clones and recursive
 }, 60_000);
 
 test("archive and rollback refuse to delete a worktree containing a live nested Git worktree", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktree-nested-delete-guard-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktree-nested-delete-guard-"));
   const repository = await createRepo(path.join(root, "repo"));
   const detachedCreatedMarker = path.join(root, "detached-created");
   const releaseDetachedMarker = path.join(root, "release-detached");
@@ -1455,8 +1455,8 @@ test("archive and rollback refuse to delete a worktree containing a live nested 
   const pluginDir = path.join(root, "nested-delete-guard-manager");
   await mkdir(pluginDir);
   await writeFile(
-    path.join(pluginDir, "paseo-plugin.json"),
-    JSON.stringify({ id: "nested-delete-guard-manager", requirements: { paseo: ">=0.17.0" } }),
+    path.join(pluginDir, "clisbot-plugin.json"),
+    JSON.stringify({ id: "nested-delete-guard-manager", requirements: { clisbot: ">=0.17.0" } }),
   );
   await writeFile(
     path.join(pluginDir, "index.server.ts"),
@@ -1500,14 +1500,14 @@ export default function contribute(server) {
 `,
   );
 
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();
     await client.patchDaemonConfig({ pluginsEnabled: true });
     expect((await client.installDirectoryPlugin(pluginDir)).status).toBe("running");
 
-    // 1. Archive of outer worktree must preserve a live nested Git worktree that Paseo does not track.
+    // 1. Archive of outer worktree must preserve a live nested Git worktree that Clisbot does not track.
     const created = await client.createWorkspace({
       source: { kind: "worktree", cwd: repository, branchName: "outer-archive" },
     });

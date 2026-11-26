@@ -3,7 +3,7 @@ require "tmpdir"
 
 default_platform(:ios)
 
-APP_IDENTIFIER = "sh.paseo"
+APP_IDENTIFIER = "sh.clisbot"
 
 # Store screenshots are rendered into assets/store-screenshots/output; see the
 # README there. Google Play and F-Droid both read fastlane/metadata/android at

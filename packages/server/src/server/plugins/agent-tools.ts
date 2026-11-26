@@ -5,7 +5,7 @@ import type {
   PluginHookContext,
   PluginSessionOpenRequest,
   PluginHookAgent,
-} from "@getpaseo/plugin/server";
+} from "@clisbot/plugin/server";
 import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
 
 export const agentToolMetadataSchema = z
@@ -87,7 +87,7 @@ export class PluginAgentTools {
     agent: PluginHookAgent,
     name: string,
     input: unknown,
-    paseo: PluginHookContext["paseo"],
+    clisbot: PluginHookContext["clisbot"],
   ): Promise<AgentToolResult> {
     const controller = new AbortController();
     this.calls.set(requestId, { agentId: agent.id, controller });
@@ -96,7 +96,7 @@ export class PluginAgentTools {
       if (!tool) throw new Error(`Agent tool not attached: ${name}`);
       const parsed = await tool.input.parseAsync(input);
       controller.signal.throwIfAborted();
-      const result = await tool.execute(parsed, { agent, paseo, signal: controller.signal });
+      const result = await tool.execute(parsed, { agent, clisbot, signal: controller.signal });
       controller.signal.throwIfAborted();
       return result;
     } catch (error) {

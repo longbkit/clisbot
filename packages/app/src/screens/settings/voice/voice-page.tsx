@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { StyleSheet } from "react-native-unistyles";
-import type { SpeechSettingsPatch } from "@getpaseo/protocol/speech/rpc-schemas";
+import type { SpeechSettingsPatch } from "@clisbot/protocol/speech/rpc-schemas";
 import {
   SettingsCard,
   SettingsDetailRow,

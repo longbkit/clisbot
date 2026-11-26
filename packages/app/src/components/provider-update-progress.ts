@@ -2,7 +2,7 @@ import type {
   ProviderInstallationUpdate,
   ProviderInstallationUpdateOutput,
   ProviderInstallationUpdateProgress,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 
 /** Characters of update output the app keeps, matching what the daemon retains. */
 export const PROVIDER_UPDATE_OUTPUT_LIMIT = 64 * 1024;

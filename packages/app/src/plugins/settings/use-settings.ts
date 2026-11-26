@@ -1,12 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { queryClient as appQueryClient } from "@/data/query-client";
 import { createDeviceSettings } from "./device";
-import type { SettingsState } from "@getpaseo/plugin/client";
+import type { SettingsState } from "@clisbot/plugin/client";
 import { useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRpc } from "@getpaseo/plugin/client";
-import { type SettingsDefinition } from "@getpaseo/plugin";
-import { settingsRpc } from "@getpaseo/plugin";
+import { useRpc } from "@clisbot/plugin/client";
+import { type SettingsDefinition } from "@clisbot/plugin";
+import { settingsRpc } from "@clisbot/plugin";
 import { useReplicaQuery } from "@/data/query";
 import { z, type ZodType } from "zod";
 import { pluginSettingsKey } from "./query";

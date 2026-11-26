@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 
-import type { PaseoOpenAIConfig, PaseoSpeechConfig } from "../bootstrap.js";
+import type { ClisbotOpenAIConfig, ClisbotSpeechConfig } from "../bootstrap.js";
 import type { LocalSpeechModelId } from "./providers/local/config.js";
 import {
   LocalSpeechModelLibrary,
@@ -51,7 +51,7 @@ export interface SpeechReadinessSnapshot {
 }
 
 function resolveRequestedSpeechProviders(
-  speechConfig: PaseoSpeechConfig | null,
+  speechConfig: ClisbotSpeechConfig | null,
 ): RequestedSpeechProviders {
   const defaults: RequestedSpeechProviders = {
     dictationStt: { provider: "local", explicit: false, enabled: true },
@@ -308,8 +308,8 @@ export class LocalSpeechModelInUseError extends Error {
 }
 
 export interface SpeechServiceConfig {
-  openaiConfig?: PaseoOpenAIConfig;
-  speechConfig?: PaseoSpeechConfig;
+  openaiConfig?: ClisbotOpenAIConfig;
+  speechConfig?: ClisbotSpeechConfig;
 }
 
 export interface SpeechService {

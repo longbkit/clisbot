@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LocalSpeechModel } from "@getpaseo/protocol/speech/rpc-schemas";
+import type { LocalSpeechModel } from "@clisbot/protocol/speech/rpc-schemas";
 import {
   buildOpenAiModelOptions,
   getSpeechSite,

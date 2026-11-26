@@ -1,6 +1,6 @@
 import { replaceEqualDeep } from "@tanstack/react-query";
 import type { CheckoutDiffSnapshot } from "./diff-snapshot";
-import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
+import type { ParsedDiffFile } from "@clisbot/protocol/messages";
 
 type DiffPayload = CheckoutDiffSnapshot;
 

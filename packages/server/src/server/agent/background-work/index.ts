@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AgentBackgroundWorkSummary } from "@getpaseo/protocol/messages";
+import type { AgentBackgroundWorkSummary } from "@clisbot/protocol/messages";
 
 export interface AgentBackgroundWorkInput {
   id: string;

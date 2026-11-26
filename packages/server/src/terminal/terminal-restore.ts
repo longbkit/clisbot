@@ -1,10 +1,10 @@
 import type { z } from "zod";
-import type { SubscribeTerminalRequest } from "@getpaseo/protocol/messages";
+import type { SubscribeTerminalRequest } from "@clisbot/protocol/messages";
 import {
   TerminalStreamOpcode,
   type TerminalReplayMetadataSchema,
   encodeTerminalStreamFrame,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@clisbot/protocol/binary-frames/index";
 import type { TerminalReplaySink, TerminalReplayOptions } from "./terminal-replay.js";
 
 export const MAX_TERMINAL_OUTPUT_FRAME_BYTES = 256 * 1024;

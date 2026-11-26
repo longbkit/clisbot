@@ -82,7 +82,7 @@ describe("pi-subagents adapter", () => {
           mode: "single",
           runId: "run-b",
           asyncId: "run-b",
-          asyncDir: "/tmp/paseo-resume-b",
+          asyncDir: "/tmp/clisbot-resume-b",
           results: [],
         },
       },
@@ -112,7 +112,7 @@ describe("pi-subagents adapter", () => {
         args: { action, id: "run-a", message: "Continue" },
         status,
         result: {
-          details: { mode, asyncId: "run-b", asyncDir: "/tmp/paseo-resume-b", results: [] },
+          details: { mode, asyncId: "run-b", asyncDir: "/tmp/clisbot-resume-b", results: [] },
         },
       }),
     ).toBeUndefined();
@@ -121,11 +121,11 @@ describe("pi-subagents adapter", () => {
   test.each([
     { mode: "single", results: [] },
     { mode: "single", asyncId: "run-b", results: [] },
-    { mode: "single", asyncDir: "/tmp/paseo-resume-b", results: [] },
+    { mode: "single", asyncDir: "/tmp/clisbot-resume-b", results: [] },
     {
       mode: "single",
       asyncId: "run-b",
-      asyncDir: "/tmp/paseo-resume-b",
+      asyncDir: "/tmp/clisbot-resume-b",
       results: [{ agent: "scout", exitCode: 0 }],
     },
   ])("does not register a resume without a new async launch: %j", (details) => {
@@ -151,7 +151,7 @@ describe("pi-subagents adapter", () => {
           details: {
             mode: "single",
             asyncId: "run-b",
-            asyncDir: "/tmp/paseo-resume-b",
+            asyncDir: "/tmp/clisbot-resume-b",
             results: [],
           },
         },
@@ -166,7 +166,7 @@ describe("pi-subagents adapter", () => {
   });
 
   test("follows consecutive resumed attempts and keeps stale notices on their own rows", async () => {
-    const root = await mkdtemp(join(tmpdir(), "paseo-pi-resume-"));
+    const root = await mkdtemp(join(tmpdir(), "clisbot-pi-resume-"));
     const host = createPiExtensionHost();
     const replay = createPiExtensionHost();
     const received: AgentStreamEvent[] = [];
@@ -309,7 +309,7 @@ describe("pi-subagents adapter", () => {
   });
 
   test("follows async status and transcript without bg_wait", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "paseo-pi-async-"));
+    const dir = await mkdtemp(join(tmpdir(), "clisbot-pi-async-"));
     const file = join(dir, "child.jsonl");
     const received: AgentStreamEvent[] = [];
     const host = createPiExtensionHost();
@@ -350,7 +350,7 @@ describe("pi-subagents adapter", () => {
     }
   });
   test("settles an async run and reads its transcript from the completion notice on replay", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "paseo-pi-async-"));
+    const dir = await mkdtemp(join(tmpdir(), "clisbot-pi-async-"));
     const file = join(dir, "child.jsonl");
     try {
       await writeFile(
@@ -491,7 +491,7 @@ describe("pi-subagents adapter", () => {
     const client = new PiRpcAgentClient({ logger: pino({ level: "silent" }), runtime: pi });
     const session = await client.createSession({
       provider: "pi",
-      cwd: "/tmp/paseo-pi-child-close",
+      cwd: "/tmp/clisbot-pi-child-close",
     });
     const events: AgentStreamEvent[] = [];
     session.subscribe((event) => events.push(event));

@@ -26,7 +26,7 @@ test.skipIf(!hasSsh)(
         remote.listen(0, '127.0.0.1');
         await once(remote, 'listening');
         const tunnel = await createSshTunnel({
-          host: '127.0.0.1', sshPort: remote.address().port, daemonPort: 6767,
+          host: '127.0.0.1', sshPort: remote.address().port, daemonPort: 6868,
         });
         const [host, port] = tunnel.endpoint.split(':');
         const client = createConnection({ host, port: Number(port) });

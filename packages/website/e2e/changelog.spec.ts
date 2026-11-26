@@ -63,7 +63,7 @@ test("shows each release's highlights and opens its sections on request", async 
 test("opens a release from a deep link with its highlights in view", async ({ page }) => {
   await openChangelog(page);
   const anchor = await releaseWithHighlights(page)
-    .getByRole("link", { name: /^Link to Paseo / })
+    .getByRole("link", { name: /^Link to Clisbot / })
     .getAttribute("href");
 
   await page.goto(`/changelog${anchor}`);

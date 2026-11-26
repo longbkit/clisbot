@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { PaseoBrowserWebviewRegistry } from "../browser-webviews/registry.js";
+import { ClisbotBrowserWebviewRegistry } from "../browser-webviews/registry.js";
 import { BrowserKeyboard } from "./index.js";
 
 interface SentMessage {
@@ -143,7 +143,7 @@ function electronInput(input: Partial<Electron.Input>): Electron.Input {
 }
 
 function createBrowserKeyboard() {
-  const registry = new PaseoBrowserWebviewRegistry();
+  const registry = new ClisbotBrowserWebviewRegistry();
   const keyboard = new BrowserKeyboard(registry);
 
   function attach(input: {
@@ -184,7 +184,7 @@ describe("BrowserKeyboard", () => {
 
     expect(host.sent).toEqual([
       {
-        channel: "paseo:event:browser-shortcut-input",
+        channel: "clisbot:event:browser-shortcut-input",
         payload: {
           alt: false,
           browserId: "browser-a",
@@ -248,15 +248,15 @@ describe("BrowserKeyboard", () => {
 
     expect(guest.sent).toEqual([
       {
-        channel: "paseo:browser-keyboard-policy",
+        channel: "clisbot:browser-keyboard-policy",
         payload: { ...initialPolicy, browserId: "browser-a" },
       },
       {
-        channel: "paseo:browser-keyboard-policy",
+        channel: "clisbot:browser-keyboard-policy",
         payload: { ...latestPolicy, browserId: "browser-a" },
       },
       {
-        channel: "paseo:browser-keyboard-policy",
+        channel: "clisbot:browser-keyboard-policy",
         payload: { ...latestPolicy, browserId: "browser-a" },
       },
     ]);
@@ -277,7 +277,7 @@ describe("BrowserKeyboard", () => {
 
     expect(guest.sent).toEqual([
       {
-        channel: "paseo:browser-keyboard-policy",
+        channel: "clisbot:browser-keyboard-policy",
         payload: { browserId: "browser-a", menuPrefixes: [], prefixes: [] },
       },
     ]);
@@ -302,7 +302,7 @@ describe("BrowserKeyboard", () => {
     expect(guest.ignoredMenuShortcuts).toEqual([false, false, true]);
     expect(host.sent).toEqual([
       {
-        channel: "paseo:event:browser-shortcut",
+        channel: "clisbot:event:browser-shortcut",
         payload: { action: "focus-url", browserId: "browser-a" },
       },
     ]);

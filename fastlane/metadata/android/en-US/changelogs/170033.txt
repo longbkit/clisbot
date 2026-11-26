@@ -3,4 +3,4 @@ Fixed
 - Fixed Antigravity applying the default model's thinking levels to every model, which blocked Orchestrator chats from opening
 - Fixed / and @ pickers disappearing until reload after returning to a workspace through window history
 
-Full notes: https://paseo.sh/changelog
+Full notes: https://clisbot.com/changelog

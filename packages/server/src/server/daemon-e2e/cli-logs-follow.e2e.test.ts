@@ -5,13 +5,13 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import { WebSocket, WebSocketServer } from "ws";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 
 // A real daemon and CLI with a deterministic provider emitting two text chunks.
 // The live Claude reproduction is recorded in the PR; this locks its CLI behavior.
 test("logs --follow preserves the same assistant text as one-shot logs", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   let follow: ReturnType<typeof spawn> | undefined;
   let stdout = "";
@@ -21,7 +21,7 @@ test("logs --follow preserves the same assistant text as one-shot logs", async (
     await client.fetchAgents({ subscribe: {} });
     const agent = await client.createAgent({
       provider: "claude",
-      cwd: daemon.paseoHome,
+      cwd: daemon.clisbotHome,
       title: "Follow transcript regression",
       modeId: "bypassPermissions",
     });
@@ -43,7 +43,7 @@ test("logs --follow preserves the same assistant text as one-shot logs", async (
         "assistant_message",
       ],
       {
-        env: { ...process.env, PASEO_HOME: daemon.paseoHome },
+        env: { ...process.env, CLISBOT_HOME: daemon.clisbotHome },
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
@@ -65,7 +65,7 @@ test("logs --follow preserves the same assistant text as one-shot logs", async (
         { timeout: 20_000 },
       )
       .toContain("Following logs");
-    await client.sendMessage(agent.id, "respond with exactly: paseo-pr-cycle 한국어 보고서");
+    await client.sendMessage(agent.id, "respond with exactly: clisbot-pr-cycle 한국어 보고서");
     await client.waitForAgentUpsert(agent.id, (snapshot) => snapshot.status === "idle", 20_000);
     const transcript = await client.fetchAgentTimeline(agent.id, {
       direction: "tail",
@@ -92,12 +92,12 @@ test("logs --follow preserves the same assistant text as one-shot logs", async (
 }, 60_000);
 
 test("omitted after limit pages forward while explicit zero preserves complete CLI history", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();
     await client.fetchAgents({ subscribe: {} });
-    const agent = await client.createAgent({ provider: "claude", cwd: daemon.paseoHome });
+    const agent = await client.createAgent({ provider: "claude", cwd: daemon.clisbotHome });
     const initial = await client.fetchAgentTimeline(agent.id, { direction: "tail", limit: 0 });
     const cursor = { epoch: initial.epoch, seq: initial.window.maxSeq };
     for (let index = 0; index < 451; index++) {
@@ -148,17 +148,17 @@ test.each([
   "logs --follow $label keeps history, live items and notices on their channels",
   async ({ flags }) => {
     await mkdir(".artifacts", { recursive: true });
-    const paseoHomeRoot = await mkdtemp(resolve(".artifacts/logs-follow-json-"));
-    const staticDir = join(paseoHomeRoot, "static");
+    const clisbotHomeRoot = await mkdtemp(resolve(".artifacts/logs-follow-json-"));
+    const staticDir = join(clisbotHomeRoot, "static");
     await mkdir(staticDir);
-    const daemon = await createTestPaseoDaemon({ paseoHomeRoot, staticDir });
+    const daemon = await createTestClisbotDaemon({ clisbotHomeRoot, staticDir });
     const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
     let follow: ReturnType<typeof spawn> | undefined;
     let stdout = "";
     let stderr = "";
     try {
       await client.connect();
-      const agent = await client.createAgent({ provider: "claude", cwd: daemon.paseoHome });
+      const agent = await client.createAgent({ provider: "claude", cwd: daemon.clisbotHome });
       const history = [
         { type: "user_message" as const, text: "Saved JSON prompt" },
         { type: "assistant_message" as const, text: "Saved JSON reply", messageId: "saved" },
@@ -180,7 +180,7 @@ test.each([
           ...flags,
         ],
         {
-          env: { ...process.env, PASEO_HOME: daemon.paseoHome },
+          env: { ...process.env, CLISBOT_HOME: daemon.clisbotHome },
           stdio: ["ignore", "pipe", "pipe"],
         },
       );
@@ -234,17 +234,17 @@ test.each([
   "logs --follow $label exits when stdout closes before saved history is written",
   async ({ command, flags }) => {
     await mkdir(".artifacts", { recursive: true });
-    const paseoHomeRoot = await mkdtemp(resolve(".artifacts/logs-follow-closed-"));
-    const staticDir = join(paseoHomeRoot, "static");
+    const clisbotHomeRoot = await mkdtemp(resolve(".artifacts/logs-follow-closed-"));
+    const staticDir = join(clisbotHomeRoot, "static");
     await mkdir(staticDir);
-    const daemon = await createTestPaseoDaemon({ paseoHomeRoot, staticDir });
+    const daemon = await createTestClisbotDaemon({ clisbotHomeRoot, staticDir });
     const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
     let follow: ReturnType<typeof spawn> | undefined;
     let stderr = "";
     try {
       await client.connect();
       // No turn is started: the saved history must trigger shutdown on its own.
-      const agent = await client.createAgent({ provider: "claude", cwd: daemon.paseoHome });
+      const agent = await client.createAgent({ provider: "claude", cwd: daemon.clisbotHome });
       await daemon.daemon.agentManager.appendTimelineItem(agent.id, {
         type: "assistant_message",
         text: "Saved reply before the reader closes",
@@ -265,7 +265,7 @@ test.each([
           ...flags,
         ],
         {
-          env: { ...process.env, PASEO_HOME: daemon.paseoHome },
+          env: { ...process.env, CLISBOT_HOME: daemon.clisbotHome },
           stdio: ["ignore", "pipe", "pipe"],
         },
       );
@@ -290,10 +290,10 @@ test.skipIf(process.platform === "win32")(
   "logs --follow stops on SIGINT while subscription startup is waiting",
   async () => {
     await mkdir(".artifacts", { recursive: true });
-    const paseoHomeRoot = await mkdtemp(resolve(".artifacts/logs-follow-startup-"));
-    const staticDir = join(paseoHomeRoot, "static");
+    const clisbotHomeRoot = await mkdtemp(resolve(".artifacts/logs-follow-startup-"));
+    const staticDir = join(clisbotHomeRoot, "static");
     await mkdir(staticDir);
-    const daemon = await createTestPaseoDaemon({ paseoHomeRoot, staticDir });
+    const daemon = await createTestClisbotDaemon({ clisbotHomeRoot, staticDir });
     const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
     const proxy = new WebSocketServer({ port: 0, host: "127.0.0.1" });
     await once(proxy, "listening");
@@ -321,7 +321,7 @@ test.skipIf(process.platform === "win32")(
     let follow: ReturnType<typeof spawn> | undefined;
     try {
       await client.connect();
-      const agent = await client.createAgent({ provider: "claude", cwd: daemon.paseoHome });
+      const agent = await client.createAgent({ provider: "claude", cwd: daemon.clisbotHome });
       follow = spawn(
         process.execPath,
         [
@@ -337,7 +337,7 @@ test.skipIf(process.platform === "win32")(
           "--json",
         ],
         {
-          env: { ...process.env, PASEO_HOME: daemon.paseoHome },
+          env: { ...process.env, CLISBOT_HOME: daemon.clisbotHome },
           stdio: ["ignore", "pipe", "pipe"],
         },
       );

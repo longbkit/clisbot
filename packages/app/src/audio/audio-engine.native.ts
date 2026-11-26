@@ -38,7 +38,7 @@ async function playEncodedAudio(
   }
   if (signal.aborted) throw new Error("Playback stopped");
   const extension = FILE_EXTENSIONS[mimeType.split(";")[0].trim()] ?? "audio";
-  const file = new File(Paths.cache, `paseo-audio-${Date.now()}-${nextFileId++}.${extension}`);
+  const file = new File(Paths.cache, `clisbot-audio-${Date.now()}-${nextFileId++}.${extension}`);
   try {
     file.write(bytes);
     const player = createAudioPlayer(file.uri, {
@@ -55,6 +55,6 @@ export function createAudioEngine(
   callbacks: AudioEngineCallbacks,
   options?: AudioEngineOptions,
 ): AudioEngine {
-  const native: NativeAudioEngineDeps["native"] = require("@getpaseo/expo-two-way-audio");
+  const native: NativeAudioEngineDeps["native"] = require("@clisbot/expo-two-way-audio");
   return createNativeAudioEngine({ native, playEncodedAudio }, callbacks, options);
 }

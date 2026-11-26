@@ -6,7 +6,7 @@ import {
   toneFromUsedPct,
   windowFromUsedPct,
   type UsageReport,
-} from "@getpaseo/plugin/server/usage";
+} from "@clisbot/plugin/server/usage";
 import type { Input } from "../shared/input.js";
 import { NO_SUBSCRIPTION, readConsoleGo } from "./console.js";
 import { defaultStorePaths, readDatabaseLogins, readFileKey, type GoCredential } from "./stores.js";

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { DiffStream } from "./stream.js";
-import { DiffOpcode, type DiffBegin } from "@getpaseo/protocol/binary-frames/index";
+import { DiffOpcode, type DiffBegin } from "@clisbot/protocol/binary-frames/index";
 import type { DiffState } from "./index.js";
 const entry = {
   path: "a.ts",

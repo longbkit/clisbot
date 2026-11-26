@@ -1,10 +1,6 @@
 import { expect, test } from "vitest";
 import { DaemonClient, type DaemonTransport } from "../daemon-client.js";
-import {
-  encodeDiffFrame,
-  DiffOpcode,
-  type DiffFrame,
-} from "@getpaseo/protocol/binary-frames/index";
+import { encodeDiffFrame, DiffOpcode, type DiffFrame } from "@clisbot/protocol/binary-frames/index";
 import type { DiffState } from "./index.js";
 function socket() {
   let message: (data: unknown, binary?: boolean) => void = () => {};

@@ -1,5 +1,5 @@
-export const EXTERNAL_SERVER_URL_ENV = "PASEO_OPENCODE_SERVER_URL";
-export const EXTERNAL_SERVER_PASSWORD_ENV = "PASEO_OPENCODE_SERVER_PASSWORD";
+export const EXTERNAL_SERVER_URL_ENV = "CLISBOT_OPENCODE_SERVER_URL";
+export const EXTERNAL_SERVER_PASSWORD_ENV = "CLISBOT_OPENCODE_SERVER_PASSWORD";
 
 export interface ExternalOpenCodeServer {
   url: string;
@@ -8,7 +8,7 @@ export interface ExternalOpenCodeServer {
 
 /**
  * Reads the optional connection to a user-managed OpenCode v2 server from
- * provider environment. When absent, Paseo keeps spawning its own server.
+ * provider environment. When absent, Clisbot keeps spawning its own server.
  */
 export function resolveExternalOpenCodeServer(
   env: Record<string, string | undefined> | undefined,

@@ -73,7 +73,7 @@ export {
   useFileText,
   useFileUrl,
 } from "./file.js";
-export { usePaseo } from "./paseo-context.js";
+export { useClisbot } from "./clisbot-context.js";
 export {
   useAgent,
   useWorkspace,
@@ -121,7 +121,7 @@ export interface PluginHostSummary {
 /** Live configured hosts. Supplied by the app's client bundle loader. */
 export declare function useHosts(): readonly PluginHostSummary[];
 /** Borrow an online host's API under this installation's lifetime. */
-export declare function getPaseoClient(serverId: string): import("@getpaseo/client").PaseoApi;
+export declare function getClisbotClient(serverId: string): import("@clisbot/client").ClisbotApi;
 /** Open an absolute HTTP(S) URL using the client platform’s external opener. */
 export declare function openExternalUrl(url: string): Promise<void>;
 
@@ -134,4 +134,8 @@ export { useTabState } from "./tab.js";
 export type { WorkspaceRef, AgentRef, ProjectRef, TerminalRef } from "../refs.js";
 export type { Query, Group, GroupKey } from "./query.js";
 
-export type { PluginPaseoApi, PluginProjectHandle, PluginTerminalHandle } from "./reference-api.js";
+export type {
+  PluginClisbotApi,
+  PluginProjectHandle,
+  PluginTerminalHandle,
+} from "./reference-api.js";

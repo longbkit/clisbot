@@ -56,7 +56,7 @@ async function expectClaudeReply(page: Page, marker: string): Promise<void> {
 
 async function restartIsolatedDaemon(): Promise<void> {
   const port = Number(getE2EDaemonPort());
-  expect([6767, 6768]).not.toContain(port);
+  expect([6767, 6768, 6868, 6869]).not.toContain(port);
   const client = await connectDaemonClient<{
     connect(): Promise<void>;
     close(): Promise<void>;
@@ -100,7 +100,7 @@ async function withPlanReview(
   testInfo: TestInfo,
   review: (context: PlanReview) => Promise<void>,
 ): Promise<void> {
-  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-plan-lifecycle-")));
+  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-plan-lifecycle-")));
   let handle: AgentHandle | undefined;
   try {
     handle = await launchAgent({

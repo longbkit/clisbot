@@ -4,18 +4,18 @@ import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import { WebSocket } from "ws";
-import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import {
   WSOutboundMessageSchema,
   type TerminalState,
   type WSOutboundMessage,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import {
   decodeTerminalStreamFrame,
   encodeTerminalStreamFrame,
   TerminalStreamOpcode,
   type TerminalStreamFrame,
-} from "@getpaseo/protocol/terminal-stream-protocol";
+} from "@clisbot/protocol/terminal-stream-protocol";
 import { createDaemonTestContext, type DaemonTestContext } from "../test-utils/index.js";
 
 type RawSessionEnvelope = Extract<WSOutboundMessage, { type: "session" }>;
@@ -1894,7 +1894,7 @@ test.each([3000, 12050])(
           .includes(`replay-${String(count).padStart(4, "0")}`),
       10000,
     );
-    const events: import("@getpaseo/client").TerminalStreamEvent[] = [];
+    const events: import("@clisbot/client").TerminalStreamEvent[] = [];
     let end!: () => void;
     const completed = new Promise<void>((resolve) => {
       end = resolve;
@@ -1957,7 +1957,7 @@ test.each([false, true])(
         async () => (await ctx.client.captureTerminal(id)).lines.join("").includes("QUIET-SCREEN"),
         10000,
       );
-    const events: import("@getpaseo/client").TerminalStreamEvent[] = [];
+    const events: import("@clisbot/client").TerminalStreamEvent[] = [];
     const observation = ctx.client.observeTerminal(id, (event) => events.push(event));
     try {
       await observation.ready;

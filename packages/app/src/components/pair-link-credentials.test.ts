@@ -32,7 +32,7 @@ describe("pairing target password", () => {
       }),
     ).toString("base64url");
     const target = new PairingTargetTracker("relay://relay.example:443/srv_a?key=AAAA");
-    expect(target.changeUrl("https://app.paseo.sh/#offer=")).toBe(false);
-    expect(target.changeUrl(`https://app.paseo.sh/#offer=${offer}`)).toBe(true);
+    expect(target.changeUrl("https://app.clisbot.com/#offer=")).toBe(false);
+    expect(target.changeUrl(`https://app.clisbot.com/#offer=${offer}`)).toBe(true);
   });
 });

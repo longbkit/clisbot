@@ -74,7 +74,7 @@ function createTurndown(flavor: "markdown" | "plain"): TurndownService {
       return `${prefix}${content.replace(/\|/g, "\\|")} |`;
     },
   });
-  // A link Paseo recognized pastes as the text the reply showed. Rich paste keeps it as a
+  // A link Clisbot recognized pastes as the text the reply showed. Rich paste keeps it as a
   // link when it points to a web page, such as a forge reference.
   turndown.addRule("recognizedLink", {
     filter: (node) =>

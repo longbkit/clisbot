@@ -1,9 +1,9 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, expect, it, vi } from "vitest";
-import type { PluginNewWorkspace, PluginPaseoApi } from "@getpaseo/plugin/client";
+import type { PluginNewWorkspace, PluginClisbotApi } from "@clisbot/plugin/client";
 import {
-  PaseoApiProvider,
+  ClisbotApiProvider,
   PluginNewWorkspaceProvider,
   PluginRpcProvider,
   PluginTranslationProvider,
@@ -11,8 +11,8 @@ import {
   usePluginRuntimeContextBridge,
   type PluginRuntimeContextBridge,
   type PluginSubscribe,
-} from "@getpaseo/plugin/client/host";
-import { useNewWorkspace } from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client/host";
+import { useNewWorkspace } from "@clisbot/plugin/client";
 
 // App sources compile against the classic JSX runtime, which expects React on the global, as the
 // other browser tests here arrange.
@@ -20,7 +20,7 @@ beforeEach(() => vi.stubGlobal("React", React));
 
 const newWorkspace = {
   host: { id: "host_1", label: "Laptop" },
-  project: { id: "project_1", name: "paseo" },
+  project: { id: "project_1", name: "clisbot" },
   isolation: "worktree",
   baseRef: { type: "branch", name: "refs/remotes/origin/main" },
   branch: null,
@@ -31,7 +31,7 @@ const translations = new PluginTranslationRuntime({
   getLocale: () => "en",
   subscribe: () => () => undefined,
 });
-const paseo = {} as PluginPaseoApi;
+const clisbot = {} as PluginClisbotApi;
 const rejectRpc = () => Promise.reject(new Error("no rpc in this test"));
 const noSubscribe: PluginSubscribe = () =>
   Object.assign(() => undefined, { ready: Promise.resolve(), release: () => Promise.resolve() });
@@ -53,7 +53,7 @@ it("a New workspace item rendered through a portal host still finds its setup", 
   const surface = createRoot(document.createElement("div"));
   act(() =>
     surface.render(
-      <PaseoApiProvider paseo={paseo}>
+      <ClisbotApiProvider clisbot={clisbot}>
         <PluginRpcProvider invoke={rejectRpc} subscribe={noSubscribe}>
           <PluginTranslationProvider runtime={translations}>
             <PluginNewWorkspaceProvider newWorkspace={newWorkspace}>
@@ -61,7 +61,7 @@ it("a New workspace item rendered through a portal host still finds its setup", 
             </PluginNewWorkspaceProvider>
           </PluginTranslationProvider>
         </PluginRpcProvider>
-      </PaseoApiProvider>,
+      </ClisbotApiProvider>,
     ),
   );
   if (!bridge) throw new Error("bridge did not mount");

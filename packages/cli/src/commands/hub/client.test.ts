@@ -33,7 +33,7 @@ describe("Hub HTTP client", () => {
         body: {
           status: "authorized",
           interval: 5,
-          credential: "paseo_cli_prefix_durable-secret-value",
+          credential: "clisbot_cli_prefix_durable-secret-value",
           organizationId: "organization-1",
         },
       };
@@ -63,8 +63,8 @@ describe("Hub HTTP client", () => {
             projects: [
               {
                 id: "a50e05af-4f20-4c8f-8dcc-58e5ea360663",
-                slug: "paseo",
-                name: "Paseo",
+                slug: "clisbot",
+                name: "Clisbot",
               },
             ],
           },
@@ -83,7 +83,7 @@ describe("Hub HTTP client", () => {
     const projects = await hub.listProjects(origin, "human-secret");
     const token = await hub.issueEnrollmentToken(origin, "human-secret");
 
-    assert.equal(projects[0]?.slug, "paseo");
+    assert.equal(projects[0]?.slug, "clisbot");
     assert.equal(token, "one-time-enrollment-token-with-enough-length");
     assert.deepEqual(
       requests.map((request) => request.url),
@@ -163,12 +163,12 @@ describe("Hub HTTP client", () => {
               slug: "getpaseo",
               accountLogin: "getpaseo",
               accountType: "Organization",
-              repositories: ["getpaseo/paseo"],
+              repositories: ["longbkit/clisbot"],
             },
           ],
-          discord: [{ slug: "paseo", guildName: "Paseo" }],
-          slack: [{ slug: "paseo", teamName: "Paseo" }],
-          linear: [{ slug: "paseo-linear", organizationName: "Paseo" }],
+          discord: [{ slug: "clisbot", guildName: "Clisbot" }],
+          slack: [{ slug: "clisbot", teamName: "Clisbot" }],
+          linear: [{ slug: "clisbot-linear", organizationName: "Clisbot" }],
         },
       }),
       requests,
@@ -177,8 +177,8 @@ describe("Hub HTTP client", () => {
     const resources = await new HubHttpClient().listConfigurationResources(origin, "secret");
 
     assert.equal(resources.daemons[0]?.slug, "macbook");
-    assert.equal(resources.discord[0]?.slug, "paseo");
-    assert.equal(resources.linear[0]?.slug, "paseo-linear");
+    assert.equal(resources.discord[0]?.slug, "clisbot");
+    assert.equal(resources.linear[0]?.slug, "clisbot-linear");
     assert.equal(requests[0]?.url, "/api/v1/configuration-resources");
   });
 
@@ -197,7 +197,7 @@ describe("Hub HTTP client", () => {
           requestId: "request-1",
           issues: [
             {
-              path: [".paseo/workflows/answer.yml", "steps", "work", "agent"],
+              path: [".clisbot/workflows/answer.yml", "steps", "work", "agent"],
               message: "unknown named agent operator-secret",
             },
           ],
@@ -212,7 +212,7 @@ describe("Hub HTTP client", () => {
         origin,
         apiKey: "operator-secret",
         projectSlug: "studio",
-        files: [{ path: ".paseo/hub.yml", content: "sensitive bundle content" }],
+        files: [{ path: ".clisbot/hub.yml", content: "sensitive bundle content" }],
       }),
       (error: unknown) => {
         assert.ok(error instanceof HubCommandError);
@@ -223,7 +223,7 @@ describe("Hub HTTP client", () => {
         assert.equal(error.details?.includes("sensitive bundle content"), false);
         assert.equal(
           error.details,
-          ".paseo/workflows/answer.yml: steps.work.agent: unknown named agent [redacted]",
+          ".clisbot/workflows/answer.yml: steps.work.agent: unknown named agent [redacted]",
         );
         return true;
       },

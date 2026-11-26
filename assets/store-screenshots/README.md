@@ -14,7 +14,7 @@ On tablets, panel 2 says "on your tablet" and panel 3 calls the popover a panel.
 
 ## Creative direction
 
-The panels follow paseo.sh:
+The panels follow clisbot.com:
 
 - **Canvas:** the site's `#101615` background.
 - **Type:** centred SF Pro headlines in sentence case, with no closing period. Every headline wraps to exactly two lines.
@@ -57,7 +57,7 @@ Callout crops are in native capture pixels. To find them, overlay a 100 px grid 
 
 ## Recapture
 
-1. Stage the demo host. It runs an in-process daemon on port 7791 with scripted Claude Code and Codex clients, a local clone of this repository as the `paseo` project, real worktrees, and a terminal in the hero worktree:
+1. Stage the demo host. It runs an in-process daemon on port 7791 with scripted Claude Code and Codex clients, a local clone of this repository as the `clisbot` project, real worktrees, and a terminal in the hero worktree:
 
    ```sh
    npx tsx assets/store-screenshots/demo/stage.mts
@@ -68,11 +68,11 @@ Callout crops are in native capture pixels. To find them, overlay a 100 px grid 
 2. Start Metro against it on a free port. When the simulator runs on another Mac, forward Metro and the daemon to it. Other agents may already hold a Metro port; pick another one rather than stopping theirs.
 
    ```sh
-   EXPO_PUBLIC_LOCAL_DAEMON=127.0.0.1:7791 npm run start:expo --workspace=@getpaseo/app -- --port <port>
+   EXPO_PUBLIC_LOCAL_DAEMON=127.0.0.1:7791 npm run start:expo --workspace=@clisbot/app -- --port <port>
    ssh -o ExitOnForwardFailure=yes -R <port>:127.0.0.1:<port> -R 7791:127.0.0.1:7791 <mac-host>
    ```
 
-3. On the simulator, install and open the dev client (`sh.paseo.debug`) at `http://127.0.0.1:<port>`. Use an iPhone 16 Pro Max for the phone set and an iPad Pro 13-inch (M4) in portrait for the tablet set.
+3. On the simulator, install and open the dev client (`sh.clisbot.debug`) at `http://127.0.0.1:<port>`. Use an iPhone 16 Pro Max for the phone set and an iPad Pro 13-inch (M4) in portrait for the tablet set.
    - Set dark appearance and override the status bar to 9:41 with full battery and signal (`xcrun simctl status_bar <device> override`).
    - On first launch, accept the open-in-app dialog, decline notifications, turn off the dev client's Tools button, and close any error toast. `agent-device react-native dismiss-overlay` clears overlays.
    - Name the host "MacBook Pro" and set the sidebar badge to Hidden.

@@ -1,8 +1,8 @@
 import type {
-  PaseoTerminalFrame,
-  PaseoTerminalRow,
-  PaseoTerminalSelection,
-} from "../../../modules/paseo-terminal/contract";
+  ClisbotTerminalFrame,
+  ClisbotTerminalRow,
+  ClisbotTerminalSelection,
+} from "../../../modules/clisbot-terminal/contract";
 import type { TerminalCellStyleResolver } from "./colors";
 import type { NativeTerminalCell, TerminalViewportState } from "./headless-terminal-state";
 import type { TerminalSelectionRange } from "./terminal-selection";
@@ -18,7 +18,7 @@ export function buildTerminalFrame(input: {
   columns: number;
   resolver: TerminalCellStyleResolver;
   selection: TerminalSelectionRange | null;
-}): PaseoTerminalFrame {
+}): ClisbotTerminalFrame {
   const grid = input.state.grid as NativeTerminalCell[][];
   return {
     columns: input.columns,
@@ -38,7 +38,7 @@ function buildRow(input: {
   cells: NativeTerminalCell[];
   columns: number;
   resolver: TerminalCellStyleResolver;
-}): PaseoTerminalRow {
+}): ClisbotTerminalRow {
   let text = "";
   const cells: number[] = [];
   const styles: number[] = [];
@@ -74,7 +74,7 @@ function buildRow(input: {
 function toFrameSelection(input: {
   range: TerminalSelectionRange;
   firstRow: number;
-}): PaseoTerminalSelection {
+}): ClisbotTerminalSelection {
   return {
     startRow: input.range.start.row - input.firstRow,
     startCol: input.range.start.col,

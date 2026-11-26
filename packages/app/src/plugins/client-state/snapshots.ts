@@ -1,10 +1,10 @@
-import { getParentAddressFromLabels } from "@getpaseo/protocol/agent-labels";
+import { getParentAddressFromLabels } from "@clisbot/protocol/agent-labels";
 import { i18n } from "@/i18n/i18next";
 import type {
   PluginAgentSnapshot,
   PluginWorkspaceSnapshot,
   PluginProjectSnapshot,
-} from "@getpaseo/plugin";
+} from "@clisbot/plugin";
 import type { Agent, WorkspaceDescriptor, ProjectDescriptor } from "@/stores/session-store";
 import { cloneAndFreeze } from "../freeze";
 

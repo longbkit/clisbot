@@ -2,7 +2,7 @@ import type {
   LocalSpeechModel,
   SpeechSettings,
   SpeechSettingsPatch,
-} from "@getpaseo/protocol/speech/rpc-schemas";
+} from "@clisbot/protocol/speech/rpc-schemas";
 
 // What the Voice page needs to know about speech providers and models, kept free of React
 // so the option lists and model states are testable on their own.

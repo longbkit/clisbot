@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
-import { DaemonConnectionError, type DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { DaemonConnectionError, type DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { createAgentAttentionController } from "@/utils/agent-attention";
 import { getIsAppActivelyVisible } from "@/utils/app-visibility";
 import { isWeb } from "@/constants/platform";

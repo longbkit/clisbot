@@ -5,16 +5,16 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 FLOW_TEMPLATE="$REPO_ROOT/packages/app/maestro/sidebar-drag-cancellation-regression.yaml"
 FLOW_TEMPLATE_DIR="$REPO_ROOT/packages/app/maestro"
-OUT_DIR="/tmp/paseo-sidebar-drag-cancellation-$(date +%s)"
+OUT_DIR="/tmp/clisbot-sidebar-drag-cancellation-$(date +%s)"
 CLIENT_EXPORTS="$REPO_ROOT/packages/client/dist/daemon-client.js"
-RELAY_EXPORTS="$REPO_ROOT/node_modules/@getpaseo/relay/dist/e2ee.js"
+RELAY_EXPORTS="$REPO_ROOT/node_modules/@clisbot/relay/dist/e2ee.js"
 FIXTURE_ROOT=""
 PROJECT_IDS_FILE="$OUT_DIR/project-ids.json"
 
-export PASEO_MAESTRO_APP_ID="${PASEO_MAESTRO_APP_ID:-sh.paseo.debug}"
-export PASEO_MAESTRO_DIRECT_ENDPOINT="${PASEO_MAESTRO_DIRECT_ENDPOINT:-127.0.0.1:6767}"
-export PASEO_MAESTRO_DAEMON_WS_URL="${PASEO_MAESTRO_DAEMON_WS_URL:-ws://127.0.0.1:6767/ws}"
-export PASEO_MAESTRO_DAEMON_HEALTH_URL="${PASEO_MAESTRO_DAEMON_HEALTH_URL:-http://127.0.0.1:6767/api/health}"
+export CLISBOT_MAESTRO_APP_ID="${CLISBOT_MAESTRO_APP_ID:-sh.clisbot.debug}"
+export CLISBOT_MAESTRO_DIRECT_ENDPOINT="${CLISBOT_MAESTRO_DIRECT_ENDPOINT:-127.0.0.1:6868}"
+export CLISBOT_MAESTRO_DAEMON_WS_URL="${CLISBOT_MAESTRO_DAEMON_WS_URL:-ws://127.0.0.1:6868/ws}"
+export CLISBOT_MAESTRO_DAEMON_HEALTH_URL="${CLISBOT_MAESTRO_DAEMON_HEALTH_URL:-http://127.0.0.1:6868/api/health}"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -36,21 +36,21 @@ if [ ! -f "$CLIENT_EXPORTS" ] || [ ! -f "$RELAY_EXPORTS" ]; then
   exit 1
 fi
 
-if ! curl --fail --silent --show-error --max-time 3 "$PASEO_MAESTRO_DAEMON_HEALTH_URL" >/dev/null; then
-  echo "Paseo daemon is unavailable at $PASEO_MAESTRO_DAEMON_HEALTH_URL" >&2
+if ! curl --fail --silent --show-error --max-time 3 "$CLISBOT_MAESTRO_DAEMON_HEALTH_URL" >/dev/null; then
+  echo "Clisbot daemon is unavailable at $CLISBOT_MAESTRO_DAEMON_HEALTH_URL" >&2
   exit 1
 fi
 
-FIXTURE_ROOT="$(mktemp -d /tmp/paseo-sidebar-drag-fixture-XXXXXX)"
-export PASEO_MAESTRO_DRAG_A_NAME="000-paseo-drag-a-$(basename "$FIXTURE_ROOT")"
-export PASEO_MAESTRO_DRAG_B_NAME="001-paseo-drag-b-$(basename "$FIXTURE_ROOT")"
-export PASEO_MAESTRO_DRAG_Z_NAME="zzz-paseo-drag-z-$(basename "$FIXTURE_ROOT")"
+FIXTURE_ROOT="$(mktemp -d /tmp/clisbot-sidebar-drag-fixture-XXXXXX)"
+export CLISBOT_MAESTRO_DRAG_A_NAME="000-clisbot-drag-a-$(basename "$FIXTURE_ROOT")"
+export CLISBOT_MAESTRO_DRAG_B_NAME="001-clisbot-drag-b-$(basename "$FIXTURE_ROOT")"
+export CLISBOT_MAESTRO_DRAG_Z_NAME="zzz-clisbot-drag-z-$(basename "$FIXTURE_ROOT")"
 
 mkdir -p "$OUT_DIR/flows"
 
-if [ -z "${PASEO_MAESTRO_IOS_UDID:-}" ]; then
-  export PASEO_MAESTRO_IOS_UDID
-  PASEO_MAESTRO_IOS_UDID="$({ xcrun simctl list devices booted -j || true; } | node -e '
+if [ -z "${CLISBOT_MAESTRO_IOS_UDID:-}" ]; then
+  export CLISBOT_MAESTRO_IOS_UDID
+  CLISBOT_MAESTRO_IOS_UDID="$({ xcrun simctl list devices booted -j || true; } | node -e '
     let input = "";
     process.stdin.on("data", (chunk) => (input += chunk));
     process.stdin.on("end", () => {
@@ -61,7 +61,7 @@ if [ -z "${PASEO_MAESTRO_IOS_UDID:-}" ]; then
   ')"
 fi
 
-if [ -z "$PASEO_MAESTRO_IOS_UDID" ]; then
+if [ -z "$CLISBOT_MAESTRO_IOS_UDID" ]; then
   echo "No booted iOS simulator found." >&2
   exit 1
 fi
@@ -70,25 +70,25 @@ render_flow() {
   local source="$1"
   local target="$2"
   perl -0pe '
-    s/^appId: sh\.paseo$/appId: $ENV{PASEO_MAESTRO_APP_ID}/m;
-    s/\$\{PASEO_MAESTRO_APP_ID\}/$ENV{PASEO_MAESTRO_APP_ID}/g;
-    s/\$\{PASEO_MAESTRO_DIRECT_ENDPOINT\}/$ENV{PASEO_MAESTRO_DIRECT_ENDPOINT}/g;
-    s/\$\{PASEO_MAESTRO_DRAG_A_NAME\}/$ENV{PASEO_MAESTRO_DRAG_A_NAME}/g;
-    s/\$\{PASEO_MAESTRO_DRAG_B_NAME\}/$ENV{PASEO_MAESTRO_DRAG_B_NAME}/g;
-    s/\$\{PASEO_MAESTRO_DRAG_Z_NAME\}/$ENV{PASEO_MAESTRO_DRAG_Z_NAME}/g;
+    s/^appId: sh\.clisbot$/appId: $ENV{CLISBOT_MAESTRO_APP_ID}/m;
+    s/\$\{CLISBOT_MAESTRO_APP_ID\}/$ENV{CLISBOT_MAESTRO_APP_ID}/g;
+    s/\$\{CLISBOT_MAESTRO_DIRECT_ENDPOINT\}/$ENV{CLISBOT_MAESTRO_DIRECT_ENDPOINT}/g;
+    s/\$\{CLISBOT_MAESTRO_DRAG_A_NAME\}/$ENV{CLISBOT_MAESTRO_DRAG_A_NAME}/g;
+    s/\$\{CLISBOT_MAESTRO_DRAG_B_NAME\}/$ENV{CLISBOT_MAESTRO_DRAG_B_NAME}/g;
+    s/\$\{CLISBOT_MAESTRO_DRAG_Z_NAME\}/$ENV{CLISBOT_MAESTRO_DRAG_Z_NAME}/g;
   ' "$source" > "$target"
 }
 
 for project_name in \
-  "$PASEO_MAESTRO_DRAG_A_NAME" \
-  "$PASEO_MAESTRO_DRAG_B_NAME" \
-  "$PASEO_MAESTRO_DRAG_Z_NAME"; do
+  "$CLISBOT_MAESTRO_DRAG_A_NAME" \
+  "$CLISBOT_MAESTRO_DRAG_B_NAME" \
+  "$CLISBOT_MAESTRO_DRAG_Z_NAME"; do
   project_path="$FIXTURE_ROOT/$project_name"
   mkdir -p "$project_path"
   git -C "$project_path" init >/dev/null
   git -C "$project_path" checkout -b main >/dev/null 2>&1 || true
-  git -C "$project_path" config user.name "Paseo Maestro"
-  git -C "$project_path" config user.email "maestro@getpaseo.local"
+  git -C "$project_path" config user.name "Clisbot Maestro"
+  git -C "$project_path" config user.email "maestro@clisbot.local"
   printf '# Sidebar drag cancellation fixture\n' > "$project_path/README.md"
   git -C "$project_path" add README.md
   git -C "$project_path" commit -m "Initial commit" >/dev/null
@@ -105,7 +105,7 @@ const moduleUrl = pathToFileURL(`${process.env.REPO_ROOT}/packages/client/dist/d
 const { DaemonClient } = await import(moduleUrl);
 const projectIds = JSON.parse(await readFile(process.env.PROJECT_IDS_FILE, "utf8"));
 const client = new DaemonClient({
-  url: process.env.PASEO_MAESTRO_DAEMON_WS_URL,
+  url: process.env.CLISBOT_MAESTRO_DAEMON_WS_URL,
   clientId: `maestro-sidebar-drag-cleanup-${Date.now()}`,
   clientType: "cli",
   webSocketFactory: (url, options) => new WebSocket(url, { headers: options?.headers }),
@@ -133,12 +133,12 @@ import WebSocket from "ws";
 const moduleUrl = pathToFileURL(`${process.env.REPO_ROOT}/packages/client/dist/daemon-client.js`).href;
 const { DaemonClient } = await import(moduleUrl);
 const projectNames = [
-  process.env.PASEO_MAESTRO_DRAG_A_NAME,
-  process.env.PASEO_MAESTRO_DRAG_B_NAME,
-  process.env.PASEO_MAESTRO_DRAG_Z_NAME,
+  process.env.CLISBOT_MAESTRO_DRAG_A_NAME,
+  process.env.CLISBOT_MAESTRO_DRAG_B_NAME,
+  process.env.CLISBOT_MAESTRO_DRAG_Z_NAME,
 ];
 const client = new DaemonClient({
-  url: process.env.PASEO_MAESTRO_DAEMON_WS_URL,
+  url: process.env.CLISBOT_MAESTRO_DAEMON_WS_URL,
   clientId: `maestro-sidebar-drag-setup-${Date.now()}`,
   clientType: "cli",
   webSocketFactory: (url, options) => new WebSocket(url, { headers: options?.headers }),
@@ -165,6 +165,6 @@ render_flow "$FLOW_TEMPLATE" "$FLOW"
 render_flow "$FLOW_TEMPLATE_DIR/flows/dev-client.yaml" "$OUT_DIR/flows/dev-client.yaml"
 render_flow "$FLOW_TEMPLATE_DIR/flows/connect-direct-if-welcome.yaml" "$OUT_DIR/flows/connect-direct-if-welcome.yaml"
 
-echo "Running sidebar drag cancellation regression on $PASEO_MAESTRO_IOS_UDID"
+echo "Running sidebar drag cancellation regression on $CLISBOT_MAESTRO_IOS_UDID"
 echo "Artifacts: $OUT_DIR"
-(cd "$OUT_DIR" && maestro test "$FLOW" --udid "$PASEO_MAESTRO_IOS_UDID")
+(cd "$OUT_DIR" && maestro test "$FLOW" --udid "$CLISBOT_MAESTRO_IOS_UDID")

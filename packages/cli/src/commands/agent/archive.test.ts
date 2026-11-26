@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import { archiveAgent, type AgentArchiveClient } from "./archive.js";
 import { reloadAgent, type AgentReloadClient } from "./reload.js";
 import { detachAgent, type AgentDetachClient } from "./detach.js";

@@ -2,8 +2,8 @@ import { Command } from "commander";
 import {
   requireTerminalKeepCapability,
   type DaemonClient,
-} from "@getpaseo/client/internal/daemon-client";
-import { stopDaemonInstance, type DaemonInstance } from "@getpaseo/server/daemon-control";
+} from "@clisbot/client/internal/daemon-client";
+import { stopDaemonInstance, type DaemonInstance } from "@clisbot/server/daemon-control";
 import { connectToDaemon, type ConnectOptions } from "../../utils/client.js";
 import { withOutput, type CommandOptions } from "../../output/index.js";
 import { addJsonAndDaemonHostOptions } from "../../utils/command-options.js";

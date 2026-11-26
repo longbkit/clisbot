@@ -11,13 +11,13 @@ import {
 } from "../support/helpers/changelog";
 
 const DISCORD_DESTINATION =
-  /^https:\/\/(?:discord\.gg\/jz8T2uahpH|discord\.com\/invite\/jz8T2uahpH)(?:[/?#]|$)/;
+  /^https:\/\/(?:discord\.gg\/awGmcmFXC|discord\.com\/invite\/awGmcmFXC)(?:[/?#]|$)/;
 const GITHUB_ISSUE_DESTINATION =
-  /^https:\/\/github\.com\/(?:getpaseo\/paseo\/issues\/new(?:\/choose)?(?:[/?#]|$)|login\?return_to=https%3A%2F%2Fgithub\.com%2Fgetpaseo%2Fpaseo%2Fissues%2Fnew$)/;
-const CHANGELOG_DESTINATION = /^https:\/\/paseo\.sh\/changelog(?:[/?#]|$)/;
+  /^https:\/\/github\.com\/(?:longbkit\/clisbot\/issues\/new(?:\/choose)?(?:[/?#]|$)|login\?return_to=https%3A%2F%2Fgithub\.com%2Flongbkit%2Fclisbot%2Fissues%2Fnew$)/;
+const CHANGELOG_DESTINATION = /^https:\/\/clisbot\.com\/changelog(?:[/?#]|$)/;
 // The name and the version are separate cells of a key/value row, so they meet with no space
 // between them in the row's text content.
-const APP_VERSION = /^Paseo\s*v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const APP_VERSION = /^Clisbot\s*v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 async function openHelpMenu(page: Page): Promise<void> {
   await page.getByTestId("sidebar-help").click();
@@ -87,7 +87,7 @@ test("renders the changelog in the app and links the website", async ({ page }) 
     "",
     "## 9.1.0 - 2026-03-04",
     "",
-    "- **Background tasks:** Paseo now shows the tasks an agent is running.",
+    "- **Background tasks:** Clisbot now shows the tasks an agent is running.",
     "",
     "### Sparkles",
     "",
@@ -119,7 +119,9 @@ test("renders the changelog in the app and links the website", async ({ page }) 
 
   await test.step("leads a release with its highlights and tucks the rest away", async () => {
     await expect(latest.getByText("March 4, 2026", { exact: true })).toBeVisible();
-    await expect(latest.getByText("Paseo now shows the tasks an agent is running.")).toBeVisible();
+    await expect(
+      latest.getByText("Clisbot now shows the tasks an agent is running."),
+    ).toBeVisible();
     await expect(latest.getByText("Added a brand new thing")).toHaveCount(0);
     await expect(latest.getByText("Fixed a crash")).toHaveCount(0);
   });
@@ -134,7 +136,9 @@ test("renders the changelog in the app and links the website", async ({ page }) 
 
     await hideAllChanges(latest);
     await expect(latest.getByText("Added a brand new thing")).toHaveCount(0);
-    await expect(latest.getByText("Paseo now shows the tasks an agent is running.")).toBeVisible();
+    await expect(
+      latest.getByText("Clisbot now shows the tasks an agent is running."),
+    ).toBeVisible();
   });
 
   await test.step("shows a release without highlights whole", async () => {

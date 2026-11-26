@@ -10,7 +10,7 @@ nav: Slack
 
 请先在 **Integrations** 下连接 Slack 工作区（自托管 Hub 请先配置 [Slack 应用](/docs/hub/self-hosting/slack-app)），并将机器人邀请到它监听的频道。
 
-`.paseo/triggers/slack-help.yml`：
+`.clisbot/triggers/slack-help.yml`：
 
 ```yaml
 name: slack-help
@@ -36,7 +36,7 @@ run:
     Answer the request using reply, then call finish_execution.
 
     <user-prompt>
-    ${{ paseo.prompt }}
+    ${{ clisbot.prompt }}
     </user-prompt>
   outputs:
     slack.reply:
@@ -52,19 +52,19 @@ Slack 过滤条件使用 ID，而不是显示名称或连接 slug。所有过滤
 - `workspace` 匹配 Slack Team ID，`channels` 限制可触发运行的频道。
 - `pattern` 要求提及之后紧跟指定前缀（`contains` 是其旧别名，前缀行为相同）。
 
-`${{ paseo.prompt }}` 包含完整消息。Hub 会在提及后解析开头的 `key=value`，提取已声明的输入值。如果声明了 `inputs.repo`，请在 `run.prompt` 中使用 `${{ paseo.inputs.repo }}` 插入该值。
+`${{ clisbot.prompt }}` 包含完整消息。Hub 会在提及后解析开头的 `key=value`，提取已声明的输入值。如果声明了 `inputs.repo`，请在 `run.prompt` 中使用 `${{ clisbot.inputs.repo }}` 插入该值。
 
 ```text
-@Paseo repo=project investigate the failed sync
+@Clisbot repo=project investigate the failed sync
 ```
 
-在 `run.prompt` 中包含 `${{ paseo.context }}`，即可以 JSON 形式传入 Slack 讨论串历史和限定在本次执行范围内的附件描述符。
+在 `run.prompt` 中包含 `${{ clisbot.context }}`，即可以 JSON 形式传入 Slack 讨论串历史和限定在本次执行范围内的附件描述符。
 
 ## 回复与会话延续 {#replies-and-continuation}
 
 Hub 会在触发运行的 Slack 讨论串中发布回复。频道根消息会开启一个讨论串，讨论串内的提及则继续留在原讨论串中。同一讨论串中的后续提及默认会继续同一个 Agent。
 
-Slack 触发器会自动授予 `reply` 工具（`slack.reply`）。如需限制 `max` 次数或设置 `required: true`，请声明 `run.outputs.slack.reply`。当 Hub 运行在 HTTPS 下时，回复会附带 **Open in Paseo** 链接。
+Slack 触发器会自动授予 `reply` 工具（`slack.reply`）。如需限制 `max` 次数或设置 `required: true`，请声明 `run.outputs.slack.reply`。当 Hub 运行在 HTTPS 下时，回复会附带 **Open in Clisbot** 链接。
 
 如需在定时任务、webhook 或其他触发器中读取或发送到 Slack 频道，请使用[集成工具](/docs/hub/tools)。如需赋予 Agent 仓库访问权限，请添加 [`run.github` 块](/docs/hub/github)。
 
@@ -76,4 +76,4 @@ Slack 触发器会自动授予 `reply` 工具（`slack.reply`）。如需限制 
 | `from_users` | 点击头像，选择 **Profile** → **⋮** → **Copy member ID**（以 `U` 开头）。 |
 | `channels`   | 点击频道名称，选择 **About**。频道 ID 位于面板底部（以 `C` 开头）。      |
 
-`paseo hub init` 会自动读取已连接的 Slack 工作区，只询问你的成员 ID。
+`clisbot hub init` 会自动读取已连接的 Slack 工作区，只询问你的成员 ID。

@@ -37,7 +37,7 @@ export class PluginSessionSocket {
     this.bufferedAmount += byteLength;
     try {
       this.child.send(
-        { type: "paseo_frame", data: frame, isBinary: typeof frame !== "string" },
+        { type: "clisbot_frame", data: frame, isBinary: typeof frame !== "string" },
         (error) => {
           this.bufferedAmount = Math.max(0, this.bufferedAmount - byteLength);
           callback?.(error ?? undefined);
@@ -59,7 +59,7 @@ export class PluginSessionSocket {
     this.readyState = 3;
     // Node reports a failed send to the callback, or else as an "error" event on the child,
     // which nothing handles. The child may already be gone; local cleanup still has to run.
-    this.child.send({ type: "paseo_close" }, () => undefined);
+    this.child.send({ type: "clisbot_close" }, () => undefined);
     this.emit("close", code, reason);
   }
 

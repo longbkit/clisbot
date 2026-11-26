@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import type { PluginListItem } from "@getpaseo/protocol/messages";
-import type { PluginListing } from "@getpaseo/protocol/plugin-registry";
+import type { PluginListItem } from "@clisbot/protocol/messages";
+import type { PluginListing } from "@clisbot/protocol/plugin-registry";
 import { Button } from "@/components/ui/button";
 import type { PluginOperation } from "./operations";
 

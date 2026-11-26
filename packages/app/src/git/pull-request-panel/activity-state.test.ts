@@ -18,7 +18,7 @@ function activity(id: string, overrides: Partial<PrPaneActivity> = {}): PrPaneAc
     avatarColor: "#0ea5e9",
     body: "Looks good.",
     age: "3d ago",
-    url: `https://github.com/getpaseo/paseo/pull/42#${id}`,
+    url: `https://github.com/longbkit/clisbot/pull/42#${id}`,
     ...overrides,
   };
 }

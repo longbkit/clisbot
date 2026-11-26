@@ -18,7 +18,7 @@ plugin fails the session open and names both sources.
 Install on a daemon with plugins enabled:
 
 ```bash
-paseo plugin install /absolute/path/to/plugin-examples/agent-configuration
+clisbot plugin install /absolute/path/to/plugin-examples/agent-configuration
 ```
 
 Each session-open callback receives only this plugin's MCP servers. The nested spreads preserve

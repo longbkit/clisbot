@@ -9,11 +9,11 @@ import { provisionLocalBridge } from "./bridge-provisioning.js";
 import { V2Runtime } from "./runtime.js";
 
 test("an owned helper uses an installed bridge once and survives catalog refresh", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-owned-opencode-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-owned-opencode-"));
   const config = path.join(root, "config", "opencode");
   const script = path.join(root, "server.cjs");
   const record = path.join(root, "env.json");
-  const bridge = new OpenCodeBridge({ paseoHome: root, logger: createTestLogger() });
+  const bridge = new OpenCodeBridge({ clisbotHome: root, logger: createTestLogger() });
   await bridge.start();
   const artifact = fileURLToPath(await bridge.materializeV2Plugin());
   await provisionLocalBridge({
@@ -57,18 +57,18 @@ test("an owned helper uses an installed bridge once and survives catalog refresh
 }, 15_000);
 
 test("reports a bridge port change that has not been applied", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-opencode-port-"));
-  const bridge = new OpenCodeBridge({ paseoHome: root, logger: createTestLogger() });
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-port-"));
+  const bridge = new OpenCodeBridge({ clisbotHome: root, logger: createTestLogger() });
   await bridge.start();
   const actual = Number(new URL(bridge.sharedV2Connection().baseUrl).port);
   const runtime = new V2Runtime({
     logger: createTestLogger(),
     bridge,
     selection: { kind: "explicit", server: { url: "http://127.0.0.1:1" } },
-    settings: { env: { PASEO_OPENCODE_BRIDGE_PORT: actual === 1 ? "2" : "1" } },
+    settings: { env: { CLISBOT_OPENCODE_BRIDGE_PORT: actual === 1 ? "2" : "1" } },
   });
   try {
-    await expect(runtime.acquire()).rejects.toThrow("restart Paseo to apply the bridge port");
+    await expect(runtime.acquire()).rejects.toThrow("restart Clisbot to apply the bridge port");
   } finally {
     await runtime.shutdown();
     await bridge.close();

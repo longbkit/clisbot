@@ -12,19 +12,19 @@ import {
   resolveAdapter,
   withLegacyProfileFeatureValues,
 } from "./agent/option-controls.js";
-import type { AgentProfile } from "@getpaseo/protocol/agent-profile";
+import type { AgentProfile } from "@clisbot/protocol/agent-profile";
 import {
   MutableDaemonConfigSchema,
   MutableDaemonConfigPatchSchema,
-} from "@getpaseo/protocol/messages";
-import type { AgentSkillSelection } from "@getpaseo/protocol/messages";
-import type { SpeechSettingsPatch } from "@getpaseo/protocol/speech/rpc-schemas";
+} from "@clisbot/protocol/messages";
+import type { AgentSkillSelection } from "@clisbot/protocol/messages";
+import type { SpeechSettingsPatch } from "@clisbot/protocol/speech/rpc-schemas";
 import { mergeSpeechSettingsPatch, type SpeechSettingsOwner } from "./speech/speech-settings.js";
 
-export type { MutableDaemonConfig, MutableDaemonConfigPatch } from "@getpaseo/protocol/messages";
+export type { MutableDaemonConfig, MutableDaemonConfigPatch } from "@clisbot/protocol/messages";
 
-type MutableDaemonConfig = import("@getpaseo/protocol/messages").MutableDaemonConfig;
-type MutableDaemonConfigPatch = import("@getpaseo/protocol/messages").MutableDaemonConfigPatch;
+type MutableDaemonConfig = import("@clisbot/protocol/messages").MutableDaemonConfig;
+type MutableDaemonConfigPatch = import("@clisbot/protocol/messages").MutableDaemonConfigPatch;
 type ProviderOverride = import("./agent/provider-launch-config.js").ProviderOverride;
 
 interface SupportedMutableConfigPatch {
@@ -397,11 +397,11 @@ export function applyMutableProviderConfigToOverrides(
     nextOverrides[providerId] = {
       ...previousOverride,
       ...parsedOverride,
-      ...(parsedOverride.paseoTools
+      ...(parsedOverride.clisbotTools
         ? {
-            paseoTools: {
-              ...previousOverride?.paseoTools,
-              ...parsedOverride.paseoTools,
+            clisbotTools: {
+              ...previousOverride?.clisbotTools,
+              ...parsedOverride.clisbotTools,
             },
           }
         : {}),
@@ -414,7 +414,7 @@ export function applyMutableProviderConfigToOverrides(
 export class DaemonConfigStore {
   private mutations: Promise<unknown> = Promise.resolve();
   private current: MutableDaemonConfig;
-  private readonly paseoHome: string;
+  private readonly clisbotHome: string;
   private readonly logger: LoggerLike | undefined;
   private readonly changeListeners = new Set<ConfigListener>();
   private readonly applyListeners = new Set<ConfigApplyListener>();
@@ -426,7 +426,7 @@ export class DaemonConfigStore {
   private lastKnownPersisted: PersistedConfig;
 
   constructor(
-    paseoHome: string,
+    clisbotHome: string,
     initial: MutableDaemonConfig,
     logger?: LoggerLike,
     options: {
@@ -436,12 +436,13 @@ export class DaemonConfigStore {
       speech?: SpeechSettingsOwner;
     } = {},
   ) {
-    this.paseoHome = paseoHome;
+    this.clisbotHome = clisbotHome;
     this.logger = getLogger(logger);
     this.relayEnabledMutable = options.relayEnabledMutable ?? true;
     this.reloadSource = options.reloadSource;
     this.speechOwner = options.speech;
-    this.startupPersisted = options.startupPersisted ?? loadPersistedConfig(paseoHome, this.logger);
+    this.startupPersisted =
+      options.startupPersisted ?? loadPersistedConfig(clisbotHome, this.logger);
     this.lastKnownPersisted = this.startupPersisted;
     this.current = MutableDaemonConfigSchema.parse({
       ...foldConfigProfiles({ config: initial, providers: initial.providers, source: "stored" }),
@@ -491,7 +492,7 @@ export class DaemonConfigStore {
   ): Promise<MutableDaemonConfig> {
     if (parsedPatch.relay?.enabled !== undefined && !this.relayEnabledMutable) {
       throw new Error(
-        "Relay is controlled by a daemon launch override. Remove PASEO_RELAY_ENABLED or the relay CLI flag before changing it here.",
+        "Relay is controlled by a daemon launch override. Remove CLISBOT_RELAY_ENABLED or the relay CLI flag before changing it here.",
       );
     }
     const { removeProviders = [], ...submittedPatch } = parsedPatch;
@@ -536,7 +537,7 @@ export class DaemonConfigStore {
       try {
         this.applyReplacement(next, { removedProviders });
       } catch (error) {
-        await savePersistedConfigAsync(this.paseoHome, persistedBeforePatch, this.logger);
+        await savePersistedConfigAsync(this.clisbotHome, persistedBeforePatch, this.logger);
         throw error;
       }
     }
@@ -576,7 +577,7 @@ export class DaemonConfigStore {
       throw new Error("Daemon config reload is unavailable for this daemon instance");
     }
 
-    const persisted = await loadPersistedConfigAsync(this.paseoHome, this.logger);
+    const persisted = await loadPersistedConfigAsync(this.clisbotHome, this.logger);
     const resolved = this.reloadSource.resolve(persisted);
     // Plugin source changes require the plugin lifecycle operation or a daemon
     // restart. The global switch is independently reloadable.
@@ -751,7 +752,7 @@ export class DaemonConfigStore {
   public readServicePorts(): Promise<NonNullable<PersistedConfig["worktrees"]>["servicePorts"]> {
     return this.enqueue(
       async () =>
-        (await loadPersistedConfigAsync(this.paseoHome, this.logger)).worktrees?.servicePorts,
+        (await loadPersistedConfigAsync(this.clisbotHome, this.logger)).worktrees?.servicePorts,
     );
   }
 
@@ -759,7 +760,7 @@ export class DaemonConfigStore {
     patch: Omit<SupportedMutableConfigPatch, "removeProviders">,
     removeProviders: readonly string[],
   ): Promise<{ previous: PersistedConfig; knownNext: PersistedConfig }> {
-    const persisted = await loadPersistedConfigAsync(this.paseoHome, this.logger);
+    const persisted = await loadPersistedConfigAsync(this.clisbotHome, this.logger);
     const merge = (source: PersistedConfig) =>
       mergeMutablePatchIntoPersistedConfig({
         persisted: source,
@@ -769,7 +770,7 @@ export class DaemonConfigStore {
       });
     const nextPersisted = merge(persisted);
     const knownNext = merge(this.lastKnownPersisted);
-    await savePersistedConfigAsync(this.paseoHome, nextPersisted, this.logger);
+    await savePersistedConfigAsync(this.clisbotHome, nextPersisted, this.logger);
     return { previous: persisted, knownNext };
   }
 }

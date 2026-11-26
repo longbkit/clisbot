@@ -34,7 +34,7 @@ const throwingAdapter: PiExtension = {
 
 describe("Pi extension host", () => {
   test("streams appended child rows before the child completes", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "paseo-pi-live-child-"));
+    const dir = await mkdtemp(join(tmpdir(), "clisbot-pi-live-child-"));
     const file = join(dir, "child.jsonl");
     const received: string[] = [];
     const host = new PiExtensionHost([

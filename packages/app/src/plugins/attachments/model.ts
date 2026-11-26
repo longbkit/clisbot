@@ -1,10 +1,10 @@
 import { z } from "zod";
-import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import type { AgentAttachment } from "@clisbot/protocol/messages";
 import {
   PluginAttachmentItemSchema,
   type PluginAttachmentItem,
   type PluginSerializableIcon,
-} from "@getpaseo/plugin";
+} from "@clisbot/plugin";
 import type { UserComposerAttachment } from "@/attachments/types";
 
 export const PluginResourceComposerAttachmentSchema = z.object({

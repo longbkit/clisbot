@@ -1,7 +1,7 @@
-import { TerminalInputModeTracker } from "@getpaseo/protocol/terminal-input-mode";
+import { TerminalInputModeTracker } from "@clisbot/protocol/terminal-input-mode";
 import { createTerminalSerializer } from "./terminal-serializer.js";
 import { readTerminalState } from "./test-utils/terminal-state.js";
-import type { TerminalState } from "@getpaseo/protocol/messages";
+import type { TerminalState } from "@clisbot/protocol/messages";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { isPlatform } from "../test-utils/platform.js";
 import {
@@ -535,7 +535,7 @@ describe("createTerminal", () => {
   it("restores CJK text without injected spaces when a snapshot round-trips through the client", async () => {
     // Each Hangul syllable is a wide char: xterm stores it as a 2-cell pair
     // whose second cell has no chars. Capturing that continuation as " " made
-    // every restored syllable three columns wide (paseo#3434).
+    // every restored syllable three columns wide (clisbot#3434).
     const text = "통합 구현은 전체 테스트를 통과했습니다";
     const session = trackSession(
       await createTerminal({
@@ -709,10 +709,10 @@ describe("createTerminal", () => {
           workspaceId: "ws-test",
           cwd: realpathSync(tmpdir()),
           name: "Codex",
-          command: "paseo-qa-absent-codex",
+          command: "clisbot-qa-absent-codex",
           args: [],
         }),
-      ).rejects.toThrow("paseo-qa-absent-codex: command not found");
+      ).rejects.toThrow("clisbot-qa-absent-codex: command not found");
     },
   );
 
@@ -724,8 +724,8 @@ describe("createTerminal", () => {
       // not necessarily on the daemon's own PATH.
       const binDir = mkdtempSync(join(tmpdir(), "terminal-envpath-bin-"));
       temporaryDirs.push(binDir);
-      const toolPath = join(binDir, "paseo-qa-envpath-tool");
-      writeFileSync(toolPath, "#!/usr/bin/env bash\nprintf 'paseo-launch-ok\\n'\nsleep 30\n");
+      const toolPath = join(binDir, "clisbot-qa-envpath-tool");
+      writeFileSync(toolPath, "#!/usr/bin/env bash\nprintf 'clisbot-launch-ok\\n'\nsleep 30\n");
       chmodSync(toolPath, 0o755);
 
       const session = trackSession(
@@ -733,14 +733,14 @@ describe("createTerminal", () => {
           workspaceId: "ws-test",
           cwd: realpathSync(tmpdir()),
           name: "Shim",
-          command: "paseo-qa-envpath-tool",
+          command: "clisbot-qa-envpath-tool",
           args: [],
           env: { PATH: `${binDir}${delimiter}${process.env.PATH ?? ""}` },
         }),
       );
 
-      await waitForLines(session, ["paseo-launch-ok"]);
-      expect(getLines(await readTerminalState(session))[0]).toBe("paseo-launch-ok");
+      await waitForLines(session, ["clisbot-launch-ok"]);
+      expect(getLines(await readTerminalState(session))[0]).toBe("clisbot-launch-ok");
     },
   );
 
@@ -752,11 +752,11 @@ describe("createTerminal", () => {
           workspaceId: "ws-test",
           cwd: realpathSync(tmpdir()),
           name: "Codex",
-          command: "paseo-qa-absent-codex",
+          command: "clisbot-qa-absent-codex",
           args: [],
-          env: { PATH: `/paseo-qa-empty${delimiter}${process.env.PATH ?? ""}` },
+          env: { PATH: `/clisbot-qa-empty${delimiter}${process.env.PATH ?? ""}` },
         }),
-      ).rejects.toThrow("paseo-qa-absent-codex: command not found");
+      ).rejects.toThrow("clisbot-qa-absent-codex: command not found");
     },
   );
 
@@ -769,7 +769,7 @@ describe("createTerminal", () => {
       temporaryDirs.push(projectDir);
       mkdirSync(join(projectDir, "scripts"));
       const scriptPath = join(projectDir, "scripts", "dev.sh");
-      writeFileSync(scriptPath, "#!/usr/bin/env bash\nprintf 'paseo-launch-ok\\n'\nsleep 30\n");
+      writeFileSync(scriptPath, "#!/usr/bin/env bash\nprintf 'clisbot-launch-ok\\n'\nsleep 30\n");
       chmodSync(scriptPath, 0o755);
 
       const session = trackSession(
@@ -782,8 +782,8 @@ describe("createTerminal", () => {
         }),
       );
 
-      await waitForLines(session, ["paseo-launch-ok"]);
-      expect(getLines(await readTerminalState(session))[0]).toBe("paseo-launch-ok");
+      await waitForLines(session, ["clisbot-launch-ok"]);
+      expect(getLines(await readTerminalState(session))[0]).toBe("clisbot-launch-ok");
     },
   );
 
@@ -791,7 +791,7 @@ describe("createTerminal", () => {
     const projectDir = mkdtempSync(join(tmpdir(), "terminal-absolute-cmd-"));
     temporaryDirs.push(projectDir);
     const scriptPath = join(projectDir, "run.sh");
-    writeFileSync(scriptPath, "#!/usr/bin/env bash\nprintf 'paseo-launch-ok\\n'\nsleep 30\n");
+    writeFileSync(scriptPath, "#!/usr/bin/env bash\nprintf 'clisbot-launch-ok\\n'\nsleep 30\n");
     chmodSync(scriptPath, 0o755);
 
     const session = trackSession(
@@ -804,8 +804,8 @@ describe("createTerminal", () => {
       }),
     );
 
-    await waitForLines(session, ["paseo-launch-ok"]);
-    expect(getLines(await readTerminalState(session))[0]).toBe("paseo-launch-ok");
+    await waitForLines(session, ["clisbot-launch-ok"]);
+    expect(getLines(await readTerminalState(session))[0]).toBe("clisbot-launch-ok");
   });
 
   it("leaves the command check to the terminal itself on Windows", async () => {
@@ -813,9 +813,9 @@ describe("createTerminal", () => {
     // shim handling and its own fallback for an unresolved command.
     await expect(
       assertTerminalCommandCanStart({
-        command: "paseo-qa-absent-codex",
+        command: "clisbot-qa-absent-codex",
         cwd: realpathSync(tmpdir()),
-        env: { PATH: "/paseo-qa-empty" },
+        env: { PATH: "/clisbot-qa-empty" },
         platform: "win32",
       }),
     ).resolves.toBeUndefined();
@@ -904,14 +904,14 @@ describe.skipIf(isPlatform("win32"))("terminal title", () => {
     temporaryDirs.push(homeDir);
     const realZdotdir = join(homeDir, ".config", "zsh");
     mkdirSync(realZdotdir, { recursive: true });
-    writeFileSync(join(realZdotdir, ".zshenv"), "export PASEO_TEST_REAL_ZDOTDIR=1\n");
+    writeFileSync(join(realZdotdir, ".zshenv"), "export CLISBOT_TEST_REAL_ZDOTDIR=1\n");
 
     const session = trackSession(
       await createTerminal({
         workspaceId: "ws-test",
         cwd: homeDir,
         command: "/bin/zsh",
-        args: ["-c", 'printf \'%s\\n%s\\n\' "${ZDOTDIR-}" "${PASEO_TEST_REAL_ZDOTDIR-}"'],
+        args: ["-c", 'printf \'%s\\n%s\\n\' "${ZDOTDIR-}" "${CLISBOT_TEST_REAL_ZDOTDIR-}"'],
         env: {
           HOME: homeDir,
           ZDOTDIR: realZdotdir,
@@ -1133,14 +1133,14 @@ describe.skipIf(isPlatform("win32"))("terminal title", () => {
   it.skipIf(!hasZsh)("loads the user's zsh prompt when the integration dir is packaged", () => {
     const homeDir = mkdtempSync(join(tmpdir(), "terminal-zsh-packaged-home-"));
     temporaryDirs.push(homeDir);
-    writeFileSync(join(homeDir, ".zshrc"), "PS1='PASEO_CUSTOM_PROMPT> '\n");
+    writeFileSync(join(homeDir, ".zshrc"), "PS1='CLISBOT_CUSTOM_PROMPT> '\n");
 
-    const fakeAppRoot = join(homeDir, "Paseo.app", "Contents", "Resources");
+    const fakeAppRoot = join(homeDir, "Clisbot.app", "Contents", "Resources");
     const inaccessiblePackagedIntegrationDir = join(
       fakeAppRoot,
       "app.asar",
       "node_modules",
-      "@getpaseo",
+      "@clisbot",
       "server",
       "dist",
       "server",
@@ -1152,7 +1152,7 @@ describe.skipIf(isPlatform("win32"))("terminal title", () => {
       fakeAppRoot,
       "app.asar.unpacked",
       "node_modules",
-      "@getpaseo",
+      "@clisbot",
       "server",
       "dist",
       "server",
@@ -1179,7 +1179,7 @@ describe.skipIf(isPlatform("win32"))("terminal title", () => {
     });
 
     expect(result.status).toBe(0);
-    expect(result.stdout.split(/\r?\n/)).toContain("PASEO_CUSTOM_PROMPT> ");
+    expect(result.stdout.split(/\r?\n/)).toContain("CLISBOT_CUSTOM_PROMPT> ");
   });
 
   it.skipIf(!hasZsh)("emits zsh shell integration command completion", async () => {
@@ -1511,10 +1511,10 @@ describe("terminal activity interruption", () => {
 // the prompt instead of executing part of it, which is the failure the
 // escaping exists to prevent (the CVE-2024-27980 class).
 describe.runIf(isPlatform("win32"))(".cmd shim argv round-trip on Windows", () => {
-  const argvMarker = "__PASEO_ARGV__";
+  const argvMarker = "__CLISBOT_ARGV__";
 
   function writeArgvEchoShim(): { dir: string; cmdPath: string } {
-    const dir = mkdtempSync(join(tmpdir(), "paseo-cmd-shim-"));
+    const dir = mkdtempSync(join(tmpdir(), "clisbot-cmd-shim-"));
     temporaryDirs.push(dir);
     const cmdPath = join(dir, "echoargv.cmd");
     const scriptPath = join(dir, "echoargv.js");
@@ -1596,19 +1596,19 @@ it.runIf(isPlatform("linux", "darwin"))(
   async () => {
     const projectDir = mkdtempSync(join(tmpdir(), "terminal-relative-path-"));
     mkdirSync(join(projectDir, "bin"));
-    const script = join(projectDir, "bin", "paseo-relative-path-tool");
-    writeFileSync(script, "#!/bin/sh\nprintf 'paseo-launch-ok\\n'\nexec /bin/sleep 30\n");
+    const script = join(projectDir, "bin", "clisbot-relative-path-tool");
+    writeFileSync(script, "#!/bin/sh\nprintf 'clisbot-launch-ok\\n'\nexec /bin/sleep 30\n");
     chmodSync(script, 0o755);
     let session: TerminalSession | undefined;
     try {
       session = await createTerminal({
         workspaceId: "ws-test",
         cwd: realpathSync(projectDir),
-        command: "paseo-relative-path-tool",
+        command: "clisbot-relative-path-tool",
         env: { PATH: "bin" },
       });
-      await waitForLines(session, ["paseo-launch-ok"]);
-      expect(getLines(await readTerminalState(session))[0]).toBe("paseo-launch-ok");
+      await waitForLines(session, ["clisbot-launch-ok"]);
+      expect(getLines(await readTerminalState(session))[0]).toBe("clisbot-launch-ok");
       expect(session.cwd).toBe(realpathSync(projectDir));
       expect(session.getExitInfo()).toBeNull();
     } finally {

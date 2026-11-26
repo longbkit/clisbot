@@ -1,7 +1,7 @@
 import type pino from "pino";
 import { createHash } from "node:crypto";
-import { getErrorMessage } from "@getpaseo/protocol/error-utils";
-import { compactProviderSnapshot } from "@getpaseo/protocol/provider-snapshot-codec";
+import { getErrorMessage } from "@clisbot/protocol/error-utils";
+import { compactProviderSnapshot } from "@clisbot/protocol/provider-snapshot-codec";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
 import {
   isGlobalProviderSnapshotKey,
@@ -19,9 +19,9 @@ import {
   type ProviderSnapshotEntry,
 } from "../../agent/agent-sdk-types.js";
 import type { ProviderAvailability } from "../../agent/agent-manager.js";
-import { featuresFromControls } from "@getpaseo/protocol/option-controls";
+import { featuresFromControls } from "@clisbot/protocol/option-controls";
 import { foldFeatureValues } from "../../agent/option-controls.js";
-import type { ProviderOptions } from "@getpaseo/protocol/agent-types";
+import type { ProviderOptions } from "@clisbot/protocol/agent-types";
 import { expandTilde } from "../../../utils/path.js";
 
 // COMPAT(customModeIcons): the only mode icons known to clients before v0.1.84. Any
@@ -156,7 +156,7 @@ export class ProviderCatalogSession {
     const snapshotHash = createHash("sha256")
       .update(
         JSON.stringify([
-          "paseo.providers-snapshot/1",
+          "clisbot.providers-snapshot/1",
           references ? "references" : "embedded",
           customModeIcons ? "icons" : "legacy-icons",
           records.map(({ entry, contentHash }) => [

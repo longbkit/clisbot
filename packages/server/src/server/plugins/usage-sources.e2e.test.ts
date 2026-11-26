@@ -8,7 +8,7 @@ import { createServer } from "node:http";
 import { once } from "node:events";
 import { expect, test } from "vitest";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { BuiltinPluginLoader, resolveBuiltinPluginsRoot } from "./builtin/index.js";
 
 const fixtureRoot = fileURLToPath(new URL("./test-fixtures/", import.meta.url));
@@ -17,7 +17,7 @@ const subprocessDirectory = fileURLToPath(
 );
 
 test("lists built-in and subprocess usage; validates input and isolates fetch errors", async () => {
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     daemonVersion: "0.9.2",
     pluginsEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(fixtureRoot, ["usage-source"]),
@@ -82,8 +82,8 @@ test("lists built-in and subprocess usage; validates input and isolates fetch er
 }, 60_000);
 
 test("a packaged daemon serves usage from external built-in resources", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-builtin-asar-"));
-  const packagePath = path.join("node_modules", "@getpaseo", "server", "dist", "server");
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-builtin-asar-"));
+  const packagePath = path.join("node_modules", "@clisbot", "server", "dist", "server");
   const resourceRoot = path.join(root, "builtin-plugins");
   // An archive is a file, so the external compiler cannot traverse paths beneath it.
   // Actual Electron archive packaging is covered by the packaged-app smoke check.
@@ -91,8 +91,8 @@ test("a packaged daemon serves usage from external built-in resources", async ()
   const directory = path.join(resourceRoot, "listed");
   await mkdir(path.join(directory, "server"), { recursive: true });
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
-    JSON.stringify({ id: "listed", requirements: { paseo: ">=0.9.2" } }),
+    path.join(directory, "clisbot-plugin.json"),
+    JSON.stringify({ id: "listed", requirements: { clisbot: ">=0.9.2" } }),
   );
   await writeFile(
     path.join(directory, "server", "contract.d.ts"),
@@ -118,7 +118,7 @@ export default function contribute(server) {
   const moduleUrl = pathToFileURL(
     path.join(root, "app.asar", packagePath, "server", "plugins", "builtin", "index.js"),
   );
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     daemonVersion: "0.9.2",
     pluginsEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(resolveBuiltinPluginsRoot(moduleUrl), ["listed"]),
@@ -237,7 +237,7 @@ export default function contribute(server) {
 `,
     );
   }
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     pluginsEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(plugins, ["codex-usage-source", "claude-usage-source"]),
   });
@@ -297,7 +297,7 @@ test("a killed discovery subprocess logs kimi once and produces no provider card
   const root = await mkdtemp(path.join(os.tmpdir(), "usage-crash-"));
   const log = path.join(root, "daemon.log");
   const destination = pino.destination({ dest: log, sync: true });
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     daemonVersion: "0.9.2",
     pluginsEnabled: true,
     logger: pino({ level: "warn" }, destination),
@@ -305,8 +305,8 @@ test("a killed discovery subprocess logs kimi once and produces no provider card
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.9.2" });
   try {
     await writeFile(
-      path.join(root, "paseo-plugin.json"),
-      JSON.stringify({ id: "crashing-usage", requirements: { paseo: ">=0.9.2" } }),
+      path.join(root, "clisbot-plugin.json"),
+      JSON.stringify({ id: "crashing-usage", requirements: { clisbot: ">=0.9.2" } }),
     );
     await writeFile(
       path.join(root, "index.server.ts"),
@@ -415,12 +415,12 @@ dns.lookup = function(host, ...args) {
 );
 
 test("resolves a plugin provider launch for cold usage discovery", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-usage-launch-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-usage-launch-"));
   const directory = path.join(root, "launch-source");
   await mkdir(directory, { recursive: true });
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
-    JSON.stringify({ id: "launch-source", requirements: { paseo: ">=0.9.2" } }),
+    path.join(directory, "clisbot-plugin.json"),
+    JSON.stringify({ id: "launch-source", requirements: { clisbot: ">=0.9.2" } }),
   );
   await writeFile(
     path.join(directory, "index.server.ts"),
@@ -434,7 +434,7 @@ export default function contribute(server) {
   return () => {};
 }`,
   );
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     daemonVersion: "0.16.2",
     pluginsEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(root, ["launch-source"]),

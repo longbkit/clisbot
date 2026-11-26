@@ -3,7 +3,7 @@ import { z } from "zod";
 import { readValidatedJson } from "@/storage/validated-storage";
 import type { OnboardingCompletionStorage } from "./model";
 
-export const ONBOARDING_STORAGE_KEY = "@paseo:onboarding";
+export const ONBOARDING_STORAGE_KEY = "@clisbot:onboarding";
 
 const OnboardingRecordSchema = z.object({ completedAt: z.string() });
 

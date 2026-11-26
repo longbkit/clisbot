@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import type {
   AgentPermissionRequest,
   AgentPermissionResponse,
-} from "@getpaseo/protocol/agent-types";
+} from "@clisbot/protocol/agent-types";
 import { connectToDaemon } from "../../utils/client.js";
 import type { CommandOptions, ListResult, OutputSchema, CommandError } from "../../output/index.js";
 
@@ -107,7 +107,7 @@ export function createAllowCommand(connect: PermitClientConnector = connectToDae
         const error: CommandError = {
           code: "AGENT_NOT_FOUND",
           message: `Agent not found: ${agentIdOrPrefix}`,
-          details: 'Use "paseo ls" to list available agents',
+          details: 'Use "clisbot ls" to list available agents',
         };
         throw error;
       }
@@ -159,7 +159,7 @@ export function createAllowCommand(connect: PermitClientConnector = connectToDae
             const error: CommandError = {
               code: "PERMISSION_RESPONSE_UNCONFIRMED",
               message: `Permission response unconfirmed for request ${permission.id}: ${message}`,
-              details: 'Use "paseo permit ls" to check whether the request is still pending',
+              details: 'Use "clisbot permit ls" to check whether the request is still pending',
             };
             throw error;
           }

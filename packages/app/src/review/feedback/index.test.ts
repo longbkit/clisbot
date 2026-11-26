@@ -45,7 +45,7 @@ function makeAttachment(comments: readonly ReviewDraftComment[]): FeedbackAttach
     commentCount: comments.length,
     attachment: {
       type: "review",
-      mimeType: "application/paseo-review",
+      mimeType: "application/clisbot-review",
       cwd: "/workspace",
       mode: "uncommitted",
       baseRef: null,

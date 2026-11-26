@@ -35,7 +35,7 @@ describe("opencode agent error handling (real)", () => {
     }
   });
 
-  test("surfaces error for the exact opencode/<bad-model> path used by paseo run", async () => {
+  test("surfaces error for the exact opencode/<bad-model> path used by clisbot run", async () => {
     const client = createRealProviderClient("opencode", pino({ level: "silent" }));
     const session = await client.createSession({
       provider: "opencode",

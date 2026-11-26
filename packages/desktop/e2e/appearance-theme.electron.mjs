@@ -39,7 +39,7 @@ export async function runAdaptiveThemeRegression(artifactDir) {
     define: { __DEV__: "false" },
     resolveExtensions: [".web.js", ".js", ".json"],
   });
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-adaptive-theme-"));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-adaptive-theme-"));
   try {
     await fs.writeFile(path.join(directory, "renderer.js"), outputFiles[0].text);
     await fs.writeFile(path.join(directory, "main.cjs"), `(${electronRegression.toString()})()`);

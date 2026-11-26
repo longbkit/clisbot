@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 /**
  * The file a file panel shows. Stable for the life of the tab's target. The stat fields hold the
- * latest version Paseo knows; read them while rendering. Changing them does not re-render the
+ * latest version Clisbot knows; read them while rendering. Changing them does not re-render the
  * panel: `watch`, or a re-render from the read hooks, is how a panel learns they changed.
  */
 export interface PluginFile {
@@ -18,7 +18,7 @@ export interface PluginFile {
   readText(): Promise<string>;
   readBytes(): Promise<Uint8Array>;
   /**
-   * A local URL of the file's current bytes, for `DocumentFrame` and images. Paseo owns it: it stays
+   * A local URL of the file's current bytes, for `DocumentFrame` and images. Clisbot owns it: it stays
    * valid until a URL of a newer version resolves or the tab closes.
    */
   url(): Promise<string>;

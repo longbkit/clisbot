@@ -1,27 +1,27 @@
 ---
 title: 支持原生移动端的开源 Superset 替代品
-description: Paseo 是一个采用 Apache-2.0 许可的 Superset 替代品，无需账号即可在本地运行，并支持覆盖其服务端和客户端的应用插件。
+description: Clisbot 是一个采用 Apache-2.0 许可的 Superset 替代品，无需账号即可在本地运行，并支持覆盖其服务端和客户端的应用插件。
 nav: Superset
 order: 51
 ---
 
-# Paseo 与 Superset 对比
+# Clisbot 与 Superset 对比
 
 Superset 是一个源代码可见的桌面工作区，用于在并行的 Git worktree 中运行 CLI 编码 Agent。它包括 CLI、SDK、MCP 服务器和远程主机。
 
-Paseo 可以从桌面端、移动端、Web 和 CLI 编排编码 Agent。它以 Apache-2.0 许可开源。
+Clisbot 可以从桌面端、移动端、Web 和 CLI 编排编码 Agent。它以 Apache-2.0 许可开源。
 
-![Paseo 桌面端和移动端应用](/hero-mockup.png)
+![Clisbot 桌面端和移动端应用](/hero-mockup.png)
 
 ## 主要区别 {#the-main-difference}
 
 Superset 提供一个以终端为中心的工作区，用于在并行的 Git worktree 中运行许多 CLI Agent。它需要 Superset 账号和 GitHub 登录，其源代码以 Elastic License 2.0 发布。
 
-Paseo 无需账号即可在本地运行，采用 Apache 2.0 许可，为受支持的 Agent harness 提供结构化界面，并支持带有服务端行为和原生客户端组件的应用插件。
+Clisbot 无需账号即可在本地运行，采用 Apache 2.0 许可，为受支持的 Agent harness 提供结构化界面，并支持带有服务端行为和原生客户端组件的应用插件。
 
 ## 许可证 {#license}
 
-Paseo 以 Apache-2.0 许可开源。你可以审计、fork、修改和重新分发它。
+Clisbot 以 Apache-2.0 许可开源。你可以审计、fork、修改和重新分发它。
 
 Superset 以 Elastic License 2.0 发布源代码。你可以使用和修改它，但该许可证限制把 Superset 作为托管服务提供，也限制绕过受许可证保护的功能。
 
@@ -29,7 +29,7 @@ Superset 以 Elastic License 2.0 发布源代码。你可以使用和修改它�
 
 两者都在你掌控的机器上运行 Agent，并且可以连接到远程主机。
 
-Paseo 的 daemon 独立于它的客户端运行。桌面端、Web、移动端、CLI、SDK 和 MCP 客户端都可以直接连接，本地使用不需要账号。
+Clisbot 的 daemon 独立于它的客户端运行。桌面端、Web、移动端、CLI、SDK 和 MCP 客户端都可以直接连接，本地使用不需要账号。
 
 Superset 在打开应用时需要 Superset 账号和 GitHub 登录。它的同步、远程访问和团队工作流使用 Superset 的云服务。
 
@@ -37,11 +37,11 @@ Superset 在打开应用时需要 Superset 账号和 GitHub 登录。它的同�
 
 Superset 支持许多基于 CLI 的编码 Agent，并允许你添加自定义的终端 Agent。
 
-Paseo 通过原生的结构化 harness 运行 Claude Code、Codex、OpenCode、Pi、Antigravity 和 Muse Code，并通过 ACP 目录支持另外 30 多个 Agent，以及任意自定义的 CLI Agent。查看[所有支持的 Provider](/agents)。
+Clisbot 通过原生的结构化 harness 运行 Claude Code、Codex、OpenCode、Pi、Antigravity 和 Muse Code，并通过 ACP 目录支持另外 30 多个 Agent，以及任意自定义的 CLI Agent。查看[所有支持的 Provider](/agents)。
 
 ## 应用插件 {#application-plugins}
 
-[Paseo 插件](/docs/plugins)用于扩展 Paseo 本身。它们可以添加服务端行为和原生客户端组件，例如工作区面板、侧边栏项、Composer 附件、主题和 Command Center 条目，并在桌面端、浏览器、iOS 和 Android 上运行。
+[Clisbot 插件](/docs/plugins)用于扩展 Clisbot 本身。它们可以添加服务端行为和原生客户端组件，例如工作区面板、侧边栏项、Composer 附件、主题和 Command Center 条目，并在桌面端、浏览器、iOS 和 Android 上运行。
 
 Superset 没有公开文档化的应用扩展 API，无法同时添加服务端行为和原生客户端组件。
 
@@ -49,9 +49,9 @@ Superset 没有公开文档化的应用扩展 API，无法同时添加服务端�
 
 两者都提供 Git worktree、拆分窗格、终端、diff 审查、应用内浏览器、GitHub 工作流、定时任务和远程主机。
 
-Paseo 为受支持的 Provider 提供结构化的聊天界面，支持模式、斜杠命令、工具调用和文件附件。Superset 可以在终端窗格中运行任何 CLI Agent，并为受支持的 Agent 添加生命周期状态。
+Clisbot 为受支持的 Provider 提供结构化的聊天界面，支持模式、斜杠命令、工具调用和文件附件。Superset 可以在终端窗格中运行任何 CLI Agent，并为受支持的 Agent 添加生命周期状态。
 
-Paseo 还为每个 worktree 提供独立的服务 URL，例如 `web--fix-auth--my-app.localhost`，因此并行的开发服务器不会争抢端口。
+Clisbot 还为每个 worktree 提供独立的服务 URL，例如 `web--fix-auth--my-app.localhost`，因此并行的开发服务器不会争抢端口。
 
 ## 自动化 {#automation}
 
@@ -59,13 +59,13 @@ Paseo 还为每个 worktree 提供独立的服务 URL，例如 `web--fix-auth--m
 
 ## 价格 {#pricing}
 
-Paseo 免费，没有席位限制。
+Clisbot 免费，没有席位限制。
 
 Superset 有一个免费的个人版。团队功能、远程访问和集成属于它的付费套餐。
 
 ## 对比 {#comparison}
 
-|                                | Paseo                                                                              | Superset                                               |
+|                                | Clisbot                                                                            | Superset                                               |
 | ------------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | 许可证                         | 开源（Apache-2.0）                                                                 | 源代码可见（Elastic License 2.0）                      |
 | 需要账号                       | 否                                                                                 | 是，需要 GitHub 登录                                   |
@@ -92,4 +92,4 @@ Superset 有一个免费的个人版。团队功能、远程访问和集成属�
 | 语音                           | 是（本地语音输入、实时语音）                                                       | -                                                      |
 | 遥测                           | 无                                                                                 | -                                                      |
 
-另请参阅：[Paseo 与 Conductor 对比](/alternatives/conductor)、[Paseo 与 OpenChamber 对比](/alternatives/openchamber)、[Paseo 与 Happy Coder 对比](/alternatives/happy-coder)。
+另请参阅：[Clisbot 与 Conductor 对比](/alternatives/conductor)、[Clisbot 与 OpenChamber 对比](/alternatives/openchamber)、[Clisbot 与 Happy Coder 对比](/alternatives/happy-coder)。

@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { PluginIcon } from "@getpaseo/plugin/client";
+import type { PluginIcon } from "@clisbot/plugin/client";
 import type { FilePanel } from "../panels";
 import { parseFilePanelSelectorKey } from "../resolve";
 
@@ -21,7 +21,7 @@ export function filePanelTitle(t: TFunction, panel: FilePanel): string {
     : panel.plugin.i18n.resolve(panel.contribution.title, panel.plugin.locale);
 }
 
-/** "Markdown — Paseo", "Rich Markdown — markdown-panel". */
+/** "Markdown — Clisbot", "Rich Markdown — markdown-panel". */
 export function filePanelOptionLabel(t: TFunction, panel: FilePanel): string {
   return t("panels.file.filePanels.option", {
     title: filePanelTitle(t, panel),

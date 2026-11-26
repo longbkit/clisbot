@@ -1,7 +1,7 @@
 export const meta = {
-  name: "paseo-workflow-row-qa",
+  name: "clisbot-workflow-row-qa",
   description: "Verify the workflow row lifecycle",
-  whenToUse: "Paseo real-provider QA only",
+  whenToUse: "Clisbot real-provider QA only",
   phases: [{ title: "Verify", detail: "one child returns a fixed marker" }],
 };
 
@@ -16,7 +16,7 @@ const child = await agent(
   `First use Bash to run this command and wait for it to exit:
 while [ ! -f ${JSON.stringify(gatePath)} ]; do sleep 0.2; done
 
-Then return exactly this JSON object and do nothing else: {"marker":"PASEO_WORKFLOW_ROW_OK"}`,
+Then return exactly this JSON object and do nothing else: {"marker":"CLISBOT_WORKFLOW_ROW_OK"}`,
   {
     label: "workflow-row-child",
     phase: "Verify",

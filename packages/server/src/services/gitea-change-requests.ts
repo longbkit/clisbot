@@ -1,6 +1,6 @@
 import pLimit from "p-limit";
 import { z } from "zod";
-import { normalizeHost } from "@getpaseo/protocol/git-remote";
+import { normalizeHost } from "@clisbot/protocol/git-remote";
 import {
   ChangeRequestRateLimitError,
   createPerHostChangeRequestPoller,

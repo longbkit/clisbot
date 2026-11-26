@@ -185,7 +185,7 @@ async function fetchChangeRequestHead(params: {
     deps,
   });
   const untrustedSource = worktreeUntrustedSource(checkout);
-  const startPoint = `refs/paseo/change-requests/${changeRequest.number}`;
+  const startPoint = `refs/clisbot/change-requests/${changeRequest.number}`;
   const remote = await deps.fetchRef({
     repoRoot,
     sources: checkout.checkoutRefs,

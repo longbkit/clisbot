@@ -28,12 +28,12 @@ console.log(result.status, result.lastMessage);
 
 `waitForFinish()` returns one of four statuses:
 
-| Status       | Meaning                                                           |
-| ------------ | ----------------------------------------------------------------- |
-| `idle`       | The turn completed and the agent can accept another prompt.       |
-| `permission` | The agent needs a person to answer a permission request in Paseo. |
-| `error`      | The provider ended the turn with an error.                        |
-| `timeout`    | The wait deadline elapsed; the agent may still be running.        |
+| Status       | Meaning                                                             |
+| ------------ | ------------------------------------------------------------------- |
+| `idle`       | The turn completed and the agent can accept another prompt.         |
+| `permission` | The agent needs a person to answer a permission request in Clisbot. |
+| `error`      | The provider ended the turn with an error.                          |
+| `timeout`    | The wait deadline elapsed; the agent may still be running.          |
 
 A timeout does not cancel the agent.
 

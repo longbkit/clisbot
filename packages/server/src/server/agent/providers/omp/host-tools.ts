@@ -2,9 +2,9 @@ import type { Logger } from "pino";
 
 import {
   addModelVisibleStructuredContent,
-  serializePaseoToolInputParameters,
-} from "../../tools/paseo-tool-serialization.js";
-import type { PaseoToolCatalog, PaseoToolResult } from "../../tools/types.js";
+  serializeClisbotToolInputParameters,
+} from "../../tools/clisbot-tool-serialization.js";
+import type { ClisbotToolCatalog, ClisbotToolResult } from "../../tools/types.js";
 import type { OmpRuntimeSession } from "./runtime.js";
 import type { OmpMcpBridge } from "./mcp-bridge.js";
 import {
@@ -25,18 +25,18 @@ interface PendingOmpHostToolCall {
 
 interface OmpHostToolRouterInput {
   runtimeSession: OmpRuntimeSession;
-  catalog?: PaseoToolCatalog;
+  catalog?: ClisbotToolCatalog;
   bridge?: OmpMcpBridge;
   logger: Logger;
 }
 
-export function serializeOmpHostTools(catalog: PaseoToolCatalog): OmpRpcHostToolDefinition[] {
+export function serializeOmpHostTools(catalog: ClisbotToolCatalog): OmpRpcHostToolDefinition[] {
   return [...catalog.tools.values()].map((tool) => {
     const definition: OmpRpcHostToolDefinition = {
       name: tool.name,
       description: tool.description,
       loadMode: "essential",
-      parameters: serializePaseoToolInputParameters(tool),
+      parameters: serializeClisbotToolInputParameters(tool),
     };
     if (tool.title) {
       definition.label = tool.title;
@@ -92,7 +92,7 @@ function sendMissingCatalogResult(
   runtimeSession.sendHostToolResult(
     toOmpHostToolErrorResult(
       request.id,
-      `Host tool "${request.toolName}" was called before Paseo tools were registered`,
+      `Host tool "${request.toolName}" was called before Clisbot tools were registered`,
     ),
   );
 }
@@ -103,7 +103,7 @@ function isOmpHostToolEventType(type: string): boolean {
 
 export class OmpHostToolRouter {
   private readonly runtimeSession: OmpRuntimeSession;
-  private readonly catalog?: PaseoToolCatalog;
+  private readonly catalog?: ClisbotToolCatalog;
   readonly bridge?: OmpMcpBridge;
   private readonly logger: Logger;
   private readonly pendingCalls = new Map<string, PendingOmpHostToolCall>();
@@ -202,7 +202,7 @@ export class OmpHostToolRouter {
     this.idleWaiters.clear();
   }
 
-  private sendUpdate(callId: string, result: PaseoToolResult): void {
+  private sendUpdate(callId: string, result: ClisbotToolResult): void {
     const update: OmpRpcHostToolUpdate = {
       type: "host_tool_update",
       id: callId,
@@ -212,7 +212,7 @@ export class OmpHostToolRouter {
   }
 }
 
-function toOmpHostToolResult(id: string, result: PaseoToolResult): OmpRpcHostToolResult {
+function toOmpHostToolResult(id: string, result: ClisbotToolResult): OmpRpcHostToolResult {
   const modelVisibleResult = addModelVisibleStructuredContent(result);
   const mappedResult = toOmpAgentToolResult(modelVisibleResult);
   return {
@@ -236,7 +236,7 @@ function toOmpHostToolErrorResult(id: string, error: unknown): OmpRpcHostToolRes
   };
 }
 
-function toOmpAgentToolResult(result: PaseoToolResult): OmpAgentToolResult {
+function toOmpAgentToolResult(result: ClisbotToolResult): OmpAgentToolResult {
   const mapped: OmpAgentToolResult = {
     content: result.content.map((item) => ({ ...item })),
   };

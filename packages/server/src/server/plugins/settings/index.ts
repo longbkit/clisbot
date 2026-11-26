@@ -2,8 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z, type ZodType } from "zod";
-import { defineSettings, settingsRpc, type SettingsDefinition } from "@getpaseo/plugin";
-import type { PluginSettings, PluginSettingsState } from "@getpaseo/plugin/server";
+import { defineSettings, settingsRpc, type SettingsDefinition } from "@clisbot/plugin";
+import type { PluginSettings, PluginSettingsState } from "@clisbot/plugin/server";
 
 const envelopeSchema = z.object({ version: z.number().int().positive(), values: z.json() });
 function message(error: unknown): string {

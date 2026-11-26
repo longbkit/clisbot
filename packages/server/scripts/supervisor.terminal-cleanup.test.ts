@@ -10,7 +10,7 @@ import { describe, expect, test } from "vitest";
 // intent cleans up before the next worker starts, a keep intent or a crash never cleans up.
 
 async function runSupervisorWith(workerScript: string, timeoutMs = 8_000) {
-  const home = await mkdtemp(path.join(tmpdir(), "paseo-terminal-cleanup-"));
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-terminal-cleanup-"));
   const workerPath = path.join(home, "worker.mjs");
   const runnerPath = path.join(home, "runner.mjs");
   const eventsPath = path.join(home, "events.jsonl");
@@ -43,11 +43,11 @@ async function runSupervisorWith(workerScript: string, timeoutMs = 8_000) {
   `,
   );
   const env = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !key.startsWith("PASEO_")),
+    Object.entries(process.env).filter(([key]) => !key.startsWith("CLISBOT_")),
   );
   const child = spawn(process.execPath, ["--import", "tsx", runnerPath], {
     cwd: fileURLToPath(new URL("../../../", import.meta.url)),
-    env: { ...env, HOME: home, PASEO_HOME: home },
+    env: { ...env, HOME: home, CLISBOT_HOME: home },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
@@ -80,23 +80,23 @@ async function runSupervisorWith(workerScript: string, timeoutMs = 8_000) {
 function scriptedWorker(firstIntent: string, secondIntent = "") {
   return `
     process.on("message", (message) => {
-      if (message.type !== "paseo:graceful-shutdown") return;
+      if (message.type !== "clisbot:graceful-shutdown") return;
       record({ graceful: generation, keepTerminals: message.keepTerminals });
       process.exit(0);
     });
-    process.send({ type: "paseo:ready", listen: "endpoint-" + generation, serverId: "srv" });
+    process.send({ type: "clisbot:ready", listen: "endpoint-" + generation, serverId: "srv" });
     if (generation === 1) { ${firstIntent} }
     else { ${secondIntent} }
   `;
 }
 
-const stopKeeping = `process.send({ type: "paseo:shutdown", reason: "test", keepTerminals: true });`;
+const stopKeeping = `process.send({ type: "clisbot:shutdown", reason: "test", keepTerminals: true });`;
 
 describe("supervisor terminal cleanup", () => {
   test("a keep restart passes keepTerminals and never cleans up", async () => {
     const result = await runSupervisorWith(
       scriptedWorker(
-        `process.send({ type: "paseo:restart", reason: "test", keepTerminals: true });`,
+        `process.send({ type: "clisbot:restart", reason: "test", keepTerminals: true });`,
         stopKeeping,
       ),
     );
@@ -112,7 +112,7 @@ describe("supervisor terminal cleanup", () => {
   test("a kill restart cleans up after the worker exits and before the respawn", async () => {
     const result = await runSupervisorWith(
       scriptedWorker(
-        `process.send({ type: "paseo:restart", reason: "test", keepTerminals: false });`,
+        `process.send({ type: "clisbot:restart", reason: "test", keepTerminals: false });`,
         stopKeeping,
       ),
     );
@@ -130,13 +130,13 @@ describe("supervisor terminal cleanup", () => {
     const result = await runSupervisorWith(
       `
       process.on("message", (message) => {
-        if (message.type !== "paseo:graceful-shutdown") return;
+        if (message.type !== "clisbot:graceful-shutdown") return;
         record({ graceful: generation, keepTerminals: message.keepTerminals });
         if (generation === 2) process.exit(0);
       });
-      process.send({ type: "paseo:ready", listen: "endpoint-" + generation, serverId: "srv" });
+      process.send({ type: "clisbot:ready", listen: "endpoint-" + generation, serverId: "srv" });
       if (generation === 1) {
-        process.send({ type: "paseo:restart", reason: "test", keepTerminals: false });
+        process.send({ type: "clisbot:restart", reason: "test", keepTerminals: false });
         setInterval(() => {}, 1000);
       } else {
         ${stopKeeping}
@@ -167,7 +167,7 @@ describe("supervisor terminal cleanup", () => {
   test("a kill stop cleans up when the supervisor exits", async () => {
     const result = await runSupervisorWith(
       scriptedWorker(
-        `process.send({ type: "paseo:shutdown", reason: "test", keepTerminals: false });`,
+        `process.send({ type: "clisbot:shutdown", reason: "test", keepTerminals: false });`,
       ),
     );
     expect(result.code, result.output).toBe(0);

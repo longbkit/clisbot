@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Modal, TextInput, ScrollView } from "@getpaseo/plugin/client/ui";
-import { useTranslation, type PluginSurfaceProps } from "@getpaseo/plugin/client";
+import { Modal, TextInput, ScrollView } from "@clisbot/plugin/client/ui";
+import { useTranslation, type PluginSurfaceProps } from "@clisbot/plugin/client";
 import { messages } from "./messages";
 
 function useStyles(theme: PluginSurfaceProps["theme"], compact: boolean) {

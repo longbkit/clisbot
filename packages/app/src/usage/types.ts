@@ -1,7 +1,7 @@
 import type {
   ProviderUsageTone,
   UsageReportEntry as WireUsageReportEntry,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 
 export interface UsageReportEntry extends WireUsageReportEntry {
   /** A refresh failed while this reading was cached. */

@@ -11,10 +11,10 @@ export interface RenderProfileSample {
 }
 
 declare global {
-  var __PASEO_RENDER_PROFILE__: RenderProfileSample[] | undefined;
-  var __PASEO_RENDER_PROFILE_REASONS__: Record<string, Record<string, number>> | undefined;
-  var __PASEO_RESET_RENDER_PROFILE__: (() => void) | undefined;
-  var __PASEO_RENDER_PROFILE_ENABLED__: boolean | undefined;
+  var __CLISBOT_RENDER_PROFILE__: RenderProfileSample[] | undefined;
+  var __CLISBOT_RENDER_PROFILE_REASONS__: Record<string, Record<string, number>> | undefined;
+  var __CLISBOT_RESET_RENDER_PROFILE__: (() => void) | undefined;
+  var __CLISBOT_RENDER_PROFILE_ENABLED__: boolean | undefined;
 }
 
 function getSearchParam(name: string): string | null {
@@ -38,20 +38,20 @@ interface RenderSink {
 function createBrowserSink(): RenderSink {
   return {
     isEnabled: () =>
-      globalThis.__PASEO_RENDER_PROFILE_ENABLED__ === true ||
+      globalThis.__CLISBOT_RENDER_PROFILE_ENABLED__ === true ||
       getSearchParam("renderProfile") === "1",
     render(sample) {
-      globalThis.__PASEO_RENDER_PROFILE__ ??= [];
-      globalThis.__PASEO_RESET_RENDER_PROFILE__ ??= () => {
-        globalThis.__PASEO_RENDER_PROFILE__ = [];
-        globalThis.__PASEO_RENDER_PROFILE_REASONS__ = {};
+      globalThis.__CLISBOT_RENDER_PROFILE__ ??= [];
+      globalThis.__CLISBOT_RESET_RENDER_PROFILE__ ??= () => {
+        globalThis.__CLISBOT_RENDER_PROFILE__ = [];
+        globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ = {};
       };
       // Browser QA compares cumulative commit counts until an explicit reset.
-      globalThis.__PASEO_RENDER_PROFILE__.push(sample);
+      globalThis.__CLISBOT_RENDER_PROFILE__.push(sample);
     },
     reasons(id, reasons) {
-      globalThis.__PASEO_RENDER_PROFILE_REASONS__ ??= {};
-      const counts = (globalThis.__PASEO_RENDER_PROFILE_REASONS__[id] ??= {});
+      globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ??= {};
+      const counts = (globalThis.__CLISBOT_RENDER_PROFILE_REASONS__[id] ??= {});
       for (const reason of reasons) counts[reason] = (counts[reason] ?? 0) + 1;
     },
   };

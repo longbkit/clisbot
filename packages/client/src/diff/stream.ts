@@ -4,8 +4,8 @@ import {
   type DiffBegin,
   type DiffBody,
   type DiffFrame,
-} from "@getpaseo/protocol/binary-frames/index";
-import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/binary-frames/index";
+import type { ParsedDiffFile } from "@clisbot/protocol/messages";
 import type { DiffState } from "./index.js";
 
 /** Owns revision assembly. End, rather than a local body count, commits the snapshot. */

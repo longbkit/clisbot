@@ -184,7 +184,7 @@ export async function useChatDisplay(
   chatDisplay: "full" | "collapseToolCalls" | "collapseTurns",
 ): Promise<void> {
   await page.addInitScript((value) => {
-    localStorage.setItem("@paseo:app-settings", JSON.stringify({ chatDisplay: value }));
+    localStorage.setItem("@clisbot:app-settings", JSON.stringify({ chatDisplay: value }));
   }, chatDisplay);
 }
 

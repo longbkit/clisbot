@@ -1,4 +1,4 @@
-import type { AgentSkillSelection } from "@getpaseo/protocol/messages";
+import type { AgentSkillSelection } from "@clisbot/protocol/messages";
 
 import type { DaemonConfigStore } from "../../daemon-config-store.js";
 

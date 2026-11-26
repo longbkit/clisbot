@@ -66,6 +66,6 @@ Use the daemon's payload shape on both iOS and Android; a browser event alone
 does not test native replay or acknowledgement.
 
 Existing foreign pins belong to the reconciliation fix in
-[#6900](https://github.com/getpaseo/paseo/issues/6900). Desktop main-process window
+[#6900](https://github.com/longbkit/clisbot/issues/6900). Desktop main-process window
 selection is tracked separately in
-[#6875](https://github.com/getpaseo/paseo/issues/6875).
+[#6875](https://github.com/longbkit/clisbot/issues/6875).

@@ -1,4 +1,4 @@
-import type { PluginListItem } from "@getpaseo/protocol/messages";
+import type { PluginListItem } from "@clisbot/protocol/messages";
 import { useFetchQuery } from "@/data/query";
 import { useHostFeature } from "@/runtime/host-features";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";

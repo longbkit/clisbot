@@ -1,0 +1,6 @@
+{
+  "id": "pi-tasks-timeline",
+  "requirements": {
+    "clisbot": ">=0.8.0"
+  }
+}

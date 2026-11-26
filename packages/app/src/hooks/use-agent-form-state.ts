@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import type { AgentProviderDefinition } from "@getpaseo/protocol/provider-manifest";
+import type { AgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
 import type {
   AgentMode,
   AgentModelDefinition,
   AgentProvider,
   ProviderOptions,
   ProviderSnapshotEntry,
-} from "@getpaseo/protocol/agent-types";
+} from "@clisbot/protocol/agent-types";
 import { buildProviderDefinitions } from "@/utils/provider-definitions";
 import {
   buildSelectableProviderSelectorProviders,

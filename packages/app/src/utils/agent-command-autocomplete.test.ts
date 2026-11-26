@@ -13,15 +13,15 @@ import {
 
 describe("filterAndRankCommandAutocompleteEntries", () => {
   const entries = [
-    { source: "provider" as const, command: { name: "paseo-committee" } },
+    { source: "provider" as const, command: { name: "clisbot-committee" } },
     { source: "provider" as const, command: { name: "commit" } },
-    { source: "provider" as const, command: { name: "paseo-advisor" } },
+    { source: "provider" as const, command: { name: "clisbot-advisor" } },
   ];
 
   it("ranks command-name prefixes above later word-boundary partial matches", () => {
     const result = filterAndRankCommandAutocompleteEntries(entries, "comm");
 
-    expect(result.map((entry) => entry.command.name)).toEqual(["commit", "paseo-committee"]);
+    expect(result.map((entry) => entry.command.name)).toEqual(["commit", "clisbot-committee"]);
   });
 
   it("matches client command aliases", () => {
@@ -53,11 +53,11 @@ describe("filterAndRankCommandAutocompleteEntries on an empty query", () => {
     return listed[getAutocompleteFallbackIndex(listed.length)]?.command.name;
   }
 
-  it("selects a provider command, never an immediate Paseo action", () => {
+  it("selects a provider command, never an immediate Clisbot action", () => {
     expect(selectedOnEnter("")).toBe("compact");
   });
 
-  it("lists Paseo actions farthest from the input", () => {
+  it("lists Clisbot actions farthest from the input", () => {
     const listed = orderAutocompleteOptions(
       filterAndRankCommandAutocompleteEntries(rootEntries, ""),
     );
@@ -70,11 +70,11 @@ describe("filterAndRankCommandAutocompleteEntries on an empty query", () => {
     ]);
   });
 
-  it("still selects a typed Paseo action", () => {
+  it("still selects a typed Clisbot action", () => {
     expect(selectedOnEnter("exit")).toBe("exit");
   });
 
-  it("waits for a search when Paseo actions are all there is", () => {
+  it("waits for a search when Clisbot actions are all there is", () => {
     const clientOnly = rootEntries.filter((entry) => entry.source === "client");
 
     expect(filterAndRankCommandAutocompleteEntries(clientOnly, "")).toEqual([]);

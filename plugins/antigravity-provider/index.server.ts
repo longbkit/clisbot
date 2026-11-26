@@ -1,4 +1,4 @@
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { Usage } from "./server/usage.js";
 import { createAntigravityProvider } from "./server/provider.js";
 

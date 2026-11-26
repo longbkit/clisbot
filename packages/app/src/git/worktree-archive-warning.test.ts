@@ -8,7 +8,7 @@ import {
   toWorktreeArchiveRisk,
 } from "@/git/worktree-archive-warning";
 
-const WORKTREE = "/home/me/.paseo/worktrees/repo/feature";
+const WORKTREE = "/home/me/.clisbot/worktrees/repo/feature";
 
 function hostAnswering(status: CheckoutStatusPayload): CheckoutStatusClient & { asked: string[] } {
   const asked: string[] = [];
@@ -25,7 +25,7 @@ const NOT_GIT = {
   cwd: WORKTREE,
   requestId: "status",
   isGit: false,
-  isPaseoOwnedWorktree: false,
+  isClisbotOwnedWorktree: false,
   repoRoot: null,
   currentBranch: null,
   isDirty: null,
@@ -44,7 +44,7 @@ describe("reading a worktree's archive risk from its host", () => {
       cwd: WORKTREE,
       requestId: "status",
       isGit: true,
-      isPaseoOwnedWorktree: true,
+      isClisbotOwnedWorktree: true,
       repoRoot: WORKTREE,
       mainRepoRoot: "/home/me/repo",
       currentBranch: "feature",

@@ -19,9 +19,9 @@ import type {
   AgentUsage,
   ImportableProviderSession,
 } from "./agent-sdk-types.js";
-import type { ProviderOptions } from "@getpaseo/protocol/agent-types";
+import type { ProviderOptions } from "@clisbot/protocol/agent-types";
 import type { ManagedAgent } from "./agent-manager.js";
-import { featuresFromControls } from "@getpaseo/protocol/option-controls";
+import { featuresFromControls } from "@clisbot/protocol/option-controls";
 import type { JsonValue } from "../json-utils.js";
 import {
   isStoredAgentProviderAvailable,
@@ -510,7 +510,7 @@ function projectPersistenceHandleForWire(
   delete projected.metadata.mcpServers;
   delete projected.metadata.pluginAppendSystemPrompt;
   delete projected.metadata.daemonAppendSystemPrompt;
-  delete projected.metadata.paseoInstructionReceipt;
+  delete projected.metadata.clisbotInstructionReceipt;
   if (Object.keys(projected.metadata).length === 0) {
     delete projected.metadata;
   }

@@ -1,20 +1,20 @@
 ---
 title: GitHub Copilot
-description: 安装 GitHub Copilot CLI 并在 Paseo 中运行。
+description: 安装 GitHub Copilot CLI 并在 Clisbot 中运行。
 nav: GitHub Copilot
 ---
 
 # GitHub Copilot {#github-copilot}
 
-Paseo 通过你已安装的 `copilot` CLI 提供的官方 Agent Client Protocol（`copilot --acp`）运行 GitHub Copilot。它使用你的本地 CLI 和现有的 GitHub 登录状态。
+Clisbot 通过你已安装的 `copilot` CLI 提供的官方 Agent Client Protocol（`copilot --acp`）运行 GitHub Copilot。它使用你的本地 CLI 和现有的 GitHub 登录状态。
 
 ## 开始使用 {#getting-started}
 
-GitHub Copilot 内置于 Paseo 且默认启用。
+GitHub Copilot 内置于 Clisbot 且默认启用。
 
 1. 在 daemon 主机上安装 [GitHub Copilot CLI](https://github.com/features/copilot/cli/)。
 2. 在终端中运行 `copilot` 并登录 GitHub。
-3. 在 Paseo 中启动 Agent 时选择 **Copilot**。
+3. 在 Clisbot 中启动 Agent 时选择 **Copilot**。
 
 如果 `copilot` 不在 daemon 的 PATH 中，请使用[命令覆盖](/docs/custom-providers#custom-binary)，并在参数中保留 `--acp`。
 

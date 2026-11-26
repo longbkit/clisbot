@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { buildSelfNodeCommand } from "../server/paseo-env.js";
+import { buildSelfNodeCommand } from "../server/clisbot-env.js";
 import { ensurePrivateDirectory } from "../server/private-files.js";
 import {
   readTerminalWorkerRecord,
@@ -25,14 +25,14 @@ export class TerminalWorkerLaunchError extends Error {
  * Resolves with the record the worker wrote; a failed start leaves no worker behind.
  */
 export async function launchTerminalWorker(input: {
-  paseoHome: string;
-  paseoVersion: string;
+  clisbotHome: string;
+  clisbotVersion: string;
   timeoutMs?: number;
   /** Defaults to the copy of this installation's bundle (source in dev). */
   entry?: TerminalWorkerEntry;
 }): Promise<{ record: TerminalWorkerRecord; recordPath: string }> {
   const recordId = randomUUID();
-  ensurePrivateDirectory(terminalWorkerDirectory(input.paseoHome));
+  ensurePrivateDirectory(terminalWorkerDirectory(input.clisbotHome));
   const entry = input.entry ?? resolveTerminalWorkerEntry(input);
   const launch = buildSelfNodeCommand([
     ...entry.execArgv,
@@ -40,10 +40,10 @@ export async function launchTerminalWorker(input: {
     "--launch",
     "--record-id",
     recordId,
-    "--paseo-home",
-    input.paseoHome,
-    "--paseo-version",
-    input.paseoVersion,
+    "--clisbot-home",
+    input.clisbotHome,
+    "--clisbot-version",
+    input.clisbotVersion,
     ...(entry.runtime ? ["--runtime", entry.runtime] : []),
   ]);
   const stdout = await new Promise<string>((resolve, reject) => {
@@ -82,7 +82,7 @@ export async function launchTerminalWorker(input: {
       { cause: error },
     );
   }
-  const recordPath = terminalWorkerRecordPath(input.paseoHome, pid);
+  const recordPath = terminalWorkerRecordPath(input.clisbotHome, pid);
   const record = await readTerminalWorkerRecord(recordPath);
   if (record.recordId !== recordId) {
     throw new TerminalWorkerLaunchError(

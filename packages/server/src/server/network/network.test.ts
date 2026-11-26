@@ -148,11 +148,11 @@ test("daemon starts with an ignored proxy and writes one redacted warning to dae
     silent: true,
     env: {
       ...env,
-      PASEO_HOME: home,
+      CLISBOT_HOME: home,
       HOME: home,
       USERPROFILE: home,
-      PASEO_LISTEN: "127.0.0.1:0",
-      PASEO_RELAY_ENABLED: "0",
+      CLISBOT_LISTEN: "127.0.0.1:0",
+      CLISBOT_RELAY_ENABLED: "0",
       https_proxy: "socks5://private:secret@127.0.0.1:7890",
     },
   });
@@ -168,7 +168,7 @@ test("daemon starts with an ignored proxy and writes one redacted warning to dae
           typeof message === "object" &&
           message !== null &&
           "type" in message &&
-          message.type === "paseo:ready"
+          message.type === "clisbot:ready"
         )
           resolve();
       });

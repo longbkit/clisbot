@@ -15,8 +15,8 @@ import {
 import { ICON_SIZE } from "@/styles/theme";
 import { openExternalUrl } from "@/utils/open-external-url";
 
-const APP_STORE_URL = "https://apps.apple.com/app/paseo-pocket-engineer/id6758887924";
-const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=sh.paseo";
+const APP_STORE_URL = "https://apps.apple.com/app/clisbot-pocket-engineer/id6758887924";
+const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=sh.clisbot";
 
 // Button calls a one-argument function with its icon colour, so the Apple mark follows the theme.
 const renderAppleIcon = (color: string) => <AppleIcon color={color} size={ICON_SIZE.sm} />;

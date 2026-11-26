@@ -25,7 +25,7 @@ describe("plugin overview destinations", () => {
     "https://example.com\n",
     "https:example.com",
     "https:///example.com",
-    "https://paseo.sh@evil.example",
+    "https://clisbot.com@evil.example",
     "https://example.com\\@evil.example",
     "https://",
   ])("leaves %s as text", (url) => {

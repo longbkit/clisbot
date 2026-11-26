@@ -12,7 +12,7 @@ import {
   type UsageReport,
   type UsageWindow,
   type UsageBalance,
-} from "@getpaseo/plugin/server/usage";
+} from "@clisbot/plugin/server/usage";
 
 const ApiNumberSchema = z.coerce.number().finite();
 const ApiOptionalStringSchema = z.preprocess(

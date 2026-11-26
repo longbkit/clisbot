@@ -9,7 +9,7 @@ test("an attended MCP caller can discover and supply a cross-provider child mode
   const artifacts = path.join(process.cwd(), ".artifacts");
   await mkdir(artifacts, { recursive: true });
   const root = await mkdtemp(path.join(artifacts, "create-agent-mode-"));
-  const ctx = await createDaemonTestContext({ paseoHomeRoot: root, mcpEnabled: true });
+  const ctx = await createDaemonTestContext({ clisbotHomeRoot: root, mcpEnabled: true });
   const mcp = new Client({ name: "mode-contract-test", version: "1" });
   try {
     const parent = await ctx.client.createAgent({

@@ -20,7 +20,7 @@ Hub keeps provider tokens on the server and enforces the connection, action, and
 4. Enter the allowed channel IDs in **Channel IDs**.
 5. Select **Read messages**, **Post messages**, or both.
 
-In `.paseo/triggers/*.yml`, add `run.tools`:
+In `.clisbot/triggers/*.yml`, add `run.tools`:
 
 ```yaml
 name: nightly-digest
@@ -76,6 +76,6 @@ See [Find your Slack IDs](/docs/hub/triggers/slack#find-your-slack-ids) and [Fin
 ## Enforcement and behavior
 
 - Hub checks every tool call against the declared `connection`, `actions`, and `channels`. Discord thread and forum post access is allowed only when the thread's parent channel is in `channels`.
-- When Hub has an HTTPS origin and a recorded daemon agent, agents with `post` access receive the run's **Open in Paseo** URL in their request context so digests and reports can link directly to the session.
+- When Hub has an HTTPS origin and a recorded daemon agent, agents with `post` access receive the run's **Open in Clisbot** URL in their request context so digests and reports can link directly to the session.
 - Because tool contracts belong to the active session, changing `run.tools` on a continuing trigger requires **New agent** (`continuation: { mode: new }`) or a new continuation key on the next run.
 - If your `run.tools` block uses YAML anchors or aliases, edit the trigger in YAML view so Hub preserves those references.

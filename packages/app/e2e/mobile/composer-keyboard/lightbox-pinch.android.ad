@@ -1,6 +1,6 @@
 # CHAT_URL opens a connected chat containing a visible Markdown image with alt text IMAGE_LABEL.
 context platform=android timeout=120000 retries=0
-env APP_ID=sh.paseo.debug
+env APP_ID=sh.clisbot.debug
 env IMAGE_LABEL="Test image"
 
 open "${APP_ID}" "${CHAT_URL}"

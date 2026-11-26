@@ -159,7 +159,7 @@ describe("collapseTurns", () => {
   it("keeps lifecycle events and compaction recognizable beside a semantic action summary", () => {
     const create = shell("create");
     if (create.payload.source !== "agent") throw new Error("Expected agent tool");
-    create.payload.data.name = "mcp__paseo__create_agent";
+    create.payload.data.name = "mcp__clisbot__create_agent";
     create.payload.data.detail = { type: "unknown", input: { title: "Side fix" }, output: null };
     const finished = shell("finished");
     if (finished.payload.source !== "agent") throw new Error("Expected agent tool");
@@ -187,7 +187,7 @@ describe("collapseTurns", () => {
     expect(result.summaryRowsByHostId.get("u1")?.tools).toMatchObject({
       commandCount: 1,
       otherToolCount: 0,
-      paseoActions: { "Created agent": 1 },
+      clisbotActions: { "Created agent": 1 },
     });
   });
 

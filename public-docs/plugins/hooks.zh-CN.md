@@ -6,10 +6,10 @@ nav: 钩子
 
 # 插件钩子 {#plugin-hooks}
 
-在 `index.server.ts` 中使用 `server.addHook(name, handler)`。钩子在插件启用时运行，即使没有连接的应用。`addHook` 从 Paseo 0.14 起可用；将 `requirements.paseo` 设置为你开发插件时使用的版本。
+在 `index.server.ts` 中使用 `server.addHook(name, handler)`。钩子在插件启用时运行，即使没有连接的应用。`addHook` 从 Clisbot 0.14 起可用；将 `requirements.clisbot` 设置为你开发插件时使用的版本。
 
 ```ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 
 export default function contribute(server: PluginServerContext) {
   const remove = server.addHook("agent.open.before", async ({ request }) => ({
@@ -22,10 +22,10 @@ export default function contribute(server: PluginServerContext) {
 
 ## 命名与等待 {#naming-and-timing}
 
-名称遵循 `subject.operation.position`：主体、操作、`before` 或 `after`。名称标识生命周期中的位置；Paseo 是否等待由每个钩子决定，见下表。`workspace` 包括所有工作区，`worktree` 仅包括 git worktree。
+名称遵循 `subject.operation.position`：主体、操作、`before` 或 `after`。名称标识生命周期中的位置；Clisbot 是否等待由每个钩子决定，见下表。`workspace` 包括所有工作区，`worktree` 仅包括 git worktree。
 
-- 等待型钩子结束后 Paseo 才继续。抛出错误、返回无效数据或超过 30 秒会让操作失败，错误包含 `Plugin <id> <hook> failed: …`。修改请求的钩子收到 `{ request }`，可以返回完整的替换请求或 `undefined`。
-- 通知收到事件对象，返回 `Promise<void>`。Paseo 不等待；错误会记录在插件名下，原操作继续。`agent.turn.before` 和 `agent.permission.before` 分别在轮次开始或权限进入待处理状态时发出通知。
+- 等待型钩子结束后 Clisbot 才继续。抛出错误、返回无效数据或超过 30 秒会让操作失败，错误包含 `Plugin <id> <hook> failed: …`。修改请求的钩子收到 `{ request }`，可以返回完整的替换请求或 `undefined`。
+- 通知收到事件对象，返回 `Promise<void>`。Clisbot 不等待；错误会记录在插件名下，原操作继续。`agent.turn.before` 和 `agent.permission.before` 分别在轮次开始或权限进入待处理状态时发出通知。
 
 所有处理函数都必须为异步函数。轮次完成包括成功、失败和取消，请查看 `outcome`。权限完成包括所有处理结果，请查看 `resolution`。
 
@@ -43,7 +43,7 @@ server.addHook("worktree.create.after", async ({ worktree }) => {
 });
 ```
 
-Paseo 只观察返回的 Promise，因此独立任务没有错误报告，也没有取消 `signal`。
+Clisbot 只观察返回的 Promise，因此独立任务没有错误报告，也没有取消 `signal`。
 
 ## 钩子一览 {#hooks}
 
@@ -104,12 +104,12 @@ type PluginTurnOutcome =
 
 ## 元数据 {#metadata}
 
-Agent 和工作区带有 `metadata` 记录，用于保存插件数据。键是字符串，值可以是任意 JSON 值，Paseo 只保存、不读取任何键。给键加上插件 ID 前缀，避免不同插件冲突。标签仍是用于筛选和标记的字符串；结构化数据请用元数据。
+Agent 和工作区带有 `metadata` 记录，用于保存插件数据。键是字符串，值可以是任意 JSON 值，Clisbot 只保存、不读取任何键。给键加上插件 ID 前缀，避免不同插件冲突。标签仍是用于筛选和标记的字符串；结构化数据请用元数据。
 
 可以在创建 Agent 或工作区时设置元数据，也可以之后修改。`null` 删除该键，其他值会替换该键的整个值：
 
 ```ts
-const agent = await paseo.agents.create({
+const agent = await clisbot.agents.create({
   config: { provider: "codex/gpt-5.5" },
   cwd: "/projects/shop",
   metadata: { "linear.issue": { id: "ENG-123" } },
@@ -117,7 +117,7 @@ const agent = await paseo.agents.create({
 
 agent.metadata; // { "linear.issue": { id: "ENG-123" } }
 await agent.setMetadata({ "linear.issue": null });
-await paseo.workspaces.ref(workspaceId).setMetadata({ "linear.issue": { id: "ENG-123" } });
+await clisbot.workspaces.ref(workspaceId).setMetadata({ "linear.issue": { id: "ENG-123" } });
 ```
 
 元数据在 daemon 重启后仍然保留。所有钩子载荷都带有元数据：`workspace.create.before` 和 `agent.create.before` 收到调用方发送的元数据，`after` 钩子和 `agent.open.before` 收到已保存的元数据。主机版本过旧时，这些调用会抛出 “Update the host to use metadata.”。
@@ -169,7 +169,7 @@ server.addHook("workspace.archive.after", async ({ workspace }) => {
 
 ## worktree.create.before {#worktreecreatebefore}
 
-为新 worktree 选择路径和创建选项。通过应用、CLI、MCP 或创建 Agent 新建 worktree 时，Paseo 在 `git worktree add` 之前等待此钩子。钩子收到 `{ request }`，返回完整的替换请求，或返回 `undefined` 保持原值。抛出错误、返回无效数据或超过 30 秒会终止创建，错误包含插件和钩子名称。
+为新 worktree 选择路径和创建选项。通过应用、CLI、MCP 或创建 Agent 新建 worktree 时，Clisbot 在 `git worktree add` 之前等待此钩子。钩子收到 `{ request }`，返回完整的替换请求，或返回 `undefined` 保持原值。抛出错误、返回无效数据或超过 30 秒会终止创建，错误包含插件和钩子名称。
 
 ```ts
 import { basename, dirname, join } from "node:path";
@@ -183,7 +183,7 @@ server.addHook("worktree.create.before", async ({ request }) => ({
 }));
 ```
 
-源检出目录为 `/home/me/src/paseo`、分支为 `feature/x` 时，目标为 `/home/me/src/paseo.feature-x`。完整插件见 [worktree-placement 示例](https://github.com/getpaseo/paseo/tree/main/plugin-examples/worktree-placement)。
+源检出目录为 `/home/me/src/clisbot`、分支为 `feature/x` 时，目标为 `/home/me/src/clisbot.feature-x`。完整插件见 [worktree-placement 示例](https://github.com/longbkit/clisbot/tree/main/plugin-examples/worktree-placement)。
 
 | 请求字段                                  | 含义                                                                                                                   |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -201,15 +201,15 @@ server.addHook("worktree.create.before", async ({ request }) => ({
 
 返回 `path` 后，`slug` 仅用于 branch-off 分支命名；CLI 使用路径的最后一级目录名查找 worktree。
 
-除 `repoRoot` 和 `sourceCheckout` 外，所有字段都可以修改。返回所选 `kind` 的全部必填字段。Paseo 在钩子之后解析 Git 源计划，因此钩子可以在获取引用之前修改分支和基准，而 Git 之后仍可能选择唯一的最终分支名称。
+除 `repoRoot` 和 `sourceCheckout` 外，所有字段都可以修改。返回所选 `kind` 的全部必填字段。Clisbot 在钩子之后解析 Git 源计划，因此钩子可以在获取引用之前修改分支和基准，而 Git 之后仍可能选择唯一的最终分支名称。
 
-Paseo 解析父目录中的符号链接并验证返回的路径。路径必须为绝对路径且不存在，不能是文件系统根目录、用户主目录、仓库根目录、`.git` 目录内的路径或仓库的祖先目录。目标已存在时创建失败，Paseo 不会为插件选择的路径添加后缀。插件应让 Paseo 创建目录。
+Clisbot 解析父目录中的符号链接并验证返回的路径。路径必须为绝对路径且不存在，不能是文件系统根目录、用户主目录、仓库根目录、`.git` 目录内的路径或仓库的祖先目录。目标已存在时创建失败，Clisbot 不会为插件选择的路径添加后缀。插件应让 Clisbot 创建目录。
 
 顺序：`worktree.create.before` → worktree 管理器 `create`（或 `git worktree add`）→ `worktree.create.after` → 注册工作区。若要将 `git worktree add`、移除和恢复委托给 Worktrunk 等外部工具，请使用 `server.registerWorktreeManager()` 注册 [worktree 管理器](/docs/plugins/reference#worktree-managers)，而不是在 `worktree.create.before` 中创建目录。恢复缺失的 worktree 时使用记录的原路径，不运行创建钩子，并在对应管理器提供可选 `restore` 处理函数时委托给它。
 
 ## worktree.create.after {#worktreecreateafter}
 
-新的 git worktree 在磁盘上创建后，Paseo 会等待此钩子，然后才注册工作区、运行 setup、打开终端或启动 Agent。收到 `{ worktree: { path, branch, sourceCheckout } }`，分别是 worktree 绝对路径、分支名、来源 checkout 目录。此时还没有工作区 id。无需返回数据，直接写入 worktree 即可。抛出错误或超过 30 秒会中止创建并删除新 worktree。
+新的 git worktree 在磁盘上创建后，Clisbot 会等待此钩子，然后才注册工作区、运行 setup、打开终端或启动 Agent。收到 `{ worktree: { path, branch, sourceCheckout } }`，分别是 worktree 绝对路径、分支名、来源 checkout 目录。此时还没有工作区 id。无需返回数据，直接写入 worktree 即可。抛出错误或超过 30 秒会中止创建并删除新 worktree。
 
 此钩子覆盖新建分支、检出分支和检出 PR。恢复缺失的已归档 worktree 使用独立路径，不触发此钩子。
 
@@ -284,8 +284,8 @@ server.addHook("agent.create.after", async ({ agent }) => {
 不要 await 对正在打开的 Agent 的写入，例如 `setMetadata`。该写入要等打开完成，而打开在等你的钩子，结果钩子超时，打开失败。启动写入但不要 await，它会在打开完成后立即执行：
 
 ```ts
-server.addHook("agent.open.before", async ({ request }, { paseo }) => {
-  void paseo.agents
+server.addHook("agent.open.before", async ({ request }, { clisbot }) => {
+  void clisbot.agents
     .ref(request.agentId)
     .setMetadata({ "my.plugin": { openedBy: "hook" } })
     .catch((error) => console.error(error));
@@ -336,7 +336,7 @@ server.addHook("agent.open.before", async ({ request }) => ({
 
 插件指令按插件顺序追加在已保存的 Agent 提示词和 daemon 指令之后。指令不会保存到 Agent 配置中，读取历史时也会忽略这些指令。插件数据更改后，重新加载插件以在下次重新打开会话时应用新指令。正在运行的轮次会继续。移除指令不会删除对话历史。内部 Agent 也会收到这些指令。ACP 适配器不会向 Provider 发送系统指令。插件 Provider 会收到组合后的提示词，但需要自行应用。
 
-更新 Codex 指令需要 Codex 0.121.0 或更新版本，且 app server 报告的版本必须可识别。版本显示为 `0.0.0` 的源码构建需要换用带版本号的构建。Paseo 会向现有会话添加当前指令快照；之前的快照仍保留在对话中。更新期间发生崩溃或回退会话时，快照可能重复。
+更新 Codex 指令需要 Codex 0.121.0 或更新版本，且 app server 报告的版本必须可识别。版本显示为 `0.0.0` 的源码构建需要换用带版本号的构建。Clisbot 会向现有会话添加当前指令快照；之前的快照仍保留在对话中。更新期间发生崩溃或回退会话时，快照可能重复。
 
 ### 在每次打开会话时注入环境变量 {#inject-environment-variables-on-every-session-opening}
 
@@ -376,9 +376,9 @@ server.addHook("agent.open.before", async ({ request }) => {
 `request.mcpServers` 使用与 `AgentSessionConfig.mcpServers` 相同的服务器配置。
 每个插件的映射从空开始，只在该插件自己的回调之间累积，不包含 Agent 已保存的服务器或其他插件的服务器。
 替换映射即可添加、替换或移除本插件的条目；返回 `undefined` 会保持不变。
-Paseo 按插件 ID 顺序合并各插件的最终映射。
+Clisbot 按插件 ID 顺序合并各插件的最终映射。
 
-名称与已保存的服务器、Paseo 内部的 `paseo` 服务器或其他插件的服务器冲突时，会话打开失败，错误会指出服务器名称及双方来源。
+名称与已保存的服务器、Clisbot 内部的 `clisbot` 服务器或其他插件的服务器冲突时，会话打开失败，错误会指出服务器名称及双方来源。
 不支持 MCP 的 Provider 会报 `does not support MCP servers` 错误，并指出插件名称。
 `purpose: "history"` 的会话打开会忽略这些服务器。安装、停用和重新加载插件后，现有 Agent
 通过[会话重新打开行为](#attach-tools-to-agents)获取变化。
@@ -392,7 +392,7 @@ Paseo 按插件 ID 顺序合并各插件的最终映射。
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { defineAgentTool, type PluginServerContext } from "@getpaseo/plugin/server";
+import { defineAgentTool, type PluginServerContext } from "@clisbot/plugin/server";
 
 const appendWorkspaceNote = defineAgentTool({
   name: "append_workspace_note",
@@ -420,7 +420,7 @@ export default function contribute(server: PluginServerContext) {
 通过 SDK 创建 Agent 时设置标签：
 
 ```ts
-const agent = await paseo.agents.create({
+const agent = await clisbot.agents.create({
   config: { provider: "codex/gpt-5.4" },
   cwd: "/projects/shop",
   labels: { "notes/enabled": "true" },
@@ -440,7 +440,7 @@ const agent = await paseo.agents.create({
 每个插件的 `request.tools` 都从空数组开始。同一插件中的后续回调会看到前面回调返回的工具；
 替换数组即可添加或移除工具。返回 `undefined` 会保留请求。`purpose: "history"` 时会忽略工具。
 
-从 `@getpaseo/plugin/server` 导入 `defineAgentTool`、`AgentToolDefinition`、`AgentToolContext`
+从 `@clisbot/plugin/server` 导入 `defineAgentTool`、`AgentToolDefinition`、`AgentToolContext`
 和 `AgentToolResult`。辅助函数会根据 Zod schema 推断验证后的输入类型：
 
 ```ts
@@ -465,35 +465,35 @@ interface AgentToolResult {
 | 执行 context | 值                                                                                                  |
 | ------------ | --------------------------------------------------------------------------------------------------- |
 | `agent`      | 发起调用的 Agent，以 `PluginHookAgent` 表示，包括 `id`、`workspaceId`、`provider`、`cwd` 和 `title` |
-| `paseo`      | 已连接到此 daemon 的 SDK                                                                            |
+| `clisbot`    | 已连接到此 daemon 的 SDK                                                                            |
 | `signal`     | 此次工具调用的中止信号；请把它传给文件操作或外部请求                                                |
 
 `execute` 在插件进程中运行。闭包和原始 Zod schema 保留在该进程中；只有工具元数据和调用的
-输入、结果会跨进程传递。Paseo 在调用 `execute` 前验证输入。无效输入会将 schema 问题返回给
+输入、结果会跨进程传递。Clisbot 在调用 `execute` 前验证输入。无效输入会将 schema 问题返回给
 Agent。抛出的错误会转换为 `{ isError: true, text: message }`，插件继续运行。取消调用或关闭
 其传输连接会中止 `signal` 并丢弃结果。工具调用最长运行 10 分钟，与钩子的 30 秒超时分开。
 关闭或重新打开 Agent 会话会移除旧定义。
 
 在 `text` 中返回模型可见的文本。`structuredContent` 必须可序列化为 JSON；省略 `text` 时，
-Paseo 会将该值格式化为供模型读取的文本。设置 `isError: true` 可报告工具错误。
+Clisbot 会将该值格式化为供模型读取的文本。设置 `isError: true` 可报告工具错误。
 
-Paseo 通过 Agent 工具传输提供附加的工具，按 Provider 的支持情况使用 MCP 或原生注册。
-同一份定义和回调适用于这两种方式。附加的工具遵循[与 Paseo 工具相同的限制](/docs/mcp#limit-paseo-tools-by-provider)。
+Clisbot 通过 Agent 工具传输提供附加的工具，按 Provider 的支持情况使用 MCP 或原生注册。
+同一份定义和回调适用于这两种方式。附加的工具遵循[与 Clisbot 工具相同的限制](/docs/mcp#limit-clisbot-tools-by-provider)。
 只有该 Agent 能看到这些工具。
 
-名称必须匹配 `/^[a-z][a-z0-9_]*$/`，且不超过 64 个字符。如果名称与同一 Agent 的 Paseo
+名称必须匹配 `/^[a-z][a-z0-9_]*$/`，且不超过 64 个字符。如果名称与同一 Agent 的 Clisbot
 工具或另一插件的工具冲突，会话打开会失败，并指出双方。一个插件内的重复名称也会导致
 会话打开失败。回调未选中的 Agent 不受影响。
 
-| 变更                                                  | Agent 何时收到变更                                                                                                                                                                 |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 启动、停止或重新加载声明了 `agent.open.before` 的插件 | 已打开的会话会标记为过期。每个会话在下一次空闲提示词前重新打开；正在运行的轮次会继续，不会被中断。重新打开后的下一条提示词复用该会话。                                             |
-| 修改回调选择的 Agent                                  | 编辑此示例后运行 `paseo plugin reload agent-tools`，然后在 Agent 空闲时发送提示词。                                                                                                |
-| 立即应用                                              | 调用 `await paseo.agents.ref(id).reload({ requestId: "reload-notes" })`。`requestId` 可选。这会重新打开 Provider 会话，以 `reason: "refresh"` 再次运行钩子，并中断正在运行的轮次。 |
-| 读取当前快照                                          | 调用 `await paseo.agents.ref(id).refresh()`。这只读取状态，不会重新打开会话。                                                                                                      |
+| 变更                                                  | Agent 何时收到变更                                                                                                                                                                   |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 启动、停止或重新加载声明了 `agent.open.before` 的插件 | 已打开的会话会标记为过期。每个会话在下一次空闲提示词前重新打开；正在运行的轮次会继续，不会被中断。重新打开后的下一条提示词复用该会话。                                               |
+| 修改回调选择的 Agent                                  | 编辑此示例后运行 `clisbot plugin reload agent-tools`，然后在 Agent 空闲时发送提示词。                                                                                                |
+| 立即应用                                              | 调用 `await clisbot.agents.ref(id).reload({ requestId: "reload-notes" })`。`requestId` 可选。这会重新打开 Provider 会话，以 `reason: "refresh"` 再次运行钩子，并中断正在运行的轮次。 |
+| 读取当前快照                                          | 调用 `await clisbot.agents.ref(id).refresh()`。这只读取状态，不会重新打开会话。                                                                                                      |
 
 如果自动重新打开失败，触发它的提示词会返回该错误。参阅
-[完整 agent-tools 示例](https://github.com/getpaseo/paseo/tree/main/plugin-examples/agent-tools)。
+[完整 agent-tools 示例](https://github.com/longbkit/clisbot/tree/main/plugin-examples/agent-tools)。
 
 ## agent.close.after {#agentcloseafter}
 
@@ -531,10 +531,10 @@ server.addHook("agent.turn.before", async ({ agent, turnId }) => {
 
 ### 在轮次结束时发送后续消息 {#send-a-follow-up-when-a-turn-ends}
 
-把 [server/inspect.ts](https://github.com/getpaseo/paseo/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts) 复制到你的插件中。该辅助文件从 `@getpaseo/protocol/agent-types` 导入类型；请把与 daemon 版本相同的 `@getpaseo/protocol` 加入开发依赖，并在加载插件之前安装它们。`latestOutputText` 会拼接最近一条用户消息之后的文本片段。
+把 [server/inspect.ts](https://github.com/longbkit/clisbot/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts) 复制到你的插件中。该辅助文件从 `@clisbot/protocol/agent-types` 导入类型；请把与 daemon 版本相同的 `@clisbot/protocol` 加入开发依赖，并在加载插件之前安装它们。`latestOutputText` 会拼接最近一条用户消息之后的文本片段。
 
 ```ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { latestOutputText } from "./server/inspect";
 
 export default function contribute(server: PluginServerContext) {
@@ -543,7 +543,7 @@ export default function contribute(server: PluginServerContext) {
       return;
     }
 
-    const agent = context.paseo.agents.ref(event.agent.id);
+    const agent = context.clisbot.agents.ref(event.agent.id);
     const page = await agent.timeline.refetch({ direction: "tail", limit: 1, wholeTurns: true });
     const turn = page.entries.filter((entry) => entry.turnId === event.turnId);
     const text = latestOutputText(turn.map(({ item }) => item));
@@ -570,10 +570,10 @@ Turn ends: "out of credits"
 
 ### 回应权限请求 {#answer-a-permission-request}
 
-使用同一个[辅助文件](https://github.com/getpaseo/paseo/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts)中的 `shellCommand`：
+使用同一个[辅助文件](https://github.com/longbkit/clisbot/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts)中的 `shellCommand`：
 
 ```ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { shellCommand } from "./server/inspect";
 
 export default function contribute(server: PluginServerContext) {
@@ -583,7 +583,7 @@ export default function contribute(server: PluginServerContext) {
       return;
     }
 
-    const agent = context.paseo.agents.ref(event.agent.id);
+    const agent = context.clisbot.agents.ref(event.agent.id);
     if (/\brm\s+-rf\b/.test(command)) {
       await agent.respondToPermission({
         requestId: event.request.id,
@@ -644,9 +644,9 @@ server.addHook("agent.turn.after", async ({ agent }) => {
 Creation request
   → agent.create.before hooks (plugin-ID order; registration order within each plugin)
   → resolve defaults and validate provider configuration
-  → derive launch configuration with Paseo runtime tools and daemon prompt
+  → derive launch configuration with Clisbot runtime tools and daemon prompt
   → agent.open.before hooks (same ordering; env and plugin-local tools and MCP servers)
-  → set PASEO_AGENT_ID, PASEO_AGENT_CWD, and PASEO_WORKSPACE_ID when the agent has a workspace
+  → set CLISBOT_AGENT_ID, CLISBOT_AGENT_CWD, and CLISBOT_WORKSPACE_ID when the agent has a workspace
   → open provider session and save agent configuration
 ```
 
@@ -664,7 +664,7 @@ Creation request
 
 | 契约                       | 行为                                                                               |
 | -------------------------- | ---------------------------------------------------------------------------------- |
-| `context.paseo`            | 已连接到此 daemon 的现有 SDK                                                       |
+| `context.clisbot`          | 已连接到此 daemon 的现有 SDK                                                       |
 | `context.signal`           | 在调用超时或插件停止时中止；请把它传给外部请求                                     |
 | 输入数据                   | 分离的快照；通过返回的请求或 SDK 命令改变状态                                      |
 | 注册结果                   | 幂等的移除函数，例如 `const remove = server.addHook(...); remove();`               |
@@ -677,15 +677,15 @@ Creation request
 
 ## 完整示例 {#complete-examples}
 
-| 插件                                                                                                   | 包含                                                              |
-| ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| [lifecycle-logger](https://github.com/getpaseo/paseo/tree/main/plugin-examples/lifecycle-logger)       | Agent、工作区和 worktree 钩子；隐去环境变量值的 JSON 日志         |
-| [lifecycle-actions](https://github.com/getpaseo/paseo/tree/main/plugin-examples/lifecycle-actions)     | 后续消息、权限、环境变量、切换 Provider、选择 worktree            |
-| [agent-configuration](https://github.com/getpaseo/paseo/tree/main/plugin-examples/agent-configuration) | MCP 注入以及 Codex 沙盒/批准选项                                  |
-| [agent-tools](https://github.com/getpaseo/paseo/tree/main/plugin-examples/agent-tools)                 | 按标签选择 Agent，并在插件进程中执行文件操作的工具                |
-| [worktrunk](https://github.com/getpaseo/paseo/tree/main/plugin-examples/worktrunk)                     | worktree 管理器（`create`、`remove`、`restore`）与 Agent 活动标记 |
+| 插件                                                                                                     | 包含                                                              |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [lifecycle-logger](https://github.com/longbkit/clisbot/tree/main/plugin-examples/lifecycle-logger)       | Agent、工作区和 worktree 钩子；隐去环境变量值的 JSON 日志         |
+| [lifecycle-actions](https://github.com/longbkit/clisbot/tree/main/plugin-examples/lifecycle-actions)     | 后续消息、权限、环境变量、切换 Provider、选择 worktree            |
+| [agent-configuration](https://github.com/longbkit/clisbot/tree/main/plugin-examples/agent-configuration) | MCP 注入以及 Codex 沙盒/批准选项                                  |
+| [agent-tools](https://github.com/longbkit/clisbot/tree/main/plugin-examples/agent-tools)                 | 按标签选择 Agent，并在插件进程中执行文件操作的工具                |
+| [worktrunk](https://github.com/longbkit/clisbot/tree/main/plugin-examples/worktrunk)                     | worktree 管理器（`create`、`remove`、`restore`）与 Agent 活动标记 |
 
-用 `paseo plugin logs lifecycle-logger` 或主机的 `daemon.log` 读取 logger 的输出。
+用 `clisbot plugin logs lifecycle-logger` 或主机的 `daemon.log` 读取 logger 的输出。
 
 ## 已重命名的钩子 {#renamed-hooks}
 

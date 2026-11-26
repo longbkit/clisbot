@@ -1,4 +1,4 @@
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { describeFrame } from "./server/frame-check";
 import { openTestPattern } from "./server/test-pattern";
 import { checkFrame } from "./shared/frame-check";

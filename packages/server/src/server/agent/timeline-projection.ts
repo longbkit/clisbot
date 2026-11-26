@@ -1,6 +1,6 @@
-import { continuesTimelineTurn, isTimelineTurnTrigger } from "@getpaseo/protocol/timeline-turn";
+import { continuesTimelineTurn, isTimelineTurnTrigger } from "@clisbot/protocol/timeline-turn";
 import type { AgentMetric, AgentTimelineItem, ToolCallDetail } from "./agent-sdk-types.js";
-import { timelineItemIdentity } from "@getpaseo/protocol/timeline-identity";
+import { timelineItemIdentity } from "@clisbot/protocol/timeline-identity";
 
 import type { AgentTimelineRow } from "./agent-timeline-store-types.js";
 

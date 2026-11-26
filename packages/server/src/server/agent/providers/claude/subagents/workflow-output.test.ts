@@ -13,15 +13,15 @@ describe("Claude workflow output", () => {
   it("extracts the real single-report result without exposing provider internals", () => {
     const text = parseClaudeWorkflowResult(
       JSON.stringify({
-        summary: "Inspect Paseo",
-        result: { report: "What Paseo is\nA local-first coding-agent environment." },
+        summary: "Inspect Clisbot",
+        result: { report: "What Clisbot is\nA local-first coding-agent environment." },
         script: "SECRET WORKFLOW SOURCE",
         args: "SECRET ARGS",
         workflowProgress: [{ promptPreview: "SECRET CHILD PROMPT" }],
       }),
     );
 
-    expect(text).toBe("What Paseo is\nA local-first coding-agent environment.");
+    expect(text).toBe("What Clisbot is\nA local-first coding-agent environment.");
     expect(text).not.toContain("SECRET");
   });
 
@@ -47,7 +47,7 @@ describe("Claude workflow output", () => {
   });
 
   it("reads at most one byte beyond the on-disk limit before rejecting", () => {
-    const directory = mkdtempSync(path.join(tmpdir(), "paseo-workflow-output-limit-"));
+    const directory = mkdtempSync(path.join(tmpdir(), "clisbot-workflow-output-limit-"));
     const outputFile = path.join(directory, "workflow.output");
     try {
       writeFileSync(outputFile, "x".repeat(1024 * 1024 + 1), "utf8");

@@ -20,10 +20,10 @@ Linear webhook 需要 HTTPS。在配置 Linear 之前，请先通过[公开 HTTP
 
 Linear 会调用这些 Hub URL：
 
-| 设置         | Hub URL                                                |
-| ------------ | ------------------------------------------------------ |
-| Redirect URL | `<PASEO_HUB_APP_URL>/api/integrations/linear/callback` |
-| Webhook URL  | `<PASEO_HUB_APP_URL>/api/integrations/linear/events`   |
+| 设置         | Hub URL                                                  |
+| ------------ | -------------------------------------------------------- |
+| Redirect URL | `<CLISBOT_HUB_APP_URL>/api/integrations/linear/callback` |
+| Webhook URL  | `<CLISBOT_HUB_APP_URL>/api/integrations/linear/events`   |
 
 Hub 请求 `read` 和 `comments:create` OAuth 权限范围，并以 Linear 应用身份发布回复。接下来使用 [Linear 触发器](/docs/hub/triggers/linear)创建你的第一个触发器。
 

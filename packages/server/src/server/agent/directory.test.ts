@@ -121,7 +121,7 @@ test("scoped status queries retain cross-workspace parent context", async () => 
     ...base,
     id: "child",
     workspaceId: "hidden",
-    labels: { "paseo.parent-agent-id": "parent" },
+    labels: { "clisbot.parent-agent-id": "parent" },
     lastStatus: "running",
   });
   const agents = await directory.list({

@@ -4,7 +4,7 @@ import { page } from "@vitest/browser/context";
 import { afterEach, describe, expect, it } from "vitest";
 import { encodeTerminalOutput, TerminalEmulatorRuntime } from "./terminal-emulator-runtime";
 
-// Regression: "streaming pino log, resized the Paseo terminal, old logs stayed
+// Regression: "streaming pino log, resized the Clisbot terminal, old logs stayed
 // narrow and new logs drew on top of the old ones."
 //
 // Backpressure triggers an ANSI replay serialized directly from xterm. Replayed
@@ -59,7 +59,7 @@ function mount(width: number, height: number): Mounted {
     scrollback: 10_000,
     theme: { background: "#0b0b0b", foreground: "#e6e6e6", cursor: "#e6e6e6" },
   });
-  const terminal = window.__paseoTerminal as InspectableTerminal | undefined;
+  const terminal = window.__clisbotTerminal as InspectableTerminal | undefined;
   if (!terminal) {
     throw new Error("terminal did not mount");
   }
@@ -134,7 +134,7 @@ afterEach(() => {
   }
 });
 
-describe("terminal resize reflow repro (Paseo terminal)", () => {
+describe("terminal resize reflow repro (Clisbot terminal)", () => {
   it("replayed soft-wrapped rows reflow after the terminal grows", async () => {
     await page.viewport(1600, 700);
     const m = mount(560, 360); // ~70 cols

@@ -1,6 +1,6 @@
 # Terminal Activity Indicators
 
-Paseo surfaces terminal activity as a tab indicator (the same "running" dot used by agents).
+Clisbot surfaces terminal activity as a tab indicator (the same "running" dot used by agents).
 
 ## Current state
 
@@ -40,12 +40,12 @@ Path-prefix routing is only a legacy fallback for unowned terminal activity cont
 
 Terminals receive four environment variables when the daemon creates the shell:
 
-- `PASEO_TERMINAL_ID`
-- `PASEO_ACTIVITY_TOKEN`
-- `PASEO_TERMINAL_ACTIVITY_URL`
-- `PASEO_HOOK_CLI` — absolute path to the current `paseo` CLI executable.
+- `CLISBOT_TERMINAL_ID`
+- `CLISBOT_ACTIVITY_TOKEN`
+- `CLISBOT_TERMINAL_ACTIVITY_URL`
+- `CLISBOT_HOOK_CLI` — absolute path to the current `clisbot` CLI executable.
 
-The generated shell command uses `PASEO_HOOK_CLI` to run the current CLI. `paseo hooks <agent> <event>` then reads the terminal id, token, and activity URL, asks the agent hook provider registry to resolve the event to a coarse activity state, and silently posts `{ terminalId, token, state }` to the activity URL. Missing env, unsupported agents/events, malformed hook input, and daemon/network failures are no-ops so agent hooks never break the user's terminal session.
+The generated shell command uses `CLISBOT_HOOK_CLI` to run the current CLI. `clisbot hooks <agent> <event>` then reads the terminal id, token, and activity URL, asks the agent hook provider registry to resolve the event to a coarse activity state, and silently posts `{ terminalId, token, state }` to the activity URL. Missing env, unsupported agents/events, malformed hook input, and daemon/network failures are no-ops so agent hooks never break the user's terminal session.
 
 Claude hook mapping:
 
@@ -76,7 +76,7 @@ OpenCode uses a server plugin instead of command hooks. Both generations discove
 | `permission.asked`                                          | Both       | needs-input |
 | `permission.replied`                                        | Both       | running     |
 
-The plugin translates both event contracts into the existing Paseo hook events. OpenCode 2 disposes its event subscription when the plugin unloads.
+The plugin translates both event contracts into the existing Clisbot hook events. OpenCode 2 disposes its event subscription when the plugin unloads.
 
 The daemon maps hook states onto terminal activity like an agent lifecycle plus unread attention: `running` → `state: working`, `idle` → `state: idle`, and `needs-input` → `state: idle` with `attentionReason: needs_input`. A `working` → `idle` transition records `state: idle` with `attentionReason: finished` until the user focuses that terminal; plain idle terminals still contribute no workspace status.
 
@@ -92,32 +92,32 @@ gates installation. It is surfaced in the app under a host's **Terminals** setti
 terminal agent hooks" — "Get notifications and status from terminal agents. This installs hooks in
 your agent config files." `applyTerminalAgentHookSetting` reconciles the installed hooks with the
 setting: at startup it installs only when enabled; toggling the setting live installs on enable and
-removes Paseo's marker-matched hooks on disable. `paseo hooks` keeps working regardless — the gate
+removes Clisbot's marker-matched hooks on disable. `clisbot hooks` keeps working regardless — the gate
 only controls whether the daemon writes hooks into agent configs, not whether the CLI can post
 activity when the env is present.
 
-When enabled, Paseo installs provider hooks globally:
+When enabled, Clisbot installs provider hooks globally:
 
 - Claude hooks are written to `~/.claude/settings.json` (or `CLAUDE_CONFIG_DIR/settings.json` when that override is set).
-- Codex hooks are written to `~/.codex/hooks.json` (or `CODEX_HOME/hooks.json` when that override is set). Codex supports a native `commandWindows`, so each Paseo hook includes both POSIX and Windows commands. Non-managed Codex hooks are trust-gated by Codex; users may see Codex's hook review prompt before the hook runs.
-- OpenCode gets a self-contained plugin at `$XDG_CONFIG_HOME/opencode/plugins/paseo-terminal-activity.js` (or `~/.config/opencode/plugins/paseo-terminal-activity.js` when XDG is unset; `OPENCODE_CONFIG_DIR` still wins when set).
+- Codex hooks are written to `~/.codex/hooks.json` (or `CODEX_HOME/hooks.json` when that override is set). Codex supports a native `commandWindows`, so each Clisbot hook includes both POSIX and Windows commands. Non-managed Codex hooks are trust-gated by Codex; users may see Codex's hook review prompt before the hook runs.
+- OpenCode gets a self-contained plugin at `$XDG_CONFIG_HOME/opencode/plugins/clisbot-terminal-activity.js` (or `~/.config/opencode/plugins/clisbot-terminal-activity.js` when XDG is unset; `OPENCODE_CONFIG_DIR` still wins when set).
 
-Installation is marker-based/idempotent for config hooks and exact-file/idempotent for the OpenCode plugin. Paseo preserves user hooks, removes only its own marker-matched command hooks, and leaves hooks installed across daemon shutdown. Outside a Paseo terminal they are inert because the command or plugin is gated on `PASEO_TERMINAL_ID`.
+Installation is marker-based/idempotent for config hooks and exact-file/idempotent for the OpenCode plugin. Clisbot preserves user hooks, removes only its own marker-matched command hooks, and leaves hooks installed across daemon shutdown. Outside a Clisbot terminal they are inert because the command or plugin is gated on `CLISBOT_TERMINAL_ID`.
 
 Provider variation lives in `AGENT_HOOK_PROVIDERS`: provider id, installed events, config install metadata, and runtime event-to-activity resolution. The daemon calls `installRegisteredAgentHooks()` once; the CLI calls `resolveHookActivity(provider, event, input)`. Adding a provider should add one provider entry and register it in `AGENT_HOOK_PROVIDERS`, without editing the generic CLI command or daemon bootstrap.
 
 The installed hook command keeps the config portable and resolves the CLI at runtime:
 
 ```sh
-[ -n "$PASEO_TERMINAL_ID" ] && "${PASEO_HOOK_CLI:-paseo}" hooks claude <event>
+[ -n "$CLISBOT_TERMINAL_ID" ] && "${CLISBOT_HOOK_CLI:-clisbot}" hooks claude <event>
 ```
 
 Codex also receives the Windows equivalent:
 
 ```bat
-if defined PASEO_TERMINAL_ID (if defined PASEO_HOOK_CLI ("%PASEO_HOOK_CLI%" hooks codex <event>) else (paseo hooks codex <event>))
+if defined CLISBOT_TERMINAL_ID (if defined CLISBOT_HOOK_CLI ("%CLISBOT_HOOK_CLI%" hooks codex <event>) else (clisbot hooks codex <event>))
 ```
 
-The daemon resolves the current CLI through `PASEO_CLI` when its launcher supplies one, or through the npm package shim for standalone installs. Terminal setup exposes that resolved executable to hooks as `PASEO_HOOK_CLI`; desktop and other daemon launchers do not know about the hook-specific variable. The generated command falls back to bare `paseo` if the hook env is missing and no-ops outside Paseo terminals because the `PASEO_TERMINAL_ID` gate remains first. Paseo also prepends the resolved CLI directory to each terminal `PATH` as a secondary fallback. All other behavior lives in `paseo hooks`: read the env, map the event, POST activity, and no-op/fail-open when anything is missing or unavailable.
+The daemon resolves the current CLI through `CLISBOT_CLI` when its launcher supplies one, or through the npm package shim for standalone installs. Terminal setup exposes that resolved executable to hooks as `CLISBOT_HOOK_CLI`; desktop and other daemon launchers do not know about the hook-specific variable. The generated command falls back to bare `clisbot` if the hook env is missing and no-ops outside Clisbot terminals because the `CLISBOT_TERMINAL_ID` gate remains first. Clisbot also prepends the resolved CLI directory to each terminal `PATH` as a secondary fallback. All other behavior lives in `clisbot hooks`: read the env, map the event, POST activity, and no-op/fail-open when anything is missing or unavailable.
 
 If config installation fails, daemon startup and terminal spawn continue without terminal activity hooks.

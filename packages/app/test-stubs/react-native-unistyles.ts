@@ -1,5 +1,5 @@
 import { createElement, type ElementType } from "react";
-import { lightHighlightColors } from "@getpaseo/highlight";
+import { lightHighlightColors } from "@clisbot/highlight";
 import { lightTheme } from "../src/styles/theme";
 
 const pinnedTheme = {

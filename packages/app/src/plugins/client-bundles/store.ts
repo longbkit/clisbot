@@ -1,7 +1,7 @@
 import type {
   PluginClientBundle,
   PluginClientBundleStore,
-} from "@getpaseo/client/internal/daemon-client";
+} from "@clisbot/client/internal/daemon-client";
 
 /** Each adapter is scoped to one host. Writes publish a complete file/record atomically. */
 export interface PluginBundleFiles {

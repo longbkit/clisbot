@@ -1,5 +1,5 @@
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { SubscribeTerminalRequest } from "@getpaseo/protocol/messages";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { SubscribeTerminalRequest } from "@clisbot/protocol/messages";
 import type { TerminalOutputData } from "./terminal-emulator-runtime";
 import { i18n } from "@/i18n/i18next";
 
@@ -26,7 +26,7 @@ export interface TerminalStreamControllerOptions {
   onExit?: (terminalId: string) => void;
   onReplay?: (input: {
     terminalId: string;
-    replay: import("@getpaseo/client").TerminalReplayEvent;
+    replay: import("@clisbot/client").TerminalReplayEvent;
   }) => void;
   getRestoreOptions?: () => SubscribeTerminalRequest["restore"] | undefined;
   onStatusChange?: (status: TerminalStreamControllerStatus) => void;

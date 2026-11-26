@@ -14,7 +14,7 @@ const run = promisify(execFile);
 test.runIf(process.platform === "linux" && process.env.RUN_RELAY_LATENCY_E2E === "1")(
   "connects relay control and data over a slow dual-stack route with an unreachable address",
   async () => {
-    const directory = await mkdtemp(path.join(os.tmpdir(), "paseo-relay-latency-"));
+    const directory = await mkdtemp(path.join(os.tmpdir(), "clisbot-relay-latency-"));
     try {
       const hosts = path.join(directory, "hosts");
       await writeFile(

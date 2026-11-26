@@ -1,4 +1,4 @@
-import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { afterEach, expect, test } from "vitest";
 
 import { createHostResolver, type HostOperations } from "./index.js";

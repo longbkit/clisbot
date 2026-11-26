@@ -50,7 +50,7 @@ import {
   SIDEBAR_UNLABELLED_LABEL_KEY,
   type SidebarGroupMode,
 } from "@/stores/sidebar-view-store";
-import { workspaceLabelKey, type WorkspaceLabelColor } from "@getpaseo/protocol/workspace-labels";
+import { workspaceLabelKey, type WorkspaceLabelColor } from "@clisbot/protocol/workspace-labels";
 import type { WorkspaceTitleSource } from "@/hooks/use-settings";
 import { SIDEBAR_CHECKS_DISPLAYS, type SidebarChecksDisplay } from "./checks-display";
 import { useSidebarDisplayPreferences, type SidebarTrailingChoice } from "./model";
@@ -610,7 +610,7 @@ function OptionList<Value extends string>({
 }
 
 /**
- * Three groups: Paseo's own row items, plugin badge items, then the one thing the slot to the
+ * Three groups: Clisbot's own row items, plugin badge items, then the one thing the slot to the
  * right of the title holds. Picking the trailing choice already showing empties the slot and
  * gives the width back to the title.
  *

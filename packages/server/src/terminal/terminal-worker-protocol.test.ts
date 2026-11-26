@@ -17,7 +17,7 @@ describe("classifyTerminalWorkerProtocol", () => {
     [4, "obsolete"],
     [-1, "obsolete"],
     [7, "newer"],
-    // A version this daemon cannot read comes from a Paseo it does not know.
+    // A version this daemon cannot read comes from a Clisbot it does not know.
     ["6", "newer"],
     [4.5, "newer"],
     [Number.NaN, "newer"],

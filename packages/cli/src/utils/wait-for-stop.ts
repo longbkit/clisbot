@@ -1,4 +1,4 @@
-// Commands that stream until stopped (`paseo agent logs --follow`, `paseo agent
+// Commands that stream until stopped (`clisbot agent logs --follow`, `clisbot agent
 // attach`) stop on Ctrl+C, a termination signal, or when the program reading
 // their output closes its end, as `| head` does. A closed reader shows up as
 // EPIPE on the next write to stdout, so the command stops at its next line of

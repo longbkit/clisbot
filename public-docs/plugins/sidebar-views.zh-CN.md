@@ -1,12 +1,12 @@
 ---
 title: 构建侧边栏视图
-description: 用你自己的 React Native 视图替换 Paseo 侧边栏的内容。
+description: 用你自己的 React Native 视图替换 Clisbot 侧边栏的内容。
 nav: 侧边栏视图
 ---
 
 # 构建侧边栏视图 {#build-a-sidebar-view}
 
-侧边栏视图替换 Paseo 页眉与页脚之间的内容。插件接收主题令牌、当前实体引用和导航方法，使用 React Native 绘制自己的界面。安装[侧边栏视图示例](https://github.com/getpaseo/paseo/tree/main/plugin-examples/sidebar-views)，体验项目列表、按任务分组的 Agent、嵌套 Agent 和标签文件夹。
+侧边栏视图替换 Clisbot 页眉与页脚之间的内容。插件接收主题令牌、当前实体引用和导航方法，使用 React Native 绘制自己的界面。安装[侧边栏视图示例](https://github.com/longbkit/clisbot/tree/main/plugin-examples/sidebar-views)，体验项目列表、按任务分组的 Agent、嵌套 Agent 和标签文件夹。
 
 ## 注册视图 {#register-a-view}
 
@@ -15,8 +15,8 @@ import type {
   PluginClientContext,
   PluginSidebarViewProps,
   WorkspaceRef,
-} from "@getpaseo/plugin/client";
-import { useWorkspaces, useWorkspace } from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
+import { useWorkspaces, useWorkspace } from "@clisbot/plugin/client";
 import { Pressable, ScrollView, Text } from "react-native";
 
 function WorkspaceRow({
@@ -92,7 +92,7 @@ const selected = useWorkspace(ref, selector, equals);
 
 没有选择器时，自定义相等比较函数接收快照；有选择器时接收选择结果。现有工作区面板仍可向 `useWorkspace` 和 `useAgent` 传入主机本地的字符串 ID。跨主机视图应使用引用。`useHosts()` 保留现有的 `serverId`、`label` 和连接 `status` 字段。
 
-工作区快照包含 `project`、`pinnedAt`、`labels`、`background`、`branch`、`lastPromptAt`、`parentAgent` 和 `createdAt`（旧主机上为 null）。使用 `indicator` 和本地化的 `indicatorLabel` 显示 Paseo 的状态。`status` 保持 daemon 原始状态。Agent 快照包含工作区和父 Agent 引用、`background` 和 `backgroundWork.count`。项目快照提供 `displayName`、`rootPath`、`kind` 和 `iconRevision`。
+工作区快照包含 `project`、`pinnedAt`、`labels`、`background`、`branch`、`lastPromptAt`、`parentAgent` 和 `createdAt`（旧主机上为 null）。使用 `indicator` 和本地化的 `indicatorLabel` 显示 Clisbot 的状态。`status` 保持 daemon 原始状态。Agent 快照包含工作区和父 Agent 引用、`background` 和 `backgroundWork.count`。项目快照提供 `displayName`、`rootPath`、`kind` 和 `iconRevision`。
 
 ## 列出终端 {#list-terminals}
 
@@ -102,17 +102,17 @@ const selected = useWorkspace(ref, selector, equals);
 
 ## 通过引用执行操作 {#act-on-a-ref}
 
-`usePaseo()` 将基于引用的操作发送到引用所属的主机：
+`useClisbot()` 将基于引用的操作发送到引用所属的主机：
 
 ```tsx
-const paseo = usePaseo();
-await paseo.workspaces.ref(workspaceRef).setPinned(true);
-await paseo.workspaces.ref(workspaceRef).setLabel("Later", { assigned: true });
-await paseo.workspaces.ref(workspaceRef).setLabel("Inbox", { assigned: false });
-paseo.projects.ref(projectRef).open();
-await paseo.projects.ref(projectRef).createWorkspace();
-paseo.terminals.ref(terminalRef).focus();
-await paseo.terminals.ref(terminalRef).kill();
+const clisbot = useClisbot();
+await clisbot.workspaces.ref(workspaceRef).setPinned(true);
+await clisbot.workspaces.ref(workspaceRef).setLabel("Later", { assigned: true });
+await clisbot.workspaces.ref(workspaceRef).setLabel("Inbox", { assigned: false });
+clisbot.projects.ref(projectRef).open();
+await clisbot.projects.ref(projectRef).createWorkspace();
+clisbot.terminals.ref(terminalRef).focus();
+await clisbot.terminals.ref(terminalRef).kill();
 ```
 
 工作区和 Agent 句柄保留现有方法。分配新标签会创建该标签；分配已有标签会保留其颜色。标签文件夹示例先添加目标标签，再移除源标签，因此分配失败时仍保留原文件夹。插件负责移动手势和错误显示。

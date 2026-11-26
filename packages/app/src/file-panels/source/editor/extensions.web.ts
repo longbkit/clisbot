@@ -12,7 +12,7 @@ import {
   keymap,
   lineNumbers,
 } from "@codemirror/view";
-import { createCodeMirrorHighlightStyle, type HighlightStyle } from "@getpaseo/highlight";
+import { createCodeMirrorHighlightStyle, type HighlightStyle } from "@clisbot/highlight";
 
 export interface EditorVisualTheme {
   colorScheme: "light" | "dark";

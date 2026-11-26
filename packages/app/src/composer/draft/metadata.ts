@@ -1,4 +1,4 @@
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 
 /** Top-level keys replace; `null` removes the key. The daemon applies the same rule to an agent. */
 export function applyMetadataPatch(

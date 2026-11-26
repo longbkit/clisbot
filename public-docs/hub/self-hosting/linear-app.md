@@ -22,10 +22,10 @@ Verify the connected workspace under **Integrations** in Hub. Each connected wor
 
 Linear calls these Hub URLs:
 
-| Setting      | Hub URL                                                |
-| ------------ | ------------------------------------------------------ |
-| Redirect URL | `<PASEO_HUB_APP_URL>/api/integrations/linear/callback` |
-| Webhook URL  | `<PASEO_HUB_APP_URL>/api/integrations/linear/events`   |
+| Setting      | Hub URL                                                  |
+| ------------ | -------------------------------------------------------- |
+| Redirect URL | `<CLISBOT_HUB_APP_URL>/api/integrations/linear/callback` |
+| Webhook URL  | `<CLISBOT_HUB_APP_URL>/api/integrations/linear/events`   |
 
 Hub requests the `read` and `comments:create` OAuth scopes and posts replies as the Linear app. Next, create a workflow with [Linear triggers](/docs/hub/triggers/linear).
 

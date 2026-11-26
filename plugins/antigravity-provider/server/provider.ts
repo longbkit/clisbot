@@ -1,10 +1,10 @@
-import { execCommand } from "@getpaseo/plugin/server";
-import { runAcpProvider, type AcpTransformer } from "@getpaseo/plugin/server/acp";
+import { execCommand } from "@clisbot/plugin/server";
+import { runAcpProvider, type AcpTransformer } from "@clisbot/plugin/server/acp";
 import {
   PROVIDER_PROTOCOL_VERSION,
   type ProviderInstallationLaunch,
   type ProviderRegistration,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 import { z } from "zod";
 import { mapToolCall } from "./tool-calls.js";
 
@@ -144,7 +144,7 @@ export function createAntigravityProvider(): ProviderRegistration {
   });
   return {
     ...provider,
-    docsUrl: "https://paseo.sh/docs/supported-providers/antigravity#troubleshooting",
+    docsUrl: "https://clisbot.com/docs/supported-providers/antigravity#troubleshooting",
     // agy documents no update command and no release source, so there is nothing to check or run.
     installation: {
       installUrl: "https://antigravity.google/docs/getting-started?tab=cli",

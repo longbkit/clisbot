@@ -2,15 +2,15 @@
 
 /**
  * A terminal worker survives an upgrade of the installation that started it. Two disposable
- * installations A and B (built dist, real copies of @getpaseo/server, @getpaseo/cli and
+ * installations A and B (built dist, real copies of @clisbot/server, @clisbot/cli and
  * node-pty, every other dependency a symlink into this repo) each get their own CLI shim, so
- * each daemon's PASEO_CLI is a distinct path:
+ * each daemon's CLISBOT_CLI is a distinct path:
  *
- * 1. A daemon from A runs its worker from a copy in $PASEO_HOME/terminal-worker/. After
+ * 1. A daemon from A runs its worker from a copy in $CLISBOT_HOME/terminal-worker/. After
  *    `stop --keep-terminals` and moving A's node-pty, worker bundle and shell integration away,
  *    a daemon from B adopts the same worker and opens a new, working terminal in it with B's
  *    environment and CLI, while the first terminal keeps A's.
- * 2. Worker protocol versions (PASEO_TERMINAL_WORKER_PROTOCOL_OVERRIDE): protocols 0–4
+ * 2. Worker protocol versions (CLISBOT_TERMINAL_WORKER_PROTOCOL_OVERRIDE): protocols 0–4
  *    are obsolete unreleased wires, so their programs/workers/copies are closed and a current
  *    worker serves new terminals. A truly newer protocol is left running, reported as
  *    terminal_worker_incompatible, and closed by `daemon stop`.
@@ -44,11 +44,11 @@ if (process.platform === "win32") {
 console.log("=== Terminal worker survives an upgrade ===\n");
 
 const repoRoot = join(import.meta.dirname, "..", "..", "..");
-const root = await mkdtemp(join(tmpdir(), "paseo-worker-upgrade-"));
-const paseoHome = join(root, "home");
+const root = await mkdtemp(join(tmpdir(), "clisbot-worker-upgrade-"));
+const clisbotHome = join(root, "home");
 const cliHome = join(root, "os-home");
 const workDir = join(root, "work");
-for (const dir of [paseoHome, cliHome, workDir]) mkdirSync(dir, { recursive: true });
+for (const dir of [clisbotHome, cliHome, workDir]) mkdirSync(dir, { recursive: true });
 const currentProtocolVersion = 6;
 const zsh = ["/bin/zsh", "/usr/bin/zsh"].find((candidate) => existsSync(candidate)) ?? null;
 
@@ -87,11 +87,11 @@ function linkEntries(source: string, target: string, taken: Set<string>): void {
 function createInstallation(name: string, version: string): Installation {
   const dir = join(root, `install-${name}`);
   const modules = join(dir, "node_modules");
-  mkdirSync(join(modules, "@getpaseo"), { recursive: true });
+  mkdirSync(join(modules, "@clisbot"), { recursive: true });
 
   // Real copies: the server (its version marks the installation), the CLI (so it resolves this
   // installation's server), and node-pty (so moving it away breaks only this installation).
-  const serverDir = join(modules, "@getpaseo", "server");
+  const serverDir = join(modules, "@clisbot", "server");
   const serverPackage = JSON.parse(
     readFileSync(join(repoRoot, "packages/server/package.json"), "utf8"),
   ) as Record<string, unknown>;
@@ -105,7 +105,7 @@ function createInstallation(name: string, version: string): Installation {
       recursive: true,
     });
   }
-  const cliDir = join(modules, "@getpaseo", "cli");
+  const cliDir = join(modules, "@clisbot", "cli");
   mkdirSync(cliDir, { recursive: true });
   cpSync(join(repoRoot, "packages/cli/package.json"), join(cliDir, "package.json"));
   cpSync(join(repoRoot, "packages/cli/dist"), join(cliDir, "dist"), { recursive: true });
@@ -113,7 +113,7 @@ function createInstallation(name: string, version: string): Installation {
     recursive: true,
   });
 
-  const taken = new Set(["@getpaseo/server", "@getpaseo/cli", "node-pty"]);
+  const taken = new Set(["@clisbot/server", "@clisbot/cli", "node-pty"]);
   for (const source of [
     "packages/server/node_modules",
     "packages/cli/node_modules",
@@ -122,7 +122,7 @@ function createInstallation(name: string, version: string): Installation {
     linkEntries(join(repoRoot, source), modules, taken);
   }
 
-  const shim = join(dir, "bin", "paseo");
+  const shim = join(dir, "bin", "clisbot");
   mkdirSync(join(dir, "bin"));
   writeFileSync(
     shim,
@@ -186,16 +186,18 @@ function run(
   extraEnv: Record<string, string> = {},
 ): Promise<RunResult> {
   const env = {
-    ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PASEO_"))),
+    ...Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !key.startsWith("CLISBOT_")),
+    ),
     HOME: cliHome,
     USERPROFILE: cliHome,
-    PASEO_HOME: paseoHome,
-    PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: "0",
-    PASEO_DICTATION_ENABLED: "0",
-    PASEO_VOICE_MODE_ENABLED: "0",
+    CLISBOT_HOME: clisbotHome,
+    CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD: "0",
+    CLISBOT_DICTATION_ENABLED: "0",
+    CLISBOT_VOICE_MODE_ENABLED: "0",
     // Each daemon hands its terminals its own installation's CLI.
-    PASEO_CLI: installation.shim,
-    PASEO_TEST_INSTALL: installation.name,
+    CLISBOT_CLI: installation.shim,
+    CLISBOT_TEST_INSTALL: installation.name,
     SHELL: "/bin/sh",
     ...extraEnv,
   };
@@ -208,7 +210,7 @@ function run(
   });
 }
 
-async function paseo(
+async function clisbot(
   installation: Installation,
   args: string[],
   extraEnv: Record<string, string> = {},
@@ -217,13 +219,13 @@ async function paseo(
   assert.equal(
     result.exitCode,
     0,
-    `paseo ${args.join(" ")} (${installation.name}) failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    `clisbot ${args.join(" ")} (${installation.name}) failed:\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
   );
   return result;
 }
 
 async function json<T>(installation: Installation, args: string[]): Promise<T> {
-  return JSON.parse((await paseo(installation, [...args, "--json"])).stdout) as T;
+  return JSON.parse((await clisbot(installation, [...args, "--json"])).stdout) as T;
 }
 
 async function capture(installation: Installation, terminalId: string): Promise<string> {
@@ -236,8 +238,8 @@ async function capture(installation: Installation, terminalId: string): Promise<
 }
 
 async function type(installation: Installation, terminalId: string, line: string) {
-  await paseo(installation, ["terminal", "send-keys", terminalId, "-l", line]);
-  await paseo(installation, ["terminal", "send-keys", terminalId, "Enter"]);
+  await clisbot(installation, ["terminal", "send-keys", terminalId, "-l", line]);
+  await clisbot(installation, ["terminal", "send-keys", terminalId, "Enter"]);
 }
 
 async function waitForScreen(installation: Installation, terminalId: string, text: string) {
@@ -305,7 +307,7 @@ interface WorkerRecordFile {
 }
 
 function workerRecords(): WorkerRecordFile[] {
-  const dir = join(paseoHome, "terminal-worker");
+  const dir = join(clisbotHome, "terminal-worker");
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((name) => /^\d+\.json$/.test(name))
@@ -313,10 +315,10 @@ function workerRecords(): WorkerRecordFile[] {
 }
 
 function runtimeCopies(): string[] {
-  const dir = join(paseoHome, "terminal-worker");
+  const dir = join(clisbotHome, "terminal-worker");
   if (!existsSync(dir)) return [];
   return readdirSync(dir).filter((name) =>
-    existsSync(join(dir, name, "paseo-terminal-worker-runtime.json")),
+    existsSync(join(dir, name, "clisbot-terminal-worker-runtime.json")),
   );
 }
 
@@ -335,7 +337,7 @@ async function terminalIds(installation: Installation): Promise<string[]> {
 }
 
 async function startDaemon(installation: Installation, extraEnv: Record<string, string> = {}) {
-  const result = await paseo(installation, ["daemon", "start", "--json"], extraEnv);
+  const result = await clisbot(installation, ["daemon", "start", "--json"], extraEnv);
   lastListen = (JSON.parse(result.stdout) as { listen: string }).listen;
   assert.match(lastListen, /^127\.0\.0\.1:[1-9]\d*$/, "start publishes the actual bound port");
   if (competingListener.listening) {
@@ -350,11 +352,11 @@ async function startDaemon(installation: Installation, extraEnv: Record<string, 
 }
 
 async function stopDaemon(installation: Installation, keepTerminals = false) {
-  await paseo(installation, [
+  await clisbot(installation, [
     "daemon",
     "stop",
     "--home",
-    paseoHome,
+    clisbotHome,
     ...(keepTerminals ? ["--keep-terminals"] : []),
   ]);
 }
@@ -366,7 +368,7 @@ async function leaveWorkerWithProtocol(
   name: string,
 ): Promise<{ terminal: { id: string; pid: number }; workerPid: number; runtime: string }> {
   await startDaemon(installation, {
-    PASEO_TERMINAL_WORKER_PROTOCOL_OVERRIDE: String(protocolVersion),
+    CLISBOT_TERMINAL_WORKER_PROTOCOL_OVERRIDE: String(protocolVersion),
   });
   const terminal = await openTerminal(installation, name);
   const [worker] = workerRecords();
@@ -393,7 +395,7 @@ try {
     ["features.dictation.enabled", "false"],
     ["features.voiceMode.enabled", "false"],
   ] as const) {
-    await paseo(a, ["daemon", "config", "set", field, value]);
+    await clisbot(a, ["daemon", "config", "set", field, value]);
   }
 
   console.log("Test 1: a daemon from A runs its worker from a copy in the home");
@@ -403,12 +405,12 @@ try {
   assert(firstWorker, "one worker runs");
   assert.equal(firstWorker.protocolVersion, currentProtocolVersion, "the current wire is adopted");
   assert.match(firstWorker.runtime ?? "", /^0\.98\.0-[0-9a-f]{12}$/);
-  const copyA = join(paseoHome, "terminal-worker", firstWorker.runtime!);
+  const copyA = join(clisbotHome, "terminal-worker", firstWorker.runtime!);
   assert(
     (await commandLineOf(firstWorker.pid)).includes(join(copyA, "terminal-worker.mjs")),
     "the worker runs the copy's bundle",
   );
-  assert.equal(await echoVariable(a, t1.id, "CLI1", "PASEO_CLI"), a.shim, "T1 has A's CLI");
+  assert.equal(await echoVariable(a, t1.id, "CLI1", "CLISBOT_CLI"), a.shim, "T1 has A's CLI");
   console.log("✓ worker runs from", copyA, "\n");
 
   console.log("Test 2: B adopts the worker after A's runtime files are gone");
@@ -422,17 +424,21 @@ try {
   );
   assert((await terminalIds(b)).includes(t1.id), "T1 is listed by B");
   const t2 = await openTerminal(b, "t2");
-  assert.equal(await echoVariable(b, t2.id, "INSTALL2", "PASEO_TEST_INSTALL"), "B");
-  assert.equal(await echoVariable(b, t2.id, "CLI2", "PASEO_CLI"), b.shim, "T2 has B's CLI");
+  assert.equal(await echoVariable(b, t2.id, "INSTALL2", "CLISBOT_TEST_INSTALL"), "B");
+  assert.equal(await echoVariable(b, t2.id, "CLI2", "CLISBOT_CLI"), b.shim, "T2 has B's CLI");
   if (zsh) {
-    // Creating a zsh terminal reads Paseo's integration from the worker's copy (A's is gone);
+    // Creating a zsh terminal reads Clisbot's integration from the worker's copy (A's is gone);
     // a missing file would have failed the create.
     const zshVersion = await echoVariable(b, t2.id, "ZSH", "ZSH_VERSION");
-    assert(zshVersion.length > 0, "T2 runs zsh with Paseo's shell integration");
+    assert(zshVersion.length > 0, "T2 runs zsh with Clisbot's shell integration");
   } else {
     console.log("  (zsh is not installed: the shell-integration check is skipped)");
   }
-  assert.equal(await echoVariable(b, t1.id, "CLI1AGAIN", "PASEO_CLI"), a.shim, "T1 keeps A's CLI");
+  assert.equal(
+    await echoVariable(b, t1.id, "CLI1AGAIN", "CLISBOT_CLI"),
+    a.shim,
+    "T1 keeps A's CLI",
+  );
   console.log("✓ same worker, T2 uses B's environment, T1 still works\n");
 
   console.log("Test 3: daemon stop closes both terminals and deletes the copy");
@@ -501,17 +507,17 @@ try {
     console.log("✓ obsolete closed, current usable, copies cleaned up\n");
   }
 
-  console.log("Test 5: a worker from a newer Paseo is left running and reported");
+  console.log("Test 5: a worker from a newer Clisbot is left running and reported");
   const newer = await leaveWorkerWithProtocol(a, currentProtocolVersion + 1, "newer");
   await startDaemon(b);
   const listed = await run(b, ["terminal", "ls", "--all", "--json"]);
   assert.notEqual(listed.exitCode, 0, "terminal ls fails");
-  assert.match(listed.stdout + listed.stderr, /held by a newer Paseo \(v0\.98\.0/);
+  assert.match(listed.stdout + listed.stderr, /held by a newer Clisbot \(v0\.98\.0/);
   const created = await run(b, ["terminal", "create", "--cwd", workDir, "--json"]);
   assert.notEqual(created.exitCode, 0, "terminal create fails");
-  assert.match(created.stdout + created.stderr, /held by a newer Paseo/);
-  const status = await paseo(b, ["daemon", "status", "--home", paseoHome]);
-  assert.match(status.stdout, /terminals: Terminals are held by a newer Paseo/);
+  assert.match(created.stdout + created.stderr, /held by a newer Clisbot/);
+  const status = await clisbot(b, ["daemon", "status", "--home", clisbotHome]);
+  assert.match(status.stdout, /terminals: Terminals are held by a newer Clisbot/);
   assert(isAlive(newer.terminal.pid), "its program keeps running");
   assert.deepEqual(
     workerRecords().map((record) => record.pid),
@@ -530,7 +536,7 @@ try {
 } finally {
   if (!passed) {
     for (const log of ["daemon.log", "terminal-worker.log"]) {
-      const logPath = join(paseoHome, log);
+      const logPath = join(clisbotHome, log);
       if (existsSync(logPath)) {
         console.error(`--- ${log} (last 60 lines) ---`);
         console.error(readFileSync(logPath, "utf8").split("\n").slice(-60).join("\n"));
@@ -550,7 +556,7 @@ try {
   }
   restoreA?.();
   for (const installation of [b, a]) {
-    await run(installation, ["daemon", "stop", "--home", paseoHome, "--force"]);
+    await run(installation, ["daemon", "stop", "--home", clisbotHome, "--force"]);
   }
   for (const pid of trackedPids) {
     if (isAlive(pid)) process.kill(pid, "SIGKILL");

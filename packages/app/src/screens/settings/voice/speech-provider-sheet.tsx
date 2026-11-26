@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Check, Download, Languages, Trash2 } from "lucide-react-native";
-import type { LocalSpeechModel, SpeechSettingsPatch } from "@getpaseo/protocol/speech/rpc-schemas";
+import type { LocalSpeechModel, SpeechSettingsPatch } from "@clisbot/protocol/speech/rpc-schemas";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import {
   SettingsCard,

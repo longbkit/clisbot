@@ -1,4 +1,4 @@
-import type { BrowserAutomationDialogEvent } from "@getpaseo/protocol/browser-automation/rpc-schemas";
+import type { BrowserAutomationDialogEvent } from "@clisbot/protocol/browser-automation/rpc-schemas";
 
 export const MAX_DIALOGS_PER_COMMAND = 20;
 
@@ -38,7 +38,7 @@ export function dialogAcceptValue(type: BrowserAutomationDialogEvent["type"]): b
 
 export function promptShimInstallScript(): string {
   return String.raw`(() => {
-    const stateKey = "__PASEO_BROWSER_AUTOMATION_DIALOG_STATE__";
+    const stateKey = "__CLISBOT_BROWSER_AUTOMATION_DIALOG_STATE__";
     const state = window[stateKey] || { prompts: [], installed: false };
     window[stateKey] = state;
     if (state.installed) return true;
@@ -63,7 +63,7 @@ export function promptShimInstallScript(): string {
 
 export function promptShimDrainScript(): string {
   return String.raw`(() => {
-    const state = window.__PASEO_BROWSER_AUTOMATION_DIALOG_STATE__;
+    const state = window.__CLISBOT_BROWSER_AUTOMATION_DIALOG_STATE__;
     if (!state || !Array.isArray(state.prompts)) return [];
     return state.prompts.splice(0);
   })()`;
@@ -71,7 +71,7 @@ export function promptShimDrainScript(): string {
 
 export function promptShimRestoreScript(): string {
   return String.raw`(() => {
-    const stateKey = "__PASEO_BROWSER_AUTOMATION_DIALOG_STATE__";
+    const stateKey = "__CLISBOT_BROWSER_AUTOMATION_DIALOG_STATE__";
     const state = window[stateKey];
     if (!state || !state.installed) return true;
     if (window.prompt === state.promptShim && typeof state.originalPrompt === "function") {

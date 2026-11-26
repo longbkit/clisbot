@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { setImmediate } from "node:timers/promises";
 import { measureMainThreadWork } from "../../test-utils/main-thread-work.js";
 import { SessionDelivery } from "../session/owned-subscriptions/index.js";
-import { highlightCode, highlightCodeWithBudget } from "@getpaseo/highlight";
+import { highlightCode, highlightCodeWithBudget } from "@clisbot/highlight";
 import {
   parseDiff,
   reconstructNewFile,
@@ -147,7 +147,7 @@ index 1234567..abcdefg 100644
 --- a/config.yaml
 +++ b/config.yaml
 @@ -1,3 +1,3 @@
- app: paseo
+ app: clisbot
 -count: 1
 +count: 2
  enabled: true

@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import { expect, test } from "vitest";
-import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+import { PARENT_AGENT_ID_LABEL } from "@clisbot/protocol/agent-labels";
 import { createDaemonTestContext, type DaemonTestContext } from "../test-utils/index.js";
 
 test.each(["agent", "workspace"] as const)(
@@ -16,7 +16,7 @@ test.each(["agent", "workspace"] as const)(
     let ctx: DaemonTestContext | undefined;
     try {
       ctx = await createDaemonTestContext({
-        paseoHomeRoot: root,
+        clisbotHomeRoot: root,
         staticDir: cwd,
         cleanup: false,
         mcpEnabled: false,
@@ -27,7 +27,7 @@ test.each(["agent", "workspace"] as const)(
       await ctx.cleanup();
       ctx = undefined;
       ctx = await createDaemonTestContext({
-        paseoHomeRoot: root,
+        clisbotHomeRoot: root,
         staticDir: cwd,
         cleanup: false,
         mcpEnabled: false,
@@ -72,7 +72,7 @@ test("creation still rejects a caller removed by workspace archive", async () =>
   await mkdir(cwd);
   execFileSync("git", ["init", cwd], { stdio: "pipe" });
   const ctx = await createDaemonTestContext({
-    paseoHomeRoot: root,
+    clisbotHomeRoot: root,
     staticDir: cwd,
     cleanup: false,
     mcpEnabled: false,

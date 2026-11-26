@@ -70,7 +70,7 @@ const CONNECTED_HOSTS: ConnectedHost[] = [
     device: Server,
     tone: HOST_TONE.devbox,
     link: "relay",
-    endpoint: "relay.paseo.sh",
+    endpoint: "relay.clisbot.com",
     latency: "38ms",
     agents: 6,
   },

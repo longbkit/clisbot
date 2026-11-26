@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SpeechSettingsPatch } from "@getpaseo/protocol/speech/rpc-schemas";
+import type { SpeechSettingsPatch } from "@clisbot/protocol/speech/rpc-schemas";
 import { openSpeechProviderForm, type SpeechProviderFormSnapshot } from "./speech-provider-form";
 
 function open(overrides: Partial<SpeechProviderFormSnapshot> = {}) {
@@ -55,11 +55,11 @@ describe("speech provider form", () => {
   it("keeps env-controlled language read-only after switching providers", async () => {
     const form = open({
       site: { provider: "local", language: "fr" },
-      envOverrides: { "features.voiceMode.stt.language": "PASEO_VOICE_LANGUAGE" },
+      envOverrides: { "features.voiceMode.stt.language": "CLISBOT_VOICE_LANGUAGE" },
     });
     form.setProvider("openai");
     expect(form.getState().fields.language).toEqual({
-      envVar: "PASEO_VOICE_LANGUAGE",
+      envVar: "CLISBOT_VOICE_LANGUAGE",
       readOnly: true,
     });
     expect(await savedPatch(form)).toEqual({ voiceMode: { stt: { provider: "openai" } } });
@@ -114,13 +114,13 @@ describe("speech provider form", () => {
     const form = open({
       site: { provider: "openai", hasApiKey: false },
       envOverrides: {
-        "features.voiceMode.stt.provider": "PASEO_VOICE_STT_PROVIDER",
+        "features.voiceMode.stt.provider": "CLISBOT_VOICE_STT_PROVIDER",
         "features.voiceMode.stt.model": "STT_MODEL",
         "features.voiceMode.stt.apiKey": "OPENAI_API_KEY",
       },
     });
     expect(form.getState().fields).toMatchObject({
-      provider: { envVar: "PASEO_VOICE_STT_PROVIDER", readOnly: true },
+      provider: { envVar: "CLISBOT_VOICE_STT_PROVIDER", readOnly: true },
       model: { envVar: "STT_MODEL", readOnly: true },
       apiKey: { envVar: "OPENAI_API_KEY", readOnly: false },
       baseUrl: { envVar: null, readOnly: false },
@@ -138,7 +138,7 @@ describe("speech provider form", () => {
 
   it("does not apply the saved provider's env vars to another provider", () => {
     const form = open({
-      envOverrides: { "features.voiceMode.stt.model": "PASEO_VOICE_LOCAL_STT_MODEL" },
+      envOverrides: { "features.voiceMode.stt.model": "CLISBOT_VOICE_LOCAL_STT_MODEL" },
     });
     expect(form.getState().fields.model.readOnly).toBe(true);
 

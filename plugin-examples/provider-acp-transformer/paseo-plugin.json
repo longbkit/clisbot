@@ -1,6 +1,0 @@
-{
-  "id": "provider-acp-transformer-example",
-  "requirements": {
-    "paseo": ">=0.8.0"
-  }
-}

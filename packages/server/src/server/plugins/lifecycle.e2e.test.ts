@@ -5,19 +5,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, onTestFinished, test } from "vitest";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { resolveDaemonVersion } from "../daemon-version.js";
 import { BuiltinPluginLoader } from "./builtin/index.js";
-import { createPaseoApi } from "@getpaseo/client";
+import { createClisbotApi } from "@clisbot/client";
 
 test("a plugin transforms workspace creation once across receipt replays and observes its committed lifecycle", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-lifecycle-"));
-  const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-lifecycle-"));
+  const daemon = await createTestClisbotDaemon({ daemonVersion: "0.8.0" });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
-      JSON.stringify({ id: "lifecycle", requirements: { paseo: ">=0.8.0" } }),
+      path.join(directory, "clisbot-plugin.json"),
+      JSON.stringify({ id: "lifecycle", requirements: { clisbot: ">=0.8.0" } }),
     );
     await writeFile(
       path.join(directory, "index.server.ts"),
@@ -78,13 +78,13 @@ export default function contribute(server) {
 }, 60_000);
 
 test("addHook transforms workspace creation once across receipt replays and observes its committed lifecycle", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-lifecycle-"));
-  const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-lifecycle-"));
+  const daemon = await createTestClisbotDaemon({ daemonVersion: "0.8.0" });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
-      JSON.stringify({ id: "lifecycle", requirements: { paseo: ">=0.8.0" } }),
+      path.join(directory, "clisbot-plugin.json"),
+      JSON.stringify({ id: "lifecycle", requirements: { clisbot: ">=0.8.0" } }),
     );
     await writeFile(
       path.join(directory, "index.server.ts"),
@@ -148,13 +148,13 @@ export default function contribute(server) {
 }, 60_000);
 
 test("plugins observe turns, answer permissions, and observe archive without blocking the agent", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-turn-hooks-"));
-  const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-turn-hooks-"));
+  const daemon = await createTestClisbotDaemon({ daemonVersion: "0.8.0" });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
-      JSON.stringify({ id: "turn-hooks", requirements: { paseo: ">=0.8.0" } }),
+      path.join(directory, "clisbot-plugin.json"),
+      JSON.stringify({ id: "turn-hooks", requirements: { clisbot: ">=0.8.0" } }),
     );
     await writeFile(
       path.join(directory, "index.server.ts"),
@@ -164,7 +164,7 @@ export default function contribute(server) {
     console.log(JSON.stringify({ hook: "agent.turn.before", event }));
   });
   server.addHook("agent.turn.after", async (event, context) => {
-    const page = await context.paseo.agents
+    const page = await context.clisbot.agents
       .ref(event.agent.id)
       .timeline.refetch({ direction: "tail", limit: 1, wholeTurns: true });
     const turn = page.entries
@@ -174,7 +174,7 @@ export default function contribute(server) {
   });
   server.addHook("agent.permission.before", async (event, context) => {
     console.log(JSON.stringify({ hook: "agent.permission.before", event }));
-    await context.paseo.agents.ref(event.agent.id).respondToPermission({
+    await context.clisbot.agents.ref(event.agent.id).respondToPermission({
       requestId: event.request.id,
       response: { behavior: "deny", message: "Declined by plugin" },
     });
@@ -249,15 +249,15 @@ export default function contribute(server) {
 }, 60_000);
 
 test("metadata set at creation reaches the hooks, a before hook can add to it, and snapshots carry it", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-metadata-hooks-"));
-  const daemon = await createTestPaseoDaemon();
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-metadata-hooks-"));
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({
         id: "metadata-hooks",
-        requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` },
+        requirements: { clisbot: `>=${resolveDaemonVersion(import.meta.url)}` },
       }),
     );
     await writeFile(
@@ -331,15 +331,15 @@ export default function contribute(server) {
 }, 60_000);
 
 test("hooks tell a background agent from a normal one", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-background-hooks-"));
-  const daemon = await createTestPaseoDaemon();
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-background-hooks-"));
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({
         id: "background-hooks",
-        requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` },
+        requirements: { clisbot: `>=${resolveDaemonVersion(import.meta.url)}` },
       }),
     );
     await writeFile(
@@ -413,15 +413,15 @@ export default function contribute(server) {
 }, 60_000);
 
 test("metadata set at creation and through setMetadata survives a daemon restart", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-metadata-restart-"));
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-metadata-cwd-"));
-  const pluginDirectory = await mkdtemp(path.join(tmpdir(), "paseo-metadata-plugin-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-metadata-restart-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-metadata-cwd-"));
+  const pluginDirectory = await mkdtemp(path.join(tmpdir(), "clisbot-metadata-plugin-"));
   try {
     await writeFile(
-      path.join(pluginDirectory, "paseo-plugin.json"),
+      path.join(pluginDirectory, "clisbot-plugin.json"),
       JSON.stringify({
         id: "metadata-restart",
-        requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` },
+        requirements: { clisbot: `>=${resolveDaemonVersion(import.meta.url)}` },
       }),
     );
     // Returns an explicit object without `metadata`, as a plugin written before metadata existed.
@@ -438,9 +438,9 @@ export default function contribute(server) {
 }
 `,
     );
-    const first = await createTestPaseoDaemon({ paseoHomeRoot: root, cleanup: false });
+    const first = await createTestClisbotDaemon({ clisbotHomeRoot: root, cleanup: false });
     const firstClient = new DaemonClient({ url: `ws://127.0.0.1:${first.port}/ws` });
-    const firstApi = createPaseoApi(firstClient);
+    const firstApi = createClisbotApi(firstClient);
     let agentId: string;
     let workspaceId: string;
     try {
@@ -476,7 +476,7 @@ export default function contribute(server) {
       await first.close();
     }
 
-    const second = await createTestPaseoDaemon({ paseoHomeRoot: root, cleanup: false });
+    const second = await createTestClisbotDaemon({ clisbotHomeRoot: root, cleanup: false });
     const secondClient = new DaemonClient({ url: `ws://127.0.0.1:${second.port}/ws` });
     try {
       await secondClient.connect();
@@ -518,7 +518,7 @@ export default function contribute(server) {
 }, 60_000);
 
 test("agent creation hooks change the provider and environment before the session opens", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-agent-hooks-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-agent-hooks-"));
   const pluginDirectory = await createProviderPlugin(directory, {
     acknowledgeClose: true,
     hooks: `
@@ -537,8 +537,8 @@ test("agent creation hooks change the provider and environment before the sessio
   const extraPlugin = path.join(directory, "extra-plugin");
   await mkdir(extraPlugin);
   await writeFile(
-    path.join(extraPlugin, "paseo-plugin.json"),
-    JSON.stringify({ id: "a-prompt", requirements: { paseo: ">=0.8.0" } }),
+    path.join(extraPlugin, "clisbot-plugin.json"),
+    JSON.stringify({ id: "a-prompt", requirements: { clisbot: ">=0.8.0" } }),
   );
   const writePrompt = (prompt: string) =>
     writeFile(
@@ -546,7 +546,7 @@ test("agent creation hooks change the provider and environment before the sessio
       `export default function contribute(server) { server.addHook("agent.open.before", async ({ request }) => ({ ...request, appendSystemPrompt: [...(request.appendSystemPrompt ?? []), ${JSON.stringify(prompt)}] })); return () => {}; }`,
     );
   await writePrompt("First plugin");
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();
@@ -618,13 +618,13 @@ test("agent creation hooks change the provider and environment before the sessio
 }, 60_000);
 
 test("invalid output from an untyped plugin rejects creation before later callbacks run", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-invalid-hook-"));
-  const daemon = await createTestPaseoDaemon({ daemonVersion: "0.8.0" });
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-invalid-hook-"));
+  const daemon = await createTestClisbotDaemon({ daemonVersion: "0.8.0" });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws`, appVersion: "0.8.0" });
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
-      JSON.stringify({ id: "invalid-hook", requirements: { paseo: ">=0.8.0" } }),
+      path.join(directory, "clisbot-plugin.json"),
+      JSON.stringify({ id: "invalid-hook", requirements: { clisbot: ">=0.8.0" } }),
     );
     await writeFile(
       path.join(directory, "index.server.ts"),
@@ -671,10 +671,10 @@ async function createProviderPlugin(
   const directory = path.join(root, "plugin");
   await mkdir(directory, { recursive: true });
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({
       id: "shutdown-provider-plugin",
-      requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` },
+      requirements: { clisbot: `>=${resolveDaemonVersion(import.meta.url)}` },
     }),
   );
   await writeFile(
@@ -683,7 +683,7 @@ async function createProviderPlugin(
   ProviderEvent,
   ProviderInput,
   ProviderRegistration,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 
 const CAPABILITIES = ["prompt.message", "session.persistence"];
 
@@ -778,8 +778,8 @@ test("a clean daemon shutdown leaves a completed plugin-provider agent without a
   const workspace = path.join(root, "workspace");
   await mkdir(workspace, { recursive: true });
 
-  const daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: path.join(root, "daemon"),
+  const daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: path.join(root, "daemon"),
     staticDir: path.join(root, "static"),
     cleanup: false,
     pluginsEnabled: true,
@@ -822,8 +822,8 @@ test("reloading a plugin leaves a completed plugin-provider agent without an err
   const workspace = path.join(root, "workspace");
   await mkdir(workspace, { recursive: true });
 
-  const daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: path.join(root, "daemon"),
+  const daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: path.join(root, "daemon"),
     staticDir: path.join(root, "static"),
     pluginsEnabled: true,
     plugins: {
@@ -871,8 +871,8 @@ test("a provider that never acknowledges session.close does not hold the daemon 
   const workspace = path.join(root, "workspace");
   await mkdir(workspace, { recursive: true });
 
-  const daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: path.join(root, "daemon"),
+  const daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: path.join(root, "daemon"),
     staticDir: path.join(root, "static"),
     cleanup: false,
     pluginsEnabled: true,
@@ -904,7 +904,7 @@ const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
 
 // Hold the provider close until the subprocess has entered shutdown cleanup.
 async function createSlowClosingProviderPlugin() {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-slow-close-plugin-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-slow-close-plugin-"));
   const closeStarted = path.join(directory, "close-started");
   const closeRelease = path.join(directory, "close-release");
   const cleanupStarted = path.join(directory, "cleanup-started");
@@ -942,8 +942,8 @@ test("reloading a plugin does not send on a closed IPC channel", async () => {
     closeRelease,
     cleanupStarted,
   } = await createSlowClosingProviderPlugin();
-  const cwd = await mkdtemp(path.join(tmpdir(), "paseo-reload-teardown-"));
-  const daemon = await createTestPaseoDaemon();
+  const cwd = await mkdtemp(path.join(tmpdir(), "clisbot-reload-teardown-"));
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();
@@ -978,15 +978,15 @@ test("reloading a plugin does not send on a closed IPC channel", async () => {
 }, 60_000);
 
 test("waiting hook failures reject the operation while notification failures are logged and later handlers run", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-hook-failures-"));
-  const daemon = await createTestPaseoDaemon();
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-hook-failures-"));
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({
         id: "hook-failures",
-        requirements: { paseo: ">=0.14.0-beta.1" },
+        requirements: { clisbot: ">=0.14.0-beta.1" },
       }),
     );
     await writeFile(
@@ -1043,7 +1043,7 @@ export default function contribute(server) {
 test.each([false, true])(
   "worktree creation waits for plugins before its first agent and rolls back failures (firstAgentContext: %s)",
   async (withFirstAgentContext) => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-worktree-hook-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktree-hook-"));
     const repository = path.join(root, "repository");
     execFileSync("git", ["init", "-b", "main", repository], { stdio: "pipe" });
     execFileSync(
@@ -1115,8 +1115,8 @@ test.each([false, true])(
     return request;
   });`,
     });
-    let daemon = await createTestPaseoDaemon({
-      paseoHomeRoot: path.join(root, "state"),
+    let daemon = await createTestClisbotDaemon({
+      clisbotHomeRoot: path.join(root, "state"),
       cleanup: false,
     });
     let client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
@@ -1147,7 +1147,7 @@ test.each([false, true])(
       const cwd = created.workspace!.workspaceDirectory;
       expect(created.workspace!.gitRuntime?.currentBranch).toBe("plugin-branch");
       const persisted = JSON.parse(
-        await readFile(path.join(daemon.paseoHome, "projects", "workspaces.json"), "utf8"),
+        await readFile(path.join(daemon.clisbotHome, "projects", "workspaces.json"), "utf8"),
       );
       expect(persisted).toContainEqual(
         expect.objectContaining({
@@ -1213,8 +1213,8 @@ test.each([false, true])(
       const hookRecordsBeforeRestore = await readFile(orderFile, "utf8");
       await client.close();
       await daemon.close();
-      daemon = await createTestPaseoDaemon({
-        paseoHomeRoot: path.join(root, "state"),
+      daemon = await createTestClisbotDaemon({
+        clisbotHomeRoot: path.join(root, "state"),
         cleanup: false,
         pluginsEnabled: true,
         plugins: {
@@ -1268,7 +1268,7 @@ test.each([false, true])(
 );
 
 test("worktree before hook rejects unsafe destinations with plugin attribution before creating branches", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktree-before-invalid-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktree-before-invalid-"));
   const repository = path.join(root, "repository");
   execFileSync("git", ["init", "-b", "main", repository], { stdio: "pipe" });
   execFileSync(
@@ -1307,7 +1307,7 @@ test("worktree before hook rejects unsafe destinations with plugin attribution b
     return { ...request, path: ${JSON.stringify(destinations)}[Number(request.branch.slice(4))] };
   });`,
   });
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();
@@ -1347,7 +1347,7 @@ test("worktree before hook rejects unsafe destinations with plugin attribution b
 }, 60_000);
 
 test("the placement example creates a sibling worktree, opens its first agent there, lists and archives it", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-placement-example-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-placement-example-"));
   const repository = path.join(root, "repository");
   execFileSync("git", ["init", "-b", "main", repository], { stdio: "pipe" });
   execFileSync(
@@ -1370,7 +1370,7 @@ test("the placement example creates a sibling worktree, opens its first agent th
     acknowledgeClose: true,
     reportOpen: true,
   });
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();
@@ -1395,7 +1395,7 @@ test("the placement example creates a sibling worktree, opens its first agent th
     expect((await client.fetchWorkspaces()).entries.map((workspace) => workspace.id)).toContain(
       created.workspace!.id,
     );
-    const worktrees = await client.getPaseoWorktreeList({ cwd: repository });
+    const worktrees = await client.getClisbotWorktreeList({ cwd: repository });
     expect(worktrees.error).toBeNull();
     expect(worktrees.worktrees).toContainEqual(
       expect.objectContaining({ worktreePath: cwd, branchName: "feature/x" }),
@@ -1432,7 +1432,7 @@ test("the placement example creates a sibling worktree, opens its first agent th
 }, 60_000);
 
 test("worktree includes reach the first agent without copying tracked or unignored files", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-worktree-include-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-worktree-include-"));
   const repository = path.join(root, "repository");
   execFileSync("git", ["init", "-b", "main", repository], { stdio: "pipe" });
   const git = (...args: string[]) => execFileSync("git", args, { cwd: repository, stdio: "pipe" });
@@ -1470,7 +1470,7 @@ test("worktree includes reach the first agent without copying tracked or unignor
     await writeFile(${JSON.stringify(observed)}, JSON.stringify(contents));
   });`,
   });
-  const daemon = await createTestPaseoDaemon({ builtinPlugins: new BuiltinPluginLoader() });
+  const daemon = await createTestClisbotDaemon({ builtinPlugins: new BuiltinPluginLoader() });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     await client.connect();

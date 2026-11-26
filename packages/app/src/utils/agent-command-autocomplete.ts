@@ -2,7 +2,7 @@ import {
   compareMatchScores,
   type MatchScore,
   scoreTextFields,
-} from "@getpaseo/protocol/search/text-match";
+} from "@clisbot/protocol/search/text-match";
 
 type CommandAutocompleteSource = "provider" | "plugin" | "client";
 
@@ -15,7 +15,7 @@ interface CommandAutocompleteEntry {
   };
 }
 
-// The list renders reversed above the input with the first entry selected. Paseo's own actions
+// The list renders reversed above the input with the first entry selected. Clisbot's own actions
 // run at once (`/exit` archives), so an empty query never selects one: they sort farthest from
 // the input, and with nothing else to list the menu waits for a search.
 const EMPTY_QUERY_SOURCE_ORDER: Record<CommandAutocompleteSource, number> = {

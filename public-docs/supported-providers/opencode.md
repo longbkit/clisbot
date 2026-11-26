@@ -1,6 +1,6 @@
 ---
 title: OpenCode
-description: Install OpenCode and run it in Paseo.
+description: Install OpenCode and run it in Clisbot.
 nav: OpenCode
 order: 31
 category: Providers
@@ -8,11 +8,11 @@ category: Providers
 
 # OpenCode
 
-Paseo runs OpenCode through your installed `opencode` CLI. It uses your existing credentials and configuration.
+Clisbot runs OpenCode through your installed `opencode` CLI. It uses your existing credentials and configuration.
 
 ## Getting started
 
-OpenCode is built into Paseo and enabled by default.
+OpenCode is built into Clisbot and enabled by default.
 
 1. Install [OpenCode](https://opencode.ai/) on your daemon host:
 
@@ -21,15 +21,15 @@ OpenCode is built into Paseo and enabled by default.
    ```
 
 2. Connect OpenCode to a model provider, and make sure that `opencode` runs in a terminal.
-3. In Paseo, choose **OpenCode** when you start an agent.
+3. In Clisbot, choose **OpenCode** when you start an agent.
 
-If you use OpenCode v2, install version 2.0.10 or later. Paseo rejects older v2 versions.
+If you use OpenCode v2, install version 2.0.10 or later. Clisbot rejects older v2 versions.
 
 If `opencode` is outside your daemon PATH, use a [command override](/docs/custom-providers#custom-binary).
 
 ## Modes
 
-Paseo shows OpenCode agents as modes.
+Clisbot shows OpenCode agents as modes.
 
 | Mode  | Effect                                          |
 | ----- | ----------------------------------------------- |
@@ -40,5 +40,5 @@ Primary agents that you define in OpenCode appear in the same list.
 
 ## See also
 
-- [OpenCode with an existing v2 server](https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md#opencode-with-an-existing-v2-server) on GitHub, to make Paseo use an OpenCode server that is already running.
+- [OpenCode with an existing v2 server](https://github.com/longbkit/clisbot/blob/main/docs/custom-providers.md#opencode-with-an-existing-v2-server) on GitHub, to make Clisbot use an OpenCode server that is already running.
 - [Provider options](/docs/sdk/provider-options#opencode), to set OpenCode permission rules for agents created from the SDK.

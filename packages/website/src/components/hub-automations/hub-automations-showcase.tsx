@@ -55,7 +55,7 @@ const STAGE_IN_VIEW_OPTIONS = { once: true, margin: "-60px" } as const;
 const PANEL_ID = "hub-source-panel";
 
 /**
- * Interactive split showcase for Paseo Hub automation sources:
+ * Interactive split showcase for Clisbot Hub automation sources:
  * left clickable pills on desktop (compact pill grid on mobile) paired with a fixed-height
  * right stage that swaps between authentic, animated dark-mode mockups with zero layout shift.
  */

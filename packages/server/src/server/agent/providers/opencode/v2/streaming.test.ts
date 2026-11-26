@@ -225,7 +225,7 @@ test.each(["text", "reasoning"] as const)(
             {
               type: "tool",
               id: "screenshot",
-              name: "paseo_browser_screenshot",
+              name: "clisbot_browser_screenshot",
               executed: false,
               state: {
                 status: "completed",

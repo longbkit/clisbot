@@ -1,4 +1,4 @@
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import path from "node:path";
 import {
   holdOlderHistoryPages,
@@ -30,7 +30,7 @@ type ChatDisplay = "full" | "collapseToolCalls" | "collapseTurns";
 
 async function useChatDisplay(page: Page, chatDisplay: ChatDisplay): Promise<void> {
   await page.addInitScript((value) => {
-    localStorage.setItem("@paseo:app-settings", JSON.stringify({ chatDisplay: value }));
+    localStorage.setItem("@clisbot:app-settings", JSON.stringify({ chatDisplay: value }));
   }, chatDisplay);
 }
 
@@ -247,7 +247,7 @@ export default function contribute(client) {
 
 test("received messages show their sender and open that agent", async ({ page }) => {
   await page.addInitScript(() =>
-    localStorage.setItem("@paseo:app-settings", JSON.stringify({ theme: "dark" })),
+    localStorage.setItem("@clisbot:app-settings", JSON.stringify({ theme: "dark" })),
   );
   const recipient = await seedMockAgentWorkspace({
     repoPrefix: "sender-attribution-",
@@ -291,7 +291,7 @@ test("received messages show their sender and open that agent", async ({ page })
 test("long sender attribution stays on one line in compact chat", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() =>
-    localStorage.setItem("@paseo:app-settings", JSON.stringify({ theme: "dark" })),
+    localStorage.setItem("@clisbot:app-settings", JSON.stringify({ theme: "dark" })),
   );
   const recipient = await seedMockAgentWorkspace({
     repoPrefix: "compact-attribution-",
@@ -338,7 +338,7 @@ interface MessagePreviewWatch {
 
 declare global {
   interface Window {
-    __paseoMessagePreviewWatch?: { stop(): MessagePreviewWatch };
+    __clisbotMessagePreviewWatch?: { stop(): MessagePreviewWatch };
   }
 }
 
@@ -389,7 +389,7 @@ async function watchReceivedMessagePreview(page: Page, senderLabel: string): Pro
       requestAnimationFrame(sample);
     };
     requestAnimationFrame(sample);
-    window.__paseoMessagePreviewWatch = {
+    window.__clisbotMessagePreviewWatch = {
       stop() {
         running = false;
         return { framesWithoutClip, framesRemounted };
@@ -403,7 +403,7 @@ async function expectReceivedMessagePreviewUndisturbed(page: Page): Promise<void
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );
-  const watch = await page.evaluate(() => window.__paseoMessagePreviewWatch!.stop());
+  const watch = await page.evaluate(() => window.__clisbotMessagePreviewWatch!.stop());
   expect(
     watch.framesWithoutClip,
     "the preview fade and Show more control stay on every frame",
@@ -587,7 +587,7 @@ async function useThinkingDisplay(
   await page.addInitScript(
     (settings) => {
       localStorage.setItem(
-        "@paseo:app-settings",
+        "@clisbot:app-settings",
         JSON.stringify({
           ...settings,
           chatDisplay: sessionStorage.getItem("e2e-chat-display") ?? settings.chatDisplay,

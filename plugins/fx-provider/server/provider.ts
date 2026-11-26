@@ -1,5 +1,5 @@
-import { runAcpProvider } from "@getpaseo/plugin/server/acp";
-import type { ProviderRegistration } from "@getpaseo/plugin/server/provider";
+import { runAcpProvider } from "@clisbot/plugin/server/acp";
+import type { ProviderRegistration } from "@clisbot/plugin/server/provider";
 import { fileToolTransformer } from "./file-tools.js";
 
 export function createFxProvider(): ProviderRegistration {
@@ -13,6 +13,6 @@ export function createFxProvider(): ProviderRegistration {
       command: ["fx", "acp"],
       transformers: [fileToolTransformer],
     }),
-    docsUrl: "https://paseo.sh/docs/supported-providers/fx",
+    docsUrl: "https://clisbot.com/docs/supported-providers/fx",
   };
 }

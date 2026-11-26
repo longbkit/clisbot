@@ -714,7 +714,7 @@ index 01026dc..3786ec4 100644
  
  #if REACT_NATIVE_VERSION_MINOR >= 81
 -        std::unordered_map<Tag, folly::dynamic> tagToProps;
-+        // Paseo backport of https://github.com/jpudysz/react-native-unistyles/pull/1357.
++        // Clisbot backport of https://github.com/jpudysz/react-native-unistyles/pull/1357.
 +        // UIManager::updateShadowTree commits a root cloned before the commit, so when a
 +        // window-size commit (rotation, keyboard) lands in between, the retried Unistyles
 +        // commit puts the previous layout constraints back and the app stays laid out for

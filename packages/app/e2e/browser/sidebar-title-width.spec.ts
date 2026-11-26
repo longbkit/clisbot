@@ -21,7 +21,7 @@ async function seedChangedWorkspace() {
   });
   try {
     await rm(path.join(workspace.repoPath, "remote.git"), { recursive: true });
-    await workspace.client.renameProject(workspace.projectId, "Paseo");
+    await workspace.client.renameProject(workspace.projectId, "Clisbot");
     await writeFile(path.join(workspace.repoPath, "README.md"), "Changed line\n".repeat(12345));
     await workspace.client.checkoutRefresh(workspace.repoPath);
     await expect

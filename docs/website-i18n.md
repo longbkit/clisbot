@@ -1,6 +1,6 @@
 # Website translations
 
-paseo.sh is served in English and Simplified Chinese (`zh-CN`). This doc covers the website in `packages/website`. App UI translations are in [i18n.md](i18n.md).
+clisbot.com is served in English and Simplified Chinese (`zh-CN`). This doc covers the website in `packages/website`. App UI translations are in [i18n.md](i18n.md).
 
 ## URLs own the language
 
@@ -13,15 +13,15 @@ paseo.sh is served in English and Simplified Chinese (`zh-CN`). This doc covers 
 
 ## Where copy lives
 
-| Content          | English                                            | Chinese                                                                         |
-| ---------------- | -------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Interface copy   | `src/i18n/resources/en.json`                       | `src/i18n/resources/zh-CN.json`                                                 |
-| Docs             | `public-docs/<page>.md`                            | `public-docs/<page>.zh-CN.md`                                                   |
-| Blog posts       | `posts/<slug>.md`                                  | `posts/<slug>.zh-CN.md`                                                         |
-| Comparison pages | `src/content/alternatives/<slug>.md`               | `src/content/alternatives/<slug>.zh-CN.md`                                      |
-| Legal pages      | `legal/<page>.md`                                  | `legal/<page>.zh-CN.md`                                                         |
-| Changelog        | `CHANGELOG.md`                                     | `CHANGELOG.zh-CN.md`, see [release.md](release.md#changelog-translations)       |
-| Plugin listings  | the plugin's `paseo-plugin.json` and `OVERVIEW.md` | `translations` and `OVERVIEW.zh-CN.md`, see `public-docs/plugins/publishing.md` |
+| Content          | English                                              | Chinese                                                                         |
+| ---------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Interface copy   | `src/i18n/resources/en.json`                         | `src/i18n/resources/zh-CN.json`                                                 |
+| Docs             | `public-docs/<page>.md`                              | `public-docs/<page>.zh-CN.md`                                                   |
+| Blog posts       | `posts/<slug>.md`                                    | `posts/<slug>.zh-CN.md`                                                         |
+| Comparison pages | `src/content/alternatives/<slug>.md`                 | `src/content/alternatives/<slug>.zh-CN.md`                                      |
+| Legal pages      | `legal/<page>.md`                                    | `legal/<page>.zh-CN.md`                                                         |
+| Changelog        | `CHANGELOG.md`                                       | `CHANGELOG.zh-CN.md`, see [release.md](release.md#changelog-translations)       |
+| Plugin listings  | the plugin's `clisbot-plugin.json` and `OVERVIEW.md` | `translations` and `OVERVIEW.zh-CN.md`, see `public-docs/plugins/publishing.md` |
 
 `en.json` types the keys, so typecheck fails when `zh-CN.json` misses one. A translation file is grouped with its English original by name (`src/markdown-content.ts`). A translation without an English original fails the build.
 

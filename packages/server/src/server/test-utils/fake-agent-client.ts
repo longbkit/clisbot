@@ -1,4 +1,4 @@
-import type { ProviderOptions } from "@getpaseo/protocol/agent-types";
+import type { ProviderOptions } from "@clisbot/protocol/agent-types";
 import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { appendFile, mkdir, readFile } from "node:fs/promises";
@@ -24,7 +24,7 @@ import type {
   FetchCatalogOptions,
 } from "../agent/agent-sdk-types.js";
 import type { AgentPermissionRequest, AgentPermissionResponse } from "../agent/agent-sdk-types.js";
-import { isLikelyExternalToolName } from "@getpaseo/protocol/tool-name-normalization";
+import { isLikelyExternalToolName } from "@clisbot/protocol/tool-name-normalization";
 
 const TEST_CAPABILITIES: AgentCapabilityFlags = {
   supportsStreaming: true,
@@ -395,7 +395,7 @@ class FakeAgentSession implements AgentSession {
     this.historyEvents = options.historyEvents;
     this.historyPath = path.join(
       tmpdir(),
-      "paseo-fake-provider-history",
+      "clisbot-fake-provider-history",
       this.providerName,
       `${this.id}.jsonl`,
     );
@@ -1053,15 +1053,15 @@ class FakeAgentSession implements AgentSession {
     if (this.providerName === "codex" && fullName.startsWith("prompts:")) {
       const promptId = fullName.slice("prompts:".length);
       return {
-        text: `PASEO_OK ${args ?? ""}`.trim(),
-        timeline: [{ type: "assistant_message", text: `PASEO_OK ${promptId}` }],
+        text: `CLISBOT_OK ${args ?? ""}`.trim(),
+        timeline: [{ type: "assistant_message", text: `CLISBOT_OK ${promptId}` }],
         usage: { inputTokens: 1, outputTokens: 1 },
       };
     }
 
     return {
-      text: "PASEO_SKILL_OK",
-      timeline: [{ type: "assistant_message", text: "PASEO_SKILL_OK" }],
+      text: "CLISBOT_SKILL_OK",
+      timeline: [{ type: "assistant_message", text: "CLISBOT_SKILL_OK" }],
       usage: { inputTokens: 1, outputTokens: 1 },
     };
   }

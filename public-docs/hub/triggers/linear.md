@@ -8,7 +8,7 @@ category: Hub
 
 # Linear triggers
 
-Start agents on your Paseo daemons from Linear issue activity and post replies back to the issue. First connect a Linear workspace under **Integrations** (or configure a [Linear app](/docs/hub/self-hosting/linear-app) on a self-hosted Hub).
+Start agents on your Clisbot daemons from Linear issue activity and post replies back to the issue. First connect a Linear workspace under **Integrations** (or configure a [Linear app](/docs/hub/self-hosting/linear-app) on a self-hosted Hub).
 
 ## Supported events
 
@@ -22,7 +22,7 @@ Events on the same Linear issue continue the same agent session by default (`con
 
 ## Respond to issue comments
 
-Save this file as `.paseo/triggers/linear-help.yml`, replace the connection slug and user UUID, and set `run.target` to a [connected daemon](/docs/hub/daemons):
+Save this file as `.clisbot/triggers/linear-help.yml`, replace the connection slug and user UUID, and set `run.target` to a [connected daemon](/docs/hub/daemons):
 
 ```yaml
 name: linear-help
@@ -31,7 +31,7 @@ on:
     connection: acme-linear
     filters:
       from_users: ["11111111-1111-4111-8111-111111111111"]
-      pattern: "/paseo "
+      pattern: "/clisbot "
 run:
   target:
     daemon: devbox
@@ -46,7 +46,7 @@ run:
     Post one reply using reply, then call finish_execution.
 
     <user-prompt>
-    ${{ paseo.prompt }}
+    ${{ clisbot.prompt }}
     </user-prompt>
   outputs:
     linear.reply:
@@ -57,13 +57,13 @@ run:
 Deploy the trigger from the repository root:
 
 ```sh
-paseo hub deploy --dry-run
-paseo hub deploy
+clisbot hub deploy --dry-run
+clisbot hub deploy
 ```
 
-From an allowed Linear account, post an issue comment such as `/paseo summarize this request`. Hub matches the prefix, runs the agent on `devbox`, and posts the reply as a comment on that Linear issue.
+From an allowed Linear account, post an issue comment such as `/clisbot summarize this request`. Hub matches the prefix, runs the agent on `devbox`, and posts the reply as a comment on that Linear issue.
 
-When Hub runs over HTTPS, the reply includes an **Open in Paseo** link. Check [Activity](/docs/hub/activity) to inspect the run.
+When Hub runs over HTTPS, the reply includes an **Open in Clisbot** link. Check [Activity](/docs/hub/activity) to inspect the run.
 
 ## Start work when an issue enters scope
 
@@ -87,7 +87,7 @@ run:
     cwd: /workspace/project
     worktree:
       mode: branch-off
-      newBranch: trigger-${{ paseo.execution.id }}
+      newBranch: trigger-${{ clisbot.execution.id }}
       base: origin/main
   agent:
     provider: codex
@@ -103,7 +103,7 @@ run:
   prompt: |
     Implement the Linear issue, open a pull request with gh, and post the PR URL using reply.
     Issue context:
-    ${{ paseo.context }}
+    ${{ clisbot.context }}
     Call finish_execution when done.
 ```
 
@@ -128,6 +128,6 @@ To find a UUID in Linear, open the command menu (`Cmd+K` or `Ctrl+K`) on an issu
 
 ## Context and replies
 
-Include `${{ paseo.context }}` in `run.prompt` to pass the issue details (identifier, title, description, URL, project, state, assignee, labels) and up to 49 preceding issue comments as JSON.
+Include `${{ clisbot.context }}` in `run.prompt` to pass the issue details (identifier, title, description, URL, project, state, assignee, labels) and up to 49 preceding issue comments as JSON.
 
 Linear triggers automatically grant the `reply` tool (`linear.reply`) to post comments on the triggering issue. Declare `run.outputs.linear.reply` to enforce `max` or `required: true`.

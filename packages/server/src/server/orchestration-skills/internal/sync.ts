@@ -15,7 +15,7 @@ export interface SkillSyncResult {
   processedSkills: number;
 }
 
-const MANAGED_FILES_MANIFEST = ".paseo-managed-files.json";
+const MANAGED_FILES_MANIFEST = ".clisbot-managed-files.json";
 
 interface ManagedFilesManifest {
   version: 1;

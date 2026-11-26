@@ -8,7 +8,7 @@ import { setTimeout } from "node:timers/promises";
 // A same-slot drop must release the list's recognizer so a body swipe moves the sheet.
 const serial = process.env.ANDROID_SERIAL;
 assert.ok(serial, "Set ANDROID_SERIAL to the device owned by this test");
-const session = process.env.PASEO_DEVICE_SESSION ?? "usage-drag-regression";
+const session = process.env.CLISBOT_DEVICE_SESSION ?? "usage-drag-regression";
 const artifacts = resolve(".artifacts/usage-drag-regression");
 mkdirSync(artifacts, { recursive: true });
 function ad(...args) {
@@ -28,7 +28,7 @@ function touch(kind, x, y) {
   adb("shell", "input", "motionevent", kind, String(Math.round(x)), String(Math.round(y)));
 }
 try {
-  ad("open", process.env.PASEO_MOBILE_APP_ID ?? "sh.paseo.debug");
+  ad("open", process.env.CLISBOT_MOBILE_APP_ID ?? "sh.clisbot.debug");
   const nodes = snapshot();
   writeFileSync(resolve(artifacts, "before.json"), JSON.stringify(nodes));
   const handle = nodes.find((node) => node.identifier === "usage-card-drag-handle");

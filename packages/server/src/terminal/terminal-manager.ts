@@ -14,8 +14,8 @@ import { type CaptureTerminalLinesResult } from "./terminal-capture.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { resolve, sep } from "node:path";
 import { assertAbsolutePath, isSameOrDescendantPath } from "../server/path-utils.js";
-import type { TerminalActivity, TerminalActivityState } from "@getpaseo/protocol/terminal-activity";
-import { deriveTerminalActivityStatusBucket } from "@getpaseo/protocol/terminal-activity";
+import type { TerminalActivity, TerminalActivityState } from "@clisbot/protocol/terminal-activity";
+import { deriveTerminalActivityStatusBucket } from "@clisbot/protocol/terminal-activity";
 
 export interface TerminalListItem {
   id: string;
@@ -56,7 +56,7 @@ export type TerminalWorkspaceContributionChangedListener = (
 
 export interface TerminalManager {
   /**
-   * Set when this host's terminals cannot be served at all (a worker from a newer Paseo holds
+   * Set when this host's terminals cannot be served at all (a worker from a newer Clisbot holds
    * them). Callers that answer terminal requests report it instead of an empty list.
    */
   getUnavailableError?(): Error | null;
@@ -75,7 +75,7 @@ export interface TerminalManager {
     activityToken?: string;
     activityUrl?: string | null;
     baseEnv?: Record<string, string>;
-    paseoCliPath?: string | null;
+    clisbotCliPath?: string | null;
   }): Promise<TerminalSession>;
   registerCwdEnv(options: { cwd: string; env: Record<string, string> }): void;
   validateTerminalActivityToken(terminalId: string, token: string): "valid" | "unknown" | "invalid";
@@ -345,7 +345,7 @@ export function createTerminalManager(
       activityToken?: string;
       activityUrl?: string | null;
       baseEnv?: Record<string, string>;
-      paseoCliPath?: string | null;
+      clisbotCliPath?: string | null;
     }): Promise<LocalTerminalSession> {
       assertAbsolutePath(options.cwd);
 
@@ -361,9 +361,9 @@ export function createTerminalManager(
           ? (managerOptions.getTerminalActivityUrl?.() ?? null)
           : options.activityUrl;
       const activityEnv = {
-        PASEO_TERMINAL_ID: terminalId,
-        PASEO_ACTIVITY_TOKEN: activityToken,
-        ...(terminalActivityUrl ? { PASEO_TERMINAL_ACTIVITY_URL: terminalActivityUrl } : {}),
+        CLISBOT_TERMINAL_ID: terminalId,
+        CLISBOT_ACTIVITY_TOKEN: activityToken,
+        ...(terminalActivityUrl ? { CLISBOT_TERMINAL_ACTIVITY_URL: terminalActivityUrl } : {}),
       };
       terminalActivityTokenById.set(terminalId, activityToken);
       let session: LocalTerminalSession;
@@ -381,7 +381,9 @@ export function createTerminalManager(
             ...(options.cols !== undefined ? { cols: options.cols } : {}),
             ...(mergedEnv ? { env: mergedEnv } : {}),
             ...(options.baseEnv ? { baseEnv: options.baseEnv } : {}),
-            ...(options.paseoCliPath === undefined ? {} : { paseoCliPath: options.paseoCliPath }),
+            ...(options.clisbotCliPath === undefined
+              ? {}
+              : { clisbotCliPath: options.clisbotCliPath }),
             activityEnv,
           }),
         );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentOptionControl } from "@getpaseo/protocol/agent-types";
+import type { AgentOptionControl } from "@clisbot/protocol/agent-types";
 import {
   getControlTooltip,
   isControlActive,

@@ -1,5 +1,5 @@
 import { i18n } from "@/i18n/i18next";
-import type { SubscribeTerminalRequest } from "@getpaseo/protocol/messages";
+import type { SubscribeTerminalRequest } from "@clisbot/protocol/messages";
 
 export interface ResolveTerminalRestoreOptionsInput {
   supportsTerminalRestoreModes: boolean;

@@ -2,8 +2,8 @@ import type {
   AgentMode,
   AgentModelDefinition,
   ProviderSnapshotEntry,
-} from "@getpaseo/protocol/agent-types";
-import type { ScheduleSummary } from "@getpaseo/protocol/schedule/types";
+} from "@clisbot/protocol/agent-types";
+import type { ScheduleSummary } from "@clisbot/protocol/schedule/types";
 import type { FormPreferences } from "@/create-agent-preferences/preferences";
 import { describe, expect, it } from "vitest";
 import { buildProjectOptionId, type ScheduleProjectTarget } from "./schedule-project-targets";

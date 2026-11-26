@@ -134,7 +134,7 @@ describe("terminateWithTreeKill", () => {
   test.runIf(process.platform === "win32")(
     "kills Windows descendants through taskkill tree cleanup",
     async () => {
-      tempDir = await mkdtemp(join(tmpdir(), "paseo-server-tree-kill-"));
+      tempDir = await mkdtemp(join(tmpdir(), "clisbot-server-tree-kill-"));
       const childPidPath = join(tempDir, "descendant.pid");
 
       ownerProcess = spawnOwnerWithDescendant({
@@ -160,7 +160,7 @@ describe("terminateWithTreeKill", () => {
   test.runIf(process.platform !== "win32")(
     "force-kills descendants that started their own process group",
     async () => {
-      tempDir = await mkdtemp(join(tmpdir(), "paseo-server-tree-kill-"));
+      tempDir = await mkdtemp(join(tmpdir(), "clisbot-server-tree-kill-"));
       const childPidPath = join(tempDir, "descendant.pid");
 
       ownerProcess = spawnOwnerWithDescendant({

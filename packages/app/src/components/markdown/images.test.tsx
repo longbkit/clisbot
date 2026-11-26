@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it } from "vitest";
-import type { FileReadResult } from "@getpaseo/client/internal/daemon-client";
+import type { FileReadResult } from "@clisbot/client/internal/daemon-client";
 import { __setAttachmentStoreForTests } from "@/attachments/store";
 import type { AttachmentStore } from "@/attachments/types";
 import { useMarkdownSource, type MarkdownImageContext } from "./images";

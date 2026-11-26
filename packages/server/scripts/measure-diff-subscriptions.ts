@@ -1,16 +1,12 @@
 import { performance } from "node:perf_hooks";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-  encodeDiffFrame,
-  DiffOpcode,
-  type DiffFrame,
-} from "@getpaseo/protocol/binary-frames/index";
+import { encodeDiffFrame, DiffOpcode, type DiffFrame } from "@clisbot/protocol/binary-frames/index";
 import { DiffSubscriptions } from "../src/server/diff/index.js";
 import { createFileObserver } from "../src/server/file-observer/index.js";
 import { runGitCommand } from "../src/utils/run-git-command.js";
 import { parseAndHighlightDiff } from "../src/server/utils/diff-highlighter.js";
-import { validateWSOutboundMessage } from "@getpaseo/protocol/validation/ws-outbound";
+import { validateWSOutboundMessage } from "@clisbot/protocol/validation/ws-outbound";
 
 const cwd = resolve(import.meta.dirname, "../../..");
 const artifacts = resolve(cwd, ".artifacts/diff-subscription");

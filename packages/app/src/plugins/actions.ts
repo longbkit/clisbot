@@ -1,14 +1,14 @@
 import { pluginComposersSource } from "./composer-items/source";
 import { getPluginClientApi } from "./client-state/api";
-import { callPluginRpc } from "@getpaseo/plugin/client/host";
+import { callPluginRpc } from "@clisbot/plugin/client/host";
 import type {
   PluginAgentCommandContext,
   PluginCommandCapabilities,
   PluginPanelLocation,
   PluginScreenParams,
   PluginWorkspaceCommandContext,
-} from "@getpaseo/plugin/client";
-import type { PluginClientStateSource } from "@getpaseo/plugin/client/host";
+} from "@clisbot/plugin/client";
+import type { PluginClientStateSource } from "@clisbot/plugin/client/host";
 import { resolvePluginPanelOpenLocation } from "./workspace-panels/locations";
 import { parsePluginOpenScreenInput } from "./surface-contribution";
 import type { InstalledPlugin } from "./types";
@@ -34,7 +34,7 @@ export function createPluginCapabilities(
     navigation.openSurface(plugin.id, screenId, params);
   }
   return {
-    paseo: getPluginClientApi(plugin).paseo,
+    clisbot: getPluginClientApi(plugin).clisbot,
     rpc: (contract, input) => callPluginRpc(contract, plugin.invoke, input),
     openSettings(screenId) {
       if (!plugin.settingsScreens.some((screen) => screen.id === screenId))

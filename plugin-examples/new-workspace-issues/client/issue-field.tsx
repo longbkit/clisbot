@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
-import { useNewWorkspace, useRpc } from "@getpaseo/plugin/client";
-import { Combobox } from "@getpaseo/plugin/client/ui";
+import { useNewWorkspace, useRpc } from "@clisbot/plugin/client";
+import { Combobox } from "@clisbot/plugin/client/ui";
 import { searchIssuesRpc, type Issue } from "../shared/issues";
 
 const ISSUE_KEY = "new-workspace-issues.issue";

@@ -1,10 +1,10 @@
 import { useCallback } from "react";
-import { copyText, SidebarRow } from "@getpaseo/plugin/client/ui";
+import { copyText, SidebarRow } from "@clisbot/plugin/client/ui";
 import type {
   PluginButtonRegistration,
   PluginClientContext,
   PluginSidebarItemProps,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 import { messages } from "./client/messages";
 import { Notes } from "./client/notes";
 

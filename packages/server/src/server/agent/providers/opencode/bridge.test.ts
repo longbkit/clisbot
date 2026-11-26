@@ -9,15 +9,18 @@ import Ajv2020 from "ajv/dist/2020.js";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { createTestLogger } from "../../../../test-utils/test-logger.js";
-import type { PaseoToolCatalog } from "../../tools/types.js";
-import { PaseoToolInputError } from "../../tools/types.js";
+import type { ClisbotToolCatalog } from "../../tools/types.js";
+import { ClisbotToolInputError } from "../../tools/types.js";
 import { AgentManager } from "../../agent-manager.js";
 import { AgentStorage } from "../../agent-storage.js";
 import { ProviderSnapshotManager } from "../../provider-snapshot-manager.js";
 import { createTestAgentClients } from "../../../test-utils/fake-agent-client.js";
 import { createTestAgentMessages } from "../../../test-utils/agent-messages.js";
-import { createPaseoAgentToolManifest, createPaseoToolCatalog } from "../../tools/paseo-tools.js";
-import { serializePaseoToolInputParameters } from "../../tools/paseo-tool-serialization.js";
+import {
+  createClisbotAgentToolManifest,
+  createClisbotToolCatalog,
+} from "../../tools/clisbot-tools.js";
+import { serializeClisbotToolInputParameters } from "../../tools/clisbot-tool-serialization.js";
 import {
   OpenCodeBridge,
   decorateOpenCodeV2Env,
@@ -35,7 +38,7 @@ afterEach(async () => {
   );
 });
 
-function createCatalog(): PaseoToolCatalog {
+function createCatalog(): ClisbotToolCatalog {
   const tool = {
     name: "echo_context",
     title: "Echo context",
@@ -46,7 +49,8 @@ function createCatalog(): PaseoToolCatalog {
         .object({ value: z.string().min(2, "value must be at least 2 characters") })
         .strict()
         .safeParse(input);
-      if (!parsed.success) throw new PaseoToolInputError(parsed.error.message, parsed.error.issues);
+      if (!parsed.success)
+        throw new ClisbotToolInputError(parsed.error.message, parsed.error.issues);
       return { content: [{ type: "text", text: parsed.data.value }] };
     },
   };
@@ -78,9 +82,9 @@ function readPluginOptions(env: Record<string, string>): {
 
 describe("OpenCodeBridge", () => {
   test("discovers only the requested session's catalog and retains global discovery", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-discovery-"));
-    temporaryDirectories.push(paseoHome);
-    const bridge = new OpenCodeBridge({ paseoHome, logger: createTestLogger() });
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-discovery-"));
+    temporaryDirectories.push(clisbotHome);
+    const bridge = new OpenCodeBridge({ clisbotHome, logger: createTestLogger() });
     const catalog = createCatalog();
     bridge.setManifestCatalog(catalog);
     await bridge.start();
@@ -102,7 +106,7 @@ describe("OpenCodeBridge", () => {
               name: "echo_context",
               title: "Echo context",
               description: "Returns the supplied value.",
-              inputSchema: serializePaseoToolInputParameters(catalog.getTool("echo_context")!),
+              inputSchema: serializeClisbotToolInputParameters(catalog.getTool("echo_context")!),
             },
           ],
         },
@@ -112,7 +116,7 @@ describe("OpenCodeBridge", () => {
       expect(await discover("?sessionID=disabled")).toEqual({ status: 200, body: { tools: [] } });
       const missing = {
         status: 404,
-        body: { error: "OpenCode session is not bound to a Paseo agent" },
+        body: { error: "OpenCode session is not bound to a Clisbot agent" },
       };
       expect(await discover("?sessionID=unknown")).toEqual(missing);
       expect(await discover("?sessionID=")).toEqual(missing);
@@ -124,9 +128,9 @@ describe("OpenCodeBridge", () => {
   });
 
   test("registers and executes session-only tools without exposing them to other sessions", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-session-tools-"));
-    temporaryDirectories.push(paseoHome);
-    const bridge = new OpenCodeBridge({ paseoHome, logger: createTestLogger() });
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-session-tools-"));
+    temporaryDirectories.push(clisbotHome);
+    const bridge = new OpenCodeBridge({ clisbotHome, logger: createTestLogger() });
     const builtin = createCatalog();
     const pluginTool = {
       name: "plugin_action",
@@ -135,7 +139,7 @@ describe("OpenCodeBridge", () => {
     };
     const tools = new Map([...builtin.tools, [pluginTool.name, pluginTool] as const]);
     const calls: unknown[] = [];
-    const author: PaseoToolCatalog = {
+    const author: ClisbotToolCatalog = {
       tools,
       getTool: (name) => tools.get(name),
       executeTool: async (name, input, context) => {
@@ -180,16 +184,16 @@ describe("OpenCodeBridge", () => {
       );
       try {
         expect([...registered.keys()]).toEqual([
-          "paseo_structured_output",
-          "paseo_echo_context",
-          `paseo_${pluginTool.name}`,
+          "clisbot_structured_output",
+          "clisbot_echo_context",
+          `clisbot_${pluginTool.name}`,
         ]);
-        const submit = registered.get(`paseo_${pluginTool.name}`)!;
-        expect(submit.input).toEqual(serializePaseoToolInputParameters(pluginTool));
+        const submit = registered.get(`clisbot_${pluginTool.name}`)!;
+        expect(submit.input).toEqual(serializeClisbotToolInputParameters(pluginTool));
         const visibleTools = [
-          ["author/one", ["paseo_echo_context", `paseo_${pluginTool.name}`, "native"]],
-          ["child", ["paseo_echo_context", `paseo_${pluginTool.name}`, "native"]],
-          ["other", ["paseo_echo_context", "native"]],
+          ["author/one", ["clisbot_echo_context", `clisbot_${pluginTool.name}`, "native"]],
+          ["child", ["clisbot_echo_context", `clisbot_${pluginTool.name}`, "native"]],
+          ["other", ["clisbot_echo_context", "native"]],
           ["disabled", ["native"]],
           ["unrelated", ["native"]],
         ] as const;
@@ -208,16 +212,16 @@ describe("OpenCodeBridge", () => {
           submit.execute({ value: "child revision" }, { sessionID: "child" }),
         ).resolves.toMatchObject({ content: [{ type: "text", text: "Plugin action complete" }] });
         await expect(submit.execute({}, { sessionID: "other" })).rejects.toThrow(
-          "Paseo tool not found",
+          "Clisbot tool not found",
         );
         await expect(submit.execute({}, { sessionID: "disabled" })).rejects.toThrow(
-          "Paseo tools are disabled",
+          "Clisbot tools are disabled",
         );
         await expect(submit.execute({}, { sessionID: "unrelated" })).rejects.toThrow("not bound");
         expect(calls).toEqual([{ value: "revision" }, { value: "child revision" }]);
         await expect(
           registered
-            .get("paseo_echo_context")!
+            .get("clisbot_echo_context")!
             .execute({ value: "builtin" }, { sessionID: "other" }),
         ).resolves.toMatchObject({ content: [{ type: "text", text: "builtin" }] });
       } finally {
@@ -229,11 +233,11 @@ describe("OpenCodeBridge", () => {
   });
 
   test("advertises agent-scoped schemas that execute through both bridge plugins", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-manifest-"));
-    temporaryDirectories.push(paseoHome);
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-manifest-"));
+    temporaryDirectories.push(clisbotHome);
     const logger = createTestLogger();
     const clients = createTestAgentClients();
-    const agentStorage = new AgentStorage(path.join(paseoHome, "agents"), logger);
+    const agentStorage = new AgentStorage(path.join(clisbotHome, "agents"), logger);
     const agentManager = new AgentManager({ clients, registry: agentStorage, logger });
     const providerSnapshotManager = new ProviderSnapshotManager({ logger, extraClients: clients });
     const agentMessages = createTestAgentMessages({ agentManager, agentStorage, logger });
@@ -244,16 +248,16 @@ describe("OpenCodeBridge", () => {
       logger,
       agentMessages: () => agentMessages,
     };
-    const bridge = new OpenCodeBridge({ paseoHome, logger });
+    const bridge = new OpenCodeBridge({ clisbotHome, logger });
     await bridge.start();
-    bridge.setManifestCatalog(createPaseoAgentToolManifest(dependencies));
+    bridge.setManifestCatalog(createClisbotAgentToolManifest(dependencies));
     try {
       const parent = await agentManager.createAgent(
-        { provider: "codex", cwd: paseoHome },
+        { provider: "codex", cwd: clisbotHome },
         undefined,
         { workspaceId: "manifest-workspace" },
       );
-      const catalog = createPaseoToolCatalog({ ...dependencies, callerAgentId: parent.id });
+      const catalog = createClisbotToolCatalog({ ...dependencies, callerAgentId: parent.id });
       bridge.bindSession({ sessionId: "bound", env: {}, tools: catalog });
       const plugin = readPluginOptions(bridge.decorateServerEnv({}));
       const response = await fetch(`${plugin.baseUrl}/_internal/opencode/tools`, {
@@ -274,9 +278,9 @@ describe("OpenCodeBridge", () => {
       const definitions = new Map(manifest.tools.map((tool) => [tool.name, tool]));
       const createDefinition = definitions.get("create_agent")!;
       const sendDefinition = definitions.get("send_agent_prompt")!;
-      const topLevelCatalog = createPaseoToolCatalog(dependencies);
+      const topLevelCatalog = createClisbotToolCatalog(dependencies);
       for (const name of ["create_agent", "send_agent_prompt"]) {
-        expect(serializePaseoToolInputParameters(topLevelCatalog.getTool(name)!)).toMatchObject({
+        expect(serializeClisbotToolInputParameters(topLevelCatalog.getTool(name)!)).toMatchObject({
           properties: { notifyOnFinish: { default: false } },
         });
       }
@@ -313,7 +317,7 @@ describe("OpenCodeBridge", () => {
       );
       try {
         const created = await tools
-          .get("paseo_create_agent")!
+          .get("clisbot_create_agent")!
           .execute(createInput, { sessionID: "bound" });
         const children = agentManager.listAgents().filter((agent) => agent.id !== parent.id);
         expect(children).toHaveLength(1);
@@ -325,9 +329,9 @@ describe("OpenCodeBridge", () => {
         expect([...definitions.keys()]).toEqual([...catalog.tools.keys()]);
         for (const definition of manifest.tools) {
           const accepted = catalog.getTool(definition.name)!;
-          expect(definition.inputSchema).toEqual(serializePaseoToolInputParameters(accepted));
+          expect(definition.inputSchema).toEqual(serializeClisbotToolInputParameters(accepted));
           expect(definition.description).toBe(accepted.description);
-          expect(tools.get(`paseo_${definition.name}`)!.input).toEqual(definition.inputSchema);
+          expect(tools.get(`clisbot_${definition.name}`)!.input).toEqual(definition.inputSchema);
         }
         expect(createDefinition.inputSchema).toMatchObject({
           properties: { notifyOnFinish: { default: true } },
@@ -347,7 +351,7 @@ describe("OpenCodeBridge", () => {
 
         const v1Module = await import(plugin.pluginUrl);
         const hooks = await v1Module.default({}, plugin);
-        expect(Object.keys(hooks.tool.paseo_create_agent.args)).toEqual(
+        expect(Object.keys(hooks.tool.clisbot_create_agent.args)).toEqual(
           Object.keys(
             z.record(z.string(), z.unknown()).parse(createDefinition.inputSchema.properties),
           ),
@@ -355,7 +359,7 @@ describe("OpenCodeBridge", () => {
         const sendInput = { agentId: child.id, prompt: "Hello again", notifyOnFinish: false };
         expect(ajv.compile(sendDefinition.inputSchema)(sendInput)).toBe(true);
         await expect(
-          hooks.tool.paseo_send_agent_prompt.execute(sendInput, {
+          hooks.tool.clisbot_send_agent_prompt.execute(sendInput, {
             sessionID: "bound",
             ask: async () => undefined,
           }),
@@ -376,7 +380,7 @@ describe("OpenCodeBridge", () => {
   });
 
   test("loads packaged bundle bytes without invoking source compilation", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-opencode-artifact-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-artifact-"));
     temporaryDirectories.push(root);
     const moduleUrl = pathToFileURL(path.join(root, "bridge.js")).href;
     const bundle = Buffer.from("export default async () => ({})");
@@ -411,8 +415,8 @@ describe("OpenCodeBridge", () => {
   });
 
   test("serves authenticated session context and caller-scoped tools", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-bridge-"));
-    temporaryDirectories.push(paseoHome);
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-bridge-"));
+    temporaryDirectories.push(clisbotHome);
     const catalog = createCatalog();
     const executedInputs: unknown[] = [];
     const executeTool = catalog.executeTool;
@@ -420,14 +424,14 @@ describe("OpenCodeBridge", () => {
       executedInputs.push(input);
       return await executeTool(name, input, context);
     };
-    const bridge = new OpenCodeBridge({ paseoHome, logger: createTestLogger() });
+    const bridge = new OpenCodeBridge({ clisbotHome, logger: createTestLogger() });
     await bridge.start();
     bridge.setManifestCatalog(catalog);
     const release = bridge.bindSession({
       sessionId: "ses_one",
       env: {
-        PASEO_AGENT_ID: "agent-one",
-        PASEO_AGENT_CWD: "/workspace/one",
+        CLISBOT_AGENT_ID: "agent-one",
+        CLISBOT_AGENT_CWD: "/workspace/one",
         CUSTOM_VALUE: "one",
       },
       tools: catalog,
@@ -448,8 +452,8 @@ describe("OpenCodeBridge", () => {
       });
       expect(await context.json()).toEqual({
         env: {
-          PASEO_AGENT_ID: "agent-one",
-          PASEO_AGENT_CWD: "/workspace/one",
+          CLISBOT_AGENT_ID: "agent-one",
+          CLISBOT_AGENT_CWD: "/workspace/one",
           CUSTOM_VALUE: "one",
         },
       });
@@ -493,17 +497,17 @@ describe("OpenCodeBridge", () => {
       );
       const asked: unknown[] = [];
       await expect(
-        hooks.tool.paseo_echo_context.execute(
+        hooks.tool.clisbot_echo_context.execute(
           { value: "through bundled plugin" },
           { sessionID: "ses_one", ask: async (request: unknown) => void asked.push(request) },
         ),
       ).resolves.toMatchObject({ output: "through bundled plugin" });
       expect(asked).toEqual([
-        { permission: "paseo_echo_context", patterns: ["*"], always: ["*"], metadata: {} },
+        { permission: "clisbot_echo_context", patterns: ["*"], always: ["*"], metadata: {} },
       ]);
       asked.length = 0;
       await expect(
-        hooks.tool.paseo_echo_context.execute(
+        hooks.tool.clisbot_echo_context.execute(
           { value: "x" },
           { sessionID: "ses_one", ask: async () => undefined },
         ),
@@ -511,7 +515,7 @@ describe("OpenCodeBridge", () => {
 
       executedInputs.length = 0;
       await expect(
-        hooks.tool.paseo_echo_context.execute(
+        hooks.tool.clisbot_echo_context.execute(
           { value: "rejected" },
           {
             sessionID: "ses_one",
@@ -529,7 +533,7 @@ describe("OpenCodeBridge", () => {
         hooks["shell.env"]({ cwd: "/workspace/one", sessionID: "ses_one" }, { env: {} }),
       ).rejects.toThrow("not bound");
       expect(pluginError).toHaveBeenCalledWith(
-        "[paseo-opencode-plugin] shell.env failed",
+        "[clisbot-opencode-plugin] shell.env failed",
         expect.objectContaining({ sessionID: "ses_one", error: expect.stringContaining("bound") }),
       );
       pluginError.mockRestore();
@@ -545,10 +549,10 @@ describe("OpenCodeBridge", () => {
   });
 
   test("v2 plugin filters caller tools and inherits child session bindings", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-v2-scope-"));
-    temporaryDirectories.push(paseoHome);
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-v2-scope-"));
+    temporaryDirectories.push(clisbotHome);
     const catalog = createCatalog();
-    const bridge = new OpenCodeBridge({ paseoHome, logger: createTestLogger() });
+    const bridge = new OpenCodeBridge({ clisbotHome, logger: createTestLogger() });
     bridge.setManifestCatalog(catalog);
     await bridge.start();
     const release = bridge.bindSession({ sessionId: "parent", env: {}, tools: catalog });
@@ -585,29 +589,31 @@ describe("OpenCodeBridge", () => {
       );
       const allowed: V2TestContext = {
         sessionID: "child",
-        tools: { paseo_echo_context: {}, native: {} },
+        tools: { clisbot_echo_context: {}, native: {} },
       };
       await filter(allowed);
-      expect(Object.keys(allowed.tools)).toEqual(["paseo_echo_context", "native"]);
+      expect(Object.keys(allowed.tools)).toEqual(["clisbot_echo_context", "native"]);
       const disabled: V2TestContext = {
         sessionID: "disabled",
-        tools: { paseo_echo_context: {}, native: {} },
+        tools: { clisbot_echo_context: {}, native: {} },
       };
       await filter(disabled);
       expect(Object.keys(disabled.tools)).toEqual(["native"]);
       const unrelated: V2TestContext = {
         sessionID: "unrelated",
-        tools: { paseo_echo_context: {}, native: {} },
+        tools: { clisbot_echo_context: {}, native: {} },
       };
       await filter(unrelated);
       expect(Object.keys(unrelated.tools)).toEqual(["native"]);
       await expect(
-        tools.get("paseo_echo_context")!.execute({ value: "child result" }, { sessionID: "child" }),
+        tools
+          .get("clisbot_echo_context")!
+          .execute({ value: "child result" }, { sessionID: "child" }),
       ).resolves.toMatchObject({ content: [{ type: "text", text: "child result" }] });
       await expect(
-        tools.get("paseo_echo_context")!.execute({ value: "blocked" }, { sessionID: "disabled" }),
+        tools.get("clisbot_echo_context")!.execute({ value: "blocked" }, { sessionID: "disabled" }),
       ).rejects.toMatchObject({
-        message: "Paseo tools are disabled for this session",
+        message: "Clisbot tools are disabled for this session",
         status: 403,
       });
       await dispose();
@@ -619,17 +625,17 @@ describe("OpenCodeBridge", () => {
   });
 
   test("v2 plugin preserves create_agent validation errors from the daemon", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-v2-errors-"));
-    temporaryDirectories.push(paseoHome);
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-v2-errors-"));
+    temporaryDirectories.push(clisbotHome);
     const logger = createTestLogger();
     const providerSnapshotManager = new ProviderSnapshotManager({ logger });
-    const catalog = createPaseoToolCatalog({
+    const catalog = createClisbotToolCatalog({
       agentManager: new AgentManager({ logger }),
-      agentStorage: new AgentStorage(paseoHome, logger),
+      agentStorage: new AgentStorage(clisbotHome, logger),
       providerSnapshotManager,
       logger,
     });
-    const bridge = new OpenCodeBridge({ paseoHome, logger });
+    const bridge = new OpenCodeBridge({ clisbotHome, logger });
     bridge.setManifestCatalog(catalog);
     await bridge.start();
     const release = bridge.bindSession({ sessionId: "caller", env: {}, tools: catalog });
@@ -670,7 +676,7 @@ describe("OpenCodeBridge", () => {
         const payload = await response.json();
         expect(payload).toMatchObject({ error: "Invalid tool input", issues: expect.any(Array) });
         await expect(
-          tools.get("paseo_create_agent")!.execute(input, { sessionID: "caller" }),
+          tools.get("clisbot_create_agent")!.execute(input, { sessionID: "caller" }),
         ).rejects.toMatchObject({
           status: 400,
           message: expect.stringContaining(
@@ -688,8 +694,8 @@ describe("OpenCodeBridge", () => {
   });
 
   test("v2 plugin returns a tool image as OpenCode file content", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-v2-image-"));
-    temporaryDirectories.push(paseoHome);
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-v2-image-"));
+    temporaryDirectories.push(clisbotHome);
     const png =
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
     const screenshot = {
@@ -707,13 +713,13 @@ describe("OpenCodeBridge", () => {
       },
     };
     const tools = new Map([[screenshot.name, screenshot]]);
-    const catalog: PaseoToolCatalog = {
+    const catalog: ClisbotToolCatalog = {
       tools,
       getTool: (name) => tools.get(name),
       executeTool: async (name, input, context) =>
         await tools.get(name)!.handler(input, context ?? {}),
     };
-    const bridge = new OpenCodeBridge({ paseoHome, logger: createTestLogger() });
+    const bridge = new OpenCodeBridge({ clisbotHome, logger: createTestLogger() });
     bridge.setManifestCatalog(catalog);
     await bridge.start();
     const release = bridge.bindSession({ sessionId: "session", env: {}, tools: catalog });
@@ -737,7 +743,7 @@ describe("OpenCodeBridge", () => {
         ["session"],
       );
       const result = await pluginTools
-        .get("paseo_browser_screenshot")!
+        .get("clisbot_browser_screenshot")!
         .execute({}, { sessionID: "session" });
       expect(result).toMatchObject({
         content: [
@@ -753,7 +759,7 @@ describe("OpenCodeBridge", () => {
   });
 
   test("v2 structured output validates values and clears its tool on ordinary turns", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "paseo-opencode-v2-structured-"));
+    const root = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-v2-structured-"));
     temporaryDirectories.push(root);
     const pluginUrl = await materializeOpenCodeV2Plugin(root);
     const module: {
@@ -771,7 +777,7 @@ describe("OpenCodeBridge", () => {
         type: "user",
         text: "answer",
         time: { created: 1 },
-        metadata: { paseoOutputSchema: schema },
+        metadata: { clisbotOutputSchema: schema },
       },
     ];
     const tools = new Map<string, V2TestTool>();
@@ -801,20 +807,20 @@ describe("OpenCodeBridge", () => {
     try {
       const context: V2TestContext = {
         sessionID: "session",
-        tools: { paseo_structured_output: {} },
+        tools: { clisbot_structured_output: {} },
         system: [],
       };
       await hook(context);
-      expect(context.tools.paseo_structured_output.input).toMatchObject({
+      expect(context.tools.clisbot_structured_output.input).toMatchObject({
         properties: { value: schema },
       });
-      const tool = tools.get("paseo_structured_output")!;
+      const tool = tools.get("clisbot_structured_output")!;
       await expect(
         tool.execute({ value: { answer: "wrong" } }, { sessionID: "session" }),
       ).rejects.toThrow("Invalid structured output");
       await expect(
         tool.execute({ value: { answer: 42 } }, { sessionID: "session" }),
-      ).resolves.toMatchObject({ metadata: { paseoStructuredOutput: { answer: 42 } } });
+      ).resolves.toMatchObject({ metadata: { clisbotStructuredOutput: { answer: 42 } } });
       history.push({ id: "next", type: "user", text: "ordinary", time: { created: 2 } });
       await hook(context);
       expect(context.tools).toEqual({});
@@ -827,14 +833,14 @@ describe("OpenCodeBridge", () => {
   });
 
   test("packages the v2 bridge as a directory with a server entry point", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-v2-package-"));
-    temporaryDirectories.push(paseoHome);
-    const bridge = new OpenCodeBridge({ paseoHome, logger: createTestLogger() });
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-v2-package-"));
+    temporaryDirectories.push(clisbotHome);
+    const bridge = new OpenCodeBridge({ clisbotHome, logger: createTestLogger() });
     await bridge.start();
     try {
       expect(
-        (await readdir(path.join(paseoHome, "runtime", "opencode"))).filter((name) =>
-          name.startsWith("paseo-v2-"),
+        (await readdir(path.join(clisbotHome, "runtime", "opencode"))).filter((name) =>
+          name.startsWith("clisbot-v2-"),
         ),
       ).toEqual([]);
       const pluginUrl = await bridge.materializeV2Plugin();
@@ -850,7 +856,7 @@ describe("OpenCodeBridge", () => {
       const directory = fileURLToPath(config.plugins[1].package);
       expect((await stat(directory)).isDirectory()).toBe(true);
       const entry = await readFile(path.join(directory, "server.js"), "utf8");
-      expect(entry).toContain('id: "paseo"');
+      expect(entry).toContain('id: "clisbot"');
       expect(await readFile(path.join(directory, "state.mjs"), "utf8")).toBe(
         await readFile(new URL("./v2/state.mjs", import.meta.url), "utf8"),
       );
@@ -862,13 +868,13 @@ describe("OpenCodeBridge", () => {
   });
 
   test("returns actionable 4xx responses for invalid bridge requests", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-bridge-errors-"));
-    temporaryDirectories.push(paseoHome);
-    const bridge = new OpenCodeBridge({ paseoHome, logger: createTestLogger() });
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-bridge-errors-"));
+    temporaryDirectories.push(clisbotHome);
+    const bridge = new OpenCodeBridge({ clisbotHome, logger: createTestLogger() });
     await bridge.start();
     const catalog = createCatalog();
     bridge.bindSession({ sessionId: "ses_errors", env: {}, tools: catalog });
-    const expectedErrorCatalog: PaseoToolCatalog = {
+    const expectedErrorCatalog: ClisbotToolCatalog = {
       tools: new Map([
         [
           "expected_error",
@@ -877,7 +883,7 @@ describe("OpenCodeBridge", () => {
             description: "Throws an expected tool error.",
             inputSchema: {},
             async handler() {
-              throw new PaseoToolInputError("Agent not found: missing-agent");
+              throw new ClisbotToolInputError("Agent not found: missing-agent");
             },
           },
         ],
@@ -932,7 +938,7 @@ describe("OpenCodeBridge", () => {
         { method: "POST", headers, body: "{}" },
       );
       expect(unknownTool.status).toBe(404);
-      expect(await unknownTool.json()).toEqual({ error: "Paseo tool not found: missing" });
+      expect(await unknownTool.json()).toEqual({ error: "Clisbot tool not found: missing" });
 
       const malformedBody = await fetch(
         `${plugin.baseUrl}/_internal/opencode/sessions/ses_errors/tools/echo_context`,
@@ -960,9 +966,9 @@ describe("OpenCodeBridge", () => {
   });
 
   test("preserves user OpenCode config while installing one content-addressed plugin", async () => {
-    const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-opencode-bridge-config-"));
-    temporaryDirectories.push(paseoHome);
-    const bridge = new OpenCodeBridge({ paseoHome, logger: createTestLogger() });
+    const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-opencode-bridge-config-"));
+    temporaryDirectories.push(clisbotHome);
+    const bridge = new OpenCodeBridge({ clisbotHome, logger: createTestLogger() });
     await bridge.start();
 
     try {
@@ -981,7 +987,7 @@ describe("OpenCodeBridge", () => {
       expect(config.model).toBe("provider/model");
       expect(config.plugin[0]).toBe("user-plugin");
       expect(config.plugin).toHaveLength(2);
-      expect(config.plugin[1]?.[0]).toMatch(/paseo-[a-f0-9]{64}\.mjs$/);
+      expect(config.plugin[1]?.[0]).toMatch(/clisbot-[a-f0-9]{64}\.mjs$/);
     } finally {
       await bridge.close();
     }

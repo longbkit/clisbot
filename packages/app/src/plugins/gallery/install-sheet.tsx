@@ -3,8 +3,8 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { PluginListItem } from "@getpaseo/protocol/messages";
-import type { PluginListing } from "@getpaseo/protocol/plugin-registry";
+import type { PluginListItem } from "@clisbot/protocol/messages";
+import type { PluginListing } from "@clisbot/protocol/plugin-registry";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import { SettingsCard, SettingsRow } from "@/components/settings";
 import { Alert } from "@/components/ui/alert";
@@ -18,7 +18,7 @@ import { pluginDisplayName } from "@/plugins/plugin-list";
 import { listingAuthor, listingSource, listingText, listingVersion } from "./listing";
 import { dismissFailedOperation, installPlugin, usePluginOperation } from "./operations";
 
-const PLUGIN_SOURCE_DOCS_URL = "https://paseo.sh/docs/plugins/reference#plugin-sources";
+const PLUGIN_SOURCE_DOCS_URL = "https://clisbot.com/docs/plugins/reference#plugin-sources";
 const SOURCE_SUBJECT = "source";
 
 /** What the sheet installs: a directory listing, or a source the user types. */

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import type { PluginListing } from "@getpaseo/protocol/plugin-registry";
+import type { PluginListing } from "@clisbot/protocol/plugin-registry";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/ui/search-field";

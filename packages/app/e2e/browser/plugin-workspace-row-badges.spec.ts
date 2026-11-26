@@ -16,7 +16,7 @@ import {
 const PLUGIN_ID = "row-badges-e2e";
 const TITLE = "Badge host workspace";
 
-const PLUGIN_SOURCE = `import { WorkspaceRowBadge } from "@getpaseo/plugin/client/ui";
+const PLUGIN_SOURCE = `import { WorkspaceRowBadge } from "@clisbot/plugin/client/ui";
 
 function Review() {
   return <WorkspaceRowBadge icon="Eye" label="In review" tone="warning" />;
@@ -83,10 +83,10 @@ test("a plugin badge shows on workspace rows, hides quietly, and follows its Sho
   const workspace = await seedWorkspace({ repoPrefix: "row-badges-", title: TITLE });
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const config = await client.getDaemonConfig();
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-row-badges-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-row-badges-"));
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({ id: PLUGIN_ID, requirements: pluginRequirements }),
     );
     await writeFile(path.join(directory, "index.client.tsx"), PLUGIN_SOURCE);

@@ -1,4 +1,4 @@
-import type { ForgeWeb } from "@getpaseo/protocol/messages";
+import type { ForgeWeb } from "@clisbot/protocol/messages";
 import { type Forge, forgeFromRemoteUrl, getForgePresentation } from "@/git/forge";
 import type { DesktopOpenTarget, OpenDesktopTargetInput } from "@/workspace/desktop-open-targets";
 import {

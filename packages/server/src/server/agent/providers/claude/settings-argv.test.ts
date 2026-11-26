@@ -5,8 +5,8 @@ import pino from "pino";
 import { expect, test } from "vitest";
 import { ClaudeAgentClient } from "./agent.js";
 
-test("the real SDK passes the user's settings file contents alongside Paseo flags", async () => {
-  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-settings-argv-"));
+test("the real SDK passes the user's settings file contents alongside Clisbot flags", async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-claude-settings-argv-"));
   const capturePath = path.join(cwd, "argv.json");
   const binaryPath = path.join(cwd, "capture.mjs");
   const settingsPath = path.join(cwd, "settings.json");

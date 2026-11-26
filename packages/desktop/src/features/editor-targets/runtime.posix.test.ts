@@ -12,7 +12,7 @@ const it = test.runIf(process.platform !== "win32");
 
 describe("editor target POSIX filesystem", () => {
   it("discovers and opens Xcode documents from the real filesystem", async () => {
-    const workspacePath = mkdtempSync(path.join(os.tmpdir(), "paseo-xcode-"));
+    const workspacePath = mkdtempSync(path.join(os.tmpdir(), "clisbot-xcode-"));
     const commands: Array<{ command: string; args: string[] }> = [];
     const runtime = createEditorTargetRuntime({
       platform: "darwin",

@@ -3,12 +3,12 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createTestPaseoDaemon, DaemonClient } from "./test-utils/index.js";
+import { createTestClisbotDaemon, DaemonClient } from "./test-utils/index.js";
 
 test("a rename-only commit returns zero added or deleted lines through the client", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "commit-rename-diff-"));
   const git = (...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
-  const daemon = await createTestPaseoDaemon({ agentClients: {} });
+  const daemon = await createTestClisbotDaemon({ agentClients: {} });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     git("init", "-b", "main");
@@ -61,7 +61,7 @@ test.skipIf(process.platform === "win32")(
       expect.objectContaining({ type: "remove", content: "before" }),
       expect.objectContaining({ type: "add", content: "after" }),
     ]);
-    const daemon = await createTestPaseoDaemon({ agentClients: {} });
+    const daemon = await createTestClisbotDaemon({ agentClients: {} });
     const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
     try {
       git("init", "-b", "main");
@@ -103,14 +103,14 @@ test.skipIf(process.platform === "win32")(
 
 test("streamed Changes preserves BOM-prefixed paths and highlighted content", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "stream-bom-diff-"));
-  const daemon = await createTestPaseoDaemon({ agentClients: {} });
+  const daemon = await createTestClisbotDaemon({ agentClients: {} });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     execFileSync("git", ["init", "-b", "main"], { cwd });
     writeFileSync(join(cwd, "\uFEFFbom.ts"), "\uFEFFexport const value = 1;\n");
     writeFileSync(join(cwd, "other.txt"), "other edit\n");
     await client.connect();
-    const states: import("@getpaseo/client").DiffState[] = [];
+    const states: import("@clisbot/client").DiffState[] = [];
     const observation = client.observeDiff({
       cwd,
       base: { kind: "empty" },
@@ -148,7 +148,7 @@ test("checkout refresh from a subdirectory updates a pinned streamed comparison"
   const { mkdirSync } = await import("node:fs");
   const workspace = join(cwd, "workspace");
   const git = (...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
-  const daemon = await createTestPaseoDaemon({ agentClients: {} });
+  const daemon = await createTestClisbotDaemon({ agentClients: {} });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     git("init", "-b", "main");
@@ -160,7 +160,7 @@ test("checkout refresh from a subdirectory updates a pinned streamed comparison"
     git("-c", "commit.gpgsign=false", "commit", "-m", "base");
     const head = git("rev-parse", "HEAD");
     await client.connect();
-    const states: import("@getpaseo/client").DiffState[] = [];
+    const states: import("@clisbot/client").DiffState[] = [];
     const observation = client.observeDiff({
       cwd: workspace,
       base: { kind: "empty" },
@@ -205,7 +205,7 @@ test("refreshing a non-Git workspace succeeds while a Git comparison is open", a
   const cwd = mkdtempSync(join(tmpdir(), "stream-refresh-git-"));
   const plain = mkdtempSync(join(tmpdir(), "stream-refresh-plain-"));
   const git = (...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
-  const daemon = await createTestPaseoDaemon({ agentClients: {} });
+  const daemon = await createTestClisbotDaemon({ agentClients: {} });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
     git("init", "-b", "main");
@@ -215,7 +215,7 @@ test("refreshing a non-Git workspace succeeds while a Git comparison is open", a
     git("add", ".");
     git("-c", "commit.gpgsign=false", "commit", "-m", "base");
     await client.connect();
-    const states: import("@getpaseo/client").DiffState[] = [];
+    const states: import("@clisbot/client").DiffState[] = [];
     const observation = client.observeDiff({
       cwd,
       base: { kind: "empty" },

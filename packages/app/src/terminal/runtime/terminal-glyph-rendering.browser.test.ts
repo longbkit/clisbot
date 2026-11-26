@@ -43,7 +43,7 @@ function mountTerminal(left: number): TerminalView {
     fontSize: 16,
     theme: { background: "#101010", foreground: "#eeeeee", cursor: "#eeeeee" },
   });
-  const terminal = window.__paseoTerminal;
+  const terminal = window.__clisbotTerminal;
   if (!terminal) throw new Error("Terminal did not mount");
   const view = { root, host, runtime, terminal };
   views.push(view);

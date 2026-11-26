@@ -203,7 +203,7 @@ test("editing a failed New workspace submission starts without a request key con
   page,
 }) => {
   // An empty git repository naturally rejects worktree creation before workspace_ready.
-  const repoDir = mkdtempSync(path.join(tmpdir(), "paseo-empty-git-ws-"));
+  const repoDir = mkdtempSync(path.join(tmpdir(), "clisbot-empty-git-ws-"));
   execFileSync("git", ["init"], { cwd: repoDir, stdio: "ignore" });
   const client = await connectNewWorkspaceDaemonClient();
   let projectId: string | null = null;

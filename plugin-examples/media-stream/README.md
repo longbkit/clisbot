@@ -4,7 +4,7 @@ One subscription carries two binary streams. Each pushed `Uint8Array` is a binar
 byte says whether it is video, a keyframe, or audio.
 
 ```bash
-paseo plugin add /absolute/path/to/paseo/plugin-examples/media-stream
+clisbot plugin add /absolute/path/to/clisbot/plugin-examples/media-stream
 ```
 
 - `shared/media-frames.ts` owns the byte layout: `encodeMediaFrame`, `decodeMediaFrame`, and the

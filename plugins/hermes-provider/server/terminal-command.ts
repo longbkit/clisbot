@@ -1,4 +1,4 @@
-import type { AcpToolCallSnapshot, AcpTransformer } from "@getpaseo/plugin/server/acp";
+import type { AcpToolCallSnapshot, AcpTransformer } from "@clisbot/plugin/server/acp";
 import { z } from "zod";
 
 const commandInput = z.object({ command: z.string() });
@@ -11,7 +11,7 @@ const startText = z.tuple([
 
 // Hermes titles a terminal call with a summary (`terminal: git status + 2 commands`) and sends the
 // command only as `$ <command>` text in the call's first update; the completed update replaces that
-// text with the result. Keeping the command as the call's input lets Paseo's Shell row show it.
+// text with the result. Keeping the command as the call's input lets Clisbot's Shell row show it.
 // When Hermes sends neither shape, the call passes through and the row shows Hermes's title.
 export const terminalCommand: AcpTransformer = {
   toolCall(call, { previous }) {

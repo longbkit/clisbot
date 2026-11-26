@@ -27,7 +27,7 @@ function ShellPrompt() {
   return (
     <>
       <span className="text-mock-term-green">mo@devbox</span>:
-      <span className="text-mock-term-blue">~/dev/paseo</span>${" "}
+      <span className="text-mock-term-blue">~/dev/clisbot</span>${" "}
     </>
   );
 }
@@ -59,7 +59,7 @@ export function RemoteTerminalPane() {
         npm run dev
       </div>
       <div> </div>
-      <div className="text-mock-fg-muted">&gt; @getpaseo/website dev</div>
+      <div className="text-mock-fg-muted">&gt; @clisbot/website dev</div>
       <div className="text-mock-fg-muted">&gt; vite</div>
       <div> </div>
       <div>

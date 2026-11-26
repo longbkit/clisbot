@@ -5,7 +5,7 @@
   },
   "ignorePatterns": [".dev/**", "packages/react-native-enriched-markdown/**"],
   "plugins": ["react", "react-perf", "unicorn", "typescript", "oxc", "import", "promise"],
-  "jsPlugins": ["./scripts/oxlint/paseo-plugin.mjs"],
+  "jsPlugins": ["./scripts/oxlint/clisbot-plugin.mjs"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -90,7 +90,7 @@
     {
       "files": ["packages/server/src/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
       "rules": {
-        "paseo/no-sync-io": [
+        "clisbot/no-sync-io": [
           "error",
           {
             "allow": {
@@ -227,7 +227,7 @@
                 "writeFileSync"
               ],
               // TODO: CLI shim lookup moved out of terminal.ts; migrate the executable-resolution boundary together.
-              "terminal/paseo-cli-path.ts": ["existsSync"],
+              "terminal/clisbot-cli-path.ts": ["existsSync"],
               // Node loader thread: TypeScript terminal-worker resolution runs in the loader, outside the daemon event loop.
               "terminal/terminal-ts-loader.mjs": ["existsSync"],
               // Terminal child process: executable preparation and shell integration run in the worker-backed terminal manager.
@@ -253,7 +253,7 @@
         "packages/server/src/server/daemon-e2e/**",
         "packages/server/src/server/agent/providers/pi/extensions/*-test.ts"
       ],
-      "rules": { "paseo/no-sync-io": "off" }
+      "rules": { "clisbot/no-sync-io": "off" }
     },
     {
       "files": [
@@ -423,7 +423,7 @@
         "packages/app/src/components/headers/screen-header.tsx",
         "packages/app/src/components/host-status-dot.tsx",
         "packages/app/src/components/hosts/host-picker.tsx",
-        "packages/app/src/components/icons/paseo-logo.tsx",
+        "packages/app/src/components/icons/clisbot-logo.tsx",
         "packages/app/src/components/left-sidebar.tsx",
         "packages/app/src/components/plan-card.tsx",
         "packages/app/src/components/provider-diagnostic-sheet.tsx",
@@ -526,7 +526,7 @@
     {
       "files": ["packages/app/src/**/*.{ts,tsx}"],
       "rules": {
-        "paseo/no-raw-pressable": "error"
+        "clisbot/no-raw-pressable": "error"
       }
     },
     // Press feedback is owned by the primitives in components/ui. Raw pressable burn-down:
@@ -622,7 +622,7 @@
         "packages/app/src/workspace/open-in-editor/button.tsx"
       ],
       "rules": {
-        "paseo/no-raw-pressable": "off"
+        "clisbot/no-raw-pressable": "off"
       }
     },
     {

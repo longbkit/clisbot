@@ -51,7 +51,7 @@ function WebLink({ link, anchorProps, children }: LinkRendererProps) {
     }),
     [anchorProps.style, hovered],
   );
-  // Selection copy pastes a link Paseo recognized as the text the reply showed.
+  // Selection copy pastes a link Clisbot recognized as the text the reply showed.
   const recognized = isRecognizedLink(link);
   const copyAnchorProps = useMemo(
     () =>

@@ -1,4 +1,4 @@
-import type { PaseoAgentBackgroundWorkItem as AgentBackgroundWorkItem } from "@getpaseo/client";
+import type { ClisbotAgentBackgroundWorkItem as AgentBackgroundWorkItem } from "@clisbot/client";
 
 interface Port {
   list(): Promise<AgentBackgroundWorkItem[]>;

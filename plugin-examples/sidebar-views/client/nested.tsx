@@ -8,7 +8,7 @@ import {
   type WorkspaceRef,
   type ProjectRef,
   type PluginSidebarViewProps,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 import { AgentRow, ProjectHeading, WorkspaceRow } from "./rows";
 const indent = { paddingLeft: 12 };
 function AgentTree({ reference, view }: { reference: AgentRef; view: PluginSidebarViewProps }) {

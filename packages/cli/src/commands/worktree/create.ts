@@ -35,7 +35,9 @@ export async function runCreateCommandWithDeps(
   deps: {
     connectToDaemon(
       options: Parameters<typeof connectToDaemon>[0],
-    ): Promise<Pick<Awaited<ReturnType<typeof connectToDaemon>>, "createPaseoWorktree" | "close">>;
+    ): Promise<
+      Pick<Awaited<ReturnType<typeof connectToDaemon>>, "createClisbotWorktree" | "close">
+    >;
   },
 ): Promise<SingleResult<WorktreeCreateResult>> {
   const cwd = options.cwd ?? process.cwd();
@@ -44,7 +46,7 @@ export async function runCreateCommandWithDeps(
   const client = await deps.connectToDaemon({ target: options.daemonTarget });
 
   try {
-    const response = await client.createPaseoWorktree(request);
+    const response = await client.createClisbotWorktree(request);
 
     const workspace = response.workspace;
     if (!workspace || response.error) {

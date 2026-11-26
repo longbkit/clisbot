@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import pino from "pino";
 import { expect, test } from "vitest";
-import { DiffOpcode } from "@getpaseo/protocol/binary-frames/index";
+import { DiffOpcode } from "@clisbot/protocol/binary-frames/index";
 import { CheckoutDiffManager, type CheckoutDiffSnapshotPayload } from "./checkout-diff-manager.js";
 import { createWorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
 import { createFileObserver } from "./file-observer/index.js";
@@ -21,7 +21,7 @@ async function withCheckout(
   const git = (...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
   const manager = new CheckoutDiffManager({
     logger: pino({ level: "silent" }),
-    paseoHome: cwd,
+    clisbotHome: cwd,
     workspaceRuntimeStore: createWorkspaceRuntimeStore(),
     workspaceGitService: {
       async requestWorkingTreeWatch(root, onChange) {
@@ -186,7 +186,7 @@ test("legacy All subscribers are not re-sent the snapshot when a commit only mov
       {
         cwd,
         base: { kind: "rev", rev: "main" },
-        checkoutBase: { compare: { mode: "all", baseRef: "main" }, paseoHome: cwd },
+        checkoutBase: { compare: { mode: "all", baseRef: "main" }, clisbotHome: cwd },
         head: { kind: "worktree" },
         mergeBase: true,
       },

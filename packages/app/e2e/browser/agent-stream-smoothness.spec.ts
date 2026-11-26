@@ -32,7 +32,7 @@ const CHARS_PER_FRAME_CV_BUDGET = 2;
 const UPDATE_GAP_P95_BUDGET_MS = 250;
 const REACT_COMMIT_P95_BUDGET_MS = 12;
 const REACT_COMMIT_COUNT_BUDGET = 600;
-const RUN_AGENT_STREAM_PERF = process.env.PASEO_AGENT_STREAM_PERF_E2E === "1";
+const RUN_AGENT_STREAM_PERF = process.env.CLISBOT_AGENT_STREAM_PERF_E2E === "1";
 const agentStreamPerfDescribe = RUN_AGENT_STREAM_PERF ? test.describe : test.describe.skip;
 
 interface ReactCommit {
@@ -48,7 +48,7 @@ agentStreamPerfDescribe("Agent stream smoothness", () => {
   test("reveals bursty model output at a steady rate", async ({ page }, testInfo) => {
     test.setTimeout(120_000);
     await page.addInitScript(() => {
-      Reflect.set(globalThis, "__PASEO_RENDER_PROFILE_ENABLED__", true);
+      Reflect.set(globalThis, "__CLISBOT_RENDER_PROFILE_ENABLED__", true);
     });
 
     const agent = await startRunningMockAgent(page, {
@@ -59,7 +59,7 @@ agentStreamPerfDescribe("Agent stream smoothness", () => {
     try {
       await awaitAssistantMessage(page);
       await page.evaluate(() => {
-        const reset = Reflect.get(globalThis, "__PASEO_RESET_RENDER_PROFILE__");
+        const reset = Reflect.get(globalThis, "__CLISBOT_RESET_RENDER_PROFILE__");
         if (typeof reset !== "function") {
           throw new Error("Render profiler did not initialize");
         }
@@ -113,7 +113,7 @@ agentStreamPerfDescribe("Agent stream smoothness", () => {
   test("keeps streaming work bounded after revealing older history", async ({ page }, testInfo) => {
     test.setTimeout(120_000);
     await page.addInitScript(() => {
-      Reflect.set(globalThis, "__PASEO_RENDER_PROFILE_ENABLED__", true);
+      Reflect.set(globalThis, "__CLISBOT_RENDER_PROFILE_ENABLED__", true);
     });
     const agent = await seedLongMockAgentTimeline({ turns: 80, liveTurns: "thirty-minute-stream" });
     try {
@@ -126,7 +126,7 @@ agentStreamPerfDescribe("Agent stream smoothness", () => {
       await awaitAssistantMessage(page);
 
       for (let sample = 0; sample < 3; sample += 1) {
-        await page.evaluate(() => globalThis.__PASEO_RESET_RENDER_PROFILE__?.());
+        await page.evaluate(() => globalThis.__CLISBOT_RESET_RENDER_PROFILE__?.());
         const frames = await sampleStreamFrames(page, { sampleWindowMs: SAMPLE_WINDOW_MS });
         const smoothness = summarizeStreamSmoothness(frames, SAMPLE_WINDOW_MS);
         const react = summarizeReactCommits(await readStreamReactCommits(page));
@@ -149,7 +149,7 @@ async function readStreamReactCommits(
   page: Parameters<typeof sampleStreamFrames>[0],
 ): Promise<ReactCommit[]> {
   return await page.evaluate(() => {
-    const samples = Reflect.get(globalThis, "__PASEO_RENDER_PROFILE__");
+    const samples = Reflect.get(globalThis, "__CLISBOT_RENDER_PROFILE__");
     if (!Array.isArray(samples)) {
       return [];
     }

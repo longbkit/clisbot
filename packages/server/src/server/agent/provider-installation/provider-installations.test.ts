@@ -4,11 +4,11 @@ import type {
   ProviderInstallationContext,
   ProviderRegistration,
   ProviderUpdateResult,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 import type {
   ProviderInstallationUpdate,
   ProviderInstallationUpdateProgress,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import { describe, expect, test } from "vitest";
 import { createTestLogger } from "../../../test-utils/test-logger.js";
 import type { AgentClient, AgentClientInstallation } from "../agent-sdk-types.js";
@@ -16,7 +16,7 @@ import { ProviderSnapshotManager } from "../provider-snapshot-manager.js";
 import { ProviderInstallations, type ProviderUpdateEvent } from "./provider-installations.js";
 
 const OPAQUE_VERSION = "  v1.2.3-beta+weird (build 7)\n";
-const MISSING_COMMAND = "paseo-provider-installation-missing-binary";
+const MISSING_COMMAND = "clisbot-provider-installation-missing-binary";
 const OPAQUE_VERSIONS = ["v9-nightly+abc", "  2.0 (LTS)\n"];
 const OPAQUE_MESSAGE = "  Restart to finish updating\n";
 
@@ -507,7 +507,7 @@ describe("ProviderInstallations", () => {
     const check = () => installations.checkForUpdates("codex");
     await expect(check()).resolves.toEqual({ status: "available", versions: ["2.0.0"] });
 
-    // The CLI updated itself outside Paseo; the cached inspection still reports 1.0.0.
+    // The CLI updated itself outside Clisbot; the cached inspection still reports 1.0.0.
     installed = "2.0.0";
     time = 29_000;
     await expect(check()).resolves.toEqual({ status: "available", versions: ["2.0.0"] });

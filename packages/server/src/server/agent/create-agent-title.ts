@@ -1,5 +1,5 @@
-import { MAX_EXPLICIT_AGENT_TITLE_CHARS } from "@getpaseo/protocol/agent-title-limits";
-import type { FirstAgentContext } from "@getpaseo/protocol/messages";
+import { MAX_EXPLICIT_AGENT_TITLE_CHARS } from "@clisbot/protocol/agent-title-limits";
+import type { FirstAgentContext } from "@clisbot/protocol/messages";
 
 const MAX_INITIAL_AGENT_TITLE_CHARS = Math.min(60, MAX_EXPLICIT_AGENT_TITLE_CHARS);
 

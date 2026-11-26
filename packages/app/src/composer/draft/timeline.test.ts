@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import type { AgentAttachment } from "@clisbot/protocol/messages";
 import type { PendingCreateAttempt } from "@/stores/create-flow-store";
 import type { UserMessageImageAttachment } from "@/types/stream";
 import { DRAFT_CAPABILITIES, resolveDraftTimeline } from "./timeline";

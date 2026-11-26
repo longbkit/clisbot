@@ -30,7 +30,7 @@ function makeStatus(overrides: Partial<DesktopDaemonStatus> = {}): DesktopDaemon
   return {
     serverId: "srv_desktop",
     status: "running",
-    listen: "127.0.0.1:6767",
+    listen: "127.0.0.1:6868",
     hostname: "desktop",
     pid: 1234,
     home: "/home",
@@ -106,7 +106,7 @@ describe("DaemonStartService", () => {
       expect(await result).toEqual({ ok: true });
       expect(startDesktopDaemon).toHaveBeenCalledTimes(1);
       expect(fake.upserts).toEqual([
-        { listenAddress: "127.0.0.1:6767", serverId: "srv_desktop", hostname: "desktop" },
+        { listenAddress: "127.0.0.1:6868", serverId: "srv_desktop", hostname: "desktop" },
       ]);
       expect(service.isRunning()).toBe(false);
     } finally {
@@ -168,7 +168,7 @@ describe("DaemonStartService", () => {
 
     expect(result).toEqual({ ok: true });
     expect(fake.upserts).toEqual([
-      { listenAddress: "127.0.0.1:6767", serverId: "srv_desktop", hostname: "desktop" },
+      { listenAddress: "127.0.0.1:6868", serverId: "srv_desktop", hostname: "desktop" },
     ]);
     expect(service.getLastError()).toBeNull();
     expect(service.isRunning()).toBe(false);
@@ -405,7 +405,7 @@ describe("upsertDesktopDaemonConnection", () => {
 
     expect(result).toEqual({ ok: true });
     expect(fake.upserts).toEqual([
-      { listenAddress: "127.0.0.1:6767", serverId: "srv_desktop", hostname: "desktop" },
+      { listenAddress: "127.0.0.1:6868", serverId: "srv_desktop", hostname: "desktop" },
     ]);
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { AgentModelDefinition } from "@getpaseo/protocol/agent-types";
-import type { AgentProviderDefinition } from "@getpaseo/protocol/provider-manifest";
+import type { AgentModelDefinition } from "@clisbot/protocol/agent-types";
+import type { AgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
 import {
   draftControlsRequest,
   openDraftOptions,

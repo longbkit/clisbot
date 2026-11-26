@@ -2,22 +2,22 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, test } from "vitest";
-import { createPaseoApi } from "@getpaseo/client";
+import { createClisbotApi } from "@clisbot/client";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
 test("an RPC-only plugin receives no agent, project or provider data", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-quiet-plugin-"));
-  await writeFile(path.join(directory, "paseo-plugin.json"), JSON.stringify({ id: "quiet" }));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-quiet-plugin-"));
+  await writeFile(path.join(directory, "clisbot-plugin.json"), JSON.stringify({ id: "quiet" }));
   await writeFile(
     path.join(directory, "index.server.ts"),
     `
-import { defineRpc } from "@getpaseo/plugin";
+import { defineRpc } from "@clisbot/plugin";
 import { z } from "zod";
 export default function contribute(server) {
   const counts = {};
   const observe = message => {
-    if (message.type !== "paseo_frame" || typeof message.data !== "string") return;
+    if (message.type !== "clisbot_frame" || typeof message.data !== "string") return;
     const frame = JSON.parse(message.data);
     const type = frame.message?.type;
     if (type) counts[type] = (counts[type] ?? 0) + 1;
@@ -27,7 +27,7 @@ export default function contribute(server) {
   return () => process.off("message", observe);
 }`,
   );
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   const idle = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   const legacy = new DaemonClient({
@@ -49,7 +49,7 @@ export default function contribute(server) {
     await client.patchDaemonConfig({ pluginsEnabled: true });
     await client.installDirectoryPlugin(directory);
     const agent = await client.createAgent({ provider: "claude", cwd: directory });
-    const api = createPaseoApi(client);
+    const api = createClisbotApi(client);
     const received: string[] = [];
     const release = api.agents
       .ref(agent.id)

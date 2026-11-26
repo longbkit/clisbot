@@ -22,7 +22,7 @@ Only the specific adapter test file was run, not the full suite. CI has not been
 ## Real desktop steps and observations
 
 1. Built server/app dependencies and launched the existing desktop dev runner with a separate home, Electron userData, Pi configuration/session directory, and async root. The final endpoints were loopback-only: daemon 6768, Metro 8082, and CDP 9223. The renderer's desktop bridge confirmed its own managed daemon/home/server identity. Only the existing pi-subagents extension and a marker-only test agent were enabled; child tasks used `sleep`/`printf`, not workspace edits.
-2. Created a Pi parent through the normal Paseo **CLI/API**, asking it to call `subagent({agent:"qa-marker", task, async:true})`. This produced A. The model first enabled the subagent tool, then performed the ordinary spawn. This step was not submitted through the composer.
+2. Created a Pi parent through the normal Clisbot **CLI/API**, asking it to call `subagent({agent:"qa-marker", task, async:true})`. This produced A. The model first enabled the subagent tool, then performed the ordinary spawn. This step was not submitted through the composer.
 3. Used the real Electron **composer** to ask Pi for `subagent({action:"resume", id:A, message})`, then resumed B the same way to produce C. No top-level `agent`, `task`, or `async` was supplied to these resume calls. All three finished with their requested markers.
 4. Opened the provider-owned track while C ran: it showed `1 working`, the follow-up description, and `qa-marker`. Opening that row showed the reused child conversation and the current Shell call. Each resume had a new run/async directory, while all attempts reused the same session JSONL.
 5. While C was still running, clicked **Archive finished subagents**. Completed A/B rows disappeared, while C remained visible as `1 working`.
@@ -53,14 +53,14 @@ Unmodified captures, except for the explicitly described dialogue crop. They con
 
 ## Coverage and limits
 
-| Surface                            | Tested                                                                    |
-| ---------------------------------- | ------------------------------------------------------------------------- |
-| macOS Electron development desktop | Yes — real renderer, composer, track, child pane, archive-finished action |
-| Pi RPC / Paseo WebSocket / daemon  | Yes — real provider calls and persisted tool results/notices              |
-| Standalone browser web             | No                                                                        |
-| iOS / Android                      | No                                                                        |
-| Windows / Linux desktop            | No                                                                        |
-| Packaged release / CI              | No                                                                        |
+| Surface                             | Tested                                                                    |
+| ----------------------------------- | ------------------------------------------------------------------------- |
+| macOS Electron development desktop  | Yes — real renderer, composer, track, child pane, archive-finished action |
+| Pi RPC / Clisbot WebSocket / daemon | Yes — real provider calls and persisted tool results/notices              |
+| Standalone browser web              | No                                                                        |
+| iOS / Android                       | No                                                                        |
+| Windows / Linux desktop             | No                                                                        |
+| Packaged release / CI               | No                                                                        |
 
 Each resumed attempt intentionally gets its own row and reads the whole reused child transcript, including earlier history; it does not slice history by attempt. Old-notice isolation is also covered by the automated regression and the earlier real-notice host replay, rather than forcing a delayed notification in the desktop run.
 

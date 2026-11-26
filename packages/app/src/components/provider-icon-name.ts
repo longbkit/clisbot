@@ -1,7 +1,7 @@
 import {
   BUILTIN_PROVIDER_ICON_NAMES,
   KNOWN_PROVIDER_ICON_NAMES,
-} from "@getpaseo/protocol/provider-icon-names";
+} from "@clisbot/protocol/provider-icon-names";
 
 export type ProviderIconName =
   | { kind: "builtin"; id: string }

@@ -1,7 +1,7 @@
 import type {
   PluginWorktreeCreateInput,
   PluginWorktreeCreateRequest,
-} from "@getpaseo/plugin/server";
+} from "@clisbot/plugin/server";
 import type { PluginLifecycle } from "./plugins/lifecycle/index.js";
 import type { PluginWorktreeManagerRuntime } from "./plugins/runtime.js";
 import { createNameId } from "mnemonic-id";
@@ -25,7 +25,7 @@ import {
   type WorktreeCreationIntent,
   worktreeUntrustedSource,
 } from "./resolve-worktree-creation-intent.js";
-import type { ChangeRequestCheckoutSource, FirstAgentContext } from "@getpaseo/protocol/messages";
+import type { ChangeRequestCheckoutSource, FirstAgentContext } from "@clisbot/protocol/messages";
 import type { WorkspaceGitService } from "./workspace-git-service.js";
 import { runWithRepositoryRoot } from "../utils/git-repository-discovery.js";
 import { runGitCommand, runWithGitCommandPriority } from "../utils/run-git-command.js";
@@ -41,7 +41,7 @@ export interface CreateWorktreeCoreInput {
   checkoutSource?: ChangeRequestCheckoutSource;
   githubPrNumber?: number;
   firstAgentContext?: FirstAgentContext;
-  paseoHome?: string;
+  clisbotHome?: string;
   worktreesRoot?: string;
 }
 
@@ -155,7 +155,7 @@ async function createWorktreeAtRepositoryRoot(
 
   const defaultPath = await resolveDefaultWorktreePath({
     cwd: repoRoot,
-    paseoHome: input.paseoHome,
+    clisbotHome: input.clisbotHome,
     worktreesRoot: input.worktreesRoot,
     worktreeSlug: normalizedSlug,
   });
@@ -202,7 +202,7 @@ async function createWorktreeAtRepositoryRoot(
       worktreePath: transformed.path,
       source: intent,
       preparedBranchOff,
-      paseoHome: input.paseoHome,
+      clisbotHome: input.clisbotHome,
       worktreesRoot: input.worktreesRoot,
     }),
     intent,
@@ -217,7 +217,7 @@ async function tryCreateWithWorktreeManager(options: {
   transformed: PluginWorktreeCreateRequest;
   intent: WorktreeCreationIntent;
   untrusted: boolean;
-  input: Pick<CreateWorktreeCoreInput, "paseoHome" | "worktreesRoot">;
+  input: Pick<CreateWorktreeCoreInput, "clisbotHome" | "worktreesRoot">;
   deps: Pick<CreateWorktreeCoreDeps, "worktreeManagers">;
 }): Promise<{ worktree: CreatedWorktree | null; preparedBranchOff?: PreparedWorktreeBranchOff }> {
   const { repoRoot, transformed, intent, untrusted, input, deps } = options;
@@ -227,7 +227,7 @@ async function tryCreateWithWorktreeManager(options: {
     source: intent,
     operation: "create",
     untrusted,
-    paseoHome: input.paseoHome,
+    clisbotHome: input.clisbotHome,
     worktreesBaseRoot: input.worktreesRoot,
     worktreeManagers: deps.worktreeManagers,
     run: async ({ changeRequestHeadSha }) => {
@@ -274,7 +274,7 @@ function creationIntentFromRequest(
   original: WorktreeCreationIntent,
 ): WorktreeCreationIntent {
   if (request.kind === "branch-off") {
-    // Plugins see the base; where a branch off a fork's change request starts stays Paseo's.
+    // Plugins see the base; where a branch off a fork's change request starts stays Clisbot's.
     const startPoint = original.kind === "branch-off" ? original.startPoint : undefined;
     return {
       kind: request.kind,
@@ -339,7 +339,7 @@ async function resolveDefaultBranch(
 }
 
 export async function resolveWorktreeRepoRoot(
-  input: Pick<CreateWorktreeCoreInput, "cwd" | "paseoHome">,
+  input: Pick<CreateWorktreeCoreInput, "cwd" | "clisbotHome">,
   workspaceGitService?: Pick<WorkspaceGitService, "resolveRepoRoot">,
 ): Promise<string> {
   if (!workspaceGitService) {

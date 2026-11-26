@@ -1,6 +1,0 @@
-{
-  "id": "markdown-panel",
-  "requirements": {
-    "paseo": ">=0.13.0"
-  }
-}

@@ -4,7 +4,7 @@ export interface PluginIconProps {
   color: string;
 }
 
-/** Inline SVG markup. Paseo validates it when the contribution registers. */
+/** Inline SVG markup. Clisbot validates it when the contribution registers. */
 export interface PluginSvgIcon {
   svg: string;
 }
@@ -17,7 +17,7 @@ export const PLUGIN_SVG_ICON_MAX_BYTES = 64 * 1024;
 const EXTERNAL_HREF = /\s(?:href|xlink:href)\s*=\s*(?:(["'])(.*?)\1|([^\s>]+))/gi;
 
 /**
- * Why Paseo refuses to render this SVG, or null when it is a self-contained document.
+ * Why Clisbot refuses to render this SVG, or null when it is a self-contained document.
  * The daemon applies it to provider and usage-source icon files; the app to inline plugin icons.
  */
 export function findSvgIconProblem(svg: string): string | null {

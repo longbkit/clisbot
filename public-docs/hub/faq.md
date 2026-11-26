@@ -1,6 +1,6 @@
 ---
 title: Hub FAQ
-description: Common questions about triggers, providers, integrations, daemons, and replies in Paseo Hub.
+description: Common questions about triggers, providers, integrations, daemons, and replies in Clisbot Hub.
 nav: FAQ
 order: 84
 category: Hub
@@ -8,17 +8,17 @@ category: Hub
 
 # Hub FAQ
 
-## Do I need Hub to use Paseo?
+## Do I need Hub to use Clisbot?
 
-No. Paseo runs agents on your machines without Hub. Hub adds event triggers, recurring schedules, inbound webhooks, shared run history, and team access on top of your daemons.
+No. Clisbot runs agents on your machines without Hub. Hub adds event triggers, recurring schedules, inbound webhooks, shared run history, and team access on top of your daemons.
 
 ## Which agent providers can Hub run?
 
-Hub runs any provider configured on your connected Paseo daemon, including Claude Code, Codex, OpenCode, Pi, and custom or plugin providers. When you create or edit a trigger, Hub queries that daemon for its available providers, models, execution modes, and thinking options.
+Hub runs any provider configured on your connected Clisbot daemon, including Claude Code, Codex, OpenCode, Pi, and custom or plugin providers. When you create or edit a trigger, Hub queries that daemon for its available providers, models, execution modes, and thinking options.
 
 ## Where do triggers live?
 
-You can create and edit triggers directly in the Hub dashboard under **Triggers**, or keep them as self-contained `.paseo/triggers/*.yml` files in your repository and deploy them with `paseo hub deploy`. Both paths use the same YAML schema and validation.
+You can create and edit triggers directly in the Hub dashboard under **Triggers**, or keep them as self-contained `.clisbot/triggers/*.yml` files in your repository and deploy them with `clisbot hub deploy`. Both paths use the same YAML schema and validation.
 
 ## Can one organization connect multiple GitHub, Linear, Slack, or Discord workspaces?
 
@@ -36,7 +36,7 @@ For Linear comments and assignments, **Everyone** matches no users. Choose **Spe
 
 Hub grants the `reply` tool when the event has an issue, pull request, or thread to reply to. A `github.push` event has no reply destination.
 
-Add `run.outputs` to set `max` or `required: true`, and tell the agent to call `reply` and `finish_execution` in `run.prompt`. When Hub runs over HTTPS, replies include an **Open in Paseo** link for signed-in organization members.
+Add `run.outputs` to set `max` or `required: true`, and tell the agent to call `reply` and `finish_execution` in `run.prompt`. When Hub runs over HTTPS, replies include an **Open in Clisbot** link for signed-in organization members.
 
 ## Can a schedule or webhook post to Slack or Discord?
 
@@ -50,9 +50,9 @@ Wait for **Activity** to show a terminal failure before sending a new event. Sch
 
 ## Does logging out disconnect my daemon?
 
-No. The CLI login is a human credential stored under `PASEO_HOME`, while an enrolled daemon holds its own relationship credential.
+No. The CLI login is a human credential stored under `CLISBOT_HOME`, while an enrolled daemon holds its own relationship credential.
 
-Interactive `paseo hub logout` offers to disconnect a daemon connected to the same Hub before deleting the login. Non-interactive and `--json` logout never disconnect the daemon unless you pass `--disconnect-daemon`.
+Interactive `clisbot hub logout` offers to disconnect a daemon connected to the same Hub before deleting the login. Non-interactive and `--json` logout never disconnect the daemon unless you pass `--disconnect-daemon`.
 
 ## Can I use Hub without GitHub?
 

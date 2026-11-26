@@ -11,10 +11,10 @@ try {
   const directory = join(context.workDir, "usage-plugin");
   await mkdir(directory);
   await writeFile(
-    join(directory, "paseo-plugin.json"),
+    join(directory, "clisbot-plugin.json"),
     JSON.stringify({
       id: "cli-usage",
-      requirements: { paseo: `>=${resolveCliVersion()}` },
+      requirements: { clisbot: `>=${resolveCliVersion()}` },
     }),
   );
   await writeFile(
@@ -49,7 +49,7 @@ export default function contribute(server) {
   return () => {};
 }`,
   );
-  const client = await connectToDaemon({ target: { kind: "instance", home: context.paseoHome } });
+  const client = await connectToDaemon({ target: { kind: "instance", home: context.clisbotHome } });
   try {
     await client.patchDaemonConfig({ pluginsEnabled: true });
     await client.installDirectoryPlugin(directory, "cli-usage");
@@ -57,7 +57,7 @@ export default function contribute(server) {
     await client.close();
   }
   async function ok(args: string[]) {
-    const result = await context.paseo(args);
+    const result = await context.clisbot(args);
     assert.equal(result.exitCode, 0, result.stderr);
     assert.equal(result.stderr, "");
     return result.stdout;
@@ -70,7 +70,7 @@ export default function contribute(server) {
     ["usage", "--agent", "agent-A", "inspect", cold.id, "--json"],
     ["usage", "inspect", cold.id, "--agent", "agent-A", "--json"],
   ]) {
-    const conflicting = await context.paseo(args);
+    const conflicting = await context.clisbot(args);
     assert.equal(conflicting.exitCode, 1, `Expected selector rejection: ${args.join(" ")}`);
     assert.equal(conflicting.stdout, "");
     assert.deepEqual(JSON.parse(conflicting.stderr).error, {
@@ -127,20 +127,20 @@ export default function contribute(server) {
     3,
   );
   for (const id of ["cli-usage:work", "missing"]) {
-    const unknown = await context.paseo(["usage", "inspect", id, "--json"]);
+    const unknown = await context.clisbot(["usage", "inspect", id, "--json"]);
     assert.equal(unknown.exitCode, 1);
     assert.equal(unknown.stdout, "");
     assert.equal(JSON.parse(unknown.stderr).error.code, "REPORT_NOT_FOUND");
   }
-  const agentFailure = await context.paseo(["usage", "ls", "--agent", "missing-agent", "--json"]);
+  const agentFailure = await context.clisbot(["usage", "ls", "--agent", "missing-agent", "--json"]);
   assert.equal(agentFailure.exitCode, 1);
   assert.equal(agentFailure.stdout, "");
   assert.match(JSON.parse(agentFailure.stderr).error.message, /Unknown agent/);
-  const remove = await context.paseo(["plugin", "remove", "cli-usage", "--json"]);
+  const remove = await context.clisbot(["plugin", "remove", "cli-usage", "--json"]);
   assert.equal(remove.exitCode, 0, remove.stderr);
   assert.equal((await ok(["usage", "ls", "--json"])).trim(), "[]");
   assert.equal((await ok(["usage"])).trim(), "No usage reports returned");
-  const connection = await context.paseo(["usage", "ls", "--host", "127.0.0.1:1", "--json"]);
+  const connection = await context.clisbot(["usage", "ls", "--host", "127.0.0.1:1", "--json"]);
   assert.equal(connection.exitCode, 1);
   assert.equal(connection.stdout, "");
   assert.equal(JSON.parse(connection.stderr).error.code, "DAEMON_UNREACHABLE");

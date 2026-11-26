@@ -1,8 +1,8 @@
-appId: sh.paseo
+appId: sh.clisbot
 ---
 - runFlow:
     when:
-      visible: "Open in.*Paseo.*\\?"
+      visible: "Open in.*Clisbot.*\\?"
     commands:
       - tapOn: "Open"
 

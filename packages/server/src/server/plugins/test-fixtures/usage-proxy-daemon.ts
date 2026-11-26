@@ -1,7 +1,7 @@
 import path from "node:path";
 import { initializeEnvironmentProxy } from "../../network/index.js";
 import { DaemonClient } from "../../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../../test-utils/clisbot-daemon.js";
 import {
   builtinPlugins,
   BuiltinPluginLoader,
@@ -15,7 +15,7 @@ const sources = builtinPlugins.filter((id) =>
 );
 // Built-ins run inside the daemon; directory plugins initialize their own subprocess network.
 if (mode === "builtin") initializeEnvironmentProxy();
-const daemon = await createTestPaseoDaemon({
+const daemon = await createTestClisbotDaemon({
   pluginsEnabled: mode === "directory",
   builtinPlugins: new BuiltinPluginLoader(
     resolveBuiltinPluginsRoot(),

@@ -7,7 +7,7 @@ export const hclHighlighting = styleTags({
   "ObjectKey/Expression/LiteralValue/StringLit!": t.definition(t.propertyName),
   "ForIntro/Identifier TemplateForStart/Identifier": t.definition(t.variableName),
   "BlockType!": t.typeName,
-  // Paseo themes have no role for labelName; labels render as the strings they are.
+  // Clisbot themes have no role for labelName; labels render as the strings they are.
   "BlockLabel!": t.string,
   "FunctionNamespace/Identifier": t.namespace,
   "FunctionName/Identifier": t.function(t.variableName),

@@ -74,7 +74,7 @@ function isSessionStoreEntry(value: unknown): value is SessionStoreEntry {
 
 /**
  * The entry a message steered into a running turn follows. Claude Code gives such a message no
- * entry of its own: it records a queued_command attachment, under the uuid Paseo minted for the
+ * entry of its own: it records a queued_command attachment, under the uuid Clisbot minted for the
  * message, hung off the entry it was read after. Forking at that entry drops the message and
  * everything after it. Null when the transcript holds no such attachment.
  */

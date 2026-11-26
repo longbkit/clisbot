@@ -1,7 +1,7 @@
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
-import type { AgentMetric } from "@getpaseo/protocol/agent-types";
+import type { AgentMetric } from "@clisbot/protocol/agent-types";
 import { AgentUsage } from "@/usage";
 import { formatTokenCount } from "./context-window-meter.utils";
 import { MetricsList } from "./metrics-list";

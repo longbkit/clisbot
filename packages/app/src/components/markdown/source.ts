@@ -1,4 +1,4 @@
-import { pluginOverviewUrl } from "@getpaseo/protocol/plugin-overview";
+import { pluginOverviewUrl } from "@clisbot/protocol/plugin-overview";
 import { classifyAssistantFileLink } from "@/assistant-file-links";
 import { ASSISTANT_FILE_EXTENSIONS } from "@/assistant-file-links/extensions";
 import { normalizeMarkdownHtml } from "./html";

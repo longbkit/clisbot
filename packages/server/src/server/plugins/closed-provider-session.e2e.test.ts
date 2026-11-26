@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, onTestFinished, test } from "vitest";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { resolveDaemonVersion } from "../daemon-version.js";
 
 const PROVIDER_ID = "closing-provider";
@@ -22,10 +22,10 @@ async function createClosingProviderPlugin(root: string, mode: CloseMode): Promi
   const directory = path.join(root, "plugin");
   await mkdir(directory, { recursive: true });
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({
       id: PLUGIN_ID,
-      requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` },
+      requirements: { clisbot: `>=${resolveDaemonVersion(import.meta.url)}` },
     }),
   );
   await writeFile(
@@ -34,7 +34,7 @@ async function createClosingProviderPlugin(root: string, mode: CloseMode): Promi
   ProviderEvent,
   ProviderInput,
   ProviderRegistration,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 
 const CAPABILITIES = ["prompt.message", "session.persistence"];
 const MODE = ${JSON.stringify(mode)};
@@ -145,8 +145,8 @@ test.each<CloseMode>(["after-turn", "after-failed-turn", "on-next-prompt"])(
     const workspace = path.join(root, "workspace");
     await mkdir(workspace, { recursive: true });
 
-    const daemon = await createTestPaseoDaemon({
-      paseoHomeRoot: path.join(root, "daemon"),
+    const daemon = await createTestClisbotDaemon({
+      clisbotHomeRoot: path.join(root, "daemon"),
       staticDir: path.join(root, "static"),
       pluginsEnabled: true,
       plugins: {

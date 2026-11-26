@@ -9,7 +9,7 @@ import {
   getCheckoutStatus,
   getCheckoutDiff,
 } from "./checkout-git.js";
-import { writePaseoWorktreeMetadata } from "./worktree-metadata.js";
+import { writeClisbotWorktreeMetadata } from "./worktree-metadata.js";
 
 const tempDirs: string[] = [];
 
@@ -177,7 +177,7 @@ describe("listCheckoutCommits", () => {
     mkdirSync(join(worktreesRoot, "repo-hash"), { recursive: true });
     git(["worktree", "add", "-b", "feature", worktreeDir], repoDir);
     commitFile(worktreeDir, "feature.txt", "feature\n", "Feature work");
-    await writePaseoWorktreeMetadata(worktreeDir, { baseRefName: "deleted-base" });
+    await writeClisbotWorktreeMetadata(worktreeDir, { baseRefName: "deleted-base" });
 
     const { baseRef, commits } = await listCheckoutCommits({
       cwd: worktreeDir,
@@ -407,7 +407,7 @@ it("compares tag-based worktrees in status, history and legacy diff modes", asyn
   const context = { worktreesRoot };
   git(["tag", "v1"], mainRepoDir);
   git(["worktree", "add", "-b", "tag-feature", repoDir, "v1"], mainRepoDir);
-  await writePaseoWorktreeMetadata(repoDir, { baseRefName: "refs/tags/v1" });
+  await writeClisbotWorktreeMetadata(repoDir, { baseRefName: "refs/tags/v1" });
   commitFile(repoDir, "tag.txt", "committed\n", "tag feature");
   writeFileSync(join(repoDir, "tag.txt"), "edited\n");
   const status = await getCheckoutStatus(repoDir, context);

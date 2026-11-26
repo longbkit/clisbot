@@ -1,4 +1,4 @@
-import { normalizeAgentModelCatalog, type ProviderOptions } from "@getpaseo/protocol/agent-types";
+import { normalizeAgentModelCatalog, type ProviderOptions } from "@clisbot/protocol/agent-types";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { homedir } from "node:os";
@@ -37,19 +37,19 @@ import {
   shutdownAgentClients,
   type ProviderDefinition,
 } from "./provider-registry.js";
-import { BUILTIN_PROVIDER_IDS } from "@getpaseo/protocol/provider-manifest";
+import { BUILTIN_PROVIDER_IDS } from "@clisbot/protocol/provider-manifest";
 import { applyMutableProviderConfigToOverrides } from "../daemon-config-store.js";
 import {
   formatProviderDiagnostic,
   formatProviderDiagnosticError,
 } from "./providers/diagnostic-utils.js";
 import type { MutableDaemonConfig } from "../daemon-config-store.js";
-import type { HubExecutionAgentValidationIssue } from "@getpaseo/protocol/messages";
+import type { HubExecutionAgentValidationIssue } from "@clisbot/protocol/messages";
 import {
   type AgentConfigurationValidationInput,
   validateAgentConfigurationAgainstProvider,
 } from "./agent-configuration-validator.js";
-import type { ProviderRegistration } from "@getpaseo/plugin/server/provider";
+import type { ProviderRegistration } from "@clisbot/plugin/server/provider";
 import { PluginAgentClientRegistry } from "./plugin-provider.js";
 import { convertLegacyClaudeUltracode, resolveAdapter } from "./option-controls.js";
 import { ProviderInstallations } from "./provider-installation/provider-installations.js";
@@ -64,10 +64,10 @@ const MAX_REFRESH_TIMEOUT_MS = 2_147_483_647;
 const DEFAULT_DIAGNOSTIC_TIMEOUT_MS = 120_000;
 const USAGE_PROVIDER_ACTIVITY_TIMEOUT_MS = 5_000;
 const USAGE_PROVIDER_ACTIVITY_TTL_MS = 300_000;
-const PROVIDER_REFRESH_DEADLINE_ENV = "PASEO_PROVIDER_REFRESH_TIMEOUT_MS";
+const PROVIDER_REFRESH_DEADLINE_ENV = "CLISBOT_PROVIDER_REFRESH_TIMEOUT_MS";
 /** How long shutdown waits for aborted probes; a provider ignoring the abort must not hang it. */
 const PROBE_SHUTDOWN_GRACE_MS = 10_000;
-export const GLOBAL_PROVIDER_SNAPSHOT_KEY = "paseo:global";
+export const GLOBAL_PROVIDER_SNAPSHOT_KEY = "clisbot:global";
 
 function validRefreshDeadline(value: unknown): number | undefined {
   return typeof value === "number" &&
@@ -1437,7 +1437,7 @@ export function isGlobalProviderSnapshotKey(cwd: string): boolean {
 function identifyEntry(entry: ProviderSnapshotEntry): ProviderSnapshotRecord {
   const { fetchedAt: _fetchedAt, ...content } = entry;
   const contentHash = createHash("sha256")
-    .update(JSON.stringify(["paseo.provider-result/1", content]))
+    .update(JSON.stringify(["clisbot.provider-result/1", content]))
     .digest("base64url");
   return { entry, contentHash };
 }

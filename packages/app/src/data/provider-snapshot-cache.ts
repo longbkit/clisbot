@@ -3,19 +3,19 @@ import { Buffer } from "buffer";
 import {
   normalizeAgentModelCatalog,
   type ProviderSnapshotEntry,
-} from "@getpaseo/protocol/agent-types";
+} from "@clisbot/protocol/agent-types";
 import {
   expandProviderSnapshot,
   type CompactProviderSnapshot,
-} from "@getpaseo/protocol/provider-snapshot-codec";
-import { CompactProviderSnapshotSchema } from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/provider-snapshot-codec";
+import { CompactProviderSnapshotSchema } from "@clisbot/protocol/messages";
 import { z } from "zod";
-import type { GetProvidersSnapshotResponseMessage } from "@getpaseo/protocol/messages";
+import type { GetProvidersSnapshotResponseMessage } from "@clisbot/protocol/messages";
 type SnapshotPayload = GetProvidersSnapshotResponseMessage["payload"];
 
 const CACHE_VERSION = 2;
-const CACHE_KEY_PREFIX = "@paseo/provider-snapshot/v2";
-const CACHE_INDEX_KEY = "@paseo/provider-snapshot-index/v2";
+const CACHE_KEY_PREFIX = "@clisbot/provider-snapshot/v2";
+const CACHE_INDEX_KEY = "@clisbot/provider-snapshot-index/v2";
 const DEFAULT_MAX_CACHE_BYTES = 4 * 1024 * 1024;
 
 interface ProviderSnapshotStorage {
@@ -143,8 +143,8 @@ export function createProviderSnapshotCache(
     // COMPAT(providerSnapshotCache): added in v0.7.2, remove legacy cleanup after 2027-03-06.
     const legacyKeys = allKeys.filter(
       (key) =>
-        key.startsWith("@paseo/provider-snapshot/v1:") ||
-        key === "@paseo/provider-snapshot-index/v1" ||
+        key.startsWith("@clisbot/provider-snapshot/v1:") ||
+        key === "@clisbot/provider-snapshot-index/v1" ||
         key === CACHE_INDEX_KEY,
     );
     if (legacyKeys.length) await storage.multiRemove(legacyKeys);

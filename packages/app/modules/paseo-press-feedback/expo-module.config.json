@@ -1,5 +1,0 @@
-{
-  "platforms": ["android", "ios"],
-  "android": { "modules": ["sh.paseo.pressfeedback.PaseoPressFeedbackModule"] },
-  "ios": { "modules": ["PaseoPressFeedbackModule"] }
-}

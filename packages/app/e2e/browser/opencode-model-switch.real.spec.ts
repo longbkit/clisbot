@@ -44,7 +44,7 @@ test("switching an existing OpenCode session clears unsupported thinking", async
   page,
 }, testInfo) => {
   test.setTimeout(240_000);
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-variant-ui-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-variant-ui-"));
   let handle: AgentHandle | undefined;
   try {
     handle = await launchAgent({

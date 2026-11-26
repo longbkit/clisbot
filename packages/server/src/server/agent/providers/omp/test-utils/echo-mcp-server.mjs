@@ -17,7 +17,7 @@ server.registerTool(
             type: "text",
             text: JSON.stringify({
               runtime: process.env.OMP_MCP_RUNTIME_ENV,
-              agent: process.env.PASEO_AGENT_ID,
+              agent: process.env.CLISBOT_AGENT_ID,
               precedence: process.env.OMP_MCP_PRECEDENCE,
             }),
           },

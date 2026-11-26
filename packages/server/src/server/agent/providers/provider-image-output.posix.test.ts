@@ -22,7 +22,7 @@ describe.skipIf(process.platform === "win32")("materializeProviderImage", () => 
     const attachmentDir = path.dirname(materialized.path);
 
     try {
-      expect(path.basename(attachmentDir)).toMatch(/^paseo-attachments-/);
+      expect(path.basename(attachmentDir)).toMatch(/^clisbot-attachments-/);
       expect(existsSync(materialized.path)).toBe(true);
       expect(statSync(attachmentDir).mode & 0o777).toBe(0o700);
       expect(statSync(materialized.path).mode & 0o777).toBe(0o600);
@@ -38,7 +38,7 @@ test.skipIf(process.platform === "win32")(
     const image = { data: "c3ltbGluayByZWdyZXNzaW9u", mimeType: "image/png" };
     const first = await materializeProviderImage(image);
     const dir = path.dirname(first.path);
-    const target = mkdtempSync(path.join(os.tmpdir(), "paseo-image-symlink-test-"));
+    const target = mkdtempSync(path.join(os.tmpdir(), "clisbot-image-symlink-test-"));
     let replacement: string | undefined;
     try {
       rmSync(dir, { recursive: true });
@@ -49,7 +49,7 @@ test.skipIf(process.platform === "win32")(
       const second = await materializeProviderImage(image);
       replacement = path.dirname(second.path);
       expect(replacement).not.toBe(dir);
-      expect(path.basename(replacement)).toMatch(/^paseo-attachments-/);
+      expect(path.basename(replacement)).toMatch(/^clisbot-attachments-/);
       expect(readFileSync(second.path, "utf8")).toBe("symlink regression");
     } finally {
       if (replacement && replacement !== dir) rmSync(replacement, { recursive: true });

@@ -207,7 +207,7 @@ test.describe("Workspace navigation regression", () => {
 
     await page.evaluate((data) => {
       globalThis.dispatchEvent(
-        new CustomEvent("paseo:web-notification-click", {
+        new CustomEvent("clisbot:web-notification-click", {
           detail: { data: { ...data, reason: "finished" } },
           cancelable: true,
         }),
@@ -393,7 +393,7 @@ test.describe("Workspace navigation regression", () => {
       await ws.close({ code: 1008, reason: "Blocked cold offline workspace route test." });
     });
 
-    await page.goto(buildHostWorkspaceRoute(serverId, "/tmp/paseo-missing-workspace"));
+    await page.goto(buildHostWorkspaceRoute(serverId, "/tmp/clisbot-missing-workspace"));
 
     await expectHostConnectingOrOffline(page);
     await expectMenuButtonVisible(page);
@@ -532,7 +532,7 @@ test.describe("Workspace navigation regression", () => {
       await page.evaluate(
         ({ agentId, serverId: targetServerId, workspaceId }) => {
           globalThis.dispatchEvent(
-            new CustomEvent("paseo:web-notification-click", {
+            new CustomEvent("clisbot:web-notification-click", {
               detail: {
                 data: {
                   serverId: targetServerId,

@@ -42,8 +42,8 @@ describe("checkout discard", () => {
       }
       try {
         git(["init", "-b", "main"]);
-        git(["config", "user.name", "Paseo Test"]);
-        git(["config", "user.email", "test@getpaseo.local"]);
+        git(["config", "user.name", "Clisbot Test"]);
+        git(["config", "user.email", "test@clisbot.local"]);
         git(["config", "core.autocrlf", "false"]);
         const nested = path.join(cwd, "apps", "web");
         mkdirSync(nested, { recursive: true });

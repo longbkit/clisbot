@@ -1,4 +1,4 @@
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import type { AcpToolCallSnapshot } from "../acp.js";
 import type { ProviderToolCallDetail } from "../provider.js";
 

@@ -2,7 +2,7 @@ import type { Locator } from "@playwright/test";
 import { expect, test, type Page } from "../support/fixtures";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 
-const APP_SETTINGS_KEY = "@paseo:app-settings";
+const APP_SETTINGS_KEY = "@clisbot:app-settings";
 
 async function useLanguage(page: Page, language: string): Promise<void> {
   await page.addInitScript(

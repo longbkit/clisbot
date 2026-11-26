@@ -3,7 +3,7 @@ import type { TFunction } from "i18next";
 import type { Locale } from "~/i18n";
 
 const HUB_PLANS_URL =
-  import.meta.env.VITE_HUB_PLANS_URL ?? "https://hub.paseo.sh/api/billing/plans";
+  import.meta.env.VITE_HUB_PLANS_URL ?? "https://hub.clisbot.com/api/billing/plans";
 
 /** The two catalog slugs the page renders. `hosted` is displayed as whatever `name` says. */
 const FREE_SLUG = "free";

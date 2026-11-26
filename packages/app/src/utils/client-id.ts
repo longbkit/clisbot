@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { z } from "zod";
 import { readValidatedString } from "@/storage/validated-storage";
 
-const CLIENT_ID_STORAGE_KEY = "@paseo:client-id-v1";
+const CLIENT_ID_STORAGE_KEY = "@clisbot:client-id-v1";
 
 export interface ClientIdStorage {
   getItem(key: string): Promise<string | null>;

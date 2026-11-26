@@ -11,7 +11,7 @@ import { waitForWorkspaceTabsVisible } from "../../app/e2e/support/helpers/works
 
 async function installMacDesktopBridge(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    window.paseoDesktop = {
+    window.clisbotDesktop = {
       platform: "darwin",
       events: { on: () => () => {} },
       invoke: async (command: string) => {

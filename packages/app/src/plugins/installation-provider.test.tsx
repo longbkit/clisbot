@@ -1,15 +1,15 @@
-import { PluginTranslationRuntime } from "@getpaseo/plugin/client/host";
-import { usePaseo, useRpc, useWorkspace, useWorkspaces } from "@getpaseo/plugin/client";
-import { defineRpc } from "@getpaseo/plugin";
-import { createPaseoApi, type PaseoApi } from "@getpaseo/client";
-import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { PluginTranslationRuntime } from "@clisbot/plugin/client/host";
+import { useClisbot, useRpc, useWorkspace, useWorkspaces } from "@clisbot/plugin/client";
+import { defineRpc } from "@clisbot/plugin";
+import { createClisbotApi, type ClisbotApi } from "@clisbot/client";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { QueryClient } from "@tanstack/react-query";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { z } from "zod";
-import type { PluginWorkspaceSnapshot } from "@getpaseo/plugin";
-import type { PluginClientStateSource } from "@getpaseo/plugin/client/host";
+import type { PluginWorkspaceSnapshot } from "@clisbot/plugin";
+import type { PluginClientStateSource } from "@clisbot/plugin/client/host";
 import type { ToastApi } from "@/components/toast-host";
 import { PluginInstallationProvider } from "./installation-provider";
 import { PluginEnvironmentProvider } from "./popover";
@@ -29,7 +29,7 @@ function installation(invoked: string[]): InstalledPlugin {
     lifetime: new AbortController(),
     locale: "en",
     i18n: new PluginTranslationRuntime({ getLocale: () => "en", subscribe: () => () => {} }),
-    paseo: createPaseoApi(
+    clisbot: createClisbotApi(
       new DaemonClient({
         url: "ws://127.0.0.1:1",
         clientId: "installation-provider",
@@ -67,10 +67,10 @@ function installation(invoked: string[]): InstalledPlugin {
 it("gives every surface the installation's client and RPCs on its first frame", async () => {
   const invoked: string[] = [];
   const plugin = installation(invoked);
-  const received: PaseoApi[] = [];
+  const received: ClisbotApi[] = [];
   let rpc: ((input: Record<string, never>) => Promise<unknown>) | null = null;
   function Surface({ name }: { name: string }) {
-    received.push(usePaseo());
+    received.push(useClisbot());
     rpc = useRpc(status);
     return <span>{name}</span>;
   }
@@ -86,12 +86,12 @@ it("gives every surface the installation's client and RPCs on its first frame", 
     .join("");
 
   expect(markup).toBe("<span>Screen</span><span>Sidebar item</span><span>Popover</span>");
-  expect(received).toEqual([plugin.paseo, plugin.paseo, plugin.paseo]);
-  expect(received.every((paseo) => paseo === plugin.paseo)).toBe(true);
+  expect(received).toEqual([plugin.clisbot, plugin.clisbot, plugin.clisbot]);
+  expect(received.every((clisbot) => clisbot === plugin.clisbot)).toBe(true);
   await expect(rpc!({})).resolves.toEqual({ state: "green" });
   expect(invoked).toEqual(["deploys.status"]);
   plugin.lifetime.abort();
-  await plugin.paseo.dispose();
+  await plugin.clisbot.dispose();
 });
 
 it("lets every surface read state through the plugin state hooks", async () => {
@@ -108,7 +108,7 @@ it("lets every surface read state through the plugin state hooks", async () => {
 
   expect(markup).toBe("<span>0 workspaces</span>");
   plugin.lifetime.abort();
-  await plugin.paseo.dispose();
+  await plugin.clisbot.dispose();
 });
 
 function pluginEnvironment(plugin: InstalledPlugin, state: PluginClientStateSource) {
@@ -141,5 +141,5 @@ it("lets a surface read the state source its host passes", async () => {
 
   expect(markup).toBe("<span>ws-on-another-host</span>");
   plugin.lifetime.abort();
-  await plugin.paseo.dispose();
+  await plugin.clisbot.dispose();
 });

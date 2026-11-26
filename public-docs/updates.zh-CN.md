@@ -1,18 +1,18 @@
 ---
 title: 更新
-description: Paseo 如何发布版本、稳定版与测试版渠道的区别，以及如何提前获取更新。
+description: Clisbot 如何发布版本、稳定版与测试版渠道的区别，以及如何提前获取更新。
 nav: 更新
 ---
 
 # 更新 {#updates}
 
-Paseo 通过两个渠道发布更新：**Stable**（稳定版）和 **Beta**（测试版）。
+Clisbot 通过两个渠道发布更新：**Stable**（稳定版）和 **Beta**（测试版）。
 
 大多数版本在稳定版渠道发布。测试版是候选版本，让你在新内容推送给所有人之前先行测试。
 
 ## 版本号 {#version-numbers}
 
-Paseo 遵循带预发布标签的[语义化版本](https://semver.org)。
+Clisbot 遵循带预发布标签的[语义化版本](https://semver.org)。
 
 稳定版看起来是这样：
 
@@ -50,12 +50,12 @@ v0.1.92-beta.3
 
 ### 如何加入测试版渠道 {#how-to-join-the-beta-channel}
 
-| 平台          | 获取测试版的方式                                                                                 |
-| ------------- | ------------------------------------------------------------------------------------------------ |
-| iOS 和 iPadOS | 加入 [Paseo TestFlight 测试版](https://testflight.apple.com/join/Y5HpSQjJ)。                     |
-| Android       | 从 [GitHub releases 页面](https://github.com/getpaseo/paseo/releases)的预发布版本下载 APK。      |
-| 桌面端        | 打开 **设置 → 关于**，在 **发布通道** 下选择 **Beta**。                                          |
-| CLI           | 运行 `npm install -g @getpaseo/cli@beta`。直接运行 `npm install -g @getpaseo/cli` 仍使用稳定版。 |
+| 平台          | 获取测试版的方式                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| iOS 和 iPadOS | 加入 [Clisbot TestFlight 测试版](https://testflight.apple.com/join/Y5HpSQjJ)。                 |
+| Android       | 从 [GitHub releases 页面](https://github.com/longbkit/clisbot/releases)的预发布版本下载 APK。  |
+| 桌面端        | 打开 **设置 → 关于**，在 **发布通道** 下选择 **Beta**。                                        |
+| CLI           | 运行 `npm install -g @clisbot/cli@beta`。直接运行 `npm install -g @clisbot/cli` 仍使用稳定版。 |
 
 在桌面应用中选择 **Beta** 后，应用就会检查测试版更新。
 

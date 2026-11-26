@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import type { AudioEngineCallbacks } from "./audio-engine-types";
 import { createNativeAudioEngine, type NativeAudioEngineDeps } from "./native-audio-engine";
 
-// In-memory stand-in for `@getpaseo/expo-two-way-audio`, matching its iOS and Android modules:
+// In-memory stand-in for `@clisbot/expo-two-way-audio`, matching its iOS and Android modules:
 // one native engine per app, `initialize()` reuses it, `tearDown()` frees it, and
 // `toggleRecording(true)` / `startDictation()` return false while no engine exists.
 // Session handling follows iOS: recording activates the OS audio session, stopping does not

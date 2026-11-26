@@ -10,14 +10,14 @@ category: Hub
 
 Run Hub on your machine, connect Slack over Socket Mode without a public server, and answer a mention with an agent in your repository.
 
-You need [Paseo installed and running](/docs), Node.js, and a Slack workspace where you can create an app.
+You need [Clisbot installed and running](/docs), Node.js, and a Slack workspace where you can create an app.
 
 ## 1. Start Hub
 
 Run Hub locally:
 
 ```sh
-npx @getpaseo/hub
+npx @clisbot/hub
 ```
 
 Open the printed address, normally <http://localhost:3000>, and create the operator account. The first run needs no external database, Docker, or environment variables. Hub creates an embedded database and your organization automatically.
@@ -33,7 +33,7 @@ Follow the steps in Hub to create the Slack app from the generated manifest, cre
 Invite the bot to the Slack channel where you will mention it:
 
 ```text
-/invite @Paseo
+/invite @Clisbot
 ```
 
 You can set up GitHub, Linear, and Discord later under **Apps**.
@@ -43,25 +43,25 @@ You can set up GitHub, Linear, and Discord later under **Apps**.
 Open the repository where the agent will work, then log in to your local Hub:
 
 ```sh
-paseo hub login http://localhost:3000
+clisbot hub login http://localhost:3000
 ```
 
-Approve the login in your browser. In the terminal, answer **Yes** to connect this daemon to Paseo Hub and **Yes** to allow Hub automations to run agents on it.
+Approve the login in your browser. In the terminal, answer **Yes** to connect this daemon to Clisbot Hub and **Yes** to allow Hub automations to run agents on it.
 
 Execution permission defaults to no. If you answered no, grant it from the machine later:
 
 ```sh
-paseo hub permissions grant hub.execute
+clisbot hub permissions grant hub.execute
 ```
 
 ## 4. Create the starter trigger
 
-Use a repository directory whose absolute path starts with `/`. Hub rejects Windows drive paths such as `C:\work\project` when `paseo hub init` validates the trigger. See [target and worktree](/docs/hub/configuration/reference#target-and-worktree).
+Use a repository directory whose absolute path starts with `/`. Hub rejects Windows drive paths such as `C:\work\project` when `clisbot hub init` validates the trigger. See [target and worktree](/docs/hub/configuration/reference#target-and-worktree).
 
 From that repository directory, generate and deploy a starter trigger.
 
 ```sh
-paseo hub init
+clisbot hub init
 ```
 
 Choose your local Hub endpoint (`http://localhost:3000`) and select your Slack connection if prompted. Setup asks three questions:
@@ -72,11 +72,11 @@ Choose your local Hub endpoint (`http://localhost:3000`) and select your Slack c
 | Your Slack member ID                    | Your Slack ID, such as `U01234567`. Only listed users can trigger the bot.                                                       |
 | Deploy now?                             | Yes, to validate and install the trigger in Hub.                                                                                 |
 
-Providers that advertise zero execution modes (such as Pi) are skipped by `paseo hub init`, but you can configure them in the Hub dashboard or in `.paseo/triggers/*.yml` and deploy with `paseo hub deploy`.
+Providers that advertise zero execution modes (such as Pi) are skipped by `clisbot hub init`, but you can configure them in the Hub dashboard or in `.clisbot/triggers/*.yml` and deploy with `clisbot hub deploy`.
 
 See [Find your Slack IDs](/docs/hub/triggers/slack#find-your-slack-ids) to copy your member ID.
 
-Setup validates the agent configuration against your connected daemon, writes `.paseo/triggers/slack-help.yml`, and deploys it. If you skip deployment during setup, run `paseo hub deploy` from the repository root when ready.
+Setup validates the agent configuration against your connected daemon, writes `.clisbot/triggers/slack-help.yml`, and deploys it. If you skip deployment during setup, run `clisbot hub deploy` from the repository root when ready.
 
 You can also create and edit triggers directly in the Hub dashboard under **Triggers**.
 
@@ -85,10 +85,10 @@ You can also create and edit triggers directly in the Hub dashboard under **Trig
 In the Slack channel you invited the bot to, send a mention:
 
 ```text
-@Paseo summarize this repository
+@Clisbot summarize this repository
 ```
 
-Hub starts the agent on your daemon and posts the reply in the Slack thread. In Hub, open **Activity** to see the run status. When Hub runs behind HTTPS, replies also include an **Open in Paseo** link so organization members can jump straight to the live session.
+Hub starts the agent on your daemon and posts the reply in the Slack thread. In Hub, open **Activity** to see the run status. When Hub runs behind HTTPS, replies also include an **Open in Clisbot** link so organization members can jump straight to the live session.
 
 If nothing runs, check [Activity](/docs/hub/activity) to tell a filtered mention from an unrouted event.
 
@@ -96,7 +96,7 @@ If nothing runs, check [Activity](/docs/hub/activity) to tell a filtered mention
 
 - [How Hub works](/docs/hub/concepts) explains integrations, daemons, triggers, and continuation.
 - [Triggers](/docs/hub/triggers) lists all event sources, including GitHub, Linear, schedules, and webhooks.
-- [Generated starter trigger](/docs/hub/configuration#generated-starter-trigger) walks through `.paseo/triggers/slack-help.yml`.
+- [Generated starter trigger](/docs/hub/configuration#generated-starter-trigger) walks through `.clisbot/triggers/slack-help.yml`.
 - [Hub security](/docs/hub/security) explains host boundaries and safe allowlists before you add more users or permissions.
 
-Hub stores local data under `~/.local/share/paseo-hub` by default. See [Self-hosting](/docs/hub/self-hosting) when you are ready for PostgreSQL or a public HTTPS deployment.
+Hub stores local data under `~/.local/share/clisbot-hub` by default. See [Self-hosting](/docs/hub/self-hosting) when you are ready for PostgreSQL or a public HTTPS deployment.

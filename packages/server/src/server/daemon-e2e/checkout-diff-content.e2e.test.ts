@@ -349,7 +349,7 @@ interface DiffWireResult {
 }
 async function openDiffWireProbe(port: number, cwd: string) {
   const { WebSocket } = await import("ws");
-  const { decodeDiffFrame, DiffOpcode } = await import("@getpaseo/protocol/binary-frames/index");
+  const { decodeDiffFrame, DiffOpcode } = await import("@clisbot/protocol/binary-frames/index");
   const activeSocket = new WebSocket(`ws://127.0.0.1:${port}/ws`);
   await new Promise<void>((resolve, reject) => {
     activeSocket.once("open", resolve);
@@ -451,7 +451,7 @@ test("SDK diff journey publishes a tag tree, commits a one-file refresh and shar
       head: { kind: "worktree" },
       mergeBase: true,
     } as const;
-    const states: import("@getpaseo/client").DiffState[] = [];
+    const states: import("@clisbot/client").DiffState[] = [];
     const observation = ctx.client.observeDiff(compare);
     observation.subscribe({ snapshot: (state) => states.push(state), update: () => {} });
     await expect.poll(() => states.at(-1)?.phase, { timeout: 15000 }).toBe("ready");
@@ -464,7 +464,7 @@ test("SDK diff journey publishes a tag tree, commits a one-file refresh and shar
     const initialStateCount = states.length;
     await second.connect();
     startGitCommandMetrics();
-    const duplicateStates: import("@getpaseo/client").DiffState[] = [];
+    const duplicateStates: import("@clisbot/client").DiffState[] = [];
     const duplicate = second.observeDiff(compare);
     duplicate.subscribe({ snapshot: (state) => duplicateStates.push(state), update: () => {} });
     await expect.poll(() => duplicateStates.at(-1)?.phase).toBe("ready");

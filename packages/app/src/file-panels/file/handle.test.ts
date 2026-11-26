@@ -2,7 +2,7 @@ import {
   PluginFileConflictError,
   PluginFileDeletedError,
   type PluginFileEvent,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 import { describe, expect, it } from "vitest";
 import { FileHandle } from "./handle";
 import { InMemoryFileSession } from "./testing";

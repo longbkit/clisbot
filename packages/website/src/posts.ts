@@ -6,6 +6,7 @@ interface PostFrontmatter {
   description: string;
   date: string;
   draft: boolean;
+  author?: string;
 }
 
 export interface Post {
@@ -16,7 +17,7 @@ export interface Post {
   locale: Locale;
 }
 
-const postModules = import.meta.glob("../posts/**/*.md", {
+const postModules = import.meta.glob(["../posts/**/*.md", "!../posts/upstream/**/*.md"], {
   eager: true,
   query: "?raw",
   import: "default",
@@ -42,6 +43,7 @@ function loadPosts(includeDrafts: boolean, locale: Locale): Post[] {
       slug,
       frontmatter: {
         title: data.title ?? "",
+        author: data.author ?? "Clisbot",
         description: data.description ?? "",
         date: original.date ?? "",
         draft: isDraft,

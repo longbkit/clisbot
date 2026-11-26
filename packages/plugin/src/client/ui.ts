@@ -186,7 +186,7 @@ export interface WorkspaceRowBadgeProps {
 /** One item on a sidebar workspace row's meta line. Render it from a workspace row badge item's `Component`. */
 export declare const WorkspaceRowBadge: ComponentType<WorkspaceRowBadgeProps>;
 
-/** Paseo's loading state. Fills the panel; the panel decides when to show it. */
+/** Clisbot's loading state. Fills the panel; the panel decides when to show it. */
 export declare const Loading: ComponentType;
 
 /** Render a local document URL in an isolated frame. */
@@ -196,7 +196,7 @@ export interface MarkdownProps {
   children: string;
 }
 
-/** Renders Markdown using Paseo’s theme, selection, and link behavior. */
+/** Renders Markdown using Clisbot’s theme, selection, and link behavior. */
 export declare const Markdown: ComponentType<MarkdownProps>;
 
 export interface ComposerControlProps {
@@ -208,7 +208,7 @@ export interface ComposerControlProps {
 }
 /**
  * What a control's callback receives. A returned promise marks the control pending until it
- * settles, and Paseo reports a rejection to the user.
+ * settles, and Clisbot reports a rejection to the user.
  */
 export interface ToggleProps extends ComposerControlProps {
   value: boolean;
@@ -239,7 +239,7 @@ export interface ComboboxProps<
   /** What the control shows. It need not be among the search results. */
   value: ComboboxItem | null;
   /**
-   * Called when the list opens and again, debounced, as the user types. Paseo shows the loading
+   * Called when the list opens and again, debounced, as the user types. Clisbot shows the loading
    * and error states, keeps the previous results while a search runs, and ignores a search that a
    * newer one replaced.
    */
@@ -247,8 +247,8 @@ export interface ComboboxProps<
   onSelect(event: { item: Item }): void | Promise<void>;
 }
 /**
- * Paseo's controls. Render them from a composer item's or a New workspace item's `Component`.
- * Paseo draws them where the item sits: inline when the composer has room and as rows in its
+ * Clisbot's controls. Render them from a composer item's or a New workspace item's `Component`.
+ * Clisbot draws them where the item sits: inline when the composer has room and as rows in its
  * overflow sheet when it does not, and as a field in the New workspace setup.
  */
 export declare const Toggle: ComponentType<ToggleProps>;

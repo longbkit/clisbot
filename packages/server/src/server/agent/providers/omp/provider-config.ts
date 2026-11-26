@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { OMP_MODES } from "@getpaseo/protocol/provider-manifest";
+import { OMP_MODES } from "@clisbot/protocol/provider-manifest";
 import { z } from "zod";
 
 import type { ProviderRuntimeSettings } from "../../provider-launch-config.js";

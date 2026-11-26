@@ -5,7 +5,7 @@ import { setInterval } from "node:timers/promises";
 import type { FileChange } from "./file-observer/index.js";
 
 export const WATCHER_LIVENESS_CANARY_TIMEOUT_MS = 10_000;
-const CANARY_CONTENTS = "paseo watcher liveness canary\n";
+const CANARY_CONTENTS = "clisbot watcher liveness canary\n";
 
 export interface WatcherLivenessCanary {
   readonly path: string;
@@ -17,7 +17,7 @@ export function createWatcherLivenessCanary(
   watchRoot: string,
   options: { timeoutMs?: number } = {},
 ): WatcherLivenessCanary {
-  const canaryPath = join(watchRoot, `.paseo-watcher-canary-${randomUUID()}`);
+  const canaryPath = join(watchRoot, `.clisbot-watcher-canary-${randomUUID()}`);
   const timeoutMs = options.timeoutMs ?? WATCHER_LIVENESS_CANARY_TIMEOUT_MS;
   let reportCanary!: () => void;
   const reported = new Promise<void>((resolve) => {

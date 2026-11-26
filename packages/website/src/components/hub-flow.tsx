@@ -3,7 +3,7 @@ import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import { ClaudeCodeIcon, CodexIcon, OpenCodeIcon } from "~/components/agent-icons";
 import { DiscordIcon, GitHubIcon, LinearIcon, SlackIcon } from "~/components/brand-icons";
-import { HubLockup, PaseoMark } from "~/components/paseo-brand";
+import { HubLockup, ClisbotMark } from "~/components/clisbot-brand";
 
 export type HubTriggerSourceId =
   | "github"
@@ -42,7 +42,7 @@ const DIAGRAM_DAEMONS = [
 
 const DIAGRAM_CLIENTS = ["desktop", "web", "mobile", "cli"] as const;
 
-/** Compact flow diagram for the homepage Paseo Hub section, sitting directly on the page background. */
+/** Compact flow diagram for the homepage Clisbot Hub section, sitting directly on the page background. */
 export function HubLandingFlow() {
   const { t } = useTranslation();
   return (
@@ -87,7 +87,7 @@ export function HubLandingFlow() {
             <CompactDaemonRow key={daemon.name} name={daemon.name} agents={daemon.agents} />
           ))}
           <div className="flex items-center gap-2 rounded-lg border border-dashed border-white/10 bg-white/[0.015] px-3 py-2 text-xs text-white/60">
-            <PaseoMark className="h-3.5 w-3.5 shrink-0 text-white/75" />
+            <ClisbotMark className="h-3.5 w-3.5 shrink-0 text-white/75" />
             <span className="truncate">{t("landing.hubSection.flowOpenSession")}</span>
           </div>
         </div>

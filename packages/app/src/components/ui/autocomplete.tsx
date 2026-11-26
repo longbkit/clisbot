@@ -21,7 +21,7 @@ import {
   SquarePen,
   SquareSlash,
 } from "lucide-react-native";
-import type { MatchRange } from "@getpaseo/protocol/search/text-match";
+import type { MatchRange } from "@clisbot/protocol/search/text-match";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import type { Theme } from "@/styles/theme";
 import { Button } from "./button";
@@ -47,7 +47,7 @@ export interface AutocompleteOption {
   labelMatches?: readonly MatchRange[];
   argumentHint?: string;
   description?: string;
-  /** Where the option comes from, when that is not the provider itself: `Skill`, `Paseo`, a plugin. */
+  /** Where the option comes from, when that is not the provider itself: `Skill`, `Clisbot`, a plugin. */
   tag?: string;
 }
 

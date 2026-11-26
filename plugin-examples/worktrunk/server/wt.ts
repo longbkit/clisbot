@@ -6,10 +6,10 @@ import {
   type PluginWorktreeCreateInput,
   type PluginWorktreeRemoveRequest,
   type PluginWorktreeRestoreRequest,
-} from "@getpaseo/plugin/server";
+} from "@clisbot/plugin/server";
 
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
-const CREATED_BRANCH_FILE = "paseo-worktrunk-created-branch";
+const CREATED_BRANCH_FILE = "clisbot-worktrunk-created-branch";
 
 export const WORKING_MARKER = "🤖";
 export const WAITING_MARKER = "💬";
@@ -205,7 +205,7 @@ export async function createWithWorktrunk(
 ): Promise<{ type: "created"; path: string } | undefined> {
   const args = buildCreateArgs(request);
   if (!args) return undefined;
-  // With a local branch collision, decline so Paseo's Git checkout allocates a unique branch
+  // With a local branch collision, decline so Clisbot's Git checkout allocates a unique branch
   // name without disturbing the existing local branch.
   const createsLocalBranch =
     request.kind === "branch-off" ||
@@ -225,7 +225,7 @@ export async function createWithWorktrunk(
   }
   const output = parseSwitchOutput(stdout);
   // If Worktrunk switched to an already-existing checkout instead of creating one,
-  // decline so Paseo falls back to Git (which creates a unique branch).
+  // decline so Clisbot falls back to Git (which creates a unique branch).
   if (output.action !== undefined && output.action !== "created") {
     return undefined;
   }
@@ -269,7 +269,7 @@ export async function restoreWithWorktrunk(
   signal: AbortSignal,
 ): Promise<{ type: "restored"; path: string } | undefined> {
   if (request.target.type === "commit") {
-    // Detached-commit restores fall back to Paseo's built-in Git restore.
+    // Detached-commit restores fall back to Clisbot's built-in Git restore.
     return undefined;
   }
   const common = [

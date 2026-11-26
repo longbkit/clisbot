@@ -7,19 +7,22 @@ import { ScriptRouteStore } from "./script-proxy.js";
 import {
   buildWorkspaceScriptPayloads,
   createScriptStatusEmitter,
-  readPaseoConfigForProjection,
+  readClisbotConfigForProjection,
 } from "./script-status-projection.js";
-import { WorkspaceScriptPayloadSchema } from "@getpaseo/protocol/messages";
+import { WorkspaceScriptPayloadSchema } from "@clisbot/protocol/messages";
 import type { ScriptHealthState } from "./script-health-monitor.js";
 import { WorkspaceScriptRuntimeStore } from "./workspace-script-runtime-store.js";
-import { readPaseoConfig } from "../utils/worktree.js";
-import { readPaseoConfigForEdit, writePaseoConfigForEdit } from "../utils/paseo-config-file.js";
-import type { PaseoConfig } from "@getpaseo/protocol/paseo-config-schema";
+import { readClisbotConfig } from "../utils/worktree.js";
+import {
+  readClisbotConfigForEdit,
+  writeClisbotConfigForEdit,
+} from "../utils/clisbot-config-file.js";
+import type { ClisbotConfig } from "@clisbot/protocol/clisbot-config-schema";
 import { createTestLogger } from "../test-utils/test-logger.js";
 
 function createWorkspaceRepo(options?: {
   branchName?: string;
-  paseoConfig?: Record<string, unknown>;
+  clisbotConfig?: Record<string, unknown>;
 }): { tempDir: string; repoDir: string; cleanup: () => void } {
   const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "script-projection-")));
   const repoDir = path.join(tempDir, "repo");
@@ -34,8 +37,11 @@ function createWorkspaceRepo(options?: {
   });
   execFileSync("git", ["config", "user.name", "Test"], { cwd: repoDir, stdio: "pipe" });
   writeFileSync(path.join(repoDir, "README.md"), "hello\n");
-  if (options?.paseoConfig) {
-    writeFileSync(path.join(repoDir, "paseo.json"), JSON.stringify(options.paseoConfig, null, 2));
+  if (options?.clisbotConfig) {
+    writeFileSync(
+      path.join(repoDir, "clisbot.json"),
+      JSON.stringify(options.clisbotConfig, null, 2),
+    );
   }
   execFileSync("git", ["add", "."], { cwd: repoDir, stdio: "pipe" });
   execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "initial"], {
@@ -55,7 +61,7 @@ function createWorkspaceRepo(options?: {
 async function buildPayloads(input: {
   workspaceId: string;
   workspaceDirectory: string;
-  paseoConfig?: PaseoConfig | null;
+  clisbotConfig?: ClisbotConfig | null;
   routeStore?: ScriptRouteStore;
   serviceProxy?: ScriptRouteStore;
   runtimeStore: WorkspaceScriptRuntimeStore;
@@ -64,20 +70,20 @@ async function buildPayloads(input: {
   gitMetadata?: { projectSlug: string; currentBranch: string | null };
   resolveHealth?: (hostname: string) => ScriptHealthState | null;
 }) {
-  const paseoConfig =
-    input.paseoConfig !== undefined
-      ? input.paseoConfig
+  const clisbotConfig =
+    input.clisbotConfig !== undefined
+      ? input.clisbotConfig
       : await loadConfig(input.workspaceDirectory);
   const { routeStore, serviceProxy, ...rest } = input;
   return buildWorkspaceScriptPayloads({
     ...rest,
     serviceProxy: serviceProxy ?? routeStore ?? new ScriptRouteStore(),
-    paseoConfig,
+    clisbotConfig,
   });
 }
 
-async function loadConfig(repoRoot: string): Promise<PaseoConfig | null> {
-  const result = await readPaseoConfig(repoRoot);
+async function loadConfig(repoRoot: string): Promise<ClisbotConfig | null> {
+  const result = await readClisbotConfig(repoRoot);
   return result.ok ? result.config : null;
 }
 
@@ -100,7 +106,7 @@ describe("script-status-projection", () => {
   it("projects plain scripts and services differently", async () => {
     const workspaceId = "workspace-plain-and-service";
     const workspace = createWorkspaceRepo({
-      paseoConfig: {
+      clisbotConfig: {
         scripts: {
           typecheck: { command: "npm run typecheck" },
           web: { type: "service", command: "npm run web", port: 3000 },
@@ -125,7 +131,7 @@ describe("script-status-projection", () => {
           workspaceDirectory: workspace.repoDir,
           routeStore,
           runtimeStore,
-          daemonPort: 6767,
+          daemonPort: 6868,
         }),
       ).toEqual([
         {
@@ -144,9 +150,9 @@ describe("script-status-projection", () => {
           type: "service",
           hostname: "web--repo.localhost",
           port: 3000,
-          localProxyUrl: "http://web--repo.localhost:6767",
+          localProxyUrl: "http://web--repo.localhost:6868",
           publicProxyUrl: null,
-          proxyUrl: "http://web--repo.localhost:6767",
+          proxyUrl: "http://web--repo.localhost:6868",
           lifecycle: "stopped",
           health: null,
           exitCode: null,
@@ -162,7 +168,7 @@ describe("script-status-projection", () => {
     const workspaceId = "workspace-service-metadata";
     const workspace = createWorkspaceRepo({
       branchName: "local-branch-that-should-not-be-read",
-      paseoConfig: {
+      clisbotConfig: {
         scripts: {
           web: { type: "service", command: "npm run web", port: 3000 },
         },
@@ -177,7 +183,7 @@ describe("script-status-projection", () => {
         workspaceDirectory: workspace.repoDir,
         serviceProxy: routeStore,
         runtimeStore,
-        daemonPort: 6767,
+        daemonPort: 6868,
         gitMetadata: {
           projectSlug: "service-provided",
           currentBranch: "feature/from-service",
@@ -190,9 +196,9 @@ describe("script-status-projection", () => {
           type: "service",
           hostname: "web--feature-from-service--service-provided.localhost",
           port: 3000,
-          localProxyUrl: "http://web--feature-from-service--service-provided.localhost:6767",
+          localProxyUrl: "http://web--feature-from-service--service-provided.localhost:6868",
           publicProxyUrl: null,
-          proxyUrl: "http://web--feature-from-service--service-provided.localhost:6767",
+          proxyUrl: "http://web--feature-from-service--service-provided.localhost:6868",
           lifecycle: "stopped",
           health: null,
           exitCode: null,
@@ -207,7 +213,7 @@ describe("script-status-projection", () => {
   it("projects local and public service URLs while keeping proxyUrl public-first", async () => {
     const workspaceId = "workspace-public-service";
     const workspace = createWorkspaceRepo({
-      paseoConfig: {
+      clisbotConfig: {
         scripts: {
           web: { type: "service", command: "npm run web", port: 3000 },
         },
@@ -223,7 +229,7 @@ describe("script-status-projection", () => {
           workspaceDirectory: workspace.repoDir,
           routeStore,
           runtimeStore,
-          daemonPort: 6767,
+          daemonPort: 6868,
           serviceProxyPublicBaseUrl: "https://services.example.com",
           gitMetadata: { projectSlug: "repo", currentBranch: "feature/card" },
         }),
@@ -233,7 +239,7 @@ describe("script-status-projection", () => {
           type: "service",
           hostname: "web--feature-card--repo.localhost",
           port: 3000,
-          localProxyUrl: "http://web--feature-card--repo.localhost:6767",
+          localProxyUrl: "http://web--feature-card--repo.localhost:6868",
           publicProxyUrl: "https://web--feature-card--repo.services.example.com",
           proxyUrl: "https://web--feature-card--repo.services.example.com",
           lifecycle: "stopped",
@@ -251,7 +257,7 @@ describe("script-status-projection", () => {
     const workspaceId = "workspace-running-service";
     const workspace = createWorkspaceRepo({
       branchName: "feature/card",
-      paseoConfig: {
+      clisbotConfig: {
         scripts: {
           web: { type: "service", command: "npm run web" },
         },
@@ -282,7 +288,7 @@ describe("script-status-projection", () => {
           workspaceDirectory: workspace.repoDir,
           routeStore,
           runtimeStore,
-          daemonPort: 6767,
+          daemonPort: 6868,
           resolveHealth: () => "healthy",
         }),
       ).toEqual([
@@ -291,9 +297,9 @@ describe("script-status-projection", () => {
           type: "service",
           hostname: "web--feature-card--repo.localhost",
           port: 4321,
-          localProxyUrl: "http://web--feature-card--repo.localhost:6767",
+          localProxyUrl: "http://web--feature-card--repo.localhost:6868",
           publicProxyUrl: null,
-          proxyUrl: "http://web--feature-card--repo.localhost:6767",
+          proxyUrl: "http://web--feature-card--repo.localhost:6868",
           lifecycle: "running",
           health: "healthy",
           exitCode: null,
@@ -308,7 +314,7 @@ describe("script-status-projection", () => {
   it("maps internal pending health to null on the wire", async () => {
     const workspaceId = "workspace-pending-health";
     const workspace = createWorkspaceRepo({
-      paseoConfig: {
+      clisbotConfig: {
         scripts: {
           web: { type: "service", command: "npm run web" },
         },
@@ -339,7 +345,7 @@ describe("script-status-projection", () => {
           workspaceDirectory: workspace.repoDir,
           routeStore,
           runtimeStore,
-          daemonPort: 6767,
+          daemonPort: 6868,
           resolveHealth: () => "pending",
         }),
       ).toEqual([
@@ -348,9 +354,9 @@ describe("script-status-projection", () => {
           type: "service",
           hostname: "web--repo.localhost",
           port: 4321,
-          localProxyUrl: "http://web--repo.localhost:6767",
+          localProxyUrl: "http://web--repo.localhost:6868",
           publicProxyUrl: null,
-          proxyUrl: "http://web--repo.localhost:6767",
+          proxyUrl: "http://web--repo.localhost:6868",
           lifecycle: "running",
           health: null,
           exitCode: null,
@@ -390,7 +396,7 @@ describe("script-status-projection", () => {
           workspaceDirectory: workspace.repoDir,
           routeStore,
           runtimeStore,
-          daemonPort: 6767,
+          daemonPort: 6868,
         }),
       ).toEqual([
         {
@@ -398,9 +404,9 @@ describe("script-status-projection", () => {
           type: "service",
           hostname: "docs--repo.localhost",
           port: 3002,
-          localProxyUrl: "http://docs--repo.localhost:6767",
+          localProxyUrl: "http://docs--repo.localhost:6868",
           publicProxyUrl: null,
-          proxyUrl: "http://docs--repo.localhost:6767",
+          proxyUrl: "http://docs--repo.localhost:6868",
           lifecycle: "running",
           health: null,
           exitCode: null,
@@ -433,7 +439,7 @@ describe("script-status-projection", () => {
           workspaceDirectory: workspace.repoDir,
           routeStore,
           runtimeStore,
-          daemonPort: 6767,
+          daemonPort: 6868,
         }),
       ).toEqual([
         {
@@ -453,16 +459,16 @@ describe("script-status-projection", () => {
     }
   });
 
-  it("readPaseoConfig fails with configPath and error when paseo.json is malformed", async () => {
+  it("readClisbotConfig fails with configPath and error when clisbot.json is malformed", async () => {
     const workspace = createWorkspaceRepo();
-    const configPath = path.join(workspace.repoDir, "paseo.json");
+    const configPath = path.join(workspace.repoDir, "clisbot.json");
     writeFileSync(
       configPath,
       '{\n<<<<<<< HEAD\n  "scripts": {}\n=======\n  "scripts": {}\n>>>>>>> origin/main\n}\n',
     );
 
     try {
-      const result = await readPaseoConfig(workspace.repoDir);
+      const result = await readClisbotConfig(workspace.repoDir);
       expect(result.ok).toBe(false);
       if (result.ok) throw new Error("unreachable");
       expect(result.configPath).toBe(configPath);
@@ -472,14 +478,14 @@ describe("script-status-projection", () => {
     }
   });
 
-  it("keeps every workspace's scripts when a listing's paseo.json checks do not finish in time", async () => {
+  it("keeps every workspace's scripts when a listing's clisbot.json checks do not finish in time", async () => {
     // More workspaces than the daemon kept snapshots for before, each with a config it has read.
     const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "script-projection-many-")));
     const workspaces = Array.from({ length: 300 }, (_, index) => {
       const directory = path.join(tempDir, `workspace-${index}`);
       mkdirSync(directory);
       writeFileSync(
-        path.join(directory, "paseo.json"),
+        path.join(directory, "clisbot.json"),
         JSON.stringify({ scripts: { api: { type: "service", command: "npm run dev" } } }),
       );
       return directory;
@@ -487,12 +493,12 @@ describe("script-status-projection", () => {
     const logger = createTestLogger();
     try {
       await Promise.all(
-        workspaces.map((directory) => readPaseoConfigForProjection(directory, logger)),
+        workspaces.map((directory) => readClisbotConfigForProjection(directory, logger)),
       );
 
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
       const listing = Promise.all(
-        workspaces.map((directory) => readPaseoConfigForProjection(directory, logger)),
+        workspaces.map((directory) => readClisbotConfigForProjection(directory, logger)),
       );
       // The filesystem has not answered any check when the 5 s budget runs out.
       vi.advanceTimersByTime(5_000);
@@ -507,13 +513,13 @@ describe("script-status-projection", () => {
 
   it("keeps the saved scripts when the first check after an in-app save is late", async () => {
     const workspace = createWorkspaceRepo({
-      paseoConfig: { scripts: { api: { type: "service", command: "npm run dev" } } },
+      clisbotConfig: { scripts: { api: { type: "service", command: "npm run dev" } } },
     });
     const logger = createTestLogger();
     try {
-      const current = await readPaseoConfigForEdit(workspace.repoDir);
-      if (!current.ok) throw new Error("expected a readable paseo.json");
-      const saved = await writePaseoConfigForEdit({
+      const current = await readClisbotConfigForEdit(workspace.repoDir);
+      if (!current.ok) throw new Error("expected a readable clisbot.json");
+      const saved = await writeClisbotConfigForEdit({
         repoRoot: workspace.repoDir,
         config: { scripts: { web: { type: "service", command: "npm run web" } } },
         expectedRevision: current.revision,
@@ -521,7 +527,7 @@ describe("script-status-projection", () => {
       expect(saved.ok).toBe(true);
 
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-      const listing = readPaseoConfigForProjection(workspace.repoDir, logger);
+      const listing = readClisbotConfigForProjection(workspace.repoDir, logger);
       vi.advanceTimersByTime(5_000);
 
       expect(Object.keys((await listing)?.scripts ?? {})).toEqual(["web"]);
@@ -531,18 +537,18 @@ describe("script-status-projection", () => {
     }
   });
 
-  it("shows an external paseo.json edit on the next listing", async () => {
+  it("shows an external clisbot.json edit on the next listing", async () => {
     const workspace = createWorkspaceRepo({
-      paseoConfig: { scripts: { api: { type: "service", command: "npm run dev" } } },
+      clisbotConfig: { scripts: { api: { type: "service", command: "npm run dev" } } },
     });
     try {
-      await readPaseoConfigForProjection(workspace.repoDir, createTestLogger());
+      await readClisbotConfigForProjection(workspace.repoDir, createTestLogger());
       writeFileSync(
-        path.join(workspace.repoDir, "paseo.json"),
+        path.join(workspace.repoDir, "clisbot.json"),
         JSON.stringify({ scripts: { web: { type: "service", command: "npm run web" } } }),
       );
 
-      const config = await readPaseoConfigForProjection(workspace.repoDir, createTestLogger());
+      const config = await readClisbotConfigForProjection(workspace.repoDir, createTestLogger());
 
       expect(Object.keys(config?.scripts ?? {})).toEqual(["web"]);
     } finally {
@@ -550,7 +556,7 @@ describe("script-status-projection", () => {
     }
   });
 
-  it("buildWorkspaceScriptPayloads given paseoConfig=null still surfaces orphaned runtime scripts", async () => {
+  it("buildWorkspaceScriptPayloads given clisbotConfig=null still surfaces orphaned runtime scripts", async () => {
     const workspaceId = "workspace-null-config";
     const workspace = createWorkspaceRepo();
     const routeStore = new ScriptRouteStore();
@@ -569,10 +575,10 @@ describe("script-status-projection", () => {
         await buildPayloads({
           workspaceId,
           workspaceDirectory: workspace.repoDir,
-          paseoConfig: null,
+          clisbotConfig: null,
           routeStore,
           runtimeStore,
-          daemonPort: 6767,
+          daemonPort: 6868,
         }),
       ).toEqual([
         {
@@ -595,7 +601,7 @@ describe("script-status-projection", () => {
   it("createScriptStatusEmitter overlays health onto the projected workspace script list", async () => {
     const workspaceId = "workspace-emitter";
     const workspace = createWorkspaceRepo({
-      paseoConfig: {
+      clisbotConfig: {
         scripts: {
           api: { type: "service", command: "npm run api" },
           typecheck: { command: "npm run typecheck" },
@@ -630,14 +636,14 @@ describe("script-status-projection", () => {
       sessions: () => [session],
       serviceProxy: routeStore,
       runtimeStore,
-      daemonPort: 6767,
+      daemonPort: 6868,
       resolveWorkspaceDirectory: async (requestedWorkspaceId) =>
         requestedWorkspaceId === "workspace-emitter" ? workspace.repoDir : null,
       logger: createTestLogger(),
     });
 
     try {
-      const originalConfig = await readPaseoConfigForProjection(
+      const originalConfig = await readClisbotConfigForProjection(
         workspace.repoDir,
         createTestLogger(),
       );
@@ -650,7 +656,7 @@ describe("script-status-projection", () => {
         },
       ]);
 
-      expect(await readPaseoConfigForProjection(workspace.repoDir, createTestLogger())).toBe(
+      expect(await readClisbotConfigForProjection(workspace.repoDir, createTestLogger())).toBe(
         originalConfig,
       );
       await emitUpdate(workspaceId, [
@@ -664,7 +670,7 @@ describe("script-status-projection", () => {
           ],
         },
       });
-      expect(await readPaseoConfigForProjection(workspace.repoDir, createTestLogger())).toBe(
+      expect(await readClisbotConfigForProjection(workspace.repoDir, createTestLogger())).toBe(
         originalConfig,
       );
       expect(messages).toContainEqual({
@@ -677,9 +683,9 @@ describe("script-status-projection", () => {
               type: "service",
               hostname: "api--repo.localhost",
               port: 3001,
-              localProxyUrl: "http://api--repo.localhost:6767",
+              localProxyUrl: "http://api--repo.localhost:6868",
               publicProxyUrl: null,
-              proxyUrl: "http://api--repo.localhost:6767",
+              proxyUrl: "http://api--repo.localhost:6868",
               lifecycle: "running",
               health: "healthy",
               exitCode: null,

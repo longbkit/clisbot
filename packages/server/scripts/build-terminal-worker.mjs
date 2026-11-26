@@ -1,5 +1,5 @@
 // Bundles the terminal worker into one file with its shell integration beside it. The daemon
-// copies this directory (plus node-pty) into $PASEO_HOME/terminal-worker/ and launches the worker
+// copies this directory (plus node-pty) into $CLISBOT_HOME/terminal-worker/ and launches the worker
 // from the copy, so a worker that outlives an upgrade never loads files from the installation
 // that replaced the one it came from. See docs/terminal-worker.md.
 //

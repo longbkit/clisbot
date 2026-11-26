@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
-import type { JsonValue, ProviderOptions } from "@getpaseo/protocol/agent-types";
+import type { JsonValue, ProviderOptions } from "@clisbot/protocol/agent-types";
 import type { UserComposerAttachment } from "@/attachments/types";
 import type { ComposerFocusOptions } from "@/composer/model";
 import type { ComposerTextSource } from "@/composer/text-source";

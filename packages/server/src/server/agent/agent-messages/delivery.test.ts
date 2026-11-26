@@ -266,12 +266,12 @@ test("batches retain each sender's attachment context and image order", async ()
   expect(prompt).toEqual([
     {
       type: "text",
-      text: '<paseo-system version="1" kind="agent-message" source-agent-id="one" message-id="first">\nFirst\n</paseo-system>',
+      text: '<clisbot-system version="1" kind="agent-message" source-agent-id="one" message-id="first">\nFirst\n</clisbot-system>',
     },
     firstImage,
     {
       type: "text",
-      text: '<paseo-system version="1" kind="agent-message" source-agent-id="two" message-id="second">\nSecond\n\nGitHub Issue #42: Context\nhttps://example.com/42\n\nAttached\n</paseo-system>',
+      text: '<clisbot-system version="1" kind="agent-message" source-agent-id="two" message-id="second">\nSecond\n\nGitHub Issue #42: Context\nhttps://example.com/42\n\nAttached\n</clisbot-system>',
     },
     secondImage,
   ]);

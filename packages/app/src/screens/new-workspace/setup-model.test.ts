@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CheckoutWorktree } from "@getpaseo/protocol/messages";
+import type { CheckoutWorktree } from "@clisbot/protocol/messages";
 import type { PickerItem } from "../new-workspace-picker-item";
 import {
   BranchInWorktreeError,

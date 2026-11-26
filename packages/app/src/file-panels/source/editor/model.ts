@@ -3,7 +3,7 @@ import {
   PluginFileDeletedError,
   type PluginFile,
   type PluginFileEvent,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 
 export type FileEditorStatus =
   | "loading"

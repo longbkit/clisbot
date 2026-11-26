@@ -1,6 +1,6 @@
 import type { AgentStreamEvent } from "../agent-sdk-types.js";
-import { parentAddressLabels } from "@getpaseo/protocol/agent-labels";
-import type { AgentActiveTurnBehavior, AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import { parentAddressLabels } from "@clisbot/protocol/agent-labels";
+import type { AgentActiveTurnBehavior, AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -8,9 +8,9 @@ import {
   DaemonConnectionError,
   type FetchWorkspacesEntry,
   type WaitForFinishResult,
-} from "@getpaseo/client/internal/daemon-client";
-import type { DaemonTransportFactory } from "@getpaseo/client/internal/daemon-client-transport-types";
-import type { HostDirectory } from "@getpaseo/protocol/hosts";
+} from "@clisbot/client/internal/daemon-client";
+import type { DaemonTransportFactory } from "@clisbot/client/internal/daemon-client-transport-types";
+import type { HostDirectory } from "@clisbot/protocol/hosts";
 import { OWNER_PERMISSIONS } from "../../authorization/index.js";
 import type { ConnectedHosts } from "../../connected-hosts/index.js";
 import { resolveRequiredProviderModel } from "../mcp-shared.js";
@@ -22,7 +22,7 @@ import {
   type BackgroundCaller,
 } from "../create-agent/intent.js";
 import { expandUserPath } from "../../path-utils.js";
-import type { PaseoToolExecutionContext, PaseoToolResult } from "../tools/types.js";
+import type { ClisbotToolExecutionContext, ClisbotToolResult } from "../tools/types.js";
 
 export class HostOperationRejectedError extends Error {
   readonly code: unknown;
@@ -38,8 +38,8 @@ function isAmbiguousPromptFailure(error: unknown): boolean {
 }
 export type HostOperation = (
   input: Record<string, unknown>,
-  context: PaseoToolExecutionContext,
-) => Promise<PaseoToolResult>;
+  context: ClisbotToolExecutionContext,
+) => Promise<ClisbotToolResult>;
 export interface HostOperations {
   createAgent: HostOperation;
   createWorkspace: HostOperation;
@@ -193,7 +193,7 @@ const remoteCreate = z
       .optional(),
   })
   .strict();
-const result = (structuredContent: unknown): PaseoToolResult => ({
+const result = (structuredContent: unknown): ClisbotToolResult => ({
   content: [],
   structuredContent,
 });

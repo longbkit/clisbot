@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { AgentCapabilityFlags } from "@getpaseo/protocol/agent-types";
+import type { AgentCapabilityFlags } from "@clisbot/protocol/agent-types";
 import type { PendingMessageSubmission } from "@/composer/submission/model";
 import type { AgentScreenAgent } from "@/hooks/use-agent-screen-state-machine";
 import { type PendingCreateAttempt, useCreateFlowStore } from "@/stores/create-flow-store";

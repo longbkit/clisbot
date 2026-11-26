@@ -69,7 +69,7 @@ function recordNaming(runtime: string | null, pid = 4242): TerminalWorkerRecord 
     createdAt: new Date().toISOString(),
     identity: { startedAt: "Thu Jan  1 00:00:00 1970", commandLine: "worker" },
     protocolVersion: 1,
-    paseoVersion: "1.0.0",
+    clisbotVersion: "1.0.0",
     socketPath: "/tmp/does-not-exist.sock",
     secret: "secret",
     runtime,
@@ -81,8 +81,8 @@ describe("terminal worker runtime copy", () => {
   it("copies the bundle, its shell integration and this platform's node-pty into the home", () => {
     const home = makeDir("tw-runtime-home-");
     const entry = prepareTerminalWorkerRuntime({
-      paseoHome: home,
-      paseoVersion: "1.0.0-beta.1",
+      clisbotHome: home,
+      clisbotVersion: "1.0.0-beta.1",
       ...makeSources(),
     });
 
@@ -106,21 +106,21 @@ describe("terminal worker runtime copy", () => {
     const home = makeDir("tw-runtime-home-");
     const sources = makeSources();
     const first = prepareTerminalWorkerRuntime({
-      paseoHome: home,
-      paseoVersion: "1.0.0",
+      clisbotHome: home,
+      clisbotVersion: "1.0.0",
       ...sources,
     });
     const marker = path.join(terminalWorkerDirectory(home), first.runtime!, "terminal-worker.mjs");
     writeFileSync(marker, "// the running copy\n");
 
     const again = prepareTerminalWorkerRuntime({
-      paseoHome: home,
-      paseoVersion: "1.0.0",
+      clisbotHome: home,
+      clisbotVersion: "1.0.0",
       ...sources,
     });
     const rebuilt = prepareTerminalWorkerRuntime({
-      paseoHome: home,
-      paseoVersion: "1.0.0",
+      clisbotHome: home,
+      clisbotVersion: "1.0.0",
       ...makeSources("export const rebuilt = true;\n"),
     });
 
@@ -133,15 +133,15 @@ describe("terminal worker runtime copy", () => {
     const home = makeDir("tw-runtime-home-");
     const sources = makeSources();
     const first = prepareTerminalWorkerRuntime({
-      paseoHome: home,
-      paseoVersion: "1.0.0",
+      clisbotHome: home,
+      clisbotVersion: "1.0.0",
       ...sources,
     });
     const directory = path.join(terminalWorkerDirectory(home), first.runtime!);
     rmSync(directory, { recursive: true });
     mkdirSync(directory);
 
-    prepareTerminalWorkerRuntime({ paseoHome: home, paseoVersion: "1.0.0", ...sources });
+    prepareTerminalWorkerRuntime({ clisbotHome: home, clisbotVersion: "1.0.0", ...sources });
 
     expect(existsSync(path.join(directory, "terminal-worker.mjs"))).toBe(true);
   });
@@ -152,7 +152,7 @@ describe("terminal worker runtime copy", () => {
     rmSync(path.join(sources.nodePtyDirectory, "prebuilds"), { recursive: true });
 
     expect(() =>
-      prepareTerminalWorkerRuntime({ paseoHome: home, paseoVersion: "1.0.0", ...sources }),
+      prepareTerminalWorkerRuntime({ clisbotHome: home, clisbotVersion: "1.0.0", ...sources }),
     ).toThrow(TerminalWorkerRuntimeError);
     expect(readdirSync(terminalWorkerDirectory(home))).toEqual([]);
   });
@@ -160,13 +160,13 @@ describe("terminal worker runtime copy", () => {
   it("removes only copies no worker record names", async () => {
     const home = makeDir("tw-runtime-home-");
     const used = prepareTerminalWorkerRuntime({
-      paseoHome: home,
-      paseoVersion: "1.0.0",
+      clisbotHome: home,
+      clisbotVersion: "1.0.0",
       ...makeSources(),
     });
     const unused = prepareTerminalWorkerRuntime({
-      paseoHome: home,
-      paseoVersion: "0.9.0",
+      clisbotHome: home,
+      clisbotVersion: "0.9.0",
       ...makeSources(),
     });
     writeTerminalWorkerRecord(home, recordNaming(used.runtime));
@@ -183,8 +183,8 @@ describe("terminal worker runtime copy", () => {
   it("removes nothing while a record cannot be read", async () => {
     const home = makeDir("tw-runtime-home-");
     const copy = prepareTerminalWorkerRuntime({
-      paseoHome: home,
-      paseoVersion: "1.0.0",
+      clisbotHome: home,
+      clisbotVersion: "1.0.0",
       ...makeSources(),
     });
     writeFileSync(path.join(terminalWorkerDirectory(home), "4242.json"), "{ not json");

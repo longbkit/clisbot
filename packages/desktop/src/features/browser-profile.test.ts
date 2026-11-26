@@ -1,10 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
-  clearPaseoBrowserProfile,
-  getLegacyPaseoBrowserProfileSession,
-  getPaseoBrowserProfileSessions,
-  listPaseoBrowserProfileGuests,
-  readLegacyPaseoBrowserIds,
+  clearClisbotBrowserProfile,
+  getLegacyClisbotBrowserProfileSession,
+  getClisbotBrowserProfileSessions,
+  listClisbotBrowserProfileGuests,
+  readLegacyClisbotBrowserIds,
 } from "./browser-profile.js";
 
 class FakeProfileSession {
@@ -65,7 +65,7 @@ class FakeWebContents extends FakeLiveGuest {
   }
 }
 
-describe("listPaseoBrowserProfileGuests", () => {
+describe("listClisbotBrowserProfileGuests", () => {
   test("returns every live webview and popup in the shared profile", () => {
     const profileSession = {};
     const firstWindowGuest = new FakeWebContents(1, profileSession, "webview");
@@ -74,7 +74,7 @@ describe("listPaseoBrowserProfileGuests", () => {
     const popupWindow = new FakeWebContents(4, profileSession, "window");
     const destroyedGuest = new FakeWebContents(5, profileSession, "webview", true);
 
-    const guests = listPaseoBrowserProfileGuests({
+    const guests = listClisbotBrowserProfileGuests({
       profileSession,
       webContents: [
         firstWindowGuest,
@@ -93,9 +93,15 @@ describe("legacy browser profiles", () => {
   test("accepts only unique saved browser ids and resolves their old partitions", () => {
     const uuid = "123e4567-e89b-42d3-a456-426614174000";
     const fallbackId = "1700000000000-abcd";
-    const browserIds = readLegacyPaseoBrowserIds([uuid, fallbackId, uuid, "not-a-browser-id", 123]);
+    const browserIds = readLegacyClisbotBrowserIds([
+      uuid,
+      fallbackId,
+      uuid,
+      "not-a-browser-id",
+      123,
+    ]);
     const partitions: string[] = [];
-    const sessions = getPaseoBrowserProfileSessions(
+    const sessions = getClisbotBrowserProfileSessions(
       {
         fromPartition: (partition) => {
           partitions.push(partition);
@@ -106,9 +112,9 @@ describe("legacy browser profiles", () => {
     );
 
     expect(partitions).toEqual([
-      "persist:paseo-browser",
-      `persist:paseo-browser-${uuid}`,
-      `persist:paseo-browser-${fallbackId}`,
+      "persist:clisbot-browser",
+      `persist:clisbot-browser-${uuid}`,
+      `persist:clisbot-browser-${fallbackId}`,
     ]);
     expect(sessions).toHaveLength(3);
   });
@@ -122,13 +128,13 @@ describe("legacy browser profiles", () => {
       },
     };
 
-    expect(getLegacyPaseoBrowserProfileSession(sessions, "1700000000000-abcd")).not.toBeNull();
-    expect(getLegacyPaseoBrowserProfileSession(sessions, "invalid")).toBeNull();
-    expect(partitions).toEqual(["persist:paseo-browser-1700000000000-abcd"]);
+    expect(getLegacyClisbotBrowserProfileSession(sessions, "1700000000000-abcd")).not.toBeNull();
+    expect(getLegacyClisbotBrowserProfileSession(sessions, "invalid")).toBeNull();
+    expect(partitions).toEqual(["persist:clisbot-browser-1700000000000-abcd"]);
   });
 });
 
-describe("clearPaseoBrowserProfile", () => {
+describe("clearClisbotBrowserProfile", () => {
   test("clears site data, HTTP cache, and auth before reloading live guests", async () => {
     const profile = new FakeProfileSession();
     const legacyProfile = new FakeProfileSession();
@@ -139,7 +145,7 @@ describe("clearPaseoBrowserProfile", () => {
     const firstGuest = new FakeLiveGuest(1);
     const secondGuest = new FakeLiveGuest(2);
 
-    const clearing = clearPaseoBrowserProfile({
+    const clearing = clearClisbotBrowserProfile({
       profileSessions: [profile, legacyProfile],
       listGuests: () => [firstGuest, secondGuest],
       logReloadError: () => {},
@@ -179,7 +185,7 @@ describe("clearPaseoBrowserProfile", () => {
     const failedGuest = new FakeLiveGuest(2, false, reloadError);
     const reloadErrors: Array<{ guestId: number; error: unknown }> = [];
 
-    await clearPaseoBrowserProfile({
+    await clearClisbotBrowserProfile({
       profileSessions: [profile],
       listGuests: () => [destroyedGuest, failedGuest],
       logReloadError: (guestId, error) => reloadErrors.push({ guestId, error }),
@@ -197,7 +203,7 @@ describe("clearPaseoBrowserProfile", () => {
     const guest = new FakeLiveGuest(1);
 
     await expect(
-      clearPaseoBrowserProfile({
+      clearClisbotBrowserProfile({
         profileSessions: [profile],
         listGuests: () => [guest],
         logReloadError: () => {},

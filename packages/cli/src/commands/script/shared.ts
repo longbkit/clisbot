@@ -1,6 +1,6 @@
 import type { DaemonTarget } from "../../utils/daemon-target.js";
 import { resolve } from "node:path";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { connectToDaemon, getDaemonHost } from "../../utils/client.js";
 import type { CommandError, CommandOptions } from "../../output/index.js";
 
@@ -31,7 +31,7 @@ export async function connectWorkspaceScriptClient(target: DaemonTarget): Promis
     throw {
       code: "DAEMON_NOT_RUNNING",
       message: `Cannot connect to daemon at ${daemonHost}: ${message}`,
-      details: "Start the daemon with: paseo daemon start",
+      details: "Start the daemon with: clisbot daemon start",
     } satisfies CommandError;
   }
 }
@@ -61,8 +61,8 @@ export async function resolveWorkspaceScriptWorkspaceId(
   }
   throw {
     code: "WORKSPACE_NOT_FOUND",
-    message: `No Paseo workspace found for ${cwd}`,
-    details: "Open the directory in Paseo first, or pass --workspace <workspace-id>.",
+    message: `No Clisbot workspace found for ${cwd}`,
+    details: "Open the directory in Clisbot first, or pass --workspace <workspace-id>.",
   } satisfies CommandError;
 }
 

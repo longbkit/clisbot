@@ -86,7 +86,7 @@ async function createSplitPlugin(): Promise<{
 }> {
   // Keep the platform's original spelling (including Windows short names) in symlink
   // targets. Only diagnostic expectations use canonical paths.
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-compiler-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-compiler-"));
   temporaryDirectories.push(directory);
   await Promise.all([
     mkdir(path.join(directory, "client")),
@@ -133,7 +133,7 @@ export default function contribute(server) {
 }
 
 async function createRootAlias(directory: string): Promise<string> {
-  const aliases = await mkdtemp(path.join(tmpdir(), "paseo-plugin-root-alias-"));
+  const aliases = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-root-alias-"));
   temporaryDirectories.push(aliases);
   const rootAlias = path.join(aliases, "plugin");
   await symlink(directory, rootAlias, process.platform === "win32" ? "junction" : "dir");
@@ -142,11 +142,11 @@ async function createRootAlias(directory: string): Promise<string> {
 
 describe("plugin runtime entries", () => {
   it.each([
-    'import type { AgentTimelineItem, ToolCallDetail } from "@getpaseo/protocol/agent-types"; export type Detail = ToolCallDetail; export type Item = AgentTimelineItem;',
-    'import { type AgentTimelineItem } from "@getpaseo/protocol/agent-types"; export type Item = AgentTimelineItem;',
-    'export type { AgentTimelineItem } from "@getpaseo/protocol/agent-types";',
-    'export type Item = import("@getpaseo/protocol/agent-types").AgentTimelineItem;',
-    'export type { AgentAttachment } from "@getpaseo/protocol/messages";',
+    'import type { AgentTimelineItem, ToolCallDetail } from "@clisbot/protocol/agent-types"; export type Detail = ToolCallDetail; export type Item = AgentTimelineItem;',
+    'import { type AgentTimelineItem } from "@clisbot/protocol/agent-types"; export type Item = AgentTimelineItem;',
+    'export type { AgentTimelineItem } from "@clisbot/protocol/agent-types";',
+    'export type Item = import("@clisbot/protocol/agent-types").AgentTimelineItem;',
+    'export type { AgentAttachment } from "@clisbot/protocol/messages";',
   ])("compiles protocol types without local dependencies: %s", async (typeSource) => {
     const entries = await createSplitPlugin();
     await writeFile(
@@ -158,19 +158,19 @@ describe("plugin runtime entries", () => {
 
     expect(result.clientBundle).toContain("Client contribution");
     expect(result.serverBundle).toContain("Server contribution");
-    expect(result.clientBundle).not.toContain("@getpaseo/protocol");
-    expect(result.serverBundle).not.toContain("@getpaseo/protocol");
+    expect(result.clientBundle).not.toContain("@clisbot/protocol");
+    expect(result.serverBundle).not.toContain("@clisbot/protocol");
   });
 
   it("still requires local dependencies for protocol runtime imports", async () => {
     const entries = await createSplitPlugin();
     await writeFile(
       entries.server,
-      'import { TOOL_CALL_ICON_NAMES } from "@getpaseo/protocol/agent-types"; export default () => TOOL_CALL_ICON_NAMES;',
+      'import { TOOL_CALL_ICON_NAMES } from "@clisbot/protocol/agent-types"; export default () => TOOL_CALL_ICON_NAMES;',
     );
 
     await expect(compilePlugin(entries)).rejects.toThrow(
-      'Could not resolve "@getpaseo/protocol/agent-types"',
+      'Could not resolve "@clisbot/protocol/agent-types"',
     );
   });
 
@@ -190,8 +190,8 @@ describe("plugin runtime entries", () => {
     "react",
     "react/jsx-runtime",
     "react-native",
-    "@getpaseo/plugin/client",
-    "@getpaseo/plugin/client/ui",
+    "@clisbot/plugin/client",
+    "@clisbot/plugin/client/ui",
   ])("rejects %s from server code", async (specifier) => {
     const entries = await createSplitPlugin();
     await writeFile(
@@ -202,9 +202,9 @@ describe("plugin runtime entries", () => {
   });
 
   it.each([
-    "@getpaseo/plugin/server",
-    "@getpaseo/plugin/server/provider",
-    "@getpaseo/plugin/server/acp",
+    "@clisbot/plugin/server",
+    "@clisbot/plugin/server/provider",
+    "@clisbot/plugin/server/acp",
   ])("rejects %s from client code", async (specifier) => {
     const entries = await createSplitPlugin();
     await writeFile(
@@ -218,8 +218,8 @@ describe("plugin runtime entries", () => {
     "react",
     "node:fs",
     "fs",
-    "@getpaseo/plugin/client",
-    "@getpaseo/plugin/server",
+    "@clisbot/plugin/client",
+    "@clisbot/plugin/server",
     "../client/surface",
     "../server/handler",
   ])("rejects %s from shared code", async (specifier) => {
@@ -234,7 +234,7 @@ describe("plugin runtime entries", () => {
   it.each([
     { target: "client", dependency: "react" },
     { target: "server", dependency: "node:fs" },
-    { target: "server", dependency: "@getpaseo/plugin/server/provider" },
+    { target: "server", dependency: "@clisbot/plugin/server/provider" },
   ] as const)(
     "rejects a shared dependency reaching $dependency in the $target bundle",
     async ({ target, dependency }) => {
@@ -260,10 +260,10 @@ describe("plugin runtime entries", () => {
   );
 
   it.each([
-    'import type { PluginClientContext } from "@getpaseo/plugin/client"; export type Context = PluginClientContext;',
-    'export type { PluginClientContext } from "@getpaseo/plugin/client";',
-    'export type Context = import("@getpaseo/plugin/client").PluginClientContext;',
-    'import { type PluginClientContext } from "@getpaseo/plugin/client"; export type Context = PluginClientContext;',
+    'import type { PluginClientContext } from "@clisbot/plugin/client"; export type Context = PluginClientContext;',
+    'export type { PluginClientContext } from "@clisbot/plugin/client";',
+    'export type Context = import("@clisbot/plugin/client").PluginClientContext;',
+    'import { type PluginClientContext } from "@clisbot/plugin/client"; export type Context = PluginClientContext;',
     'import type { ComponentType } from "react"; export type Component = ComponentType;',
   ])("rejects runtime-owned types in shared code: %s", async (typeSource) => {
     const entries = await createSplitPlugin();
@@ -374,7 +374,7 @@ export type Value = string;`,
       );
       await writeFile(
         referencedFile,
-        'export type { PluginClientContext } from "@getpaseo/plugin/client";',
+        'export type { PluginClientContext } from "@clisbot/plugin/client";',
       );
       await writeFile(
         path.join(entries.directory, "shared/labels.ts"),
@@ -425,16 +425,16 @@ export type Value = string;`,
     });
     await writeFile(
       path.join(entries.directory, "shared/types.ts"),
-      'export type { PluginClientContext as Value } from "@getpaseo/plugin/client";',
+      'export type { PluginClientContext as Value } from "@clisbot/plugin/client";',
     );
     await expect(compilePlugin(entries)).rejects.toThrow("plugin shared");
   });
 
   it.each([
-    { specifier: "@getpaseo/plugin/client", importKind: "import type" },
-    { specifier: "@getpaseo/plugin/server", importKind: "import type" },
-    { specifier: "@getpaseo/plugin/client", importKind: "import" },
-    { specifier: "@getpaseo/plugin/server", importKind: "import" },
+    { specifier: "@clisbot/plugin/client", importKind: "import type" },
+    { specifier: "@clisbot/plugin/server", importKind: "import type" },
+    { specifier: "@clisbot/plugin/client", importKind: "import" },
+    { specifier: "@clisbot/plugin/server", importKind: "import" },
   ])(
     "rejects transitive declaration dependencies on $specifier through $importKind",
     async ({ specifier, importKind }) => {
@@ -467,7 +467,7 @@ export type Value = string;`,
     const entries = await createSplitPlugin();
     await writeFile(
       path.join(entries.directory, "shared/types.ts"),
-      'export type { PluginClientContext } from "@getpaseo/plugin/client";',
+      'export type { PluginClientContext } from "@clisbot/plugin/client";',
     );
     await writeFile(
       path.join(entries.directory, "shared/labels.ts"),
@@ -477,12 +477,12 @@ export type Value = string;`,
   });
 
   it.each([
-    "@paseo/plugin",
-    "@getpaseo/plugin/react-native",
-    "@getpaseo/plugin/ui",
-    "@getpaseo/plugin/provider",
-    "@getpaseo/plugin/acp",
-    "@getpaseo/plugin/host",
+    "@clisbot/plugin",
+    "@clisbot/plugin/react-native",
+    "@clisbot/plugin/ui",
+    "@clisbot/plugin/provider",
+    "@clisbot/plugin/acp",
+    "@clisbot/plugin/host",
   ])("rejects retired entry %s", async (specifier) => {
     const entries = await createSplitPlugin();
     await writeFile(
@@ -716,7 +716,7 @@ export default function contribute() { void value; return () => undefined; }`,
   });
 
   it("rejects relative imports that escape the plugin root", async () => {
-    const parent = await mkdtemp(path.join(tmpdir(), "paseo-plugin-compiler-parent-"));
+    const parent = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-compiler-parent-"));
     temporaryDirectories.push(parent);
     const pluginDirectory = path.join(parent, "plugin");
     const server = path.join(pluginDirectory, "index.server.ts");
@@ -737,7 +737,7 @@ export default function contribute() { void secret; return () => undefined; }`,
 
   it("rejects absolute imports from outside the plugin root", async () => {
     const entries = await createSplitPlugin();
-    const outsideDirectory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-outside-"));
+    const outsideDirectory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-outside-"));
     temporaryDirectories.push(outsideDirectory);
     const outside = path.join(outsideDirectory, "secret.ts");
     await writeFile(outside, `export const secret = "outside";`);
@@ -753,7 +753,7 @@ export default function contribute() { void secret; return () => undefined; }`,
   });
 
   it("rejects plugin-authored relative imports that escape into node_modules", async () => {
-    const parent = await mkdtemp(path.join(tmpdir(), "paseo-plugin-node-modules-parent-"));
+    const parent = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-node-modules-parent-"));
     temporaryDirectories.push(parent);
     const pluginDirectory = path.join(parent, "plugin");
     const server = path.join(pluginDirectory, "index.server.ts");
@@ -970,7 +970,7 @@ export default function contribute() { void handler; return () => undefined; }`,
 
   it("allows linked dependencies to resolve within their own package root", async () => {
     const entries = await createSplitPlugin();
-    const linkedPackage = await mkdtemp(path.join(tmpdir(), "paseo-plugin-linked-dependency-"));
+    const linkedPackage = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-linked-dependency-"));
     temporaryDirectories.push(linkedPackage);
     await mkdir(path.join(entries.directory, "node_modules"));
     await Promise.all([
@@ -1031,7 +1031,7 @@ export default function contribute() { void secret; return () => undefined; }`,
 
   it("does not let remembered linked roots hide plugin-local runtime boundaries", async () => {
     const entries = await createSplitPlugin();
-    const linkedPackage = await mkdtemp(path.join(tmpdir(), "paseo-plugin-linked-boundary-"));
+    const linkedPackage = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-linked-boundary-"));
     temporaryDirectories.push(linkedPackage);
     await mkdir(path.join(entries.directory, "node_modules"));
     await Promise.all([
@@ -1101,14 +1101,14 @@ it("preserves esbuild diagnostics across the compiler boundary", async () => {
 
 it("preserves manifest validation errors across the compiler boundary", async () => {
   const { directory } = await createSplitPlugin();
-  await writeFile(path.join(directory, "paseo-plugin.json"), JSON.stringify({ id: 42 }));
+  await writeFile(path.join(directory, "clisbot-plugin.json"), JSON.stringify({ id: 42 }));
   const error = await compileDirectoryPlugin(directory, "0.13.2").catch((cause: unknown) => cause);
   expect(error).toBeInstanceOf(ZodError);
   expect(error).toMatchObject({
     name: "ZodError",
     issues: [expect.objectContaining({ path: ["id"], code: "invalid_type" })],
   });
-  await writeFile(path.join(directory, "paseo-plugin.json"), "{");
+  await writeFile(path.join(directory, "clisbot-plugin.json"), "{");
   await expect(compileDirectoryPlugin(directory, "0.13.2")).rejects.toBeInstanceOf(SyntaxError);
 });
 

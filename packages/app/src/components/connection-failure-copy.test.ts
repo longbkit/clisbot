@@ -29,10 +29,10 @@ function failure(message: string) {
 
 describe("direct connection failure copy", () => {
   it.each([
-    "paseo-qa-nonexistent.invalid",
-    "ssl-paseo-qa.invalid",
-    "tls-paseo-qa.invalid",
-    "certificate-paseo-qa.invalid",
+    "clisbot-qa-nonexistent.invalid",
+    "ssl-clisbot-qa.invalid",
+    "tls-clisbot-qa.invalid",
+    "certificate-clisbot-qa.invalid",
   ])(
     "identifies Android DNS failures for %s without treating the hostname as TLS evidence",
     (host) => {
@@ -74,7 +74,7 @@ describe("direct connection failure copy", () => {
     const message = "Invalid daemon password";
     expect(
       buildConnectionFailureCopy({
-        endpoint: "example.test:6767",
+        endpoint: "example.test:6868",
         error: new DaemonConnectionTestError(message, {
           reason: message,
           lastError: message,

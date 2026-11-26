@@ -1,4 +1,4 @@
-import type { ProviderUpdateCheck } from "@getpaseo/plugin/server/provider";
+import type { ProviderUpdateCheck } from "@clisbot/plugin/server/provider";
 import { z } from "zod";
 
 /** What a Muse update channel publishes; the launcher installs `version` when it differs. */

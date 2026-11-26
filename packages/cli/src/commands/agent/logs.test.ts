@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentTimelineItem } from "@getpaseo/protocol/agent-types";
+import type { AgentTimelineItem } from "@clisbot/protocol/agent-types";
 import {
   createFollowJsonWriter,
   createFollowTranscriptWriter,
@@ -33,11 +33,11 @@ describe("createFollowTranscriptWriter", () => {
 
   it("keeps a word that arrives split across fragments intact", () => {
     const output = collect([
-      { type: "assistant_message", text: "the paseo-pr", messageId: "msg_1" },
+      { type: "assistant_message", text: "the clisbot-pr", messageId: "msg_1" },
       { type: "assistant_message", text: "-cycle label\n", messageId: "msg_1" },
     ]);
 
-    expect(output).toBe("the paseo-pr-cycle label\n");
+    expect(output).toBe("the clisbot-pr-cycle label\n");
   });
 
   it("streams text as it arrives without inventing a line break", () => {
@@ -75,7 +75,7 @@ describe("createFollowTranscriptWriter", () => {
     const items: AgentTimelineItem[] = [
       {
         type: "assistant_message",
-        text: "Plan for paseo-pr",
+        text: "Plan for clisbot-pr",
         messageId: "msg_1",
       },
       {

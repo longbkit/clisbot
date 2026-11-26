@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchUsage, discover } from "./usage.js";
 import { inputSchema, type UsageInput } from "../shared/input.js";
-import { hashAccountKey, type UsageReport } from "@getpaseo/plugin/server/usage";
+import { hashAccountKey, type UsageReport } from "@clisbot/plugin/server/usage";
 
 function credentialInput(directory: string): UsageInput {
   return { route: { store: "claude", path: join(directory, ".credentials.json") } };
@@ -228,7 +228,7 @@ describe("usage bars escalate as they fill", () => {
   let claudeHome: string;
 
   beforeEach(() => {
-    claudeHome = mkdtempSync(join(tmpdir(), "paseo-tone-claude-"));
+    claudeHome = mkdtempSync(join(tmpdir(), "clisbot-tone-claude-"));
   });
 
   afterEach(() => {
@@ -271,7 +271,7 @@ describe("Claude usage source scoped weekly limits", () => {
   let claudeHome: string;
 
   beforeEach(() => {
-    claudeHome = mkdtempSync(join(tmpdir(), "paseo-claude-limits-"));
+    claudeHome = mkdtempSync(join(tmpdir(), "clisbot-claude-limits-"));
   });
 
   afterEach(() => {
@@ -450,7 +450,7 @@ describe("Claude usage source scoped limit reconciliation", () => {
   let claudeHome: string;
 
   beforeEach(() => {
-    claudeHome = mkdtempSync(join(tmpdir(), "paseo-claude-matrix-"));
+    claudeHome = mkdtempSync(join(tmpdir(), "clisbot-claude-matrix-"));
   });
 
   afterEach(() => {

@@ -7,7 +7,7 @@ import {
   ForgeSearchKind,
   type ForgeSearchResponse,
   type GitHubSearchResponse,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import { i18n } from "@/i18n/i18next";
 import { useFetchQuery } from "@/data/query";
 import { parseForgeAuthState } from "@/git/forge";

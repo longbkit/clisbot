@@ -4,7 +4,7 @@ import type {
   ComboboxProps,
   SelectProps,
   ToggleProps,
-} from "@getpaseo/plugin/client/ui";
+} from "@clisbot/plugin/client/ui";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {

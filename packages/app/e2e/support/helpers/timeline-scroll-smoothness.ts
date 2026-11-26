@@ -251,7 +251,9 @@ export async function openOnlyTimelineTail(
   newestPrompt: string,
   pages: TimelinePage[],
 ): Promise<void> {
-  await page.addInitScript(() => Reflect.set(globalThis, "__PASEO_RENDER_PROFILE_ENABLED__", true));
+  await page.addInitScript(() =>
+    Reflect.set(globalThis, "__CLISBOT_RENDER_PROFILE_ENABLED__", true),
+  );
   await openAgentTimeline(page, agent);
   await expectTimelinePromptVisible(page, newestPrompt.trim());
   await expect
@@ -383,7 +385,7 @@ export async function recordUpwardTraversal(
       },
     };
     Reflect.set(window, "__timelineScrollRecording", recording);
-    const reset = Reflect.get(window, "__PASEO_RESET_RENDER_PROFILE__");
+    const reset = Reflect.get(window, "__CLISBOT_RESET_RENDER_PROFILE__");
     if (typeof reset === "function") reset();
     sample();
   });
@@ -485,7 +487,7 @@ export async function reportScrollJumps(
   pages: TimelinePage[],
 ): Promise<void> {
   const jumps = findScrollJumps(frames);
-  const react = await page.evaluate(() => Reflect.get(window, "__PASEO_RENDER_PROFILE__") ?? []);
+  const react = await page.evaluate(() => Reflect.get(window, "__CLISBOT_RENDER_PROFILE__") ?? []);
   const gaps = frames
     .slice(1)
     .map((frame, index) => frame.at - frames[index].at)
@@ -551,7 +553,7 @@ async function traceScrollIfRequested(
   testInfo: TestInfo,
   cadence: Cadence,
 ): Promise<() => Promise<void>> {
-  if (process.env.PASEO_TIMELINE_SCROLL_TRACE !== cadence.name) return async () => {};
+  if (process.env.CLISBOT_TIMELINE_SCROLL_TRACE !== cadence.name) return async () => {};
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Tracing.start", {
     categories:

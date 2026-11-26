@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import { render } from "../../output/index.js";
 import { buildAgentLsFetchOptions, listAgents } from "./ls.js";
 

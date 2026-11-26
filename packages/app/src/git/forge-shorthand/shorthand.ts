@@ -1,4 +1,4 @@
-import type { ForgeWeb } from "@getpaseo/protocol/messages";
+import type { ForgeWeb } from "@clisbot/protocol/messages";
 import type { ForgeReferenceSigil } from "@/git/client-forge-module";
 import { forgeFromRemoteUrl } from "@/git/forge";
 import { getClientForgeLogicModule } from "@/git/forges";

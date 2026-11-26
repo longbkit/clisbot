@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ReactElement } from "react";
-import type { AgentProfile } from "@getpaseo/protocol/messages";
+import type { AgentProfile } from "@clisbot/protocol/messages";
 import { AgentProfileEditModal } from "./settings/agent-profile-edit-modal";
 import { generateAgentProfileId } from "./internal/profile-id";
 import type { AgentProfileSeed, AgentProfileValue } from "./internal/profile-form-model";

@@ -1,4 +1,4 @@
-import type { SpeechSettings, SpeechSettingsPatch } from "@getpaseo/protocol/speech/rpc-schemas";
+import type { SpeechSettings, SpeechSettingsPatch } from "@clisbot/protocol/speech/rpc-schemas";
 
 import {
   PersistedConfigSchema,
@@ -23,15 +23,15 @@ export interface SpeechSettingsOwner {
 }
 
 export function createSpeechSettingsOwner(params: {
-  paseoHome: string;
+  clisbotHome: string;
   env: NodeJS.ProcessEnv;
   speechService: Pick<SpeechService, "reconfigure">;
 }): SpeechSettingsOwner {
-  const { paseoHome, env, speechService } = params;
+  const { clisbotHome, env, speechService } = params;
   return {
     read: (persisted) => readSpeechSettings(persisted, env),
     apply: (persisted) => {
-      const resolved = resolveSpeechConfig({ paseoHome, env, persisted });
+      const resolved = resolveSpeechConfig({ clisbotHome, env, persisted });
       speechService.reconfigure({ openaiConfig: resolved.openai, speechConfig: resolved.speech });
     },
   };
@@ -47,10 +47,10 @@ export function readSpeechSettings(persisted: PersistedConfig, env: NodeJS.Proce
     const name = names.find((candidate) => env[candidate]?.trim());
     if (name) envOverrides[path] = name;
   };
-  recordOverride("features.dictation.enabled", ["PASEO_DICTATION_ENABLED"]);
-  recordOverride("features.voiceMode.enabled", ["PASEO_VOICE_MODE_ENABLED"]);
+  recordOverride("features.dictation.enabled", ["CLISBOT_DICTATION_ENABLED"]);
+  recordOverride("features.voiceMode.enabled", ["CLISBOT_VOICE_MODE_ENABLED"]);
   recordOverride("features.voiceMode.turnDetection.provider", [
-    "PASEO_VOICE_TURN_DETECTION_PROVIDER",
+    "CLISBOT_VOICE_TURN_DETECTION_PROVIDER",
   ]);
 
   function readSite(
@@ -69,8 +69,8 @@ export function readSpeechSettings(persisted: PersistedConfig, env: NodeJS.Proce
     if (kind === "stt") {
       const languageVars =
         path === "features.dictation.stt"
-          ? ["PASEO_DICTATION_LANGUAGE"]
-          : ["PASEO_VOICE_LANGUAGE", "PASEO_DICTATION_LANGUAGE"];
+          ? ["CLISBOT_DICTATION_LANGUAGE"]
+          : ["CLISBOT_VOICE_LANGUAGE", "CLISBOT_DICTATION_LANGUAGE"];
       recordOverride(`${path}.language`, languageVars);
     }
     if (provider === "openai") {
@@ -88,8 +88,8 @@ export function readSpeechSettings(persisted: PersistedConfig, env: NodeJS.Proce
         recordOverride(`${path}.confidenceThreshold`, ["STT_CONFIDENCE_THRESHOLD"]);
       } else recordOverride(`${path}.voice`, ["TTS_VOICE"]);
     } else if (kind === "tts") {
-      recordOverride(`${path}.speakerId`, ["PASEO_VOICE_LOCAL_TTS_SPEAKER_ID"]);
-      recordOverride(`${path}.speed`, ["PASEO_VOICE_LOCAL_TTS_SPEED"]);
+      recordOverride(`${path}.speakerId`, ["CLISBOT_VOICE_LOCAL_TTS_SPEAKER_ID"]);
+      recordOverride(`${path}.speed`, ["CLISBOT_VOICE_LOCAL_TTS_SPEED"]);
     }
     return {
       ...fields,
@@ -109,8 +109,8 @@ export function readSpeechSettings(persisted: PersistedConfig, env: NodeJS.Proce
           providers.dictationStt.provider,
           "features.dictation.stt",
           "stt",
-          "PASEO_DICTATION_STT_PROVIDER",
-          "PASEO_DICTATION_LOCAL_STT_MODEL",
+          "CLISBOT_DICTATION_STT_PROVIDER",
+          "CLISBOT_DICTATION_LOCAL_STT_MODEL",
         ),
       },
       voiceMode: {
@@ -129,16 +129,16 @@ export function readSpeechSettings(persisted: PersistedConfig, env: NodeJS.Proce
           providers.voiceStt.provider,
           "features.voiceMode.stt",
           "stt",
-          "PASEO_VOICE_STT_PROVIDER",
-          "PASEO_VOICE_LOCAL_STT_MODEL",
+          "CLISBOT_VOICE_STT_PROVIDER",
+          "CLISBOT_VOICE_LOCAL_STT_MODEL",
         ),
         tts: readSite(
           voiceMode?.tts,
           providers.voiceTts.provider,
           "features.voiceMode.tts",
           "tts",
-          "PASEO_VOICE_TTS_PROVIDER",
-          "PASEO_VOICE_LOCAL_TTS_MODEL",
+          "CLISBOT_VOICE_TTS_PROVIDER",
+          "CLISBOT_VOICE_LOCAL_TTS_MODEL",
         ),
       },
     },

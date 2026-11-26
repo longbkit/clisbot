@@ -1,4 +1,4 @@
-export const BROWSER_NEW_TAB_REQUEST_EVENT = "paseo:event:browser-new-tab-request";
+export const BROWSER_NEW_TAB_REQUEST_EVENT = "clisbot:event:browser-new-tab-request";
 
 export type BrowserWindowOpenDisposition =
   | "default"

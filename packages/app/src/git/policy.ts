@@ -6,7 +6,7 @@ import type {
   CheckoutPrMergeMethod,
   CheckoutStatusResponse,
   PullRequestMergeable,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 
 import type { MergeCapability } from "./merge-capability";
 
@@ -82,18 +82,18 @@ type CheckoutStatusPayload = CheckoutStatusResponse["payload"];
 export type GitUpstreamState = NonNullable<CheckoutStatusPayload["upstreamState"]>;
 
 export function readUpstreamState(
-  status: Pick<CheckoutStatusPayload, "upstreamState" | "aheadOfOrigin" | "isPaseoOwnedWorktree">,
+  status: Pick<CheckoutStatusPayload, "upstreamState" | "aheadOfOrigin" | "isClisbotOwnedWorktree">,
 ): GitUpstreamState {
   if (status.upstreamState !== undefined) {
     return status.upstreamState;
   }
   // COMPAT(checkoutUpstreamState): added in v0.17.4, remove after 2027-05-23 once the daemon
   // floor reports upstreamState. Older daemons send a null upstream for both a never-pushed and
-  // a deleted remote branch. Only a Paseo worktree's null was trusted as never pushed.
+  // a deleted remote branch. Only a Clisbot worktree's null was trusted as never pushed.
   if (status.aheadOfOrigin !== null) {
     return "tracked";
   }
-  return status.isPaseoOwnedWorktree ? "none" : "unknown";
+  return status.isClisbotOwnedWorktree ? "none" : "unknown";
 }
 
 export interface BuildGitActionsInput {
@@ -115,7 +115,7 @@ export interface BuildGitActionsInput {
   /** The daemon confirmed where a first push publishes the branch. */
   hasFirstPushRemote: boolean;
   upstream: GitUpstreamState;
-  isPaseoOwnedWorktree: boolean;
+  isClisbotOwnedWorktree: boolean;
   isOnBaseBranch: boolean;
   canMergeLocally: boolean;
   hasUncommittedChanges: boolean;
@@ -409,9 +409,9 @@ function getPrimaryActionId(input: BuildGitActionsInput): GitActionId | null {
     return "pr";
   }
 
-  // Only Paseo-owned worktrees get Archive as a fallback primary action.
+  // Only Clisbot-owned worktrees get Archive as a fallback primary action.
   // Regular Git checkouts should not show the destructive archive CTA by default.
-  if (input.isPaseoOwnedWorktree) {
+  if (input.isClisbotOwnedWorktree) {
     return "archive-workspace";
   }
 
@@ -585,16 +585,16 @@ function hasPushableCommits(input: BuildGitActionsInput): boolean {
       return (input.aheadOfOrigin ?? 0) > 0;
     case "none":
       // A first push, which sets the upstream. The commits to send are the ones ahead of the base.
-      // Paseo worktrees always publish to origin. A regular checkout publishes only where the
+      // Clisbot worktrees always publish to origin. A regular checkout publishes only where the
       // daemon confirmed Git would push the branch too, so a fork setup is not sent to origin.
-      return input.aheadCount > 0 && (input.isPaseoOwnedWorktree || input.hasFirstPushRemote);
+      return input.aheadCount > 0 && (input.isClisbotOwnedWorktree || input.hasFirstPushRemote);
     case "gone":
     case "unknown":
       // The branch has an upstream that is deleted or unreadable, so nothing counts the commits
-      // left to send. Paseo worktrees publish whenever the branch is ahead of its base, for
+      // left to send. Clisbot worktrees publish whenever the branch is ahead of its base, for
       // example after a merged PR. Regular checkouts do not: Push would re-create a branch that
       // was deleted.
-      return input.isPaseoOwnedWorktree && input.aheadCount > 0;
+      return input.isClisbotOwnedWorktree && input.aheadCount > 0;
   }
 }
 

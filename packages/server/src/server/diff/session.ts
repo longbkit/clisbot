@@ -1,10 +1,10 @@
 import type { Logger } from "pino";
-import { encodeDiffFrame } from "@getpaseo/protocol/binary-frames/index";
+import { encodeDiffFrame } from "@clisbot/protocol/binary-frames/index";
 import type {
   DiffSubscribeRequest,
   SessionOutboundMessage,
   DiffError,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import type { SessionDelivery, OwnedSubscription } from "../session/owned-subscriptions/index.js";
 import { DiffReadError } from "./git.js";
 import type { DiffSubscriptions, DiffSubscription } from "./index.js";

@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import type { ProviderEvent } from "@getpaseo/plugin/server/provider";
+import type { ProviderEvent } from "@clisbot/plugin/server/provider";
 import { afterEach, describe, expect, it } from "vitest";
 import { createAntigravityProvider } from "./provider.js";
 
@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 async function launchAgent(source: string) {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-antigravity-acp-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-antigravity-acp-"));
   directories.push(directory);
   const executable = path.join(directory, "agy.cjs");
   await writeFile(executable, source);
@@ -349,8 +349,8 @@ const completedToolCalls = [
     rawInput: { query: "IANA example domains" },
   },
   {
-    toolCallId: "paseo",
-    name: "mcp_paseo_send_agent_prompt",
+    toolCallId: "clisbot",
+    name: "mcp_clisbot_send_agent_prompt",
     kind: "other",
     rawInput: { agentId: "agent-1", prompt: "Hello", toolSummary: "Send message" },
   },
@@ -362,7 +362,7 @@ const completedToolCalls = [
   },
   {
     toolCallId: "ambiguous",
-    name: "mcp_paseo_get_agent_status",
+    name: "mcp_clisbot_get_agent_status",
     kind: "other",
     rawInput: { agentId: "agent-1", toolSummary: "Get agent status" },
   },
@@ -425,7 +425,7 @@ it.each(["live", "replay"] as const)(
           cwd: directory,
           env: {},
           mcpServers: {
-            paseo_get: { type: "stdio", command: "other-server" },
+            clisbot_get: { type: "stdio", command: "other-server" },
             local_tools: { type: "stdio", command: "echo-mcp" },
           },
           settings: {},
@@ -488,18 +488,18 @@ it.each(["live", "replay"] as const)(
         toolName: "web_search",
         query: "IANA example domains",
       });
-      expect(completed.paseo).toMatchObject({
-        name: "paseo.send_agent_prompt",
+      expect(completed.clisbot).toMatchObject({
+        name: "clisbot.send_agent_prompt",
         detail: { type: "unknown", input: { agentId: "agent-1", prompt: "Hello" }, output: null },
       });
-      expect(completed.paseo.detail).not.toHaveProperty("input.toolSummary");
+      expect(completed.clisbot.detail).not.toHaveProperty("input.toolSummary");
       expect(completed.mcp).toMatchObject({
         name: "local_tools.echo_message",
         detail: { type: "unknown", input: { message: "hello" }, output: null },
       });
       expect(completed.mcp.detail).not.toHaveProperty("input.toolSummary");
       expect(completed.ambiguous).toMatchObject({
-        name: "mcp_paseo_get_agent_status",
+        name: "mcp_clisbot_get_agent_status",
         detail: { type: "unknown", input: { agentId: "agent-1" }, output: null },
       });
       if (source === "live") {

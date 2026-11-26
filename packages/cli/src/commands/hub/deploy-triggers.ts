@@ -2,7 +2,7 @@ import { lstat, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { HubCommandError } from "./error.js";
 
-const TRIGGER_DIRECTORY = ".paseo/triggers";
+const TRIGGER_DIRECTORY = ".clisbot/triggers";
 
 export interface HubDeployTrigger {
   path: string;
@@ -12,11 +12,11 @@ export interface HubDeployTrigger {
 export async function discoverHubTriggers(cwd: string): Promise<HubDeployTrigger[]> {
   const root = path.resolve(cwd);
   const directory = path.join(root, TRIGGER_DIRECTORY);
-  const paseoDirectory = await readStats(path.join(root, ".paseo"), {
+  const clisbotDirectory = await readStats(path.join(root, ".clisbot"), {
     code: "HUB_TRIGGER_DIRECTORY_MISSING",
     message: `${TRIGGER_DIRECTORY} does not exist. Run this command from the project root.`,
   });
-  if (paseoDirectory.isSymbolicLink()) throw unsafeTriggerPath(TRIGGER_DIRECTORY);
+  if (clisbotDirectory.isSymbolicLink()) throw unsafeTriggerPath(TRIGGER_DIRECTORY);
   const directoryStats = await readTriggerDirectoryStats(root, directory);
   if (directoryStats.isSymbolicLink()) throw unsafeTriggerPath(TRIGGER_DIRECTORY);
   if (!directoryStats.isDirectory()) {
@@ -76,7 +76,7 @@ async function readTriggerDirectoryStats(
     if (await legacyBundleExists(root)) {
       throw new HubCommandError(
         "HUB_PROJECT_REQUIRED",
-        "This directory contains a legacy .paseo/hub.yml bundle. Pass --project <slug> to deploy it.",
+        "This directory contains a legacy .clisbot/hub.yml bundle. Pass --project <slug> to deploy it.",
       );
     }
     throw new HubCommandError(
@@ -88,12 +88,12 @@ async function readTriggerDirectoryStats(
 
 async function legacyBundleExists(root: string): Promise<boolean> {
   try {
-    await lstat(path.join(root, ".paseo/hub.yml"));
+    await lstat(path.join(root, ".clisbot/hub.yml"));
     return true;
   } catch (error) {
     if (errorCode(error) === "ENOENT") return false;
     if (!isExpectedReadError(error)) throw error;
-    throw unreadableTriggerPath(".paseo/hub.yml");
+    throw unreadableTriggerPath(".clisbot/hub.yml");
   }
 }
 

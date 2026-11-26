@@ -18,7 +18,7 @@ import type {
   AgentTimelineItem,
   ToolCallDetail,
 } from "../../../packages/server/src/server/agent/agent-sdk-types.js";
-import { getAgentProviderDefinition } from "@getpaseo/protocol/provider-manifest";
+import { getAgentProviderDefinition } from "@clisbot/protocol/provider-manifest";
 
 export type ScriptStep =
   | { kind: "say"; text: string }

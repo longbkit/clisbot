@@ -8,7 +8,7 @@ import {
   HIGHLIGHT_MAX_SOURCE_BYTES,
   isLanguageSupported,
   type HighlightToken,
-} from "@getpaseo/highlight";
+} from "@clisbot/highlight";
 import { unquoteGitPath } from "../../utils/git-quoted-path.js";
 
 const MAX_DIFF_HIGHLIGHT_LINE_CHARS = 10_000;

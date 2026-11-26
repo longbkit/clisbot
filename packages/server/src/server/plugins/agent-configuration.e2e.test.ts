@@ -6,12 +6,12 @@ import { expect, test } from "vitest";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import type { AgentClient, AgentSessionConfig } from "../agent/agent-sdk-types.js";
 import { createTestAgentClient } from "../test-utils/fake-agent-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
 test("the configuration example saves Codex options and injects launch-only MCP servers while preserving other configuration", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-config-example-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-config-example-"));
   const launches: AgentSessionConfig[] = [];
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     daemonVersion: "0.14.0-beta.1",
     agentClients: {
       codex: createTestAgentClient("codex", {
@@ -74,7 +74,7 @@ test("the configuration example saves Codex options and injects launch-only MCP 
 }, 60_000);
 
 test("session-open entrypoint contributions are optional and rederived for existing agents", async () => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-entrypoint-hook-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-entrypoint-hook-"));
   const launches: { provider: string; env?: Record<string, string> }[] = [];
   function recordingProvider(provider: "claude" | "codex"): AgentClient {
     const inner = createTestAgentClient(provider);
@@ -93,7 +93,7 @@ test("session-open entrypoint contributions are optional and rederived for exist
       },
     };
   }
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     daemonVersion: "0.14.0-beta.2",
     agentClients: { claude: recordingProvider("claude"), codex: recordingProvider("codex") },
     mcpEnabled: false,
@@ -104,8 +104,8 @@ test("session-open entrypoint contributions are optional and rederived for exist
   });
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
-      JSON.stringify({ id: "entrypoint-test", requirements: { paseo: ">=0.14.0-beta.2" } }),
+      path.join(directory, "clisbot-plugin.json"),
+      JSON.stringify({ id: "entrypoint-test", requirements: { clisbot: ">=0.14.0-beta.2" } }),
     );
     await writeFile(
       path.join(directory, "index.server.ts"),

@@ -13,7 +13,7 @@
  * a profile contains, and how it reaches a live agent versus a draft, stays in
  * here.
  */
-export type { AgentProfile } from "@getpaseo/protocol/messages";
+export type { AgentProfile } from "@clisbot/protocol/messages";
 export type { MaterializedAgentProfile } from "./internal/materialize-profile";
 export type { AgentProfileSeed } from "./internal/profile-form-model";
 export { useAgentProfileEditor, type AgentProfileEditorControls } from "./agent-profile-editor";

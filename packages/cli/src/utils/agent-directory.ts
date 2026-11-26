@@ -1,4 +1,4 @@
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import { resolveAgentId, type connectToDaemon } from "./client.js";
 
 type DaemonClient = Awaited<ReturnType<typeof connectToDaemon>>;

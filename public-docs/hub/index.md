@@ -1,6 +1,6 @@
 ---
 title: Hub
-description: Automate coding agents on your Paseo daemons from GitHub, Linear, Slack, Discord, schedules, and webhooks.
+description: Automate coding agents on your Clisbot daemons from GitHub, Linear, Slack, Discord, schedules, and webhooks.
 nav: Overview
 order: 60
 category: Hub
@@ -8,7 +8,7 @@ category: Hub
 
 # Hub
 
-A Paseo daemon runs coding agents on one machine. Paseo Hub sits above your daemons so external events, schedules, and webhooks can start agents on those machines and share the history with your team.
+A Clisbot daemon runs coding agents on one machine. Clisbot Hub sits above your daemons so external events, schedules, and webhooks can start agents on those machines and share the history with your team.
 
 ```text
 GitHub · Linear · Slack · Discord · Schedules · Webhooks
@@ -23,7 +23,7 @@ GitHub · Linear · Slack · Discord · Schedules · Webhooks
 Hub gives your team four things:
 
 - Event-driven agents that start from GitHub, Linear, Slack, Discord, recurring schedules, and inbound webhooks.
-- Triggers you can edit in the browser or store in `.paseo/triggers/*.yml` and deploy from the CLI.
+- Triggers you can edit in the browser or store in `.clisbot/triggers/*.yml` and deploy from the CLI.
 - Scoped integration tools that let any trigger read or post to Slack and Discord or act on GitHub.
 - [Activity](/docs/hub/activity) for recent runs and **Integrations → Known unrouted events** for deliveries that did not start a run.
 
@@ -34,12 +34,12 @@ Your daemons still run agents on your machines with your existing subscriptions,
 You can manage triggers in the Hub dashboard or store each trigger as one YAML file in your repository:
 
 ```text
-.paseo/
+.clisbot/
 └── triggers/
     └── slack-help.yml
 ```
 
-Each file is self-contained. It names the event, allowed senders, target daemon, working directory, agent configuration, prompt, and any tools or reply bounds. Run `paseo hub init` to generate a starter file, or run `paseo hub deploy` to validate and install your triggers.
+Each file is self-contained. It names the event, allowed senders, target daemon, working directory, agent configuration, prompt, and any tools or reply bounds. Run `clisbot hub init` to generate a starter file, or run `clisbot hub deploy` to validate and install your triggers.
 
 ## Reading order
 
@@ -56,6 +56,6 @@ Before giving a trigger access to a working directory, GitHub permissions, or ch
 
 ## Hosted or self-hosted
 
-[Hosted Hub](/docs/hub/hosted) manages the server and provider apps for you. Create a free account at [hub.paseo.sh](https://hub.paseo.sh) with no card and no expiry.
+Clisbot does not run a hosted Hub. Run a personal Hub on your own machine or a Hub your team deploys.
 
-To run Hub on your own machine or server, start with `npx @getpaseo/hub` and an embedded database, then add PostgreSQL or a public HTTPS deployment when you need them. See [Self-hosting](/docs/hub/self-hosting).
+To run Hub on your own machine or server, start with `npx @clisbot/hub` and an embedded database, then add PostgreSQL or a public HTTPS deployment when you need them. See [Self-hosting](/docs/hub/self-hosting).

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // Emit the set of files the daemon and CLI need at runtime, computed by
 // static module-graph tracing (@vercel/nft) from the daemon entry points.
-// Used by nix/package.nix's installPhase to materialize $out/lib/paseo
+// Used by nix/package.nix's installPhase to materialize $out/lib/clisbot
 // with only the bytes the daemon actually loads — no Expo, RN, Metro,
 // Electron, ML stacks, or other non-daemon workspace bloat.
 //
 // Output: newline-separated repo-relative file paths on stdout. The Nix
-// installPhase copies each path to $out/lib/paseo/<path>, preserving the
+// installPhase copies each path to $out/lib/clisbot/<path>, preserving the
 // directory structure node's module resolution expects.
 //
 // Run from the repo root, after `npm run build:server`. Requires
@@ -29,7 +29,7 @@ const { sherpaPlatformPackageName } = await import(
   ).href
 );
 
-const traceDesktop = process.env.PASEO_TRACE_DESKTOP === "1";
+const traceDesktop = process.env.CLISBOT_TRACE_DESKTOP === "1";
 const terminalModule = "packages/server/dist/server/terminal/terminal.js";
 const sherpaModule =
   "packages/server/dist/server/server/speech/providers/local/sherpa/sherpa-onnx-node-loader.js";
@@ -40,14 +40,14 @@ const sherpaEnvModule =
 // paths. Analyze them at their real importer so nft retains the package exports,
 // manifests and workspace symlinks used by Node's resolution.
 const runtimeDependencies = new Map([
-  ["packages/cli/dist/commands/daemon/local-daemon.js", ["@getpaseo/server"]],
-  [terminalModule, ["@getpaseo/cli/bin/paseo", "node-pty/package.json"]],
+  ["packages/cli/dist/commands/daemon/local-daemon.js", ["@clisbot/server"]],
+  [terminalModule, ["@clisbot/cli/bin/clisbot", "node-pty/package.json"]],
   [sherpaModule, ["sherpa-onnx-node"]],
   [sherpaEnvModule, [`${sherpaPlatformPackageName()}/package.json`]],
   ...(traceDesktop
     ? [
-        ["packages/desktop/dist/daemon/runtime-paths.js", ["@getpaseo/server"]],
-        ["packages/desktop/dist/integrations/cli-install/paths.js", ["@getpaseo/cli/bin/paseo"]],
+        ["packages/desktop/dist/daemon/runtime-paths.js", ["@clisbot/server"]],
+        ["packages/desktop/dist/integrations/cli-install/paths.js", ["@clisbot/cli/bin/clisbot"]],
       ]
     : []),
 ]);

@@ -5,10 +5,10 @@ import {
   useHosts,
   useTerminals,
   useTerminal,
-  usePaseo,
+  useClisbot,
   type TerminalRef,
   type PluginSidebarViewProps,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 import { Heading } from "./rows";
 
 class TerminalError extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -28,9 +28,9 @@ function TerminalRow({
   view: PluginSidebarViewProps;
 }) {
   const terminal = useTerminal(reference);
-  const paseo = usePaseo();
-  const focus = useCallback(() => paseo.terminals.ref(reference).focus(), [paseo, reference]);
-  const close = useMutation({ mutationFn: () => paseo.terminals.ref(reference).kill() });
+  const clisbot = useClisbot();
+  const focus = useCallback(() => clisbot.terminals.ref(reference).focus(), [clisbot, reference]);
+  const close = useMutation({ mutationFn: () => clisbot.terminals.ref(reference).kill() });
   const kill = useCallback(() => close.mutate(), [close]);
   const style = useMemo(
     () => ({ color: view.theme.colors.foreground, fontSize: 12, padding: 12 }),

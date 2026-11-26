@@ -111,7 +111,7 @@ export type PublishedPlugin = z.infer<typeof PublishedPluginSchema>;
 export type PublishedPluginDetail = z.infer<typeof PublishedPluginDetailSchema>;
 export type PluginRegistryIndex = z.infer<typeof PluginRegistryIndexSchema>;
 
-export const DEFAULT_PLUGIN_REGISTRY_URL = "https://plugins.paseo.sh";
+export const DEFAULT_PLUGIN_REGISTRY_URL = "https://plugins.clisbot.com";
 
 export function parsePluginRegistryReference(
   source: string,

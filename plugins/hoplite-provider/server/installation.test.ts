@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { ProviderInstallationLaunch } from "@getpaseo/plugin/server/provider";
+import type { ProviderInstallationLaunch } from "@clisbot/plugin/server/provider";
 import { createHopliteInstallation } from "./installation.js";
 
 const temporary: string[] = [];
@@ -14,7 +14,7 @@ afterEach(async () => {
 
 /** A `hoplite` that records its arguments and prints `banner` for `--version`. */
 async function fakeHoplite(banner: string) {
-  const dir = await mkdtemp(path.join(os.tmpdir(), "paseo-hoplite-"));
+  const dir = await mkdtemp(path.join(os.tmpdir(), "clisbot-hoplite-"));
   temporary.push(dir);
   const script = path.join(dir, "hoplite.mjs");
   const record = path.join(dir, "args.json");

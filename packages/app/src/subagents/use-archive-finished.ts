@@ -1,4 +1,4 @@
-import { getParentAddressFromLabels } from "@getpaseo/protocol/agent-labels";
+import { getParentAddressFromLabels } from "@clisbot/protocol/agent-labels";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useArchiveAgent } from "@/hooks/use-archive-agent";
 import { useSessionStore } from "@/stores/session-store";

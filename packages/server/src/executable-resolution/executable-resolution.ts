@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { delimiter, resolve } from "node:path";
-import type { ProcessEnvRecord } from "../server/paseo-env.js";
+import type { ProcessEnvRecord } from "../server/clisbot-env.js";
 import { execCommand } from "../utils/spawn.js";
 import which from "which";
 import { windowsExecutableResolution } from "./windows.js";

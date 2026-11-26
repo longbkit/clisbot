@@ -1,4 +1,4 @@
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import { z } from "zod";
 
 export const PROVIDER_PROTOCOL_VERSION = 1 as const;
@@ -40,7 +40,7 @@ export interface ProviderRegistration {
   description?: string;
   /** Plugin-directory-relative path to a self-contained SVG file. */
   icon?: string;
-  /** http(s) page that helps users set up and troubleshoot the provider. Paseo opens it. */
+  /** http(s) page that helps users set up and troubleshoot the provider. Clisbot opens it. */
   docsUrl?: string;
   /** How users install the provider's CLI and which version they run. Every member is optional. */
   installation?: ProviderInstallation;
@@ -48,7 +48,7 @@ export interface ProviderRegistration {
 }
 
 export interface ProviderInstallation {
-  /** http(s) page that explains how to install the provider. Paseo opens it; it never installs. */
+  /** http(s) page that explains how to install the provider. Clisbot opens it; it never installs. */
   installUrl?: string;
   /** http(s) page that explains how to update the provider. */
   updateUrl?: string;
@@ -56,16 +56,16 @@ export interface ProviderInstallation {
   inspect?(context: ProviderInstallationContext): Promise<ProviderInspection>;
   /**
    * Report whether a newer version than `installedVersion` is available. The provider decides how
-   * to find out and what counts as newer; Paseo shows the result as written. Return `unknown` when
+   * to find out and what counts as newer; Clisbot shows the result as written. Return `unknown` when
    * it cannot tell. Runs only when a user asks, never before a session, and only after `inspect`
-   * reports the provider installed. Paseo reuses the answer while `inspect` reports the same
+   * reports the provider installed. Clisbot reuses the answer while `inspect` reports the same
    * version.
    */
   checkForUpdates?(context: ProviderUpdateCheckContext): Promise<ProviderUpdateCheck>;
   /**
-   * Update the provider, usually by running its CLI's own updater. Paseo shows everything passed
+   * Update the provider, usually by running its CLI's own updater. Clisbot shows everything passed
    * to `report` while it runs, then the returned message. A throw is a failure with its message.
-   * Runs only when a user asks. Paseo sets no deadline; `signal` aborts when the daemon stops.
+   * Runs only when a user asks. Clisbot sets no deadline; `signal` aborts when the daemon stops.
    */
   update?(context: ProviderUpdateContext): Promise<ProviderUpdateResult>;
 }
@@ -100,7 +100,7 @@ export type ProviderUpdateResult = z.infer<typeof ProviderUpdateResultSchema>;
 export interface ProviderInstallationContext {
   /** The launch a session would use. Absent when the provider declares no `command`. */
   launch?: ProviderInstallationLaunch;
-  /** Aborted when Paseo stops waiting for the result. */
+  /** Aborted when Clisbot stops waiting for the result. */
   signal: AbortSignal;
 }
 
@@ -110,7 +110,7 @@ export interface ProviderInstallationLaunch extends ProviderLaunch {
 }
 
 export const ProviderInspectionSchema = z.discriminatedUnion("status", [
-  /** `version` is shown as written and passed to `checkForUpdates`; Paseo does not parse it. */
+  /** `version` is shown as written and passed to `checkForUpdates`; Clisbot does not parse it. */
   z.object({ status: z.literal("installed"), version: z.string().optional() }).strip(),
   z.object({ status: z.literal("not_installed") }).strip(),
 ]);
@@ -119,7 +119,7 @@ export type ProviderInspection = z.infer<typeof ProviderInspectionSchema>;
 
 export const ProviderUpdateCheckSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("current") }).strip(),
-  /** `versions` and `message` are shown as written; Paseo does not parse, sort or compare them. */
+  /** `versions` and `message` are shown as written; Clisbot does not parse, sort or compare them. */
   z
     .object({
       status: z.literal("available"),
@@ -240,7 +240,7 @@ export interface ProviderPrompt {
 
 interface ProviderForgeChangeRequestAttachment {
   type: "forge_change_request";
-  mimeType: "application/paseo-forge-change-request";
+  mimeType: "application/clisbot-forge-change-request";
   forge?: string;
   number: number;
   title: string;
@@ -253,7 +253,7 @@ interface ProviderForgeChangeRequestAttachment {
 
 interface ProviderForgeIssueAttachment {
   type: "forge_issue";
-  mimeType: "application/paseo-forge-issue";
+  mimeType: "application/clisbot-forge-issue";
   forge?: string;
   number: number;
   title: string;
@@ -301,7 +301,7 @@ interface ProviderTextAttachment {
 
 interface ProviderReviewAttachment {
   type: "review";
-  mimeType: "application/paseo-review";
+  mimeType: "application/clisbot-review";
   cwd: string;
   mode: "uncommitted" | "base" | "all";
   baseRef?: string | null;
@@ -411,7 +411,7 @@ export interface ProviderMode {
 }
 
 /**
- * Draws one top-level option key in the composer. The control holds no value: Paseo reads it
+ * Draws one top-level option key in the composer. The control holds no value: Clisbot reads it
  * from the agent's options.
  */
 export type ProviderOptionControl =
@@ -554,7 +554,7 @@ export interface ProviderUsage {
 
 /**
  * One row of provider-owned detail about a session or a turn. Format `value` for
- * reading: Paseo shows it as given.
+ * reading: Clisbot shows it as given.
  */
 export interface ProviderMetric {
   label: string;
@@ -747,7 +747,7 @@ export type ProviderEvent =
       sessionId: string;
       /**
        * Replaces the metrics shown for the session. An empty list clears them. Publish only when
-       * `session.metrics` was negotiated: a Paseo that does not offer it rejects this event.
+       * `session.metrics` was negotiated: a Clisbot that does not offer it rejects this event.
        */
       metrics: readonly ProviderMetric[];
     }
@@ -934,7 +934,7 @@ const providerContentSchema: z.ZodType<ProviderContent> = z.union([
   z
     .object({
       type: z.literal("forge_change_request"),
-      mimeType: z.literal("application/paseo-forge-change-request"),
+      mimeType: z.literal("application/clisbot-forge-change-request"),
       forge: z.string().optional(),
       number: z.number().int().positive(),
       title: z.string(),
@@ -948,7 +948,7 @@ const providerContentSchema: z.ZodType<ProviderContent> = z.union([
   z
     .object({
       type: z.literal("forge_issue"),
-      mimeType: z.literal("application/paseo-forge-issue"),
+      mimeType: z.literal("application/clisbot-forge-issue"),
       forge: z.string().optional(),
       number: z.number().int().positive(),
       title: z.string(),
@@ -992,7 +992,7 @@ const providerContentSchema: z.ZodType<ProviderContent> = z.union([
   z
     .object({
       type: z.literal("review"),
-      mimeType: z.literal("application/paseo-review"),
+      mimeType: z.literal("application/clisbot-review"),
       cwd: z.string(),
       mode: z.enum(["uncommitted", "base", "all"]),
       baseRef: z.string().nullable().optional(),

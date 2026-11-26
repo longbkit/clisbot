@@ -8,7 +8,7 @@ import {
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { matchCommandLink, useAgentCommandHints, type CommandHints } from "@/agent-commands";
 import { useForgeShorthand } from "@/git/forge-shorthand";
-import { pluginOverviewUrl } from "@getpaseo/protocol/plugin-overview";
+import { pluginOverviewUrl } from "@clisbot/protocol/plugin-overview";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { AttachmentLightbox, type ImageLightboxSource } from "@/components/attachment-lightbox";
 import type { Theme } from "@/styles/theme";

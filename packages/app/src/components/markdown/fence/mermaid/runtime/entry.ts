@@ -10,7 +10,7 @@ declare global {
     ReactNativeWebView?: {
       postMessage?: (data: string) => void;
     };
-    __PASEO_MERMAID_RUNTIME_RECEIVE__?: (message: unknown) => void;
+    __CLISBOT_MERMAID_RUNTIME_RECEIVE__?: (message: unknown) => void;
   }
 }
 
@@ -105,7 +105,7 @@ async function render(message: MermaidRuntimeRenderMessage): Promise<void> {
       throw new Error("Missing Mermaid staging container");
     }
     const { svg } = await mermaid.render(
-      `paseo-mermaid-${message.revision}`,
+      `clisbot-mermaid-${message.revision}`,
       message.source,
       staging,
     );
@@ -171,7 +171,7 @@ function receiveRender(value: unknown): void {
   }, 0);
 }
 
-window.__PASEO_MERMAID_RUNTIME_RECEIVE__ = receiveRender;
+window.__CLISBOT_MERMAID_RUNTIME_RECEIVE__ = receiveRender;
 window.addEventListener("message", (event) => {
   if (event.source === window.parent) {
     receiveRender(event.data);

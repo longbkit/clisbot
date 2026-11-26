@@ -35,8 +35,8 @@ const source = [
 
 const wrappingSource = [
   "Measurement parity. Take a repo with a gitignored `.env` in the main checkout and a `.worktreeinclude` containing `.env`.",
-  "Every creation path goes through `createPaseoWorktreeWorkflow` in `worktree-session.ts:341`, before `createAgent` in `creation/index.ts:160-174` starts.",
-  "The built-in plugin lives in `plugins/worktree-include/index.server.ts` and copies `paseo.json` beside `.worktreeinclude`. End of measurement fixture.",
+  "Every creation path goes through `createClisbotWorktreeWorkflow` in `worktree-session.ts:341`, before `createAgent` in `creation/index.ts:160-174` starts.",
+  "The built-in plugin lives in `plugins/worktree-include/index.server.ts` and copies `clisbot.json` beside `.worktreeinclude`. End of measurement fixture.",
 ].join("\n\n");
 
 export default function MarkdownFormattingRegression() {

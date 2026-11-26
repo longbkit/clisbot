@@ -1,4 +1,4 @@
-import type { PaseoApi } from "@getpaseo/client";
+import type { ClisbotApi } from "@clisbot/client";
 import type { ZodType, input as ZodInput, output as ZodOutput } from "zod";
 import type { PluginRpcContract, PluginSubscriptionContract, PluginWireInput } from "../rpc.js";
 import type { PluginCleanup } from "../contracts.js";
@@ -8,7 +8,7 @@ import type { PluginLifecycleRegistration } from "./lifecycle.js";
 import type { WorktreeManagerRegistration } from "./worktree.js";
 
 export interface PluginHandlerContext {
-  paseo: PaseoApi;
+  clisbot: ClisbotApi;
 }
 
 /** What a subscription handler receives beside its input. */

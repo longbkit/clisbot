@@ -9,19 +9,19 @@ import { connectNewWorkspaceDaemonClient } from "./new-workspace";
 import { pluginRequirements } from "./plugin-fixture";
 
 const id = "host-clients";
-const source = `import { useHosts, getPaseoClient, usePaseo } from "@getpaseo/plugin/client";
+const source = `import { useHosts, getClisbotClient, useClisbot } from "@clisbot/plugin/client";
 import { useState } from "react";
 import { View, Text, Pressable } from "react-native";
 export default function contribute(plugin) {
   function Surface() {
     const hosts = useHosts();
-    const selected = usePaseo();
+    const selected = useClisbot();
     const [result, setResult] = useState("");
     const [subscriptionId, setSubscriptionId] = useState("");
     async function read(serverId) {
       setResult("Loading");
       try {
-        const client = serverId ? getPaseoClient(serverId) : selected;
+        const client = serverId ? getClisbotClient(serverId) : selected;
         const { subscriptionId } = await client.agents.list({ subscribe: {} });
         setSubscriptionId(subscriptionId);
         const { config } = await client.config.get();
@@ -29,7 +29,7 @@ export default function contribute(plugin) {
       } catch (error) { setResult(error.message); }
     }
     async function disposeHost(serverId) {
-      await getPaseoClient(serverId).dispose();
+      await getClisbotClient(serverId).dispose();
       setResult("Disposed:" + serverId);
     }
     return <View>
@@ -71,7 +71,7 @@ export async function readHost(page: Page, label: string, result: string) {
 }
 
 export async function installHostClientsScenario(page: Page) {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-hosts-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-hosts-"));
   const primary = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const secondary = await startIsolatedHostDaemon("plugin-hosts-secondary");
   const remote = await connectNewWorkspaceDaemonClient({
@@ -91,7 +91,7 @@ export async function installHostClientsScenario(page: Page) {
   try {
     await remote.patchDaemonConfig({ pluginsEnabled: false });
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({ id, requirements: pluginRequirements }),
     );
     await writeFile(path.join(directory, "index.client.tsx"), source);

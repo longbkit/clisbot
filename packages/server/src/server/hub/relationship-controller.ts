@@ -159,7 +159,7 @@ export interface HubRelationshipRetryPolicy {
 }
 
 export interface HubRelationshipControllerOptions {
-  paseoHome: string;
+  clisbotHome: string;
   hostname: string;
   serverId: string;
   daemonPublicKey: string;
@@ -226,7 +226,7 @@ export class HubRelationshipController implements HubRelationshipManagement {
   private executionAgents: { daemonId: string; value: HubExecutionAgents } | null = null;
 
   constructor(private readonly options: HubRelationshipControllerOptions) {
-    this.filePath = path.join(options.paseoHome, FILE_NAME);
+    this.filePath = path.join(options.clisbotHome, FILE_NAME);
     this.clock = options.clock ?? systemClock;
     this.retryPolicy = options.retryPolicy ?? new BoundedExponentialHubRetryPolicy();
     this.record = this.load();
@@ -521,7 +521,7 @@ export class HubRelationshipController implements HubRelationshipManagement {
     if (generation !== this.generation) return;
     if (code === 4403 && reason === "daemon session permissions do not match enrollment") {
       this.lastError =
-        "Hub and daemon permissions differ. Run `paseo hub permissions grant <permission>` or `paseo hub permissions revoke <permission>` on this daemon to reapply your intended permissions.";
+        "Hub and daemon permissions differ. Run `clisbot hub permissions grant <permission>` or `clisbot hub permissions revoke <permission>` on this daemon to reapply your intended permissions.";
       this.scheduleSocket(true);
       return;
     }

@@ -15,13 +15,13 @@ import type {
 } from "../workspace-git-service.js";
 import type { ForgeService } from "../../services/forge-service.js";
 import type { TerminalManager } from "../../terminal/terminal-manager.js";
-import { isPaseoOwnedWorktreeCwd } from "../../utils/worktree.js";
+import { isClisbotOwnedWorktreeCwd } from "../../utils/worktree.js";
 import type { WorkspaceArchiveContext } from "../workspace-registry.js";
 import type { PluginWorktreeManagerRuntime } from "../plugins/runtime.js";
 
 export interface AutoArchiveArchiveOptions {
-  paseoHome: string;
-  paseoWorktreesBaseRoot?: string;
+  clisbotHome: string;
+  clisbotWorktreesBaseRoot?: string;
   worktreeManagers?: Pick<PluginWorktreeManagerRuntime, "removeWorktree">;
   workspaceArchiveOperations?: ArchiveDependencies["workspaceArchiveOperations"];
   getWorkspace?: ArchiveDependencies["getWorkspace"];
@@ -47,13 +47,13 @@ export interface AutoArchiveArchiveOptions {
 
 export interface ArchiveIfSafeDependencies {
   archiveByScope: typeof archiveByScope;
-  isPaseoOwnedWorktreeCwd: typeof isPaseoOwnedWorktreeCwd;
+  isClisbotOwnedWorktreeCwd: typeof isClisbotOwnedWorktreeCwd;
   killTerminalsForWorkspace: typeof killTerminalsForWorkspace;
 }
 
 const defaultDependencies: ArchiveIfSafeDependencies = {
   archiveByScope,
-  isPaseoOwnedWorktreeCwd,
+  isClisbotOwnedWorktreeCwd,
   killTerminalsForWorkspace,
 };
 
@@ -87,9 +87,9 @@ export async function archiveIfSafe(input: {
     return;
   }
 
-  const ownership = await deps.isPaseoOwnedWorktreeCwd(cwd, {
-    paseoHome: options.paseoHome,
-    worktreesRoot: options.paseoWorktreesBaseRoot,
+  const ownership = await deps.isClisbotOwnedWorktreeCwd(cwd, {
+    clisbotHome: options.clisbotHome,
+    worktreesRoot: options.clisbotWorktreesBaseRoot,
   });
   if (!ownership.allowed) {
     return;
@@ -103,8 +103,8 @@ export async function archiveIfSafe(input: {
 
     await deps.archiveByScope(
       {
-        paseoHome: options.paseoHome,
-        paseoWorktreesBaseRoot: options.paseoWorktreesBaseRoot,
+        clisbotHome: options.clisbotHome,
+        clisbotWorktreesBaseRoot: options.clisbotWorktreesBaseRoot,
         worktreeManagers: options.worktreeManagers,
         workspaceArchiveOperations: options.workspaceArchiveOperations,
         github: options.github,

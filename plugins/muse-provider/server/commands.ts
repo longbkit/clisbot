@@ -1,4 +1,4 @@
-import type { ProviderEvent, ProviderPrompt } from "@getpaseo/plugin/server/provider";
+import type { ProviderEvent, ProviderPrompt } from "@clisbot/plugin/server/provider";
 import type { TurnStartParams } from "./msp.js";
 import { MspConnection } from "./connection.js";
 import { ackSchema, skillsSchema } from "./wire.js";

@@ -3,8 +3,8 @@ import type {
   ProviderInstallationUpdateOperation,
   ProviderInstallationUpdateOutput,
   ProviderInstallationUpdateProgress,
-} from "@getpaseo/protocol/messages";
-import type { ProviderUpdateResult } from "@getpaseo/plugin/server/provider";
+} from "@clisbot/protocol/messages";
+import type { ProviderUpdateResult } from "@clisbot/plugin/server/provider";
 
 interface ProviderUpdateOperationOptions {
   id: string;

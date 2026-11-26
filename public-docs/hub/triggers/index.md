@@ -1,6 +1,6 @@
 ---
 title: Hub triggers
-description: Connect events, schedules, and webhooks to agents running on your Paseo daemons.
+description: Connect events, schedules, and webhooks to agents running on your Clisbot daemons.
 nav: Triggers
 order: 64
 category: Hub
@@ -10,9 +10,9 @@ category: Hub
 
 A trigger defines what starts an agent on your daemon, who is allowed to invoke it, which agent runs, and what tools or replies it can use.
 
-You can author triggers in the Hub dashboard under **Triggers** (in Form or YAML view), or store them in `.paseo/triggers/*.yml` and deploy with `paseo hub deploy`.
+You can author triggers in the Hub dashboard under **Triggers** (in Form or YAML view), or store them in `.clisbot/triggers/*.yml` and deploy with `clisbot hub deploy`.
 
-`.paseo/triggers/github-issue.yml`:
+`.clisbot/triggers/github-issue.yml`:
 
 ```yaml
 name: triage-issue
@@ -33,7 +33,7 @@ run:
   idle_timeout: 10m
   prompt: |
     Triage this issue, reply with your summary using reply, then call finish_execution.
-    ${{ paseo.context }}
+    ${{ clisbot.context }}
 ```
 
 See the [Trigger YAML reference](/docs/hub/configuration/reference) for every supported field.
@@ -42,11 +42,11 @@ See the [Trigger YAML reference](/docs/hub/configuration/reference) for every su
 
 When you create or edit a trigger in the Hub dashboard, choose the daemon and enter its working directory first. Hub asks that daemon for its available providers, models, execution modes, and thinking options.
 
-Only daemons granted `hub.execute` appear as targets. Hub supports any provider configured on your Paseo daemon, including Claude Code, Codex, OpenCode, Pi, and custom or plugin providers. Hub automatically preapproves its own MCP tools when the provider supports preapproval.
+Only daemons granted `hub.execute` appear as targets. Hub supports any provider configured on your Clisbot daemon, including Claude Code, Codex, OpenCode, Pi, and custom or plugin providers. Hub automatically preapproves its own MCP tools when the provider supports preapproval.
 
 Changing the daemon or working directory reloads the available choices. If an existing trigger names a model, mode, or thinking option that the daemon no longer reports, Hub marks that value unavailable without overwriting it. You can keep the authored value, pick a current value, or edit the YAML directly.
 
-If the daemon is offline or needs a newer Paseo version, the agent selectors show an error with a retry action while the rest of the trigger remains editable.
+If the daemon is offline or needs a newer Clisbot version, the agent selectors show an error with a retry action while the rest of the trigger remains editable.
 
 ## Saving checks the agent against the daemon
 
@@ -58,7 +58,7 @@ run.agent.mode: Mode 'default' is not available for provider 'opencode'
 
 If the target and agent settings stay the same, you can save edits through the dashboard while the daemon is offline. For example, you can edit only the prompt, filters, or limits. Creating a trigger or changing its daemon, working directory, or agent settings requires a connected target daemon.
 
-Hub always validates agent settings against a connected target daemon for `paseo hub deploy` and direct API installs (`POST /api/v1/triggers/install`). This applies even if you change only the prompt. When `paseo hub init` validates a trigger, it also requires a connected target daemon.
+Hub always validates agent settings against a connected target daemon for `clisbot hub deploy` and direct API installs (`POST /api/v1/triggers/install`). This applies even if you change only the prompt. When `clisbot hub init` validates a trigger, it also requires a connected target daemon.
 
 ## Continue the same agent
 
@@ -170,7 +170,7 @@ on:
 
 Both run. Triggers are independent, unordered, and do not shadow each other.
 
-## Replying and Open in Paseo links
+## Replying and Open in Clisbot links
 
 Hub grants the `reply` tool when the event has an issue, pull request, or thread to reply to.
 
@@ -188,6 +188,6 @@ run:
 
 Use `github.reply`, `linear.reply`, `slack.reply`, or `discord.reply` to match the trigger source. The prompt must tell the agent to call `reply` and `finish_execution` because Hub does not rewrite your prompt to add tool instructions. See [Output capabilities](/docs/hub/configuration/reference#output-capabilities).
 
-When Hub has a configured HTTPS origin and the run has a recorded daemon agent, Hub appends an **Open in Paseo** link to conversation replies so signed-in organization members can open the live session in Paseo or inspect the run in Hub.
+When Hub has a configured HTTPS origin and the run has a recorded daemon agent, Hub appends an **Open in Clisbot** link to conversation replies so signed-in organization members can open the live session in Clisbot or inspect the run in Hub.
 
 To read or post to Slack or Discord channels from any trigger (including schedules, webhooks, GitHub, and Linear), grant [Integration tools](/docs/hub/tools).

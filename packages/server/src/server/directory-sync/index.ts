@@ -5,7 +5,7 @@ import type {
   SessionOutboundMessage,
   WorkspaceDescriptorPayload,
   WorkspaceProjectDescriptorPayload,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import type { BackgroundVisibility } from "../agent/directory.js";
 import { type CollectionRead, VersionedCollection } from "./internal/versioned-collection.js";
 

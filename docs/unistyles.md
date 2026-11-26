@@ -10,7 +10,7 @@ That model is powerful, but it has sharp edges. Use this note when adding theme-
 
 > We strongly recommend **not using** this hook, as it will re-render your component on every change. This hook was created to simplify the migration process and should only be used when other methods fail.
 
-We have hit this gotcha repeatedly in Paseo. The hook subscribes the component to **every** Unistyles runtime change (theme, breakpoint, insets, color scheme, scale) and returns a fresh object reference each call. That means a periodic lockstep re-render of warm subtrees (agent streams, panels, sidebars) even when nothing the user can see has changed — confirmed in profiling, with `theme` as the only changed input every cycle. It also breaks every downstream `useMemo`/`memo` boundary that includes a derived theme value.
+We have hit this gotcha repeatedly in Clisbot. The hook subscribes the component to **every** Unistyles runtime change (theme, breakpoint, insets, color scheme, scale) and returns a fresh object reference each call. That means a periodic lockstep re-render of warm subtrees (agent streams, panels, sidebars) even when nothing the user can see has changed — confirmed in profiling, with `theme` as the only changed input every cycle. It also breaks every downstream `useMemo`/`memo` boundary that includes a derived theme value.
 
 Reviewers MUST reject PRs that introduce a new `useUnistyles()` call. There is no last-resort carveout. If you cannot solve a case with the alternatives below, file an issue and stop — do not paper over it with the hook.
 
@@ -70,7 +70,7 @@ const ROW_STYLE = [settingsStyles.row, settingsStyles.rowBorder];
 <View style={[settingsStyles.row, settingsStyles.rowBorder]} />;
 ```
 
-Paseo starts with adaptive themes, then applies the persisted theme after async settings load. A
+Clisbot starts with adaptive themes, then applies the persisted theme after async settings load. A
 module-level read can therefore materialize the light style before a persisted dark theme is
 active. If the view mounts after that theme change, React Native receives the stale light object;
 Unistyles registers the node for future changes but does not retroactively replace its initial
@@ -234,7 +234,7 @@ Avoid the bug by preferring the wrapper-`View` pattern from the previous section
 
 ## Hidden Sheet Content
 
-`@gorhom/bottom-sheet` can keep `BottomSheetModal` content mounted while the sheet is hidden. That matters during Paseo's startup theme transition: a header node can be created under the initial adaptive theme, stay hidden, then appear later with stale native style values even though surrounding content has re-rendered correctly.
+`@gorhom/bottom-sheet` can keep `BottomSheetModal` content mounted while the sheet is hidden. That matters during Clisbot's startup theme transition: a header node can be created under the initial adaptive theme, stay hidden, then appear later with stale native style values even though surrounding content has re-rendered correctly.
 
 We saw this in `AdaptiveModalSheet`: the body text and buttons were dark-theme-correct, but the shared sheet title opened with the initial light-theme text color on a dark sheet background. For tiny values in a reusable sheet header, prefer the inline escape hatch:
 
@@ -322,7 +322,7 @@ This is one of the rare places `useUnistyles()` is the right tool: there is no `
 
 Unistyles [`initialTheme`](https://www.unistyl.es/v3/guides/theming#select-theme) and [`adaptiveThemes`](https://www.unistyl.es/v3/guides/theming#adaptive-themes) are mutually exclusive. `initialTheme` can be a string or a synchronous function, but it cannot wait on async storage.
 
-Paseo currently stores app settings in AsyncStorage and loads them through react-query. That means the app can mount under adaptive/system theme first, then switch after settings load:
+Clisbot currently stores app settings in AsyncStorage and loads them through react-query. That means the app can mount under adaptive/system theme first, then switch after settings load:
 
 1. Unistyles config starts with `adaptiveThemes: true`.
 2. The device may report system light.

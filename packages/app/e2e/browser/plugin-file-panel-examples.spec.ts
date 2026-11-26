@@ -18,7 +18,7 @@ import {
 test.use({ channel: "chromium" });
 
 function samplePdf() {
-  const stream = "BT /F1 24 Tf 72 720 Td (Paseo PDF panel example) Tj ET";
+  const stream = "BT /F1 24 Tf 72 720 Td (Clisbot PDF panel example) Tj ET";
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -74,7 +74,7 @@ async function captureWideAndCompact(
 /** Turns on vim keybindings without discarding settings the test writes later. */
 async function enableVimKeybindings(page: Page) {
   await page.addInitScript(() => {
-    const key = "@paseo:app-settings";
+    const key = "@clisbot:app-settings";
     const settings = JSON.parse(localStorage.getItem(key) ?? "{}");
     localStorage.setItem(key, JSON.stringify({ ...settings, vimKeybindings: true }));
   });
@@ -155,7 +155,7 @@ test("directory examples mount the PDF frame and write Markdown through the file
       files: [
         {
           path: "notes.md",
-          content: "# Markdown panel example\n\nEdit **Markdown** through Paseo.\n",
+          content: "# Markdown panel example\n\nEdit **Markdown** through Clisbot.\n",
         },
         { path: "second.md", content: "# Remembered panel\n" },
         { path: "report.pdf", content: samplePdf() },
@@ -200,7 +200,9 @@ test("directory examples mount the PDF frame and write Markdown through the file
     });
 
     await openFile(page, "notes.md");
-    await expect(page.getByRole("radio", { name: "Markdown — Paseo", exact: true })).toBeChecked();
+    await expect(
+      page.getByRole("radio", { name: "Markdown — Clisbot", exact: true }),
+    ).toBeChecked();
     await expect(
       page.getByRole("radio", { name: "Rich Markdown — markdown-panel", exact: true }),
     ).toBeVisible();
@@ -234,9 +236,9 @@ test("directory examples mount the PDF frame and write Markdown through the file
     await rememberMarkdownViewAcrossReload(page, "Preview");
     await rememberMarkdownViewAcrossReload(page, "Source");
 
-    // "Open with…" switches to Paseo's Markdown panel; its Source view is the editor, with the
+    // "Open with…" switches to Clisbot's Markdown panel; its Source view is the editor, with the
     // cursor and vim mode in the panel's toolbar.
-    await openWithFromTabMenu(page, "notes.md", "Markdown — Paseo");
+    await openWithFromTabMenu(page, "notes.md", "Markdown — Clisbot");
     await expect(page.getByRole("heading", { name: "Edited by Rich Markdown" })).toBeVisible();
     await selectFileView(page, "Source");
     const source = page.getByTestId("file-source-editor").filter({ visible: true });

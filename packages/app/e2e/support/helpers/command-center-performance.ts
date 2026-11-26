@@ -40,7 +40,7 @@ export async function seedSearchableCommandCenter() {
 
 export async function observeCommandCenterRowRenders(page: Page) {
   await page.addInitScript(() => {
-    globalThis.__PASEO_RENDER_PROFILE_ENABLED__ = true;
+    globalThis.__CLISBOT_RENDER_PROFILE_ENABLED__ = true;
   });
 }
 
@@ -62,12 +62,12 @@ export async function warmCommandCenterRows(page: Page) {
 
 // Runs in the page: resets the render profile and counts row renders over two frames and 300ms.
 async function countRowRendersOverQuietPeriod() {
-  globalThis.__PASEO_RENDER_PROFILE_REASONS__ = {};
+  globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ = {};
   await new Promise<void>((resolve) =>
     requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
   );
   await new Promise((resolve) => setTimeout(resolve, 300));
-  return Object.keys(globalThis.__PASEO_RENDER_PROFILE_REASONS__ ?? {}).filter((id) =>
+  return Object.keys(globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ?? {}).filter((id) =>
     id.startsWith("CommandCenterResultRow:"),
   ).length;
 }
@@ -81,7 +81,7 @@ export async function expectOnlyCommandCenterRowRendered(page: Page, resultId: s
   );
   const renders = await page.evaluate(() =>
     Object.fromEntries(
-      Object.entries(globalThis.__PASEO_RENDER_PROFILE_REASONS__ ?? {}).filter(([id]) =>
+      Object.entries(globalThis.__CLISBOT_RENDER_PROFILE_REASONS__ ?? {}).filter(([id]) =>
         id.startsWith("CommandCenterResultRow:"),
       ),
     ),

@@ -10,7 +10,7 @@ export default defineConfig({
   test: {
     // Fake-timer suites freeze p-throttle's clock, so a real per-second cap deadlocks them.
     env: {
-      PASEO_GIT_MAX_PROCESSES_PER_SECOND: "10000",
+      CLISBOT_GIT_MAX_PROCESSES_PER_SECOND: "10000",
     },
     testTimeout: 30000,
     hookTimeout: 60000,

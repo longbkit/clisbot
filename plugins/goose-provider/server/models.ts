@@ -1,4 +1,4 @@
-import type { AcpRequest, AcpTransformer } from "@getpaseo/plugin/server/acp";
+import type { AcpRequest, AcpTransformer } from "@clisbot/plugin/server/acp";
 import { z } from "zod";
 
 const inventorySchema = z.object({

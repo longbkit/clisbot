@@ -106,7 +106,7 @@ function createHarness(
   };
   const watches = createChangeRequestWatches({
     router,
-    paseoHome: home,
+    clisbotHome: home,
     logger: pino({ enabled: false }),
     isActive,
     messages: () => messages,

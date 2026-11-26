@@ -1,4 +1,4 @@
-import type { AgentMetric } from "@getpaseo/protocol/agent-types";
+import type { AgentMetric } from "@clisbot/protocol/agent-types";
 import { continuesResponse } from "@/agent-stream/turn-membership";
 import type { StreamItem, TimelinePosition } from "@/types/stream";
 

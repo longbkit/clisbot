@@ -1,6 +1,6 @@
 ---
 title: Daemons in Hub
-description: Enroll a Paseo daemon with Hub, grant execution permission, and target it from triggers.
+description: Enroll a Clisbot daemon with Hub, grant execution permission, and target it from triggers.
 nav: Daemons
 order: 63
 category: Hub
@@ -8,24 +8,24 @@ category: Hub
 
 # Daemons in Hub
 
-A daemon is one of your machines running the Paseo daemon. Enroll it once with your Hub organization, grant execution permission, and reference its slug in your triggers.
+A daemon is one of your machines running the Clisbot daemon. Enroll it once with your Hub organization, grant execution permission, and reference its slug in your triggers.
 
 ## Connect a daemon
 
 Log in from the machine first:
 
 ```sh
-paseo hub login https://hub.example.com
+clisbot hub login https://hub.example.com
 ```
 
-The CLI prints a URL and verification code and opens your browser. After approval, Paseo stores an organization-scoped CLI login under `PASEO_HOME`.
+The CLI prints a URL and verification code and opens your browser. After approval, Clisbot stores an organization-scoped CLI login under `CLISBOT_HOME`.
 
 In an interactive terminal, `login` offers to connect this daemon and separately asks whether to allow Hub automations to run agents. Connection defaults to yes, and execution permission defaults to no. `--json` and non-TTY logins do not prompt.
 
 If you skipped connection during login, enroll the daemon separately:
 
 ```sh
-paseo hub connect
+clisbot hub connect
 ```
 
 `connect` uses your active login to request a single-use enrollment token. The daemon exchanges that token for its own relationship credential, so your CLI login is never stored as daemon authority.
@@ -37,26 +37,26 @@ You can rename the slug later in Hub without changing the immutable daemon ID, t
 For unattended setup, pass an organization API key through the environment:
 
 ```sh
-PASEO_HUB_URL=https://hub.example.com PASEO_HUB_API_KEY=paseo_pk_... paseo hub connect
+CLISBOT_HUB_URL=https://hub.example.com CLISBOT_HUB_API_KEY=clisbot_pk_... clisbot hub connect
 ```
 
-Origin precedence is explicit `[origin]` or `--hub`, then `PASEO_HUB_URL`, then the active stored login, then `https://hub.paseo.sh`. An explicit `--api-key <secret>` takes precedence over environment variables and stored logins.
+Origin precedence is explicit `[origin]` or `--hub`, then `CLISBOT_HUB_URL`, then the active stored login; with none of these it stops and asks for a Hub URL. An explicit `--api-key <secret>` takes precedence over environment variables and stored logins.
 
 Check status or disconnect a daemon:
 
 ```sh
-paseo hub status
-paseo hub disconnect
-paseo hub disconnect --force   # drop local authority when Hub is unreachable
+clisbot hub status
+clisbot hub disconnect
+clisbot hub disconnect --force   # drop local authority when Hub is unreachable
 ```
 
 One daemon connects to one Hub organization at a time. Connecting a daemon that already belongs to a Hub is refused.
 
-`paseo hub logout` removes the stored CLI login. In an interactive terminal, it offers to disconnect a daemon connected to the same Hub first. In `--json` or non-interactive mode, `logout` never disconnects the daemon unless you pass `--disconnect-daemon`:
+`clisbot hub logout` removes the stored CLI login. In an interactive terminal, it offers to disconnect a daemon connected to the same Hub first. In `--json` or non-interactive mode, `logout` never disconnects the daemon unless you pass `--disconnect-daemon`:
 
 ```sh
-paseo hub logout --disconnect-daemon
-paseo hub logout --disconnect-daemon --force
+clisbot hub logout --disconnect-daemon
+clisbot hub logout --disconnect-daemon --force
 ```
 
 ## Grant execution permission
@@ -64,9 +64,9 @@ paseo hub logout --disconnect-daemon --force
 Enrolling a daemon does not allow Hub to start agents on it. Grant the `hub.execute` permission from that machine:
 
 ```sh
-paseo hub permissions list
-paseo hub permissions grant hub.execute
-paseo hub permissions revoke hub.execute
+clisbot hub permissions list
+clisbot hub permissions grant hub.execute
+clisbot hub permissions revoke hub.execute
 ```
 
 Until `hub.execute` is granted, Hub tracks the daemon for identity and presence only. **Daemons** marks it as **Connected only** and **Home** notes that it cannot run agents. See [Choose daemon authority](/docs/hub/security#choose-daemon-authority) for what `hub.execute` permits.
@@ -103,7 +103,7 @@ run:
     cwd: /workspace/project
     worktree:
       mode: branch-off
-      newBranch: trigger-${{ paseo.execution.id }}
+      newBranch: trigger-${{ clisbot.execution.id }}
       base: origin/main
   agent:
     provider: codex
@@ -111,13 +111,13 @@ run:
   prompt: Run tests and call hub.finish_execution.
 ```
 
-`${{ paseo.execution.id }}` renders the execution UUID, giving each run a unique branch off `origin/main` that survives retries and recovery. See [Trigger YAML reference](/docs/hub/configuration/reference#target-and-worktree) and [Git worktrees](/docs/worktrees).
+`${{ clisbot.execution.id }}` renders the execution UUID, giving each run a unique branch off `origin/main` that survives retries and recovery. See [Trigger YAML reference](/docs/hub/configuration/reference#target-and-worktree) and [Git worktrees](/docs/worktrees).
 
 ## Provider discovery
 
 When you select a daemon and working directory in the Hub trigger editor, Hub asks that daemon for its configured providers, models, execution modes, and thinking options.
 
-Hub works with any provider configured on your Paseo daemon, including Claude Code, Codex, OpenCode, Pi, and custom or plugin providers.
+Hub works with any provider configured on your Clisbot daemon, including Claude Code, Codex, OpenCode, Pi, and custom or plugin providers.
 
 ## Recovery and ownership
 
@@ -134,6 +134,6 @@ If Hub loses the create response or the daemon restarts mid-run, Hub resends the
 | Offline           | Enrolled, but not currently connected.   |
 | Revoked           | Access was removed from Hub.             |
 
-While the daemon is offline, you can save dashboard edits that keep the same target and agent settings, such as a prompt change. `paseo hub deploy` and direct API installs require a connected target daemon even for that edit. See [trigger validation](/docs/hub/triggers#saving-checks-the-agent-against-the-daemon).
+While the daemon is offline, you can save dashboard edits that keep the same target and agent settings, such as a prompt change. `clisbot hub deploy` and direct API installs require a connected target daemon even for that edit. See [trigger validation](/docs/hub/triggers#saving-checks-the-agent-against-the-daemon).
 
 Revoking from **Daemons → Revoke daemon** ends the relationship from Hub's side while leaving local agents running.

@@ -38,7 +38,7 @@ export interface LocalDaemonVersionResult {
   error: string | null;
 }
 
-const RELEASE_DOWNLOAD_BASE_URL = "https://github.com/getpaseo/paseo/releases/download";
+const RELEASE_DOWNLOAD_BASE_URL = "https://github.com/longbkit/clisbot/releases/download";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -194,7 +194,7 @@ export function buildMacAppleSiliconDownloadUrl(version: string | null | undefin
     return null;
   }
 
-  return `${RELEASE_DOWNLOAD_BASE_URL}/v${normalizedVersion}/Paseo-${normalizedVersion}-arm64.dmg`;
+  return `${RELEASE_DOWNLOAD_BASE_URL}/v${normalizedVersion}/Clisbot-${normalizedVersion}-arm64.dmg`;
 }
 
 export function buildDaemonUpdateDiagnostics(result: LocalDaemonUpdateResult): string {

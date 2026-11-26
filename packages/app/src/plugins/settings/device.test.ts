@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defineSettings } from "@getpaseo/plugin";
+import { defineSettings } from "@clisbot/plugin";
 import { z } from "zod";
 import { createDeviceSettings } from "./device";
 

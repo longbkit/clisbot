@@ -99,7 +99,7 @@ In-place, separately reviewable. Split the `audio_output` TTS-debug branch out o
 
 **Move:** voice handlers + ~25 voice fields + the TTS-debug hook (Slice 6) + `voiceModeAgentId`/`isVoiceMode` + the `shouldAutoAllowVoicePermission` predicate (Slice 3) → the existing `packages/server/src/server/session/voice/voice-session.ts` (see Progress above). Carve voice types out of `dispatchVoiceAndControlMessage`, leaving infra (restart/shutdown/heartbeat/ping/abort) on the shell.
 
-**SessionContext surface:** pure `emit`, `emitBinary`, `hasBinaryChannel`, `sessionLogger`/`sessionId`/`paseoHome`, `getSpeechReadiness`, agent-control port `{ loadAgent, reloadWithSystemPrompt, interruptIfRunning, isRunning, sendSpokenText, buildAgentPrompt }`, `getSignal`/`abortCurrent` (Slice 6).
+**SessionContext surface:** pure `emit`, `emitBinary`, `hasBinaryChannel`, `sessionLogger`/`sessionId`/`clisbotHome`, `getSpeechReadiness`, agent-control port `{ loadAgent, reloadWithSystemPrompt, interruptIfRunning, isRunning, sendSpokenText, buildAgentPrompt }`, `getSignal`/`abortCurrent` (Slice 6).
 
 **Behavior note:** depends on Slices 3 + 6. `cleanup()` stays the ordered orchestrator and calls `voiceController.dispose()` at the position the inlined voice teardown occupies today (8505-8525). **Tests:** `voice-roundtrip.e2e.test.ts`, `voice-local-agent.e2e.test.ts`, `session.voice-mcp-config.test.ts`, `session.test.ts`.
 

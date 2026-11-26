@@ -26,7 +26,7 @@ function git(args: string[], cwd?: string): string {
 }
 
 function makeTempDir(): string {
-  const dir = realpathSync.native(mkdtempSync(path.join(tmpdir(), "paseo-git-discovery-")));
+  const dir = realpathSync.native(mkdtempSync(path.join(tmpdir(), "clisbot-git-discovery-")));
   tempDirs.push(dir);
   return dir;
 }

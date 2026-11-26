@@ -1,5 +1,5 @@
-import { useRpc, useSubscription, type PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
-import type { RpcOutput } from "@getpaseo/plugin";
+import { useRpc, useSubscription, type PluginWorkspacePanelProps } from "@clisbot/plugin/client";
+import type { RpcOutput } from "@clisbot/plugin";
 import { type UseMutationResult, useMutation } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";

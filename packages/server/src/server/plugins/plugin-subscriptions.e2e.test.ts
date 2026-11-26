@@ -6,20 +6,20 @@ import {
   DaemonClient,
   type OwnedSubscription,
   type WebSocketLike,
-} from "@getpaseo/client/internal/daemon-client";
+} from "@clisbot/client/internal/daemon-client";
 import { afterEach, expect, test } from "vitest";
-import { defineRpc } from "@getpaseo/plugin";
-import { callPluginRpc } from "@getpaseo/plugin/client/host";
+import { defineRpc } from "@clisbot/plugin";
+import { callPluginRpc } from "@clisbot/plugin/client/host";
 import { z } from "zod";
 import { resolveDaemonVersion } from "../daemon-version.js";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 
 const PLUGIN_ID = "subscriptions";
 
 // Written as an author writes a plugin: one contract per name, handlers that read like English.
 const SERVER_ENTRY = `
-import { defineRpc, defineSubscription } from "@getpaseo/plugin";
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import { defineRpc, defineSubscription } from "@clisbot/plugin";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { z } from "zod";
 
 const ticks = defineSubscription({
@@ -114,18 +114,18 @@ afterEach(async () => {
 });
 
 interface Harness {
-  daemon: TestPaseoDaemon;
+  daemon: TestClisbotDaemon;
   client: DaemonClient;
   sockets: WebSocket[];
   close(): Promise<void>;
 }
 
 async function writePlugin(id: string, serverEntry: string): Promise<string> {
-  const pluginDirectory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-subscriptions-"));
+  const pluginDirectory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-subscriptions-"));
   roots.push(pluginDirectory);
   await writeFile(
-    path.join(pluginDirectory, "paseo-plugin.json"),
-    JSON.stringify({ id, requirements: { paseo: `>=${resolveDaemonVersion(import.meta.url)}` } }),
+    path.join(pluginDirectory, "clisbot-plugin.json"),
+    JSON.stringify({ id, requirements: { clisbot: `>=${resolveDaemonVersion(import.meta.url)}` } }),
   );
   await writeFile(path.join(pluginDirectory, "index.server.ts"), serverEntry);
   return pluginDirectory;
@@ -133,7 +133,7 @@ async function writePlugin(id: string, serverEntry: string): Promise<string> {
 
 async function startHarness(): Promise<Harness> {
   const pluginDirectory = await writePlugin(PLUGIN_ID, SERVER_ENTRY);
-  const daemon = await createTestPaseoDaemon({ mcpEnabled: false });
+  const daemon = await createTestClisbotDaemon({ mcpEnabled: false });
   const sockets: WebSocket[] = [];
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -344,8 +344,8 @@ test("one name cannot serve both an RPC and a subscription", async () => {
     const directory = await writePlugin(
       "collision",
       `
-import { defineRpc, defineSubscription } from "@getpaseo/plugin";
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import { defineRpc, defineSubscription } from "@clisbot/plugin";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { z } from "zod";
 
 export default function contribute(server: PluginServerContext) {

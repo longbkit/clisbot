@@ -17,9 +17,9 @@ const app = path.join(root, "packages/app");
 const env = {
   ...process.env,
   APP_VARIANT: "production",
-  PASEO_WATCHDOG_BUILD: "1",
-  PASEO_DIAGNOSTIC_BUILD_TIME: new Date().toISOString(),
-  PASEO_DIAGNOSTIC_REVISION:
+  CLISBOT_WATCHDOG_BUILD: "1",
+  CLISBOT_DIAGNOSTIC_BUILD_TIME: new Date().toISOString(),
+  CLISBOT_DIAGNOSTIC_REVISION:
     execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" }).trim() +
     (execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim()
       ? "-dirty"
@@ -46,7 +46,7 @@ run(
   ],
   path.join(app, "android"),
 );
-const destination = path.join(root, `artifacts/paseo-dogfood-${target}.apk`);
+const destination = path.join(root, `artifacts/clisbot-dogfood-${target}.apk`);
 mkdirSync(path.dirname(destination), { recursive: true });
 copyFileSync(path.join(app, "android/app/build/outputs/apk/release/app-release.apk"), destination);
-console.log(`\nDiagnostic release APK: ${destination}\nLogs: Downloads/Paseo diagnostics\n`);
+console.log(`\nDiagnostic release APK: ${destination}\nLogs: Downloads/Clisbot diagnostics\n`);

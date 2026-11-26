@@ -15,8 +15,8 @@ export const COMPACT = { width: 390, height: 844 };
 /** A plugin written against the current API: a screen, header and footer items, a command. */
 const SHOWCASE_SOURCE = `import React from "react";
 import { Pressable, Text, View } from "react-native";
-import { useWorkspaces } from "@getpaseo/plugin/client";
-import { SidebarRow } from "@getpaseo/plugin/client/ui";
+import { useWorkspaces } from "@clisbot/plugin/client";
+import { SidebarRow } from "@clisbot/plugin/client/ui";
 
 function WorkspacesScreen({ theme }) {
   const workspaces = useWorkspaces();
@@ -93,8 +93,8 @@ export default function contribute(client) {
  */
 const BOTS_SOURCE = `import React from "react";
 import { Pressable, Text, View } from "react-native";
-import { usePaseo } from "@getpaseo/plugin/client";
-import { SidebarRow, SidebarSeparator } from "@getpaseo/plugin/client/ui";
+import { useClisbot } from "@clisbot/plugin/client";
+import { SidebarRow, SidebarSeparator } from "@clisbot/plugin/client/ui";
 
 const BOTS = [
   { id: "bot-1", name: "Bot 1" },
@@ -166,12 +166,12 @@ function BotsItem({ theme, currentScreen, openScreen, openPopover }) {
 }
 
 function AlertsItem() {
-  const paseo = usePaseo();
+  const clisbot = useClisbot();
   React.useEffect(() => {
-    const observation = paseo.observeEvents(["project.update"]);
+    const observation = clisbot.observeEvents(["project.update"]);
     observation.subscribe({ snapshot(value) { globalThis.__botAlertsObservation = value.subscriptionId; }, update() {} });
     return () => { void observation.release(); };
-  }, [paseo]);
+  }, [clisbot]);
   return <SidebarRow icon="Bell" onPress={() => {}} />;
 }
 
@@ -216,10 +216,10 @@ export async function installSidebarPlugins() {
     [LEGACY_PLUGIN_ID, LEGACY_SOURCE],
     [BOTS_PLUGIN_ID, BOTS_SOURCE],
   ] as const) {
-    const directory = await mkdtemp(path.join(tmpdir(), `paseo-${id}-`));
+    const directory = await mkdtemp(path.join(tmpdir(), `clisbot-${id}-`));
     directories.push(directory);
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({ id, requirements: pluginRequirements }),
     );
     await writeFile(path.join(directory, "index.client.tsx"), source);

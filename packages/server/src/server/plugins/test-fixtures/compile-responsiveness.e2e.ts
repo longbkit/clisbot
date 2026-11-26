@@ -12,7 +12,7 @@ const directory = process.argv[2];
 assert.ok(directory, "Fixture directory is required");
 const results: { blockingMs: number }[] = [];
 await writeFile(
-  path.join(directory, "paseo-plugin.json"),
+  path.join(directory, "clisbot-plugin.json"),
   JSON.stringify({ id: "responsive-build" }),
 );
 // Erased types stress TypeScript's AST walk without a multi-MiB runtime bundle.

@@ -1,4 +1,4 @@
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { planTimelineTailFetch } from "./timeline-sync-plan";
 
 interface TimelineReplacementFetch {

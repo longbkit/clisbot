@@ -5,4 +5,4 @@ Fixed
 - Fixed daemons losing their Hub connection after execution permissions changed
 - Fixed saved hosts disappearing when one stored entry could not be read
 
-Full notes: https://paseo.sh/changelog
+Full notes: https://clisbot.com/changelog

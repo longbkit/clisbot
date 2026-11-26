@@ -1,4 +1,4 @@
-import type { ParsedDiffFile } from "@getpaseo/protocol/messages";
+import type { ParsedDiffFile } from "@clisbot/protocol/messages";
 import { bench, describe } from "vitest";
 import {
   changelogCorpusFile,

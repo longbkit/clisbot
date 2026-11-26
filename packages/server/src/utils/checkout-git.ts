@@ -1,4 +1,4 @@
-import { MAX_RELAY_WEBSOCKET_MESSAGE_BYTES } from "@getpaseo/protocol/websocket-message-limit";
+import { MAX_RELAY_WEBSOCKET_MESSAGE_BYTES } from "@clisbot/protocol/websocket-message-limit";
 import { resolve, dirname, basename } from "path";
 import {
   open as openFile,
@@ -14,9 +14,9 @@ import {
 import { tmpdir } from "node:os";
 import { setImmediate } from "node:timers/promises";
 import { TTLCache } from "@isaacs/ttlcache";
-import type { CheckoutCommit, CheckoutCommitFile } from "@getpaseo/protocol/messages";
-import { parseGitHubRemoteIdentity, parseGitRemoteLocation } from "@getpaseo/protocol/git-remote";
-import { maxSecuredPlaintextByteLength } from "@getpaseo/relay";
+import type { CheckoutCommit, CheckoutCommitFile } from "@clisbot/protocol/messages";
+import { parseGitHubRemoteIdentity, parseGitRemoteLocation } from "@clisbot/protocol/git-remote";
+import { maxSecuredPlaintextByteLength } from "@clisbot/relay";
 import type { Logger } from "pino";
 import type { ParsedDiffFile } from "../server/utils/diff-highlighter.js";
 import {
@@ -43,16 +43,16 @@ import { parseGitRevParsePath, resolveGitRevParsePath } from "./git-rev-parse-pa
 import { runGitCommand, type RunGitCommand } from "./run-git-command.js";
 import { readGitFileContents, readGitFileContentAtRef } from "./git-file-contents.js";
 import { unquoteGitPath } from "./git-quoted-path.js";
-import { isPaseoOwnedWorktreeCwd, resolvePaseoWorktreesBaseRoot } from "./worktree.js";
+import { isClisbotOwnedWorktreeCwd, resolveClisbotWorktreesBaseRoot } from "./worktree.js";
 import {
   branchNameFromRef,
-  findPaseoWorktreeRootForCwd,
-  hasPaseoWorktreeMetadata,
-  getPaseoWorktreeChangeRequestHintForBranch,
-  type PaseoWorktreeMetadata,
-  readPaseoWorktreeMetadata,
-  rebindPaseoWorktreeChangeRequestHint,
-  setPaseoWorktreeBaseRef,
+  findClisbotWorktreeRootForCwd,
+  hasClisbotWorktreeMetadata,
+  getClisbotWorktreeChangeRequestHintForBranch,
+  type ClisbotWorktreeMetadata,
+  readClisbotWorktreeMetadata,
+  rebindClisbotWorktreeChangeRequestHint,
+  setClisbotWorktreeBaseRef,
 } from "./worktree-metadata.js";
 const READ_ONLY_GIT_ENV = {
   GIT_OPTIONAL_LOCKS: "0",
@@ -892,7 +892,7 @@ export interface CheckoutStatus {
   isGit: false;
 }
 
-export interface CheckoutStatusGitNonPaseo {
+export interface CheckoutStatusGitNonClisbot {
   isGit: true;
   repoRoot: string;
   mainRepoRoot: string | null;
@@ -912,10 +912,10 @@ export interface CheckoutStatusGitNonPaseo {
   hasRemote: boolean;
   firstPushRemote: string | null;
   remoteUrl: string | null;
-  isPaseoOwnedWorktree: false;
+  isClisbotOwnedWorktree: false;
 }
 
-export interface CheckoutStatusGitPaseo {
+export interface CheckoutStatusGitClisbot {
   isGit: true;
   repoRoot: string;
   mainRepoRoot: string;
@@ -932,10 +932,10 @@ export interface CheckoutStatusGitPaseo {
   hasRemote: boolean;
   firstPushRemote: string | null;
   remoteUrl: string | null;
-  isPaseoOwnedWorktree: true;
+  isClisbotOwnedWorktree: true;
 }
 
-export type CheckoutStatusGit = CheckoutStatusGitNonPaseo | CheckoutStatusGitPaseo;
+export type CheckoutStatusGit = CheckoutStatusGitNonClisbot | CheckoutStatusGitClisbot;
 
 export type CheckoutStatusResult = CheckoutStatus | CheckoutStatusGit;
 
@@ -962,7 +962,7 @@ export interface MergeFromBaseOptions {
 }
 
 export interface CheckoutContext {
-  paseoHome?: string;
+  clisbotHome?: string;
   worktreesRoot?: string;
   logger?: Pick<Logger, "trace" | "warn">;
   facts?: CheckoutSnapshotFacts | null;
@@ -980,7 +980,7 @@ export type CheckoutSnapshotFacts =
       remoteUrl: string | null;
       absoluteGitDir: string | null;
       gitCommonDir: string | null;
-      paseoWorktree: PaseoWorktreeForCwd;
+      clisbotWorktree: ClisbotWorktreeForCwd;
       storedBaseRef: string | null;
       resolvedBaseRef: string | null;
       mainRepoRoot: string | null;
@@ -1152,25 +1152,27 @@ async function getMainRepoRootFromCommonDir(
     },
   );
   const worktrees = parseWorktreeList(worktreeOut);
-  const paseoPaths = new Set(
+  const clisbotPaths = new Set(
     (
       await Promise.all(
-        worktrees.map(async (wt) => ((await hasPaseoWorktreeMetadata(wt.path)) ? wt.path : null)),
+        worktrees.map(async (wt) => ((await hasClisbotWorktreeMetadata(wt.path)) ? wt.path : null)),
       )
     ).filter((p) => p !== null),
   );
-  const nonBareNonPaseo = worktrees.filter(
+  const nonBareNonClisbot = worktrees.filter(
     (wt) =>
       !wt.isBare &&
-      !paseoPaths.has(wt.path) &&
-      !isPaseoWorktreePath(wt.path, {
-        paseoHome: context?.paseoHome,
+      !clisbotPaths.has(wt.path) &&
+      !isClisbotWorktreePath(wt.path, {
+        clisbotHome: context?.clisbotHome,
         worktreesRoot: context?.worktreesRoot,
       }),
   );
-  const childrenOfBareRepo = nonBareNonPaseo.filter((wt) => isDescendantPath(wt.path, normalized));
+  const childrenOfBareRepo = nonBareNonClisbot.filter((wt) =>
+    isDescendantPath(wt.path, normalized),
+  );
   const mainChild = childrenOfBareRepo.find((wt) => basename(wt.path) === "main");
-  return mainChild?.path ?? childrenOfBareRepo[0]?.path ?? nonBareNonPaseo[0]?.path ?? normalized;
+  return mainChild?.path ?? childrenOfBareRepo[0]?.path ?? nonBareNonClisbot[0]?.path ?? normalized;
 }
 
 export interface GitWorktreeEntry {
@@ -1179,15 +1181,15 @@ export interface GitWorktreeEntry {
   isBare?: boolean;
 }
 
-/** Check whether a path is under Paseo's worktree root. */
-export function isPaseoWorktreePath(
+/** Check whether a path is under Clisbot's worktree root. */
+export function isClisbotWorktreePath(
   p: string,
-  options?: { paseoHome?: string; worktreesRoot?: string },
+  options?: { clisbotHome?: string; worktreesRoot?: string },
 ): boolean {
-  if (options?.worktreesRoot || options?.paseoHome) {
-    return isDescendantPath(p, resolvePaseoWorktreesBaseRoot(options));
+  if (options?.worktreesRoot || options?.clisbotHome) {
+    return isDescendantPath(p, resolveClisbotWorktreesBaseRoot(options));
   }
-  return /[/\\]\.paseo[/\\]worktrees[/\\]/.test(p);
+  return /[/\\]\.clisbot[/\\]worktrees[/\\]/.test(p);
 }
 
 /** True when `child` is strictly inside `parent` (handles both `/` and `\`). */
@@ -1271,53 +1273,53 @@ export async function renameCurrentBranch(
 
   const currentBranch = await getCurrentBranch(cwd);
   if (currentBranch) {
-    await rebindPaseoWorktreeChangeRequestHint(worktreeRoot, previousBranch, currentBranch);
+    await rebindClisbotWorktreeChangeRequestHint(worktreeRoot, previousBranch, currentBranch);
   }
   return { previousBranch, currentBranch };
 }
 
-type PaseoWorktreeForCwd =
-  | { isPaseoOwnedWorktree: false }
-  | { isPaseoOwnedWorktree: true; worktreeRoot: string };
+type ClisbotWorktreeForCwd =
+  | { isClisbotOwnedWorktree: false }
+  | { isClisbotOwnedWorktree: true; worktreeRoot: string };
 
-interface PaseoWorktreeLookupOptions {
+interface ClisbotWorktreeLookupOptions {
   context?: CheckoutContext;
   knownWorktreeRoot?: string | null;
   knownGitCommonDir?: string | null;
 }
 
-async function getPaseoWorktreeForCwd(
+async function getClisbotWorktreeForCwd(
   cwd: string,
-  options: PaseoWorktreeLookupOptions = {},
-): Promise<PaseoWorktreeForCwd> {
+  options: ClisbotWorktreeLookupOptions = {},
+): Promise<ClisbotWorktreeForCwd> {
   // Fast-path reject: non-worktree paths do not need expensive ownership checks.
-  if (!/[\\/]worktrees[\\/]/.test(cwd) && (await findPaseoWorktreeRootForCwd(cwd)) === null) {
-    return { isPaseoOwnedWorktree: false };
+  if (!/[\\/]worktrees[\\/]/.test(cwd) && (await findClisbotWorktreeRootForCwd(cwd)) === null) {
+    return { isClisbotOwnedWorktree: false };
   }
 
-  const ownership = await isPaseoOwnedWorktreeCwd(cwd, {
-    paseoHome: options.context?.paseoHome,
+  const ownership = await isClisbotOwnedWorktreeCwd(cwd, {
+    clisbotHome: options.context?.clisbotHome,
     worktreesRoot: options.context?.worktreesRoot,
     knownGitCommonDir: options.knownGitCommonDir,
   });
   if (!ownership.allowed) {
-    return { isPaseoOwnedWorktree: false };
+    return { isClisbotOwnedWorktree: false };
   }
 
   return {
-    isPaseoOwnedWorktree: true,
+    isClisbotOwnedWorktree: true,
     worktreeRoot: options.knownWorktreeRoot ?? (await getWorktreeRoot(cwd, options.context)) ?? cwd,
   };
 }
 
 // Worktrees created before baseRef existed only stored the stripped name; it resolves
 // local-first, which is the base they were actually cut from.
-function storedBaseRefFromMetadata(metadata: PaseoWorktreeMetadata | null): string | null {
+function storedBaseRefFromMetadata(metadata: ClisbotWorktreeMetadata | null): string | null {
   return metadata?.baseRef ?? metadata?.baseRefName ?? null;
 }
 
-async function readPaseoWorktreeBaseRef(worktreeRoot: string): Promise<string | null> {
-  return storedBaseRefFromMetadata(await readPaseoWorktreeMetadata(worktreeRoot));
+async function readClisbotWorktreeBaseRef(worktreeRoot: string): Promise<string | null> {
+  return storedBaseRefFromMetadata(await readClisbotWorktreeMetadata(worktreeRoot));
 }
 
 async function getStoredBaseRefForCwd(
@@ -1327,8 +1329,10 @@ async function getStoredBaseRefForCwd(
   if (context?.facts?.isGit) {
     return context.facts.storedBaseRef;
   }
-  const ownership = await getPaseoWorktreeForCwd(cwd, { context });
-  return ownership.isPaseoOwnedWorktree ? readPaseoWorktreeBaseRef(ownership.worktreeRoot) : null;
+  const ownership = await getClisbotWorktreeForCwd(cwd, { context });
+  return ownership.isClisbotOwnedWorktree
+    ? readClisbotWorktreeBaseRef(ownership.worktreeRoot)
+    : null;
 }
 
 export async function setCheckoutBaseBranch(input: {
@@ -1337,8 +1341,8 @@ export async function setCheckoutBaseBranch(input: {
   context?: CheckoutContext;
 }): Promise<string> {
   await requireGitRepo(input.cwd);
-  const ownership = await getPaseoWorktreeForCwd(input.cwd, { context: input.context });
-  if (!ownership.isPaseoOwnedWorktree) throw new Error("Workspace is not a Paseo worktree");
+  const ownership = await getClisbotWorktreeForCwd(input.cwd, { context: input.context });
+  if (!ownership.isClisbotOwnedWorktree) throw new Error("Workspace is not a Clisbot worktree");
   const requested = input.baseRef.trim();
   const qualified = requested.startsWith("refs/");
   const candidates = qualified
@@ -1353,7 +1357,7 @@ export async function setCheckoutBaseBranch(input: {
     if (valid.exitCode !== 0 || !(await doesGitRefExist(input.cwd, candidate))) continue;
     const worktreeRoot = await getWorktreeRoot(input.cwd);
     if (!worktreeRoot) throw new NotGitRepoError(input.cwd);
-    await setPaseoWorktreeBaseRef({ worktreeRoot, baseRef: candidate });
+    await setClisbotWorktreeBaseRef({ worktreeRoot, baseRef: candidate });
     return candidate;
   }
   throw new Error(`Base branch not found: ${requested}`);
@@ -2061,7 +2065,7 @@ interface CheckoutInspectionContext {
   remoteUrl: string | null;
   absoluteGitDir: string | null;
   gitCommonDir: string | null;
-  paseoWorktree: PaseoWorktreeForCwd;
+  clisbotWorktree: ClisbotWorktreeForCwd;
 }
 
 async function inspectCheckoutContext(
@@ -2079,7 +2083,7 @@ async function inspectCheckoutContext(
     resolveAbsoluteGitDir(cwd, context),
     resolveGitCommonDir(cwd, context),
   ]);
-  const paseoWorktree = await getPaseoWorktreeForCwd(cwd, {
+  const clisbotWorktree = await getClisbotWorktreeForCwd(cwd, {
     context,
     knownWorktreeRoot: root,
     knownGitCommonDir: gitCommonDir,
@@ -2091,7 +2095,7 @@ async function inspectCheckoutContext(
     remoteUrl,
     absoluteGitDir,
     gitCommonDir,
-    paseoWorktree,
+    clisbotWorktree,
   };
 }
 
@@ -2183,10 +2187,10 @@ function buildPullRequestLookupTargetFromPushConfig(
 }
 
 function buildPullRequestLookupTargetFromMetadata(
-  metadata: PaseoWorktreeMetadata | null,
+  metadata: ClisbotWorktreeMetadata | null,
   currentBranch: string,
 ): PullRequestStatusLookupTarget | null {
-  const target = getPaseoWorktreeChangeRequestHintForBranch(metadata, currentBranch);
+  const target = getClisbotWorktreeChangeRequestHintForBranch(metadata, currentBranch);
   if (!target) {
     return null;
   }
@@ -2267,7 +2271,7 @@ async function resolvePullRequestLookupTargetFromPushConfig(
 async function resolveFactsPullRequestLookupTarget(input: {
   cwd: string;
   inspected: CheckoutInspectionContext;
-  metadata: PaseoWorktreeMetadata | null;
+  metadata: ClisbotWorktreeMetadata | null;
   branchRemoteName: string | null;
   branchMergeRef: string | null;
   branchRemoteUrl: string | null;
@@ -2320,10 +2324,10 @@ export async function getCheckoutSnapshotFacts(
     return { isGit: false };
   }
 
-  const paseoWorktreeMetadata = inspected.paseoWorktree.isPaseoOwnedWorktree
-    ? await readPaseoWorktreeMetadata(inspected.paseoWorktree.worktreeRoot)
+  const clisbotWorktreeMetadata = inspected.clisbotWorktree.isClisbotOwnedWorktree
+    ? await readClisbotWorktreeMetadata(inspected.clisbotWorktree.worktreeRoot)
     : null;
-  const storedBaseRef = storedBaseRefFromMetadata(paseoWorktreeMetadata);
+  const storedBaseRef = storedBaseRefFromMetadata(clisbotWorktreeMetadata);
   const resolvedBaseRef = storedBaseRef ?? (await resolveBaseRef(cwd, context));
   const mainRepoRoot = await getMainRepoRootFromCommonDir(
     cwd,
@@ -2370,7 +2374,7 @@ export async function getCheckoutSnapshotFacts(
   let pullRequestLookupTarget = await resolveFactsPullRequestLookupTarget({
     cwd,
     inspected,
-    metadata: paseoWorktreeMetadata,
+    metadata: clisbotWorktreeMetadata,
     branchRemoteName,
     branchMergeRef,
     branchRemoteUrl,
@@ -2394,7 +2398,7 @@ export async function getCheckoutSnapshotFacts(
     remoteUrl: inspected.remoteUrl,
     absoluteGitDir: inspected.absoluteGitDir,
     gitCommonDir: inspected.gitCommonDir,
-    paseoWorktree: inspected.paseoWorktree,
+    clisbotWorktree: inspected.clisbotWorktree,
     storedBaseRef,
     resolvedBaseRef,
     mainRepoRoot,
@@ -2410,7 +2414,7 @@ export async function getCheckoutSnapshotFacts(
 export const PER_FILE_DIFF_MAX_BYTES = 1024 * 1024; // 1MB
 export const TOTAL_DIFF_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 const CHECKOUT_DIFF_FRAME_HEADROOM_BYTES = 1024 * 1024;
-// Temporary until diffs load lazily per file. The Paseo relay's 32 MiB frame limit is
+// Temporary until diffs load lazily per file. The Clisbot relay's 32 MiB frame limit is
 // binding: string frames are encrypted and base64-encoded. Reserve 1 MiB plaintext for
 // the surrounding WebSocket JSON envelope after inverting that exact wire expansion.
 export const CHECKOUT_DIFF_MAX_STRUCTURED_BYTES =
@@ -2561,7 +2565,7 @@ export async function getCheckoutStatus(
   const worktreeRoot = facts.worktreeRoot;
   const currentBranch = facts.currentBranch;
   const remoteUrl = facts.remoteUrl;
-  const paseoWorktree = facts.paseoWorktree;
+  const clisbotWorktree = facts.clisbotWorktree;
   const isDirty = await isWorkingTreeDirty(cwd, context);
   const hasRemote = remoteUrl !== null;
   const baseRef = facts.resolvedBaseRef;
@@ -2581,7 +2585,7 @@ export async function getCheckoutStatus(
   const displayBaseRef = baseRef ? branchNameFromRef(baseRef) : null;
   const upstream = projectUpstreamStatus(facts.upstreamStatus);
 
-  if (paseoWorktree.isPaseoOwnedWorktree && baseRef) {
+  if (clisbotWorktree.isClisbotOwnedWorktree && baseRef) {
     return {
       isGit: true,
       repoRoot: worktreeRoot,
@@ -2596,7 +2600,7 @@ export async function getCheckoutStatus(
       hasRemote,
       firstPushRemote: facts.firstPushRemote,
       remoteUrl,
-      isPaseoOwnedWorktree: true,
+      isClisbotOwnedWorktree: true,
     };
   }
 
@@ -2615,7 +2619,7 @@ export async function getCheckoutStatus(
     hasRemote,
     firstPushRemote: facts.firstPushRemote,
     remoteUrl,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
   };
 }
 
@@ -3817,7 +3821,7 @@ export async function prepareAllChangesIndex(cwd: string, baseRef: string) {
 // read as unchanged. The copy takes the source's mtime, read before copying and
 // rounded down to the second, so it is never later than the source.
 export async function snapshotComparisonIndex(cwd: string) {
-  const directory = await mkdtemp(resolve(tmpdir(), "paseo-comparison-index-"));
+  const directory = await mkdtemp(resolve(tmpdir(), "clisbot-comparison-index-"));
   const indexFile = resolve(directory, "index");
   try {
     const index = await runGitCommand(["rev-parse", "--git-path", "index"], {
@@ -4374,7 +4378,7 @@ export async function pushCurrentBranch(
 }
 
 // The status a client acted on can be older than the git configuration, so a first push checks
-// the destination again before it sends anything. Paseo worktrees always publish to origin.
+// the destination again before it sends anything. Clisbot worktrees always publish to origin.
 async function requireFirstPushAgreesWithGit(
   cwd: string,
   storedBranchName: string,
@@ -4389,8 +4393,8 @@ async function requireFirstPushAgreesWithGit(
   if (branchRemoteName !== null && branchMergeRef !== null) {
     return;
   }
-  const paseoWorktree = await getPaseoWorktreeForCwd(cwd, { context });
-  if (paseoWorktree.isPaseoOwnedWorktree) {
+  const clisbotWorktree = await getClisbotWorktreeForCwd(cwd, { context });
+  if (clisbotWorktree.isClisbotOwnedWorktree) {
     return;
   }
   const gitPushRemote = await readGitPushRemote({
@@ -4719,7 +4723,7 @@ function getUnavailablePullRequestStatus(
   }
   if (
     facts?.isGit === true &&
-    facts.paseoWorktree.isPaseoOwnedWorktree &&
+    facts.clisbotWorktree.isClisbotOwnedWorktree &&
     facts.pullRequestLookupTarget === null
   ) {
     return buildPullRequestStatusResult(null, "authenticated");

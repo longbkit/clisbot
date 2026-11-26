@@ -1,6 +1,6 @@
 import type { AttachedAgentTool, PluginAgentToolsRuntime } from "../plugins/agent-tools.js";
 import { ProviderOptionsValidationError } from "./provider-options.js";
-import type { AgentToolResult } from "@getpaseo/plugin/server";
+import type { AgentToolResult } from "@clisbot/plugin/server";
 import type { RuntimeCleanupCandidate } from "./idle-runtime-cleanup/index.js";
 import { AgentNotFoundError, ensureAgentLoaded } from "./agent-loading.js";
 import { AgentTurnChangedError } from "./agent-prompt.js";
@@ -12,24 +12,24 @@ import {
 import type { PluginLifecycle } from "../plugins/lifecycle/index.js";
 import { describeHookAgent, publishAgentStream } from "../plugins/lifecycle/index.js";
 import { applyRecordPatch } from "../record-patch.js";
-import type { PluginSessionOpenRequest } from "@getpaseo/plugin/server";
+import type { PluginSessionOpenRequest } from "@clisbot/plugin/server";
 import { randomUUID } from "node:crypto";
 import { basename, resolve } from "node:path";
 import { stat } from "node:fs/promises";
 import {
   AGENT_LIFECYCLE_STATUSES,
   type AgentLifecycleStatus,
-} from "@getpaseo/protocol/agent-lifecycle";
+} from "@clisbot/protocol/agent-lifecycle";
 import {
   getParentAgentIdFromLabels,
   hasOpenAgentTab,
   isDelegatedAgent,
   isOpenAgentTabLabel,
   PARENT_AGENT_ID_LABEL,
-} from "@getpaseo/protocol/agent-labels";
+} from "@clisbot/protocol/agent-labels";
 import type { Logger } from "pino";
-import type { ToolPolicy } from "@getpaseo/protocol/agent-types";
-import type { ProviderPaseoToolsPolicy } from "@getpaseo/protocol/provider-config";
+import type { ToolPolicy } from "@clisbot/protocol/agent-types";
+import type { ProviderClisbotToolsPolicy } from "@clisbot/protocol/provider-config";
 import { z } from "zod";
 import type { TerminalManager } from "../../terminal/terminal-manager.js";
 
@@ -69,7 +69,7 @@ import {
   type ListImportableSessionsOptions,
 } from "./agent-sdk-types.js";
 import { buildArchivedAgentRecord, type ArchivedStoredAgentRecord } from "./agent-archive.js";
-import type { JsonValue, ProviderOptions } from "@getpaseo/protocol/agent-types";
+import type { JsonValue, ProviderOptions } from "@clisbot/protocol/agent-types";
 import { toStoredAgentRecord } from "./agent-projections.js";
 import { sanitizeAgentMetrics, withModelMetric } from "./agent-metrics.js";
 import {
@@ -109,13 +109,13 @@ import { invokeRewindCapability, type RewindMode } from "./rewind/rewind.js";
 import { parseAgentMessage, projectAgentMessages } from "./agent-messages/index.js";
 import { isStaleProviderSessionError } from "./stale-provider-session-error.js";
 import {
-  PASEO_MCP_SERVER_NAME,
-  stripInternalPaseoMcpServer,
-  withRuntimePaseoMcpServer,
+  CLISBOT_MCP_SERVER_NAME,
+  stripInternalClisbotMcpServer,
+  withRuntimeClisbotMcpServer,
 } from "./runtime-mcp-config.js";
 import { resolveCreateAgentTitles } from "./create-agent-title.js";
-import type { PaseoToolCatalogFactory } from "./tools/types.js";
-import { isPaseoToolPolicyEnabled } from "./paseo-tool-policy.js";
+import type { ClisbotToolCatalogFactory } from "./tools/types.js";
+import { isClisbotToolPolicyEnabled } from "./clisbot-tool-policy.js";
 import {
   ProviderSubagentStore,
   type ProviderSubagentDescriptor,
@@ -230,7 +230,7 @@ async function resolveResumePurpose(
 interface PreparedSessionConfig {
   storedConfig: AgentSessionConfig;
   launchConfig: AgentSessionConfig;
-  paseoToolPolicy: ProviderPaseoToolsPolicy | undefined;
+  clisbotToolPolicy: ProviderClisbotToolsPolicy | undefined;
 }
 
 interface NormalizeConfigOptions {
@@ -274,7 +274,7 @@ function buildStoredAgentConfig(record: StoredAgentRecord): AgentSessionConfig {
     config.systemPrompt = record.config.systemPrompt;
   }
   if (record.config.mcpServers != null) config.mcpServers = record.config.mcpServers;
-  return stripInternalPaseoMcpServer(config);
+  return stripInternalClisbotMcpServer(config);
 }
 
 export { AGENT_LIFECYCLE_STATUSES, type AgentLifecycleStatus };
@@ -400,9 +400,9 @@ export interface AgentManagerOptions {
   mcpBaseUrl?: string;
   mcpAuthToken?: string;
   pluginAgentTools?: PluginAgentToolsRuntime;
-  paseoToolsEnabled?: boolean;
-  paseoToolCatalogFactory?: PaseoToolCatalogFactory;
-  resolvePaseoToolPolicy?: (provider: AgentProvider) => ProviderPaseoToolsPolicy | undefined;
+  clisbotToolsEnabled?: boolean;
+  clisbotToolCatalogFactory?: ClisbotToolCatalogFactory;
+  resolveClisbotToolPolicy?: (provider: AgentProvider) => ProviderClisbotToolsPolicy | undefined;
   appendSystemPrompt?: string;
   agentStreamCoalesceWindowMs?: number;
   rescueTimeouts?: AgentManagerRescueTimeouts;
@@ -536,7 +536,7 @@ interface ManagedAgentBase {
    * User-defined labels for categorizing agents (e.g., { surface: "workspace" }).
    */
   labels: Record<string, string>;
-  /** Plugin-owned data. Paseo persists and forwards it and never reads a key. */
+  /** Plugin-owned data. Clisbot persists and forwards it and never reads a key. */
   metadata: AgentMetadata;
 }
 
@@ -747,8 +747,8 @@ function agentEntityData(source?: { labels?: Record<string, string>; metadata?: 
   return { labels: source?.labels ?? {}, metadata: source?.metadata ?? {} };
 }
 
-// PASEO_WORKSPACE_ID lets an agent rename or archive its own workspace; several workspaces can
-// share one cwd, so the agent can't work it out from PASEO_AGENT_CWD.
+// CLISBOT_WORKSPACE_ID lets an agent rename or archive its own workspace; several workspaces can
+// share one cwd, so the agent can't work it out from CLISBOT_AGENT_CWD.
 function agentIdentityEnv({
   agentId,
   cwd,
@@ -760,9 +760,9 @@ function agentIdentityEnv({
 }): Record<string, string> {
   const workspaceId = opening?.workspaceId;
   return {
-    PASEO_AGENT_ID: agentId,
-    PASEO_AGENT_CWD: cwd,
-    ...(workspaceId ? { PASEO_WORKSPACE_ID: workspaceId } : {}),
+    CLISBOT_AGENT_ID: agentId,
+    CLISBOT_AGENT_CWD: cwd,
+    ...(workspaceId ? { CLISBOT_WORKSPACE_ID: workspaceId } : {}),
   };
 }
 
@@ -941,12 +941,12 @@ export class AgentManager {
   private readonly sessionOpenGenerations = new Map<string, number>();
   private readonly attachedPluginTools = new Map<string, AttachedAgentTool[]>();
   private readonly pluginAgentTools: PluginAgentToolsRuntime | undefined;
-  private paseoToolsEnabled = true;
-  private paseoToolCatalogFactory: PaseoToolCatalogFactory | null = null;
-  private readonly paseoToolPolicies = new Map<string, ProviderPaseoToolsPolicy | undefined>();
-  private readonly resolvePaseoToolPolicy: (
+  private clisbotToolsEnabled = true;
+  private clisbotToolCatalogFactory: ClisbotToolCatalogFactory | null = null;
+  private readonly clisbotToolPolicies = new Map<string, ProviderClisbotToolsPolicy | undefined>();
+  private readonly resolveClisbotToolPolicy: (
     provider: AgentProvider,
-  ) => ProviderPaseoToolsPolicy | undefined;
+  ) => ProviderClisbotToolsPolicy | undefined;
   private appendSystemPrompt: string;
   private onAgentAttention?: AgentAttentionCallback;
   private onAgentArchived?: AgentArchivedCallback;
@@ -967,8 +967,8 @@ export class AgentManager {
     this.onWorkspaceStateMayHaveChanged = options?.onWorkspaceStateMayHaveChanged;
     this.mcpBaseUrl = options?.mcpBaseUrl ?? null;
     this.mcpAuthToken = options?.mcpAuthToken ?? null;
-    this.configurePaseoTools(options);
-    this.resolvePaseoToolPolicy = options.resolvePaseoToolPolicy ?? (() => undefined);
+    this.configureClisbotTools(options);
+    this.resolveClisbotToolPolicy = options.resolveClisbotToolPolicy ?? (() => undefined);
     this.appendSystemPrompt = options.appendSystemPrompt ?? "";
     this.logger = options.logger.child({ module: "agent", component: "agent-manager" });
     this.rescueTimeouts = {
@@ -992,9 +992,9 @@ export class AgentManager {
     });
   }
 
-  private configurePaseoTools(options: AgentManagerOptions): void {
-    this.paseoToolsEnabled = options.paseoToolsEnabled ?? true;
-    this.paseoToolCatalogFactory = options.paseoToolCatalogFactory ?? null;
+  private configureClisbotTools(options: AgentManagerOptions): void {
+    this.clisbotToolsEnabled = options.clisbotToolsEnabled ?? true;
+    this.clisbotToolCatalogFactory = options.clisbotToolCatalogFactory ?? null;
   }
 
   registerClient(provider: AgentProvider, client: AgentClient): void {
@@ -1055,12 +1055,12 @@ export class AgentManager {
     this.acceptingAgentRegistrations = false;
   }
 
-  setPaseoToolsEnabled(enabled: boolean): void {
-    this.paseoToolsEnabled = enabled;
+  setClisbotToolsEnabled(enabled: boolean): void {
+    this.clisbotToolsEnabled = enabled;
   }
 
-  setPaseoToolCatalogFactory(factory: PaseoToolCatalogFactory | null): void {
-    this.paseoToolCatalogFactory = factory;
+  setClisbotToolCatalogFactory(factory: ClisbotToolCatalogFactory | null): void {
+    this.clisbotToolCatalogFactory = factory;
   }
 
   invalidatePluginSessions(): void {
@@ -1119,8 +1119,8 @@ export class AgentManager {
     this.pluginAgentTools?.detachTools(agentId);
   }
 
-  getPaseoToolPolicy(agentId: string): ProviderPaseoToolsPolicy | undefined {
-    return this.paseoToolPolicies.get(agentId);
+  getClisbotToolPolicy(agentId: string): ProviderClisbotToolsPolicy | undefined {
+    return this.clisbotToolPolicies.get(agentId);
   }
 
   /**
@@ -1661,7 +1661,7 @@ export class AgentManager {
       options = { ...options, env: request.env, metadata: request.metadata ?? options.metadata };
     }
     await this.deleteAgentState(resolvedAgentId);
-    const { storedConfig, launchConfig, paseoToolPolicy } = await this.prepareSessionConfig(
+    const { storedConfig, launchConfig, clisbotToolPolicy } = await this.prepareSessionConfig(
       config,
       resolvedAgentId,
       { env: options?.env },
@@ -1670,12 +1670,12 @@ export class AgentManager {
     const client = await this.requireAvailableClient({
       provider: storedConfig.provider,
     });
-    this.paseoToolPolicies.set(resolvedAgentId, paseoToolPolicy);
+    this.clisbotToolPolicies.set(resolvedAgentId, clisbotToolPolicy);
     const launchContext = await this.buildLaunchContext(
       resolvedAgentId,
       client,
       storedConfig.cwd,
-      paseoToolPolicy,
+      clisbotToolPolicy,
       options?.env,
       {
         reason: "create",
@@ -1793,7 +1793,7 @@ export class AgentManager {
 
     const launchEnv = record?.launchEnv;
     const workspaceId = resolveResumeWorkspaceId({ options, record });
-    const { storedConfig, launchConfig, paseoToolPolicy } = await this.prepareSessionConfig(
+    const { storedConfig, launchConfig, clisbotToolPolicy } = await this.prepareSessionConfig(
       mergedConfig,
       resolvedAgentId,
       { purpose, env: launchEnv },
@@ -1805,12 +1805,12 @@ export class AgentManager {
         `Provider '${handle.provider}' is not available. Please ensure the CLI is installed.`,
       );
     }
-    this.paseoToolPolicies.set(resolvedAgentId, paseoToolPolicy);
+    this.clisbotToolPolicies.set(resolvedAgentId, clisbotToolPolicy);
     const launchContext = await this.buildLaunchContext(
       resolvedAgentId,
       client,
       storedConfig.cwd,
-      paseoToolPolicy,
+      clisbotToolPolicy,
       launchEnv,
       {
         reason: "resume",
@@ -1880,7 +1880,7 @@ export class AgentManager {
       throw new Error(`Provider '${input.provider}' does not support importing sessions`);
     }
 
-    const { storedConfig, launchConfig, paseoToolPolicy } = await this.prepareSessionConfig(
+    const { storedConfig, launchConfig, clisbotToolPolicy } = await this.prepareSessionConfig(
       {
         provider: input.provider,
         cwd: input.cwd,
@@ -1888,12 +1888,12 @@ export class AgentManager {
       resolvedAgentId,
       { resolveDefaultModel: false },
     );
-    this.paseoToolPolicies.set(resolvedAgentId, paseoToolPolicy);
+    this.clisbotToolPolicies.set(resolvedAgentId, clisbotToolPolicy);
     const launchContext = await this.buildLaunchContext(
       resolvedAgentId,
       client,
       storedConfig.cwd,
-      paseoToolPolicy,
+      clisbotToolPolicy,
       undefined,
       {
         reason: "import",
@@ -1916,7 +1916,7 @@ export class AgentManager {
     try {
       const runtimeInfo = await imported.session.getRuntimeInfo();
       const importedConfig = await this.normalizeConfig(
-        stripInternalPaseoMcpServer({
+        stripInternalClisbotMcpServer({
           ...imported.config,
           model: runtimeInfo.model ?? imported.config.model,
         }),
@@ -1955,7 +1955,7 @@ export class AgentManager {
   // config swaps). When `rehydrateFromDisk` is set, the timeline is wiped so a
   // new epoch is minted and provider history is re-streamed — this is what the
   // user-facing "Reload agent" action wants when the on-disk session was
-  // mutated outside Paseo.
+  // mutated outside Clisbot.
   reloadAgentSession(
     agentId: string,
     overrides?: Partial<AgentSessionConfig>,
@@ -1993,18 +1993,18 @@ export class AgentManager {
       ...overrides,
       provider,
     } as AgentSessionConfig;
-    const { storedConfig, launchConfig, paseoToolPolicy } = await this.prepareSessionConfig(
+    const { storedConfig, launchConfig, clisbotToolPolicy } = await this.prepareSessionConfig(
       refreshConfig,
       agentId,
       { env: existing.launchEnv },
     );
-    const hadPreviousPaseoToolPolicy = this.paseoToolPolicies.has(agentId);
-    const previousPaseoToolPolicy = this.paseoToolPolicies.get(agentId);
+    const hadPreviousClisbotToolPolicy = this.clisbotToolPolicies.has(agentId);
+    const previousClisbotToolPolicy = this.clisbotToolPolicies.get(agentId);
     const launchContext = await this.buildLaunchContext(
       agentId,
       client,
       storedConfig.cwd,
-      paseoToolPolicy,
+      clisbotToolPolicy,
       existing.launchEnv,
       {
         reason: "refresh",
@@ -2018,7 +2018,8 @@ export class AgentManager {
     );
     const providerLaunchConfig = this.resolveProviderLaunchConfig(launchConfig, launchContext);
     if (
-      Object.keys(stripInternalPaseoMcpServer(providerLaunchConfig).mcpServers ?? {}).length > 0 &&
+      Object.keys(stripInternalClisbotMcpServer(providerLaunchConfig).mcpServers ?? {}).length >
+        0 &&
       existing.session.capabilities.supportsMcpServers !== true
     ) {
       throw this.unsupportedMcpError(providerLaunchConfig, launchContext);
@@ -2037,7 +2038,7 @@ export class AgentManager {
       await this.persistSnapshot(closedExisting);
       this.assertAcceptingAgentRegistrations();
 
-      this.paseoToolPolicies.set(agentId, paseoToolPolicy);
+      this.clisbotToolPolicies.set(agentId, clisbotToolPolicy);
       const launchedOptions = this.launchOptionsFor({ client, own: storedConfig.providerOptions });
       session = handle
         ? await client.resumeSession(handle, providerLaunchConfig, launchContext)
@@ -2087,10 +2088,10 @@ export class AgentManager {
     } finally {
       if (!handedToRegistration) {
         this.detachPluginTools(agentId);
-        if (hadPreviousPaseoToolPolicy) {
-          this.paseoToolPolicies.set(agentId, previousPaseoToolPolicy);
+        if (hadPreviousClisbotToolPolicy) {
+          this.clisbotToolPolicies.set(agentId, previousClisbotToolPolicy);
         } else {
-          this.paseoToolPolicies.delete(agentId);
+          this.clisbotToolPolicies.delete(agentId);
         }
         if (session) {
           await this.closeUnregisteredSession(session);
@@ -4689,7 +4690,7 @@ export class AgentManager {
     launchContext: AgentLaunchContext,
   ): Promise<void> {
     if (
-      Object.keys(stripInternalPaseoMcpServer(launchConfig).mcpServers ?? {}).length === 0 ||
+      Object.keys(stripInternalClisbotMcpServer(launchConfig).mcpServers ?? {}).length === 0 ||
       session.capabilities.supportsMcpServers === true
     ) {
       return;
@@ -4869,7 +4870,7 @@ export class AgentManager {
 
   private discardRetainedAgentState(agentId: string): void {
     this.timelineStore.delete(agentId);
-    this.paseoToolPolicies.delete(agentId);
+    this.clisbotToolPolicies.delete(agentId);
     this.detachPluginTools(agentId);
     for (const event of this.providerSubagents.deleteParent(agentId)) {
       this.dispatch({ type: "provider_subagent", event });
@@ -6459,26 +6460,26 @@ export class AgentManager {
     agentId: string,
     options: NormalizeConfigOptions = {},
   ): Promise<PreparedSessionConfig> {
-    const storedConfig = await this.normalizeConfig(stripInternalPaseoMcpServer(config), {
+    const storedConfig = await this.normalizeConfig(stripInternalClisbotMcpServer(config), {
       env: options.env,
       purpose: options.purpose,
       resolveDefaultModel: options.resolveDefaultModel,
     });
-    const paseoToolPolicy = this.paseoToolsEnabled
-      ? this.resolvePaseoToolPolicy(storedConfig.provider)
+    const clisbotToolPolicy = this.clisbotToolsEnabled
+      ? this.resolveClisbotToolPolicy(storedConfig.provider)
       : { enabled: false };
     const launchConfig = this.applyDaemonAppendSystemPrompt(
-      withRuntimePaseoMcpServer({
+      withRuntimeClisbotMcpServer({
         config: storedConfig,
         agentId,
         mcpBaseUrl:
-          this.paseoToolsEnabled && isPaseoToolPolicyEnabled(paseoToolPolicy)
+          this.clisbotToolsEnabled && isClisbotToolPolicyEnabled(clisbotToolPolicy)
             ? this.mcpBaseUrl
             : null,
         mcpAuthToken: this.mcpAuthToken,
       }),
     );
-    return { storedConfig, launchConfig, paseoToolPolicy };
+    return { storedConfig, launchConfig, clisbotToolPolicy };
   }
 
   private applyDaemonAppendSystemPrompt(config: AgentSessionConfig): AgentSessionConfig {
@@ -6498,7 +6499,7 @@ export class AgentManager {
     agentId: string,
     client: AgentClient,
     cwd: string,
-    paseoToolPolicy: ProviderPaseoToolsPolicy | undefined,
+    clisbotToolPolicy: ProviderClisbotToolsPolicy | undefined,
     env?: Record<string, string>,
     opening?: {
       reason: PluginSessionOpenRequest["reason"];
@@ -6551,19 +6552,19 @@ export class AgentManager {
       },
     };
     const useNativeTools =
-      this.paseoToolsEnabled &&
-      isPaseoToolPolicyEnabled(paseoToolPolicy) &&
-      client.capabilities.supportsNativePaseoTools;
+      this.clisbotToolsEnabled &&
+      isClisbotToolPolicyEnabled(clisbotToolPolicy) &&
+      client.capabilities.supportsNativeClisbotTools;
     if (
-      this.paseoToolCatalogFactory &&
+      this.clisbotToolCatalogFactory &&
       (useNativeTools || this.getPluginTools(agentId).length > 0)
     ) {
       try {
-        const catalog = await this.paseoToolCatalogFactory({
+        const catalog = await this.clisbotToolCatalogFactory({
           callerAgentId: agentId,
-          paseoToolPolicy,
+          clisbotToolPolicy,
         });
-        if (useNativeTools) context.paseoTools = catalog;
+        if (useNativeTools) context.clisbotTools = catalog;
       } catch (error) {
         this.detachPluginTools(agentId);
         throw error;
@@ -6578,14 +6579,14 @@ export class AgentManager {
     launchContext: AgentLaunchContext,
   ): AgentSessionConfig {
     const savedServerNames = new Set(
-      Object.keys(stripInternalPaseoMcpServer(launchConfig).mcpServers ?? {}),
+      Object.keys(stripInternalClisbotMcpServer(launchConfig).mcpServers ?? {}),
     );
     for (const name of Object.keys(launchContext.mcpServers ?? {})) {
       const owner = launchContext.mcpServerOwners?.[name];
-      if (name === PASEO_MCP_SERVER_NAME || savedServerNames.has(name)) {
+      if (name === CLISBOT_MCP_SERVER_NAME || savedServerNames.has(name)) {
         const existingOwner = savedServerNames.has(name)
           ? "agent saved configuration"
-          : "Paseo internal MCP server";
+          : "Clisbot internal MCP server";
         throw new Error(`MCP server '${name}' from plugin ${owner} collides with ${existingOwner}`);
       }
     }
@@ -6597,7 +6598,7 @@ export class AgentManager {
             mcpServers: { ...launchConfig.mcpServers, ...launchContext.mcpServers },
           }
         : launchConfig;
-    return launchContext.paseoTools ? stripInternalPaseoMcpServer(merged) : merged;
+    return launchContext.clisbotTools ? stripInternalClisbotMcpServer(merged) : merged;
   }
 
   private async requireAvailableClient(options: { provider: AgentProvider }): Promise<AgentClient> {

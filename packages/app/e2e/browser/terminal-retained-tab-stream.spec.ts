@@ -73,7 +73,7 @@ test.describe("retained terminal tab streams", () => {
       page,
     }) => {
       await page.addInitScript(() => {
-        const key = "@paseo:app-settings";
+        const key = "@clisbot:app-settings";
         const settings = JSON.parse(localStorage.getItem(key) ?? "{}");
         localStorage.setItem(key, JSON.stringify({ ...settings, terminalScrollbackLines: 10000 }));
       });

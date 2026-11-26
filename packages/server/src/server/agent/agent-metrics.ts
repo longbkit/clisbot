@@ -21,7 +21,7 @@ function sanitizeMetric(value: unknown): AgentMetric | null {
 
 /**
  * The one place provider metrics are checked. Providers build them from SDK and
- * process output Paseo does not control, and one malformed row would make a
+ * process output Clisbot does not control, and one malformed row would make a
  * client reject the whole snapshot, turn event, or timeline page that carries it.
  */
 export function sanitizeAgentMetrics(value: unknown): AgentMetric[] {

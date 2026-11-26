@@ -3,7 +3,7 @@
 //   npx tsx assets/store-screenshots/demo/stage.mts
 //
 // Starts an in-process daemon on DEMO_PORT (default 7791) with scripted Claude
-// Code and Codex clients, adds a local clone of this repository as the `paseo`
+// Code and Codex clients, adds a local clone of this repository as the `clisbot`
 // project, cuts real worktrees, applies a real change to the hero worktree, and
 // opens a terminal there. Leave it running while you capture.
 import { execFileSync, execSync } from "node:child_process";
@@ -11,7 +11,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createTestPaseoDaemon } from "../../../packages/server/src/server/test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../../../packages/server/src/server/test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../../../packages/server/src/server/test-utils/daemon-client.js";
 import { type AgentScript, ScriptedAgentClient } from "./scripted-agents.mjs";
 
@@ -27,7 +27,7 @@ const claudeScripts: AgentScript[] = [];
 const codexScripts: AgentScript[] = [];
 
 function git(cwd: string, ...args: string[]): string {
-  return execFileSync("git", ["-c", "user.name=Mo", "-c", "user.email=mo@paseo.sh", ...args], {
+  return execFileSync("git", ["-c", "user.name=Mo", "-c", "user.email=mo@clisbot.com", ...args], {
     cwd,
     encoding: "utf8",
   });
@@ -40,16 +40,16 @@ function run(cwd: string, command: string): string {
 async function prepareRepos(): Promise<void> {
   // A fresh clone each run: worktrees from an earlier run stay registered in it.
   // Worktree setup (npm ci, builds) is dropped so new worktrees open instantly.
-  const paseo = path.join(codeRoot, "paseo");
-  await rm(paseo, { recursive: true, force: true });
+  const clisbot = path.join(codeRoot, "clisbot");
+  await rm(clisbot, { recursive: true, force: true });
   await mkdir(codeRoot, { recursive: true });
-  execFileSync("git", ["clone", "-q", "--local", repoRoot, paseo]);
-  git(paseo, "checkout", "-q", "-B", "main");
-  git(paseo, "remote", "remove", "origin");
-  const config = JSON.parse(await readFile(path.join(paseo, "paseo.json"), "utf8"));
+  execFileSync("git", ["clone", "-q", "--local", repoRoot, clisbot]);
+  git(clisbot, "checkout", "-q", "-B", "main");
+  git(clisbot, "remote", "remove", "origin");
+  const config = JSON.parse(await readFile(path.join(clisbot, "clisbot.json"), "utf8"));
   delete config.worktree;
-  await writeFile(path.join(paseo, "paseo.json"), `${JSON.stringify(config, null, 2)}\n`);
-  git(paseo, "commit", "-qam", "chore: skip worktree setup in demo");
+  await writeFile(path.join(clisbot, "clisbot.json"), `${JSON.stringify(config, null, 2)}\n`);
+  git(clisbot, "commit", "-qam", "chore: skip worktree setup in demo");
   const dotfiles = path.join(codeRoot, "dotfiles");
   if (!existsSync(dotfiles)) {
     await mkdir(dotfiles, { recursive: true });
@@ -67,14 +67,14 @@ async function main(): Promise<void> {
   await rm(home, { recursive: true, force: true });
   await mkdir(home, { recursive: true });
 
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: {
       claude: new ScriptedAgentClient("claude", claudeScripts),
       codex: new ScriptedAgentClient("codex", codexScripts),
     },
     listen: "127.0.0.1",
     listenPort: port,
-    paseoHomeRoot: home,
+    clisbotHomeRoot: home,
     mcpEnabled: false,
     cleanup: false,
     pluginsEnabled: true,
@@ -89,16 +89,16 @@ async function main(): Promise<void> {
   await client.connect();
   await client.fetchAgents({ subscribe: {} });
 
-  const paseo = await client.addProject(path.join(codeRoot, "paseo"));
+  const clisbot = await client.addProject(path.join(codeRoot, "clisbot"));
   const dotfiles = await client.addProject(path.join(codeRoot, "dotfiles"));
-  const paseoProjectId = paseo.project!.projectId;
+  const clisbotProjectId = clisbot.project!.projectId;
 
   async function worktree(title: string, branchName: string) {
     const result = await client.createWorkspace({
       title,
       source: {
         kind: "worktree",
-        projectId: paseoProjectId,
+        projectId: clisbotProjectId,
         action: "branch-off",
         baseBranch: "main",
         branchName,
@@ -305,7 +305,7 @@ async function main(): Promise<void> {
           name: "Bash",
           detail: {
             type: "shell",
-            command: "npm run test --workspace=@getpaseo/app -- i18n",
+            command: "npm run test --workspace=@clisbot/app -- i18n",
             output: "Test Files  3 passed (3)\n     Tests  41 passed (41)\n",
             exitCode: 0,
           },
@@ -371,8 +371,8 @@ async function main(): Promise<void> {
           name: "Write",
           detail: {
             type: "write",
-            filePath: "plugins/preview-deploys/paseo-plugin.json",
-            content: pluginSource("paseo-plugin.json"),
+            filePath: "plugins/preview-deploys/clisbot-plugin.json",
+            content: pluginSource("clisbot-plugin.json"),
           },
         },
         {
@@ -389,7 +389,7 @@ async function main(): Promise<void> {
           name: "Bash",
           detail: {
             type: "shell",
-            command: "paseo plugin install ./plugins/preview-deploys",
+            command: "clisbot plugin install ./plugins/preview-deploys",
             output: "Installed preview-deploys\n",
             exitCode: 0,
           },
@@ -531,11 +531,11 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log(`READY port=${daemon.port} home=${daemon.paseoHome}`);
+  console.log(`READY port=${daemon.port} home=${daemon.clisbotHome}`);
   await writeFile(
     path.join(demoRoot, "state.json"),
     JSON.stringify(
-      { port: daemon.port, home: daemon.paseoHome, hero: { workspaceId: jitter.id, cwd } },
+      { port: daemon.port, home: daemon.clisbotHome, hero: { workspaceId: jitter.id, cwd } },
       null,
       2,
     ),

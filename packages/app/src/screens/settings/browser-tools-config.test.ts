@@ -1,4 +1,4 @@
-import type { MutableDaemonConfig } from "@getpaseo/protocol/messages";
+import type { MutableDaemonConfig } from "@clisbot/protocol/messages";
 import { describe, expect, it } from "vitest";
 import {
   BROWSER_TOOLS_WARNING,

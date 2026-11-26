@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { CheckoutPrStatusSchema } from "@getpaseo/protocol/messages";
+import { CheckoutPrStatusSchema } from "@clisbot/protocol/messages";
 import { i18n } from "@/i18n/i18next";
 
 import {
@@ -79,7 +79,7 @@ function createInput(
     hasRemote: false,
     hasFirstPushRemote: rest.hasRemote ?? false,
     upstream: "tracked",
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     isOnBaseBranch: true,
     canMergeLocally: true,
     hasUncommittedChanges: false,
@@ -236,7 +236,7 @@ describe("git-actions-policy", () => {
   it("offers local merge when the selected local base starts with origin slash", () => {
     const actions = buildGitActions(
       createInput({
-        isPaseoOwnedWorktree: true,
+        isClisbotOwnedWorktree: true,
         isOnBaseBranch: isCurrentBranchBase("release", "refs/heads/origin/release"),
         canMergeLocally: canMergeIntoLocalBase("release", "refs/heads/origin/release"),
         baseRefLabel: "origin/release",
@@ -250,7 +250,7 @@ describe("git-actions-policy", () => {
   it("offers update but not local merge for a non-origin remote base", () => {
     const actions = buildGitActions(
       createInput({
-        isPaseoOwnedWorktree: true,
+        isClisbotOwnedWorktree: true,
         isOnBaseBranch: false,
         canMergeLocally: canMergeIntoLocalBase("feature", "refs/remotes/upstream/release"),
         baseRefLabel: "upstream/release",
@@ -268,7 +268,7 @@ describe("git-actions-policy", () => {
   it("does not offer merging into the current local branch when the remote base shares its name", () => {
     const actions = buildGitActions(
       createInput({
-        isPaseoOwnedWorktree: true,
+        isClisbotOwnedWorktree: true,
         isOnBaseBranch: false,
         canMergeLocally: canMergeIntoLocalBase("release", "refs/remotes/origin/release"),
         baseRefLabel: "release",
@@ -286,7 +286,7 @@ describe("git-actions-policy", () => {
   it("offers update from the same-named remote base when it is ahead", () => {
     const actions = buildGitActions(
       createInput({
-        isPaseoOwnedWorktree: true,
+        isClisbotOwnedWorktree: true,
         isOnBaseBranch: isCurrentBranchBase("release", "refs/remotes/origin/release"),
         baseRefLabel: "release",
         behindBaseCount: 1,
@@ -349,12 +349,12 @@ describe("git-actions-policy", () => {
     });
   });
 
-  it("keeps push available for a no-upstream Paseo worktree with local commits", () => {
+  it("keeps push available for a no-upstream Clisbot worktree with local commits", () => {
     const actions = buildGitActions(
       createInput({
         hasRemote: true,
         upstream: "none",
-        isPaseoOwnedWorktree: true,
+        isClisbotOwnedWorktree: true,
         isOnBaseBranch: false,
         aheadCount: 1,
         aheadOfOrigin: null,
@@ -369,12 +369,12 @@ describe("git-actions-policy", () => {
     });
   });
 
-  it("re-publishes a Paseo worktree branch whose remote copy was deleted", () => {
+  it("re-publishes a Clisbot worktree branch whose remote copy was deleted", () => {
     const actions = buildGitActions(
       createInput({
         hasRemote: true,
         upstream: "gone",
-        isPaseoOwnedWorktree: true,
+        isClisbotOwnedWorktree: true,
         isOnBaseBranch: false,
         aheadCount: 2,
         aheadOfOrigin: null,
@@ -442,9 +442,9 @@ describe("git-actions-policy", () => {
       );
     });
 
-    it("keeps offering Push in a Paseo worktree when Git pushes the branch to another remote", () => {
+    it("keeps offering Push in a Clisbot worktree when Git pushes the branch to another remote", () => {
       const actions = buildGitActions(
-        createInput({ ...neverPushed, hasFirstPushRemote: false, isPaseoOwnedWorktree: true }),
+        createInput({ ...neverPushed, hasFirstPushRemote: false, isClisbotOwnedWorktree: true }),
       );
 
       expect(actions.primary).toMatchObject({ id: "push", label: "Push" });
@@ -489,9 +489,9 @@ describe("git-actions-policy", () => {
       expect(pushActionOf(actions)?.unavailableMessage).toEqual(expect.any(String));
     });
 
-    it("keeps offering Push in a Paseo worktree", () => {
+    it("keeps offering Push in a Clisbot worktree", () => {
       const actions = buildGitActions(
-        createInput({ ...unreadableUpstream, isPaseoOwnedWorktree: true }),
+        createInput({ ...unreadableUpstream, isClisbotOwnedWorktree: true }),
       );
 
       expect(actions.primary).toMatchObject({ id: "push", label: "Push" });
@@ -508,14 +508,14 @@ describe("git-actions-policy", () => {
         readUpstreamState({
           upstreamState: "none",
           aheadOfOrigin: null,
-          isPaseoOwnedWorktree: false,
+          isClisbotOwnedWorktree: false,
         }),
       ).toBe("none");
       expect(
         readUpstreamState({
           upstreamState: "gone",
           aheadOfOrigin: null,
-          isPaseoOwnedWorktree: true,
+          isClisbotOwnedWorktree: true,
         }),
       ).toBe("gone");
     });
@@ -525,21 +525,21 @@ describe("git-actions-policy", () => {
         readUpstreamState({
           upstreamState: undefined,
           aheadOfOrigin: 1,
-          isPaseoOwnedWorktree: false,
+          isClisbotOwnedWorktree: false,
         }),
       ).toBe("tracked");
       expect(
         readUpstreamState({
           upstreamState: undefined,
           aheadOfOrigin: null,
-          isPaseoOwnedWorktree: true,
+          isClisbotOwnedWorktree: true,
         }),
       ).toBe("none");
       expect(
         readUpstreamState({
           upstreamState: undefined,
           aheadOfOrigin: null,
-          isPaseoOwnedWorktree: false,
+          isClisbotOwnedWorktree: false,
         }),
       ).toBe("unknown");
     });
@@ -551,7 +551,7 @@ describe("git-actions-policy", () => {
           upstream: readUpstreamState({
             upstreamState: undefined,
             aheadOfOrigin: null,
-            isPaseoOwnedWorktree: false,
+            isClisbotOwnedWorktree: false,
           }),
           isOnBaseBranch: false,
           aheadCount: 1,
@@ -764,7 +764,7 @@ describe("git-actions-policy", () => {
   it("offers archive workspace for Git checkouts and worktrees", () => {
     const localCheckout = buildGitActions(createInput({ hasUncommittedChanges: true }));
     const worktree = buildGitActions(
-      createInput({ hasUncommittedChanges: true, isPaseoOwnedWorktree: true }),
+      createInput({ hasUncommittedChanges: true, isClisbotOwnedWorktree: true }),
     );
 
     expect(localCheckout.secondary.some((action) => action.id === "archive-workspace")).toBe(true);
@@ -778,8 +778,8 @@ describe("git-actions-policy", () => {
     expect(actions.secondary.some((action) => action.id === "archive-workspace")).toBe(true);
   });
 
-  it("still promotes archive as primary for an idle Paseo-owned worktree", () => {
-    const actions = buildGitActions(createInput({ isPaseoOwnedWorktree: true }));
+  it("still promotes archive as primary for an idle Clisbot-owned worktree", () => {
+    const actions = buildGitActions(createInput({ isClisbotOwnedWorktree: true }));
 
     expect(actions.primary).toMatchObject({ id: "archive-workspace" });
   });
@@ -1405,7 +1405,7 @@ describe("git-actions-policy", () => {
         pullRequestState: "open",
         pullRequestMergeable: "MERGEABLE",
         pullRequestGithub: githubStatus(),
-        isPaseoOwnedWorktree: true,
+        isClisbotOwnedWorktree: true,
       }),
     );
 

@@ -13,7 +13,7 @@ import {
 } from "./window-state";
 
 async function createTempUserDataDir(): Promise<string> {
-  return await mkdtemp(path.join(os.tmpdir(), "paseo-window-state-"));
+  return await mkdtemp(path.join(os.tmpdir(), "clisbot-window-state-"));
 }
 
 function stateFilePath(userDataPath: string): string {

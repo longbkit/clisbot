@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import type { MutableDaemonConfig, MutableDaemonConfigPatch } from "@getpaseo/protocol/messages";
+import type { MutableDaemonConfig, MutableDaemonConfigPatch } from "@clisbot/protocol/messages";
 import { useReplicaQuery } from "@/data/query";
 import { daemonConfigQueryKey } from "@/data/daemon-config";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";

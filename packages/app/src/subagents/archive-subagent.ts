@@ -1,4 +1,4 @@
-import { isAgentRunning } from "@getpaseo/protocol/agent-state-bucket";
+import { isAgentRunning } from "@clisbot/protocol/agent-state-bucket";
 import type { Agent } from "@/stores/session-store";
 import type { ConfirmDialogInput } from "@/utils/confirm-dialog";
 

@@ -1,4 +1,4 @@
-import type { LocalSpeechModel } from "@getpaseo/protocol/speech/rpc-schemas";
+import type { LocalSpeechModel } from "@clisbot/protocol/speech/rpc-schemas";
 
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
 import { LocalSpeechModelIdSchema } from "../../speech/providers/local/models.js";

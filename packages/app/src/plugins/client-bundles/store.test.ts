@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { expect, test } from "vitest";
 import { createPluginClientBundleStore, type PluginBundleFiles } from "./store";
 

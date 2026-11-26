@@ -3,7 +3,7 @@
 # or the long timing breakdown. Vitest drops its colors when piped, so the
 # wrapper puts its usual green checks and grey timings back.
 export FORCE_COLOR=1
-__where() { local top; top=$(git rev-parse --show-toplevel 2>/dev/null); printf '~/paseo%s' "${PWD#"$top"}"; }
+__where() { local top; top=$(git rev-parse --show-toplevel 2>/dev/null); printf '~/clisbot%s' "${PWD#"$top"}"; }
 __branch() { git branch --show-current 2>/dev/null; }
 __dirty() { [ -n "$(git status --porcelain 2>/dev/null)" ] && printf '*'; }
 PROMPT_COMMAND='printf "\e]0;zsh\a"'

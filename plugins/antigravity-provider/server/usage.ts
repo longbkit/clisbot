@@ -1,15 +1,15 @@
 import { homedir } from "node:os";
 import path from "node:path";
 import { z } from "zod";
-import { execCommand } from "@getpaseo/plugin/server";
-import type { ProviderLaunch } from "@getpaseo/plugin/server/provider";
+import { execCommand } from "@clisbot/plugin/server";
+import type { ProviderLaunch } from "@clisbot/plugin/server/provider";
 import {
   hashAccountKey,
   toneFromUsedPct,
   unavailable,
   windowFromUsedPct,
   type UsageSourceRegistration,
-} from "@getpaseo/plugin/server/usage";
+} from "@clisbot/plugin/server/usage";
 
 const input = z.object({ launch: z.string() }).strict();
 const response = z.object({

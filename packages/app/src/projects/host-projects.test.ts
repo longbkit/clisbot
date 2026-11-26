@@ -149,7 +149,7 @@ describe("host project lookups", () => {
           currentBranch: "main",
           remoteUrl: "https://github.com/acme/app.git",
           worktreeRoot: "/repo/app",
-          isPaseoOwnedWorktree: false,
+          isClisbotOwnedWorktree: false,
           mainRepoRoot: null,
         },
       },

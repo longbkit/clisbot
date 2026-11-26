@@ -6,19 +6,19 @@ import { withOutput } from "../../output/index.js";
 import { addJsonAndDaemonHostOptions } from "../../utils/command-options.js";
 
 export function createWorktreeCommand(): Command {
-  const worktree = new Command("worktree").description("Manage Paseo-managed git worktrees");
+  const worktree = new Command("worktree").description("Manage Clisbot-managed git worktrees");
 
   addJsonAndDaemonHostOptions(
     worktree
       .command("ls")
-      .description("List Paseo-managed git worktrees")
+      .description("List Clisbot-managed git worktrees")
       .option("--cwd <path>", "Repository directory (default: current)"),
   ).action(withOutput(runLsCommand));
 
   addJsonAndDaemonHostOptions(
     worktree
       .command("create")
-      .description("Create a Paseo-managed git worktree")
+      .description("Create a Clisbot-managed git worktree")
       .option("--mode <mode>", "Creation mode: branch-off, checkout-branch, or checkout-pr")
       .option("--new-branch <name>", "New branch name (--mode branch-off)")
       .option(

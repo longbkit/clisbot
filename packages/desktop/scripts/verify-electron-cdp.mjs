@@ -3,7 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import { chromium } from "playwright";
 
-const CDP_PORT = process.env.PASEO_ELECTRON_REMOTE_DEBUGGING_PORT ?? "9223";
+const CDP_PORT = process.env.CLISBOT_ELECTRON_REMOTE_DEBUGGING_PORT ?? "9223";
 const EXPO_PORT = process.env.EXPO_PORT ?? "8082";
 const CDP_URL = process.env.CDP_URL ?? `http://127.0.0.1:${CDP_PORT}`;
 const OUTPUT_DIR = process.env.ELECTRON_VERIFY_OUTPUT_DIR ?? "/tmp/electron-verification";
@@ -114,13 +114,13 @@ function settingsGeometryClearsWindowChrome(geometry, platform) {
 async function readBridgeFullscreen(page) {
   return page.evaluate(
     async () =>
-      (await window.paseoDesktop?.window?.getCurrentWindow?.()?.isFullscreen?.()) === true,
+      (await window.clisbotDesktop?.window?.getCurrentWindow?.()?.isFullscreen?.()) === true,
   );
 }
 
 async function setNativeFullscreen(page, fullscreen) {
   await page.evaluate(async (nextFullscreen) => {
-    const win = window.paseoDesktop?.window?.getCurrentWindow?.();
+    const win = window.clisbotDesktop?.window?.getCurrentWindow?.();
     if (typeof win?.setFullscreen !== "function") throw new Error("setFullscreen is unavailable");
     await win.setFullscreen(nextFullscreen);
   }, fullscreen);
@@ -357,7 +357,7 @@ async function inspectFullscreenWindowChrome(page, platform) {
     await waitForBridgeFullscreen(page, true);
 
     const details = await page.evaluate(async () => {
-      const bridge = window.paseoDesktop?.window?.getCurrentWindow?.();
+      const bridge = window.clisbotDesktop?.window?.getCurrentWindow?.();
       const bridgeFullscreen =
         typeof bridge?.isFullscreen === "function" ? await bridge.isFullscreen() : null;
       return { bridgeFullscreen };
@@ -522,7 +522,7 @@ async function navigateToWelcome(page) {
 
 async function detectDesktopBridge(page) {
   return page.evaluate(() => {
-    const bridge = window.paseoDesktop;
+    const bridge = window.clisbotDesktop;
     const keys = bridge && typeof bridge === "object" ? Object.keys(bridge) : [];
     const keyTypes =
       bridge && typeof bridge === "object"
@@ -709,7 +709,7 @@ async function main() {
     });
 
     const desktopStatus = await page.evaluate(() =>
-      window.paseoDesktop.invoke("desktop_daemon_status"),
+      window.clisbotDesktop.invoke("desktop_daemon_status"),
     );
     assert(
       typeof desktopStatus?.serverId === "string" && desktopStatus.serverId.trim().length > 0,

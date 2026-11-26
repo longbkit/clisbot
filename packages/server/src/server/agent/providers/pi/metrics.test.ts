@@ -8,7 +8,7 @@ import { PiFirstTokenTimer, piReplyStep, piSessionMetrics } from "./metrics.js";
 import type { PiAgentMessage } from "./rpc-types.js";
 import { FakePi } from "./test-utils/fake-pi.js";
 
-// The fields Pi records on an assistant message, which Paseo's message type leaves out.
+// The fields Pi records on an assistant message, which Clisbot's message type leaves out.
 function reply(fields: Record<string, unknown> = {}): PiAgentMessage {
   return {
     role: "assistant",

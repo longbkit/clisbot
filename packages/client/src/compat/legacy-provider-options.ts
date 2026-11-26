@@ -1,5 +1,5 @@
-import { controlsFromFeatures, optionsFromFeatures } from "@getpaseo/protocol/option-controls";
-import type { AgentOptionControl } from "@getpaseo/protocol/agent-types";
+import { controlsFromFeatures, optionsFromFeatures } from "@clisbot/protocol/option-controls";
+import type { AgentOptionControl } from "@clisbot/protocol/agent-types";
 import type {
   AgentConfigApply,
   AgentProfile,
@@ -10,7 +10,7 @@ import type {
   ServerInfoStatusPayload,
   SessionInboundMessage,
   SessionOutboundMessage,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 
 /**
  * COMPAT(providerOptionControls): added in v0.15.0, remove after 2027-05-01 once daemon floor >=

@@ -1,4 +1,4 @@
-import type { ProviderEvent } from "@getpaseo/plugin/server/provider";
+import type { ProviderEvent } from "@clisbot/plugin/server/provider";
 import { describe, expect, it } from "vitest";
 import { createDirectExampleProvider } from "./provider.js";
 
@@ -184,7 +184,7 @@ describe("direct provider example", () => {
     await connection.close();
   });
 
-  it("keeps session metrics from a Paseo that does not offer them", async () => {
+  it("keeps session metrics from a Clisbot that does not offer them", async () => {
     const connection = await createDirectExampleProvider().connect({
       versions: [1],
       capabilities: ["prompt.message"],

@@ -3,7 +3,7 @@ import { writeFile, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { expect, type Page } from "@playwright/test";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { connectDaemonClient } from "./daemon-client-loader";
 import { openSettings } from "./app";
 import { openHostSection, openSettingsHost, seedSavedSettingsHosts } from "./settings";
@@ -66,11 +66,11 @@ export async function openLongLivedTerminal(daemon: IsolatedHostDaemon): Promise
   });
   try {
     const workspace = await client.createWorkspace({
-      source: { kind: "directory", path: daemon.paseoHome },
+      source: { kind: "directory", path: daemon.clisbotHome },
       title: "lifecycle",
     });
     if (!workspace.workspace) throw new Error(workspace.error ?? "Workspace creation failed");
-    const created = await client.createTerminal(daemon.paseoHome, "lifecycle", undefined, {
+    const created = await client.createTerminal(daemon.clisbotHome, "lifecycle", undefined, {
       workspaceId: workspace.workspace.id,
       command: process.execPath,
       args: ["-e", "setInterval(() => {}, 1e9)"],
@@ -143,13 +143,13 @@ export async function plantUnclosableTerminalProgram(
       createdAt: new Date().toISOString(),
       identity: { startedAt: "Thu Jan  1 00:00:00 1970", commandLine: "planted-worker" },
       protocolVersion: 1,
-      paseoVersion: "0.0.0-test",
-      socketPath: path.join(daemon.paseoHome, "planted-worker.sock"),
+      clisbotVersion: "0.0.0-test",
+      socketPath: path.join(daemon.clisbotHome, "planted-worker.sock"),
       secret: "planted-secret",
       terminals: [{ id: "planted-terminal", pid, startedAt: await psField(pid, "lstart") }],
     };
     await writeFile(
-      path.join(daemon.paseoHome, "terminal-worker", `${gone.pid}.json`),
+      path.join(daemon.clisbotHome, "terminal-worker", `${gone.pid}.json`),
       `${JSON.stringify(record, null, 2)}\n`,
       { mode: 0o600 },
     );
@@ -184,7 +184,7 @@ export async function daemonProcessCanWrite(pid: number): Promise<boolean> {
 }
 
 export async function readTerminalProcessIds(daemon: IsolatedHostDaemon): Promise<number[]> {
-  const directory = path.join(daemon.paseoHome, "terminal-worker");
+  const directory = path.join(daemon.clisbotHome, "terminal-worker");
   const records = await Promise.all(
     (await readdir(directory))
       .filter((name) => name.endsWith(".json"))

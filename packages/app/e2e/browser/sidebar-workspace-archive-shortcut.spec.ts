@@ -114,7 +114,7 @@ test.describe("Archive workspace shortcut", () => {
     const teardown = createGatedTeardown();
     const project = await seedWorkspace({
       repoPrefix: "archive-shortcut-teardown-",
-      repo: { paseoConfig: teardown.paseoConfig },
+      repo: { clisbotConfig: teardown.clisbotConfig },
     });
     const next = await seedWorkspace({ repoPrefix: "archive-shortcut-next-" });
 

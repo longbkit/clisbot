@@ -4,15 +4,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import { DaemonClient } from "../test-utils/daemon-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { BuiltinPluginLoader } from "./builtin/index.js";
 
 const directory = fileURLToPath(new URL("./test-fixtures/internal-seam/", import.meta.url));
 const fixtureRoot = fileURLToPath(new URL("./test-fixtures/", import.meta.url));
 
 test("built-in and directory plugins share RPC and lifecycle behavior while built-ins stay hidden and enabled", async () => {
-  const workspaceDirectory = await mkdtemp(path.join(tmpdir(), "paseo-internal-seam-"));
-  const daemon = await createTestPaseoDaemon({
+  const workspaceDirectory = await mkdtemp(path.join(tmpdir(), "clisbot-internal-seam-"));
+  const daemon = await createTestClisbotDaemon({
     daemonVersion: "0.8.0",
     pluginsEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(fixtureRoot, ["internal-seam"]),
@@ -23,7 +23,7 @@ test("built-in and directory plugins share RPC and lifecycle behavior while buil
     expect(await client.listPlugins()).toEqual([]);
     expect(await client.invokePluginRpc("internal-seam", "state", {})).toEqual({ workspaces: 0 });
     expect((await client.getPluginLogs("internal-seam")).map(({ message }) => message)).toContain(
-      "[paseo] Plugin ready",
+      "[clisbot] Plugin ready",
     );
     await client.patchDaemonConfig({ pluginsEnabled: true });
     await client.installDirectoryPlugin(directory, "directory-seam");
@@ -52,19 +52,19 @@ test("built-in and directory plugins share RPC and lifecycle behavior while buil
 }, 60_000);
 
 test("a failing built-in does not stop the daemon or the next built-in", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-builtin-failure-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-builtin-failure-"));
   const failingDirectory = path.join(root, "failing-builtin");
   await mkdir(failingDirectory);
   await writeFile(
-    path.join(failingDirectory, "paseo-plugin.json"),
-    JSON.stringify({ id: "failing-builtin", requirements: { paseo: ">=0.8.0" } }),
+    path.join(failingDirectory, "clisbot-plugin.json"),
+    JSON.stringify({ id: "failing-builtin", requirements: { clisbot: ">=0.8.0" } }),
   );
   await writeFile(
     path.join(failingDirectory, "index.server.ts"),
     "export default function contribute() { throw new Error('fixture startup failure'); }",
   );
   await cp(directory, path.join(root, "internal-seam"), { recursive: true });
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     daemonVersion: "0.8.0",
     pluginsEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(root, ["failing-builtin", "internal-seam"]),

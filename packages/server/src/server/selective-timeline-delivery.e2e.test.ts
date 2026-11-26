@@ -4,11 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { createPersistedWorkspaceRecord } from "./workspace-registry.js";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
-import { DaemonClient, type WebSocketLike } from "@getpaseo/client/internal/daemon-client";
+import { CLIENT_CAPS } from "@clisbot/protocol/client-capabilities";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
+import { DaemonClient, type WebSocketLike } from "@clisbot/client/internal/daemon-client";
 import { WebSocket } from "ws";
-import { createTestPaseoDaemon, type TestPaseoDaemon } from "./test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon, type TestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
 import {
   MockLoadTestAgentClient,
   MockLoadTestAgentSession,
@@ -161,11 +161,11 @@ function legacyAttentionResult(message: SessionOutboundMessage) {
   };
 }
 
-let daemon: TestPaseoDaemon;
+let daemon: TestClisbotDaemon;
 const clients: ConnectedClient[] = [];
 
 beforeEach(async () => {
-  daemon = await createTestPaseoDaemon();
+  daemon = await createTestClisbotDaemon();
 });
 
 afterEach(async () => {
@@ -213,10 +213,10 @@ async function connect(input: {
 }
 
 async function startDaemonWithMockAgents(
-  home: { paseoHomeRoot: string; cleanup: boolean } | Record<string, never> = {},
+  home: { clisbotHomeRoot: string; cleanup: boolean } | Record<string, never> = {},
 ): Promise<void> {
   await daemon.close();
-  daemon = await createTestPaseoDaemon({
+  daemon = await createTestClisbotDaemon({
     isDev: true,
     agentClients: { mock: new MockLoadTestAgentClient() },
     ...home,
@@ -282,13 +282,13 @@ test("subscribing with a cursor answers whether each chat is at its head", async
 });
 
 test("subscribing with a cursor answers behind for a stored agent and leaves it unloaded", async () => {
-  const paseoHomeRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-freshness-"));
-  await startDaemonWithMockAgents({ paseoHomeRoot, cleanup: false });
+  const clisbotHomeRoot = await mkdtemp(path.join(os.tmpdir(), "clisbot-freshness-"));
+  await startDaemonWithMockAgents({ clisbotHomeRoot, cleanup: false });
   const before = await connectForFreshness("freshness-before-restart");
   const stored = await createChatAtHead(before, "Stored");
   before.close();
   await before.client.close();
-  await startDaemonWithMockAgents({ paseoHomeRoot, cleanup: true });
+  await startDaemonWithMockAgents({ clisbotHomeRoot, cleanup: true });
   expect(daemon.daemon.agentManager.getAgent(stored.agentId)).toBeNull();
 
   const connected = await connectForFreshness("freshness-after-restart");
@@ -305,7 +305,7 @@ test("subscribing with a cursor answers behind for a stored agent and leaves it 
 
 test("notification timeline items are sent only to clients that advertise support", async () => {
   await daemon.close();
-  daemon = await createTestPaseoDaemon({
+  daemon = await createTestClisbotDaemon({
     isDev: true,
     agentClients: { mock: new MockLoadTestAgentClient() },
   });
@@ -382,7 +382,7 @@ test("notification timeline items are sent only to clients that advertise suppor
 
 test("plugin timeline items are sent only to clients that advertise support", async () => {
   await daemon.close();
-  daemon = await createTestPaseoDaemon({
+  daemon = await createTestClisbotDaemon({
     isDev: true,
     agentClients: { mock: new MockLoadTestAgentClient() },
   });
@@ -470,7 +470,7 @@ test("plugin timeline items are sent only to clients that advertise support", as
 
 test("rewind routes replacement completion by source capability and subscription", async () => {
   await daemon.close();
-  daemon = await createTestPaseoDaemon({
+  daemon = await createTestClisbotDaemon({
     isDev: true,
     agentClients: { mock: new MockLoadTestAgentClient() },
   });
@@ -565,7 +565,7 @@ test("real WebSocket sessions enforce selective delivery, retained resets, downg
     ["A", "B", "C"].map((title) =>
       legacy.client.createAgent({
         provider: "codex",
-        cwd: daemon.paseoHome,
+        cwd: daemon.clisbotHome,
         title: `Selective ${title}`,
         workspaceId,
         modeId: "full-access",
@@ -700,8 +700,8 @@ test("real WebSocket sessions enforce selective delivery, retained resets, downg
 
 test("blocked setup remains readable on mixed-capability sockets sharing a session", async () => {
   await daemon.close();
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-blocked-compat-"));
-  const projects = path.join(root, ".paseo", "projects");
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-blocked-compat-"));
+  const projects = path.join(root, ".clisbot", "projects");
   await mkdir(projects, { recursive: true });
   const workspace = createPersistedWorkspaceRecord({
     workspaceId: "blocked-workspace",
@@ -719,7 +719,7 @@ test("blocked setup remains readable on mixed-capability sockets sharing a sessi
     },
   });
   await writeFile(path.join(projects, "workspaces.json"), JSON.stringify([workspace]));
-  daemon = await createTestPaseoDaemon({ paseoHomeRoot: root });
+  daemon = await createTestClisbotDaemon({ clisbotHomeRoot: root });
   const legacy = await connect({ clientId: "setup-shared", selective: false });
   const capable = await connect({
     clientId: "setup-shared",
@@ -731,7 +731,7 @@ test("blocked setup remains readable on mixed-capability sockets sharing a sessi
   expect(oldStatus.snapshot).toMatchObject({
     status: "failed",
     error:
-      "Workspace setup is blocked pending approval of code from a fork pull request. Update Paseo to review and run setup.",
+      "Workspace setup is blocked pending approval of code from a fork pull request. Update Clisbot to review and run setup.",
   });
   expect(newStatus.snapshot).toMatchObject({
     status: "blocked",
@@ -777,7 +777,7 @@ class CompatibilityProvider extends MockLoadTestAgentClient {
 test("plugin items are gated in provider child streams, child fetches, and rewind replay", async () => {
   await daemon.close();
   const provider = new CompatibilityProvider();
-  daemon = await createTestPaseoDaemon({ isDev: true, agentClients: { mock: provider } });
+  daemon = await createTestClisbotDaemon({ isDev: true, agentClients: { mock: provider } });
   const legacy = await connect({ clientId: "provider-shared", selective: false });
   const capable = await connect({
     clientId: "provider-shared",
@@ -870,7 +870,7 @@ test("plugin items are gated in provider child streams, child fetches, and rewin
 
 async function createAttentionWorkspace(client: DaemonClient): Promise<string> {
   const result = await client.createWorkspace({
-    source: { kind: "directory", path: daemon.paseoHome },
+    source: { kind: "directory", path: daemon.clisbotHome },
   });
   if (!result.workspace) throw new Error(result.error ?? "Expected workspace");
   return result.workspace.id;

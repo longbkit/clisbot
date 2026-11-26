@@ -1,7 +1,7 @@
 import { expect, test, waitForHydration, type Locator, type Page } from "./fixtures";
 
 const desktopName =
-  "Paseo desktop app with coding agents, a conversation, and a code diff open side by side";
+  "Clisbot desktop app with coding agents, a conversation, and a code diff open side by side";
 
 /** Opens the homepage once it has hydrated, so the router's scroll reset cannot undo a later scroll. */
 async function openHomepage(page: Page, window = { width: 1512, height: 930 }) {
@@ -11,7 +11,7 @@ async function openHomepage(page: Page, window = { width: 1512, height: 930 }) {
 }
 
 async function viewPhones(page: Page) {
-  await page.getByRole("img", { name: "Paseo agent chat", exact: true }).scrollIntoViewIfNeeded();
+  await page.getByRole("img", { name: "Clisbot agent chat", exact: true }).scrollIntoViewIfNeeded();
 }
 
 async function expectScreenContentInsidePhone(page: Page, name: string, time: string) {
@@ -47,9 +47,9 @@ async function resizeToPhone(page: Page) {
 test("the three phone mockups show their screen content", async ({ page }) => {
   await openHomepage(page);
   await viewPhones(page);
-  await expectScreenContentInsidePhone(page, "Paseo workspace drawer", "18:54");
-  await expectScreenContentInsidePhone(page, "Paseo agent chat", "18:53");
-  await expectScreenContentInsidePhone(page, "Paseo diff view", "18:55");
+  await expectScreenContentInsidePhone(page, "Clisbot workspace drawer", "18:54");
+  await expectScreenContentInsidePhone(page, "Clisbot agent chat", "18:53");
+  await expectScreenContentInsidePhone(page, "Clisbot diff view", "18:55");
 });
 
 test("desktop mockup corners shrink in proportion on a phone", async ({ page }) => {
@@ -66,7 +66,7 @@ const HERO_SCENES = [
   { pill: "Orchestration", shows: "Pi · GLM-5.2" },
   { pill: "Remote", shows: "Tailscale" },
   { pill: "Code review", shows: "Feedback sent to Codex" },
-  { pill: "Pull requests", shows: "https://github.com/getpaseo/paseo/pull/3981" },
+  { pill: "Pull requests", shows: "https://github.com/longbkit/clisbot/pull/3981" },
   { pill: "Plugins", shows: "app-tests (macos)" },
 ];
 
@@ -135,7 +135,7 @@ test("the orchestration scene plays from an empty chat to the open roster of sub
   ).toBeVisible();
   await expect(mockup.getByText("Create agent", { exact: true })).toHaveCount(3);
   await expect(
-    mockup.getByText("All three are launched. Paseo will notify me when each one finishes."),
+    mockup.getByText("All three are launched. Clisbot will notify me when each one finishes."),
   ).toBeVisible();
   await expect(mockup.getByText("Pi · GLM-5.2", { exact: true })).toBeVisible();
 });
@@ -181,7 +181,7 @@ test("the plugins scene installs the panel, then changes it on request", async (
   // The second request reloads the plugin and the open panel lists the failing check.
   await expect(failingCheck).toBeVisible({ timeout: 15_000 });
   await expect(
-    mockup.getByText("paseo plugin reload release-radar", { exact: true }),
+    mockup.getByText("clisbot plugin reload release-radar", { exact: true }),
   ).toBeVisible();
 });
 
@@ -303,7 +303,7 @@ test("the plugin demo plays through to the panel the agent built", async ({ page
   expect(await renderedOpacity(builtPanelRow)).toBe(0);
 
   // Hydration can reset the scroll position, so keep the demo in view until it finishes.
-  const heading = page.getByRole("heading", { name: "Ask Paseo to change Paseo" });
+  const heading = page.getByRole("heading", { name: "Ask Clisbot to change Clisbot" });
   await expect(async () => {
     await heading.scrollIntoViewIfNeeded();
     expect(await renderedOpacity(builtPanelRow)).toBe(1);
@@ -316,7 +316,7 @@ test("the plugin demo shows its finished state when motion is reduced", async ({
   await openHomepage(page);
   const builtPanelRow = page.getByText("Add Gruvbox theme", { exact: true });
   const panel = builtPanelRow.locator("xpath=ancestor::div[contains(@class, 'md:border-l')]");
-  const heading = page.getByRole("heading", { name: "Ask Paseo to change Paseo" });
+  const heading = page.getByRole("heading", { name: "Ask Clisbot to change Clisbot" });
 
   await expect(async () => {
     await heading.scrollIntoViewIfNeeded();

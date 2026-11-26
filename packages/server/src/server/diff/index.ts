@@ -10,13 +10,13 @@ import {
   type DiffFrame,
   type DiffEntry,
   type DiffBody,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@clisbot/protocol/binary-frames/index";
 import type {
   DiffError,
   DiffEndpoint,
   ParsedDiffFile,
   CheckoutCommitFileDiffRequest,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import type { WorkspaceGitService } from "../workspace-git-service.js";
 import {
   listComparison,

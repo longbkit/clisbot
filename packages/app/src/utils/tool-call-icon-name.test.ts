@@ -54,13 +54,13 @@ describe("resolveToolCallIconName", () => {
     expect(icon).toBe("wrench");
   });
 
-  it("uses the Paseo icon for agent messages despite the legacy bot detail icon", () => {
+  it("uses the Clisbot icon for agent messages despite the legacy bot detail icon", () => {
     const icon = resolveToolCallIconName(
       "agent_message",
       { type: "plain_text", text: "Done.", icon: "bot" },
       { event: "finished", sender: { id: "agt_1" }, text: "Done." },
     );
 
-    expect(icon).toBe("paseo");
+    expect(icon).toBe("clisbot");
   });
 });

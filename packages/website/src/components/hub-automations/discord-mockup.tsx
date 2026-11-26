@@ -5,8 +5,8 @@ import {
   MoAvatar,
   MockupStageWindow,
   MockupStep,
-  OpenInPaseoChip,
-  PaseoBotAvatar,
+  OpenInClisbotChip,
+  ClisbotBotAvatar,
   type SourceMockupProps,
   WindowTrafficLights,
 } from "./shared";
@@ -23,7 +23,7 @@ const STEP_DELAYS = {
 const DISCORD_COMPONENTS = {
   mention: (
     <span className="rounded-[3px] bg-[#5865F2]/30 px-1 py-[0.5px] font-medium text-[#C9CDFB]">
-      @paseo-bot
+      @clisbot-bot
     </span>
   ),
   host: (
@@ -74,7 +74,7 @@ function DiscordMessageFeed() {
       >
         <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-[#949BA4]" aria-hidden="true" />
         <p>
-          <span className="font-medium text-[#F2F3F5]">paseo-bot</span>{" "}
+          <span className="font-medium text-[#F2F3F5]">clisbot-bot</span>{" "}
           {t("hub.demo.discord.startedThread")}{" "}
           <span className="font-semibold text-[#F2F3F5]">{t("hub.demo.discord.threadTitle")}</span>
         </p>
@@ -82,7 +82,7 @@ function DiscordMessageFeed() {
 
       <div className="ml-3 space-y-3 border-l-2 border-[#4E5058] pl-3.5">
         <MockupStep delay={STEP_DELAYS.botWorking}>
-          <DiscordMessage author="paseo-bot" time={t("hub.demo.discord.time1")} bot>
+          <DiscordMessage author="clisbot-bot" time={t("hub.demo.discord.time1")} bot>
             <p className="text-[#DBDEE1]">
               <Trans i18nKey="hub.demo.discord.botStarted" components={DISCORD_COMPONENTS} />
             </p>
@@ -90,7 +90,7 @@ function DiscordMessageFeed() {
         </MockupStep>
 
         <MockupStep delay={STEP_DELAYS.botDone}>
-          <DiscordMessage author="paseo-bot" time={t("hub.demo.discord.time2")} bot>
+          <DiscordMessage author="clisbot-bot" time={t("hub.demo.discord.time2")} bot>
             <p className="text-[#DBDEE1]">{t("hub.demo.discord.botFinished")}</p>
             <DiscordPrEmbed />
           </DiscordMessage>
@@ -107,7 +107,7 @@ function DiscordPrEmbed() {
       <div className="rounded-[4px] border-l-[4px] border-[#2BAC76] bg-[#2B2D31] px-3 py-2.5">
         <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#00A8FC]">
           <GitPullRequest className="h-3.5 w-3.5 shrink-0 text-[#2BAC76]" aria-hidden="true" />
-          <span>getpaseo/paseo#2825</span>
+          <span>longbkit/clisbot#2825</span>
         </div>
         <p className="mt-0.5 text-[12px] text-[#DBDEE1]">
           fix(worktree): prune orphaned branches on close
@@ -132,7 +132,7 @@ function DiscordPrEmbed() {
       </div>
 
       <div>
-        <OpenInPaseoChip variant="discord" />
+        <OpenInClisbotChip variant="discord" />
       </div>
     </div>
   );
@@ -171,7 +171,7 @@ function DiscordSidebar() {
       className="hidden flex-col border-r border-[#1F2023] bg-[#2B2D31] md:flex"
     >
       <div className="border-b border-[#1F2023] px-3.5 py-2.5 text-[13.5px] font-bold text-[#F2F3F5]">
-        Paseo
+        Clisbot
       </div>
       <div className="space-y-0.5 px-2 py-3 text-[12.5px]">
         <p className="px-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wide text-[#949BA4]">
@@ -232,7 +232,7 @@ function DiscordMessage({
   return (
     <div className="flex items-start gap-2.5 @max-[14rem]:flex-col @max-[14rem]:gap-1">
       {bot ? (
-        <PaseoBotAvatar size="md" rounded="rounded-full" className="mt-0.5" />
+        <ClisbotBotAvatar size="md" rounded="rounded-full" className="mt-0.5" />
       ) : (
         <MoAvatar size="md" rounded="rounded-full" className="mt-0.5" />
       )}

@@ -1,5 +1,5 @@
-import type { PluginServerContext } from "@getpaseo/plugin/server";
-import { runAcpProvider, type AcpStreamMessage } from "@getpaseo/plugin/server/acp";
+import type { PluginServerContext } from "@clisbot/plugin/server";
+import { runAcpProvider, type AcpStreamMessage } from "@clisbot/plugin/server/acp";
 
 function connect() {
   let controller: ReadableStreamDefaultController<AcpStreamMessage>;
@@ -18,7 +18,7 @@ function connect() {
         if (message.method === "session/prompt") {
           for (const text of [
             "- **Current tem",
-            "perature**: 25°C. Read [Paseo ",
+            "perature**: 25°C. Read [Clisbot ",
             "docs](https://example.com/docs).",
           ]) {
             controller.enqueue({

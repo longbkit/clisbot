@@ -16,16 +16,16 @@ Open **Apps → GitHub**. Hub shows the exact callback URLs, required repository
 
 Repository access and App installation work without a webhook. GitHub event triggers require a [public HTTPS address](/docs/hub/self-hosting#public-addresses) so GitHub can deliver webhooks.
 
-On a local HTTP Hub, **Apps → GitHub** lets you configure repository access and marks event webhooks unavailable. Reopen Hub at its public HTTPS origin after setting `PASEO_HUB_APP_URL` to add the webhook secret and events.
+On a local HTTP Hub, **Apps → GitHub** lets you configure repository access and marks event webhooks unavailable. Reopen Hub at its public HTTPS origin after setting `CLISBOT_HUB_APP_URL` to add the webhook secret and events.
 
 GitHub calls these Hub URLs:
 
-| Setting      | Hub URL                                                |
-| ------------ | ------------------------------------------------------ |
-| Homepage URL | `<PASEO_HUB_APP_URL>`                                  |
-| Callback URL | `<PASEO_HUB_APP_URL>/api/integrations/github/callback` |
-| Setup URL    | `<PASEO_HUB_APP_URL>/api/integrations/github/setup`    |
-| Webhook URL  | `<PASEO_HUB_APP_URL>/webhook`                          |
+| Setting      | Hub URL                                                  |
+| ------------ | -------------------------------------------------------- |
+| Homepage URL | `<CLISBOT_HUB_APP_URL>`                                  |
+| Callback URL | `<CLISBOT_HUB_APP_URL>/api/integrations/github/callback` |
+| Setup URL    | `<CLISBOT_HUB_APP_URL>/api/integrations/github/setup`    |
+| Webhook URL  | `<CLISBOT_HUB_APP_URL>/webhook`                          |
 
 Keep GitHub SSL verification enabled.
 

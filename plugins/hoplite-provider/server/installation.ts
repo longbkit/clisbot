@@ -1,9 +1,9 @@
-import { execCommand } from "@getpaseo/plugin/server";
+import { execCommand } from "@clisbot/plugin/server";
 import type {
   ProviderInstallation,
   ProviderInstallationLaunch,
   ProviderUpdateCheck,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 
 /** The file Hoplite's installer and its own update check read for the current release. */
 const LATEST_RELEASE_URL = "https://hoplite.sh/downloads/latest.json";

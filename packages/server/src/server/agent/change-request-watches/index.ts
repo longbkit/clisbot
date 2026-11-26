@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { FORGE_IDS } from "@getpaseo/protocol/forge-manifest";
+import { FORGE_IDS } from "@clisbot/protocol/forge-manifest";
 import type { Logger } from "pino";
 import { z } from "zod";
 import type { ChangeRequestRouter } from "../../../services/change-request-router.js";
@@ -41,7 +41,7 @@ interface Observation {
 }
 interface Dependencies {
   router: ChangeRequestRouter;
-  paseoHome: string;
+  clisbotHome: string;
   logger: Logger;
   isActive(agentId: string): Promise<boolean>;
   messages(): AgentMessageDelivery;
@@ -88,7 +88,7 @@ function describeUpdate(group: WatchGroup, next: ChangeRequestSnapshot) {
 export type ChangeRequestWatches = ReturnType<typeof createChangeRequestWatches>;
 
 export function createChangeRequestWatches(deps: Dependencies) {
-  const file = join(deps.paseoHome, "change-request-watches.json");
+  const file = join(deps.clisbotHome, "change-request-watches.json");
   const groups = new Map<string, WatchGroup>();
   const unrestored: WatchGroup[] = [];
   const observations = new Map<string, Observation>();
@@ -120,7 +120,7 @@ export function createChangeRequestWatches(deps: Dependencies) {
       deps.messages().enqueue({
         recipientId,
         source: { kind: "change-request-update", url },
-        prompt: [`Paseo change request update for ${url}`, ...events].join("\n"),
+        prompt: [`Clisbot change request update for ${url}`, ...events].join("\n"),
         unarchive: false,
       });
     }

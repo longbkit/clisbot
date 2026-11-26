@@ -1,6 +1,6 @@
 ---
 title: Updates
-description: How Paseo releases work, the difference between stable and beta channels, and how to opt in to earlier updates.
+description: How Clisbot releases work, the difference between stable and beta channels, and how to opt in to earlier updates.
 nav: Updates
 order: 5
 category: Getting started
@@ -8,13 +8,13 @@ category: Getting started
 
 # Updates
 
-Paseo ships updates through two channels: **Stable** and **Beta**.
+Clisbot ships updates through two channels: **Stable** and **Beta**.
 
 Most releases go out on the stable channel. Betas are release candidates that let you test what's coming next before it rolls out to everyone.
 
 ## Version numbers
 
-Paseo follows [Semantic Versioning](https://semver.org) with prerelease tags.
+Clisbot follows [Semantic Versioning](https://semver.org) with prerelease tags.
 
 A stable release looks like this:
 
@@ -52,12 +52,12 @@ Betas are the best way to get fixes and features early. If you hit a bug, report
 
 ### How to join the beta channel
 
-| Platform       | How to get betas                                                                                              |
-| -------------- | ------------------------------------------------------------------------------------------------------------- |
-| iOS and iPadOS | Join the [Paseo TestFlight beta](https://testflight.apple.com/join/Y5HpSQjJ).                                 |
-| Android        | Download the APK from a prerelease on the [GitHub releases page](https://github.com/getpaseo/paseo/releases). |
-| Desktop        | Open **Settings → About** and select **Beta** under **Release channel**.                                      |
-| CLI            | Run `npm install -g @getpaseo/cli@beta`. Plain `npm install -g @getpaseo/cli` stays on stable.                |
+| Platform       | How to get betas                                                                                                |
+| -------------- | --------------------------------------------------------------------------------------------------------------- |
+| iOS and iPadOS | Join the [Clisbot TestFlight beta](https://testflight.apple.com/join/Y5HpSQjJ).                                 |
+| Android        | Download the APK from a prerelease on the [GitHub releases page](https://github.com/longbkit/clisbot/releases). |
+| Desktop        | Open **Settings → About** and select **Beta** under **Release channel**.                                        |
+| CLI            | Run `npm install -g @clisbot/cli@beta`. Plain `npm install -g @clisbot/cli` stays on stable.                    |
 
 The desktop app checks for beta updates from the moment you select **Beta**.
 

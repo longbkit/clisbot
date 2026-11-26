@@ -1,6 +1,6 @@
 ---
 title: Supported providers
-description: Every coding agent Paseo can launch, with native support or through ACP.
+description: Every coding agent Clisbot can launch, with native support or through ACP.
 nav: Supported providers
 order: 21
 category: Providers
@@ -8,11 +8,11 @@ category: Providers
 
 # Supported providers
 
-Paseo runs coding agents that you install and sign in to on your daemon host. For how Paseo manages providers, see [Providers](/docs/providers). To add an agent that is not listed here, see [Custom providers](/docs/custom-providers).
+Clisbot runs coding agents that you install and sign in to on your daemon host. For how Clisbot manages providers, see [Providers](/docs/providers). To add an agent that is not listed here, see [Custom providers](/docs/custom-providers).
 
 ## Native support
 
-Paseo ships an integration for each of these agents. Most appear in Paseo automatically after you install and sign in to the CLI. Open a provider page for setup steps and defaults.
+Clisbot ships an integration for each of these agents. Most appear in Clisbot automatically after you install and sign in to the CLI. Open a provider page for setup steps and defaults.
 
 - [Antigravity](/docs/supported-providers/antigravity), runs through your installed `agy` CLI over ACP.
 - [Claude Code](/docs/supported-providers/claude-code), Anthropic's coding agent.
@@ -27,12 +27,12 @@ Paseo ships an integration for each of these agents. Most appear in Paseo automa
 
 ## More agents through ACP
 
-Paseo runs any agent that speaks the [Agent Client Protocol](https://agentclientprotocol.com) (ACP). The in-app catalog lists these agents.
+Clisbot runs any agent that speaks the [Agent Client Protocol](https://agentclientprotocol.com) (ACP). The in-app catalog lists these agents.
 
 To add one from the catalog:
 
 1. If the agent does not launch through `npx` or `uvx`, install its CLI on your daemon host.
-2. Open **Settings → Hosts → your host → Providers** in Paseo.
+2. Open **Settings → Hosts → your host → Providers** in Clisbot.
 3. Select **+ Provider**, find the agent, and select **Add**.
 
 Entries that launch through `npx` or `uvx` need only that tool on your daemon host. If a CLI is missing, the provider page shows **Not installed**, and **Install** opens its install instructions.
@@ -57,9 +57,9 @@ Entries that launch through `npx` or `uvx` need only that tool on your daemon ho
 - [Gajae Code](https://gajae-code.com), subscription-based coding agent with plan-before-mutation workflows.
 - [Gemini CLI](https://geminicli.com), Google's official Gemini CLI.
 - [GLM Agent](https://github.com/stefandevo/glm-acp-agent), Zhipu AI's GLM coding agent.
-- [goose](https://block.github.io/goose/), Block's local open-source AI agent. Paseo lists models from all providers configured in goose when goose supports model inventory discovery.
+- [goose](https://block.github.io/goose/), Block's local open-source AI agent. Clisbot lists models from all providers configured in goose when goose supports model inventory discovery.
 - [Grok](https://docs.x.ai/build/overview), xAI's Grok Build agentic coding CLI.
-- [Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/features/acp), Nous Research's self-improving agent. Paseo shows the full command of each terminal call.
+- [Hermes Agent](https://hermes-agent.nousresearch.com/docs/user-guide/features/acp), Nous Research's self-improving agent. Clisbot shows the full command of each terminal call.
 - [Junie](https://junie.jetbrains.com/docs/junie-cli-acp.html), JetBrains' coding agent.
 - [Kilo Code](https://kilo.ai/docs/code-with-ai/platforms/cli), open-source coding agent.
 - [Kimi Code CLI](https://github.com/MoonshotAI/kimi-code), Moonshot AI's coding assistant.

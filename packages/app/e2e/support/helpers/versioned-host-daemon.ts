@@ -23,16 +23,16 @@ export interface RestartableHostDaemon {
 }
 
 export async function startRestartableHostDaemon(version: string): Promise<RestartableHostDaemon> {
-  const paseoHomeRoot = await mkdtemp(path.join(tmpdir(), "paseo-e2e-restartable-host-"));
+  const clisbotHomeRoot = await mkdtemp(path.join(tmpdir(), "clisbot-e2e-restartable-host-"));
   const port = await getAvailableHostDaemonPort();
   let current: VersionedHostDaemon | null = null;
   async function dispose(): Promise<void> {
     await current?.stop();
     current = null;
-    await rm(paseoHomeRoot, { recursive: true, force: true });
+    await rm(clisbotHomeRoot, { recursive: true, force: true });
   }
   try {
-    current = await startVersionedHostDaemon({ version, port, paseoHomeRoot });
+    current = await startVersionedHostDaemon({ version, port, clisbotHomeRoot });
   } catch (error) {
     await dispose();
     throw error;
@@ -51,7 +51,7 @@ export async function startRestartableHostDaemon(version: string): Promise<Resta
       await current?.stop();
       current = null;
       await waitForPortReleased(port);
-      current = await startVersionedHostDaemon({ version: nextVersion, port, paseoHomeRoot });
+      current = await startVersionedHostDaemon({ version: nextVersion, port, clisbotHomeRoot });
       if (current.serverId !== serverId) {
         throw new Error(
           `Restarted host daemon reported serverId ${current.serverId}, expected ${serverId}`,
@@ -73,23 +73,23 @@ export async function startHostDaemon(options: {
   version: string;
   pluginRegistryUrl?: string;
 }): Promise<HostDaemon> {
-  const paseoHomeRoot = await mkdtemp(path.join(tmpdir(), "paseo-e2e-host-"));
+  const clisbotHomeRoot = await mkdtemp(path.join(tmpdir(), "clisbot-e2e-host-"));
   try {
     const daemon = await startVersionedHostDaemon({
       ...options,
       port: await getAvailableHostDaemonPort(),
-      paseoHomeRoot,
+      clisbotHomeRoot,
     });
     return {
       serverId: daemon.serverId,
       port: daemon.port,
       async dispose() {
         await daemon.stop();
-        await rm(paseoHomeRoot, { recursive: true, force: true });
+        await rm(clisbotHomeRoot, { recursive: true, force: true });
       },
     };
   } catch (error) {
-    await rm(paseoHomeRoot, { recursive: true, force: true });
+    await rm(clisbotHomeRoot, { recursive: true, force: true });
     throw error;
   }
 }
@@ -104,22 +104,22 @@ interface VersionedHostDaemon {
 interface VersionedHostDaemonOptions {
   version: string;
   port: number;
-  paseoHomeRoot: string;
+  clisbotHomeRoot: string;
   pluginRegistryUrl?: string;
 }
 
-// Starts the versioned test daemon on an explicit port with a caller-owned PASEO_HOME. The caller
+// Starts the versioned test daemon on an explicit port with a caller-owned CLISBOT_HOME. The caller
 // removes the home root.
 async function startVersionedHostDaemon(
   options: VersionedHostDaemonOptions,
 ): Promise<VersionedHostDaemon> {
   const child = spawnTsx(
     VERSIONED_DAEMON_ENTRYPOINT,
-    [options.version, String(options.port), options.paseoHomeRoot],
+    [options.version, String(options.port), options.clisbotHomeRoot],
     {
       stdio: ["ignore", "pipe", "pipe", "ipc"],
       env: options.pluginRegistryUrl
-        ? { ...process.env, PASEO_PLUGIN_REGISTRY: options.pluginRegistryUrl }
+        ? { ...process.env, CLISBOT_PLUGIN_REGISTRY: options.pluginRegistryUrl }
         : process.env,
     },
   );

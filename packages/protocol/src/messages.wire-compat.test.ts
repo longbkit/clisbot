@@ -25,7 +25,7 @@ test("base selection RPCs are correlated while older checkout and branch message
     requestId: "status",
     error: null,
     isGit: true,
-    isPaseoOwnedWorktree: false,
+    isClisbotOwnedWorktree: false,
     repoRoot: "/repo",
     currentBranch: "feature",
     isDirty: false,
@@ -453,7 +453,11 @@ test("blocked setup preserves the legacy failed shape and optional provenance", 
     status: legacyStatus,
   });
   expect(legacySnapshot.safeParse(snapshot).success).toBe(false);
-  const failed = { ...snapshot, status: "failed", error: "Update Paseo to review and run setup." };
+  const failed = {
+    ...snapshot,
+    status: "failed",
+    error: "Update Clisbot to review and run setup.",
+  };
   expect(legacySnapshot.safeParse(failed).success).toBe(true);
   const progress = {
     type: "workspace_setup_progress",
@@ -630,7 +634,7 @@ test("speech config reads remain compatible with clients before features and fut
         tts: { provider: "openai", hasApiKey: false },
       },
     },
-    envOverrides: { "features.voiceMode.stt.provider": "PASEO_VOICE_STT_PROVIDER" },
+    envOverrides: { "features.voiceMode.stt.provider": "CLISBOT_VOICE_STT_PROVIDER" },
   };
   expect(oldSchema.parse(read)).toEqual(read);
   expect(MutableDaemonConfigSchema.parse(oldRead)).toEqual(oldRead);

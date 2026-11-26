@@ -98,16 +98,18 @@ async function startSupervisor(
   mkdirSync(workDir, { recursive: true });
   const port = options.port ?? (await getAvailablePort());
   const env: NodeJS.ProcessEnv = {
-    ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PASEO_"))),
+    ...Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !key.startsWith("CLISBOT_")),
+    ),
     HOME: home,
     USERPROFILE: home,
-    PASEO_HOME: home,
-    PASEO_LISTEN: `127.0.0.1:${port}`,
-    PASEO_RELAY_ENABLED: "false",
-    PASEO_NODE_INSPECT: "0",
-    PASEO_LOCAL_SPEECH_AUTO_DOWNLOAD: "0",
-    PASEO_DICTATION_ENABLED: "0",
-    PASEO_VOICE_MODE_ENABLED: "0",
+    CLISBOT_HOME: home,
+    CLISBOT_LISTEN: `127.0.0.1:${port}`,
+    CLISBOT_RELAY_ENABLED: "false",
+    CLISBOT_NODE_INSPECT: "0",
+    CLISBOT_LOCAL_SPEECH_AUTO_DOWNLOAD: "0",
+    CLISBOT_DICTATION_ENABLED: "0",
+    CLISBOT_VOICE_MODE_ENABLED: "0",
     CI: "true",
   };
   if (options.pathPrefix) {
@@ -146,7 +148,7 @@ async function connect(harness: Harness): Promise<DaemonClient> {
   }, "cannot connect to the daemon");
 }
 
-// A plain `paseo daemon stop`: SIGTERM on POSIX, the shutdown RPC where there is no signal
+// A plain `clisbot daemon stop`: SIGTERM on POSIX, the shutdown RPC where there is no signal
 // for it (Windows refuses a graceful stop without one).
 async function stopDaemon(harness: Harness): Promise<void> {
   await stopDaemonInstance(harness.home, {
@@ -340,7 +342,7 @@ afterEach(async () => {
         }
       }
     }
-    await reapTerminalWorkers({ paseoHome: harness.home, gracefulMs: 0 }).catch(() => undefined);
+    await reapTerminalWorkers({ clisbotHome: harness.home, gracefulMs: 0 }).catch(() => undefined);
     rmSync(harness.home, { recursive: true, force: true });
   }
   for (const pid of extraPids) {
@@ -406,7 +408,7 @@ describe("terminals across daemon restarts", { timeout: 240_000 }, () => {
     const listing = JSON.stringify({
       path: path.join(fakeBin, "global"),
       dependencies: {
-        "@getpaseo/cli": {
+        "@clisbot/cli": {
           version: resolveDaemonVersion(import.meta.url),
           path: SERVER_ROOT,
         },
@@ -417,9 +419,9 @@ describe("terminals across daemon restarts", { timeout: 240_000 }, () => {
       fakeNpm,
       `const args = process.argv.slice(2);
 const has = (...tokens) => tokens.every((token) => args.includes(token));
-if (has("-g", "ls", "@getpaseo/cli", "--json", "--depth=0", "--long")) {
+if (has("-g", "ls", "@clisbot/cli", "--json", "--depth=0", "--long")) {
   process.stdout.write(${JSON.stringify(listing)} + "\\n");
-} else if (args[0] === "install" && has("-g", "@getpaseo/cli@latest")) {
+} else if (args[0] === "install" && has("-g", "@clisbot/cli@latest")) {
   // The installed version is already the running one: nothing to do.
 } else {
   process.stderr.write("unexpected npm call: " + args.join(" ") + "\\n");
@@ -581,7 +583,7 @@ describe("terminals when the daemon stops", { timeout: 240_000 }, () => {
       recordId: "stale-record",
       pid: reused.pid!,
       socketPath: resolveTerminalWorkerSocketPath({
-        paseoHome: harness.home,
+        clisbotHome: harness.home,
         workerPid: reused.pid!,
         recordId: "stale-record",
       }),
@@ -608,7 +610,7 @@ describe("terminals when the daemon stops", { timeout: 240_000 }, () => {
       recordId: "stale-record",
       pid: reused.pid!,
       socketPath: resolveTerminalWorkerSocketPath({
-        paseoHome: harness.home,
+        clisbotHome: harness.home,
         workerPid: reused.pid!,
         recordId: "stale-record",
       }),
@@ -637,15 +639,15 @@ describe("a worker launched from its own copy", { timeout: 240_000 }, () => {
       createRequire(import.meta.url).resolve("node-pty/package.json"),
     );
     const entry = prepareTerminalWorkerRuntime({
-      paseoHome: home,
-      paseoVersion: "0.0.0-copy",
+      clisbotHome: home,
+      clisbotVersion: "0.0.0-copy",
       bundleDirectory,
       nodePtyDirectory,
     });
 
     const launched = await launchTerminalWorker({
-      paseoHome: home,
-      paseoVersion: "0.0.0-copy",
+      clisbotHome: home,
+      clisbotVersion: "0.0.0-copy",
       entry,
     });
     extraPids.add(launched.record.pid);
@@ -656,7 +658,7 @@ describe("a worker launched from its own copy", { timeout: 240_000 }, () => {
         secret: launched.record.secret,
       }),
       closeTerminals: async () => {
-        await reapTerminalWorkers({ paseoHome: home });
+        await reapTerminalWorkers({ clisbotHome: home });
       },
     });
     try {

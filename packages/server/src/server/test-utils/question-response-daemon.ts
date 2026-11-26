@@ -3,7 +3,7 @@ import {
   MockLoadTestAgentClient,
   MockLoadTestAgentSession,
 } from "../agent/providers/mock-load-test-agent.js";
-import { createTestPaseoDaemon } from "./paseo-daemon.js";
+import { createTestClisbotDaemon } from "./clisbot-daemon.js";
 
 const firstResponse = Promise.withResolvers<void>();
 
@@ -43,7 +43,7 @@ class RetryQuestionClient extends MockLoadTestAgentClient {
 }
 
 async function main(): Promise<void> {
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: { mock: new RetryQuestionClient() },
     isDev: true,
     mcpEnabled: false,

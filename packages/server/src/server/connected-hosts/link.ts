@@ -6,12 +6,12 @@ import {
   MAX_HOST_CHANNEL_FRAME_BYTES,
   encodeHostRouteFrame,
   type HostRouteFrame,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@clisbot/protocol/binary-frames/index";
 import type {
   DaemonPermission,
   SessionInboundMessage,
   SessionOutboundMessage,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 
 /** A logical socket has no network resources or authority of its own. */
 export class VirtualHostSocket extends EventEmitter {

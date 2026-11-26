@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentProvider, ProviderOptions } from "@getpaseo/protocol/agent-types";
+import type { AgentProvider, ProviderOptions } from "@clisbot/protocol/agent-types";
 import {
   draftControlsRequest,
   openDraftOptions,

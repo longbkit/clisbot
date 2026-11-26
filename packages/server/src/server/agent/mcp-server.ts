@@ -5,15 +5,18 @@ import type {
   StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
 
-import { addModelVisibleStructuredContent } from "./tools/paseo-tool-serialization.js";
-import { createPaseoToolCatalog, type PaseoToolHostDependencies } from "./tools/paseo-tools.js";
-import type { PaseoToolResult } from "./tools/types.js";
+import { addModelVisibleStructuredContent } from "./tools/clisbot-tool-serialization.js";
+import {
+  createClisbotToolCatalog,
+  type ClisbotToolHostDependencies,
+} from "./tools/clisbot-tools.js";
+import type { ClisbotToolResult } from "./tools/types.js";
 
-export type AgentMcpServerOptions = PaseoToolHostDependencies;
+export type AgentMcpServerOptions = ClisbotToolHostDependencies;
 
 type McpToolContext = ServerContext;
 
-function toMcpToolResult(result: PaseoToolResult): CallToolResult {
+function toMcpToolResult(result: ClisbotToolResult): CallToolResult {
   const modelVisibleResult = addModelVisibleStructuredContent(result);
   return {
     content: modelVisibleResult.content as CallToolResult["content"],
@@ -28,7 +31,7 @@ function toMcpToolResult(result: PaseoToolResult): CallToolResult {
 }
 
 export async function createAgentMcpServer(options: AgentMcpServerOptions): Promise<McpServer> {
-  const catalog = await createPaseoToolCatalog(options);
+  const catalog = await createClisbotToolCatalog(options);
   const server = new McpServer({
     name: "agent-mcp",
     version: "2.0.0",
@@ -40,7 +43,7 @@ export async function createAgentMcpServer(options: AgentMcpServerOptions): Prom
       {
         title: tool.title,
         description: tool.description,
-        // Paseo declares tool schemas through the `zod` root entry; the SDK types
+        // Clisbot declares tool schemas through the `zod` root entry; the SDK types
         // its input schema through the `zod/v4` core entry. Both are the same zod
         // runtime, but the two entry points carry distinct type identities, so a
         // single narrowing cast is required at this boundary.

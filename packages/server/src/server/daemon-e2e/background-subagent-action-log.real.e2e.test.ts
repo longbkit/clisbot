@@ -4,13 +4,13 @@ import path from "node:path";
 import pino from "pino";
 import { expect, test } from "vitest";
 import { ClaudeAgentClient } from "../agent/providers/claude/agent.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 
 test("background children keep their actions after the parent finishes (#6253)", async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-background-card-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-background-card-"));
   const logger = pino({ level: "silent" });
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     logger,
     agentClients: { claude: new ClaudeAgentClient({ logger }) },
   });

@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import type { UsageReportEntry } from "@getpaseo/protocol/messages";
+import type { UsageReportEntry } from "@clisbot/protocol/messages";
 import { daemonWsRoutePattern, wsRoutePatternForPort } from "./daemon-port";
 
 export interface UsageListRequest {

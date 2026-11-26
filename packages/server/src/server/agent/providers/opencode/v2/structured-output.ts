@@ -2,7 +2,7 @@ import { Ajv } from "ajv";
 import { z } from "zod";
 import type { SessionMessageInfo } from "@opencode/client";
 
-export const STRUCTURED_OUTPUT_TOOL = "paseo_structured_output";
+export const STRUCTURED_OUTPUT_TOOL = "clisbot_structured_output";
 const schemas = new Ajv({ strict: false, allErrors: true });
 
 export function structuredOutput(input: unknown) {
@@ -21,7 +21,7 @@ export function structuredOutput(input: unknown) {
             part.state.status !== "completed"
           )
             continue;
-          const result = part.state.metadata?.paseoStructuredOutput;
+          const result = part.state.metadata?.clisbotStructuredOutput;
           if (result === undefined) continue;
           if (!validate(result))
             throw new Error(

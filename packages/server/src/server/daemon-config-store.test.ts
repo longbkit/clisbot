@@ -12,7 +12,7 @@ import { loadConfig } from "./config.js";
 import { loadPersistedConfig } from "./persisted-config.js";
 import { readSpeechSettings } from "./speech/speech-settings.js";
 import type { PersistedConfig } from "./persisted-config.js";
-import type { MutableDaemonConfig } from "@getpaseo/protocol/messages";
+import type { MutableDaemonConfig } from "@clisbot/protocol/messages";
 
 function usageEnabled(persisted: PersistedConfig): boolean {
   return persisted.daemon?.usage?.enabled !== false;
@@ -47,7 +47,7 @@ function reloadableConfig(
       maxProcessesPerSecond: git.maxProcessesPerSecond ?? 64,
       maxProcessConcurrency: git.maxProcessConcurrency ?? 8,
     },
-    app: { baseUrl: "https://app.paseo.sh" },
+    app: { baseUrl: "https://app.clisbot.com" },
     pluginsEnabled: persisted.pluginsEnabled ?? false,
     plugins: persisted.plugins ?? {},
   };
@@ -111,9 +111,9 @@ describe("DaemonConfigStore", () => {
   });
 
   test("patch persists relay state and emits its field change", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
-    const store = new DaemonConfigStore(paseoHome, {
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
+    const store = new DaemonConfigStore(clisbotHome, {
       relay: { enabled: false },
       mcp: { injectIntoAgents: false },
       browserTools: { enabled: false },
@@ -129,14 +129,14 @@ describe("DaemonConfigStore", () => {
     await store.patch({ relay: { enabled: true } });
 
     expect(changes).toEqual([true]);
-    expect(loadPersistedConfig(paseoHome).daemon?.relay?.enabled).toBe(true);
+    expect(loadPersistedConfig(clisbotHome).daemon?.relay?.enabled).toBe(true);
   });
 
   test("patch persists the relay protected security requirement independently of relay enablement", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         relay: { enabled: true },
         mcp: { injectIntoAgents: false },
@@ -158,13 +158,13 @@ describe("DaemonConfigStore", () => {
 
     expect(changes).toEqual([true]);
     expect(store.get().relay).toEqual({ enabled: true, requireProtectedSecurity: true });
-    expect(loadPersistedConfig(paseoHome).daemon?.relay?.requireProtectedSecurity).toBe(true);
+    expect(loadPersistedConfig(clisbotHome).daemon?.relay?.requireProtectedSecurity).toBe(true);
   });
 
   test("patch round-trips agent profiles through the strictly-parsed persisted config", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
-    const store = new DaemonConfigStore(paseoHome, {
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
+    const store = new DaemonConfigStore(clisbotHome, {
       relay: { enabled: false },
       mcp: { injectIntoAgents: false },
       browserTools: { enabled: false },
@@ -191,7 +191,7 @@ describe("DaemonConfigStore", () => {
       ],
     });
 
-    expect(loadPersistedConfig(paseoHome).daemon?.agentProfiles).toEqual([
+    expect(loadPersistedConfig(clisbotHome).daemon?.agentProfiles).toEqual([
       {
         id: "profile_ui",
         name: "UI work",
@@ -208,9 +208,9 @@ describe("DaemonConfigStore", () => {
   });
 
   test("a profile written with featureValues is stored as options, and the config API answers with both", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
-    const store = new DaemonConfigStore(paseoHome, {
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
+    const store = new DaemonConfigStore(clisbotHome, {
       relay: { enabled: false },
       mcp: { injectIntoAgents: false },
       browserTools: { enabled: false },
@@ -233,7 +233,7 @@ describe("DaemonConfigStore", () => {
       ],
     });
 
-    expect(loadPersistedConfig(paseoHome).daemon?.agentProfiles).toEqual([
+    expect(loadPersistedConfig(clisbotHome).daemon?.agentProfiles).toEqual([
       { id: "p", name: "P", provider: "claude", options: { fast_mode: true } },
     ]);
     expect(store.get().agentProfiles).toEqual([
@@ -250,10 +250,10 @@ describe("DaemonConfigStore", () => {
     ]);
   });
 
-  function storeWithProfile(): { store: DaemonConfigStore; paseoHome: string } {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
-    const store = new DaemonConfigStore(paseoHome, {
+  function storeWithProfile(): { store: DaemonConfigStore; clisbotHome: string } {
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
+    const store = new DaemonConfigStore(clisbotHome, {
       relay: { enabled: false },
       mcp: { injectIntoAgents: false },
       browserTools: { enabled: false },
@@ -271,18 +271,18 @@ describe("DaemonConfigStore", () => {
         },
       ],
     });
-    return { store, paseoHome };
+    return { store, clisbotHome };
   }
 
   test("a profile written with empty options, as the form sends it once the last one is removed, keeps none", async () => {
-    const { store, paseoHome } = storeWithProfile();
+    const { store, clisbotHome } = storeWithProfile();
 
     await store.patch({
       agentProfiles: [{ id: "p", name: "P", provider: "codex", options: {} }],
     });
 
     expect(store.get().agentProfiles).toEqual([{ id: "p", name: "P", provider: "codex" }]);
-    expect(loadPersistedConfig(paseoHome).daemon?.agentProfiles).toEqual([
+    expect(loadPersistedConfig(clisbotHome).daemon?.agentProfiles).toEqual([
       { id: "p", name: "P", provider: "codex" },
     ]);
   });
@@ -404,9 +404,9 @@ describe("DaemonConfigStore", () => {
   });
 
   test("a profile stored with featureValues loads as options", () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
-    const store = new DaemonConfigStore(paseoHome, {
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
+    const store = new DaemonConfigStore(clisbotHome, {
       relay: { enabled: false },
       mcp: { injectIntoAgents: false },
       browserTools: { enabled: false },
@@ -439,9 +439,9 @@ describe("DaemonConfigStore", () => {
     }));
 
     function storeWithLegacyProfiles(agentProfiles: unknown[] = legacyProfiles): DaemonConfigStore {
-      const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-      tempDirs.push(paseoHome);
-      return new DaemonConfigStore(paseoHome, {
+      const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+      tempDirs.push(clisbotHome);
+      return new DaemonConfigStore(clisbotHome, {
         relay: { enabled: false },
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -521,9 +521,9 @@ describe("DaemonConfigStore", () => {
   });
 
   test("patch replaces the whole agent profile list rather than merging entries", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
-    const store = new DaemonConfigStore(paseoHome, {
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
+    const store = new DaemonConfigStore(clisbotHome, {
       relay: { enabled: false },
       mcp: { injectIntoAgents: false },
       browserTools: { enabled: false },
@@ -541,13 +541,13 @@ describe("DaemonConfigStore", () => {
     await store.patch({ agentProfiles: [{ id: "a", name: "Keep", provider: "claude" }] });
 
     expect(store.get().agentProfiles).toEqual([{ id: "a", name: "Keep", provider: "claude" }]);
-    expect(loadPersistedConfig(paseoHome).daemon?.agentProfiles).toHaveLength(1);
+    expect(loadPersistedConfig(clisbotHome).daemon?.agentProfiles).toHaveLength(1);
   });
 
   test("rolls back config when a field transition fails", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
-    const store = new DaemonConfigStore(paseoHome, {
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
+    const store = new DaemonConfigStore(clisbotHome, {
       relay: { enabled: false },
       mcp: { injectIntoAgents: false },
       browserTools: { enabled: false },
@@ -567,13 +567,13 @@ describe("DaemonConfigStore", () => {
       "Relay transport failed to start",
     );
     expect(store.get().relay?.enabled).toBe(false);
-    expect(loadPersistedConfig(paseoHome).daemon?.relay?.enabled).toBe(false);
+    expect(loadPersistedConfig(clisbotHome).daemon?.relay?.enabled).toBe(false);
   });
 
   test("rolls back live owners when a later transactional owner fails", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
-    const store = new DaemonConfigStore(paseoHome, {
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
+    const store = new DaemonConfigStore(clisbotHome, {
       relay: { enabled: false },
       mcp: { injectIntoAgents: false },
       browserTools: { enabled: false },
@@ -599,14 +599,14 @@ describe("DaemonConfigStore", () => {
     );
     expect(browserToolsEnabled).toBe(false);
     expect(store.get().browserTools.enabled).toBe(false);
-    expect(loadPersistedConfig(paseoHome).daemon?.browserTools?.enabled).toBeUndefined();
+    expect(loadPersistedConfig(clisbotHome).daemon?.browserTools?.enabled).toBeUndefined();
   });
 
   test("rejects relay patches when a launch override owns the setting", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         relay: { enabled: false },
         mcp: { injectIntoAgents: false },
@@ -627,18 +627,18 @@ describe("DaemonConfigStore", () => {
   });
 
   test("unrelated patches do not persist a one-launch relay override", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
-    const persisted = loadPersistedConfig(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     writeFileSync(
-      path.join(paseoHome, "config.json"),
+      path.join(clisbotHome, "config.json"),
       `${JSON.stringify({
         ...persisted,
         daemon: { ...persisted.daemon, relay: { enabled: false } },
       })}\n`,
     );
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         relay: { enabled: true },
         mcp: { injectIntoAgents: false },
@@ -655,15 +655,15 @@ describe("DaemonConfigStore", () => {
 
     await store.patch({ browserTools: { enabled: true } });
 
-    expect(loadPersistedConfig(paseoHome).daemon?.relay?.enabled).toBe(false);
+    expect(loadPersistedConfig(clisbotHome).daemon?.relay?.enabled).toBe(false);
   });
 
   test("unrelated patches persist only requested file intent", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
-    const before = loadPersistedConfig(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
+    const before = loadPersistedConfig(clisbotHome);
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         relay: { enabled: true },
         mcp: { enabled: false, injectIntoAgents: false },
@@ -692,18 +692,18 @@ describe("DaemonConfigStore", () => {
     } as Parameters<typeof store.patch>[0]);
 
     expect(store.get().hostnames).toEqual(["launch.example.test"]);
-    expect(loadPersistedConfig(paseoHome)).toEqual({
+    expect(loadPersistedConfig(clisbotHome)).toEqual({
       ...before,
       daemon: { ...before.daemon, appendSystemPrompt: "Only this field" },
     });
   });
 
   test("patch persists provider enabled flags into config.json", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
-    const initial = loadPersistedConfig(paseoHome);
-    const configPath = path.join(paseoHome, "config.json");
+    const initial = loadPersistedConfig(clisbotHome);
+    const configPath = path.join(clisbotHome, "config.json");
     // Reuse the validated serializer through the store path by seeding the file directly.
     // This keeps the test focused on the merge behavior.
     const seeded =
@@ -726,7 +726,7 @@ describe("DaemonConfigStore", () => {
     writeFileSync(configPath, seeded);
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -745,7 +745,7 @@ describe("DaemonConfigStore", () => {
       },
     });
 
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     expect(persisted.agents?.providers?.gemini).toEqual({
       extends: "acp",
       label: "Gemini",
@@ -754,14 +754,14 @@ describe("DaemonConfigStore", () => {
     });
   });
 
-  test("patch persists provider Paseo-tool policy without changing availability", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+  test("patch persists provider Clisbot-tool policy without changing availability", async () => {
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
     writeFileSync(
-      path.join(paseoHome, "config.json"),
+      path.join(clisbotHome, "config.json"),
       JSON.stringify({ agents: { providers: { claude: { enabled: false } } } }),
     );
-    const store = new DaemonConfigStore(paseoHome, {
+    const store = new DaemonConfigStore(clisbotHome, {
       mcp: { injectIntoAgents: true },
       browserTools: { enabled: false },
       providers: { claude: { enabled: false } },
@@ -774,33 +774,33 @@ describe("DaemonConfigStore", () => {
     await store.patch({
       providers: {
         claude: {
-          paseoTools: { enabled: true, disabledTools: ["list_agents"] },
+          clisbotTools: { enabled: true, disabledTools: ["list_agents"] },
         },
       },
     });
     await store.patch({
       providers: {
         claude: {
-          paseoTools: { disabledTools: ["create_agent"] },
+          clisbotTools: { disabledTools: ["create_agent"] },
         },
       },
     });
 
     expect(store.get().providers.claude).toEqual({
       enabled: false,
-      paseoTools: { enabled: true, disabledTools: ["create_agent"] },
+      clisbotTools: { enabled: true, disabledTools: ["create_agent"] },
     });
-    expect(loadPersistedConfig(paseoHome).agents?.providers?.claude).toEqual({
+    expect(loadPersistedConfig(clisbotHome).agents?.providers?.claude).toEqual({
       enabled: false,
-      paseoTools: { enabled: true, disabledTools: ["create_agent"] },
+      clisbotTools: { enabled: true, disabledTools: ["create_agent"] },
     });
   });
 
   test("patch removes provider entries from config.json", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
-    const configPath = path.join(paseoHome, "config.json");
+    const configPath = path.join(clisbotHome, "config.json");
     writeFileSync(
       configPath,
       `${JSON.stringify(
@@ -825,7 +825,7 @@ describe("DaemonConfigStore", () => {
     );
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -845,16 +845,16 @@ describe("DaemonConfigStore", () => {
 
     expect(next.providers.gemini).toBeUndefined();
     expect(next.providers.claude).toEqual({ enabled: false });
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     expect(persisted.agents?.providers?.gemini).toBeUndefined();
     expect(persisted.agents?.providers?.claude).toEqual({ enabled: false });
   });
 
   test("patch removes the providers object when the last provider is deleted", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
-    const configPath = path.join(paseoHome, "config.json");
+    const configPath = path.join(clisbotHome, "config.json");
     writeFileSync(
       configPath,
       `${JSON.stringify(
@@ -876,7 +876,7 @@ describe("DaemonConfigStore", () => {
     );
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -891,15 +891,15 @@ describe("DaemonConfigStore", () => {
 
     await store.patch({ removeProviders: ["gemini"] });
 
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     expect(persisted.agents?.providers).toBeUndefined();
   });
 
   test("patch removes deleted providers from metadata generation", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
-    const configPath = path.join(paseoHome, "config.json");
+    const configPath = path.join(clisbotHome, "config.json");
     writeFileSync(
       configPath,
       `${JSON.stringify(
@@ -930,7 +930,7 @@ describe("DaemonConfigStore", () => {
     );
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -954,17 +954,17 @@ describe("DaemonConfigStore", () => {
     const next = await store.patch({ removeProviders: ["gemini"] });
 
     expect(next.metadataGeneration.providers).toEqual([{ provider: "claude", model: "haiku" }]);
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     expect(persisted.agents?.metadataGeneration).toEqual({
       providers: [{ provider: "claude", model: "haiku" }],
     });
   });
 
   test("patch persists provider removal when in-memory config is already clean", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
-    const configPath = path.join(paseoHome, "config.json");
+    const configPath = path.join(clisbotHome, "config.json");
     writeFileSync(
       configPath,
       `${JSON.stringify(
@@ -989,7 +989,7 @@ describe("DaemonConfigStore", () => {
     );
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -1005,17 +1005,17 @@ describe("DaemonConfigStore", () => {
     const next = await store.patch({ removeProviders: ["gemini"] });
 
     expect(next.providers.gemini).toBeUndefined();
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     expect(persisted.agents?.providers).toBeUndefined();
     expect(persisted.agents?.metadataGeneration).toEqual({ providers: [] });
   });
 
   test("patch persists append system prompt into config.json", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -1032,16 +1032,16 @@ describe("DaemonConfigStore", () => {
       appendSystemPrompt: "Prefer terse replies.",
     });
 
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     expect(persisted.daemon?.appendSystemPrompt).toBe("Prefer terse replies.");
   });
 
   test("patch persists browser tools opt-in into config.json", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -1055,16 +1055,16 @@ describe("DaemonConfigStore", () => {
 
     await store.patch({ browserTools: { enabled: true } });
 
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     expect(persisted.daemon?.browserTools).toEqual({ enabled: true });
   });
 
   test("patch persists provider additional models into config.json", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -1090,7 +1090,7 @@ describe("DaemonConfigStore", () => {
       },
     });
 
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     expect(persisted.agents?.providers?.claude).toEqual({
       additionalModels: [
         {
@@ -1102,11 +1102,11 @@ describe("DaemonConfigStore", () => {
   });
 
   test("patch persists daemon append system prompt into config.json", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -1123,16 +1123,16 @@ describe("DaemonConfigStore", () => {
       appendSystemPrompt: "Prefer terse replies.",
     });
 
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     expect(persisted.daemon?.appendSystemPrompt).toBe("Prefer terse replies.");
   });
 
   test("patch persists enable terminal agent hooks into config.json", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         providers: {},
@@ -1146,16 +1146,16 @@ describe("DaemonConfigStore", () => {
 
     await store.patch({ enableTerminalAgentHooks: true });
 
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     expect(persisted.daemon?.enableTerminalAgentHooks).toBe(true);
   });
 
   test("patch persists metadata generation providers into config.json", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -1177,7 +1177,7 @@ describe("DaemonConfigStore", () => {
       },
     });
 
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     expect(persisted.agents?.metadataGeneration).toEqual({
       providers: [
         { provider: "claude", model: "haiku" },
@@ -1187,10 +1187,10 @@ describe("DaemonConfigStore", () => {
   });
 
   test("patch persists clearing metadata generation providers into config.json", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
-    const configPath = path.join(paseoHome, "config.json");
+    const configPath = path.join(clisbotHome, "config.json");
     writeFileSync(
       configPath,
       `${JSON.stringify(
@@ -1208,7 +1208,7 @@ describe("DaemonConfigStore", () => {
     );
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -1223,22 +1223,22 @@ describe("DaemonConfigStore", () => {
 
     await store.patch({ metadataGeneration: { providers: [] } });
 
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     expect(persisted.agents?.metadataGeneration).toEqual({ providers: [] });
   });
 
   test("patch persists the host idle runtime cleanup opt-out for the next daemon start", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
     writeFileSync(
-      path.join(paseoHome, "config.json"),
+      path.join(clisbotHome, "config.json"),
       `${JSON.stringify({
         version: 1,
         agents: { metadataGeneration: { providers: [{ provider: "claude" }] } },
       })}\n`,
     );
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -1254,31 +1254,31 @@ describe("DaemonConfigStore", () => {
 
     expect((await store.patch({ idleRuntimeCleanup: false })).idleRuntimeCleanup).toBe(false);
 
-    expect(loadPersistedConfig(paseoHome).agents).toEqual({
+    expect(loadPersistedConfig(clisbotHome).agents).toEqual({
       metadataGeneration: { providers: [{ provider: "claude" }] },
       idleRuntimeCleanup: false,
     });
-    expect(loadConfig(paseoHome, { env: {} }).idleRuntimeCleanup).toBe(false);
+    expect(loadConfig(clisbotHome, { env: {} }).idleRuntimeCleanup).toBe(false);
 
     await store.patch({ idleRuntimeCleanup: true });
-    expect(loadConfig(paseoHome, { env: {} }).idleRuntimeCleanup).toBe(true);
+    expect(loadConfig(clisbotHome, { env: {} }).idleRuntimeCleanup).toBe(true);
     await store.patch({ resumeOnStartup: false, resumePrompt: "Keep going.\n" });
-    expect(loadPersistedConfig(paseoHome).agents).toMatchObject({
+    expect(loadPersistedConfig(clisbotHome).agents).toMatchObject({
       resumeOnStartup: false,
       resumePrompt: "Keep going.\n",
     });
-    expect(loadConfig(paseoHome, { env: {} })).toMatchObject({
+    expect(loadConfig(clisbotHome, { env: {} })).toMatchObject({
       resumeOnStartup: false,
       resumePrompt: "Keep going.\n",
     });
   });
 
   test("patch persists custom ACP provider overrides into config.json", async () => {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-store-"));
+    tempDirs.push(clisbotHome);
 
     const store = new DaemonConfigStore(
-      paseoHome,
+      clisbotHome,
       {
         mcp: { injectIntoAgents: false },
         browserTools: { enabled: false },
@@ -1293,9 +1293,9 @@ describe("DaemonConfigStore", () => {
 
     await store.patch({
       providers: {
-        "paseo-e2e-acp": {
+        "clisbot-e2e-acp": {
           extends: "acp",
-          label: "Paseo E2E ACP",
+          label: "Clisbot E2E ACP",
           description: "E2E ACP provider fixture",
           command: ["npx", "-y", "--version"],
           env: {},
@@ -1303,10 +1303,10 @@ describe("DaemonConfigStore", () => {
       },
     });
 
-    const persisted = loadPersistedConfig(paseoHome);
-    expect(persisted.agents?.providers?.["paseo-e2e-acp"]).toEqual({
+    const persisted = loadPersistedConfig(clisbotHome);
+    expect(persisted.agents?.providers?.["clisbot-e2e-acp"]).toEqual({
       extends: "acp",
-      label: "Paseo E2E ACP",
+      label: "Clisbot E2E ACP",
       description: "E2E ACP provider fixture",
       command: ["npx", "-y", "--version"],
       env: {},
@@ -1327,18 +1327,18 @@ describe("DaemonConfigStore reload", () => {
       initialPersisted?: PersistedConfig;
     } = {},
   ) {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-reload-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-reload-"));
+    tempDirs.push(clisbotHome);
     if (options.initialPersisted) {
       writeFileSync(
-        path.join(paseoHome, "config.json"),
+        path.join(clisbotHome, "config.json"),
         `${JSON.stringify(options.initialPersisted, null, 2)}\n`,
       );
     }
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     const relayEnabledFallback = persisted.daemon?.relay?.enabled === undefined;
     const initialMutable = reloadableConfig(persisted, { relayEnabledFallback });
-    const store = new DaemonConfigStore(paseoHome, initialMutable, undefined, {
+    const store = new DaemonConfigStore(clisbotHome, initialMutable, undefined, {
       reloadSource: {
         resolve: (nextPersisted) => {
           const mutable = reloadableConfig(nextPersisted, { relayEnabledFallback });
@@ -1352,11 +1352,11 @@ describe("DaemonConfigStore reload", () => {
         },
       },
     });
-    return { paseoHome, store, persisted };
+    return { clisbotHome, store, persisted };
   }
 
-  function writeConfig(paseoHome: string, config: unknown): void {
-    writeFileSync(path.join(paseoHome, "config.json"), `${JSON.stringify(config, null, 2)}\n`);
+  function writeConfig(clisbotHome: string, config: unknown): void {
+    writeFileSync(path.join(clisbotHome, "config.json"), `${JSON.stringify(config, null, 2)}\n`);
   }
 
   test("applies overlapping plugin mutations to the latest committed sources", async () => {
@@ -1388,22 +1388,22 @@ describe("DaemonConfigStore reload", () => {
   });
 
   test("serializes overlapping patches before committing their combined state", async () => {
-    const { paseoHome, store } = createReloadableStore();
+    const { clisbotHome, store } = createReloadableStore();
     const first = store.patch({ appendSystemPrompt: "first" });
     const second = store.patch({ browserTools: { enabled: true } });
     expect(store.get().appendSystemPrompt).toBe("");
     await Promise.all([first, second]);
     expect(store.get().appendSystemPrompt).toBe("first");
     expect(store.get().browserTools.enabled).toBe(true);
-    expect(loadPersistedConfig(paseoHome).daemon).toMatchObject({
+    expect(loadPersistedConfig(clisbotHome).daemon).toMatchObject({
       appendSystemPrompt: "first",
       browserTools: { enabled: true },
     });
   });
 
   test("applies mutable edits and reports startup-only edits", async () => {
-    const { paseoHome, store, persisted } = createReloadableStore();
-    writeConfig(paseoHome, {
+    const { clisbotHome, store, persisted } = createReloadableStore();
+    writeConfig(clisbotHome, {
       ...persisted,
       daemon: {
         ...persisted.daemon,
@@ -1427,11 +1427,11 @@ describe("DaemonConfigStore reload", () => {
   });
 
   test("reloads idle runtime cleanup in both directions without requiring a restart", async () => {
-    const { paseoHome, store, persisted } = createReloadableStore();
+    const { clisbotHome, store, persisted } = createReloadableStore();
     const changes: unknown[] = [];
     store.onFieldChange("idleRuntimeCleanup", (value) => changes.push(value));
     for (const enabled of [false, true]) {
-      writeConfig(paseoHome, { ...persisted, agents: { idleRuntimeCleanup: enabled } });
+      writeConfig(clisbotHome, { ...persisted, agents: { idleRuntimeCleanup: enabled } });
       expect(await store.reload()).toEqual({
         appliedPaths: ["agents.idleRuntimeCleanup"],
         restartRequiredPaths: [],
@@ -1450,13 +1450,13 @@ describe("DaemonConfigStore reload", () => {
   });
 
   test("applies the global plugin switch in both directions", async () => {
-    const { paseoHome, store, persisted } = createReloadableStore({
+    const { clisbotHome, store, persisted } = createReloadableStore({
       initialPersisted: { version: 1, pluginsEnabled: false },
     });
     const changes: unknown[] = [];
     store.onFieldChange("pluginsEnabled", (value) => changes.push(value));
 
-    writeConfig(paseoHome, { ...persisted, pluginsEnabled: true });
+    writeConfig(clisbotHome, { ...persisted, pluginsEnabled: true });
     expect(await store.reload()).toEqual({
       appliedPaths: ["pluginsEnabled"],
       restartRequiredPaths: [],
@@ -1464,7 +1464,7 @@ describe("DaemonConfigStore reload", () => {
     });
     expect(store.get().pluginsEnabled).toBe(true);
 
-    writeConfig(paseoHome, { ...persisted, pluginsEnabled: false });
+    writeConfig(clisbotHome, { ...persisted, pluginsEnabled: false });
     expect(await store.reload()).toEqual({
       appliedPaths: ["pluginsEnabled"],
       restartRequiredPaths: [],
@@ -1475,10 +1475,10 @@ describe("DaemonConfigStore reload", () => {
   });
 
   test("classifies every leaf when a parent subtree is added", async () => {
-    const { paseoHome, store } = createReloadableStore({
+    const { clisbotHome, store } = createReloadableStore({
       initialPersisted: { version: 1 },
     });
-    writeConfig(paseoHome, {
+    writeConfig(clisbotHome, {
       version: 1,
       daemon: {
         relay: {
@@ -1497,7 +1497,7 @@ describe("DaemonConfigStore reload", () => {
   });
 
   test("classifies every leaf when the daemon subtree is removed", async () => {
-    const { paseoHome, store } = createReloadableStore({
+    const { clisbotHome, store } = createReloadableStore({
       initialPersisted: {
         version: 1,
         daemon: {
@@ -1515,7 +1515,7 @@ describe("DaemonConfigStore reload", () => {
         },
       },
     });
-    writeConfig(paseoHome, { version: 1 });
+    writeConfig(clisbotHome, { version: 1 });
 
     expect(await store.reload()).toEqual({
       appliedPaths: ["daemon.browserTools.enabled"],
@@ -1532,11 +1532,11 @@ describe("DaemonConfigStore reload", () => {
   });
 
   test("keeps overridden leaves separate from restart-required siblings", async () => {
-    const { paseoHome, store } = createReloadableStore({
+    const { clisbotHome, store } = createReloadableStore({
       initialPersisted: { version: 1 },
       overrideControlledPaths: ["daemon.relay.enabled"],
     });
-    writeConfig(paseoHome, {
+    writeConfig(clisbotHome, {
       version: 1,
       daemon: {
         relay: { enabled: false, endpoint: "relay.example.test:443" },
@@ -1551,19 +1551,19 @@ describe("DaemonConfigStore reload", () => {
   });
 
   test("invalid JSON and invalid schema apply nothing", async () => {
-    const { paseoHome, store } = createReloadableStore();
-    writeFileSync(path.join(paseoHome, "config.json"), "{ nope\n");
+    const { clisbotHome, store } = createReloadableStore();
+    writeFileSync(path.join(clisbotHome, "config.json"), "{ nope\n");
     await expect(store.reload()).rejects.toThrow("Invalid JSON");
     expect(store.get().browserTools.enabled).toBe(false);
 
-    writeConfig(paseoHome, { daemon: { browserTools: { enabled: "yes" } } });
+    writeConfig(clisbotHome, { daemon: { browserTools: { enabled: "yes" } } });
     await expect(store.reload()).rejects.toThrow("Invalid config");
     expect(store.get().browserTools.enabled).toBe(false);
   });
 
   test("removing providers and optional profiles clears live state", async () => {
-    const { paseoHome, store, persisted } = createReloadableStore();
-    writeConfig(paseoHome, {
+    const { clisbotHome, store, persisted } = createReloadableStore();
+    writeConfig(clisbotHome, {
       ...persisted,
       daemon: {
         ...persisted.daemon,
@@ -1578,7 +1578,7 @@ describe("DaemonConfigStore reload", () => {
     });
     await store.reload();
 
-    writeConfig(paseoHome, persisted);
+    writeConfig(clisbotHome, persisted);
     const result = await store.reload();
 
     expect(result.appliedPaths).toEqual([
@@ -1592,8 +1592,8 @@ describe("DaemonConfigStore reload", () => {
   });
 
   test("reload folds a profile file written with featureValues into options, and saving it persists options", async () => {
-    const { paseoHome, store, persisted } = createReloadableStore();
-    writeConfig(paseoHome, {
+    const { clisbotHome, store, persisted } = createReloadableStore();
+    writeConfig(clisbotHome, {
       ...persisted,
       daemon: {
         ...persisted.daemon,
@@ -1615,17 +1615,17 @@ describe("DaemonConfigStore reload", () => {
     ]);
     // The app reads the profile and writes the list back on its next edit.
     await store.patch({ agentProfiles: store.get().agentProfiles });
-    expect(loadPersistedConfig(paseoHome).daemon?.agentProfiles).toEqual([
+    expect(loadPersistedConfig(clisbotHome).daemon?.agentProfiles).toEqual([
       { id: "legacy", name: "Legacy", provider: "codex", options: { service_tier: "fast" } },
     ]);
   });
 
   test("reports a launch-controlled edit without changing live state", async () => {
-    const { paseoHome, store, persisted } = createReloadableStore({
+    const { clisbotHome, store, persisted } = createReloadableStore({
       overrideControlledPaths: ["daemon.relay.enabled"],
     });
     const initialRelay = store.get().relay?.enabled;
-    writeConfig(paseoHome, {
+    writeConfig(clisbotHome, {
       ...persisted,
       daemon: { ...persisted.daemon, relay: { enabled: !initialRelay } },
     });
@@ -1639,10 +1639,10 @@ describe("DaemonConfigStore reload", () => {
   });
 
   test("an unrelated patch does not mark a manual override-owned edit as applied", async () => {
-    const { paseoHome, store, persisted } = createReloadableStore({
+    const { clisbotHome, store, persisted } = createReloadableStore({
       overrideControlledPaths: ["daemon.relay.enabled"],
     });
-    writeConfig(paseoHome, {
+    writeConfig(clisbotHome, {
       ...persisted,
       daemon: { ...persisted.daemon, relay: { enabled: true } },
     });
@@ -1656,10 +1656,10 @@ describe("DaemonConfigStore reload", () => {
   });
 
   test("reports startup-only launch overrides instead of restart warnings", async () => {
-    const { paseoHome, store, persisted } = createReloadableStore({
+    const { clisbotHome, store, persisted } = createReloadableStore({
       overrideControlledPaths: ["daemon.listen", "daemon.relay.endpoint"],
     });
-    writeConfig(paseoHome, {
+    writeConfig(clisbotHome, {
       ...persisted,
       daemon: {
         ...persisted.daemon,
@@ -1696,36 +1696,36 @@ describe("DaemonConfigStore speech settings", () => {
   });
 
   function createSpeechStore(initialPersisted?: unknown, env: NodeJS.ProcessEnv = {}) {
-    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-speech-"));
-    tempDirs.push(paseoHome);
+    const clisbotHome = mkdtempSync(path.join(tmpdir(), "clisbot-daemon-config-speech-"));
+    tempDirs.push(clisbotHome);
     if (initialPersisted) {
       writeFileSync(
-        path.join(paseoHome, "config.json"),
+        path.join(clisbotHome, "config.json"),
         `${JSON.stringify(initialPersisted, null, 2)}\n`,
       );
     }
-    const persisted = loadPersistedConfig(paseoHome);
+    const persisted = loadPersistedConfig(clisbotHome);
     const applied: PersistedConfig[] = [];
     const speech = {
       read: (next: PersistedConfig) => readSpeechSettings(next, env),
       apply: (next: PersistedConfig) => applied.push(next),
     };
-    const store = new DaemonConfigStore(paseoHome, reloadableConfig(persisted), undefined, {
+    const store = new DaemonConfigStore(clisbotHome, reloadableConfig(persisted), undefined, {
       speech,
       reloadSource: {
         resolve: (next) => ({ mutable: reloadableConfig(next), overrideControlledPaths: [] }),
       },
     });
-    return { paseoHome, store, applied, persisted };
+    return { clisbotHome, store, applied, persisted };
   }
 
   test("reads, patches, and clears local STT language without losing it on other saves", async () => {
-    const { paseoHome, store } = createSpeechStore({
+    const { clisbotHome, store } = createSpeechStore({
       features: { dictation: { stt: { language: "fr" } } },
     });
     expect(store.get().features?.dictation.stt).toEqual({ provider: "local", language: "fr" });
     await store.patch({ features: { voiceMode: { enabled: true } } });
-    expect(loadPersistedConfig(paseoHome).features?.dictation?.stt).toEqual({
+    expect(loadPersistedConfig(clisbotHome).features?.dictation?.stt).toEqual({
       provider: "local",
       language: "fr",
     });
@@ -1734,22 +1734,24 @@ describe("DaemonConfigStore speech settings", () => {
     });
     expect(patched.features?.dictation.stt).toEqual({ provider: "local", language: "de" });
     await store.patch({ features: { dictation: { stt: { language: null } } } });
-    expect(loadPersistedConfig(paseoHome).features?.dictation?.stt).toEqual({ provider: "local" });
+    expect(loadPersistedConfig(clisbotHome).features?.dictation?.stt).toEqual({
+      provider: "local",
+    });
   });
 
   test("reports language env overrides for both local STT sites", async () => {
     const { store } = createSpeechStore(
       {},
-      { PASEO_DICTATION_LANGUAGE: "fr", PASEO_VOICE_LANGUAGE: "de" },
+      { CLISBOT_DICTATION_LANGUAGE: "fr", CLISBOT_VOICE_LANGUAGE: "de" },
     );
     expect(store.get().envOverrides).toMatchObject({
-      "features.dictation.stt.language": "PASEO_DICTATION_LANGUAGE",
-      "features.voiceMode.stt.language": "PASEO_VOICE_LANGUAGE",
+      "features.dictation.stt.language": "CLISBOT_DICTATION_LANGUAGE",
+      "features.voiceMode.stt.language": "CLISBOT_VOICE_LANGUAGE",
     });
   });
 
   test("keeps voice mode off until it is turned on", async () => {
-    const { paseoHome, store } = createSpeechStore();
+    const { clisbotHome, store } = createSpeechStore();
 
     expect(store.get().features?.dictation.enabled).toBe(true);
     expect(store.get().features?.voiceMode.enabled).toBe(false);
@@ -1757,11 +1759,11 @@ describe("DaemonConfigStore speech settings", () => {
     const result = await store.patch({ features: { voiceMode: { enabled: true } } });
 
     expect(result.features?.voiceMode.enabled).toBe(true);
-    expect(loadPersistedConfig(paseoHome).features?.voiceMode?.enabled).toBe(true);
+    expect(loadPersistedConfig(clisbotHome).features?.voiceMode?.enabled).toBe(true);
   });
 
   test("stores the OpenAI key without ever returning it", async () => {
-    const { paseoHome, store, applied } = createSpeechStore();
+    const { clisbotHome, store, applied } = createSpeechStore();
 
     const result = await store.patch({
       features: { dictation: { stt: { provider: "openai", apiKey: " sk-test " } } },
@@ -1769,7 +1771,7 @@ describe("DaemonConfigStore speech settings", () => {
 
     expect(result.features?.dictation.stt).toEqual({ provider: "openai", hasApiKey: true });
     expect(JSON.stringify(result)).not.toContain("sk-test");
-    expect(loadPersistedConfig(paseoHome).features?.dictation?.stt).toMatchObject({
+    expect(loadPersistedConfig(clisbotHome).features?.dictation?.stt).toMatchObject({
       apiKey: "sk-test",
     });
     expect(applied).toHaveLength(1);
@@ -1789,7 +1791,7 @@ describe("DaemonConfigStore speech settings", () => {
   });
 
   test("switching provider clears the previous provider's model", async () => {
-    const { paseoHome, store } = createSpeechStore({
+    const { clisbotHome, store } = createSpeechStore({
       version: 1,
       features: { dictation: { stt: { provider: "local", model: "parakeet-tdt-0.6b-v3-int8" } } },
     });
@@ -1797,25 +1799,25 @@ describe("DaemonConfigStore speech settings", () => {
     const result = await store.patch({ features: { dictation: { stt: { provider: "openai" } } } });
 
     expect(result.features?.dictation.stt).toEqual({ provider: "openai", hasApiKey: false });
-    expect(loadPersistedConfig(paseoHome).features?.dictation?.stt).toEqual({
+    expect(loadPersistedConfig(clisbotHome).features?.dictation?.stt).toEqual({
       provider: "openai",
     });
   });
 
   test("rejects a local model id outside the catalog without persisting it", async () => {
-    const { paseoHome, store, applied } = createSpeechStore();
+    const { clisbotHome, store, applied } = createSpeechStore();
 
     await expect(
       store.patch({ features: { voiceMode: { tts: { provider: "local", model: "nope" } } } }),
     ).rejects.toThrow("Unknown local voice model: nope");
-    expect(loadPersistedConfig(paseoHome).features?.voiceMode).toBeUndefined();
+    expect(loadPersistedConfig(clisbotHome).features?.voiceMode).toBeUndefined();
     expect(applied).toEqual([]);
   });
 
   test("reload applies hand-edited speech settings without a restart", async () => {
-    const { paseoHome, store, applied, persisted } = createSpeechStore();
+    const { clisbotHome, store, applied, persisted } = createSpeechStore();
     writeFileSync(
-      path.join(paseoHome, "config.json"),
+      path.join(clisbotHome, "config.json"),
       `${JSON.stringify({ ...persisted, features: { voiceMode: { enabled: false } } }, null, 2)}\n`,
     );
 
@@ -1827,7 +1829,7 @@ describe("DaemonConfigStore speech settings", () => {
     expect(applied).toHaveLength(1);
   });
   test("merges same-provider fields and replaces the whole variant when provider changes", async () => {
-    const { paseoHome, store } = createSpeechStore();
+    const { clisbotHome, store } = createSpeechStore();
     await store.patch({
       features: {
         voiceMode: {
@@ -1836,7 +1838,7 @@ describe("DaemonConfigStore speech settings", () => {
       },
     });
     await store.patch({ features: { voiceMode: { stt: { model: "second", baseUrl: null } } } });
-    expect(loadPersistedConfig(paseoHome).features?.voiceMode?.stt).toEqual({
+    expect(loadPersistedConfig(clisbotHome).features?.voiceMode?.stt).toEqual({
       provider: "openai",
       apiKey: "secret",
       model: "second",
@@ -1854,7 +1856,7 @@ describe("DaemonConfigStore speech settings", () => {
   });
 
   test("keeps a saved OpenAI key when a full variant patch omits the write-only key", async () => {
-    const { paseoHome, store } = createSpeechStore({
+    const { clisbotHome, store } = createSpeechStore({
       features: { voiceMode: { stt: { provider: "openai", apiKey: "saved-secret" } } },
     });
     const result = await store.patch({
@@ -1865,7 +1867,7 @@ describe("DaemonConfigStore speech settings", () => {
       model: "whisper-1",
       hasApiKey: true,
     });
-    expect(loadPersistedConfig(paseoHome).features?.voiceMode?.stt).toEqual({
+    expect(loadPersistedConfig(clisbotHome).features?.voiceMode?.stt).toEqual({
       provider: "openai",
       apiKey: "saved-secret",
       model: "whisper-1",
@@ -1874,7 +1876,7 @@ describe("DaemonConfigStore speech settings", () => {
   });
 
   test("loads a legacy host, redacts its key and writes the normalized config after any save", async () => {
-    const { paseoHome, store } = createSpeechStore({
+    const { clisbotHome, store } = createSpeechStore({
       providers: { openai: { apiKey: "legacy-secret", stt: { baseUrl: "https://old/v1" } } },
       features: { voiceMode: { enabled: true, stt: { provider: "openai" } } },
     });
@@ -1885,7 +1887,7 @@ describe("DaemonConfigStore speech settings", () => {
     });
     expect(JSON.stringify(store.get())).not.toContain("legacy-secret");
     await store.patch({ autoArchiveAfterMerge: true });
-    const disk = JSON.parse(readFileSync(path.join(paseoHome, "config.json"), "utf8"));
+    const disk = JSON.parse(readFileSync(path.join(clisbotHome, "config.json"), "utf8"));
     expect(disk.providers).not.toHaveProperty("openai");
     expect(disk.features.voiceMode.stt.apiKey).toBe("legacy-secret");
   });
@@ -1894,13 +1896,13 @@ describe("DaemonConfigStore speech settings", () => {
     const { store } = createSpeechStore(
       { features: { voiceMode: { stt: { provider: "openai", model: "configured" } } } },
       {
-        PASEO_VOICE_STT_PROVIDER: "local",
+        CLISBOT_VOICE_STT_PROVIDER: "local",
         OPENAI_API_KEY: "env-secret",
       },
     );
     expect(store.get().features?.voiceMode.stt.provider).toBe("local");
     expect(store.get().envOverrides).toEqual({
-      "features.voiceMode.stt.provider": "PASEO_VOICE_STT_PROVIDER",
+      "features.voiceMode.stt.provider": "CLISBOT_VOICE_STT_PROVIDER",
     });
     const other = createSpeechStore(
       { features: { voiceMode: { stt: { provider: "openai" } } } },
@@ -1925,10 +1927,10 @@ describe("DaemonConfigStore speech settings", () => {
 });
 
 test("usage policy persists across restart and live reload", async () => {
-  const paseoHome = mkdtempSync(path.join(tmpdir(), "usage-policy-"));
+  const clisbotHome = mkdtempSync(path.join(tmpdir(), "usage-policy-"));
   try {
     const initial = reloadableConfig({});
-    const store = new DaemonConfigStore(paseoHome, initial, undefined, {
+    const store = new DaemonConfigStore(clisbotHome, initial, undefined, {
       reloadSource: {
         resolve: (persisted) => ({
           mutable: reloadableConfig(persisted),
@@ -1937,17 +1939,17 @@ test("usage policy persists across restart and live reload", async () => {
       },
     });
     await store.patch({ usage: { enabled: false } });
-    expect(loadConfig(paseoHome, { env: {} }).usageEnabled).toBe(false);
-    const persisted = loadPersistedConfig(paseoHome);
-    const restarted = new DaemonConfigStore(paseoHome, reloadableConfig(persisted));
+    expect(loadConfig(clisbotHome, { env: {} }).usageEnabled).toBe(false);
+    const persisted = loadPersistedConfig(clisbotHome);
+    const restarted = new DaemonConfigStore(clisbotHome, reloadableConfig(persisted));
     expect(restarted.get().usage).toEqual({ enabled: false });
     writeFileSync(
-      path.join(paseoHome, "config.json"),
+      path.join(clisbotHome, "config.json"),
       JSON.stringify({ daemon: { usage: { enabled: true } } }),
     );
     await store.reload();
     expect(store.get().usage).toEqual({ enabled: true });
   } finally {
-    rmSync(paseoHome, { recursive: true, force: true });
+    rmSync(clisbotHome, { recursive: true, force: true });
   }
 });

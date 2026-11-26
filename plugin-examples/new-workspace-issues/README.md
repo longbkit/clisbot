@@ -9,7 +9,7 @@ Choosing an issue:
 - Calls `newWorkspace.setMetadata({ "new-workspace-issues.issue": issue.id })`, so the created
   workspace carries the issue id.
 
-`Combobox` runs `search` when the list opens and again as the user types. Paseo shows the loading
+`Combobox` runs `search` when the list opens and again as the user types. Clisbot shows the loading
 and error states and drops results that a newer search replaced. The server handler in
 [server/issues.ts](server/issues.ts) filters a fixed list; a real plugin would call its tracker.
 

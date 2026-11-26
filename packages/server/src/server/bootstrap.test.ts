@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, test, onTestFinished } from "vitest";
-import { MutableDaemonConfigSchema } from "@getpaseo/protocol/messages";
+import { MutableDaemonConfigSchema } from "@clisbot/protocol/messages";
 import { DaemonConfigStore } from "./daemon-config-store.js";
 import { loadPersistedConfig } from "./persisted-config.js";
 import {
@@ -69,7 +69,7 @@ test("reconciliation isolates workspace update failures between sessions", async
 // Exercise bootstrap's actual live-config binding with the real collector and store.
 
 function liveCleanupHost() {
-  const home = mkdtempSync(path.join(tmpdir(), "paseo-live-cleanup-"));
+  const home = mkdtempSync(path.join(tmpdir(), "clisbot-live-cleanup-"));
   writeFileSync(path.join(home, "config.json"), JSON.stringify({ version: 1 }));
   const store = new DaemonConfigStore(
     home,

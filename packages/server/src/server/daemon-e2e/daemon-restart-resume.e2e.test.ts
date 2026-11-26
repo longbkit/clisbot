@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { createDaemonTestContext, type DaemonTestContext } from "../test-utils/index.js";
-import type { PersistenceHandle } from "@getpaseo/protocol/messages";
+import type { PersistenceHandle } from "@clisbot/protocol/messages";
 
 function tmpCwd(): string {
   return mkdtempSync(path.join(tmpdir(), "daemon-restart-resume-"));
@@ -98,7 +98,7 @@ async function restartFixture(
   });
   const ready = await Promise.race([
     once(child, "message").then(
-      ([message]) => message as { port: number; paseoHome: string; cwd: string },
+      ([message]) => message as { port: number; clisbotHome: string; cwd: string },
     ),
     once(child, "exit").then(([code]) => {
       throw new Error(`Fixture exited ${code}: ${output}`);
@@ -168,14 +168,17 @@ test.each([false, true])(
         .poll(
           async () =>
             (
-              await new AgentStorage(path.join(first.paseoHome, "agents"), createTestLogger()).get(
-                childId,
-              )
+              await new AgentStorage(
+                path.join(first.clisbotHome, "agents"),
+                createTestLogger(),
+              ).get(childId)
             )?.lastStatus,
         )
         .toBe("running");
       expect(
-        JSON.parse(await readFile(path.join(first.paseoHome, "finish-subscriptions.json"), "utf8")),
+        JSON.parse(
+          await readFile(path.join(first.clisbotHome, "finish-subscriptions.json"), "utf8"),
+        ),
       ).toHaveLength(1);
       await mcp.close();
       mcp = undefined;
@@ -210,7 +213,7 @@ test.each([false, true])(
         .poll(
           async () =>
             JSON.parse(
-              await readFile(path.join(second.paseoHome, "finish-subscriptions.json"), "utf8"),
+              await readFile(path.join(second.clisbotHome, "finish-subscriptions.json"), "utf8"),
             ),
           { timeout: 5000 },
         )
@@ -226,7 +229,9 @@ test.each([false, true])(
       processes.push(third.child);
       expect(await readPrompts(root)).toHaveLength(1);
       expect(
-        JSON.parse(await readFile(path.join(third.paseoHome, "finish-subscriptions.json"), "utf8")),
+        JSON.parse(
+          await readFile(path.join(third.clisbotHome, "finish-subscriptions.json"), "utf8"),
+        ),
       ).toEqual([]);
     } catch (error) {
       console.error(
@@ -270,14 +275,15 @@ test.each([undefined, false, true])(
         .poll(
           async () =>
             (
-              await new AgentStorage(path.join(first.paseoHome, "agents"), createTestLogger()).get(
-                working.id,
-              )
+              await new AgentStorage(
+                path.join(first.clisbotHome, "agents"),
+                createTestLogger(),
+              ).get(working.id)
             )?.lastStatus,
         )
         .toBe("running");
       const original = await new AgentStorage(
-        path.join(first.paseoHome, "agents"),
+        path.join(first.clisbotHome, "agents"),
         createTestLogger(),
       ).get(working.id);
       await client.close();
@@ -287,7 +293,7 @@ test.each([undefined, false, true])(
       processes.push(second.child);
       client = new DaemonClient({ url: `ws://127.0.0.1:${second.port}/ws`, appVersion: "0.13.0" });
       await client.connect();
-      const storage = new AgentStorage(path.join(second.paseoHome, "agents"), createTestLogger());
+      const storage = new AgentStorage(path.join(second.clisbotHome, "agents"), createTestLogger());
       // Resume runs in the background; it is done once the saved intent is consumed.
       await expect.poll(async () => (await storage.get(working.id))?.resumeOnStartup).toBe(false);
       const resumePrompts = async () =>
@@ -328,7 +334,7 @@ test("a provider that is slow to reopen does not hold daemon startup", async () 
       .poll(
         async () =>
           (
-            await new AgentStorage(path.join(first.paseoHome, "agents"), createTestLogger()).get(
+            await new AgentStorage(path.join(first.clisbotHome, "agents"), createTestLogger()).get(
               working.id,
             )
           )?.lastStatus,

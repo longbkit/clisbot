@@ -185,9 +185,9 @@ export async function withPluginWritingToAnotherWorkspace(
   const target = await createMockAgent(workspace, "Target agent");
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previous = await client.getDaemonConfig();
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-composer-ref-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-composer-ref-"));
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id: "composer-ref", requirements: pluginRequirements }),
   );
   await writeFile(
@@ -277,10 +277,10 @@ export async function withPluginFocusingAComposer(
   const other = await createMockAgent(workspace, "Other agent");
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previous = await client.getDaemonConfig();
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-composer-focus-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-composer-focus-"));
   const targetId = JSON.stringify(target.id);
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id: "composer-focus", requirements: pluginRequirements }),
   );
   await writeFile(
@@ -455,14 +455,14 @@ export async function withPluginHoldingNewWorkspaceComposer(
   const workspace = await seedWorkspace({ repoPrefix: "held-composer-", title: "Held composer" });
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previous = await client.getDaemonConfig();
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-held-composer-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-held-composer-"));
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id: "held-composer", requirements: pluginRequirements }),
   );
   await writeFile(
     path.join(directory, "index.client.tsx"),
-    `import { useComposer } from "@getpaseo/plugin/client";
+    `import { useComposer } from "@clisbot/plugin/client";
 
 function Holder() {
   globalThis.heldComposer = useComposer();
@@ -692,9 +692,9 @@ export async function withPluginFocusingASubagent(
 async function installFocusingPlugin(page: Page) {
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previous = await client.getDaemonConfig();
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-focus-agent-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-focus-agent-"));
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id: "focus-agent", requirements: pluginRequirements }),
   );
   await writeFile(

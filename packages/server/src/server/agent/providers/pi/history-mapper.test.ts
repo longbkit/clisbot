@@ -322,7 +322,7 @@ test("replays both sides of compaction with native IDs and isolates rewound bran
   expect(await collectHistory(history.messages, history.userEntries)).toHaveLength(3);
   const rewound = [
     ...records,
-    { type: "custom", id: "r1", parentId: null, customType: "paseo_rewind" },
+    { type: "custom", id: "r1", parentId: null, customType: "clisbot_rewind" },
   ];
   expect(decode(rewound).messages).toEqual([]);
   const replacement = [
@@ -338,7 +338,7 @@ test("replays both sides of compaction with native IDs and isolates rewound bran
   expect(
     decode([
       ...replacement,
-      { type: "custom", id: "r2", parentId: "a1", customType: "paseo_rewind" },
+      { type: "custom", id: "r2", parentId: "a1", customType: "clisbot_rewind" },
     ]).userEntries.map((entry) => entry.id),
   ).toEqual(["u1"]);
 });

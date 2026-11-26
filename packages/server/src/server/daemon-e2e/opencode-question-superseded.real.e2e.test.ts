@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import pino from "pino";
 
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import {
   canRunRealProvider,
@@ -38,7 +38,7 @@ describe("daemon E2E (real opencode) - a message sent instead of answering a que
   test("removes the superseded question from the pending list", async () => {
     const cwd = mkdtempSync(path.join(tmpdir(), "daemon-real-opencode-question-"));
     const logger = pino({ level: "silent" });
-    const daemon = await createTestPaseoDaemon({
+    const daemon = await createTestClisbotDaemon({
       agentClients: createRealProviderClients(["opencode"], logger),
       logger,
     });

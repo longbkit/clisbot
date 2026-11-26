@@ -1,6 +1,6 @@
 import { expect, type Page } from "../support/fixtures";
 import { test } from "../support/creation-fixtures";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
 import type { FormPreferences } from "@/create-agent-preferences/preferences";
 import { gotoAppShell } from "../support/helpers/app";
@@ -16,7 +16,7 @@ import { escapeRegex } from "../support/helpers/regex";
 import { seedWorkspace } from "../support/helpers/seed-client";
 import { waitForSidebarHydration } from "../support/helpers/workspace-ui";
 
-const CREATE_AGENT_PREFERENCES_KEY = "@paseo:create-agent-preferences";
+const CREATE_AGENT_PREFERENCES_KEY = "@clisbot:create-agent-preferences";
 
 async function seedCodexDefaultPermissionPreferences(page: Page, cwd: string): Promise<string> {
   const client = await connectDaemonClient<DaemonClient>({

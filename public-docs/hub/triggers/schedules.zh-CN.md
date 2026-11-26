@@ -16,7 +16,7 @@ nav: 定时任务
 
 ## 用 YAML 编写定时任务 {#author-a-schedule-in-yaml}
 
-将以下内容保存为 `.paseo/triggers/daily-ci-digest.yml`，并通过 `paseo hub deploy` 部署：
+将以下内容保存为 `.clisbot/triggers/daily-ci-digest.yml`，并通过 `clisbot hub deploy` 部署：
 
 ```yaml
 name: daily-ci-digest
@@ -48,12 +48,12 @@ run:
   prompt: |
     Analyze the last 24 hours of CI failures, post a short digest to C01234567 with slack_post,
     and call finish_execution.
-    Schedule context: ${{ paseo.context }}
+    Schedule context: ${{ clisbot.context }}
 ```
 
 `schedule.tick` 不接受 `connection` 或 `filters`。包含 `schedule.tick` 的触发器不能声明 `required: true` 的输入，因为定时触发不会提供调用参数。
 
-设置 `run.background: true` 可以创建后台 Paseo 工作区，使其在默认工作区列表中保持隐藏。设置 `run.auto_archive: true`（默认值）会在运行结束后归档工作区。
+设置 `run.background: true` 可以创建后台 Clisbot 工作区，使其在默认工作区列表中保持隐藏。设置 `run.auto_archive: true`（默认值）会在运行结束后归档工作区。
 
 ## 重复规则 {#recurrence-rules}
 
@@ -80,5 +80,5 @@ run:
 - Hub 按所选时区的本地挂钟时间计算计划，跳过夏令时跳过的本地时间，并在夏令时回拨重复时仅在较早一次运行。如需跨夏令时保持固定时长间隔，请使用 `UTC`。
 - 当该触发器的某次定时运行仍在进行时，Hub 会跳过新到期的触发，不会堆叠并行运行。当前运行完成或失败后，下一次未来触发会恢复。不同触发器仍可在同一台 daemon 上同时运行。
 - Hub 停机恢复后，会对最早错过的一次执行派发 1 次补跑，然后直接推进到下一次未来触发，不会逐条重放所有错过的计划。
-- 在 `run.prompt` 中包含 `${{ paseo.context }}` 可以传入 `schedule.trigger_id`、`schedule.scheduled_at`（UTC）和 `schedule.timezone`。
-- Hub 定时任务独立于 Paseo daemon 本地的定时任务。
+- 在 `run.prompt` 中包含 `${{ clisbot.context }}` 可以传入 `schedule.trigger_id`、`schedule.scheduled_at`（UTC）和 `schedule.timezone`。
+- Hub 定时任务独立于 Clisbot daemon 本地的定时任务。

@@ -8,7 +8,7 @@ function matches(shorthand: { pattern: string }, text: string): string[] {
 describe("createForgeShorthand", () => {
   const github = createForgeShorthand({
     forge: "github",
-    remoteUrl: "git@github.com:getpaseo/paseo.git",
+    remoteUrl: "git@github.com:longbkit/clisbot.git",
   })!;
   const gitlab = createForgeShorthand({
     forge: "gitlab",
@@ -16,7 +16,7 @@ describe("createForgeShorthand", () => {
   })!;
 
   it("resolves same-repo and cross-repo references on the remote's host", () => {
-    expect(github.resolve("#8613")).toBe("https://github.com/getpaseo/paseo/issues/8613");
+    expect(github.resolve("#8613")).toBe("https://github.com/longbkit/clisbot/issues/8613");
     expect(github.resolve("acme/tools#4")).toBe("https://github.com/acme/tools/issues/4");
     expect(gitlab.resolve("!7")).toBe("https://gitlab.com/g/p/-/merge_requests/7");
     expect(gitlab.resolve("g/sub/q#3")).toBe("https://gitlab.com/g/sub/q/-/issues/3");

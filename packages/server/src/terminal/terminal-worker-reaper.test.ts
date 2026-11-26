@@ -94,7 +94,7 @@ async function waitUntilGone(pid: number): Promise<void> {
 
 // A member of the terminal "t1" carries its id, as every program a terminal starts does.
 function terminalEnv(terminalId: string): NodeJS.ProcessEnv {
-  return { ...process.env, PASEO_TERMINAL_ID: terminalId };
+  return { ...process.env, CLISBOT_TERMINAL_ID: terminalId };
 }
 
 // A process's start environment: /proc where the real inspector reads it (Linux), `ps -E` on
@@ -194,10 +194,10 @@ function writeRecord(
     createdAt: new Date().toISOString(),
     identity: {
       startedAt: "Thu Jan  1 00:00:00 1970",
-      commandLine: "node terminal-worker --paseo-terminal-worker record-under-test",
+      commandLine: "node terminal-worker --clisbot-terminal-worker record-under-test",
     },
     protocolVersion: 1,
-    paseoVersion: "0.0.0-test",
+    clisbotVersion: "0.0.0-test",
     socketPath: path.join(home, "missing.sock"),
     secret: "not-a-real-secret",
     terminals: [],
@@ -233,7 +233,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
       terminals: [{ id: "t1", pid: program.pid!, startedAt: await birthOf(program.pid!) }],
     });
 
-    const result = await reapTerminalWorkers({ paseoHome: home, inspector });
+    const result = await reapTerminalWorkers({ clisbotHome: home, inspector });
 
     await waitUntilGone(program.pid!);
     await waitUntilGone(childPid);
@@ -252,7 +252,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
       terminals: [{ id: "t1", pid: program.pid!, startedAt: await birthOf(program.pid!) }],
     });
 
-    const result = await reapTerminalWorkers({ paseoHome: home, inspector });
+    const result = await reapTerminalWorkers({ clisbotHome: home, inspector });
 
     await waitUntilGone(program.pid!);
     expect(isAlive(program.pid!)).toBe(false);
@@ -269,7 +269,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
       terminals: [original],
     });
 
-    await reapTerminalWorkers({ paseoHome: home, inspector, gracefulMs: 0 });
+    await reapTerminalWorkers({ clisbotHome: home, inspector, gracefulMs: 0 });
 
     expect(isAlive(unrelated.pid!)).toBe(true);
     // Completion means the recorded process is gone, even if its PID is occupied.
@@ -298,7 +298,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
       terminals: [{ id: "t1", pid: program.pid!, startedAt: await birthOf(program.pid!) }],
     });
 
-    await reapTerminalWorkers({ paseoHome: home, inspector });
+    await reapTerminalWorkers({ clisbotHome: home, inspector });
 
     expect(isAlive(program.pid!)).toBe(true);
     expect(existsSync(recordPath)).toBe(false);
@@ -329,7 +329,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
 
     let caught: unknown;
     try {
-      await reapTerminalWorkers({ paseoHome: home, inspector: failing, confirmMs: 500 });
+      await reapTerminalWorkers({ clisbotHome: home, inspector: failing, confirmMs: 500 });
     } catch (error) {
       caught = error;
     }
@@ -361,7 +361,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
     });
 
     const result = await reapTerminalWorkers({
-      paseoHome: home,
+      clisbotHome: home,
       inspector: withSessionMember({ memberPid: member.pid!, sessionId: goneProgramPid }),
     });
 
@@ -383,7 +383,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
     });
 
     const result = await reapTerminalWorkers({
-      paseoHome: home,
+      clisbotHome: home,
       inspector: withSessionMember({ memberPid: member.pid!, sessionId: goneProgramPid }),
     });
 
@@ -403,7 +403,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
 
     await expect(
       reapTerminalWorkers({
-        paseoHome: home,
+        clisbotHome: home,
         inspector: withSessionMember({
           memberPid: member.pid!,
           sessionId: goneProgramPid,
@@ -432,7 +432,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       await expect(
-        reapTerminalWorkers({ paseoHome: home, inspector: scrubbedMember }),
+        reapTerminalWorkers({ clisbotHome: home, inspector: scrubbedMember }),
       ).rejects.toBeInstanceOf(TerminalCleanupNotConfirmedError);
       expect(isAlive(member.pid!)).toBe(true);
       expect(await readUnconfirmedTerminalCleanup(home)).toEqual([
@@ -456,7 +456,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
     });
 
     const result = await reapTerminalWorkers({
-      paseoHome: home,
+      clisbotHome: home,
       inspector: withSessionMember({
         memberPid: member.pid!,
         sessionId: goneProgramPid,
@@ -482,7 +482,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
     for (const attempt of [
       async () => await readUnconfirmedTerminalCleanup(home),
       () => retryUnconfirmedTerminalCleanup(home),
-      () => reapTerminalWorkers({ paseoHome: home, inspector }),
+      () => reapTerminalWorkers({ clisbotHome: home, inspector }),
     ]) {
       let caught: unknown;
       try {
@@ -514,7 +514,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
     };
 
     await expect(
-      reapTerminalWorkers({ paseoHome: home, inspector: tableUnavailable }),
+      reapTerminalWorkers({ clisbotHome: home, inspector: tableUnavailable }),
     ).rejects.toBeInstanceOf(TerminalCleanupNotConfirmedError);
 
     expect(isAlive(program.pid!)).toBe(true);
@@ -525,7 +525,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
     expect(kept.closing?.unresolved.length).toBeGreaterThan(0);
     expect(kept.terminals.map((entry) => entry.pid)).toEqual([program.pid]);
 
-    const retry = await reapTerminalWorkers({ paseoHome: home, inspector, gracefulMs: 0 });
+    const retry = await reapTerminalWorkers({ clisbotHome: home, inspector, gracefulMs: 0 });
 
     await waitUntilGone(program.pid!);
     await waitUntilGone(childPid);
@@ -548,7 +548,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
       terminals: [{ id: "t1", pid: stubborn.pid!, startedAt: await birthOf(stubborn.pid!) }],
     });
 
-    await reapTerminalWorkers({ paseoHome: home, inspector });
+    await reapTerminalWorkers({ clisbotHome: home, inspector });
 
     await waitUntilGone(stubborn.pid!);
     expect(isAlive(stubborn.pid!)).toBe(false);
@@ -585,7 +585,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
           "-e",
           `require("node:net").createServer(() => {}).listen(${JSON.stringify(socketPath)}, () => process.stdout.write("listening\\n"));setInterval(() => {}, 1e9)`,
           "--",
-          "--paseo-terminal-worker",
+          "--clisbot-terminal-worker",
           "record-under-test",
         ],
         { detached: true, stdio: ["ignore", "pipe", "ignore"] },
@@ -603,13 +603,13 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
         socketPath: path.join(home, "live-record-under-test.sock"),
         identity: {
           startedAt: await birthOf(worker.pid!),
-          commandLine: "node -e --paseo-terminal-worker record-under-test",
+          commandLine: "node -e --clisbot-terminal-worker record-under-test",
         },
       });
       const record = await unreadableUntilReleased(recordPath);
 
       record.release();
-      const result = await reapTerminalWorkers({ paseoHome: home, inspector, gracefulMs: 0 });
+      const result = await reapTerminalWorkers({ clisbotHome: home, inspector, gracefulMs: 0 });
       await record.restored;
 
       await waitUntilGone(worker.pid!);
@@ -628,7 +628,7 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
       const record = await unreadableUntilReleased(recordPath);
 
       record.release();
-      const result = await reapTerminalWorkers({ paseoHome: home, inspector, gracefulMs: 0 });
+      const result = await reapTerminalWorkers({ clisbotHome: home, inspector, gracefulMs: 0 });
       await record.restored;
 
       await waitUntilGone(program.pid!);
@@ -645,14 +645,14 @@ describe.skipIf(isPlatform("win32"))("terminal worker reaper", () => {
         socketPath: path.join(home, "live-record-under-test.sock"),
         identity: {
           startedAt: await birthOf(worker.pid!),
-          commandLine: "node -e --paseo-terminal-worker record-under-test",
+          commandLine: "node -e --clisbot-terminal-worker record-under-test",
         },
       });
       chmodSync(recordPath, 0);
 
       let caught: unknown;
       try {
-        await reapTerminalWorkers({ paseoHome: home, inspector, gracefulMs: 0 });
+        await reapTerminalWorkers({ clisbotHome: home, inspector, gracefulMs: 0 });
       } catch (error) {
         caught = error;
       }
@@ -691,7 +691,7 @@ describe("terminal worker reaper without process identity", () => {
       terminals: [{ id: "t1", pid: await goneProcessPid(), startedAt: null }],
     });
 
-    const result = await reapTerminalWorkers({ paseoHome: home, inspector: noIdentity });
+    const result = await reapTerminalWorkers({ clisbotHome: home, inspector: noIdentity });
 
     expect(result).toEqual({ records: 1, retired: 1, signaled: [] });
     expect(existsSync(recordPath)).toBe(false);
@@ -701,7 +701,7 @@ describe("terminal worker reaper without process identity", () => {
     const home = makeHome();
     const socketPath =
       process.platform === "win32"
-        ? `\\\\.\\pipe\\paseo-legacy-${Date.now()}`
+        ? `\\\\.\\pipe\\clisbot-legacy-${Date.now()}`
         : path.join(home, "legacy.sock");
     const listener = spawnIdle(`
       require("node:net").createServer(socket => socket.on("data", () => socket.destroy())).listen(${JSON.stringify(socketPath)}, () => process.stdout.write("ready"));
@@ -725,7 +725,7 @@ describe("terminal worker reaper without process identity", () => {
     });
     await expect(
       reapTerminalWorkers({
-        paseoHome: home,
+        clisbotHome: home,
         gracefulMs: 0,
         confirmMs: 50,
         recordPaths: [cleanupPath],
@@ -738,7 +738,7 @@ describe("terminal worker reaper without process identity", () => {
     const home = makeHome();
     const socketPath =
       process.platform === "win32"
-        ? `\\\\.\\pipe\\paseo-test-${Date.now()}-record-under-test`
+        ? `\\\\.\\pipe\\clisbot-test-${Date.now()}-record-under-test`
         : path.join(home, "w-record-under-test.sock");
     const listener = await spawnSilentListener(socketPath);
     writeRecord(home, {
@@ -747,7 +747,7 @@ describe("terminal worker reaper without process identity", () => {
     });
 
     const result = await reapTerminalWorkers({
-      paseoHome: home,
+      clisbotHome: home,
       inspector: noIdentity,
       gracefulMs: 300,
     });
@@ -764,7 +764,7 @@ describe("terminal worker reaper without process identity", () => {
       pid: reusedWorkerPid,
     });
 
-    const result = await reapTerminalWorkers({ paseoHome: home, inspector: noIdentity });
+    const result = await reapTerminalWorkers({ clisbotHome: home, inspector: noIdentity });
 
     expect(result).toEqual({ records: 1, retired: 1, signaled: [] });
     expect(isAlive(reusedWorkerPid)).toBe(true);
@@ -782,7 +782,7 @@ describe("terminal worker reaper without process identity", () => {
       });
 
       await expect(
-        reapTerminalWorkers({ paseoHome: home, inspector, confirmMs: 200 }),
+        reapTerminalWorkers({ clisbotHome: home, inspector, confirmMs: 200 }),
       ).rejects.toBeInstanceOf(TerminalCleanupNotConfirmedError);
 
       expect(isAlive(program.pid!)).toBe(true);

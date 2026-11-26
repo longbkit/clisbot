@@ -5,4 +5,4 @@ Fixed
 - Fixed Claude tool calls that run longer than 30 seconds, such as WebFetch or MCP tools, showing up as subagents
 - Fixed subagents that finish while the app is disconnected staying "working" until one is opened
 
-Full notes: https://paseo.sh/changelog
+Full notes: https://clisbot.com/changelog

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { createHostBackgroundWorkModel } from "./host";
 
 test("retries a failed observation and receives subsequent updates", async () => {

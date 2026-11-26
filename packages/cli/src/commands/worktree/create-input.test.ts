@@ -90,7 +90,7 @@ it("uses the explicit worktree creation RPC and returns the created worktree det
     },
     {
       connectToDaemon: async () => ({
-        createPaseoWorktree: async (input) => {
+        createClisbotWorktree: async (input) => {
           expect(input).toEqual({
             cwd: REPO,
             worktreeSlug: "topic",

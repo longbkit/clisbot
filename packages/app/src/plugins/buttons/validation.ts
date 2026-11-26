@@ -1,9 +1,9 @@
-import type { PluginText } from "@getpaseo/plugin/client";
+import type { PluginText } from "@clisbot/plugin/client";
 import type {
   PluginButton as SDKPluginButton,
   PluginButtonBehavior as SDKPluginButtonBehavior,
   PluginButtonIcon,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 
 type PluginButton = SDKPluginButton<PluginText>;
 type PluginButtonBehavior = SDKPluginButtonBehavior<PluginText>;

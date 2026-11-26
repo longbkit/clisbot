@@ -1,6 +1,6 @@
 # Terminal rendering
 
-Web and Electron draw terminals with xterm.js. iOS and Android keep an `@xterm/headless` buffer in JS and draw it with the `PaseoTerminal` native view in `packages/app/modules/paseo-terminal`: CoreText on iOS, `Canvas.drawTextRun` on Android. `src/terminal/native-renderer/terminal-frame.ts` turns the visible buffer into frames, and both native views take the same props.
+Web and Electron draw terminals with xterm.js. iOS and Android keep an `@xterm/headless` buffer in JS and draw it with the `ClisbotTerminal` native view in `packages/app/modules/clisbot-terminal`: CoreText on iOS, `Canvas.drawTextRun` on Android. `src/terminal/native-renderer/terminal-frame.ts` turns the visible buffer into frames, and both native views take the same props.
 
 ## xterm owns the grid
 
@@ -10,7 +10,7 @@ A cluster is the run of cells the shaper merged, and it is drawn once from the s
 
 Android also groups cells with `android.icu.text.BreakIterator`, because Minikin's advances and cursor boundaries alone split some clusters that span cells. Grouping only merges whole cells, so a conjunct xterm keeps in one cell cannot be split by the OS. Grapheme rules follow the OS ICU version, and we accept that to avoid bundling approximately 14 MB of ICU4J data. Before the buffers used grapheme widths, Android 10 (API 29) split `स्ते` across its two cells. This renderer does not guarantee identical shaping across OS versions.
 
-`TerminalRowLayoutTest.kt` is the Android regression test. It draws the rows of `grapheme-rows.json` and compares each with its grapheme clusters drawn one at a time, and with a wrong clustering that must not match. `terminal-frame.test.ts` checks that those rows are what xterm produces and that the clusters are UAX #29 grapheme clusters. Run it with `./gradlew :paseo-terminal:connectedDebugAndroidTest` from `packages/app/android`, with `ANDROID_SERIAL` set.
+`TerminalRowLayoutTest.kt` is the Android regression test. It draws the rows of `grapheme-rows.json` and compares each with its grapheme clusters drawn one at a time, and with a wrong clustering that must not match. `terminal-frame.test.ts` checks that those rows are what xterm produces and that the clusters are UAX #29 grapheme clusters. Run it with `./gradlew :clisbot-terminal:connectedDebugAndroidTest` from `packages/app/android`, with `ANDROID_SERIAL` set.
 
 The view reports ready only after it has measured its grid size. The pane attaches with that size, so the daemon replays the terminal at the client's size. Before this, the replay arrived at the PTY's old size, the resize came after it, and the shell's redraw landed on the wrong rows.
 
@@ -52,7 +52,7 @@ The scripts live in `packages/app/e2e/mobile/terminal-rendering`. Run them from 
 - every row is exposed as `terminal-row-<n>`;
 - selecting one cell of a conjunct highlights only that cell.
 
-On iOS the screenshot is taken at 3 pixels per point (`PASEO_TERMINAL_RENDERING_PIXEL_DENSITY`), because the simulator's default is one pixel per point and a glyph is then about 12 pixels. Focus the terminal before a run: with the simulator's hardware keyboard connected the key bar shows without a focused input, and `type` fails. In a debug build, the dev client's floating gear button covers the right end of the first row, so ruler cells there fail.
+On iOS the screenshot is taken at 3 pixels per point (`CLISBOT_TERMINAL_RENDERING_PIXEL_DENSITY`), because the simulator's default is one pixel per point and a glyph is then about 12 pixels. Focus the terminal before a run: with the simulator's hardware keyboard connected the key bar shows without a focused input, and `type` fails. In a debug build, the dev client's floating gear button covers the right end of the first row, so ruler cells there fail.
 
 ```bash
 PLATFORM=android ANDROID_SERIAL=emulator-5554 node e2e/mobile/terminal-rendering/render.mjs
@@ -72,4 +72,4 @@ FONTCONFIG_FILE=fonts.conf node e2e/mobile/terminal-rendering/identity.mjs <run 
 
 `overhang.mjs` prints rows whose marks reach the rows next to them. In one update it writes into two rows that hold a neighbour's marks and erases two rows whose marks reach a blank row. The marks must be drawn before the update, stay drawn in the written rows, and leave no ink behind the erased rows. Run it like `render.mjs`.
 
-`reattach.mjs` checks the restore size. It changes the PTY size by opening the keyboard (`RESIZE=keyboard`) or folding an Android foldable (`RESIZE=fold`), relaunches the app, and compares the client's rows with `paseo terminal capture`. A trial where no terminal rows appear, for example after a launch crash, counts as never attached and fails the run.
+`reattach.mjs` checks the restore size. It changes the PTY size by opening the keyboard (`RESIZE=keyboard`) or folding an Android foldable (`RESIZE=fold`), relaunches the app, and compares the client's rows with `clisbot terminal capture`. A trial where no terminal rows appear, for example after a launch crash, counts as never attached and fails the run.

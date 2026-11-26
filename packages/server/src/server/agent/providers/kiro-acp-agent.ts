@@ -26,10 +26,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
-// Maps a `_kiro.dev/commands/available` payload onto Paseo slash commands.
+// Maps a `_kiro.dev/commands/available` payload onto Clisbot slash commands.
 // Kiro reports built-in slash commands under `commands` (names arrive with a
 // leading "/", e.g. "/agent") and skills/prompts under `prompts` (names without
-// a slash, tagged with a `skill:` serverName). Paseo stores command names
+// a slash, tagged with a `skill:` serverName). Clisbot stores command names
 // without the leading slash — the composer prepends it on insertion.
 function mapKiroAvailableCommands(params: Record<string, unknown>): AgentSlashCommand[] {
   const result: AgentSlashCommand[] = [];

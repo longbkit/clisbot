@@ -20,7 +20,7 @@ import type { DOMProps } from "expo/dom";
 import { useDOMImperativeHandle, type DOMImperativeFactory } from "expo/dom";
 import "@xterm/xterm/css/xterm.css";
 import type { ITheme } from "@xterm/xterm";
-import type { TerminalInputModeState } from "@getpaseo/protocol/terminal-input-mode";
+import type { TerminalInputModeState } from "@clisbot/protocol/terminal-input-mode";
 import type { PendingTerminalModifiers } from "../utils/terminal-keys";
 import {
   TerminalEmulatorRuntime,
@@ -41,7 +41,7 @@ import { focusWithRetries } from "../utils/web-focus";
 export interface TerminalEmulatorHandle {
   find?: TerminalFindHandle;
   writeOutput: (data: TerminalOutputData) => void;
-  replay: (event: import("@getpaseo/client").TerminalReplayEvent) => void;
+  replay: (event: import("@clisbot/client").TerminalReplayEvent) => void;
   paste: (text: string) => void;
   copySelection: (clipboard: TerminalClipboardWriter) => Promise<string>;
   clear: () => void;
@@ -548,7 +548,7 @@ export default function TerminalEmulator({
   }, [resizeRequestToken]);
 
   const showTerminalContextMenu = useCallback(() => {
-    const showContextMenu = window.paseoDesktop?.menu?.showContextMenu;
+    const showContextMenu = window.clisbotDesktop?.menu?.showContextMenu;
     if (typeof showContextMenu !== "function") {
       return;
     }

@@ -4,7 +4,7 @@ import { continuesTurn } from "./turn-membership";
 export const DEFAULT_MOUNTED_RECENT_STREAM_ITEMS = 20;
 
 type MountedRecentStreamItemsE2ETestGlobals = typeof globalThis & {
-  __PASEO_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS?: unknown;
+  __CLISBOT_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS?: unknown;
 };
 
 function readPositiveIntegerOverride(value: unknown): number | null {
@@ -18,7 +18,7 @@ function readPositiveIntegerOverride(value: unknown): number | null {
 export function getMountedRecentStreamItems(): number {
   const override = readPositiveIntegerOverride(
     (globalThis as MountedRecentStreamItemsE2ETestGlobals)
-      .__PASEO_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS,
+      .__CLISBOT_E2E_WEB_MOUNTED_RECENT_STREAM_ITEMS,
   );
   return override ?? DEFAULT_MOUNTED_RECENT_STREAM_ITEMS;
 }

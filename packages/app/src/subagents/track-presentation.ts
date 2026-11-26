@@ -1,16 +1,16 @@
 import type { TFunction } from "i18next";
 import type { ComposerTrackPillSegment } from "@/composer/tracks";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
-import { isAgentRunning } from "@getpaseo/protocol/agent-state-bucket";
-import type { AgentBackgroundWorkSummary } from "@getpaseo/protocol/messages";
-import type { AgentLifecycleStatus } from "@getpaseo/protocol/agent-lifecycle";
+import { isAgentRunning } from "@clisbot/protocol/agent-state-bucket";
+import type { AgentBackgroundWorkSummary } from "@clisbot/protocol/messages";
+import type { AgentLifecycleStatus } from "@clisbot/protocol/agent-lifecycle";
 import { STATUS_BUCKET_ORDER } from "@/utils/sidebar-agent-state";
 import type { SubagentRow } from "./select";
 import { isFinishedSubagent } from "./archive-finished";
 import { providerSubagentLifecycleStatus } from "./provider-store";
 
 function presentationStatus(row: SubagentRow) {
-  if (row.kind === "paseo") {
+  if (row.kind === "clisbot") {
     if (row.turn.phase === "open") return "running";
     return row.status === "running" ? "idle" : row.status;
   }
@@ -56,7 +56,7 @@ export function buildSubagentRowPresentationData(row: SubagentRow): SubagentRowP
     titleState: label ? "ready" : "loading",
     statusBucket: deriveSubagentStatusBucket(
       status,
-      row.kind === "paseo" ? row.backgroundWork : undefined,
+      row.kind === "clisbot" ? row.backgroundWork : undefined,
     ),
   };
 }

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { WorkspaceDescriptorPayload } from "@getpaseo/protocol/messages";
+import type { WorkspaceDescriptorPayload } from "@clisbot/protocol/messages";
 import { normalizeWorkspaceDescriptor } from "@/stores/session-store";
 import {
   clearWorkspaceArchivePending,

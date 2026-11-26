@@ -6,7 +6,7 @@ import {
   type DaemonSelfUpdatePhase,
   type DaemonSelfUpdater,
 } from "./daemon-self-updater.js";
-import { getErrorMessage } from "@getpaseo/protocol/error-utils";
+import { getErrorMessage } from "@clisbot/protocol/error-utils";
 
 type DaemonUpdateRequest = Extract<SessionInboundMessage, { type: "daemon.update.request" }>;
 

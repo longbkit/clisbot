@@ -14,7 +14,7 @@ afterEach(async () => {
 });
 
 test("requires the canary event to round-trip through the watcher callback", async () => {
-  const watchRoot = await mkdtemp(join(tmpdir(), "paseo-watcher-canary-"));
+  const watchRoot = await mkdtemp(join(tmpdir(), "clisbot-watcher-canary-"));
   cleanupPaths.push(watchRoot);
   const canary = createWatcherLivenessCanary(watchRoot, { timeoutMs: 1_000 });
 
@@ -26,7 +26,7 @@ test("requires the canary event to round-trip through the watcher callback", asy
 });
 
 test("rejects when the watcher never reports the canary", async () => {
-  const watchRoot = await mkdtemp(join(tmpdir(), "paseo-watcher-canary-"));
+  const watchRoot = await mkdtemp(join(tmpdir(), "clisbot-watcher-canary-"));
   cleanupPaths.push(watchRoot);
   const canary = createWatcherLivenessCanary(watchRoot, { timeoutMs: 10 });
 
@@ -34,14 +34,14 @@ test("rejects when the watcher never reports the canary", async () => {
 });
 
 test("verifies a watcher that starts delivering after the initial canary write", async () => {
-  const watchRoot = await mkdtemp(join(tmpdir(), "paseo-watcher-canary-"));
+  const watchRoot = await mkdtemp(join(tmpdir(), "clisbot-watcher-canary-"));
   cleanupPaths.push(watchRoot);
   const canary = createWatcherLivenessCanary(watchRoot);
   const verification = canary.verify();
   const verified = expect(verification).resolves.toBeUndefined();
 
   // The initial write happens before the observer starts delivering changes.
-  await expect.poll(() => readFile(canary.path, "utf8")).toBe("paseo watcher liveness canary\n");
+  await expect.poll(() => readFile(canary.path, "utf8")).toBe("clisbot watcher liveness canary\n");
   watchFile(canary.path, { interval: 10 }, () => {
     canary.filterEvents([{ path: canary.path, type: "update" }]);
   });
@@ -54,13 +54,13 @@ test("verifies a watcher that starts delivering after the initial canary write",
 });
 
 test("aborting verification stops pulses before removing the canary", async () => {
-  const watchRoot = await mkdtemp(join(tmpdir(), "paseo-watcher-canary-"));
+  const watchRoot = await mkdtemp(join(tmpdir(), "clisbot-watcher-canary-"));
   cleanupPaths.push(watchRoot);
   const canary = createWatcherLivenessCanary(watchRoot);
   const controller = new AbortController();
   const verification = canary.verify(controller.signal);
   const cancelled = expect(verification).rejects.toThrow("stop watching");
-  await expect.poll(() => readFile(canary.path, "utf8")).toBe("paseo watcher liveness canary\n");
+  await expect.poll(() => readFile(canary.path, "utf8")).toBe("clisbot watcher liveness canary\n");
   const initialWrite = (await stat(canary.path)).mtimeMs;
   await expect.poll(async () => (await stat(canary.path)).mtimeMs).toBeGreaterThan(initialWrite);
 

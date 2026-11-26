@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { AgentUsageSession } from "../../agent/agent-sdk-types.js";
-import type { UsageScope } from "@getpaseo/plugin/server/usage";
+import type { UsageScope } from "@clisbot/plugin/server/usage";
 import { z } from "zod";
 import type { Logger } from "pino";
 import {
@@ -9,7 +9,7 @@ import {
   type UsageReportEntry,
   type UsageProblem,
   type UsageReport,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 
 export interface UsageSource {
   id: string;
@@ -38,7 +38,7 @@ export interface AgentUsageLookup {
   usageSession(id: string): AgentUsageSession | null;
   resolveLaunch?(
     provider: string,
-  ): Promise<import("@getpaseo/plugin/server/provider").ProviderLaunch | undefined>;
+  ): Promise<import("@clisbot/plugin/server/provider").ProviderLaunch | undefined>;
   /** Whether the provider (or a custom provider derived from it) is installed and enabled. */
   isProviderActive?(provider: string, options?: { forceRefresh?: boolean }): Promise<boolean>;
 }

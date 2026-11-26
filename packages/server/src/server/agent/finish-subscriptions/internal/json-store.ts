@@ -14,8 +14,8 @@ const recordsSchema = z.array(
   }),
 );
 
-export function createJsonFinishSubscriptionStore(paseoHome: string): FinishSubscriptionStore {
-  const file = join(paseoHome, "finish-subscriptions.json");
+export function createJsonFinishSubscriptionStore(clisbotHome: string): FinishSubscriptionStore {
+  const file = join(clisbotHome, "finish-subscriptions.json");
   let records: FinishSubscription[] | undefined;
   let pending = Promise.resolve();
   async function load(): Promise<FinishSubscription[]> {

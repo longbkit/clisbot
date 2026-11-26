@@ -40,12 +40,12 @@ function stop(options: Record<string, unknown>, deps: StopCommandDeps) {
 
 // A home whose lock names a live stand-in supervisor, so the local stop path runs for real.
 function homeWithRunningSupervisor(): { home: string; supervisor: ChildProcess } {
-  const home = mkdtempSync(path.join(tmpdir(), "paseo-stop-keep-"));
+  const home = mkdtempSync(path.join(tmpdir(), "clisbot-stop-keep-"));
   const supervisor = spawn(process.execPath, ["-e", "setInterval(() => {}, 1e9)"], {
     stdio: "ignore",
   });
   writeFileSync(
-    path.join(home, "paseo.pid"),
+    path.join(home, "clisbot.pid"),
     JSON.stringify({
       pid: supervisor.pid,
       startedAt: new Date().toISOString(),

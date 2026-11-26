@@ -6,7 +6,7 @@
       "toolCallId": "call_dab88a12b4db419586ac9d0eab565ca8|fc_0e57afa06f701795016af298be50c487d0844c674c8a61fa94",
       "arguments": {
         "agent": "qa-marker",
-        "task": "Run sleep 18 then printf PASEO_DESKTOP_A; do not read or write any files",
+        "task": "Run sleep 18 then printf CLISBOT_DESKTOP_A; do not read or write any files",
         "async": true
       }
     },
@@ -28,7 +28,7 @@
       "arguments": {
         "action": "resume",
         "id": "832f02f3-3cf9-4f7b-a8f2-b6cc06c5e122",
-        "message": "Run sleep 18 then printf PASEO_DESKTOP_B; do not read or write files"
+        "message": "Run sleep 18 then printf CLISBOT_DESKTOP_B; do not read or write files"
       }
     },
     {
@@ -49,7 +49,7 @@
       "arguments": {
         "action": "resume",
         "id": "8ca757d4-7514-4e87-8eeb-af52e2228ccb",
-        "message": "Run bash sleep 45 then printf PASEO_DESKTOP_C; do not read or write files"
+        "message": "Run bash sleep 45 then printf CLISBOT_DESKTOP_C; do not read or write files"
       }
     },
     {
@@ -70,7 +70,7 @@
       "arguments": {
         "action": "resume",
         "id": "00000000-0000-0000-0000-000000000000",
-        "message": "Output PASEO_INVALID"
+        "message": "Output CLISBOT_INVALID"
       }
     },
     {
@@ -91,7 +91,7 @@
       "arguments": {
         "action": "resume",
         "id": "832f02f3-3cf9-4f7b-a8f2-b6cc06c5e122",
-        "message": "Run bash sleep 45 then printf PASEO_DESKTOP_B_OBSERVE; do not read or write files"
+        "message": "Run bash sleep 45 then printf CLISBOT_DESKTOP_B_OBSERVE; do not read or write files"
       }
     },
     {
@@ -136,22 +136,22 @@
     {
       "timestamp": "2026-11-10T04:09:07.245Z",
       "customType": "subagent-notify",
-      "content": "Background task completed: **qa-marker**\n\nqa-marker:\nPASEO_DESKTOP_A\n\nRetention-managed async directory: <QA_ROOT>/async/async-subagent-runs/832f02f3-3cf9-4f7b-a8f2-b6cc06c5e122\n\nSession file: <QA_ROOT>/pi/sessions/<QA_WORKSPACE>/2026-11-10T04-08-20-423Z_01a1c3a4-80c7-75ad-8526-1844853a0f02/832f02f3-3cf9-4f7b-a8f2-b6cc06c5e122/run-0/session.jsonl\n\nParent action: Read the saved results above and resume the already-authorized parent task, or report completion. If approval is required, explicitly ask the user. Do not silently yield, rerun completed work, or infer new authorization."
+      "content": "Background task completed: **qa-marker**\n\nqa-marker:\nCLISBOT_DESKTOP_A\n\nRetention-managed async directory: <QA_ROOT>/async/async-subagent-runs/832f02f3-3cf9-4f7b-a8f2-b6cc06c5e122\n\nSession file: <QA_ROOT>/pi/sessions/<QA_WORKSPACE>/2026-11-10T04-08-20-423Z_01a1c3a4-80c7-75ad-8526-1844853a0f02/832f02f3-3cf9-4f7b-a8f2-b6cc06c5e122/run-0/session.jsonl\n\nParent action: Read the saved results above and resume the already-authorized parent task, or report completion. If approval is required, explicitly ask the user. Do not silently yield, rerun completed work, or infer new authorization."
     },
     {
       "timestamp": "2026-11-10T04:10:53.423Z",
       "customType": "subagent-notify",
-      "content": "Background task completed: **qa-marker**\n\nqa-marker:\nPASEO_DESKTOP_B\n\nRetention-managed async directory: <QA_ROOT>/async/async-subagent-runs/8ca757d4-7514-4e87-8eeb-af52e2228ccb\n\nSession file: <QA_ROOT>/pi/sessions/<QA_WORKSPACE>/2026-11-10T04-08-20-423Z_01a1c3a4-80c7-75ad-8526-1844853a0f02/832f02f3-3cf9-4f7b-a8f2-b6cc06c5e122/run-0/session.jsonl\n\nParent action: Read the saved results above and resume the already-authorized parent task, or report completion. If approval is required, explicitly ask the user. Do not silently yield, rerun completed work, or infer new authorization."
+      "content": "Background task completed: **qa-marker**\n\nqa-marker:\nCLISBOT_DESKTOP_B\n\nRetention-managed async directory: <QA_ROOT>/async/async-subagent-runs/8ca757d4-7514-4e87-8eeb-af52e2228ccb\n\nSession file: <QA_ROOT>/pi/sessions/<QA_WORKSPACE>/2026-11-10T04-08-20-423Z_01a1c3a4-80c7-75ad-8526-1844853a0f02/832f02f3-3cf9-4f7b-a8f2-b6cc06c5e122/run-0/session.jsonl\n\nParent action: Read the saved results above and resume the already-authorized parent task, or report completion. If approval is required, explicitly ask the user. Do not silently yield, rerun completed work, or infer new authorization."
     },
     {
       "timestamp": "2026-11-10T04:14:37.834Z",
       "customType": "subagent-notify",
-      "content": "Background task completed: **qa-marker**\n\nqa-marker:\nPASEO_DESKTOP_C\n\nRetention-managed async directory: <QA_ROOT>/async/async-subagent-runs/f41865ed-0e62-44b5-a825-27ac4f0aa596\n\nSession file: <QA_ROOT>/pi/sessions/<QA_WORKSPACE>/2026-11-10T04-08-20-423Z_01a1c3a4-80c7-75ad-8526-1844853a0f02/832f02f3-3cf9-4f7b-a8f2-b6cc06c5e122/run-0/session.jsonl\n\nParent action: Read the saved results above and resume the already-authorized parent task, or report completion. If approval is required, explicitly ask the user. Do not silently yield, rerun completed work, or infer new authorization."
+      "content": "Background task completed: **qa-marker**\n\nqa-marker:\nCLISBOT_DESKTOP_C\n\nRetention-managed async directory: <QA_ROOT>/async/async-subagent-runs/f41865ed-0e62-44b5-a825-27ac4f0aa596\n\nSession file: <QA_ROOT>/pi/sessions/<QA_WORKSPACE>/2026-11-10T04-08-20-423Z_01a1c3a4-80c7-75ad-8526-1844853a0f02/832f02f3-3cf9-4f7b-a8f2-b6cc06c5e122/run-0/session.jsonl\n\nParent action: Read the saved results above and resume the already-authorized parent task, or report completion. If approval is required, explicitly ask the user. Do not silently yield, rerun completed work, or infer new authorization."
     },
     {
       "timestamp": "2026-11-10T04:17:37.887Z",
       "customType": "subagent-notify",
-      "content": "Background task completed: **qa-marker**\n\nqa-marker:\nPASEO_DESKTOP_B_OBSERVE\n\nRetention-managed async directory: <QA_ROOT>/async/async-subagent-runs/01ac3b2e-2ed6-472d-8438-4dfb91ea62f7\n\nSession file: <QA_ROOT>/pi/sessions/<QA_WORKSPACE>/2026-11-10T04-08-20-423Z_01a1c3a4-80c7-75ad-8526-1844853a0f02/832f02f3-3cf9-4f7b-a8f2-b6cc06c5e122/run-0/session.jsonl\n\nParent action: Read the saved results above and resume the already-authorized parent task, or report completion. If approval is required, explicitly ask the user. Do not silently yield, rerun completed work, or infer new authorization."
+      "content": "Background task completed: **qa-marker**\n\nqa-marker:\nCLISBOT_DESKTOP_B_OBSERVE\n\nRetention-managed async directory: <QA_ROOT>/async/async-subagent-runs/01ac3b2e-2ed6-472d-8438-4dfb91ea62f7\n\nSession file: <QA_ROOT>/pi/sessions/<QA_WORKSPACE>/2026-11-10T04-08-20-423Z_01a1c3a4-80c7-75ad-8526-1844853a0f02/832f02f3-3cf9-4f7b-a8f2-b6cc06c5e122/run-0/session.jsonl\n\nParent action: Read the saved results above and resume the already-authorized parent task, or report completion. If approval is required, explicitly ask the user. Do not silently yield, rerun completed work, or infer new authorization."
     }
   ]
 }

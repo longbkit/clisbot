@@ -1,0 +1,32 @@
+{
+  "worktree": {
+    "setup": [
+      "npm ci",
+      "node ./scripts/seed-ios-native-cache.mjs",
+      "node ./scripts/seed-worktree-dev-state.mjs",
+      "npm run build:server",
+      "npm run build --workspace=@clisbot/expo-two-way-audio"
+    ]
+  },
+  "scripts": {
+    "daemon": {
+      "type": "service",
+      "command": "CLISBOT_DEV_MANAGED_HOME=1 CLISBOT_DEV_ROOT=\"${CLISBOT_WORKTREE_PATH:-$PWD}\" CLISBOT_HOME=\"${CLISBOT_WORKTREE_PATH:-$PWD}/.dev/clisbot-home\" CLISBOT_SKIP_DEV_SERVER_BUILD=1 CLISBOT_LISTEN=0.0.0.0:${CLISBOT_PORT:-6869} ./scripts/dev-daemon.sh"
+    },
+    "app": {
+      "type": "service",
+      "command": "CLISBOT_DEV_MANAGED_HOME=1 CLISBOT_DEV_ROOT=\"${CLISBOT_WORKTREE_PATH:-$PWD}\" CLISBOT_HOME=\"${CLISBOT_WORKTREE_PATH:-$PWD}/.dev/clisbot-home\" CLISBOT_LISTEN=0.0.0.0:${CLISBOT_SERVICE_DAEMON_PORT:-6869} CLISBOT_DEV_DAEMON_ENDPOINT=localhost:${CLISBOT_SERVICE_DAEMON_PORT:-6869} EXPO_PORT=${CLISBOT_PORT:-} ./scripts/dev-app.sh"
+    },
+    "desktop": {
+      "type": "service",
+      "command": "CLISBOT_DEV_MANAGED_HOME=1 CLISBOT_DEV_ROOT=\"${CLISBOT_WORKTREE_PATH:-$PWD}\" CLISBOT_HOME=\"${CLISBOT_WORKTREE_PATH:-$PWD}/.dev/clisbot-home\" CLISBOT_LISTEN=0.0.0.0:${CLISBOT_SERVICE_DAEMON_PORT:-6869} CLISBOT_DEV_DAEMON_ENDPOINT=localhost:${CLISBOT_SERVICE_DAEMON_PORT:-6869} EXPO_PORT=${CLISBOT_PORT:-} exec ./packages/desktop/scripts/dev.sh"
+    },
+    "ios-simulator": {
+      "type": "service",
+      "command": "CLISBOT_DEV_MANAGED_HOME=1 CLISBOT_DEV_ROOT=\"$PWD\" CLISBOT_HOME=\"$PWD/.dev/clisbot-home\" CLISBOT_LISTEN=0.0.0.0:${CLISBOT_SERVICE_DAEMON_PORT} CLISBOT_DEV_DAEMON_ENDPOINT=localhost:${CLISBOT_SERVICE_DAEMON_PORT} ./scripts/clisbot-ios-simulator-service.sh"
+    },
+    "typecheck": {
+      "command": "npm run typecheck"
+    }
+  }
+}

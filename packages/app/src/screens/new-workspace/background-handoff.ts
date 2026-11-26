@@ -1,7 +1,7 @@
 import { useWorkspaceAttachmentsStore } from "@/attachments/workspace-attachments-store";
 import { buildDraftStoreKey } from "@/stores/draft-keys";
 import { useDraftStore } from "@/stores/draft-store";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import { useWorkspaceDraftSubmissionStore } from "@/stores/workspace-draft-submission-store";
 
 /**

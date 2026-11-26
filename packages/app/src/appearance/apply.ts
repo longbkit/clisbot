@@ -1,5 +1,5 @@
 import { UnistylesRuntime } from "react-native-unistyles";
-import { resolveSyntaxColors, type SyntaxThemeId } from "@getpaseo/highlight";
+import { resolveSyntaxColors, type SyntaxThemeId } from "@clisbot/highlight";
 import {
   DEFAULT_UI_FONT_STACK,
   DEFAULT_MONO_FONT_STACK,

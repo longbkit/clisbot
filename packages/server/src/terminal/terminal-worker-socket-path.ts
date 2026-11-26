@@ -19,7 +19,7 @@ const OWNER_ONLY_MODE = 0o700;
 const SOCKET_UNSUPPORTED_BIND_CODES = new Set(["EPERM", "EACCES", "EOPNOTSUPP", "ENOTSUP"]);
 
 export interface TerminalWorkerSocketPathInput {
-  paseoHome: string;
+  clisbotHome: string;
   workerPid: number;
   recordId: string;
   platform?: NodeJS.Platform;
@@ -61,14 +61,14 @@ export class TerminalWorkerSocketPathError extends Error {
 }
 
 /** First 16 hex chars of sha256(home) plus the worker pid: unique per home and worker. */
-export function terminalWorkerSocketId(paseoHome: string, workerPid: number): string {
-  const digest = createHash("sha256").update(path.resolve(paseoHome)).digest("hex");
+export function terminalWorkerSocketId(clisbotHome: string, workerPid: number): string {
+  const digest = createHash("sha256").update(path.resolve(clisbotHome)).digest("hex");
   return `${digest.slice(0, 16)}-${workerPid}`;
 }
 
 /**
  * Picks (and creates) the socket path a worker listens on. Windows uses a named pipe; POSIX
- * tries $PASEO_HOME/terminal-worker/sock, then <tmpdir>/paseo-<uid>, then /tmp/paseo-<uid>.
+ * tries $CLISBOT_HOME/terminal-worker/sock, then <tmpdir>/clisbot-<uid>, then /tmp/clisbot-<uid>.
  * A shared root is never chmodded: an existing directory there is used only when it is a real
  * directory owned by this user with mode 0700. It does not bind; the worker listens through
  * `listenOnTerminalWorkerSocket`, which also skips directories that refuse a socket.
@@ -118,11 +118,11 @@ export async function listenOnTerminalWorkerSocket<T>(
 }
 
 function windowsPipePath(input: TerminalWorkerSocketPathInput): string {
-  return `\\\\.\\pipe\\paseo-tw-${socketFileId(input)}`;
+  return `\\\\.\\pipe\\clisbot-tw-${socketFileId(input)}`;
 }
 
 function socketFileId(input: TerminalWorkerSocketPathInput): string {
-  return terminalWorkerSocketId(input.paseoHome, input.workerPid) + "-" + input.recordId;
+  return terminalWorkerSocketId(input.clisbotHome, input.workerPid) + "-" + input.recordId;
 }
 
 function socketPathByteBudget(platform: NodeJS.Platform): number {
@@ -137,7 +137,7 @@ function* eligibleUnixSocketPaths(
 ): Generator<{ path: string; byteLength: number }> {
   const uid = input.uid ?? process.getuid?.() ?? 0;
   const fileName = `tw-${socketFileId(input)}.sock`;
-  const homeSocketDirectory = path.join(terminalWorkerDirectory(input.paseoHome), "sock");
+  const homeSocketDirectory = path.join(terminalWorkerDirectory(input.clisbotHome), "sock");
   const candidates: Array<{ directory: string; prepare: () => string | null }> = [
     {
       directory: homeSocketDirectory,
@@ -147,7 +147,7 @@ function* eligibleUnixSocketPaths(
       },
     },
     ...[input.tmpDir ?? tmpdir(), "/tmp"].map((root) => {
-      const directory = path.join(root, `paseo-${uid}`);
+      const directory = path.join(root, `clisbot-${uid}`);
       return {
         directory,
         prepare: () => prepareSharedRootDirectory(directory, uid),

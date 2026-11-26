@@ -5,7 +5,7 @@ import type {
   PluginButtonContentProps,
   PluginButtonRegistration,
   PluginClientContext,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 import { useMemo } from "react";
 import { Text, View } from "react-native";
 
@@ -173,7 +173,7 @@ export default function contribute(client: PluginClientContext) {
       }),
     );
   };
-  void client.paseo.agents
+  void client.clisbot.agents
     .list({ subscribe: {}, signal: lifetime.signal })
     .then(({ subscription }) => {
       subscription.subscribe({

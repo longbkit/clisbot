@@ -5,8 +5,8 @@ import {
   MoAvatar,
   MockupStageWindow,
   MockupStep,
-  OpenInPaseoChip,
-  PaseoBotAvatar,
+  OpenInClisbotChip,
+  ClisbotBotAvatar,
   type SourceMockupProps,
   WindowTrafficLights,
 } from "./shared";
@@ -19,7 +19,7 @@ const STEP_DELAYS = {
 } as const;
 
 const GH_COMPONENTS = {
-  mention: <span className="font-semibold text-[#58A6FF]">@paseo-bot</span>,
+  mention: <span className="font-semibold text-[#58A6FF]">@clisbot-bot</span>,
   host: (
     <span className="rounded-[4px] border border-[#30363D] bg-[#161B22] px-1.5 py-[1px] font-mono text-[11px] text-[#E6EDF3]" />
   ),
@@ -83,7 +83,7 @@ function GitHubTimeline() {
           <span className="font-semibold text-[#E6EDF3]">mo</span>
           <span>{t("hub.demo.github.addedLabel")}</span>
           <span className="rounded-full border border-[#20744A]/60 bg-[#20744A]/20 px-2 py-[1px] font-mono text-[10.5px] font-medium text-[#6CB17B]">
-            paseo
+            clisbot
           </span>
           <span>·</span>
           <span>{t("hub.demo.github.startedOn")}</span>
@@ -92,7 +92,7 @@ function GitHubTimeline() {
 
       <MockupStep delay={STEP_DELAYS.botReply} className="relative">
         <GitHubComment
-          author="paseo-bot"
+          author="clisbot-bot"
           badge={t("hub.demo.github.botBadge")}
           timestamp={t("hub.demo.github.repliedAgo")}
           bot
@@ -144,7 +144,7 @@ function GitHubPrSummaryCard() {
             ))}
           </span>
         </div>
-        <OpenInPaseoChip variant="brand" />
+        <OpenInClisbotChip variant="brand" />
       </div>
     </MockupStep>
   );
@@ -157,9 +157,9 @@ function GitHubChrome() {
         <WindowTrafficLights />
         <div className="flex items-center gap-1.5 text-[12px] text-[#8B949E]">
           <GitHubIcon className="h-3.5 w-3.5 text-[#E6EDF3]" />
-          <span>getpaseo</span>
+          <span>longbkit</span>
           <span className="text-[#484F58]">/</span>
-          <span className="font-semibold text-[#E6EDF3]">paseo</span>
+          <span className="font-semibold text-[#E6EDF3]">clisbot</span>
         </div>
       </div>
 
@@ -218,7 +218,11 @@ function GitHubComment({
   return (
     <div className="flex items-start gap-2.5">
       {bot ? (
-        <PaseoBotAvatar size="sm" rounded="rounded-full" className="relative z-10 mt-0.5 h-7 w-7" />
+        <ClisbotBotAvatar
+          size="sm"
+          rounded="rounded-full"
+          className="relative z-10 mt-0.5 h-7 w-7"
+        />
       ) : (
         <MoAvatar size="sm" rounded="rounded-full" className="relative z-10 mt-0.5 h-7 w-7" />
       )}
@@ -248,8 +252,8 @@ function GitHubSidebar() {
       <div className="space-y-1.5 border-b border-[#21262D] pb-3">
         <p className="font-medium text-[#8B949E]">{t("hub.demo.github.assignees")}</p>
         <div className="flex items-center gap-1.5 text-[#E6EDF3]">
-          <PaseoBotAvatar size="xs" rounded="rounded-full" />
-          <span className="font-medium">paseo-bot</span>
+          <ClisbotBotAvatar size="xs" rounded="rounded-full" />
+          <span className="font-medium">clisbot-bot</span>
         </div>
       </div>
 
@@ -263,7 +267,7 @@ function GitHubSidebar() {
             p0
           </span>
           <span className="rounded-full border border-[#20744A]/60 bg-[#20744A]/20 px-2 py-[1px] text-[10.5px] font-medium text-[#6CB17B]">
-            paseo
+            clisbot
           </span>
         </div>
       </div>

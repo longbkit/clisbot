@@ -15,7 +15,7 @@
         "agent": "marker",
         "name": "fixture-marker",
         "title": "Fixture marker verification",
-        "task": "Return only PASEO_EDXETH_LEAN_OK"
+        "task": "Return only CLISBOT_EDXETH_LEAN_OK"
       }
     },
     {
@@ -32,16 +32,16 @@
         "details": {
           "evidence": {
             "runId": "1bfdf3b3",
-            "cwd": "/tmp/paseo-edxeth-fixture/lean/workspace",
+            "cwd": "/tmp/clisbot-edxeth-fixture/lean/workspace",
             "activityFile": "/home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/activity.jsonl",
             "resultFile": "/home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/result.json"
           },
           "id": "1bfdf3b3",
           "name": "fixture-marker",
           "title": "Fixture marker verification",
-          "task": "Return only PASEO_EDXETH_LEAN_OK",
+          "task": "Return only CLISBOT_EDXETH_LEAN_OK",
           "agent": "marker",
-          "sessionFile": "/tmp/paseo-edxeth-fixture/background/child-session.jsonl",
+          "sessionFile": "/tmp/clisbot-edxeth-fixture/background/child-session.jsonl",
           "noSession": false,
           "status": "started",
           "mode": "background",
@@ -58,19 +58,19 @@
       "message": {
         "role": "custom",
         "customType": "subagent_result",
-        "content": "Sub-agent \"fixture-marker\" completed (7s).\n\nPASEO_EDXETH_LEAN_OK\n\nSession: /tmp/paseo-edxeth-fixture/background/child-session.jsonl\nResume: pi --session /tmp/paseo-edxeth-fixture/background/child-session.jsonl\n\nSub-agent context: 2K/372K tokens (0%) used at finish.\n\nActivity: /home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/activity.jsonl\nRun evidence: /home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/result.json\nRead these on demand for progress or failure diagnosis; activity is evidence, not a completion verdict.",
+        "content": "Sub-agent \"fixture-marker\" completed (7s).\n\nCLISBOT_EDXETH_LEAN_OK\n\nSession: /tmp/clisbot-edxeth-fixture/background/child-session.jsonl\nResume: pi --session /tmp/clisbot-edxeth-fixture/background/child-session.jsonl\n\nSub-agent context: 2K/372K tokens (0%) used at finish.\n\nActivity: /home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/activity.jsonl\nRun evidence: /home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/result.json\nRead these on demand for progress or failure diagnosis; activity is evidence, not a completion verdict.",
         "display": true,
         "details": {
           "evidence": {
             "runId": "1bfdf3b3",
-            "cwd": "/tmp/paseo-edxeth-fixture/lean/workspace",
+            "cwd": "/tmp/clisbot-edxeth-fixture/lean/workspace",
             "activityFile": "/home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/activity.jsonl",
             "resultFile": "/home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/result.json",
             "finalized": true
           },
           "id": "1bfdf3b3",
           "name": "fixture-marker",
-          "task": "Return only PASEO_EDXETH_LEAN_OK",
+          "task": "Return only CLISBOT_EDXETH_LEAN_OK",
           "agent": "marker",
           "mode": "background",
           "status": "completed",
@@ -82,7 +82,7 @@
           "outputTokens": 13,
           "contextTokens": 1775,
           "contextWindow": 372000,
-          "sessionFile": "/tmp/paseo-edxeth-fixture/background/child-session.jsonl"
+          "sessionFile": "/tmp/clisbot-edxeth-fixture/background/child-session.jsonl"
         },
         "timestamp": 1792587964414
       }
@@ -100,7 +100,7 @@
             "agent": "marker",
             "name": "fixture-marker",
             "title": "Fixture marker verification",
-            "task": "Return only PASEO_EDXETH_LEAN_OK"
+            "task": "Return only CLISBOT_EDXETH_LEAN_OK"
           }
         }
       ],
@@ -140,7 +140,7 @@
       "details": {
         "evidence": {
           "runId": "1bfdf3b3",
-          "cwd": "/tmp/paseo-edxeth-fixture/lean/workspace",
+          "cwd": "/tmp/clisbot-edxeth-fixture/lean/workspace",
           "activityFile": "/home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/activity.jsonl",
           "resultFile": "/home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/result.json",
           "finalized": true
@@ -148,9 +148,9 @@
         "id": "1bfdf3b3",
         "name": "fixture-marker",
         "title": "Fixture marker verification",
-        "task": "Return only PASEO_EDXETH_LEAN_OK",
+        "task": "Return only CLISBOT_EDXETH_LEAN_OK",
         "agent": "marker",
-        "sessionFile": "/tmp/paseo-edxeth-fixture/background/child-session.jsonl",
+        "sessionFile": "/tmp/clisbot-edxeth-fixture/background/child-session.jsonl",
         "noSession": false,
         "status": "started",
         "mode": "background",
@@ -200,19 +200,19 @@
     {
       "role": "custom",
       "customType": "subagent_result",
-      "content": "Sub-agent \"fixture-marker\" completed (7s).\n\nPASEO_EDXETH_LEAN_OK\n\nSession: /tmp/paseo-edxeth-fixture/background/child-session.jsonl\nResume: pi --session /tmp/paseo-edxeth-fixture/background/child-session.jsonl\n\nSub-agent context: 2K/372K tokens (0%) used at finish.\n\nActivity: /home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/activity.jsonl\nRun evidence: /home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/result.json\nRead these on demand for progress or failure diagnosis; activity is evidence, not a completion verdict.",
+      "content": "Sub-agent \"fixture-marker\" completed (7s).\n\nCLISBOT_EDXETH_LEAN_OK\n\nSession: /tmp/clisbot-edxeth-fixture/background/child-session.jsonl\nResume: pi --session /tmp/clisbot-edxeth-fixture/background/child-session.jsonl\n\nSub-agent context: 2K/372K tokens (0%) used at finish.\n\nActivity: /home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/activity.jsonl\nRun evidence: /home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/result.json\nRead these on demand for progress or failure diagnosis; activity is evidence, not a completion verdict.",
       "display": true,
       "details": {
         "evidence": {
           "runId": "1bfdf3b3",
-          "cwd": "/tmp/paseo-edxeth-fixture/lean/workspace",
+          "cwd": "/tmp/clisbot-edxeth-fixture/lean/workspace",
           "activityFile": "/home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/activity.jsonl",
           "resultFile": "/home/pi-user/.pi/history/workspace/artifacts/2026-10-21T13-05-57-380Z_db802a71-7bb32177-573971ee-535c/subagents/1bfdf3b3/result.json",
           "finalized": true
         },
         "id": "1bfdf3b3",
         "name": "fixture-marker",
-        "task": "Return only PASEO_EDXETH_LEAN_OK",
+        "task": "Return only CLISBOT_EDXETH_LEAN_OK",
         "agent": "marker",
         "mode": "background",
         "status": "completed",
@@ -224,7 +224,7 @@
         "outputTokens": 13,
         "contextTokens": 1775,
         "contextWindow": 372000,
-        "sessionFile": "/tmp/paseo-edxeth-fixture/background/child-session.jsonl"
+        "sessionFile": "/tmp/clisbot-edxeth-fixture/background/child-session.jsonl"
       },
       "timestamp": 1792587964414
     },

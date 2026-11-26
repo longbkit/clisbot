@@ -5,7 +5,7 @@ import {
   windowFromUsedPct,
   type UsageReport,
   type UsageWindow,
-} from "@getpaseo/plugin/server/usage";
+} from "@clisbot/plugin/server/usage";
 
 // The endpoint the Console's own Go page reads. It is not publicly documented.
 const STATUS_URL = "https://opencode.ai/console/api/go/status";

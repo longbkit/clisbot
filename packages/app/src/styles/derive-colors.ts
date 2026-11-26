@@ -8,7 +8,7 @@
  *
  * Every step is a WCAG contrast ratio from the color it starts at, moving toward the foreground.
  * A ratio keeps the step equally visible on every base; a lightness delta disappears near black.
- * The numbers come from the default themes: Paseo dark and Light.
+ * The numbers come from the default themes: Clisbot dark and Light.
  */
 import { contrastRatio, mixHexColors, stepContrast } from "@/utils/color";
 

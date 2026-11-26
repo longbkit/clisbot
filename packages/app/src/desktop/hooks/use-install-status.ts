@@ -24,7 +24,7 @@ interface CliInstall {
   isWorking: boolean;
   /**
    * Installs or removes the CLI; resolves to whether it worked. Failures are reported. Removing
-   * keeps a paseo command this app did not install, says so, and resolves true.
+   * keeps a clisbot command this app did not install, says so, and resolves true.
    */
   setInstalled: (installed: boolean) => Promise<boolean>;
   refresh: () => void;
@@ -69,7 +69,7 @@ export function useCliInstall(): CliInstall {
   });
   const { mutateAsync, isPending } = mutation;
 
-  // Removing only ever deletes the CLI this app installed. A paseo command put there some other way
+  // Removing only ever deletes the CLI this app installed. A clisbot command put there some other way
   // stays, and that still counts as done: the user is told rather than left with a switch that
   // silently won't turn off.
   const setInstalled = useCallback(

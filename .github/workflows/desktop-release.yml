@@ -84,7 +84,7 @@ jobs:
             fi
             gh release create "$RELEASE_TAG" \
               --repo "${{ github.repository }}" \
-              --title "Paseo $RELEASE_TAG" \
+              --title "Clisbot $RELEASE_TAG" \
               --notes "" \
               --draft \
               $prerelease_flag || {
@@ -161,15 +161,15 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          PASEO_DESKTOP_SMOKE: "1"
-          PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
+          CLISBOT_DESKTOP_SMOKE: "1"
+          CLISBOT_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
           # Metro's jest workers OOM on the generated ws-outbound.aot.js validator,
           # the last module in the web bundle. Node's default heap is sized from
           # runner RAM, which is not enough on the Intel runner.
           NODE_OPTIONS: --max-old-space-size=${{ matrix.node_heap_mb }}
         run: |
           set -euo pipefail
-          export PASEO_REAL_XCRUN="$(command -v xcrun)"
+          export CLISBOT_REAL_XCRUN="$(command -v xcrun)"
           xcrun_bin="$(mktemp -d)"
           trap 'rm -rf "$xcrun_bin"' EXIT
           cp scripts/macos-xcrun-retry.sh "$xcrun_bin/xcrun"
@@ -272,8 +272,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EP_GH_IGNORE_TIME: true
-          PASEO_DESKTOP_SMOKE: "1"
-          PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
+          CLISBOT_DESKTOP_SMOKE: "1"
+          CLISBOT_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
         run: |
           set -euo pipefail
           build_args=(-- --publish never --linux --x64)
@@ -370,8 +370,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EP_GH_IGNORE_TIME: true
-          PASEO_DESKTOP_SMOKE: "1"
-          PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
+          CLISBOT_DESKTOP_SMOKE: "1"
+          CLISBOT_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
         run: |
           set -euo pipefail
           build_args=(-- --publish never --win --x64 --arm64)

@@ -10,7 +10,7 @@ import { inheritLoginShellEnv } from "./login-shell-env";
 const zsh = "/bin/zsh";
 const describeIfZsh = existsSync(zsh) ? describe : describe.skip;
 const basePath = "/usr/bin:/bin:/usr/sbin:/sbin";
-const fakeHome = path.join(os.tmpdir(), "paseo-login-shell-env-fake-home");
+const fakeHome = path.join(os.tmpdir(), "clisbot-login-shell-env-fake-home");
 type LoginShellEnvInput = NonNullable<Parameters<typeof inheritLoginShellEnv>[0]>;
 type LoginShellSpawnSync = NonNullable<LoginShellEnvInput["spawnSync"]>;
 
@@ -55,8 +55,8 @@ class RecordingLoginShellLogger {
 function createEnv(home: string): NodeJS.ProcessEnv {
   return {
     HOME: home,
-    USER: "paseo-test",
-    LOGNAME: "paseo-test",
+    USER: "clisbot-test",
+    LOGNAME: "clisbot-test",
     SHELL: zsh,
     PATH: basePath,
   };
@@ -108,7 +108,7 @@ function expectNoRawStdout(fields: Record<string, unknown>): void {
 }
 
 async function createShellHome(): Promise<string> {
-  return await mkdtemp(path.join(os.tmpdir(), "paseo-login-shell-env-"));
+  return await mkdtemp(path.join(os.tmpdir(), "clisbot-login-shell-env-"));
 }
 
 describe("login shell env retry behavior", () => {
@@ -362,7 +362,7 @@ describe("login shell env retry behavior", () => {
   it("uses the configured shell env timeout", () => {
     const env = {
       ...createEnv(fakeHome),
-      PASEO_SHELL_ENV_TIMEOUT_MS: "1234",
+      CLISBOT_SHELL_ENV_TIMEOUT_MS: "1234",
     };
     const logger = new RecordingLoginShellLogger();
     const clock = createTestClock();
@@ -492,13 +492,13 @@ describeIfZsh("login shell env", () => {
   it("loads the user's zshrc while resolving the login shell env", async () => {
     const home = await createShellHome();
     homes.add(home);
-    await writeFile(path.join(home, ".zshrc"), "export PASEO_TEST_ZSHRC_LOADED=1\n");
+    await writeFile(path.join(home, ".zshrc"), "export CLISBOT_TEST_ZSHRC_LOADED=1\n");
     const env = createEnv(home);
     const logger = new RecordingLoginShellLogger();
 
     inheritLoginShellEnv({ env, logger });
 
-    expect(env.PASEO_TEST_ZSHRC_LOADED).toBe("1");
+    expect(env.CLISBOT_TEST_ZSHRC_LOADED).toBe("1");
     expect(logger.infos.map((entry) => entry.message)).toEqual([
       "[login-shell-env] start",
       "[login-shell-env] attempt applied",

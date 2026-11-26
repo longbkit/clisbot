@@ -1,4 +1,4 @@
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import { promises as fs } from "node:fs";
 
 import type { Logger } from "pino";
@@ -86,7 +86,7 @@ const PersistedWorkspaceRecordSchema = z.object({
     .nullable()
     .optional()
     .transform((value) => value ?? null),
-  isPaseoOwnedWorktree: z.boolean().default(false),
+  isClisbotOwnedWorktree: z.boolean().default(false),
   mainRepoRoot: z.string().nullable().default(null),
   worktreeManagerPluginId: z.string().min(1).optional(),
   createdAt: z.string(),
@@ -105,7 +105,7 @@ const PersistedWorkspaceRecordSchema = z.object({
     .optional()
     .transform((value) => value ?? null),
   labels: z.array(z.string()).optional(),
-  // Plugin-owned data. Paseo stores it and never reads a key.
+  // Plugin-owned data. Clisbot stores it and never reads a key.
   metadata: z.record(z.string(), z.custom<JsonValue>()).default({}),
   untrustedSource: UntrustedWorkspaceSourceSchema.optional(),
   // Public discovery visibility. Contents retain their ordinary lifecycle.
@@ -697,7 +697,7 @@ export function createPersistedWorkspaceRecord(input: {
   branch?: string | null;
   worktreeRoot?: string | null;
   baseBranch?: string | null;
-  isPaseoOwnedWorktree?: boolean;
+  isClisbotOwnedWorktree?: boolean;
   mainRepoRoot?: string | null;
   worktreeManagerPluginId?: string | null;
   createdAt: string;
@@ -718,7 +718,7 @@ export function createPersistedWorkspaceRecord(input: {
     branch: input.branch ?? null,
     worktreeRoot: input.worktreeRoot ?? null,
     baseBranch: input.baseBranch ?? null,
-    isPaseoOwnedWorktree: input.isPaseoOwnedWorktree ?? false,
+    isClisbotOwnedWorktree: input.isClisbotOwnedWorktree ?? false,
     mainRepoRoot: input.mainRepoRoot ?? null,
     ...(worktreeManagerPluginId ? { worktreeManagerPluginId } : {}),
     archivedAt: input.archivedAt ?? null,

@@ -12,7 +12,7 @@ category: Hub
 
 First connect a Discord server under **Integrations** (or configure a [Discord app](/docs/hub/self-hosting/discord-app) on a self-hosted Hub).
 
-`.paseo/triggers/discord-help.yml`:
+`.clisbot/triggers/discord-help.yml`:
 
 ```yaml
 name: discord-help
@@ -38,7 +38,7 @@ run:
     Answer the request using reply, then call finish_execution.
 
     <user-prompt>
-    ${{ paseo.prompt }}
+    ${{ clisbot.prompt }}
     </user-prompt>
   outputs:
     discord.reply:
@@ -52,15 +52,15 @@ Discord filters use numeric snowflake IDs, not server names, display names, or c
 
 `from_users` is required and matches the sender, while `guild` and `channels` restrict where the mention arrived. `pattern` requires a prefix after the mention (`contains` is its legacy alias with the same prefix behavior). All filters compose with AND.
 
-`${{ paseo.prompt }}` contains the full message. Hub parses leading `key=value` tokens after the mention for inputs you declare. If you declare `inputs.repo`, use `${{ paseo.inputs.repo }}` in `run.prompt` to insert its value.
+`${{ clisbot.prompt }}` contains the full message. Hub parses leading `key=value` tokens after the mention for inputs you declare. If you declare `inputs.repo`, use `${{ clisbot.inputs.repo }}` in `run.prompt` to insert its value.
 
-Include `${{ paseo.context }}` in `run.prompt` to pass the referenced message, thread history, and attachment descriptors as JSON.
+Include `${{ clisbot.context }}` in `run.prompt` to pass the referenced message, thread history, and attachment descriptors as JSON.
 
 ## Replies and continuation
 
 Hub posts replies in the triggering Discord channel or thread. Follow-up mentions in the same thread continue the same agent by default.
 
-Discord triggers automatically grant the `reply` tool (`discord.reply`). Declare `run.outputs.discord.reply` to enforce `max` or `required: true`. When Hub runs over HTTPS, replies include an **Open in Paseo** link.
+Discord triggers automatically grant the `reply` tool (`discord.reply`). Declare `run.outputs.discord.reply` to enforce `max` or `required: true`. When Hub runs over HTTPS, replies include an **Open in Clisbot** link.
 
 To read or post to Discord channels and forums from a schedule, webhook, or another trigger, use [Integration tools](/docs/hub/tools). To give the agent repository access, add a [`run.github` block](/docs/hub/github).
 
@@ -68,4 +68,4 @@ To read or post to Discord channels and forums from a schedule, webhook, or anot
 
 In Discord, turn on **Settings → Advanced → Developer Mode**. Right-click a server and choose **Copy Server ID** for `guild`, right-click a channel and choose **Copy Channel ID** for `channels`, and right-click a user and choose **Copy User ID** for `from_users`.
 
-`paseo hub init` selects your connected Discord server automatically and asks for your user ID.
+`clisbot hub init` selects your connected Discord server automatically and asks for your user ID.

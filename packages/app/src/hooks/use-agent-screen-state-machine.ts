@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import type { AgentCapabilityFlags, AgentProvider } from "@getpaseo/protocol/agent-types";
+import type { AgentCapabilityFlags, AgentProvider } from "@clisbot/protocol/agent-types";
 import type { Agent } from "@/stores/session-store";
 import type { ViewedTimelineStatus } from "@/timeline/viewed-timeline-sync";
 

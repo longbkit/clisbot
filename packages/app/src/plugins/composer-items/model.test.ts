@@ -1,7 +1,7 @@
-import { defineRpc } from "@getpaseo/plugin";
-import { PluginTranslationRuntime } from "@getpaseo/plugin/client/host";
+import { defineRpc } from "@clisbot/plugin";
+import { PluginTranslationRuntime } from "@clisbot/plugin/client/host";
 import { QueryClient } from "@tanstack/react-query";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
 import type { UserComposerAttachment } from "@/attachments/types";
@@ -23,7 +23,7 @@ function installed(): InstalledPlugin {
     locale: "en",
     i18n: new PluginTranslationRuntime({ getLocale: () => "en", subscribe: () => () => {} }),
     queryClient: new QueryClient(),
-    paseo: {} as InstalledPlugin["paseo"],
+    clisbot: {} as InstalledPlugin["clisbot"],
     invoke: async () => undefined,
     subscribe: () => {
       throw new Error("Subscriptions are not used here");

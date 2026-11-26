@@ -30,7 +30,7 @@ test("configures an env-pinned OpenAI site and keeps the saved key on later save
 
     const sheet = await test.step("the env var decides the provider", async () => {
       const opened = await openSpeechSite(page, "Listening");
-      await expect(opened.getByText("Set by PASEO_VOICE_STT_PROVIDER")).toBeVisible();
+      await expect(opened.getByText("Set by CLISBOT_VOICE_STT_PROVIDER")).toBeVisible();
       await expect(providerOption(opened, "Local")).toBeDisabled();
       await expect(providerOption(opened, "OpenAI")).toHaveAttribute("aria-selected", "true");
       await expect(opened.getByText("Set by OPENAI_API_KEY")).toBeVisible();

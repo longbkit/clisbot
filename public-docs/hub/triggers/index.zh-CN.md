@@ -1,6 +1,6 @@
 ---
 title: Hub 触发器
-description: 将事件、定时任务和 webhook 连接到在你的 Paseo daemon 上运行的 Agent。
+description: 将事件、定时任务和 webhook 连接到在你的 Clisbot daemon 上运行的 Agent。
 nav: 触发器
 ---
 
@@ -8,9 +8,9 @@ nav: 触发器
 
 触发器定义了什么条件会在你的 daemon 上启动 Agent、允许谁触发、运行哪个 Agent，以及它可以使用哪些工具或回复能力。
 
-你可以在 Hub 控制台的 **Triggers** 页面使用表单或 YAML 视图编写触发器，也可以将其保存在 `.paseo/triggers/*.yml` 中，通过 `paseo hub deploy` 部署。
+你可以在 Hub 控制台的 **Triggers** 页面使用表单或 YAML 视图编写触发器，也可以将其保存在 `.clisbot/triggers/*.yml` 中，通过 `clisbot hub deploy` 部署。
 
-`.paseo/triggers/github-issue.yml`：
+`.clisbot/triggers/github-issue.yml`：
 
 ```yaml
 name: triage-issue
@@ -31,7 +31,7 @@ run:
   idle_timeout: 10m
   prompt: |
     Triage this issue, reply with your summary using reply, then call finish_execution.
-    ${{ paseo.context }}
+    ${{ clisbot.context }}
 ```
 
 所有支持的字段见[触发器 YAML 参考](/docs/hub/configuration/reference)。
@@ -40,11 +40,11 @@ run:
 
 在 Hub 控制台中创建或编辑触发器时，先选择 daemon 并输入工作目录。Hub 会向该 daemon 查询可用的 Provider、模型、执行模式和思考选项。
 
-只有被授予 `hub.execute` 的 daemon 会作为目标出现。Hub 支持你在 Paseo daemon 上配置的任意 Provider，包括 Claude Code、Codex、OpenCode、Pi，以及自定义或插件 Provider。当 Provider 支持工具预批准时，Hub 会自动预批准自身的 MCP 工具。
+只有被授予 `hub.execute` 的 daemon 会作为目标出现。Hub 支持你在 Clisbot daemon 上配置的任意 Provider，包括 Claude Code、Codex、OpenCode、Pi，以及自定义或插件 Provider。当 Provider 支持工具预批准时，Hub 会自动预批准自身的 MCP 工具。
 
 修改 daemon 或工作目录会重新加载可用选项。如果已有触发器指定的模型、模式或思考选项不再由 daemon 报告，Hub 会将该值标记为不可用而不会覆盖它。你可以保留原值、改选当前可用值，或直接编辑 YAML。
 
-如果 daemon 离线或需要更新 Paseo 版本，Agent 选择器会显示错误和重试按钮，触发器的其余部分仍可编辑。
+如果 daemon 离线或需要更新 Clisbot 版本，Agent 选择器会显示错误和重试按钮，触发器的其余部分仍可编辑。
 
 ## 保存时会对照 daemon 检查 Agent {#saving-checks-the-agent-against-the-daemon}
 
@@ -56,7 +56,7 @@ run.agent.mode: Mode 'default' is not available for provider 'opencode'
 
 只要目标和 Agent 设置不变，即使 daemon 离线也能在控制台保存修改。例如，你可以只修改提示词、过滤条件或限制。创建触发器或修改 daemon、工作目录或 Agent 设置时，目标 daemon 必须连接到 Hub。
 
-执行 `paseo hub deploy` 或直接通过 API（`POST /api/v1/triggers/install`）安装时，Hub 始终通过已连接的目标 daemon 校验 Agent 设置。即使只修改提示词，也需要校验。`paseo hub init` 校验触发器时也要求目标 daemon 已连接。
+执行 `clisbot hub deploy` 或直接通过 API（`POST /api/v1/triggers/install`）安装时，Hub 始终通过已连接的目标 daemon 校验 Agent 设置。即使只修改提示词，也需要校验。`clisbot hub init` 校验触发器时也要求目标 daemon 已连接。
 
 ## 继续同一个 Agent {#continue-the-same-agent}
 
@@ -168,7 +168,7 @@ on:
 
 两个都会运行。触发器彼此独立、没有先后顺序，也不会互相遮蔽。
 
-## 回复与 Open in Paseo 链接 {#replying-and-open-in-paseo-links}
+## 回复与 Open in Clisbot 链接 {#replying-and-open-in-clisbot-links}
 
 当事件有关联的 issue、Pull Request 或讨论串可供回复时，Hub 会授予 `reply` 工具。
 
@@ -186,6 +186,6 @@ run:
 
 根据触发器来源使用 `github.reply`、`linear.reply`、`slack.reply` 或 `discord.reply`。提示词必须明确告诉 Agent 调用 `reply` 和 `finish_execution`，因为 Hub 不会改写你的提示词来添加工具说明。参见[输出能力](/docs/hub/configuration/reference#output-capabilities)。
 
-当 Hub 配置了 HTTPS 地址且运行记录了 daemon Agent 时，Hub 会在对话回复中附带 **Open in Paseo** 链接，方便已登录的组织成员在 Paseo 中打开实时会话或在 Hub 中查看运行记录。
+当 Hub 配置了 HTTPS 地址且运行记录了 daemon Agent 时，Hub 会在对话回复中附带 **Open in Clisbot** 链接，方便已登录的组织成员在 Clisbot 中打开实时会话或在 Hub 中查看运行记录。
 
 如需在任意触发器（包括定时任务、webhook、GitHub 和 Linear）中读取或发送到 Slack 或 Discord 频道，请授予[集成工具](/docs/hub/tools)。

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { DaemonClient } from "./test-utils/index.js";
-import { createTestPaseoDaemon } from "./test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
 import { createTestLogger } from "../test-utils/test-logger.js";
 import { AgentStorage } from "./agent/agent-storage.js";
 import { getAskModeConfig } from "./daemon-e2e/agent-configs.js";
@@ -104,7 +104,7 @@ function createSnapshotStormClients(): SnapshotStormProviderClient[] {
 }
 
 async function createSnapshotStormDaemon(clients: SnapshotStormProviderClient[]) {
-  return createTestPaseoDaemon({
+  return createTestClisbotDaemon({
     mcpEnabled: false,
     isDev: true,
     agentClients: {
@@ -152,10 +152,10 @@ function collectProviderSnapshotUpdateBytes(client: DaemonClient): {
 // active stays done. Both registry files must exist on disk before the daemon starts:
 // bootstrapWorkspaceRegistries skips materialization when both files are
 // present, leaving these seeded records untouched.
-function seedSameCwdWorkspaces(): { paseoHomeRoot: string; cwd: string } {
-  const paseoHomeRoot = mkdtempSync(path.join(tmpdir(), "paseo-same-cwd-home-"));
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-same-cwd-dir-"));
-  const projectsDir = path.join(paseoHomeRoot, ".paseo", "projects");
+function seedSameCwdWorkspaces(): { clisbotHomeRoot: string; cwd: string } {
+  const clisbotHomeRoot = mkdtempSync(path.join(tmpdir(), "clisbot-same-cwd-home-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-same-cwd-dir-"));
+  const projectsDir = path.join(clisbotHomeRoot, ".clisbot", "projects");
   mkdirSync(projectsDir, { recursive: true });
 
   const project = createPersistedProjectRecord({
@@ -193,14 +193,14 @@ function seedSameCwdWorkspaces(): { paseoHomeRoot: string; cwd: string } {
     JSON.stringify([workspaceA, workspaceB]),
   );
 
-  return { paseoHomeRoot, cwd };
+  return { clisbotHomeRoot, cwd };
 }
 
-async function seedWorkspaceWithLegacyAgent(): Promise<{ paseoHomeRoot: string; cwd: string }> {
-  const paseoHomeRoot = mkdtempSync(path.join(tmpdir(), "paseo-legacy-agent-home-"));
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-legacy-agent-dir-"));
-  const paseoHome = path.join(paseoHomeRoot, ".paseo");
-  const projectsDir = path.join(paseoHome, "projects");
+async function seedWorkspaceWithLegacyAgent(): Promise<{ clisbotHomeRoot: string; cwd: string }> {
+  const clisbotHomeRoot = mkdtempSync(path.join(tmpdir(), "clisbot-legacy-agent-home-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-legacy-agent-dir-"));
+  const clisbotHome = path.join(clisbotHomeRoot, ".clisbot");
+  const projectsDir = path.join(clisbotHome, "projects");
   mkdirSync(projectsDir, { recursive: true });
 
   const project = createPersistedProjectRecord({
@@ -224,7 +224,7 @@ async function seedWorkspaceWithLegacyAgent(): Promise<{ paseoHomeRoot: string; 
   writeFileSync(path.join(projectsDir, "projects.json"), JSON.stringify([project]));
   writeFileSync(path.join(projectsDir, "workspaces.json"), JSON.stringify([workspace]));
 
-  const agentStorage = new AgentStorage(path.join(paseoHome, "agents"), createTestLogger());
+  const agentStorage = new AgentStorage(path.join(clisbotHome, "agents"), createTestLogger());
   await agentStorage.initialize();
   await agentStorage.upsert({
     id: "legacy-cwd-only-agent",
@@ -244,7 +244,7 @@ async function seedWorkspaceWithLegacyAgent(): Promise<{ paseoHomeRoot: string; 
     archivedAt: null,
   });
 
-  return { paseoHomeRoot, cwd };
+  return { clisbotHomeRoot, cwd };
 }
 
 async function statusByWorkspaceId(client: DaemonClient): Promise<Map<string, string>> {
@@ -280,8 +280,8 @@ async function waitForPermission(client: DaemonClient, agentId: string) {
 }
 
 test("daemon bootstrap migrates cwd-only legacy agents before same-cwd workspaces are added", async () => {
-  const { paseoHomeRoot, cwd } = await seedWorkspaceWithLegacyAgent();
-  const daemon = await createTestPaseoDaemon({ paseoHomeRoot });
+  const { clisbotHomeRoot, cwd } = await seedWorkspaceWithLegacyAgent();
+  const daemon = await createTestClisbotDaemon({ clisbotHomeRoot });
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.1.82",
@@ -325,8 +325,8 @@ test("daemon bootstrap migrates cwd-only legacy agents before same-cwd workspace
 });
 
 test("workspace.create directory source with firstAgentContext generates a daemon-visible workspace title", async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-named-local-dir-"));
-  const daemon = await createTestPaseoDaemon({
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-named-local-dir-"));
+  const daemon = await createTestClisbotDaemon({
     agentClients: { mock: new MockLoadTestAgentClient() },
   });
   const client = new DaemonClient({
@@ -363,7 +363,7 @@ test("workspace.create directory source with firstAgentContext generates a daemo
 }, 20_000);
 
 test("local workspace auto-title does not broadcast provider snapshot warm-up to clients", async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-title-snapshot-storm-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-title-snapshot-storm-"));
   const stormClients = createSnapshotStormClients();
   const daemon = await createSnapshotStormDaemon(stormClients);
   const client = new DaemonClient({
@@ -412,8 +412,8 @@ test("local workspace auto-title does not broadcast provider snapshot warm-up to
 }, 20_000);
 
 test("create_agent_request with workspaceId does not retitle an existing workspace", async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-agent-submit-title-"));
-  const daemon = await createTestPaseoDaemon({
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-agent-submit-title-"));
+  const daemon = await createTestClisbotDaemon({
     agentClients: { mock: new MockLoadTestAgentClient() },
   });
   const client = new DaemonClient({
@@ -455,8 +455,8 @@ test("create_agent_request with workspaceId does not retitle an existing workspa
 }, 20_000);
 
 test("creating another same-cwd local workspace keeps running status on the owning workspace only", async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-running-same-cwd-create-"));
-  const daemon = await createTestPaseoDaemon({
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-running-same-cwd-create-"));
+  const daemon = await createTestClisbotDaemon({
     agentClients: { mock: new MockLoadTestAgentClient() },
   });
   const client = new DaemonClient({
@@ -530,8 +530,8 @@ test("creating another same-cwd local workspace keeps running status on the owni
 }, 30_000);
 
 test("two workspaces sharing one cwd compute agent status per workspaceId", async () => {
-  const { paseoHomeRoot, cwd } = seedSameCwdWorkspaces();
-  const daemon = await createTestPaseoDaemon({ paseoHomeRoot });
+  const { clisbotHomeRoot, cwd } = seedSameCwdWorkspaces();
+  const daemon = await createTestClisbotDaemon({ clisbotHomeRoot });
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.1.82",

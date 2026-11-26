@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { parseConnectionOfferFromUrl } from "@getpaseo/protocol/connection-offer";
+import { parseConnectionOfferFromUrl } from "@clisbot/protocol/connection-offer";
 import type { LocalElixirRelay } from "./local-elixir-relay";
 import type { PackagedWebDaemon } from "./packaged-web-daemon";
 import { expectRunningAgentChrome } from "./agent-stream";
@@ -39,8 +39,8 @@ export async function connectDaemonWebAppOnlyThroughRelay(
     updatedAt: now,
   };
 
-  await page.route(/:(6767)\b/, (route) => route.abort());
-  await page.routeWebSocket(/:(6767)\b/, async (socket) => {
+  await page.route(/:(6767|6768|6868|6869)\b/, (route) => route.abort());
+  await page.routeWebSocket(/:(6767|6768|6868|6869)\b/, async (socket) => {
     await socket.close({ code: 1008, reason: "Blocked developer daemon during relay E2E" });
   });
   await page.route("**/*", async (route) => {
@@ -52,13 +52,13 @@ export async function connectDaemonWebAppOnlyThroughRelay(
     const html = await response.text();
     await route.fulfill({
       response,
-      body: html.replace(/<script>window\.__PASEO_INITIAL_DAEMON_CONNECTION__=.*?<\/script>/, ""),
+      body: html.replace(/<script>window\.__CLISBOT_INITIAL_DAEMON_CONNECTION__=.*?<\/script>/, ""),
     });
   });
   await page.addInitScript(
     ({ storedHost, preferences }) => {
-      localStorage.setItem("@paseo:daemon-registry", JSON.stringify([storedHost]));
-      localStorage.setItem("@paseo:create-agent-preferences", JSON.stringify(preferences));
+      localStorage.setItem("@clisbot:daemon-registry", JSON.stringify([storedHost]));
+      localStorage.setItem("@clisbot:create-agent-preferences", JSON.stringify(preferences));
     },
     { storedHost: host, preferences: buildCreateAgentPreferences() },
   );

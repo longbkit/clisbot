@@ -1,8 +1,8 @@
 import type { ToolCallTimelineItem } from "./agent-types.js";
 import {
   buildAgentMessageDisplay,
-  buildPaseoToolDisplay,
-} from "./paseo-tool-presentation/index.js";
+  buildClisbotToolDisplay,
+} from "./clisbot-tool-presentation/index.js";
 import { stripCwdPrefix } from "./path-utils.js";
 
 export type ToolCallDisplayInput = Pick<
@@ -10,7 +10,7 @@ export type ToolCallDisplayInput = Pick<
   "name" | "status" | "error" | "metadata" | "detail" | "agentMessage"
 > & {
   cwd?: string;
-  /** Title of the agent a Paseo call targets, when the caller knows it. */
+  /** Title of the agent a Clisbot call targets, when the caller knows it. */
   targetAgentTitle?: string;
 };
 
@@ -151,17 +151,17 @@ function buildUnknownDetailOverride(input: ToolCallDisplayInput): DetailDisplay 
 
 export function buildToolCallDisplayModel(input: ToolCallDisplayInput): ToolCallDisplayModel {
   const errorText = input.status === "failed" ? formatErrorText(input.error) : undefined;
-  const paseoDisplay = input.agentMessage
+  const clisbotDisplay = input.agentMessage
     ? buildAgentMessageDisplay(input.agentMessage)
-    : buildPaseoToolDisplay({
+    : buildClisbotToolDisplay({
         toolName: input.name,
         detail: input.detail,
         targetAgentTitle: input.targetAgentTitle,
       });
-  if (paseoDisplay) {
+  if (clisbotDisplay) {
     return {
-      displayName: paseoDisplay.displayName,
-      ...(paseoDisplay.summary ? { summary: paseoDisplay.summary } : {}),
+      displayName: clisbotDisplay.displayName,
+      ...(clisbotDisplay.summary ? { summary: clisbotDisplay.summary } : {}),
       ...(errorText ? { errorText } : {}),
     };
   }

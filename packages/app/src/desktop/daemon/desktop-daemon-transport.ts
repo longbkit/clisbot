@@ -1,8 +1,8 @@
 import type {
   DaemonTransport,
   DaemonTransportFactory,
-} from "@getpaseo/client/internal/daemon-client";
-import { validatePort, validateSshHost } from "@getpaseo/protocol/ssh-transport";
+} from "@clisbot/client/internal/daemon-client";
+import { validatePort, validateSshHost } from "@clisbot/protocol/ssh-transport";
 import type { DesktopDaemonTransportTarget } from "./desktop-daemon";
 import {
   defaultLocalDaemonTransportRpc,
@@ -10,7 +10,7 @@ import {
   type LocalDaemonTransportRpc,
 } from "./local-daemon-transport-rpc";
 
-const DESKTOP_TRANSPORT_SCHEME = "paseo+desktop:";
+const DESKTOP_TRANSPORT_SCHEME = "clisbot+desktop:";
 
 function encodeBinaryToBase64(data: Uint8Array | ArrayBuffer): string {
   const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;

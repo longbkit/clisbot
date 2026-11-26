@@ -144,8 +144,8 @@ function parseSessionRequest(message: string | Buffer): SessionRequest | null {
 }
 
 export interface GatedTeardown {
-  /** The `paseo.json` config whose worktree teardown parks until released. */
-  paseoConfig: Record<string, unknown>;
+  /** The `clisbot.json` config whose worktree teardown parks until released. */
+  clisbotConfig: Record<string, unknown>;
   expectStarted(): Promise<void>;
   release(): void;
 }
@@ -157,7 +157,7 @@ export function createGatedTeardown(): GatedTeardown {
   const releasePath = path.join(gateDir, "release");
   const teardown = `node -e "const fs=require('fs');fs.writeFileSync('${startedPath}','started');const timer=setInterval(()=>{if(fs.existsSync('${releasePath}'))clearInterval(timer)},20)"`;
   return {
-    paseoConfig: { worktree: { teardown: [teardown] } },
+    clisbotConfig: { worktree: { teardown: [teardown] } },
     expectStarted: () => expectDirectoryPresence(startedPath, true),
     release: () => writeFileSync(releasePath, "release\n"),
   };

@@ -19,7 +19,7 @@ const execFileAsync = promisify(execFile);
 export interface IsolatedHostDaemon {
   serverId: string;
   port: number;
-  paseoHome: string;
+  clisbotHome: string;
   getPid(): number | undefined;
   restart(): Promise<void>;
   close(): Promise<void>;
@@ -33,7 +33,7 @@ export interface IsolatedHostDaemonOptions {
     enabled: boolean;
     endpoint?: string;
   };
-  paseoHome?: string;
+  clisbotHome?: string;
   preserveHome?: boolean;
   publishedVersion?: string;
 }
@@ -56,7 +56,8 @@ async function getAvailablePort(): Promise<number> {
 export async function getAvailableHostDaemonPort(): Promise<number> {
   const primaryPort = Number(process.env.E2E_DAEMON_PORT ?? 0);
   let port = await getAvailablePort();
-  while (port === 6767 || port === 6768 || port === primaryPort) port = await getAvailablePort();
+  while ([6767, 6768, 6868, 6869].includes(port) || port === primaryPort)
+    port = await getAvailablePort();
   return port;
 }
 
@@ -69,7 +70,7 @@ export async function getAvailableHostDaemonPort(): Promise<number> {
 async function waitForServer(
   port: number,
   child: ChildProcess,
-  identity: { serverId: string; paseoHome: string },
+  identity: { serverId: string; clisbotHome: string },
 ): Promise<void> {
   const deadline = Date.now() + 90_000;
   let lastError: unknown = null;
@@ -81,7 +82,7 @@ async function waitForServer(
       );
     }
     try {
-      const serverId = await readServerId(port, identity.paseoHome);
+      const serverId = await readServerId(port, identity.clisbotHome);
       if (serverId === identity.serverId) return;
       lastError = new Error(`Port ${port} is served by ${serverId}, not ${identity.serverId}`);
     } catch (error) {
@@ -102,8 +103,8 @@ async function waitForServer(
  * on a password-protected daemon; the daemon accepts the local credential it
  * writes into its home before listening, as the CLI does for local status.
  */
-async function readServerId(port: number, paseoHome: string): Promise<string> {
-  const localCredential = await readFile(path.join(paseoHome, "local-credential"), "utf8").then(
+async function readServerId(port: number, clisbotHome: string): Promise<string> {
+  const localCredential = await readFile(path.join(clisbotHome, "local-credential"), "utf8").then(
     (token) => token.trim(),
     () => null,
   );
@@ -147,11 +148,11 @@ export async function startIsolatedHostDaemon(
   const metroPort = process.env.E2E_METRO_PORT;
   if (!metroPort) throw new Error("E2E_METRO_PORT is required to start an isolated host daemon");
 
-  const paseoHome =
-    options.paseoHome ?? (await mkdtemp(path.join(tmpdir(), "paseo-e2e-secondary-host-")));
+  const clisbotHome =
+    options.clisbotHome ?? (await mkdtemp(path.join(tmpdir(), "clisbot-e2e-secondary-host-")));
   let publishedPackageRoot: string | null = null;
   if (options.publishedVersion) {
-    publishedPackageRoot = await mkdtemp(path.join(tmpdir(), "paseo-e2e-published-server-"));
+    publishedPackageRoot = await mkdtemp(path.join(tmpdir(), "clisbot-e2e-published-server-"));
     await writeFile(
       path.join(publishedPackageRoot, "package.json"),
       `${JSON.stringify({ private: true })}\n`,
@@ -177,7 +178,7 @@ export async function startIsolatedHostDaemon(
       );
     } catch (error) {
       if (!options.preserveHome) {
-        await rm(paseoHome, { recursive: true, force: true });
+        await rm(clisbotHome, { recursive: true, force: true });
       }
       await rm(publishedPackageRoot, { recursive: true, force: true });
       throw error;
@@ -188,7 +189,7 @@ export async function startIsolatedHostDaemon(
     : options.config;
   if (config) {
     await writeFile(
-      path.join(paseoHome, "config.json"),
+      path.join(clisbotHome, "config.json"),
       `${JSON.stringify({ version: 1, ...config })}\n`,
     );
   }
@@ -206,7 +207,7 @@ export async function startIsolatedHostDaemon(
         "daemon",
         "stop",
         "--home",
-        paseoHome,
+        clisbotHome,
         "--force",
       ],
       { timeout: 30_000 },
@@ -219,12 +220,12 @@ export async function startIsolatedHostDaemon(
       env: withDisabledE2ESpeechEnv({
         ...process.env,
         ...options.environment,
-        PASEO_HOME: paseoHome,
-        PASEO_SERVER_ID: serverId,
-        PASEO_LISTEN: `127.0.0.1:${port}`,
-        PASEO_CORS_ORIGINS: `http://localhost:${metroPort}`,
-        PASEO_RELAY_ENABLED: options.mutableRelay ? undefined : "0",
-        PASEO_NODE_ENV: "development",
+        CLISBOT_HOME: clisbotHome,
+        CLISBOT_SERVER_ID: serverId,
+        CLISBOT_LISTEN: `127.0.0.1:${port}`,
+        CLISBOT_CORS_ORIGINS: `http://localhost:${metroPort}`,
+        CLISBOT_RELAY_ENABLED: options.mutableRelay ? undefined : "0",
+        CLISBOT_NODE_ENV: "development",
         NODE_ENV: "development",
       }),
       stdio: ["ignore", "ignore", "pipe"],
@@ -246,7 +247,7 @@ export async function startIsolatedHostDaemon(
     });
 
     try {
-      await waitForServer(port, spawned, { serverId, paseoHome });
+      await waitForServer(port, spawned, { serverId, clisbotHome });
       return spawned;
     } catch (error) {
       throw new Error(
@@ -278,7 +279,7 @@ export async function startIsolatedHostDaemon(
   } catch (error) {
     await stopDaemon();
     if (!options.preserveHome) {
-      await rm(paseoHome, { recursive: true, force: true });
+      await rm(clisbotHome, { recursive: true, force: true });
     }
     if (publishedPackageRoot) {
       await rm(publishedPackageRoot, { recursive: true, force: true });
@@ -290,7 +291,7 @@ export async function startIsolatedHostDaemon(
   return {
     serverId,
     port,
-    paseoHome,
+    clisbotHome,
     getPid: () => child?.pid,
     restart: async () => {
       if (closed) throw new Error(`Cannot restart closed isolated daemon ${serverId}`);
@@ -301,7 +302,7 @@ export async function startIsolatedHostDaemon(
       if (closed) return;
       await stopDaemon();
       if (!options.preserveHome) {
-        await rm(paseoHome, { recursive: true, force: true });
+        await rm(clisbotHome, { recursive: true, force: true });
       }
       if (publishedPackageRoot) {
         await rm(publishedPackageRoot, { recursive: true, force: true });

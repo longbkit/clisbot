@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 declare global {
-  var __PASEO_E2E_REACT_RENDERS__: Record<string, number> | undefined;
+  var __CLISBOT_E2E_REACT_RENDERS__: Record<string, number> | undefined;
 }
 
 /**
@@ -28,7 +28,7 @@ export async function recordReactRenders(page: Page): Promise<void> {
       return component.displayName || nameOf(component.render) || nameOf(component.type);
     };
     const record = (root: Fiber) => {
-      const renders = (globalThis.__PASEO_E2E_REACT_RENDERS__ ??= {});
+      const renders = (globalThis.__CLISBOT_E2E_REACT_RENDERS__ ??= {});
       const pending: Fiber[] = [root];
       while (pending.length > 0) {
         const fiber = pending.pop()!;
@@ -65,7 +65,7 @@ export async function recordReactRenders(page: Page): Promise<void> {
 
 export async function resetReactRenders(page: Page): Promise<void> {
   await page.evaluate(() => {
-    globalThis.__PASEO_E2E_REACT_RENDERS__ = {};
+    globalThis.__CLISBOT_E2E_REACT_RENDERS__ = {};
   });
 }
 
@@ -73,6 +73,6 @@ export async function resetReactRenders(page: Page): Promise<void> {
 export async function readReactRenders(page: Page): Promise<Record<string, number>> {
   return page.evaluate(async () => {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    return { ...globalThis.__PASEO_E2E_REACT_RENDERS__ };
+    return { ...globalThis.__CLISBOT_E2E_REACT_RENDERS__ };
   });
 }

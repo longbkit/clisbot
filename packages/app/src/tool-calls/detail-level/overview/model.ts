@@ -1,4 +1,4 @@
-import { getPaseoToolActionLabel } from "@getpaseo/protocol/paseo-tool-presentation/index";
+import { getClisbotToolActionLabel } from "@clisbot/protocol/clisbot-tool-presentation/index";
 import { isTurnTrigger } from "@/agent-stream/turn-membership";
 
 import { describeToolCall, type GroupableItem, type ToolCallRun } from "../grouping";
@@ -12,7 +12,7 @@ export interface OverviewSummary {
   readFileCount: number;
   searchCount: number;
   otherToolCount: number;
-  paseoActions: Record<string, number>;
+  clisbotActions: Record<string, number>;
 }
 
 export interface OverviewToolCallGroup {
@@ -34,7 +34,7 @@ export function summarizeToolCalls(calls: readonly GroupableItem[]): OverviewSum
   let commandCount = 0;
   let searchCount = 0;
   let otherToolCount = 0;
-  const paseoActions: Record<string, number> = {};
+  const clisbotActions: Record<string, number> = {};
 
   for (const call of calls) {
     if (call.kind === "thought") {
@@ -44,9 +44,9 @@ export function summarizeToolCalls(calls: readonly GroupableItem[]): OverviewSum
     if (isTurnTrigger(call)) continue;
     const descriptor = describeToolCall(call);
     const normalizedName = descriptor.name.trim().toLowerCase();
-    const action = getPaseoToolActionLabel(descriptor.name);
+    const action = getClisbotToolActionLabel(descriptor.name);
     if (action) {
-      paseoActions[action] = (paseoActions[action] ?? 0) + 1;
+      clisbotActions[action] = (clisbotActions[action] ?? 0) + 1;
     } else if (descriptor.detail.type === "edit" || descriptor.detail.type === "write") {
       editedFiles.add(descriptor.detail.filePath);
     } else if (descriptor.detail.type === "shell") {
@@ -67,7 +67,7 @@ export function summarizeToolCalls(calls: readonly GroupableItem[]): OverviewSum
     readFileCount: readFiles.size,
     searchCount,
     otherToolCount,
-    paseoActions,
+    clisbotActions,
   };
 }
 

@@ -27,7 +27,7 @@ const TABBED_PLUGIN_NAME = "Tabbed settings";
 /** Two settings screens, so the settings page shows a tab per screen. */
 const TABBED_SOURCE = `import React from "react";
 import { Text, View } from "react-native";
-import { defineTranslations, useTranslation } from "@getpaseo/plugin/client";
+import { defineTranslations, useTranslation } from "@clisbot/plugin/client";
 
 const messages = defineTranslations({ resources: { en: { icon: "advanced-tab-icon" } } });
 
@@ -57,9 +57,9 @@ export default function contribute(client) {
 `;
 
 async function writeTabbedPlugin() {
-  const directory = await mkdtemp(path.join(tmpdir(), `paseo-${TABBED_PLUGIN_ID}-`));
+  const directory = await mkdtemp(path.join(tmpdir(), `clisbot-${TABBED_PLUGIN_ID}-`));
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({
       id: TABBED_PLUGIN_ID,
       name: TABBED_PLUGIN_NAME,

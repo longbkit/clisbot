@@ -389,7 +389,7 @@ describe("WorkspaceArchiveOperations", () => {
     const firstStarted = deferred();
     const order: string[] = [];
 
-    const first = operations.withCheckout("/tmp/paseo-checkout-a", async () => {
+    const first = operations.withCheckout("/tmp/clisbot-checkout-a", async () => {
       order.push("a1-start");
       firstStarted.resolve();
       await firstGate.promise;
@@ -398,11 +398,11 @@ describe("WorkspaceArchiveOperations", () => {
     });
     await firstStarted.promise;
 
-    const second = operations.withCheckout("/tmp/paseo-checkout-a/", async () => {
+    const second = operations.withCheckout("/tmp/clisbot-checkout-a/", async () => {
       order.push("a2");
       return "second";
     });
-    const other = operations.withCheckout("/tmp/paseo-checkout-b", async () => {
+    const other = operations.withCheckout("/tmp/clisbot-checkout-b", async () => {
       order.push("b");
       return "other";
     });

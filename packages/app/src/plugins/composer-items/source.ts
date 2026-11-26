@@ -1,5 +1,5 @@
-import type { PluginComposer, PluginComposerSelector } from "@getpaseo/plugin/client";
-import type { PluginComposersSource } from "@getpaseo/plugin/client/host";
+import type { PluginComposer, PluginComposerSelector } from "@clisbot/plugin/client";
+import type { PluginComposersSource } from "@clisbot/plugin/client/host";
 import { agentComposer } from "@/composer/agent-composer";
 import type { ComposerState } from "@/composer/model";
 import { useSessionStore } from "@/stores/session-store";

@@ -1,10 +1,10 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { PluginIdSchema, PluginRequirementsSchema } from "@getpaseo/protocol/messages";
-import { validatePluginRequirements } from "@getpaseo/protocol/plugin-requirements";
+import { PluginIdSchema, PluginRequirementsSchema } from "@clisbot/protocol/messages";
+import { validatePluginRequirements } from "@clisbot/protocol/plugin-requirements";
 
-const MANIFEST_FILENAME = "paseo-plugin.json";
+const MANIFEST_FILENAME = "clisbot-plugin.json";
 const PluginBuildCommandSchema = z
   .array(z.string().refine((argument) => argument.trim().length > 0))
   .min(1);

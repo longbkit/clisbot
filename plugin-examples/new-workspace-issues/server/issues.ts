@@ -1,4 +1,4 @@
-import type { RpcInput } from "@getpaseo/plugin";
+import type { RpcInput } from "@clisbot/plugin";
 import { searchIssuesRpc, type Issue } from "../shared/issues";
 
 // A real plugin would ask its tracker. A fixed list keeps the example self-contained.

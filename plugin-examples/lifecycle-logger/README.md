@@ -7,8 +7,8 @@ the request unchanged. Environment values are redacted; prompts and timeline con
 Install it on a daemon where plugins are enabled:
 
 ```bash
-paseo plugin install /absolute/path/to/plugin-examples/lifecycle-logger
-paseo plugin logs lifecycle-logger
+clisbot plugin install /absolute/path/to/plugin-examples/lifecycle-logger
+clisbot plugin logs lifecycle-logger
 ```
 
 The same entries appear in the target daemon's `daemon.log`. The plugin log viewer retains a bounded

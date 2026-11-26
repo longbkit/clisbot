@@ -1,6 +1,6 @@
-import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@getpaseo/protocol/browser-automation/rpc-schemas";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { SessionInboundMessage, SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import { BROWSER_AUTOMATION_COMMAND_NAMES } from "@clisbot/protocol/browser-automation/rpc-schemas";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { SessionInboundMessage, SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { getDesktopHost, type DesktopHostBridge } from "@/desktop/host";
 import {
   ensureResidentBrowserWebview as ensureResidentBrowserWebviewDefault,

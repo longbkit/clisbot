@@ -1,5 +1,5 @@
 {
-  "name": "@getpaseo/plugin-example-markdown-panel",
+  "name": "@clisbot/plugin-example-markdown-panel",
   "version": "0.1.0",
   "private": true,
   "type": "module",

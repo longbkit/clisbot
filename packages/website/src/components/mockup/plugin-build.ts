@@ -20,10 +20,10 @@ export const PLUGIN_BUILD = script([
   {
     kind: "tools",
     calls: [
-      { kind: "read", detail: "paseo-plugin/SKILL.md" },
-      { kind: "shell", detail: "paseo plugin init ~/dev/release-radar" },
+      { kind: "read", detail: "clisbot-plugin/SKILL.md" },
+      { kind: "shell", detail: "clisbot plugin init ~/dev/release-radar" },
       { kind: "write", detail: "~/dev/release-radar/release-radar.client.tsx" },
-      { kind: "shell", detail: "paseo plugin install ~/dev/release-radar" },
+      { kind: "shell", detail: "clisbot plugin install ~/dev/release-radar" },
     ],
   },
   { kind: "mark", name: "installed", ms: 500 },
@@ -36,7 +36,7 @@ export const PLUGIN_BUILD = script([
     kind: "tools",
     calls: [
       { kind: "write", detail: "~/dev/release-radar/release-radar.client.tsx" },
-      { kind: "shell", detail: "paseo plugin reload release-radar" },
+      { kind: "shell", detail: "clisbot plugin reload release-radar" },
     ],
   },
   { kind: "mark", name: "revised", ms: 500 },

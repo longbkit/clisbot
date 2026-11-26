@@ -7,7 +7,7 @@ import pino from "pino";
 import { CodexAppServerAgentClient } from "../agent/providers/codex-app-server-agent.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import { createMessageCollector } from "../test-utils/message-collector.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { canRunRealProvider } from "./real-provider-test-config.js";
 
 test("keeps two concurrent startup steer messages in one real Codex turn", async (context) => {
@@ -17,7 +17,7 @@ test("keeps two concurrent startup steer messages in one real Codex turn", async
   }
   const cwd = mkdtempSync(path.join(tmpdir(), "codex-steer-starting-"));
   const logger = pino({ level: "silent" });
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: { codex: new CodexAppServerAgentClient(logger) },
     logger,
   });

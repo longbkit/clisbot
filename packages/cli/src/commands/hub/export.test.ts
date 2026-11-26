@@ -49,12 +49,12 @@ describe("Hub trigger export", () => {
 
     assert.deepEqual(requests, [{ origin: "https://hub.test", credential: "stored-secret" }]);
     assert.equal(
-      await readFile(path.join(cwd, ".paseo", "triggers", "slack-help.yml"), "utf8"),
+      await readFile(path.join(cwd, ".clisbot", "triggers", "slack-help.yml"), "utf8"),
       "name: slack-help\nenabled: true\n",
     );
     assert.deepEqual(result.data, {
       origin: "https://hub.test",
-      directory: path.join(cwd, ".paseo", "triggers"),
+      directory: path.join(cwd, ".clisbot", "triggers"),
       exported: 1,
       unchanged: 0,
     });
@@ -113,7 +113,7 @@ class MemoryCredentials implements HubCredentialStore {
 }
 
 async function temporaryDirectory(): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-hub-export-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-hub-export-"));
   directories.push(directory);
   return directory;
 }

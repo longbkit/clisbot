@@ -1,4 +1,4 @@
-export const DEFAULT_SSH_DAEMON_PORT = 6767;
+export const DEFAULT_SSH_DAEMON_PORT = 6868;
 
 export interface SshTransportTarget {
   host: string;

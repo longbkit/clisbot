@@ -2,7 +2,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ComboboxItem } from "@getpaseo/plugin/client/ui";
+import type { ComboboxItem } from "@clisbot/plugin/client/ui";
 import type { ToastApi } from "@/components/toast-host";
 import { ComposerControlSurfaceProvider } from "@/composer/agent-controls/composer-control";
 import { ToastApiProvider } from "@/contexts/toast-api-context";

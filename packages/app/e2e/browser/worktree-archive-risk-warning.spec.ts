@@ -89,7 +89,7 @@ async function answerArchiveWarning(
   return await warning;
 }
 
-// A clean Paseo worktree's primary git action in the workspace header is Archive.
+// A clean Clisbot worktree's primary git action in the workspace header is Archive.
 function gitActionsArchiveButton(page: Page) {
   return page.getByTestId("changes-primary-cta").and(page.getByLabel("Archive workspace"));
 }
@@ -191,7 +191,7 @@ async function relayDaemon(
         response.payload = {
           ...response.payload,
           isGit: false,
-          isPaseoOwnedWorktree: false,
+          isClisbotOwnedWorktree: false,
           repoRoot: null,
           currentBranch: null,
           isDirty: null,

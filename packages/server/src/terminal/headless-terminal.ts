@@ -8,7 +8,7 @@ export interface HeadlessTerminalOptions {
 }
 
 /**
- * A headless xterm that measures text the way Paseo clients render it.
+ * A headless xterm that measures text the way Clisbot clients render it.
  *
  * Grapheme-cluster widths give every emoji cluster (VS16, skin-tone, flags,
  * ZWJ sequences) one two-column cell, matching color-emoji fonts. Clients

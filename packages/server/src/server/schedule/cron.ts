@@ -1,8 +1,8 @@
 import {
   parseCronExpression,
   validateCronExpression,
-} from "@getpaseo/protocol/schedule/cron-expression";
-import type { ScheduleCadence } from "@getpaseo/protocol/schedule/types";
+} from "@clisbot/protocol/schedule/cron-expression";
+import type { ScheduleCadence } from "@clisbot/protocol/schedule/types";
 
 interface CronDateParts {
   minute: number;

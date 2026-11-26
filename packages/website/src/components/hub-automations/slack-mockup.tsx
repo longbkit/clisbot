@@ -15,13 +15,13 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { PaseoMark } from "~/components/paseo-brand";
+import { ClisbotMark } from "~/components/clisbot-brand";
 import {
   MoAvatar,
   MockupStageWindow,
   MockupStep,
-  OpenInPaseoChip,
-  PaseoBotAvatar,
+  OpenInClisbotChip,
+  ClisbotBotAvatar,
   type SourceMockupProps,
   WindowTrafficLights,
 } from "./shared";
@@ -116,7 +116,7 @@ function SlackSidebar() {
     >
       <div className="flex items-center justify-between border-b border-white/[0.07] px-3 py-2.5">
         <div className="flex items-center gap-1 text-[13.5px] font-bold text-[#F8F8F8]">
-          <span>Paseo</span>
+          <span>Clisbot</span>
           <ChevronDown className="h-3.5 w-3.5 text-[#ABABAD]" />
         </div>
         <SquarePen className="h-3.5 w-3.5 text-[#ABABAD]" />
@@ -146,10 +146,10 @@ function SlackSidebar() {
           </p>
           <div className="flex items-center gap-2 rounded-[6px] px-2 py-1 text-[#D1D2D3]">
             <span className="relative flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] bg-[#101615] ring-1 ring-white/15">
-              <PaseoMark className="h-2.5 w-2.5 text-white" />
+              <ClisbotMark className="h-2.5 w-2.5 text-white" />
               <span className="absolute -right-0.5 -bottom-0.5 h-1.5 w-1.5 rounded-full bg-[#2BAC76] ring-1 ring-[#19171D]" />
             </span>
-            <span className="truncate">paseo-bot</span>
+            <span className="truncate">clisbot-bot</span>
           </div>
         </div>
       </div>
@@ -178,7 +178,7 @@ function SlackChannelHeader() {
         <div className="flex -space-x-1">
           <MoAvatar size="xs" rounded="rounded-[3px]" className="ring-1 ring-[#1A1D21]" />
           <span className="flex h-4 w-4 items-center justify-center rounded-[3px] bg-[#101615] ring-1 ring-[#1A1D21]">
-            <PaseoMark className="h-2.5 w-2.5 text-white" />
+            <ClisbotMark className="h-2.5 w-2.5 text-white" />
           </span>
         </div>
         <span className="tabular-nums">4</span>
@@ -209,7 +209,7 @@ function SlackMessageFeed() {
             <span className="h-px flex-1 bg-[#2C2D30]" aria-hidden="true" />
           </div>
 
-          <SlackMessage author="paseo-bot" time="9:41 AM" bot>
+          <SlackMessage author="clisbot-bot" time="9:41 AM" bot>
             <p>{t("hub.demo.slack.issuesOpen")}</p>
             <ul className="mt-1 space-y-0.5 border-l-[3px] border-[#36C5F0] pl-2.5 text-[12px]">
               {DEMO_ISSUES.map((issue) => (
@@ -239,7 +239,7 @@ function SlackMessageFeed() {
           delay={STEP_DELAYS.finalReply}
           className="border-l-2 border-[#2C2D30] pl-3 sm:pl-3.5"
         >
-          <SlackMessage author="paseo-bot" time="9:48 AM" bot>
+          <SlackMessage author="clisbot-bot" time="9:48 AM" bot>
             <p>
               <Trans i18nKey="hub.demo.slack.ranOn" components={SLACK_COMPONENTS} />
             </p>
@@ -266,7 +266,7 @@ function SlackPrAttachment() {
         </span>
       </div>
       <div>
-        <OpenInPaseoChip variant="slack" />
+        <OpenInClisbotChip variant="slack" />
       </div>
     </div>
   );
@@ -287,7 +287,7 @@ function SlackMessage({
   return (
     <div className="flex items-start gap-2.5 @max-[14rem]:flex-col @max-[14rem]:gap-1">
       {bot ? (
-        <PaseoBotAvatar size="sm" className="mt-0.5 h-8 w-8" />
+        <ClisbotBotAvatar size="sm" className="mt-0.5 h-8 w-8" />
       ) : (
         <MoAvatar size="sm" className="mt-0.5 h-8 w-8" />
       )}
@@ -310,7 +310,7 @@ function SlackMessage({
 function SlackMention() {
   return (
     <span className="rounded-[3px] bg-[#1D9BD1]/20 px-1 py-[1px] font-medium text-[#1D9BD1]">
-      @paseo-bot
+      @clisbot-bot
     </span>
   );
 }

@@ -10,10 +10,10 @@ import { StyleSheet } from "react-native-unistyles";
 import type { ITheme } from "@xterm/xterm";
 
 import {
-  PaseoTerminalView,
-  type PaseoTerminalCellMetrics,
-  type PaseoTerminalTheme,
-} from "../../../modules/paseo-terminal";
+  ClisbotTerminalView,
+  type ClisbotTerminalCellMetrics,
+  type ClisbotTerminalTheme,
+} from "../../../modules/clisbot-terminal";
 import {
   createTerminalCellStyleResolver,
   DEFAULT_TERMINAL_THEME,
@@ -72,7 +72,7 @@ export function TerminalGridView({
     [fontFamily],
   );
   const resolver = useMemo(() => createTerminalCellStyleResolver(xtermTheme), [xtermTheme]);
-  const theme = useMemo<PaseoTerminalTheme>(
+  const theme = useMemo<ClisbotTerminalTheme>(
     () => ({
       background: resolver.backgroundColor,
       cursor: resolver.cursorColor,
@@ -87,7 +87,7 @@ export function TerminalGridView({
   );
 
   const handleCellMetrics = useCallback(
-    (metrics: PaseoTerminalCellMetrics) => {
+    (metrics: ClisbotTerminalCellMetrics) => {
       const changedMetrics = resolveTerminalGridMetricsMeasurement(
         measuredMetricsRef.current,
         metrics,
@@ -109,7 +109,7 @@ export function TerminalGridView({
 
   return (
     <View onLayout={handleContainerLayout} pointerEvents="none" style={[styles.root, style]}>
-      <PaseoTerminalView
+      <ClisbotTerminalView
         frame={frame}
         theme={theme}
         fontFamily={resolvedFontFamily}

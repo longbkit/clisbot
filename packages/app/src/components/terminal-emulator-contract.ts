@@ -4,7 +4,7 @@ import type {
 } from "../terminal/runtime/terminal-emulator-runtime";
 import type { Ref } from "react";
 import type { ITheme } from "@xterm/xterm";
-import type { TerminalInputModeState } from "@getpaseo/protocol/terminal-input-mode";
+import type { TerminalInputModeState } from "@clisbot/protocol/terminal-input-mode";
 import type { TerminalOutputData } from "../terminal/runtime/terminal-emulator-runtime";
 import type {
   TerminalLocalFileLinkSource,
@@ -19,7 +19,7 @@ import type { TerminalRendererReadyChange } from "../utils/terminal-renderer-rea
 export interface TerminalEmulatorHandle {
   find?: TerminalFindHandle;
   writeOutput: (data: TerminalOutputData) => void;
-  replay: (event: import("@getpaseo/client").TerminalReplayEvent) => void;
+  replay: (event: import("@clisbot/client").TerminalReplayEvent) => void;
   paste: (text: string) => void;
   copySelection: (clipboard: TerminalClipboardWriter) => Promise<string>;
   clear: () => void;

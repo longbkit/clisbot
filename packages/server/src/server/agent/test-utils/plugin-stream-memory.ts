@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import type { ProviderEvent, ProviderRegistration } from "@getpaseo/plugin/server/provider";
+import type { ProviderEvent, ProviderRegistration } from "@clisbot/plugin/server/provider";
 import pino from "pino";
 import { PluginAgentClientRegistry } from "../plugin-provider.js";
 import { InMemoryAgentTimelineStore } from "../agent-timeline-store.js";

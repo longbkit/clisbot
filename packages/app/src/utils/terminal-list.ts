@@ -1,4 +1,4 @@
-import type { CreateTerminalResponse, ListTerminalsResponse } from "@getpaseo/protocol/messages";
+import type { CreateTerminalResponse, ListTerminalsResponse } from "@clisbot/protocol/messages";
 
 type TerminalListEntry = ListTerminalsResponse["payload"]["terminals"][number];
 type CreatedTerminal = NonNullable<CreateTerminalResponse["payload"]["terminal"]>;

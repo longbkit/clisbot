@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import type { PluginClientContext, PluginSidebarItemProps } from "@getpaseo/plugin/client";
-import { SidebarRow } from "@getpaseo/plugin/client/ui";
+import type { PluginClientContext, PluginSidebarItemProps } from "@clisbot/plugin/client";
+import { SidebarRow } from "@clisbot/plugin/client/ui";
 import { ModalExamples } from "./client/examples";
 
 function ModalExamplesItem({ currentScreen, openScreen }: PluginSidebarItemProps) {

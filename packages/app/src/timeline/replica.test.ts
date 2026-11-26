@@ -6,8 +6,8 @@ import {
   type SqliteValue,
 } from "@/runtime/replica-cache/row-store-sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import type { AgentTimelineItem } from "@getpaseo/protocol/agent-types";
-import type { AgentStreamEventPayload } from "@getpaseo/protocol/messages";
+import type { AgentTimelineItem } from "@clisbot/protocol/agent-types";
+import type { AgentStreamEventPayload } from "@clisbot/protocol/messages";
 import type { CachedTimeline } from "@/runtime/replica-cache";
 import {
   selectAgentTimelineState,

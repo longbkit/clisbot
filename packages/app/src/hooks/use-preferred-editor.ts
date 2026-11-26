@@ -6,7 +6,7 @@ import { readValidatedString, type ValidatedStorage } from "@/storage/validated-
 
 type EditorTargetId = string;
 
-const PREFERRED_EDITOR_STORAGE_KEY = "@paseo:preferred-editor";
+const PREFERRED_EDITOR_STORAGE_KEY = "@clisbot:preferred-editor";
 
 interface EditorPreferenceStorage extends ValidatedStorage {
   setItem(key: string, value: string): Promise<void>;

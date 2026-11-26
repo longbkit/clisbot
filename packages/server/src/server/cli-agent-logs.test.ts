@@ -8,7 +8,7 @@ import type { Readable } from "node:stream";
 import { join } from "node:path";
 import { createDaemonTestContext } from "./test-utils/daemon-test-context.js";
 import { createTestAgentClients } from "./test-utils/fake-agent-client.js";
-import type { AgentStreamEvent } from "@getpaseo/protocol/agent-types";
+import type { AgentStreamEvent } from "@clisbot/protocol/agent-types";
 
 interface CliResult {
   exitCode: number | null;
@@ -50,9 +50,9 @@ function waitForCliOutput(child: CliProcess, text: string): Promise<void> {
 }
 
 test("logs --since filters history and live output through the CLI and daemon", async () => {
-  const cliHome = await mkdtemp(join(tmpdir(), "paseo-logs-cli-home-"));
+  const cliHome = await mkdtemp(join(tmpdir(), "clisbot-logs-cli-home-"));
   const port = 1; // Invalid dates must fail before trying this unavailable endpoint.
-  const runLocalPaseo = (
+  const runLocalClisbot = (
     args: string[],
     env: NodeJS.ProcessEnv = {},
     cwd = cliHome,
@@ -71,7 +71,7 @@ test("logs --since filters history and live output through the CLI and daemon", 
         cwd,
         env: {
           ...Object.fromEntries(
-            Object.entries(process.env).filter(([key]) => !key.startsWith("PASEO_")),
+            Object.entries(process.env).filter(([key]) => !key.startsWith("CLISBOT_")),
           ),
           ...env,
           HOME: cliHome,
@@ -110,7 +110,7 @@ test("logs --since filters history and live output through the CLI and daemon", 
     try {
       const agent = await ctx.client.createAgent({
         provider: "codex",
-        cwd: ctx.daemon.paseoHome,
+        cwd: ctx.daemon.clisbotHome,
         title: "logs since",
       });
       const manager = ctx.daemon.daemon.agentManager;
@@ -118,7 +118,7 @@ test("logs --since filters history and live output through the CLI and daemon", 
       await manager.appendTimelineItem(agent.id, { type: "assistant_message", text: "OLD_REPLY" });
       const host = `127.0.0.1:${ctx.daemon.port}`;
       const logs = (args: string[]) =>
-        runLocalPaseo(["--host", host, ...args], {}, ctx.daemon.paseoHome);
+        runLocalClisbot(["--host", host, ...args], {}, ctx.daemon.clisbotHome);
 
       const baseline = await logs(["logs", agent.id]);
       assert.strictEqual(baseline.exitCode, 0, baseline.stderr);
@@ -126,7 +126,7 @@ test("logs --since filters history and live output through the CLI and daemon", 
 
       for (const command of [["logs"], ["agent", "logs"]]) {
         const result = await logs([...command, agent.id, "--since", "2100-01-01T00:00:00Z"]);
-        console.log(`paseo ${command.join(" ")} <id> --since 2100-01-01T00:00:00Z`);
+        console.log(`clisbot ${command.join(" ")} <id> --since 2100-01-01T00:00:00Z`);
         console.log(`exit=${result.exitCode}\nstdout:\n${result.stdout}stderr:\n${result.stderr}`);
         assert.strictEqual(result.exitCode, 0, result.stderr);
         assert.strictEqual(result.stdout, "No activity to display.\n");
@@ -167,7 +167,7 @@ test("logs --since filters history and live output through the CLI and daemon", 
       assert.strictEqual(empty.stdout, "");
 
       for (const followArgs of [[], ["--follow"]]) {
-        const invalid = await runLocalPaseo([
+        const invalid = await runLocalClisbot([
           "--host",
           `127.0.0.1:${port}`,
           "logs",

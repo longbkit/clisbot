@@ -12,7 +12,7 @@ import {
   useFileText,
   type PluginFilePanelProps,
   type PluginFilePanelParams,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";

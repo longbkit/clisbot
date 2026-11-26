@@ -6,7 +6,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import type { PluginAttachmentItem } from "../attachments.js";
 import type { PluginHostProps } from "./contracts.js";
 
@@ -46,7 +46,7 @@ export interface PluginComposer {
   /** Inserts at the cursor, replacing the selection. */
   insertText(text: string): void;
   /**
-   * Puts the cursor in this composer, ready to type. Paseo opens the agent's tab or workspace when
+   * Puts the cursor in this composer, ready to type. Clisbot opens the agent's tab or workspace when
    * it is not on screen. Resolves once the input has focus; rejects when it could not get there.
    */
   focus(options?: PluginComposerFocusOptions): Promise<void>;
@@ -102,7 +102,7 @@ export function useComposer(): PluginComposer {
  */
 export type PluginComposerSelector = { agentId: string } | { focused: true };
 
-/** What `useComposers` and `composers(selector)` read. Paseo implements it per installed plugin. */
+/** What `useComposers` and `composers(selector)` read. Clisbot implements it per installed plugin. */
 export interface PluginComposersSource {
   /** Tells `listener` when the composers `selector` names change, and keeps them live meanwhile. */
   subscribe(selector: PluginComposerSelector, listener: () => void): () => void;

@@ -1,9 +1,9 @@
-import { parseHostTarget } from "@getpaseo/protocol/host-target";
+import { parseHostTarget } from "@clisbot/protocol/host-target";
 import { test, expect } from "vitest";
 import { selectDaemonTarget, describeDaemonTarget } from "./daemon-target.js";
 import {
   resolveDaemonCredential,
-  resolveClientPaseoHome,
+  resolveClientClisbotHome,
   buildDaemonConnectionCommandError,
 } from "./client.js";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 test("explicit selectors win over both environment selectors", () => {
-  const env = { PASEO_HOME: "/tmp/a", PASEO_HOST: "unused:12345" };
+  const env = { CLISBOT_HOME: "/tmp/a", CLISBOT_HOST: "unused:12345" };
   expect(selectDaemonTarget({ home: "/tmp/b" }, env)).toEqual({ kind: "instance", home: "/tmp/b" });
   expect(selectDaemonTarget({ host: "chosen:23456" }, env)).toEqual({
     kind: "endpoint",
@@ -21,18 +21,18 @@ test("explicit selectors win over both environment selectors", () => {
   expect(() => selectDaemonTarget({ home: "/tmp/b", host: "chosen:23456" }, {})).toThrow();
 });
 
-test("endpoint connections resolve local credentials from PASEO_HOME", () => {
+test("endpoint connections resolve local credentials from CLISBOT_HOME", () => {
   expect(
-    resolveClientPaseoHome(
-      { kind: "endpoint", host: "localhost:6767" },
-      { PASEO_HOME: "/tmp/custom-home" },
+    resolveClientClisbotHome(
+      { kind: "endpoint", host: "localhost:6868" },
+      { CLISBOT_HOME: "/tmp/custom-home" },
     ),
   ).toBe("/tmp/custom-home");
 });
 
 test("local operations ignore routing environment but reject an explicit endpoint", () => {
   expect(
-    selectDaemonTarget({}, { PASEO_HOME: "/tmp/b", PASEO_HOST: "unused:12345" }, true),
+    selectDaemonTarget({}, { CLISBOT_HOME: "/tmp/b", CLISBOT_HOST: "unused:12345" }, true),
   ).toEqual({ kind: "instance", home: "/tmp/b" });
   expect(() => selectDaemonTarget({ host: "chosen:23456" }, {}, true)).toThrow();
 });
@@ -45,7 +45,7 @@ test("endpoint descriptions redact pairing material and credentials", () => {
     }),
   ).not.toMatch(/private|secret/);
   expect(
-    describeDaemonTarget({ kind: "endpoint", host: "https://app.paseo.sh/#offer=private" }),
+    describeDaemonTarget({ kind: "endpoint", host: "https://app.clisbot.com/#offer=private" }),
   ).not.toContain("private");
 });
 
@@ -54,16 +54,16 @@ test("a pairing offer without a URL prefix still redacts its key", () => {
     v: 2,
     serverId: "srv_example",
     daemonPublicKeyB64: "example-secret",
-    relay: { endpoint: "localhost:6767", useTls: false },
+    relay: { endpoint: "localhost:6868", useTls: false },
   };
   const host = `#offer=${Buffer.from(JSON.stringify(offer)).toString("base64url")}`;
   expect(describeDaemonTarget({ kind: "endpoint", host })).toBe(
-    "relay://localhost:6767/srv_example",
+    "relay://localhost:6868/srv_example",
   );
 });
 
 test("malformed endpoint diagnostics never expose the supplied credential", () => {
-  const target = { kind: "endpoint" as const, host: "alice:example-secret@localhost:6767" };
+  const target = { kind: "endpoint" as const, host: "alice:example-secret@localhost:6868" };
   expect(describeDaemonTarget(target)).not.toContain("example-secret");
   for (const message of [
     `Invalid connection ${target.host}`,
@@ -75,30 +75,30 @@ test("malformed endpoint diagnostics never expose the supplied credential", () =
 });
 
 test("CLI selects an explicit password before a matching local credential and never sends the latter remotely", async () => {
-  const home = await mkdtemp(join(tmpdir(), "paseo-cli-credential-"));
-  const previousPassword = process.env.PASEO_PASSWORD;
-  delete process.env.PASEO_PASSWORD;
+  const home = await mkdtemp(join(tmpdir(), "clisbot-cli-credential-"));
+  const previousPassword = process.env.CLISBOT_PASSWORD;
+  delete process.env.CLISBOT_PASSWORD;
   try {
     const token = "a".repeat(43);
-    await writeFile(join(home, "paseo.pid"), JSON.stringify({ listen: "127.0.0.1:6767" }));
+    await writeFile(join(home, "clisbot.pid"), JSON.stringify({ listen: "127.0.0.1:6868" }));
     await writeFile(join(home, "local-credential"), token);
-    expect(resolveDaemonCredential("tcp://localhost:6767", home)).toEqual({
+    expect(resolveDaemonCredential("tcp://localhost:6868", home)).toEqual({
       kind: "localCredential",
       token,
     });
-    expect(resolveDaemonCredential("tcp://remote.example:6767", home)).toBeNull();
-    expect(resolveDaemonCredential("tcp://localhost:6767?password=explicit", home)).toEqual({
+    expect(resolveDaemonCredential("tcp://remote.example:6868", home)).toBeNull();
+    expect(resolveDaemonCredential("tcp://localhost:6868?password=explicit", home)).toEqual({
       kind: "password",
       password: "explicit",
     });
   } finally {
-    if (previousPassword === undefined) delete process.env.PASEO_PASSWORD;
-    else process.env.PASEO_PASSWORD = previousPassword;
+    if (previousPassword === undefined) delete process.env.CLISBOT_PASSWORD;
+    else process.env.CLISBOT_PASSWORD = previousPassword;
     await rm(home, { recursive: true, force: true });
   }
 });
 
-test.each(["/tmp/paseo.sock", "\\\\.\\pipe\\paseo", "localhost:6767", "[::1]:6767", "6767"])(
+test.each(["/tmp/clisbot.sock", "\\\\.\\pipe\\clisbot", "localhost:6868", "[::1]:6868", "6868"])(
   "validated bare target %s keeps its spelling in command hints",
   (host) => {
     expect(describeDaemonTarget({ kind: "endpoint", host })).toBe(host);
@@ -124,7 +124,7 @@ test("validated URI command hints preserve their transport address without crede
   expect(
     describeDaemonTarget({
       kind: "endpoint",
-      host: "tcp://localhost:6767?daemonPort=example-secret&ssl=example-secret",
+      host: "tcp://localhost:6868?daemonPort=example-secret&ssl=example-secret",
     }),
   ).not.toContain("example-secret");
 });

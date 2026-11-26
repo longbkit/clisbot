@@ -15,9 +15,9 @@ import {
   type ProviderRegistration,
   type ProviderLaunch,
   type ProviderInput,
-} from "@getpaseo/plugin/server/provider";
-import type { UsageSourceRegistration } from "@getpaseo/plugin/server";
-import { execCommand } from "@getpaseo/plugin/server";
+} from "@clisbot/plugin/server/provider";
+import type { UsageSourceRegistration } from "@clisbot/plugin/server";
+import { execCommand } from "@clisbot/plugin/server";
 import contribute from "../index.server.js";
 import { createMuseProvider } from "../server/provider.js";
 
@@ -95,7 +95,7 @@ async function harness(
     await send({
       type: "session.open",
       requestId: "open",
-      sessionId: "paseo-session",
+      sessionId: "clisbot-session",
       config: {
         cwd: root,
         providerOptions,
@@ -116,7 +116,7 @@ async function harness(
   async function prompt(delivery: "auto" | "steer" = "auto", image = false) {
     return send({
       type: "session.prompt",
-      sessionId: "paseo-session",
+      sessionId: "clisbot-session",
       prompt: {
         clientMessageId: `client-${events.length}`,
         delivery,
@@ -170,7 +170,7 @@ test("installation links to the Muse guide and reports the installed version", a
     env: { MUSE_TEST_VERSION: "1.7.2" },
   };
   const signal = new AbortController().signal;
-  expect(provider.installation?.installUrl).toBe("https://paseo.sh/docs/muse-code");
+  expect(provider.installation?.installUrl).toBe("https://clisbot.com/docs/muse-code");
   await expect(
     provider.installation?.inspect?.({ launch: { ...launch, resolved: true }, signal }),
   ).resolves.toEqual({ status: "installed", version: "1.7.2" });
@@ -341,7 +341,7 @@ test("multi-stage approvals surface Stage 2 then Stage 3 and send the current re
   if (first.type !== "session.permission") throw new Error("Expected approval");
   const from = await h.send({
     type: "session.permission",
-    sessionId: "paseo-session",
+    sessionId: "clisbot-session",
     permissionId: first.request.id,
     response: { behavior: "allow", selectedActionId: first.request.actions![0]!.id },
   });
@@ -351,7 +351,7 @@ test("multi-stage approvals surface Stage 2 then Stage 3 and send the current re
   });
   await h.send({
     type: "session.permission",
-    sessionId: "paseo-session",
+    sessionId: "clisbot-session",
     permissionId: first.request.id,
     response: { behavior: "allow", selectedActionId: first.request.actions![0]!.id },
   });
@@ -380,7 +380,7 @@ test("interrupt awaits cancelled terminal and reconciles the tool", async () => 
   await h.open();
   await h.prompt();
   await h.wait((event) => event.type === "session.prompt_result");
-  await h.send({ type: "session.interrupt", sessionId: "paseo-session", requestId: "interrupt" });
+  await h.send({ type: "session.interrupt", sessionId: "clisbot-session", requestId: "interrupt" });
   await h.wait((event) => event.type === "request.completed" && event.requestId === "interrupt");
   const terminalIndex = h.events.findIndex(
     (event) => event.type === "session.turn" && event.state === "canceled",
@@ -526,7 +526,7 @@ for (const source of ["live", "history", "backfill"]) {
     ).toEqual([]);
     expect(
       h.events.filter((event) => event.type === "session.opened").map((event) => event.sessionId),
-    ).toEqual(["paseo-session"]);
+    ).toEqual(["clisbot-session"]);
     expect((await h.recorded()).filter((frame) => frame.method === "session/read")).toEqual([]);
   });
 }
@@ -645,7 +645,7 @@ test("configure reports the effective model, approval mode, and per-turn effort"
   const from = await h.send({
     type: "session.configure",
     requestId: "configure",
-    sessionId: "paseo-session",
+    sessionId: "clisbot-session",
     changes: { model: "meta/muse-spark-1.3", mode: "promptUnmatched", thinkingOption: "low" },
   });
   await h.wait((event) => event.type === "request.completed" && event.requestId === "configure");
@@ -669,7 +669,7 @@ test("CLI-style allow response selects a published allow action without a suppli
   if (permissionEvent.type !== "session.permission") throw new Error("Expected approval");
   await h.send({
     type: "session.permission",
-    sessionId: "paseo-session",
+    sessionId: "clisbot-session",
     permissionId: permissionEvent.request.id,
     response: { behavior: "allow" },
   });
@@ -847,7 +847,7 @@ for (const [configuredModel, catalogModels, expectedModel] of [
     expect(await h.open(undefined, "onRequest", configuredModel || null)).toEqual({
       type: "session.ready",
       requestId: "open",
-      sessionId: "paseo-session",
+      sessionId: "clisbot-session",
     });
     const config = await h.wait((event) => event.type === "session.config");
     if (config.type !== "session.config") throw new Error("Expected session config");
@@ -874,7 +874,7 @@ test("session startup accepts described catalog efforts and publishes the comple
   expect(await h.open()).toEqual({
     type: "session.ready",
     requestId: "open",
-    sessionId: "paseo-session",
+    sessionId: "clisbot-session",
   });
   expect(await h.wait((event) => event.type === "session.config")).toMatchObject({
     config: {
@@ -885,7 +885,7 @@ test("session startup accepts described catalog efforts and publishes the comple
   await h.send({
     type: "session.configure",
     requestId: "choose-max",
-    sessionId: "paseo-session",
+    sessionId: "clisbot-session",
     changes: { thinkingOption: "max" },
   });
   await h.wait((event) => event.type === "request.completed" && event.requestId === "choose-max");
@@ -979,7 +979,7 @@ for (const restoring of [false, true]) {
     const h = await harness(restoring ? "resume-without-cursor" : "text-reasoning");
     await h.send({
       type: "session.open",
-      sessionId: "paseo-session",
+      sessionId: "clisbot-session",
       requestId: "mcp",
       persistence: restoring
         ? { version: 1, data: { sessionId: "saved-session", cursor: "v:old:7" } }
@@ -997,7 +997,7 @@ for (const restoring of [false, true]) {
             args: ["--serve"],
             env: { TEST_ENV: "yes" },
           },
-          paseo: {
+          clisbot: {
             type: "http",
             url: "http://localhost/mcp/agents",
             headers: { Authorization: "Bearer test-token" },
@@ -1018,7 +1018,7 @@ for (const restoring of [false, true]) {
         env: { TEST_ENV: "yes" },
         framing: "lineDelimitedJson",
       },
-      paseo: {
+      clisbot: {
         transport: "streamableHttp",
         url: "http://localhost/mcp/agents",
         headers: { Authorization: "Bearer test-token" },
@@ -1055,7 +1055,7 @@ test("interrupt targets the running turn when another prompt is queued", async (
   await h.wait((event) => event.type === "session.prompt_result", from);
   await h.send({
     type: "session.interrupt",
-    sessionId: "paseo-session",
+    sessionId: "clisbot-session",
     requestId: "interrupt-queued",
   });
   await h.wait(
@@ -1076,7 +1076,7 @@ for (const terminal of ["completed", "failed"]) {
     await h.wait((event) => event.type === "session.prompt_result");
     await h.send({
       type: "session.interrupt",
-      sessionId: "paseo-session",
+      sessionId: "clisbot-session",
       requestId: "racing-interrupt",
     });
     await h.wait((event) => event.type === "session.turn" && event.state === terminal);
@@ -1098,7 +1098,7 @@ for (const [behavior, choiceId] of [
     if (permission.type !== "session.permission") throw new Error("Expected permission");
     await h.send({
       type: "session.permission",
-      sessionId: "paseo-session",
+      sessionId: "clisbot-session",
       permissionId: permission.request.id,
       response: { behavior },
     });
@@ -1119,7 +1119,7 @@ test("CLI deny rejects a tool without aborting when denied/once is offered", asy
   if (permission.type !== "session.permission") throw new Error("Expected permission");
   await h.send({
     type: "session.permission",
-    sessionId: "paseo-session",
+    sessionId: "clisbot-session",
     permissionId: permission.request.id,
     response: { behavior: "deny" },
   });
@@ -1142,7 +1142,7 @@ test("skills publish commands and command prompts submit structured skill parts"
   });
   await h.send({
     type: "session.prompt",
-    sessionId: "paseo-session",
+    sessionId: "clisbot-session",
     prompt: {
       clientMessageId: "skill-client",
       delivery: "auto",
@@ -1194,7 +1194,7 @@ for (const mode of ["answer", "cancel"] as const) {
     });
     await h.send({
       type: "session.permission",
-      sessionId: "paseo-session",
+      sessionId: "clisbot-session",
       permissionId: permission.request.id,
       response:
         mode === "answer"
@@ -1223,7 +1223,7 @@ for (const variant of ["tool", "dedicated", "workflow"]) {
     expect(
       await h.wait((e) => e.type === "session.opened" && e.sessionId === "fixture-child"),
     ).toMatchObject({
-      parentSessionId: "paseo-session",
+      parentSessionId: "clisbot-session",
       restoration: "parent",
       toolCallId: expect.any(String),
     });
@@ -1358,7 +1358,7 @@ test("resuming a session reapplies its provider options to the new host", async 
   const saved = h.events.find((e) => e.type === "session.opened");
   if (saved?.type !== "session.opened" || !saved.persistence)
     throw new Error("Expected persistence");
-  await h.send({ type: "session.close", sessionId: "paseo-session", requestId: "close" });
+  await h.send({ type: "session.close", sessionId: "clisbot-session", requestId: "close" });
   await h.wait((e) => e.type === "session.closed");
   const from = h.events.length;
   await h.open(saved.persistence);
@@ -1446,7 +1446,7 @@ for (const fixture of ["phase3-compact", "phase3-compact-history", "phase3-compa
     await h.open({ version: 1, data: { sessionId: nativeId } });
     await h.send({
       type: "session.prompt",
-      sessionId: "paseo-session",
+      sessionId: "clisbot-session",
       prompt: {
         clientMessageId: "compact",
         delivery: "auto",
@@ -1542,7 +1542,7 @@ test("admitted compact publishes compaction progress and completes the command w
   await h.open();
   await h.send({
     type: "session.prompt",
-    sessionId: "paseo-session",
+    sessionId: "clisbot-session",
     prompt: {
       clientMessageId: "compact-admitted",
       delivery: "auto",
@@ -1600,7 +1600,7 @@ for (const source of ["user", "project"] as const) {
     });
     await h.send({
       type: "session.prompt",
-      sessionId: "paseo-session",
+      sessionId: "clisbot-session",
       prompt: {
         clientMessageId: "real-skill",
         delivery: "auto",
@@ -1701,7 +1701,7 @@ for (const extension of ["cmd", "bat"]) {
       });
       await h.open();
       expect(await h.wait((event) => event.type === "session.opened")).toMatchObject({
-        sessionId: "paseo-session",
+        sessionId: "clisbot-session",
       });
     },
     20000,

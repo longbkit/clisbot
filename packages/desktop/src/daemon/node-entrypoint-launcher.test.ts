@@ -5,7 +5,7 @@ import {
 } from "./node-entrypoint-launcher";
 
 const CLI_ENTRYPOINT: NodeEntrypointSpec = {
-  entryPath: "/tmp/paseo-cli.js",
+  entryPath: "/tmp/clisbot-cli.js",
   execArgv: ["--import", "tsx"],
 };
 
@@ -14,29 +14,29 @@ describe("node-entrypoint-launcher", () => {
     it("uses the packaged runner when the desktop app is packaged", () => {
       expect(
         createNodeEntrypointInvocation({
-          execPath: "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          execPath: "/Applications/Clisbot.app/Contents/MacOS/Clisbot",
           isPackaged: true,
           packagedRunnerPath:
-            "/Applications/Paseo.app/Contents/Resources/app.asar/dist/daemon/node-entrypoint-runner.js",
+            "/Applications/Clisbot.app/Contents/Resources/app.asar/dist/daemon/node-entrypoint-runner.js",
           entrypoint: CLI_ENTRYPOINT,
           argvMode: "node-script",
           args: ["ls", "--json"],
           baseEnv: { PATH: "/usr/bin" },
         }),
       ).toEqual({
-        command: "/Applications/Paseo.app/Contents/MacOS/Paseo",
+        command: "/Applications/Clisbot.app/Contents/MacOS/Clisbot",
         args: [
           "--disable-warning=DEP0040",
-          "/Applications/Paseo.app/Contents/Resources/app.asar/dist/daemon/node-entrypoint-runner.js",
+          "/Applications/Clisbot.app/Contents/Resources/app.asar/dist/daemon/node-entrypoint-runner.js",
           "node-script",
-          "/tmp/paseo-cli.js",
+          "/tmp/clisbot-cli.js",
           "ls",
           "--json",
         ],
         env: {
           PATH: "/usr/bin",
           ELECTRON_RUN_AS_NODE: "1",
-          PASEO_NODE_ENV: "production",
+          CLISBOT_NODE_ENV: "production",
         },
       });
     });
@@ -50,15 +50,15 @@ describe("node-entrypoint-launcher", () => {
           entrypoint: CLI_ENTRYPOINT,
           argvMode: "node-script",
           args: ["ls"],
-          baseEnv: { PATH: "/usr/bin", PASEO_NODE_ENV: "production" },
+          baseEnv: { PATH: "/usr/bin", CLISBOT_NODE_ENV: "production" },
         }),
       ).toEqual({
         command: "/opt/homebrew/bin/electron",
-        args: ["--import", "tsx", "/tmp/paseo-cli.js", "ls"],
+        args: ["--import", "tsx", "/tmp/clisbot-cli.js", "ls"],
         env: {
           PATH: "/usr/bin",
           ELECTRON_RUN_AS_NODE: "1",
-          PASEO_NODE_ENV: "development",
+          CLISBOT_NODE_ENV: "development",
         },
       });
     });
@@ -66,10 +66,10 @@ describe("node-entrypoint-launcher", () => {
     it("forces packaged launches to production even when NODE_ENV is inherited as development", () => {
       expect(
         createNodeEntrypointInvocation({
-          execPath: "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          execPath: "/Applications/Clisbot.app/Contents/MacOS/Clisbot",
           isPackaged: true,
           packagedRunnerPath:
-            "/Applications/Paseo.app/Contents/Resources/app.asar/dist/daemon/node-entrypoint-runner.js",
+            "/Applications/Clisbot.app/Contents/Resources/app.asar/dist/daemon/node-entrypoint-runner.js",
           entrypoint: CLI_ENTRYPOINT,
           argvMode: "node-script",
           args: [],
@@ -79,35 +79,35 @@ describe("node-entrypoint-launcher", () => {
         PATH: "/usr/bin",
         ELECTRON_RUN_AS_NODE: "1",
         NODE_ENV: "development",
-        PASEO_NODE_ENV: "production",
+        CLISBOT_NODE_ENV: "production",
       });
     });
 
     it("keeps node-style argv for packaged script entrypoints", () => {
       expect(
         createNodeEntrypointInvocation({
-          execPath: "/Applications/Paseo.app/Contents/MacOS/Paseo",
+          execPath: "/Applications/Clisbot.app/Contents/MacOS/Clisbot",
           isPackaged: true,
           packagedRunnerPath:
-            "/Applications/Paseo.app/Contents/Resources/app.asar/dist/daemon/node-entrypoint-runner.js",
+            "/Applications/Clisbot.app/Contents/Resources/app.asar/dist/daemon/node-entrypoint-runner.js",
           entrypoint: CLI_ENTRYPOINT,
           argvMode: "node-script",
           args: ["--dev"],
           baseEnv: { PATH: "/usr/bin" },
         }),
       ).toEqual({
-        command: "/Applications/Paseo.app/Contents/MacOS/Paseo",
+        command: "/Applications/Clisbot.app/Contents/MacOS/Clisbot",
         args: [
           "--disable-warning=DEP0040",
-          "/Applications/Paseo.app/Contents/Resources/app.asar/dist/daemon/node-entrypoint-runner.js",
+          "/Applications/Clisbot.app/Contents/Resources/app.asar/dist/daemon/node-entrypoint-runner.js",
           "node-script",
-          "/tmp/paseo-cli.js",
+          "/tmp/clisbot-cli.js",
           "--dev",
         ],
         env: {
           PATH: "/usr/bin",
           ELECTRON_RUN_AS_NODE: "1",
-          PASEO_NODE_ENV: "production",
+          CLISBOT_NODE_ENV: "production",
         },
       });
     });

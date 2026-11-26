@@ -7,4 +7,4 @@ Voice settings now let you configure speech providers and download local models 
 Added
 - Let plugins give tools to specific agents
 
-Full notes: https://paseo.sh/changelog
+Full notes: https://clisbot.com/changelog

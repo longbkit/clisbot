@@ -1,4 +1,4 @@
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { createStore } from "zustand/vanilla";
 
 export const providerSnapshotIcons = createStore<ReadonlyMap<string, ReadonlyMap<string, string>>>(

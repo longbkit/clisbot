@@ -7,10 +7,10 @@ import type { SessionOutboundMessage } from "../messages.js";
 import { createMessageCollector } from "../test-utils/message-collector.js";
 import { createOpenCodeOmoRealRuntime } from "./opencode-omo-real-runtime.js";
 
-const CHILD_TOKEN = "PASEO_OMO_CHILD_READY";
-const ROOT_IDLE_TOKEN = "PASEO_OMO_ROOT_WAITING";
-const FINAL_TOKEN = "PASEO_OMO_AUTONOMOUS_FINAL";
-const ROOT_IDLE_BARRIER = ".paseo-omo-root-idle";
+const CHILD_TOKEN = "CLISBOT_OMO_CHILD_READY";
+const ROOT_IDLE_TOKEN = "CLISBOT_OMO_ROOT_WAITING";
+const FINAL_TOKEN = "CLISBOT_OMO_AUTONOMOUS_FINAL";
+const ROOT_IDLE_BARRIER = ".clisbot-omo-root-idle";
 
 test("OpenCode remains idle while an OMO child works and completes the autonomous wake", async () => {
   const runtime = await createOpenCodeOmoRealRuntime();

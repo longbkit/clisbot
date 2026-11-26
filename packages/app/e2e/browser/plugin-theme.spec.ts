@@ -89,7 +89,7 @@ async function expectTimestampContrast(row: Locator) {
 test("keeps plugin workspace timestamps readable on state surfaces and honors overrides", async ({
   page,
 }) => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-theme-state-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-theme-state-"));
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previousConfig = await client.getDaemonConfig();
   const selected = await seedMockAgentWorkspace({
@@ -101,7 +101,7 @@ test("keeps plugin workspace timestamps readable on state surfaces and honors ov
     title: "Hovered theme workspace",
   });
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id: PLUGIN_ID, requirements: pluginRequirements }),
   );
   await writeFile(path.join(directory, "index.client.ts"), PLUGIN_SOURCE);
@@ -147,11 +147,11 @@ test("keeps plugin workspace timestamps readable on state surfaces and honors ov
 test("applies a contributed theme and falls back when its plugin is gone", async ({
   page,
 }, testInfo) => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-theme-e2e-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-theme-e2e-"));
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previousConfig = await client.getDaemonConfig();
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id: PLUGIN_ID, requirements: pluginRequirements }),
   );
   await writeFile(path.join(directory, "index.client.ts"), PLUGIN_SOURCE);
@@ -249,11 +249,11 @@ const MANY_THEMES_SOURCE = `export default function contribute(plugin) {
 test("reaches the last theme when a plugin contributes more themes than fit", async ({
   page,
 }, testInfo) => {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-theme-many-e2e-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-theme-many-e2e-"));
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previousConfig = await client.getDaemonConfig();
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
+    path.join(directory, "clisbot-plugin.json"),
     JSON.stringify({ id: MANY_THEMES_PLUGIN_ID, requirements: pluginRequirements }),
   );
   await writeFile(path.join(directory, "index.client.ts"), MANY_THEMES_SOURCE);

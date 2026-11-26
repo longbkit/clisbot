@@ -1,4 +1,4 @@
-import type { ForgeSearchKind } from "@getpaseo/protocol/messages";
+import type { ForgeSearchKind } from "@clisbot/protocol/messages";
 import type { ChangeRequestSource } from "./change-request-source.js";
 
 export type ForgeSearchRequestKind = ForgeSearchKind | "github-issue" | "github-pr" | "pr";

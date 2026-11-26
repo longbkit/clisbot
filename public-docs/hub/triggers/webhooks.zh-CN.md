@@ -12,7 +12,7 @@ nav: Webhook
 
 ## 创建 webhook 触发器 {#create-a-webhook-trigger}
 
-在 Hub 控制台触发器编辑器中选择 **Webhook received**，或保存 `.paseo/triggers/alert-handler.yml` 并运行 `paseo hub deploy`：
+在 Hub 控制台触发器编辑器中选择 **Webhook received**，或保存 `.clisbot/triggers/alert-handler.yml` 并运行 `clisbot hub deploy`：
 
 ```yaml
 name: alert-handler
@@ -54,7 +54,7 @@ run:
 1. 在 Hub 控制台中打开已保存的触发器，选择 **Create secret**（之后可选择 **Rotate secret**）。请立即复制密钥，Hub 只会显示一次。
 2. 通过公开 API，使用具备 `configuration:install` 权限的组织凭据向 `POST /api/v1/triggers/webhook-secret` 发送 `{"triggerId":"<trigger-id>"}`。Hub 返回 `{ "path": "/webhooks/wh_...", "secret": "whsec_..." }`。
 
-轮换密钥会立即使旧密钥失效。使用 `paseo hub deploy` 重新部署同名且包含 `webhook.received` 的触发器时，端点路径和现有密钥都会保留。
+轮换密钥会立即使旧密钥失效。使用 `clisbot hub deploy` 重新部署同名且包含 `webhook.received` 的触发器时，端点路径和现有密钥都会保留。
 
 ## 发送 webhook 请求 {#send-a-webhook-request}
 
@@ -100,6 +100,6 @@ curl -X POST "$WEBHOOK_URL" \
 
 Hub 会将 webhook 请求体和投递元数据（`contentType` 和 `receivedAt`）作为不可信外部数据进行包装。
 
-如果你的 `run.prompt` 没有包含 `${{ paseo.prompt }}`，Hub 会自动将包装后的 webhook 负载追加到指令末尾。如需控制负载在提示词中的位置，在目标位置插入 `${{ paseo.prompt }}` 即可。
+如果你的 `run.prompt` 没有包含 `${{ clisbot.prompt }}`，Hub 会自动将包装后的 webhook 负载追加到指令末尾。如需控制负载在提示词中的位置，在目标位置插入 `${{ clisbot.prompt }}` 即可。
 
-如果还需要结构化的 `webhook` 元数据对象（`contentType` 和 `receivedAt`），请包含 `${{ paseo.context }}`。如需将分析结果发送到 Slack 或 Discord，请添加[集成工具](/docs/hub/tools)。
+如果还需要结构化的 `webhook` 元数据对象（`contentType` 和 `receivedAt`），请包含 `${{ clisbot.context }}`。如需将分析结果发送到 Slack 或 Discord，请添加[集成工具](/docs/hub/tools)。

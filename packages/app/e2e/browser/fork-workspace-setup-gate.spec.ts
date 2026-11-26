@@ -24,7 +24,7 @@ test("fork workspace setup stays blocked until the user runs it", async ({ page 
     withRemote: true,
     originUrl: "https://github.com/paseo-e2e/local-fixture.git",
     branches: ["pr-branch-2"],
-    paseoConfig: {
+    clisbotConfig: {
       worktree: {
         setup: ["node -e \"setTimeout(() => console.log('setup complete'), 1500)\""],
       },

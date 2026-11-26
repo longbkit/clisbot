@@ -1,7 +1,7 @@
 import { motion, type Variants } from "framer-motion";
 import type * as React from "react";
 import { useTranslation } from "react-i18next";
-import { PaseoMark } from "~/components/paseo-brand";
+import { ClisbotMark } from "~/components/clisbot-brand";
 
 export interface SourceMockupProps {
   /** Whether the section is visible or reduced motion is requested. */
@@ -118,10 +118,10 @@ export function MoAvatar({
 }
 
 /**
- * Paseo bot avatar using the canonical Paseo butterfly mark (`PaseoMark`).
- * Used consistently for `paseo-bot` across Slack, GitHub, Linear, Discord, Schedules, and Webhooks.
+ * Clisbot bot avatar using the canonical Clisbot butterfly mark (`ClisbotMark`).
+ * Used consistently for `clisbot-bot` across Slack, GitHub, Linear, Discord, Schedules, and Webhooks.
  */
-export function PaseoBotAvatar({
+export function ClisbotBotAvatar({
   size = "md",
   rounded = "rounded-[6px]",
   className = "",
@@ -135,20 +135,20 @@ export function PaseoBotAvatar({
       aria-hidden="true"
       className={`inline-flex shrink-0 items-center justify-center border border-white/14 bg-[#101615] ${AVATAR_DIM[size]} ${rounded} ${className}`}
     >
-      <PaseoMark className={`${BOT_ICON_DIM[size]} text-white`} />
+      <ClisbotMark className={`${BOT_ICON_DIM[size]} text-white`} />
     </span>
   );
 }
 
-/** Consistent "Open in Paseo" action chip rendered inside source mockups. */
-export function OpenInPaseoChip({ variant = "brand" }: { variant?: OpenChipVariant }) {
+/** Consistent "Open in Clisbot" action chip rendered inside source mockups. */
+export function OpenInClisbotChip({ variant = "brand" }: { variant?: OpenChipVariant }) {
   const { t } = useTranslation();
   return (
     <span
       className={`inline-flex max-w-full items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-[11.5px] font-medium ${OPEN_CHIP_STYLES[variant]}`}
     >
-      <PaseoMark className="h-3.5 w-3.5 shrink-0 text-current" />
-      <span>{t("hub.demo.shared.openInPaseo")}</span>
+      <ClisbotMark className="h-3.5 w-3.5 shrink-0 text-current" />
+      <span>{t("hub.demo.shared.openInClisbot")}</span>
     </span>
   );
 }

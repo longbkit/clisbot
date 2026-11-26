@@ -58,7 +58,7 @@ function spawnRelayDevServer(port: number): ChildProcess {
       "--local",
       // Local execution still inherits production vars; exercise the local Durable Object.
       "--var",
-      "PASEO_RELAY_UPSTREAM:",
+      "CLISBOT_RELAY_UPSTREAM:",
       "--ip",
       "127.0.0.1",
       "--port",

@@ -2,9 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { resolve } from "node:path";
 import { connectToDaemon } from "../../utils/client.js";
-import { runPaseoCli, startTestDaemon } from "../../../tests/helpers/test-daemon.js";
+import { runClisbotCli, startTestDaemon } from "../../../tests/helpers/test-daemon.js";
 
-describe("paseo logs JSON output", () => {
+describe("clisbot logs JSON output", () => {
   let daemon: Awaited<ReturnType<typeof startTestDaemon>>;
   let agentId: string;
   let host: string;
@@ -12,7 +12,7 @@ describe("paseo logs JSON output", () => {
   beforeAll(async () => {
     await mkdir(".artifacts", { recursive: true });
     daemon = await startTestDaemon({
-      paseoHome: await mkdtemp(resolve(".artifacts/logs-json-home-")),
+      clisbotHome: await mkdtemp(resolve(".artifacts/logs-json-home-")),
       workDir: await mkdtemp(resolve(".artifacts/logs-json-work-")),
     });
     host = `127.0.0.1:${daemon.port}`;
@@ -41,7 +41,7 @@ describe("paseo logs JSON output", () => {
   ])(
     "prints JSON through $label",
     async ({ args }) => {
-      const result = await runPaseoCli(daemon, [...args, agentId, "--host", host]);
+      const result = await runClisbotCli(daemon, [...args, agentId, "--host", host]);
       expect(result.exitCode, result.stderr).toBe(0);
       expect(JSON.parse(result.stdout)).toEqual({ agentId, items: [] });
     },

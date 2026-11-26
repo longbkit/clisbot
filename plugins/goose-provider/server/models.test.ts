@@ -1,5 +1,5 @@
-import type { AcpConfigureContext, AcpRequest } from "@getpaseo/plugin/server/acp";
-import type { ProviderCatalog, ProviderConfigState } from "@getpaseo/plugin/server/provider";
+import type { AcpConfigureContext, AcpRequest } from "@clisbot/plugin/server/acp";
+import type { ProviderCatalog, ProviderConfigState } from "@clisbot/plugin/server/provider";
 import { describe, expect, it } from "vitest";
 import { gooseModels } from "./models.js";
 

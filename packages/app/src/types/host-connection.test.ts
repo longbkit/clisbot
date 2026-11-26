@@ -60,21 +60,21 @@ describe("normalizeStoredHostProfile", () => {
       label: "Old Host",
       connections: [
         {
-          id: "direct:127.0.0.1:6767",
+          id: "direct:127.0.0.1:6868",
           type: "directTcp",
-          endpoint: "127.0.0.1:6767",
+          endpoint: "127.0.0.1:6868",
         },
       ],
-      preferredConnectionId: "direct:127.0.0.1:6767",
+      preferredConnectionId: "direct:127.0.0.1:6868",
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-02T00:00:00.000Z",
     });
 
     expect(profile).not.toBeNull();
     expect(profile?.connections[0]).toEqual({
-      id: "direct:localhost:6767",
+      id: "direct:localhost:6868",
       type: "directTcp",
-      endpoint: "localhost:6767",
+      endpoint: "localhost:6868",
       useTls: false,
     });
     expect(profile?.connections[0]).not.toHaveProperty("password");
@@ -83,7 +83,7 @@ describe("normalizeStoredHostProfile", () => {
   it("moves a stored direct TCP password to the host profile", () => {
     const profile = normalizeStoredHostProfile({
       serverId: "srv_legacy",
-      connections: [{ type: "directTcp", endpoint: "localhost:6767", password: "old-secret" }],
+      connections: [{ type: "directTcp", endpoint: "localhost:6868", password: "old-secret" }],
     });
     expect(profile?.password).toBe("old-secret");
     expect(profile?.connections[0]).not.toHaveProperty("password");
@@ -95,17 +95,17 @@ describe("normalizeStoredHostProfile", () => {
       password: "secret",
       connections: [
         { id: "future:1", type: "futureKind", address: "future.example.com" },
-        { id: "direct:lan:6767", type: "directTcp", endpoint: "lan:6767", futureField: true },
-        { id: "direct:remote:6767", type: "directTcp", endpoint: "remote:6767" },
+        { id: "direct:lan:6868", type: "directTcp", endpoint: "lan:6868", futureField: true },
+        { id: "direct:remote:6868", type: "directTcp", endpoint: "remote:6868" },
       ],
-      preferredConnectionId: "direct:remote:6767",
+      preferredConnectionId: "direct:remote:6868",
     });
 
     expect(profile?.password).toBe("secret");
     expect(profile?.connections).toEqual([
-      { id: "direct:remote:6767", type: "directTcp", endpoint: "remote:6767", useTls: false },
+      { id: "direct:remote:6868", type: "directTcp", endpoint: "remote:6868", useTls: false },
     ]);
-    expect(profile?.preferredConnectionId).toBe("direct:remote:6767");
+    expect(profile?.preferredConnectionId).toBe("direct:remote:6868");
   });
 
   it("preserves legacy relay ids when TLS is absent", () => {
@@ -156,7 +156,7 @@ describe("normalizeStoredHostProfile", () => {
     const profile = normalizeStoredHostProfile({
       serverId: "srv_old",
       connections: [
-        { id: "socket:/tmp/paseo.sock", type: "directSocket", path: "/tmp/paseo.sock" },
+        { id: "socket:/tmp/clisbot.sock", type: "directSocket", path: "/tmp/clisbot.sock" },
       ],
     });
 
@@ -168,7 +168,7 @@ describe("normalizeStoredHostProfile", () => {
       serverId: "srv_new",
       appearance: { color: "teal", badgeDisplay: "icon" },
       connections: [
-        { id: "socket:/tmp/paseo.sock", type: "directSocket", path: "/tmp/paseo.sock" },
+        { id: "socket:/tmp/clisbot.sock", type: "directSocket", path: "/tmp/clisbot.sock" },
       ],
     });
 
@@ -200,9 +200,9 @@ describe("normalizeStoredHostProfile", () => {
 
 describe("readHostRegistry and writeHostRegistry", () => {
   const direct: HostConnection = {
-    id: "direct:lan:6767",
+    id: "direct:lan:6868",
     type: "directTcp",
-    endpoint: "lan:6767",
+    endpoint: "lan:6868",
     useTls: false,
   };
   const future = { id: "future:1", type: "futureKind", address: "future.example.com" };
@@ -241,7 +241,7 @@ describe("readHostRegistry and writeHostRegistry", () => {
     const registry = readHostRegistry([
       {
         serverId: "srv_legacy",
-        connections: [future, { type: "directTcp", endpoint: "lan:6767", password: "old-secret" }],
+        connections: [future, { type: "directTcp", endpoint: "lan:6868", password: "old-secret" }],
       },
     ]);
 
@@ -276,9 +276,9 @@ describe("createRemoteSshHostConnection", () => {
 
 describe("upsertHostConnectionInProfiles", () => {
   const connection: HostConnection = {
-    id: "socket:/tmp/paseo.sock",
+    id: "socket:/tmp/clisbot.sock",
     type: "directSocket",
-    path: "/tmp/paseo.sock",
+    path: "/tmp/clisbot.sock",
   };
 
   it.each([false, true])(
@@ -286,14 +286,14 @@ describe("upsertHostConnectionInProfiles", () => {
     (savedC) => {
       const route: HostConnection = { id: "via:srv_a", type: "routed", originServerId: "srv_a" };
       const directB: HostConnection = {
-        id: "direct:b:6767",
+        id: "direct:b:6868",
         type: "directTcp",
-        endpoint: "b:6767",
+        endpoint: "b:6868",
       };
       const directC: HostConnection = {
-        id: "direct:c:6767",
+        id: "direct:c:6868",
         type: "directTcp",
-        endpoint: "c:6767",
+        endpoint: "c:6868",
       };
       const b: HostProfile = {
         ...makeHost("srv_b"),
@@ -360,9 +360,9 @@ describe("upsertHostConnectionInProfiles", () => {
 
   it("replaces a direct connection when its settings change", () => {
     const existingConnection: HostConnection = {
-      id: "direct:example.test:6767",
+      id: "direct:example.test:6868",
       type: "directTcp",
-      endpoint: "example.test:6767",
+      endpoint: "example.test:6868",
       useTls: false,
     };
     const existing: HostProfile = {

@@ -12,7 +12,7 @@ category: Hub
 
 First connect a Slack workspace under **Integrations** (or configure a [Slack app](/docs/hub/self-hosting/slack-app) on a self-hosted Hub) and invite the bot to the channels it watches.
 
-`.paseo/triggers/slack-help.yml`:
+`.clisbot/triggers/slack-help.yml`:
 
 ```yaml
 name: slack-help
@@ -38,7 +38,7 @@ run:
     Answer the request using reply, then call finish_execution.
 
     <user-prompt>
-    ${{ paseo.prompt }}
+    ${{ clisbot.prompt }}
     </user-prompt>
   outputs:
     slack.reply:
@@ -54,19 +54,19 @@ Slack filters use IDs, not display names or connection slugs. All filters compos
 - `workspace` matches the Slack team ID and `channels` limits which channels can trigger the run.
 - `pattern` requires a prefix after the mention (`contains` is its legacy alias with the same prefix behavior).
 
-`${{ paseo.prompt }}` contains the full message. Hub parses leading `key=value` tokens after the mention for inputs you declare. If you declare `inputs.repo`, use `${{ paseo.inputs.repo }}` in `run.prompt` to insert its value.
+`${{ clisbot.prompt }}` contains the full message. Hub parses leading `key=value` tokens after the mention for inputs you declare. If you declare `inputs.repo`, use `${{ clisbot.inputs.repo }}` in `run.prompt` to insert its value.
 
 ```text
-@Paseo repo=project investigate the failed sync
+@Clisbot repo=project investigate the failed sync
 ```
 
-Include `${{ paseo.context }}` in `run.prompt` to pass the Slack thread history and execution-scoped attachment descriptors as JSON.
+Include `${{ clisbot.context }}` in `run.prompt` to pass the Slack thread history and execution-scoped attachment descriptors as JSON.
 
 ## Replies and continuation
 
 Hub posts replies in the triggering Slack thread. A channel message starts a thread, and a reply inside a thread stays in that thread. Follow-up mentions in the same thread continue the same agent by default.
 
-Slack triggers automatically grant the `reply` tool (`slack.reply`). Declare `run.outputs.slack.reply` when you want to cap `max` replies or set `required: true`. When Hub runs over HTTPS, replies include an **Open in Paseo** link.
+Slack triggers automatically grant the `reply` tool (`slack.reply`). Declare `run.outputs.slack.reply` when you want to cap `max` replies or set `required: true`. When Hub runs over HTTPS, replies include an **Open in Clisbot** link.
 
 To read or post to Slack channels from a schedule, webhook, or another trigger, use [Integration tools](/docs/hub/tools). To give the agent repository access, add a [`run.github` block](/docs/hub/github).
 
@@ -78,4 +78,4 @@ To read or post to Slack channels from a schedule, webhook, or another trigger, 
 | `from_users` | Open your avatar, then **Profile**, then **⋮**, then **Copy member ID** (starts with `U`). |
 | `channels`   | Open the channel name, then **About**. The channel ID is at the bottom (starts with `C`).  |
 
-`paseo hub init` reads the Slack connection automatically and prompts only for your member ID.
+`clisbot hub init` reads the Slack connection automatically and prompts only for your member ID.

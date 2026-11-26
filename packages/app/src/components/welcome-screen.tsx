@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { resolveAppVersion } from "@/utils/app-version";
 import { formatVersionWithPrefix } from "@/desktop/updates/desktop-updates";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
-import { PaseoLogo } from "@/components/icons/paseo-logo";
+import { ClisbotLogo } from "@/components/icons/clisbot-logo";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { isFdroidBuild } from "@/constants/build-profile";
 import { isWeb, isNative } from "@/constants/platform";
@@ -178,8 +178,8 @@ export function WelcomeScreen() {
     router.replace(buildOpenProjectRoute());
   }, [router]);
 
-  const handleOpenPaseoSite = useCallback(() => {
-    void openExternalUrl("https://paseo.sh");
+  const handleOpenClisbotSite = useCallback(() => {
+    void openExternalUrl("https://clisbot.com");
   }, []);
 
   const handleOpenSettings = useCallback(() => {
@@ -263,13 +263,13 @@ export function WelcomeScreen() {
         testID="welcome-screen"
       >
         <View style={styles.content}>
-          <PaseoLogo size={96} />
+          <ClisbotLogo size={96} />
           <View style={styles.copyBlock}>
             <Text style={styles.title}>{t("onboarding.title")}</Text>
             <Text style={styles.subtitle}>{t("onboarding.subtitle")}</Text>
             {isNative ? (
-              <Pressable style={styles.setupLink} onPress={handleOpenPaseoSite}>
-                <Text style={styles.setupLinkText}>paseo.sh</Text>
+              <Pressable style={styles.setupLink} onPress={handleOpenClisbotSite}>
+                <Text style={styles.setupLinkText}>clisbot.com</Text>
                 <ExternalLink size={14} color={theme.colors.accent} />
               </Pressable>
             ) : null}

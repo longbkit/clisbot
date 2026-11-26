@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, test } from "vitest";
 import { createTestLogger } from "../../../../test-utils/test-logger.js";
-import { createPaseoToolCatalog } from "../../tools/paseo-tools.js";
+import { createClisbotToolCatalog } from "../../tools/clisbot-tools.js";
 import { AgentManager } from "../../agent-manager.js";
 import { AgentStorage } from "../../agent-storage.js";
 import { ProviderSnapshotManager } from "../../provider-snapshot-manager.js";
@@ -20,22 +20,22 @@ import { createTerminalManager } from "../../../../terminal/terminal-manager.js"
 import { createTestAgentMessages } from "../../../test-utils/agent-messages.js";
 
 test("bridge preserves tool failure messages and classifies invalid requests as client errors", async () => {
-  const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-7045-"));
+  const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-7045-"));
   const logger = createTestLogger();
   const providerSnapshotManager = new ProviderSnapshotManager({ logger });
   const agentManager = new AgentManager({ logger });
-  const agentStorage = new AgentStorage(paseoHome, logger);
+  const agentStorage = new AgentStorage(clisbotHome, logger);
   const unused = async (): Promise<never> => {
     throw new Error("Unexpected workspace or agent creation");
   };
   const scheduleService = new ScheduleService({
-    paseoHome,
+    clisbotHome,
     logger,
     agentManager,
     agentStorage,
     createAgent: unused,
     createDirectoryWorkspace: unused,
-    createPaseoWorktreeWorkspace: unused,
+    createClisbotWorktreeWorkspace: unused,
     archiveWorkspace: unused,
     runner: async () => ({ agentId: null, output: "done" }),
   });
@@ -44,10 +44,10 @@ test("bridge preserves tool failure messages and classifies invalid requests as 
     scriptRuntimeStore: new WorkspaceScriptRuntimeStore(),
     terminalManager: createTerminalManager(),
     workspaceRegistry: new FileBackedWorkspaceRegistry(
-      path.join(paseoHome, "workspaces.json"),
+      path.join(clisbotHome, "workspaces.json"),
       logger,
     ),
-    projectRegistry: new FileBackedProjectRegistry(path.join(paseoHome, "projects.json"), logger),
+    projectRegistry: new FileBackedProjectRegistry(path.join(clisbotHome, "projects.json"), logger),
     workspaceRuntimeStore: {
       get: () => {
         throw new Error("Unexpected git lookup");
@@ -65,7 +65,7 @@ test("bridge preserves tool failure messages and classifies invalid requests as 
     assertAutomationAllowed: unused,
   });
   const agentMessages = createTestAgentMessages({ agentManager, agentStorage, logger });
-  const catalog = createPaseoToolCatalog({
+  const catalog = createClisbotToolCatalog({
     workspaceScripts,
     agentManager,
     agentStorage,
@@ -74,7 +74,7 @@ test("bridge preserves tool failure messages and classifies invalid requests as 
     providerSnapshotManager,
     logger,
   });
-  const bridge = new OpenCodeBridge({ paseoHome, logger });
+  const bridge = new OpenCodeBridge({ clisbotHome, logger });
   try {
     await bridge.start();
     bridge.setManifestCatalog(catalog);
@@ -85,7 +85,7 @@ test("bridge preserves tool failure messages and classifies invalid requests as 
       prompt: "Run once",
       name: "Daily check",
       cadence: { type: "cron", expression: "0 0 * * *" },
-      target: { type: "new-agent", config: { provider: "codex", cwd: paseoHome } },
+      target: { type: "new-agent", config: { provider: "codex", cwd: clisbotHome } },
       maxRuns: 1,
       runOnCreate: true,
     });
@@ -103,7 +103,7 @@ test("bridge preserves tool failure messages and classifies invalid requests as 
         .properties,
     ).not.toHaveProperty("every");
     await writeFile(
-      path.join(paseoHome, "schedules", "broken.json"),
+      path.join(clisbotHome, "schedules", "broken.json"),
       JSON.stringify({ id: "broken", prompt: 17 }),
     );
     const observed = [];
@@ -202,6 +202,6 @@ test("bridge preserves tool failure messages and classifies invalid requests as 
     await agentMessages.close();
     await bridge.close();
     await providerSnapshotManager.shutdown();
-    await rm(paseoHome, { recursive: true, force: true });
+    await rm(clisbotHome, { recursive: true, force: true });
   }
 });

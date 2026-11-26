@@ -1,4 +1,4 @@
-import type { ProviderOptions } from "@getpaseo/protocol/agent-types";
+import type { ProviderOptions } from "@clisbot/protocol/agent-types";
 
 /**
  * The options that still apply after an answer from the daemon. A key an earlier answer drew as a

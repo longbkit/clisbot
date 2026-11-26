@@ -10,13 +10,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 
 export const PUBLISH_WORKSPACES = [
-  "@getpaseo/highlight",
-  "@getpaseo/relay",
-  "@getpaseo/protocol",
-  "@getpaseo/client",
-  "@getpaseo/plugin",
-  "@getpaseo/server",
-  "@getpaseo/cli",
+  "@clisbot/highlight",
+  "@clisbot/relay",
+  "@clisbot/protocol",
+  "@clisbot/client",
+  "@clisbot/plugin",
+  "@clisbot/server",
+  "@clisbot/cli",
 ];
 
 const PUBLISH_ATTEMPTS = 4;
@@ -210,7 +210,7 @@ async function publishOnePackage(pkg, version, { beta, dryRun, otp }, { runNpm, 
 async function syncBetaDistTags(version, { otp }, { runNpm, sleep }) {
   let distTags = {};
   for (let attempt = 1; attempt <= VIEW_ATTEMPTS; attempt += 1) {
-    const result = runNpm(["view", "@getpaseo/cli", "dist-tags", "--json"]);
+    const result = runNpm(["view", "@clisbot/cli", "dist-tags", "--json"]);
     if (result.status === 0) {
       distTags = JSON.parse(result.stdout.trim());
       break;
@@ -220,7 +220,7 @@ async function syncBetaDistTags(version, { otp }, { runNpm, sleep }) {
       await sleep(attempt * 5_000);
       continue;
     }
-    throw new Error(`Failed to read @getpaseo/cli dist-tags:\n${combined}`);
+    throw new Error(`Failed to read @clisbot/cli dist-tags:\n${combined}`);
   }
 
   const currentBeta = typeof distTags.beta === "string" ? distTags.beta.trim() : "";

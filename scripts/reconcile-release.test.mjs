@@ -10,17 +10,17 @@ const MAIN_CHANGELOG_WITH_BETA = `# Changelog
 
 ## 0.17.0-beta.1 - 2026-11-19
 
-- **Beta 1 highlight:** Initial beta. ([#101](https://github.com/getpaseo/paseo/pull/101))
+- **Beta 1 highlight:** Initial beta. ([#101](https://github.com/longbkit/clisbot/pull/101))
 
 ### Fixed
 
-- Fixed beta 1 bug ([#101](https://github.com/getpaseo/paseo/pull/101))
+- Fixed beta 1 bug ([#101](https://github.com/longbkit/clisbot/pull/101))
 
 ## 0.16.2 - 2026-11-18
 
 ### Fixed
 
-- Fixed 0.16.2 bug ([#99](https://github.com/getpaseo/paseo/pull/99))
+- Fixed 0.16.2 bug ([#99](https://github.com/longbkit/clisbot/pull/99))
 `;
 
 test("replaces an earlier beta entry in place for follow-up betas and promotions", () => {
@@ -28,13 +28,13 @@ test("replaces an earlier beta entry in place for follow-up betas and promotions
 
 ## 0.17.0-beta.2 - 2026-11-21
 
-- **Beta 2 highlight:** Updated beta. ([#105](https://github.com/getpaseo/paseo/pull/105))
+- **Beta 2 highlight:** Updated beta. ([#105](https://github.com/longbkit/clisbot/pull/105))
 
 ## 0.16.2 - 2026-11-18
 
 ### Fixed
 
-- Fixed 0.16.2 bug ([#99](https://github.com/getpaseo/paseo/pull/99))
+- Fixed 0.16.2 bug ([#99](https://github.com/longbkit/clisbot/pull/99))
 `;
 
   const mergedBeta2 = mergeChangelogEntry(MAIN_CHANGELOG_WITH_BETA, tagBeta2, "0.17.0-beta.2");
@@ -46,7 +46,7 @@ test("replaces an earlier beta entry in place for follow-up betas and promotions
 
 ## 0.17.0 - 2026-11-22
 
-- **Stable highlight:** Shipped stable. ([#105](https://github.com/getpaseo/paseo/pull/105))
+- **Stable highlight:** Shipped stable. ([#105](https://github.com/longbkit/clisbot/pull/105))
 
 ## 0.16.2 - 2026-11-18
 `;
@@ -64,13 +64,13 @@ test("inserts a stable hotfix below a newer active beta entry", () => {
 
 ### Fixed
 
-- Fixed urgent 0.16.3 regression ([#103](https://github.com/getpaseo/paseo/pull/103))
+- Fixed urgent 0.16.3 regression ([#103](https://github.com/longbkit/clisbot/pull/103))
 
 ## 0.16.2 - 2026-11-18
 
 ### Fixed
 
-- Fixed 0.16.2 bug ([#99](https://github.com/getpaseo/paseo/pull/99))
+- Fixed 0.16.2 bug ([#99](https://github.com/longbkit/clisbot/pull/99))
 `;
 
   const merged = mergeChangelogEntry(MAIN_CHANGELOG_WITH_BETA, tagHotfix, "0.16.3");
@@ -86,7 +86,7 @@ test("keeps newer beta or promoted stable changelog entries when reconciling an 
 
 ## 0.17.0-beta.2 - 2026-11-21
 
-- **Beta 2 highlight:** Newer beta. ([#105](https://github.com/getpaseo/paseo/pull/105))
+- **Beta 2 highlight:** Newer beta. ([#105](https://github.com/longbkit/clisbot/pull/105))
 
 ## 0.16.2 - 2026-11-18
 `;
@@ -95,7 +95,7 @@ test("keeps newer beta or promoted stable changelog entries when reconciling an 
 
 ## 0.17.0 - 2026-11-22
 
-- **Stable highlight:** Shipped stable. ([#105](https://github.com/getpaseo/paseo/pull/105))
+- **Stable highlight:** Shipped stable. ([#105](https://github.com/longbkit/clisbot/pull/105))
 
 ## 0.16.2 - 2026-11-18
 `;
@@ -120,17 +120,17 @@ test("reconcileRelease updates changelogs, F-Droid files, and versions only when
     );
     writeFileSync(
       path.join(dir, "package.json"),
-      `${JSON.stringify({ name: "paseo", version: "0.17.0-beta.1" }, null, 2)}\n`,
+      `${JSON.stringify({ name: "clisbot", version: "0.17.0-beta.1" }, null, 2)}\n`,
     );
 
     const tagFiles = new Map([
       [
         "CHANGELOG.md",
-        "# Changelog\n\n## 0.16.3 - 2026-11-20\n\n### Fixed\n\n- Hotfix ([#103](https://github.com/getpaseo/paseo/pull/103))\n\n## 0.16.2 - 2026-11-18\n",
+        "# Changelog\n\n## 0.16.3 - 2026-11-20\n\n### Fixed\n\n- Hotfix ([#103](https://github.com/longbkit/clisbot/pull/103))\n\n## 0.16.2 - 2026-11-18\n",
       ],
       [
         "CHANGELOG.zh-CN.md",
-        "# Changelog\n\n## 0.16.3 - 2026-11-20\n\n### 修复\n\n- 热修复 ([#103](https://github.com/getpaseo/paseo/pull/103))\n\n## 0.16.2 - 2026-11-18\n",
+        "# Changelog\n\n## 0.16.3 - 2026-11-20\n\n### 修复\n\n- 热修复 ([#103](https://github.com/longbkit/clisbot/pull/103))\n\n## 0.16.2 - 2026-11-18\n",
       ],
       ["fastlane/metadata/android/en-US/changelogs/160031.txt", "Hotfix notes\n"],
       ["fastlane/metadata/android/en-US/changelogs/160032.txt", "Hotfix notes\n"],
@@ -177,11 +177,11 @@ test("reconcileRelease updates changelogs, F-Droid files, and versions only when
     mkdirSync(path.join(dir, "fastlane/metadata/android/en-US/changelogs"), { recursive: true });
     tagFiles.set(
       "CHANGELOG.md",
-      "# Changelog\n\n## 0.17.0 - 2026-11-22\n\n- **Shipped:** Ready. ([#105](https://github.com/getpaseo/paseo/pull/105))\n",
+      "# Changelog\n\n## 0.17.0 - 2026-11-22\n\n- **Shipped:** Ready. ([#105](https://github.com/longbkit/clisbot/pull/105))\n",
     );
     tagFiles.set(
       "CHANGELOG.zh-CN.md",
-      "# Changelog\n\n## 0.17.0 - 2026-11-22\n\n- **已发布**：就绪。([#105](https://github.com/getpaseo/paseo/pull/105))\n",
+      "# Changelog\n\n## 0.17.0 - 2026-11-22\n\n- **已发布**：就绪。([#105](https://github.com/longbkit/clisbot/pull/105))\n",
     );
     tagFiles.set("fastlane/metadata/android/en-US/changelogs/170001.txt", "0.17.0 notes\n");
 
@@ -233,11 +233,11 @@ test("reconcileRelease retries version sync and lockfile install when a prior ru
     // before `npm run release:prepare` failed, leaving package-lock.json at 0.17.0-beta.1.
     writeFileSync(
       path.join(dir, "package.json"),
-      `${JSON.stringify({ name: "paseo", version: "0.17.0-beta.2" }, null, 2)}\n`,
+      `${JSON.stringify({ name: "clisbot", version: "0.17.0-beta.2" }, null, 2)}\n`,
     );
     writeFileSync(
       path.join(dir, "package-lock.json"),
-      `${JSON.stringify({ name: "paseo", version: "0.17.0-beta.1", packages: { "": { version: "0.17.0-beta.1" } } }, null, 2)}\n`,
+      `${JSON.stringify({ name: "clisbot", version: "0.17.0-beta.1", packages: { "": { version: "0.17.0-beta.1" } } }, null, 2)}\n`,
     );
 
     const tagFiles = new Map([
@@ -256,7 +256,7 @@ test("reconcileRelease retries version sync and lockfile install when a prior ru
           if (args[1] === "release:prepare") {
             writeFileSync(
               path.join(dir, "package-lock.json"),
-              `${JSON.stringify({ name: "paseo", version: "0.17.0-beta.2", packages: { "": { version: "0.17.0-beta.2" } } }, null, 2)}\n`,
+              `${JSON.stringify({ name: "clisbot", version: "0.17.0-beta.2", packages: { "": { version: "0.17.0-beta.2" } } }, null, 2)}\n`,
             );
           }
         },

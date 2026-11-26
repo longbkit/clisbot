@@ -132,7 +132,7 @@ async function withAuthenticatedRemote(
     expectedOid: string;
   }) => Promise<void>,
 ): Promise<void> {
-  const root = await mkdtemp(join(tmpdir(), "paseo-fetch-auth-"));
+  const root = await mkdtemp(join(tmpdir(), "clisbot-fetch-auth-"));
   const cwd = join(root, "checkout");
   const remote = join(root, "remote.git");
   const emptyConfig = join(root, "gitconfig");

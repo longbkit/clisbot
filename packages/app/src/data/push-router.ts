@@ -1,13 +1,13 @@
 import { checkoutDiffSnapshot, type CheckoutDiffSnapshot } from "@/git/diff-snapshot";
-import type { DiffState } from "@getpaseo/client";
-import type { OwnedSubscription } from "@getpaseo/client";
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { DiffState } from "@clisbot/client";
+import type { OwnedSubscription } from "@clisbot/client";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import type { Query, QueryCacheNotifyEvent, QueryClient, QueryKey } from "@tanstack/react-query";
 import type {
   ListTerminalsResponse,
   MutableDaemonConfig,
   SessionOutboundMessage,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import {
   invalidateCommandsForDirectory,
   invalidateCommandsForProviderChange,
@@ -73,10 +73,10 @@ export interface ServerDataQueryMeta extends Record<string, unknown> {
 export type ProvidersSnapshotUpdate = ProvidersSnapshotUpdateMessage;
 
 interface ServerDataPushClient {
-  getProvidersSnapshot: import("@getpaseo/client/internal/daemon-client").DaemonClient["getProvidersSnapshot"];
-  observeEvents: import("@getpaseo/client/internal/daemon-client").DaemonClient["observeEvents"];
-  observeDiff: import("@getpaseo/client/internal/daemon-client").DaemonClient["observeDiff"];
-  observeTerminals: import("@getpaseo/client/internal/daemon-client").DaemonClient["observeTerminals"];
+  getProvidersSnapshot: import("@clisbot/client/internal/daemon-client").DaemonClient["getProvidersSnapshot"];
+  observeEvents: import("@clisbot/client/internal/daemon-client").DaemonClient["observeEvents"];
+  observeDiff: import("@clisbot/client/internal/daemon-client").DaemonClient["observeDiff"];
+  observeTerminals: import("@clisbot/client/internal/daemon-client").DaemonClient["observeTerminals"];
 }
 
 interface PushRouterInput {

@@ -12,7 +12,7 @@ import {
   type DaemonTestContext,
   DaemonClient,
 } from "./test-utils/index.js";
-import { createTestPaseoDaemon } from "./test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "./test-utils/clisbot-daemon.js";
 import { createTestAgentClients } from "./test-utils/fake-agent-client.js";
 import { getFullAccessConfig, getAskModeConfig } from "./daemon-e2e/agent-configs.js";
 import { parsePcm16MonoWav, wordSimilarity } from "./test-utils/dictation-e2e.js";
@@ -29,7 +29,8 @@ import type {
 const openaiApiKey = process.env.OPENAI_API_KEY ?? null;
 
 const localModelsDir =
-  process.env.PASEO_LOCAL_MODELS_DIR ?? path.join(homedir(), ".paseo", "models", "local-speech");
+  process.env.CLISBOT_LOCAL_MODELS_DIR ??
+  path.join(homedir(), ".clisbot", "models", "local-speech");
 const testFileDir = path.dirname(fileURLToPath(import.meta.url));
 const appE2eFixturesDir = path.resolve(testFileDir, "../../../app/e2e/support/fixtures");
 
@@ -68,7 +69,7 @@ function tmpCwd(): string {
 }
 
 test("DaemonClient connects to a password-protected daemon", async () => {
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     auth: { password: "$2b$12$GMhF7pN4QnMlHOQXOqjd1OitKWPSmAO3FwB0PHzKtcZR/sAMryz76" },
   });
   const client = new DaemonClient({
@@ -87,7 +88,7 @@ test("DaemonClient connects to a password-protected daemon", async () => {
 });
 
 test("DaemonClient surfaces password auth failures from WebSocket close reasons", async () => {
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     auth: { password: "$2b$12$GMhF7pN4QnMlHOQXOqjd1OitKWPSmAO3FwB0PHzKtcZR/sAMryz76" },
   });
   const missingPasswordClient = new DaemonClient({
@@ -114,7 +115,7 @@ test("DaemonClient surfaces password auth failures from WebSocket close reasons"
 });
 
 test("createAgent without an initial prompt returns an idle snapshot", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.1.82",
@@ -140,7 +141,7 @@ test("createAgent without an initial prompt returns an idle snapshot", async () 
 });
 
 test("DaemonClient uploads file bytes to daemon temp storage", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.1.82",
@@ -170,7 +171,7 @@ test("DaemonClient uploads file bytes to daemon temp storage", async () => {
         fileName: "notes.txt",
         mimeType: "text/plain",
         size: 11,
-        path: path.join(daemon.paseoHome, "uploads", uploadId, "notes.txt"),
+        path: path.join(daemon.clisbotHome, "uploads", uploadId, "notes.txt"),
       },
       error: null,
     });
@@ -199,7 +200,7 @@ test("agent.config.apply sets an option that has no control and the next snapsho
       },
     },
   });
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: { ...clients, codex: recordingCodex },
   });
   const client = new DaemonClient({
@@ -232,7 +233,7 @@ test("agent.config.apply sets an option that has no control and the next snapsho
 });
 
 test("createAgent with background initialPrompt returns a running snapshot before turn completion", async () => {
-  const daemon = await createTestPaseoDaemon();
+  const daemon = await createTestClisbotDaemon();
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     appVersion: "0.1.82",
@@ -463,7 +464,7 @@ test("createAgent preserves the error snapshot when the initial turn cannot star
     startError: "Initial turn failed to start",
   });
 
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: { codex: testAgent },
   });
   const client = new DaemonClient({
@@ -503,7 +504,7 @@ function createUninterruptibleClient(): AgentClient {
 
 test("DaemonClient rejects a replacement prompt when cancellation is not acknowledged", async () => {
   const cwd = tmpCwd();
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: { codex: createUninterruptibleClient() },
   });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
@@ -525,7 +526,7 @@ test("DaemonClient rejects a replacement prompt when cancellation is not acknowl
 
 test("DaemonClient rejects Stop when cancellation is not acknowledged", async () => {
   const cwd = tmpCwd();
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: { codex: createUninterruptibleClient() },
   });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
@@ -1114,7 +1115,7 @@ test("resume_agent keeps the workspace of the agent it matches", async () => {
     await localCtx.client.archiveAgent(created.id);
     const resumed = await localCtx.client.resumeAgent(created.persistence);
 
-    expect(provider.resumeLaunchContexts[0]?.env?.PASEO_WORKSPACE_ID).toBe(workspaceId);
+    expect(provider.resumeLaunchContexts[0]?.env?.CLISBOT_WORKSPACE_ID).toBe(workspaceId);
     expect(resumed.workspaceId).toBe(workspaceId);
   } finally {
     await localCtx.cleanup();
@@ -1205,9 +1206,9 @@ test("update_agent persists unloaded title and labels across auto-unarchive", as
 }, 180000);
 
 test("returns home-scoped directory suggestions", async () => {
-  const insideHomeDir = mkdtempSync(path.join(homedir(), "paseo-dir-suggestion-"));
-  const rootBrowseDir = mkdtempSync(path.join(homedir(), "000-paseo-root-browse-"));
-  const outsideHomeDir = mkdtempSync(path.join(tmpdir(), "paseo-dir-suggestion-outside-"));
+  const insideHomeDir = mkdtempSync(path.join(homedir(), "clisbot-dir-suggestion-"));
+  const rootBrowseDir = mkdtempSync(path.join(homedir(), "000-clisbot-root-browse-"));
+  const outsideHomeDir = mkdtempSync(path.join(tmpdir(), "clisbot-dir-suggestion-outside-"));
 
   try {
     const insideQuery = path.basename(insideHomeDir);
@@ -1244,7 +1245,7 @@ test("returns home-scoped directory suggestions", async () => {
 }, 30000);
 
 test("returns typed relative suggestions within a requested directory", async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-workspace-suggestion-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-workspace-suggestion-"));
   const target = path.join(cwd, "src", "components", "message-renderer.tsx");
 
   try {
@@ -1268,7 +1269,7 @@ test("returns typed relative suggestions within a requested directory", async ()
 }, 30000);
 
 test("finds workspace files inside the OpenCode directory", async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-opencode-suggestion-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-opencode-suggestion-"));
   const target = path.join(
     cwd,
     ".opencode",
@@ -1304,7 +1305,7 @@ test("finds workspace files inside the OpenCode directory", async () => {
 }, 30000);
 
 test("opens an exact gitignored workspace path without offering it as a suggestion", async () => {
-  const cwd = mkdtempSync(path.join(tmpdir(), "paseo-gitignored-suggestion-"));
+  const cwd = mkdtempSync(path.join(tmpdir(), "clisbot-gitignored-suggestion-"));
   const target = path.join(cwd, "generated", "notes.md");
 
   try {
@@ -1362,7 +1363,7 @@ test("receives server_info on websocket connect", async () => {
 }, 15000);
 
 test("a Desktop-managed daemon does not advertise npm self-update", async () => {
-  const daemon = await createTestPaseoDaemon({ desktopManaged: true });
+  const daemon = await createTestClisbotDaemon({ desktopManaged: true });
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
     clientId: `cid-desktop-managed-${randomUUID()}`,

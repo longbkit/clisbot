@@ -10,7 +10,7 @@ interface HardwareKeyboardModule {
     handler: (event: HardwareKeyboardEvent) => void,
   ): { remove(): void };
 }
-const module = requireNativeModule<HardwareKeyboardModule>("PaseoHardwareKeyboard");
+const module = requireNativeModule<HardwareKeyboardModule>("ClisbotHardwareKeyboard");
 export function subscribeHardwareKeyboard(
   handler: (event: HardwareKeyboardEvent) => void,
 ): () => void {

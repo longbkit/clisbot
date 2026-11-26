@@ -1,34 +1,34 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { initializeEnvironmentProxy } from "./network/index.js";
-import { createPaseoDaemon, formatListenTarget } from "./bootstrap.js";
+import { createClisbotDaemon, formatListenTarget } from "./bootstrap.js";
 import { loadConfig } from "./config.js";
-import { resolvePaseoHome } from "./paseo-home.js";
+import { resolveClisbotHome } from "./clisbot-home.js";
 import { createRootLogger } from "./logger.js";
 import type { DaemonLifecycleIntent } from "./bootstrap.js";
 import { getProcessDiagnostics } from "./process-diagnostics.js";
 
-process.title = "Paseo Daemon";
+process.title = "Clisbot Daemon";
 
 type SupervisorLifecycleMessage =
   | {
-      type: "paseo:shutdown";
+      type: "clisbot:shutdown";
       reason: string;
       keepTerminals: boolean;
     }
   | {
-      type: "paseo:ready";
+      type: "clisbot:ready";
       listen: string;
       serverId: string;
     }
   | {
-      type: "paseo:restart";
+      type: "clisbot:restart";
       reason?: string;
       keepTerminals: boolean;
     };
 
 interface BootstrapResult {
-  paseoHome: string;
+  clisbotHome: string;
   logger: ReturnType<typeof createRootLogger>;
   config: ReturnType<typeof loadConfig>;
 }
@@ -46,12 +46,12 @@ function isPidAlive(pid: number): boolean {
 }
 
 function writeWorkerLifecycleLog(
-  paseoHome: string,
+  clisbotHome: string,
   message: string,
   fields: Record<string, unknown> = {},
 ): void {
   try {
-    const logPath = path.join(paseoHome, "daemon.log");
+    const logPath = path.join(clisbotHome, "daemon.log");
     mkdirSync(path.dirname(logPath), { recursive: true });
     appendFileSync(
       logPath,
@@ -72,10 +72,10 @@ function writeWorkerLifecycleLog(
 
 function bootstrapFromEnvironment(): BootstrapResult {
   try {
-    const paseoHome = resolvePaseoHome();
-    const config = loadConfig(paseoHome);
-    const logger = createRootLogger({ log: config.log }, { paseoHome, file: false });
-    return { paseoHome, logger, config };
+    const clisbotHome = resolveClisbotHome();
+    const config = loadConfig(clisbotHome);
+    const logger = createRootLogger({ log: config.log }, { clisbotHome, file: false });
+    return { clisbotHome, logger, config };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     process.stderr.write(`${message}\n`);
@@ -132,13 +132,13 @@ function applyCliFlagOverrides(config: ReturnType<typeof loadConfig>): void {
 }
 
 async function main() {
-  const { paseoHome, logger, config } = bootstrapFromEnvironment();
+  const { clisbotHome, logger, config } = bootstrapFromEnvironment();
   for (const variable of initializeEnvironmentProxy()) {
-    writeWorkerLifecycleLog(paseoHome, "Ignoring invalid or unsupported HTTP proxy variable", {
+    writeWorkerLifecycleLog(clisbotHome, "Ignoring invalid or unsupported HTTP proxy variable", {
       variable,
     });
   }
-  let daemon: Awaited<ReturnType<typeof createPaseoDaemon>> | null = null;
+  let daemon: Awaited<ReturnType<typeof createClisbotDaemon>> | null = null;
   let shutdownPromise: Promise<number> | null = null;
   let exitHookInstalled = false;
 
@@ -229,7 +229,7 @@ async function main() {
     if (intent.type === "shutdown") {
       logger.warn(fields, "Shutdown requested via websocket");
       const sent = sendSupervisorLifecycleMessage({
-        type: "paseo:shutdown",
+        type: "clisbot:shutdown",
         reason: intent.reason,
         keepTerminals: intent.keepTerminals,
       });
@@ -246,7 +246,7 @@ async function main() {
 
     logger.warn(fields, "Restart requested via websocket");
     const sent = sendSupervisorLifecycleMessage({
-      type: "paseo:restart",
+      type: "clisbot:restart",
       ...(intent.reason ? { reason: intent.reason } : {}),
       keepTerminals: intent.keepTerminals,
     });
@@ -264,7 +264,7 @@ async function main() {
   // Written straight to daemon.log: the pino stream goes through the supervisor's pipe, which
   // a paused or busy supervisor does not drain. Tests synchronize on this line.
   const recordLifecycleIntentDispatched = (type: string, fields: Record<string, unknown>) => {
-    writeWorkerLifecycleLog(paseoHome, "Lifecycle intent dispatched", { type, ...fields });
+    writeWorkerLifecycleLog(clisbotHome, "Lifecycle intent dispatched", { type, ...fields });
   };
 
   const installSupervisorLivenessGuard = () => {
@@ -281,7 +281,7 @@ async function main() {
       }
       supervisorExitRequested = true;
 
-      writeWorkerLifecycleLog(paseoHome, "Supervisor liveness lost; worker exiting", {
+      writeWorkerLifecycleLog(clisbotHome, "Supervisor liveness lost; worker exiting", {
         reason,
         ...getProcessDiagnostics(),
         supervisorPid,
@@ -301,11 +301,11 @@ async function main() {
         return;
       }
       const type = (message as { type?: unknown }).type;
-      if (type === "paseo:supervisor-heartbeat") {
+      if (type === "clisbot:supervisor-heartbeat") {
         lastSupervisorHeartbeatAt = Date.now();
         return;
       }
-      if (type === "paseo:graceful-shutdown") {
+      if (type === "clisbot:graceful-shutdown") {
         const { reason, keepTerminals } = message as { reason?: unknown; keepTerminals?: unknown };
         beginShutdown("Supervisor shutdown request", {
           reason: typeof reason === "string" ? reason : "supervisor_requested_shutdown",
@@ -338,7 +338,7 @@ async function main() {
   installSupervisorLivenessGuard();
 
   try {
-    daemon = await createPaseoDaemon(
+    daemon = await createClisbotDaemon(
       {
         ...config,
         onLifecycleIntent: handleLifecycleIntent,
@@ -358,7 +358,7 @@ async function main() {
       throw new Error("Daemon did not expose a listen target after startup");
     }
     sendSupervisorLifecycleMessage({
-      type: "paseo:ready",
+      type: "clisbot:ready",
       listen,
       serverId: daemon.getServerId(),
     });

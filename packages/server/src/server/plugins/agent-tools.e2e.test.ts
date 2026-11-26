@@ -10,10 +10,10 @@ import {
   createTestAgentClient,
   type TestAgentClientOptions,
 } from "../test-utils/fake-agent-client.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { importSessionFromPersistence } from "../agent/provider-session-import.js";
 import { BuiltinPluginLoader } from "./builtin/index.js";
-import { serializePaseoToolInputParameters } from "../agent/tools/paseo-tool-serialization.js";
+import { serializeClisbotToolInputParameters } from "../agent/tools/clisbot-tool-serialization.js";
 import type {
   AgentClient,
   AgentLaunchContext,
@@ -44,7 +44,7 @@ function recordingProvider(native: boolean, callbacks: TestAgentClientOptions = 
   });
   const provider: AgentClient = {
     provider: inner.provider,
-    capabilities: { ...inner.capabilities, supportsNativePaseoTools: native },
+    capabilities: { ...inner.capabilities, supportsNativeClisbotTools: native },
     createSession: async (config, context, options) => {
       launches.push({ config, context });
       return inner.createSession(config, context, options);
@@ -68,15 +68,15 @@ function recordingProvider(native: boolean, callbacks: TestAgentClientOptions = 
 
 const pluginSource = `
 import { z } from "zod";
-import { defineAgentTool } from "@getpaseo/plugin/server";
+import { defineAgentTool } from "@clisbot/plugin/server";
 let calls = 0;
 const tool = defineAgentTool({
   name: "plugin_echo", description: "Echo for the chosen agent",
   input: z.object({ text: z.string().min(1).refine(value => value !== "forbidden", "Forbidden by plugin").describe("Message") }),
-  async execute(input, { agent, paseo, signal }) {
+  async execute(input, { agent, clisbot, signal }) {
     calls++;
     if (input.text === "throw") throw new Error("handler failed");
-    return { text: JSON.stringify({ agent, input, calls, sdk: typeof paseo.agents.ref, aborted: signal.aborted }) };
+    return { text: JSON.stringify({ agent, input, calls, sdk: typeof clisbot.agents.ref, aborted: signal.aborted }) };
   },
 });
 export default function contribute(server) {
@@ -94,13 +94,13 @@ async function setup(
   policy?: { enabled?: boolean; disabledTools?: string[] },
   providerOptions?: TestAgentClientOptions,
 ) {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-agent-tools-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-agent-tools-"));
   const recorder = recordingProvider(native, providerOptions);
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     daemonVersion: "0.14.0-beta.1",
     agentClients: { codex: recorder.provider },
     mcpEnabled: true,
-    providerOverrides: { codex: { paseoTools: policy } },
+    providerOverrides: { codex: { clisbotTools: policy } },
   });
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -111,8 +111,8 @@ async function setup(
     const pluginDirectory = path.join(directory, id);
     await mkdir(pluginDirectory);
     await writeFile(
-      path.join(pluginDirectory, "paseo-plugin.json"),
-      JSON.stringify({ id, requirements: { paseo: ">=0.14.0-beta.1" } }),
+      path.join(pluginDirectory, "clisbot-plugin.json"),
+      JSON.stringify({ id, requirements: { clisbot: ">=0.14.0-beta.1" } }),
     );
     await writeFile(path.join(pluginDirectory, "index.server.ts"), code);
     await client.installDirectoryPlugin(pluginDirectory);
@@ -142,7 +142,7 @@ async function setup(
       );
     },
     async mcp(agentId?: string) {
-      const server = recorder.launches.at(-1)!.config.mcpServers?.paseo;
+      const server = recorder.launches.at(-1)!.config.mcpServers?.clisbot;
       let url: string;
       if (agentId) url = `http://127.0.0.1:${daemon.port}/mcp/agents?callerAgentId=${agentId}`;
       else {
@@ -219,11 +219,11 @@ test("native providers get the same attached schema and execution", async () => 
   const h = await setup(true);
   try {
     const a = await h.create({ x: "y" });
-    const catalog = h.launches.at(-1)!.context!.paseoTools!;
+    const catalog = h.launches.at(-1)!.context!.clisbotTools!;
     expect(catalog.getTool("plugin_echo")?.description).toBe("Echo for the chosen agent");
     const mcp = await h.mcp(a.id);
     const advertised = (await mcp.listTools()).tools.find((tool) => tool.name === "plugin_echo")!;
-    expect(serializePaseoToolInputParameters(catalog.getTool("plugin_echo")!)).toEqual(
+    expect(serializeClisbotToolInputParameters(catalog.getTool("plugin_echo")!)).toEqual(
       advertised.inputSchema,
     );
     const result = await catalog.executeTool("plugin_echo", { text: "native" });
@@ -240,7 +240,7 @@ test("resume uses the stored title and labels, and close removes the attachment"
   const h = await setup(true);
   try {
     const a = await h.create({ x: "y" });
-    const catalog = h.launches.at(-1)!.context!.paseoTools!;
+    const catalog = h.launches.at(-1)!.context!.clisbotTools!;
     const handle = a.persistence!;
     await h.daemon.daemon.agentManager.setTitle(a.id, "Stored title");
     await h.daemon.daemon.agentManager.closeAgent(a.id);
@@ -254,7 +254,7 @@ test("resume uses the stored title and labels, and close removes the attachment"
       labels: { x: "y" },
       reason: "resume",
     });
-    expect(h.launches.at(-1)!.context!.paseoTools!.getTool("plugin_echo")?.name).toBe(
+    expect(h.launches.at(-1)!.context!.clisbotTools!.getTool("plugin_echo")?.name).toBe(
       "plugin_echo",
     );
   } finally {
@@ -264,10 +264,10 @@ test("resume uses the stored title and labels, and close removes the attachment"
 
 test.each([
   {
-    name: "Paseo",
+    name: "Clisbot",
     source: pluginSource.replace('name: "plugin_echo"', 'name: "list_agents"'),
     other: false,
-    message: /plugin tools-test.*Paseo tool list_agents/,
+    message: /plugin tools-test.*Clisbot tool list_agents/,
   },
   {
     name: "another plugin",
@@ -354,8 +354,8 @@ test.each([false, true])(
     const h = await setup(native, pluginSource, { enabled: false });
     try {
       await h.create({ x: "y" });
-      expect(h.launches.at(-1)!.context!.paseoTools).toBeUndefined();
-      expect(h.launches.at(-1)!.config.mcpServers?.paseo).toBeUndefined();
+      expect(h.launches.at(-1)!.context!.clisbotTools).toBeUndefined();
+      expect(h.launches.at(-1)!.config.mcpServers?.clisbot).toBeUndefined();
     } finally {
       await h.close();
     }
@@ -367,7 +367,7 @@ test("disabledTools filters plugin tool names", async () => {
   const h = await setup(true, pluginSource, { disabledTools: ["plugin_echo"] });
   try {
     await h.create({ x: "y" });
-    expect(h.launches.at(-1)!.context!.paseoTools!.getTool("plugin_echo")).toBeUndefined();
+    expect(h.launches.at(-1)!.context!.clisbotTools!.getTool("plugin_echo")).toBeUndefined();
   } finally {
     await h.close();
   }
@@ -392,7 +392,7 @@ test("caller cancellation aborts the plugin handler and discards its result", as
   const h = await setup(true, waitingSource);
   try {
     const a = await h.create({ x: "y" });
-    const catalog = h.launches.at(-1)!.context!.paseoTools!;
+    const catalog = h.launches.at(-1)!.context!.clisbotTools!;
     const controller = new AbortController();
     const call = catalog.executeTool(
       "plugin_echo",
@@ -415,7 +415,7 @@ test("a plugin stopping mid-call returns a tool error", async () => {
     const a = await h.create({ x: "y" });
     const call = h.launches
       .at(-1)!
-      .context!.paseoTools!.executeTool("plugin_echo", { text: "wait" });
+      .context!.clisbotTools!.executeTool("plugin_echo", { text: "wait" });
     await expect.poll(() => readFile(path.join(h.directory, "started"), "utf8")).toBe(a.id);
     await h.client.patchDaemonConfig({ pluginsEnabled: false });
     expect(await call).toMatchObject({
@@ -435,7 +435,7 @@ test("history sessions ignore attached tools", async () => {
     await h.client.archiveAgent(a.id);
     await h.daemon.daemon.agentManager.resumeAgentFromPersistence(handle, a.config, a.id);
     expect(h.daemon.daemon.agentManager.getPluginTools(a.id)).toEqual([]);
-    expect(h.launches.at(-1)!.context!.paseoTools?.getTool("plugin_echo")).toBeUndefined();
+    expect(h.launches.at(-1)!.context!.clisbotTools?.getTool("plugin_echo")).toBeUndefined();
   } finally {
     await h.close();
   }
@@ -446,7 +446,7 @@ test("disabled plugins attach no tools to a new native session", async () => {
   try {
     await h.client.patchDaemonConfig({ pluginsEnabled: false });
     await h.create({ x: "y" });
-    expect(h.launches.at(-1)!.context!.paseoTools!.getTool("plugin_echo")).toBeUndefined();
+    expect(h.launches.at(-1)!.context!.clisbotTools!.getTool("plugin_echo")).toBeUndefined();
   } finally {
     await h.close();
   }
@@ -465,7 +465,7 @@ test("structured tool results get model-visible text when text is omitted", asyn
     expect(
       await h.launches
         .at(-1)!
-        .context!.paseoTools!.executeTool("plugin_echo", { text: "structured" }),
+        .context!.clisbotTools!.executeTool("plugin_echo", { text: "structured" }),
     ).toEqual({
       content: [{ type: "text", text: JSON.stringify({ status: "created" }, null, 2) }],
       structuredContent: { status: "created" },
@@ -481,7 +481,7 @@ test("reloading a plugin retires its old attachments before an agent reopens", a
   try {
     const a = await h.create({ x: "y" });
     const mcp = await h.mcp(a.id);
-    const oldCatalog = h.launches.at(-1)!.context!.paseoTools!;
+    const oldCatalog = h.launches.at(-1)!.context!.clisbotTools!;
     expect((await mcp.listTools()).tools.map((tool) => tool.name)).toContain("plugin_echo");
     await h.client.reloadPlugin("tools-test");
     expect((await mcp.listTools()).tools.map((tool) => tool.name)).not.toContain("plugin_echo");
@@ -496,16 +496,16 @@ test("reloading a plugin retires its old attachments before an agent reopens", a
 }, 60_000);
 
 test("built-in plugins attach and execute tools while configured plugins are disabled", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "paseo-builtin-tools-"));
+  const root = await mkdtemp(path.join(tmpdir(), "clisbot-builtin-tools-"));
   const directory = path.join(root, "builtin-tools");
   await mkdir(directory);
   await writeFile(
-    path.join(directory, "paseo-plugin.json"),
-    JSON.stringify({ id: "builtin-tools", requirements: { paseo: ">=0.14.0-beta.1" } }),
+    path.join(directory, "clisbot-plugin.json"),
+    JSON.stringify({ id: "builtin-tools", requirements: { clisbot: ">=0.14.0-beta.1" } }),
   );
   await writeFile(path.join(directory, "index.server.ts"), pluginSource);
   const recorder = recordingProvider(true);
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     daemonVersion: "0.14.0-beta.1",
     agentClients: { codex: recorder.provider },
     pluginsEnabled: false,
@@ -517,7 +517,7 @@ test("built-in plugins attach and execute tools while configured plugins are dis
       undefined,
       { labels: { x: "y" } },
     );
-    const catalog = recorder.launches.at(-1)!.context!.paseoTools!;
+    const catalog = recorder.launches.at(-1)!.context!.clisbotTools!;
     expect(catalog.getTool("plugin_echo")?.name).toBe("plugin_echo");
     const result = await catalog.executeTool("plugin_echo", { text: "builtin" });
     expect(result.isError).not.toBe(true);
@@ -600,7 +600,7 @@ test("a busy agent is steered after plugin reload and reopens only at its next i
     await sendAndFinish(h, a.id, "idle prompt");
     expect(h.launches).toHaveLength(2);
     expect(h.events.interrupts).toBe(0);
-    expect(h.launches.at(-1)!.context!.paseoTools!.getTool("plugin_echo")?.name).toBe(
+    expect(h.launches.at(-1)!.context!.clisbotTools!.getTool("plugin_echo")?.name).toBe(
       "plugin_echo",
     );
     await sendAndFinish(h, a.id, "stable prompt");
@@ -612,12 +612,12 @@ test("a busy agent is steered after plugin reload and reopens only at its next i
 }, 60_000);
 
 const reloadRpcSource = pluginSource
-  .replace("import { z }", 'import { defineRpc } from "@getpaseo/plugin";\nimport { z }')
+  .replace("import { z }", 'import { defineRpc } from "@clisbot/plugin";\nimport { z }')
   .replace(
     "  return () => {};",
     `
-  server.handle(defineRpc({ name: "reload_agent", input: z.object({ id: z.string() }), output: z.object({ id: z.string() }) }), async ({ id }, { paseo }) => {
-    const agent = paseo.agents.ref(id);
+  server.handle(defineRpc({ name: "reload_agent", input: z.object({ id: z.string() }), output: z.object({ id: z.string() }) }), async ({ id }, { clisbot }) => {
+    const agent = clisbot.agents.ref(id);
     await agent.refresh();
     await agent.reload();
     return { id: agent.current().id };
@@ -636,7 +636,7 @@ test("a plugin can reload an agent through the SDK and rerun session hooks with 
     });
     expect(h.launches).toHaveLength(2);
     expect(JSON.parse(h.launches.at(-1)!.context!.env!.OPEN_INFO).reason).toBe("refresh");
-    expect(h.launches.at(-1)!.context!.paseoTools!.getTool("plugin_echo")?.name).toBe(
+    expect(h.launches.at(-1)!.context!.clisbotTools!.getTool("plugin_echo")?.name).toBe(
       "plugin_echo",
     );
   } finally {
@@ -654,11 +654,13 @@ test("starting and stopping a session-hook plugin each causes one idle reopen", 
     );
     await sendAndFinish(h, a.id, "after start");
     expect(h.launches).toHaveLength(2);
-    expect(h.launches.at(-1)!.context!.paseoTools!.getTool("added_echo")?.name).toBe("added_echo");
+    expect(h.launches.at(-1)!.context!.clisbotTools!.getTool("added_echo")?.name).toBe(
+      "added_echo",
+    );
     await h.client.disablePlugin("added-tools");
     await sendAndFinish(h, a.id, "after stop");
     expect(h.launches).toHaveLength(3);
-    expect(h.launches.at(-1)!.context!.paseoTools!.getTool("added_echo")).toBeUndefined();
+    expect(h.launches.at(-1)!.context!.clisbotTools!.getTool("added_echo")).toBeUndefined();
     await sendAndFinish(h, a.id, "stable after stop");
     expect(h.launches).toHaveLength(3);
     expect(h.events.interrupts).toBe(0);
@@ -772,7 +774,7 @@ export default function contribute(server) {
 `;
 
 test.each([
-  { native: false, serverNames: ["paseo", "company"] },
+  { native: false, serverNames: ["clisbot", "company"] },
   { native: true, serverNames: ["company"] },
 ])(
   "session-open MCP servers reach launch but never saved configuration (native=$native)",
@@ -788,11 +790,11 @@ test.each([
       expect(h.launches.at(-1)!.context!.env!.OPEN_REASON).toBe("create");
       expect(Object.keys(h.launches.at(-1)!.config.mcpServers!)).toEqual(serverNames);
       await h.daemon.daemon.agentManager.closeAgent(a.id);
-      const agentFiles = await readdir(path.join(h.daemon.paseoHome, "agents"), {
+      const agentFiles = await readdir(path.join(h.daemon.clisbotHome, "agents"), {
         recursive: true,
       });
       const recordFile = agentFiles.find((file) => file.endsWith(a.id + ".json"))!;
-      const record = await readFile(path.join(h.daemon.paseoHome, "agents", recordFile), "utf8");
+      const record = await readFile(path.join(h.daemon.clisbotHome, "agents", recordFile), "utf8");
       expect(record).not.toContain("tools.example.com");
     } finally {
       await h.close();
@@ -902,18 +904,18 @@ test.each([
     error: /company.*plugin tools-test.*agent saved configuration/,
   },
   {
-    target: "saved Paseo name",
+    target: "saved Clisbot name",
     saved: true,
-    name: "paseo",
+    name: "clisbot",
     other: false,
-    error: /paseo.*plugin tools-test.*agent saved configuration/,
+    error: /clisbot.*plugin tools-test.*agent saved configuration/,
   },
   {
-    target: "Paseo internal server",
+    target: "Clisbot internal server",
     saved: false,
-    name: "paseo",
+    name: "clisbot",
     other: false,
-    error: /paseo.*plugin tools-test.*Paseo internal MCP server/,
+    error: /clisbot.*plugin tools-test.*Clisbot internal MCP server/,
   },
   {
     target: "another plugin with identical config",

@@ -11,7 +11,7 @@ import {
   RotateCw,
   Trash2,
 } from "lucide-react-native";
-import type { PluginListItem, PluginLogEntry } from "@getpaseo/protocol/messages";
+import type { PluginListItem, PluginLogEntry } from "@clisbot/protocol/messages";
 import {
   AdaptiveModalSheet,
   SheetHeaderIconButton,

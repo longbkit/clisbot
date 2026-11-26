@@ -1,4 +1,4 @@
-import type { WorkspaceRowBadgeProps, WorkspaceRowBadgeTone } from "@getpaseo/plugin/client/ui";
+import type { WorkspaceRowBadgeProps, WorkspaceRowBadgeTone } from "@clisbot/plugin/client/ui";
 import { createContext, useContext, useMemo } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";

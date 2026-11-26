@@ -9,8 +9,8 @@ import {
   resolvePackagedAsarPath,
 } from "../package-paths.js";
 
-const CLI_PACKAGE_NAME = "@getpaseo/cli";
-const CLI_BIN_ENTRY = `${CLI_PACKAGE_NAME}/bin/paseo`;
+const CLI_PACKAGE_NAME = "@clisbot/cli";
+const CLI_BIN_ENTRY = `${CLI_PACKAGE_NAME}/bin/clisbot`;
 const CLI_RUN_ENTRY = `${CLI_PACKAGE_NAME}/dist/run.js`;
 
 const esmRequire = createRequire(__filename);
@@ -30,7 +30,7 @@ export function resolveExternalCliEntrypoint(): NodeEntrypointSpec {
         filePath: path.join(
           resolvePackagedAsarPath(),
           "node_modules",
-          "@getpaseo",
+          "@clisbot",
           "cli",
           "dist",
           "index.js",
@@ -65,7 +65,7 @@ export function resolvePassthroughCliEntrypoint(): string {
       filePath: path.join(
         resolvePackagedAsarPath(),
         "node_modules",
-        "@getpaseo",
+        "@clisbot",
         "cli",
         "dist",
         "run.js",

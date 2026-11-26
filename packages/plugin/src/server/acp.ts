@@ -1,4 +1,4 @@
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import type {
   ProviderCatalog,
   ProviderCommand,
@@ -124,7 +124,7 @@ export interface AcpToolCallSnapshot {
   /** The call's ACP `content` blocks. An update that sends `content` replaces them. */
   content?: JsonValue;
   locations: readonly string[];
-  /** The row Paseo shows. Without it, Paseo builds the standard row for the call's ACP `kind`. */
+  /** The row Clisbot shows. Without it, Clisbot builds the standard row for the call's ACP `kind`. */
   detail?: ProviderToolCallDetail;
 }
 
@@ -147,9 +147,9 @@ export interface AcpTransformer {
     context: AcpDiscoveryContext,
   ): Promise<ProviderCatalog> | ProviderCatalog;
   configure?(change: AcpConfigChange, context: AcpConfigureContext): Promise<"handled" | "pass">;
-  /** Rewrites every session config snapshot before Paseo sees it. */
+  /** Rewrites every session config snapshot before Clisbot sees it. */
   config?(state: ProviderConfigState, context: AcpContext): ProviderConfigState;
-  /** Rewrites each advertised ACP slash command before Paseo sees it. */
+  /** Rewrites each advertised ACP slash command before Clisbot sees it. */
   command?(command: ProviderCommand, context: AcpContext): ProviderCommand;
   notification?(
     notification: { method: string; params: JsonValue },
@@ -160,7 +160,7 @@ export interface AcpTransformer {
     toolCall: AcpToolCallSnapshot,
     context: AcpContext & {
       mcpServerNames?: readonly string[];
-      /** The call as Paseo last presented it, after every transformer. Absent on its first update. */
+      /** The call as Clisbot last presented it, after every transformer. Absent on its first update. */
       previous?: AcpToolCallSnapshot;
     },
   ): AcpToolCallSnapshot;

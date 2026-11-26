@@ -8,7 +8,7 @@ import type { OpenCodeBridge } from "../bridge.js";
 import { OpenCodeHttpError } from "../http-error.js";
 import { resolveOpenCodeHomeDir } from "../paths.js";
 import { openCodeConfigDirectory, provisionLocalBridge } from "./bridge-provisioning.js";
-import { awaitPaseoPlugin } from "./readiness.js";
+import { awaitClisbotPlugin } from "./readiness.js";
 import {
   compatibleVersion,
   isLocalOpenCodeHost,
@@ -57,7 +57,7 @@ export async function connectSharedService(
       try {
         response = await fetch(request, { ...init, signal });
       } catch (error) {
-        // Paseo does not own this process, so a refused connection is its only exit signal.
+        // Clisbot does not own this process, so a refused connection is its only exit signal.
         if (isConnectionRefused(error)) markExited(error);
         throw error;
       }
@@ -116,8 +116,8 @@ export async function connectSharedService(
     });
   }
   const advertised =
-    options.settings?.env?.PASEO_OPENCODE_BRIDGE_URL ??
-    globalThis.process.env.PASEO_OPENCODE_BRIDGE_URL;
+    options.settings?.env?.CLISBOT_OPENCODE_BRIDGE_URL ??
+    globalThis.process.env.CLISBOT_OPENCODE_BRIDGE_URL;
   validateBridgeAddress(selection, bridge, advertised);
   const generation: SharedService = {
     client,
@@ -150,15 +150,15 @@ function validateBridgeAddress(
     try {
       bridgeUrl = new URL(advertised);
     } catch {
-      throw new Error("PASEO_OPENCODE_BRIDGE_URL must be an absolute HTTP or HTTPS URL");
+      throw new Error("CLISBOT_OPENCODE_BRIDGE_URL must be an absolute HTTP or HTTPS URL");
     }
     if (bridgeUrl.protocol !== "http:" && bridgeUrl.protocol !== "https:")
-      throw new Error("PASEO_OPENCODE_BRIDGE_URL must be an absolute HTTP or HTTPS URL");
+      throw new Error("CLISBOT_OPENCODE_BRIDGE_URL must be an absolute HTTP or HTTPS URL");
   }
   const hostname = new URL(selection.server.url).hostname;
   if (bridge && selection.kind === "explicit" && !advertised && !isLocalOpenCodeHost(hostname))
     throw new Error(
-      "Remote OpenCode requires PASEO_OPENCODE_BRIDGE_URL pointing to a reachable Paseo bridge tunnel and the Paseo plugin installed on the server",
+      "Remote OpenCode requires CLISBOT_OPENCODE_BRIDGE_URL pointing to a reachable Clisbot bridge tunnel and the Clisbot plugin installed on the server",
     );
 }
 
@@ -174,16 +174,16 @@ export function bridgeBindings(
       const location = { directory: cwd };
       let result: Awaited<ReturnType<typeof client.rpc.call>>;
       try {
-        await awaitPaseoPlugin({ client, location });
+        await awaitClisbotPlugin({ client, location });
         result = await client.rpc.call({
           location,
-          rpcID: "paseo.bridge",
+          rpcID: "clisbot.bridge",
           method: "bind",
           input: { sessionID: sessionId, ...bridge.sharedV2Connection(advertised) },
         });
       } catch (error) {
         throw new Error(
-          `Cannot connect the Paseo tool bridge to OpenCode. Install the plugin from ${pluginDirectory ?? "Paseo's runtime directory"} and configure a reachable bridge URL: ${error instanceof Error ? error.message : String(error)}`,
+          `Cannot connect the Clisbot tool bridge to OpenCode. Install the plugin from ${pluginDirectory ?? "Clisbot's runtime directory"} and configure a reachable bridge URL: ${error instanceof Error ? error.message : String(error)}`,
           { cause: error },
         );
       }
@@ -195,7 +195,7 @@ export function bridgeBindings(
         await client.rpc.call(
           {
             location: { directory: cwd },
-            rpcID: "paseo.bridge",
+            rpcID: "clisbot.bridge",
             method: "unbind",
             input: { sessionID: sessionId, ...bridge.sharedV2Connection(advertised) },
           },
@@ -205,9 +205,9 @@ export function bridgeBindings(
     refreshLocation: async (cwd, signal) => {
       if (!bridge) return;
       const location = { directory: cwd };
-      await awaitPaseoPlugin({ client, location, signal });
+      await awaitClisbotPlugin({ client, location, signal });
       await client.rpc.call(
-        { location, rpcID: "paseo.bridge", method: "refresh", input: {} },
+        { location, rpcID: "clisbot.bridge", method: "refresh", input: {} },
         { signal },
       );
     },

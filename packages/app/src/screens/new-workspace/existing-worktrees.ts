@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { CheckoutWorktree } from "@getpaseo/protocol/messages";
+import type { CheckoutWorktree } from "@clisbot/protocol/messages";
 import { useFetchQuery } from "@/data/query";
 
 /** An existing worktree, as the Worktree picker lists it. */

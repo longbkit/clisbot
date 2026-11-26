@@ -1,4 +1,4 @@
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import type { AgentStreamEvent } from "../../agent-sdk-types.js";
 import type { HostObservation } from "../../host-operations/index.js";
 import type { FinishSubscription, FinishObservationSession } from "../index.js";

@@ -9,7 +9,7 @@ import { expectFileTabOpen, openFileFromExplorer } from "./file-explorer";
 /** A directory plugin whose "Rich Markdown" file panel claims `.md`, next to the built-in. */
 export const MARKDOWN_PANEL_PLUGIN_ID = "file-panel-picker-e2e";
 export const MARKDOWN_PANEL_ID = `plugin:${MARKDOWN_PANEL_PLUGIN_ID}/rich-markdown`;
-export const BUILTIN_MARKDOWN_OPTION = "Markdown — Paseo";
+export const BUILTIN_MARKDOWN_OPTION = "Markdown — Clisbot";
 export const PLUGIN_MARKDOWN_OPTION = `Rich Markdown — ${MARKDOWN_PANEL_PLUGIN_ID}`;
 
 const SOURCE = `import React from "react";
@@ -25,7 +25,7 @@ export default function contribute(client) {
 
 /** Enables plugins on the test daemon and installs the plugin; `uninstall` restores both. */
 export async function installMarkdownPanelPlugin(): Promise<{ uninstall(): Promise<void> }> {
-  const directory = await mkdtemp(path.join(tmpdir(), "paseo-markdown-file-panel-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "clisbot-markdown-file-panel-"));
   const client = await connectNewWorkspaceDaemonClient({ ownProjects: false });
   const previousConfig = await client.getDaemonConfig();
   const uninstall = async () => {
@@ -38,7 +38,7 @@ export async function installMarkdownPanelPlugin(): Promise<{ uninstall(): Promi
   };
   try {
     await writeFile(
-      path.join(directory, "paseo-plugin.json"),
+      path.join(directory, "clisbot-plugin.json"),
       JSON.stringify({ id: MARKDOWN_PANEL_PLUGIN_ID, requirements: pluginRequirements }),
     );
     await writeFile(path.join(directory, "index.client.tsx"), SOURCE);
@@ -70,7 +70,7 @@ export async function expectPluginMarkdown(page: Page, name: string): Promise<vo
 
 export async function storedFilePanelAssociations(page: Page): Promise<unknown> {
   return page.evaluate(() => {
-    const settings = JSON.parse(localStorage.getItem("@paseo:app-settings") ?? "{}");
+    const settings = JSON.parse(localStorage.getItem("@clisbot:app-settings") ?? "{}");
     return settings.filePanelAssociations ?? {};
   });
 }

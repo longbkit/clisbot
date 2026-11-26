@@ -13,13 +13,13 @@ import {
 } from "../../utils/checkout-git.js";
 import { lstat, readFile, readlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import type { DiffEndpoint, DiffSubscribeRequest } from "@getpaseo/protocol/messages";
-import type { DiffEntry, DiffBody } from "@getpaseo/protocol/binary-frames/index";
+import type { DiffEndpoint, DiffSubscribeRequest } from "@clisbot/protocol/messages";
+import type { DiffEntry, DiffBody } from "@clisbot/protocol/binary-frames/index";
 import { runGitCommand, type GitCommandOptions } from "../../utils/run-git-command.js";
 import { parseDiff, highlightDiffWithFileContent } from "../utils/diff-highlighter.js";
 
 export type Compare = Omit<DiffSubscribeRequest, "type" | "requestId"> & {
-  checkoutBase?: { compare: CheckoutDiffCompare; paseoHome: string };
+  checkoutBase?: { compare: CheckoutDiffCompare; clisbotHome: string };
 };
 export interface ComparisonRevisions {
   refs: Map<string, string | null>;
@@ -161,7 +161,7 @@ export async function listComparison(
   if (compare.checkoutBase) {
     if (revisions) revisions.checkoutBase = null;
     const selected = await resolveCheckoutDiffBase(compare.cwd, compare.checkoutBase.compare, {
-      paseoHome: compare.checkoutBase.paseoHome,
+      clisbotHome: compare.checkoutBase.clisbotHome,
     });
     if (revisions) revisions.checkoutBase = selected;
     if (!selected) throw new DiffReadError("REF_NOT_FOUND", "Comparison base is unavailable");

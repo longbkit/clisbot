@@ -10,34 +10,34 @@ import { setTimeout } from "node:timers/promises";
 // relaunches the app unfolded. Either way the shell redraws its prompt on attach.
 //
 // Preconditions: the app shows terminal TERMINAL_ID, idle at an empty shell prompt, against the
-// daemon at PASEO_HOST.
+// daemon at CLISBOT_HOST.
 //
-//   PLATFORM=android TERMINAL_ID=511fd9f0 PASEO_HOST=localhost:6870 \
+//   PLATFORM=android TERMINAL_ID=511fd9f0 CLISBOT_HOST=localhost:6870 \
 //     node e2e/mobile/terminal-rendering/reattach.mjs
 //
 // The client used to be sized after the replay arrived, so the shell's redraw landed on the
 // wrong rows in most trials. TRIALS sets how many reattaches to check.
 const platform = process.env.PLATFORM ?? "android";
-const appId = process.env.PASEO_TERMINAL_RENDERING_APP_ID ?? "sh.paseo.debug";
-const appUrl = process.env.PASEO_TERMINAL_RENDERING_APP_URL;
+const appId = process.env.CLISBOT_TERMINAL_RENDERING_APP_ID ?? "sh.clisbot.debug";
+const appUrl = process.env.CLISBOT_TERMINAL_RENDERING_APP_URL;
 const terminalId = process.env.TERMINAL_ID;
-const host = process.env.PASEO_HOST;
+const host = process.env.CLISBOT_HOST;
 const trials = Number(process.env.TRIALS ?? 5);
 const resize = process.env.RESIZE ?? "keyboard";
-const label = process.env.PASEO_TERMINAL_RENDERING_LABEL ?? "reattach";
+const label = process.env.CLISBOT_TERMINAL_RENDERING_LABEL ?? "reattach";
 const session = process.env.AGENT_DEVICE_SESSION ?? `terminal-rendering-${platform}`;
 const artifacts = resolve(
-  process.env.PASEO_TERMINAL_RENDERING_ARTIFACTS ??
-    resolve(homedir(), ".paseo/artifacts/terminal-rendering", platform),
+  process.env.CLISBOT_TERMINAL_RENDERING_ARTIFACTS ??
+    resolve(homedir(), ".clisbot/artifacts/terminal-rendering", platform),
   label,
 );
 const env = {
   ...process.env,
   AGENT_DEVICE_STATE_DIR:
     process.env.AGENT_DEVICE_STATE_DIR ??
-    resolve(homedir(), ".paseo/artifacts/terminal-rendering/device-state"),
+    resolve(homedir(), ".clisbot/artifacts/terminal-rendering/device-state"),
 };
-if (!terminalId || !host) throw new Error("Set TERMINAL_ID and PASEO_HOST");
+if (!terminalId || !host) throw new Error("Set TERMINAL_ID and CLISBOT_HOST");
 mkdirSync(artifacts, { recursive: true });
 
 function ad(...args) {
@@ -48,7 +48,7 @@ function ad(...args) {
   });
 }
 
-function paseo(...args) {
+function clisbot(...args) {
   return execFileSync("npm", ["run", "-s", "cli", "--", ...args, "--host", host], {
     cwd: resolve(import.meta.dirname, "../../../../.."),
     encoding: "utf8",
@@ -123,7 +123,7 @@ function mismatches(client, server) {
 
 const results = [];
 for (let trial = 1; trial <= trials; trial += 1) {
-  paseo("terminal", "send-keys", terminalId, "clear", "Enter");
+  clisbot("terminal", "send-keys", terminalId, "clear", "Enter");
   await setTimeout(1_500);
   await resizePty();
   ad("open", appId, ...(appUrl ? [appUrl] : []), "--relaunch");
@@ -134,7 +134,7 @@ for (let trial = 1; trial <= trials; trial += 1) {
     console.log(`${label} trial ${trial}: no terminal rows appeared`);
     continue;
   }
-  const server = paseo("terminal", "capture", terminalId).split("\n");
+  const server = clisbot("terminal", "capture", terminalId).split("\n");
   const rows = mismatches(client, server);
   results.push({ trial, attached: true, mismatchedRows: rows });
   console.log(`${label} trial ${trial}: ${rows.length} mismatched rows`);

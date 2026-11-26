@@ -8,7 +8,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 const serial = process.env.ANDROID_SERIAL;
 assert(serial, "Set ANDROID_SERIAL to a booted Android foldable emulator");
-const appId = process.env.PASEO_MOBILE_APP_ID ?? "sh.paseo.debug";
+const appId = process.env.CLISBOT_MOBILE_APP_ID ?? "sh.clisbot.debug";
 const session = "android-fold";
 const artifacts = resolve(".dev/agent-device-artifacts/android-fold");
 const env = {
@@ -55,7 +55,7 @@ async function expectLayout(posture) {
       await delay(200);
       continue;
     }
-    assert.equal(data.appBundleId, appId, "Snapshot must belong to Paseo");
+    assert.equal(data.appBundleId, appId, "Snapshot must belong to Clisbot");
     nodes = data.nodes;
     if (
       nodes.some((node) => node.identifier === expectedId) &&

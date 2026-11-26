@@ -1,9 +1,9 @@
-import type { AcpToolCallSnapshot, AcpTransformer } from "@getpaseo/plugin/server/acp";
+import type { AcpToolCallSnapshot, AcpTransformer } from "@clisbot/plugin/server/acp";
 
 type ToolInput = AcpToolCallSnapshot["input"];
 
 // fx names its file arguments for the model (`path`, `old_string`), so its file tools need the
-// argument names Paseo's edit rows read. The adapter reapplies this to each update of a call.
+// argument names Clisbot's edit rows read. The adapter reapplies this to each update of a call.
 export const fileToolTransformer: AcpTransformer = {
   toolCall(toolCall) {
     const input = toEditRowInput(toolCall.name, toolCall.input);

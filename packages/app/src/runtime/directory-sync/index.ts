@@ -1,10 +1,10 @@
-import type { OwnedSubscription } from "@getpaseo/client";
+import type { OwnedSubscription } from "@clisbot/client";
 import type {
   DaemonClient,
   FetchAgentsEntry,
   FetchAgentsOptions,
-} from "@getpaseo/client/internal/daemon-client";
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+} from "@clisbot/client/internal/daemon-client";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import { fetchAgentTimelineOnce } from "@/timeline/fetch-agent-timeline-once";
 import {
   normalizeProjectDescriptor,

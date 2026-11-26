@@ -118,7 +118,7 @@ for (const seeder of ["setup", "shell", "setup-bom"] as const) {
       try {
         const source = join(root, "source");
         const targetRoot = join(root, "target");
-        const target = join(targetRoot, ".dev/paseo-home");
+        const target = join(targetRoot, ".dev/clisbot-home");
         const storage = new AgentStorage(join(root, "source-records"), createTestLogger());
         for (const [id, lastStatus, resumeOnStartup] of [
           ["live", "running", false],
@@ -158,10 +158,10 @@ for (const seeder of ["setup", "shell", "setup-bom"] as const) {
         const repo = fileURLToPath(new URL("../../../../../../", import.meta.url));
         const env = {
           ...process.env,
-          PASEO_SOURCE_CHECKOUT_PATH: join(root, "checkout"),
-          PASEO_WORKTREE_PATH: targetRoot,
-          PASEO_DEV_SEED_HOME: source,
-          PASEO_HOME: target,
+          CLISBOT_SOURCE_CHECKOUT_PATH: join(root, "checkout"),
+          CLISBOT_WORKTREE_PATH: targetRoot,
+          CLISBOT_DEV_SEED_HOME: source,
+          CLISBOT_HOME: target,
         };
         if (seeder !== "shell")
           execFileSync(process.execPath, [join(repo, "scripts/seed-worktree-dev-state.mjs")], {
@@ -213,7 +213,7 @@ test("seeding skips an existing home without reading invalid source config", asy
   try {
     const source = join(root, "source");
     const targetRoot = join(root, "target");
-    const target = join(targetRoot, ".dev/paseo-home");
+    const target = join(targetRoot, ".dev/clisbot-home");
     await mkdir(source, { recursive: true });
     await mkdir(target, { recursive: true });
     await writeFile(join(source, "config.json"), "invalid JSON");
@@ -222,10 +222,10 @@ test("seeding skips an existing home without reading invalid source config", asy
     execFileSync(process.execPath, [join(repo, "scripts/seed-worktree-dev-state.mjs")], {
       env: {
         ...process.env,
-        PASEO_SOURCE_CHECKOUT_PATH: join(root, "checkout"),
-        PASEO_WORKTREE_PATH: targetRoot,
-        PASEO_DEV_SEED_HOME: source,
-        PASEO_DEV_RESET_HOME: "0",
+        CLISBOT_SOURCE_CHECKOUT_PATH: join(root, "checkout"),
+        CLISBOT_WORKTREE_PATH: targetRoot,
+        CLISBOT_DEV_SEED_HOME: source,
+        CLISBOT_DEV_RESET_HOME: "0",
       },
     });
     expect(await readdir(target)).toEqual(["keep.json"]);

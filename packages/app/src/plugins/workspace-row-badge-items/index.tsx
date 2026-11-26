@@ -1,5 +1,5 @@
-import type { PluginTheme } from "@getpaseo/plugin";
-import type { PluginWorkspaceRowBadgeItemProps } from "@getpaseo/plugin/client";
+import type { PluginTheme } from "@clisbot/plugin";
+import type { PluginWorkspaceRowBadgeItemProps } from "@clisbot/plugin/client";
 import { useMemo } from "react";
 import { withUnistyles } from "react-native-unistyles";
 import { useAppSettings } from "@/hooks/use-settings";

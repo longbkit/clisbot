@@ -160,15 +160,15 @@ export default function contribute(server) {
   composerMetadata: async ({ page }, provide) => {
     const client = await connectNewWorkspaceDaemonClient();
     const previous = await client.getDaemonConfig();
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-composer-metadata-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-composer-metadata-"));
     try {
       await writeFile(
-        path.join(directory, "paseo-plugin.json"),
+        path.join(directory, "clisbot-plugin.json"),
         JSON.stringify({ id: "composer-metadata", requirements: pluginRequirements }),
       );
       await writeFile(
         path.join(directory, "index.client.tsx"),
-        `import { useComposer } from "@getpaseo/plugin/client";
+        `import { useComposer } from "@clisbot/plugin/client";
 
 function Holder() {
   globalThis.metadataComposer = useComposer();

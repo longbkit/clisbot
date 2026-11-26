@@ -1,4 +1,4 @@
-import { defineSubscription } from "@getpaseo/plugin";
+import { defineSubscription } from "@clisbot/plugin";
 import { z } from "zod";
 
 /** The first byte of every frame says which stream it belongs to. */

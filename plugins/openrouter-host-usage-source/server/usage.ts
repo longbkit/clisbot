@@ -1,11 +1,11 @@
-// Adapted from kiawin/paseo-openrouter-usage. See LICENSE.
+// Adapted from kiawin/clisbot-openrouter-usage. See LICENSE.
 import {
   balanceToneFromRemaining,
   unavailable,
   type UsageAccount,
   type UsageReport,
   type UsageScope,
-} from "@getpaseo/plugin/server/usage";
+} from "@clisbot/plugin/server/usage";
 import { z } from "zod";
 
 const meters = {

@@ -3,7 +3,7 @@
  * contributions now come from client forge modules and validate the open
  * `forgeSpecific` envelope at runtime.
  */
-import type { CheckoutPrStatusResponse } from "@getpaseo/protocol/messages";
+import type { CheckoutPrStatusResponse } from "@clisbot/protocol/messages";
 import type { Forge } from "@/git/forge";
 import { CLIENT_FORGE_LOGIC_MODULES } from "@/git/forges";
 import type { PrPaneCheck } from "./data";

@@ -1,6 +1,6 @@
-import type { PluginTerminalSnapshot } from "@getpaseo/plugin";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { TerminalsChanged } from "@getpaseo/protocol/messages";
+import type { PluginTerminalSnapshot } from "@clisbot/plugin";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { TerminalsChanged } from "@clisbot/protocol/messages";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { entityRefs } from "./refs";
 import type { PluginTerminalsSource } from "./source";

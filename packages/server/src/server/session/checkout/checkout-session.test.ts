@@ -27,7 +27,7 @@ import {
   createNoGitWorkspaceRuntimeSnapshot,
   createNoopWorkspaceGitService,
 } from "../../test-utils/workspace-git-service-stub.js";
-import { createWorktree, deletePaseoWorktree } from "../../../utils/worktree.js";
+import { createWorktree, deleteClisbotWorktree } from "../../../utils/worktree.js";
 import { expandTilde } from "../../../utils/path.js";
 import type { GitMetadataGenerator } from "./git-metadata-generator.js";
 
@@ -108,7 +108,7 @@ interface RecordedGeneratorCalls {
 }
 
 function makeCheckoutSession(options?: {
-  paseoHome?: string;
+  clisbotHome?: string;
   git?: Partial<WorkspaceGitService>;
   diff?: CheckoutDiffSubscriber;
   github?: Partial<ForgeService>;
@@ -174,7 +174,7 @@ function makeCheckoutSession(options?: {
     checkoutDiffManager:
       options?.diff ?? createFakeDiffSubscriber({ cwd: "", files: [], error: null }).subscriber,
     gitMetadataGenerator,
-    paseoHome: options?.paseoHome ?? "/tmp/paseo-home",
+    clisbotHome: options?.clisbotHome ?? "/tmp/clisbot-home",
     worktreesRoot: undefined,
     logger: pino({ level: "silent" }),
   });
@@ -210,7 +210,7 @@ function createGitSnapshot(
       mainRepoRoot: cwd,
       currentBranch,
       remoteUrl: null,
-      isPaseoOwnedWorktree: false,
+      isClisbotOwnedWorktree: false,
       isDirty: overrides?.isDirty ?? false,
       baseRef: null,
       aheadBehind: null,
@@ -1405,12 +1405,12 @@ describe("CheckoutSession", () => {
   });
 
   describe("stash list", () => {
-    it("returns stash entries scoped to paseo stashes by default", async () => {
-      const listStashesCalls: Array<{ cwd: string; paseoOnly: boolean | undefined }> = [];
+    it("returns stash entries scoped to clisbot stashes by default", async () => {
+      const listStashesCalls: Array<{ cwd: string; clisbotOnly: boolean | undefined }> = [];
       const { checkout, emitted } = makeCheckoutSession({
         git: {
           listStashes: async (cwd, opts) => {
-            listStashesCalls.push({ cwd, paseoOnly: opts?.paseoOnly });
+            listStashesCalls.push({ cwd, clisbotOnly: opts?.clisbotOnly });
             return [];
           },
         },
@@ -1422,7 +1422,7 @@ describe("CheckoutSession", () => {
         requestId: "sl1",
       });
 
-      expect(listStashesCalls).toEqual([{ cwd: "/repo", paseoOnly: true }]);
+      expect(listStashesCalls).toEqual([{ cwd: "/repo", clisbotOnly: true }]);
       expect(emitted).toEqual([
         {
           type: "stash_list_response",
@@ -1727,10 +1727,10 @@ describe("CheckoutSession", () => {
 });
 
 it("creates a PR from a restored exact base using the host metadata and a forge branch name", async () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "paseo-restored-pr-")));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "clisbot-restored-pr-")));
   const repo = join(root, "repo");
   const remote = join(root, "remote.git");
-  const paseoHome = join(root, "home");
+  const clisbotHome = join(root, "home");
   const git = (cwd: string, ...args: string[]) =>
     execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" }).trim();
   try {
@@ -1744,17 +1744,17 @@ it("creates a PR from a restored exact base using the host metadata and a forge 
     const baseRef = "refs/remotes/origin/main";
     const created = await createWorktree({
       cwd: repo,
-      paseoHome,
+      clisbotHome,
       worktreeSlug: "restored-pr",
       source: { kind: "branch-off", baseBranch: baseRef, branchName: "restored-pr" },
     });
     writeFileSync(join(created.worktreePath, "feature.txt"), "feature\n");
     git(created.worktreePath, "add", ".");
     git(created.worktreePath, "commit", "-m", "feature");
-    await deletePaseoWorktree({ cwd: repo, paseoHome, worktreePath: created.worktreePath });
+    await deleteClisbotWorktree({ cwd: repo, clisbotHome, worktreePath: created.worktreePath });
     const restored = await createWorktree({
       cwd: repo,
-      paseoHome,
+      clisbotHome,
       worktreeSlug: "restored-pr",
       source: { kind: "restore", branchName: created.branchName, baseRef },
     });
@@ -1767,7 +1767,7 @@ it("creates a PR from a restored exact base using the host metadata and a forge 
       },
     };
     const { checkout, emitted } = makeCheckoutSession({
-      paseoHome,
+      clisbotHome,
       git: { resolveForge: async () => ({ forge: "github", host: "github.com", service }) },
     });
     await checkout.handleCheckoutPrCreateRequest({

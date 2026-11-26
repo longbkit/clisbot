@@ -15,7 +15,7 @@ import {
   type UsageBalance,
   type UsageScope,
   type UsageWindow,
-} from "@getpaseo/plugin/server/usage";
+} from "@clisbot/plugin/server/usage";
 
 const ApiNumberSchema = z.coerce.number().finite();
 const ApiNullableNumberSchema = z.preprocess(

@@ -1,13 +1,13 @@
 import { describe, expect, test } from "vitest";
-import { PASEO_BROWSER_PROFILE_PARTITION } from "../browser-profile.js";
+import { CLISBOT_BROWSER_PROFILE_PARTITION } from "../browser-profile.js";
 import {
-  getPaseoBrowserIdForWebContents,
-  getPaseoBrowserWorkspaceId,
-  isPaseoBrowserWebviewAttach,
-  preparePaseoBrowserWebContents,
-  registerAttachedPaseoBrowser,
-  unregisterPaseoBrowser,
-  unregisterPaseoBrowserFromHost,
+  getClisbotBrowserIdForWebContents,
+  getClisbotBrowserWorkspaceId,
+  isClisbotBrowserWebviewAttach,
+  prepareClisbotBrowserWebContents,
+  registerAttachedClisbotBrowser,
+  unregisterClisbotBrowser,
+  unregisterClisbotBrowserFromHost,
 } from "./index.js";
 
 class FakeRenderer {
@@ -46,19 +46,19 @@ class FakeBrowserGuest {
 describe("browser webview attachment", () => {
   test("accepts only allowed URLs on the shared profile partition", () => {
     expect(
-      isPaseoBrowserWebviewAttach({
+      isClisbotBrowserWebviewAttach({
         src: "https://example.com",
-        partition: PASEO_BROWSER_PROFILE_PARTITION,
+        partition: CLISBOT_BROWSER_PROFILE_PARTITION,
       }),
     ).toBe(true);
     expect(
-      isPaseoBrowserWebviewAttach({
+      isClisbotBrowserWebviewAttach({
         src: "https://example.com",
-        partition: "persist:paseo-browser-tab-a",
+        partition: "persist:clisbot-browser-tab-a",
       }),
     ).toBe(false);
     expect(
-      isPaseoBrowserWebviewAttach({ src: "https://example.com", partition: "persist:foreign" }),
+      isClisbotBrowserWebviewAttach({ src: "https://example.com", partition: "persist:foreign" }),
     ).toBe(false);
   });
 
@@ -67,7 +67,7 @@ describe("browser webview attachment", () => {
     const renderer = new FakeRenderer(1);
     const guest = new FakeBrowserGuest(101, renderer, profileSession);
 
-    const registered = registerAttachedPaseoBrowser({
+    const registered = registerAttachedClisbotBrowser({
       browserId: "browser-a",
       workspaceId: "workspace-a",
       webContentsId: guest.id,
@@ -77,9 +77,9 @@ describe("browser webview attachment", () => {
     });
 
     expect(registered).toBe(true);
-    expect(getPaseoBrowserIdForWebContents(guest)).toBe("browser-a");
-    expect(getPaseoBrowserWorkspaceId("browser-a")).toBe("workspace-a");
-    unregisterPaseoBrowser("browser-a");
+    expect(getClisbotBrowserIdForWebContents(guest)).toBe("browser-a");
+    expect(getClisbotBrowserWorkspaceId("browser-a")).toBe("workspace-a");
+    unregisterClisbotBrowser("browser-a");
   });
 
   test("rejects a guest hosted by another renderer", () => {
@@ -88,7 +88,7 @@ describe("browser webview attachment", () => {
     const claimant = new FakeRenderer(2);
     const guest = new FakeBrowserGuest(201, owner, profileSession);
 
-    const registered = registerAttachedPaseoBrowser({
+    const registered = registerAttachedClisbotBrowser({
       browserId: "browser-rejected-owner",
       workspaceId: "workspace-a",
       webContentsId: guest.id,
@@ -98,7 +98,7 @@ describe("browser webview attachment", () => {
     });
 
     expect(registered).toBe(false);
-    expect(getPaseoBrowserIdForWebContents(guest)).toBeNull();
+    expect(getClisbotBrowserIdForWebContents(guest)).toBeNull();
   });
 
   test("rejects a guest outside the shared profile", () => {
@@ -106,7 +106,7 @@ describe("browser webview attachment", () => {
     const renderer = new FakeRenderer(1);
     const guest = new FakeBrowserGuest(301, renderer, {});
 
-    const registered = registerAttachedPaseoBrowser({
+    const registered = registerAttachedClisbotBrowser({
       browserId: "browser-rejected-profile",
       workspaceId: "workspace-a",
       webContentsId: guest.id,
@@ -116,7 +116,7 @@ describe("browser webview attachment", () => {
     });
 
     expect(registered).toBe(false);
-    expect(getPaseoBrowserIdForWebContents(guest)).toBeNull();
+    expect(getClisbotBrowserIdForWebContents(guest)).toBeNull();
   });
 
   test("concurrent windows cannot swap browser identities", () => {
@@ -130,7 +130,7 @@ describe("browser webview attachment", () => {
       [secondGuest.id, secondGuest],
     ]);
 
-    registerAttachedPaseoBrowser({
+    registerAttachedClisbotBrowser({
       browserId: "browser-second",
       workspaceId: "workspace-second",
       webContentsId: secondGuest.id,
@@ -138,7 +138,7 @@ describe("browser webview attachment", () => {
       profileSession,
       findWebContents: (id) => guests.get(id) ?? null,
     });
-    registerAttachedPaseoBrowser({
+    registerAttachedClisbotBrowser({
       browserId: "browser-first",
       workspaceId: "workspace-first",
       webContentsId: firstGuest.id,
@@ -147,10 +147,10 @@ describe("browser webview attachment", () => {
       findWebContents: (id) => guests.get(id) ?? null,
     });
 
-    expect(getPaseoBrowserIdForWebContents(firstGuest)).toBe("browser-first");
-    expect(getPaseoBrowserIdForWebContents(secondGuest)).toBe("browser-second");
-    unregisterPaseoBrowser("browser-first");
-    unregisterPaseoBrowser("browser-second");
+    expect(getClisbotBrowserIdForWebContents(firstGuest)).toBe("browser-first");
+    expect(getClisbotBrowserIdForWebContents(secondGuest)).toBe("browser-second");
+    unregisterClisbotBrowser("browser-first");
+    unregisterClisbotBrowser("browser-second");
   });
 
   test("unregisters the same browser only from its requesting host", () => {
@@ -164,7 +164,7 @@ describe("browser webview attachment", () => {
       [firstRenderer, firstGuest],
       [secondRenderer, secondGuest],
     ] as const) {
-      registerAttachedPaseoBrowser({
+      registerAttachedClisbotBrowser({
         browserId: "browser-shared-hosts",
         workspaceId: "workspace-shared",
         webContentsId: guest.id,
@@ -174,20 +174,20 @@ describe("browser webview attachment", () => {
       });
     }
 
-    unregisterPaseoBrowserFromHost(firstRenderer.id, "browser-shared-hosts");
+    unregisterClisbotBrowserFromHost(firstRenderer.id, "browser-shared-hosts");
 
-    expect(getPaseoBrowserIdForWebContents(firstGuest)).toBeNull();
-    expect(getPaseoBrowserIdForWebContents(secondGuest)).toBe("browser-shared-hosts");
-    expect(getPaseoBrowserWorkspaceId("browser-shared-hosts")).toBe("workspace-shared");
-    unregisterPaseoBrowser("browser-shared-hosts");
+    expect(getClisbotBrowserIdForWebContents(firstGuest)).toBeNull();
+    expect(getClisbotBrowserIdForWebContents(secondGuest)).toBe("browser-shared-hosts");
+    expect(getClisbotBrowserWorkspaceId("browser-shared-hosts")).toBe("workspace-shared");
+    unregisterClisbotBrowser("browser-shared-hosts");
   });
 
   test("removes registration when the guest is destroyed", () => {
     const profileSession = {};
     const renderer = new FakeRenderer(31);
     const guest = new FakeBrowserGuest(601, renderer, profileSession);
-    preparePaseoBrowserWebContents(guest);
-    registerAttachedPaseoBrowser({
+    prepareClisbotBrowserWebContents(guest);
+    registerAttachedClisbotBrowser({
       browserId: "browser-cleanup",
       workspaceId: "workspace-cleanup",
       webContentsId: guest.id,
@@ -196,10 +196,10 @@ describe("browser webview attachment", () => {
       findWebContents: () => guest,
     });
 
-    expect(getPaseoBrowserIdForWebContents(guest)).toBe("browser-cleanup");
+    expect(getClisbotBrowserIdForWebContents(guest)).toBe("browser-cleanup");
 
     guest.destroy();
 
-    expect(getPaseoBrowserIdForWebContents(guest)).toBeNull();
+    expect(getClisbotBrowserIdForWebContents(guest)).toBeNull();
   });
 });

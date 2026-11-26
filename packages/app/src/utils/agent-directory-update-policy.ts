@@ -1,5 +1,5 @@
 import equal from "fast-deep-equal";
-import type { AgentMetric, AgentUsage } from "@getpaseo/protocol/agent-types";
+import type { AgentMetric, AgentUsage } from "@clisbot/protocol/agent-types";
 
 interface AgentUpdateValue {
   updatedAt: Date | string;

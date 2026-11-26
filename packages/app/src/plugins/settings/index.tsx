@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Platform, ScrollView, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { router } from "expo-router";
-import type { PluginHostProps } from "@getpaseo/plugin/client";
+import type { PluginHostProps } from "@clisbot/plugin/client";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { useIsCompactFormFactor } from "@/constants/layout";

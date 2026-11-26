@@ -1,4 +1,4 @@
-import { getParentAgentIdFromLabels } from "@getpaseo/protocol/agent-labels";
+import { getParentAgentIdFromLabels } from "@clisbot/protocol/agent-labels";
 import type { AgentSnapshotPayload } from "../messages.js";
 import type { WorkspaceRegistry } from "../workspace-registry.js";
 import type { AgentManager, ManagedAgent } from "./agent-manager.js";

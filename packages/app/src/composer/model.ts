@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { JsonValue, ProviderOptions } from "@getpaseo/protocol/agent-types";
+import type { JsonValue, ProviderOptions } from "@clisbot/protocol/agent-types";
 import type { UserComposerAttachment } from "@/attachments/types";
 
 /** Everything a plugin can read of a composer. A new object whenever any of it changes. */

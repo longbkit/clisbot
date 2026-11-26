@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   CheckoutPrStatusResponse,
   PullRequestTimelineResponse,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import {
   createInMemoryUnsupportedTimelineRegistry,
   extractPrRepoIdentity,
@@ -40,7 +40,7 @@ function prStatus(overrides: Partial<CheckoutPrStatus> = {}): CheckoutPrStatus {
   return {
     forge: "github",
     number: 42,
-    url: "https://github.com/getpaseo/paseo/pull/42",
+    url: "https://github.com/longbkit/clisbot/pull/42",
     title: "Wire real PR pane data",
     state: "open",
     baseRefName: "main",
@@ -51,7 +51,7 @@ function prStatus(overrides: Partial<CheckoutPrStatus> = {}): CheckoutPrStatus {
     checks: [],
     reviewDecision: null,
     repoOwner: "getpaseo",
-    repoName: "paseo",
+    repoName: "clisbot",
     github: githubStatus,
     ...overrides,
   };
@@ -119,7 +119,7 @@ describe("extractPrRepoIdentity", () => {
     expect(extractPrRepoIdentity(prStatus())).toEqual({
       prNumber: 42,
       repoOwner: "getpaseo",
-      repoName: "paseo",
+      repoName: "clisbot",
     });
   });
 
@@ -152,7 +152,7 @@ describe("shouldFetchTimelineFrom", () => {
     timelineEnabled: true,
     githubFeaturesEnabled: true,
     cwd: "/repo",
-    identity: { prNumber: 42, repoOwner: "getpaseo", repoName: "paseo" },
+    identity: { prNumber: 42, repoOwner: "getpaseo", repoName: "clisbot" },
     timelineUnsupported: false,
   };
 
@@ -213,11 +213,11 @@ describe("fetchPrPaneTimelinePage", () => {
       cwd: "/repo",
       prNumber: 42,
       repoOwner: "getpaseo",
-      repoName: "paseo",
+      repoName: "clisbot",
     });
 
     expect(client.calls).toEqual([
-      { cwd: "/repo", prNumber: 42, repoOwner: "getpaseo", repoName: "paseo" },
+      { cwd: "/repo", prNumber: 42, repoOwner: "getpaseo", repoName: "clisbot" },
     ]);
   });
 
@@ -230,7 +230,7 @@ describe("fetchPrPaneTimelinePage", () => {
           author: "octocat",
           body: "Looks good",
           createdAt: Date.now(),
-          url: "https://github.com/getpaseo/paseo/pull/42#c1",
+          url: "https://github.com/longbkit/clisbot/pull/42#c1",
         },
       ],
     });
@@ -244,7 +244,7 @@ describe("fetchPrPaneTimelinePage", () => {
       cwd: "/repo",
       prNumber: 42,
       repoOwner: "getpaseo",
-      repoName: "paseo",
+      repoName: "clisbot",
     });
 
     expect(result).toBe(payload);
@@ -265,7 +265,7 @@ describe("fetchPrPaneTimelinePage", () => {
         cwd: "/repo",
         prNumber: 99,
         repoOwner: "getpaseo",
-        repoName: "paseo",
+        repoName: "clisbot",
       }),
     ).rejects.toBe(error);
 
@@ -289,7 +289,7 @@ describe("fetchPrPaneTimelinePage", () => {
         cwd: "/repo",
         prNumber: 99,
         repoOwner: "getpaseo",
-        repoName: "paseo",
+        repoName: "clisbot",
       }),
     ).rejects.toBe(error);
 
@@ -315,7 +315,7 @@ describe("fetchPrPaneTimelinePage", () => {
         cwd: "/repo-a",
         prNumber: 1,
         repoOwner: "getpaseo",
-        repoName: "paseo",
+        repoName: "clisbot",
       }),
     ).rejects.toThrow();
 
@@ -326,7 +326,7 @@ describe("fetchPrPaneTimelinePage", () => {
       cwd: "/repo-b",
       prNumber: 2,
       repoOwner: "getpaseo",
-      repoName: "paseo",
+      repoName: "clisbot",
     });
 
     expect(result.prNumber).toBe(2);
@@ -431,7 +431,7 @@ describe("selectPrPaneState", () => {
             author: "octocat",
             body: "Belongs to another PR",
             createdAt: Date.now(),
-            url: "https://github.com/getpaseo/paseo/pull/41#c1",
+            url: "https://github.com/longbkit/clisbot/pull/41#c1",
           },
         ],
       }),

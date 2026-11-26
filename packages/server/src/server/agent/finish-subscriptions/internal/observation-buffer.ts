@@ -1,4 +1,4 @@
-import type { WaitForFinishResult } from "@getpaseo/client/internal/daemon-client";
+import type { WaitForFinishResult } from "@clisbot/client/internal/daemon-client";
 
 export type FinishObservationResult = WaitForFinishResult & {
   reason?: "was canceled" | "host unreachable" | "host removed";

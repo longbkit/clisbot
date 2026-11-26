@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentSnapshotPayload } from "@getpaseo/protocol/messages";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import { buildWaitResult } from "./wait.js";
 
 const agentId = "11111111-1111-4111-8111-111111111111";
@@ -22,7 +22,7 @@ describe("buildWaitResult", () => {
       expect.objectContaining({
         code: "AGENT_NOT_FOUND",
         message: "Agent not found: does-not-exist",
-        details: "Use `paseo ls` to list available agents",
+        details: "Use `clisbot ls` to list available agents",
       }),
     );
   });

@@ -224,7 +224,7 @@ export interface AgentUsage {
 export type AgentMetricTone = "default" | "ok" | "warning" | "danger";
 
 /**
- * One provider-owned label/value row. The provider formats `value`; Paseo renders
+ * One provider-owned label/value row. The provider formats `value`; Clisbot renders
  * it as given and never interprets it.
  */
 export interface AgentMetric {

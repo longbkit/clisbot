@@ -109,7 +109,7 @@ export async function checkDiffRevisions(
     let selected = checkoutBases.get(key);
     if (!selected) {
       selected = resolveCheckoutDiffBase(watch.cwd, base.compare, {
-        paseoHome: base.paseoHome,
+        clisbotHome: base.clisbotHome,
         runGitCommand: (args, options) => git(args, { ...options, timeout: TIMEOUT_MS }),
       }).catch(() => undefined);
       checkoutBases.set(key, selected);

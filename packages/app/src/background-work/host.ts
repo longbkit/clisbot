@@ -1,5 +1,5 @@
-import type { PaseoAgentBackgroundWorkItem } from "@getpaseo/client";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { ClisbotAgentBackgroundWorkItem } from "@clisbot/client";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { createBackgroundWorkModel } from "./model";
 
@@ -7,8 +7,8 @@ interface BackgroundWorkClient {
   getLastServerInfoMessage(): {
     features?: { agentBackgroundWork?: boolean; agentBackgroundWorkStop?: boolean } | null;
   } | null;
-  stopAgentBackgroundWork(agentId: string, item: PaseoAgentBackgroundWorkItem): Promise<void>;
-  listAgentBackgroundWork(agentId: string): Promise<PaseoAgentBackgroundWorkItem[]>;
+  stopAgentBackgroundWork(agentId: string, item: ClisbotAgentBackgroundWorkItem): Promise<void>;
+  listAgentBackgroundWork(agentId: string): Promise<ClisbotAgentBackgroundWorkItem[]>;
   observeAgentBackgroundWork(): {
     subscribe(observer: {
       snapshot(): void;
@@ -38,7 +38,7 @@ export function createHostBackgroundWorkModel(
   host: BackgroundWorkHost = hostFor(serverId),
 ) {
   let client: BackgroundWorkClient | null = null;
-  const controls = (items: PaseoAgentBackgroundWorkItem[]) => {
+  const controls = (items: ClisbotAgentBackgroundWorkItem[]) => {
     // COMPAT(agentBackgroundWorkStop): added after v0.15.0, remove after 2027-05-03.
     if (client?.getLastServerInfoMessage()?.features?.agentBackgroundWorkStop === true)
       return items;

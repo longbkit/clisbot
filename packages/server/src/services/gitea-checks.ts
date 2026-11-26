@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { normalizeHost } from "@getpaseo/protocol/git-remote";
+import { normalizeHost } from "@clisbot/protocol/git-remote";
 
 // 50 is the page-size cap Gitea enforces on list endpoints; five pages bounds
 // the sweep to the 250 most recent Actions tasks.

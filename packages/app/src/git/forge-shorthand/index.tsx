@@ -1,4 +1,4 @@
-import type { ForgeWeb } from "@getpaseo/protocol/messages";
+import type { ForgeWeb } from "@clisbot/protocol/messages";
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
 import { createForgeShorthand, type ForgeShorthand } from "./shorthand";
 

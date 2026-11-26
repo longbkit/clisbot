@@ -40,7 +40,7 @@ async function expectUncoveredMatch(page: Page) {
       const selected = await page.evaluate(() => {
         const term = (
           window as Window & {
-            __paseoTerminal?: {
+            __clisbotTerminal?: {
               rows: number;
               cols: number;
               buffer: { active: { viewportY: number } };
@@ -49,7 +49,7 @@ async function expectUncoveredMatch(page: Page) {
                 | undefined;
             };
           }
-        ).__paseoTerminal;
+        ).__clisbotTerminal;
         const selection = term?.getSelectionPosition();
         return term && selection
           ? { selection, rows: term.rows, cols: term.cols, firstRow: term.buffer.active.viewportY }
@@ -74,8 +74,8 @@ async function expectUncoveredMatch(page: Page) {
 async function viewport(page: Page) {
   return page.evaluate(
     () =>
-      (window as Window & { __paseoTerminal?: { buffer: { active: { viewportY: number } } } })
-        .__paseoTerminal?.buffer.active.viewportY,
+      (window as Window & { __clisbotTerminal?: { buffer: { active: { viewportY: number } } } })
+        .__clisbotTerminal?.buffer.active.viewportY,
   );
 }
 
@@ -165,7 +165,7 @@ async function openNumberedFileInVim(page: Page) {
 
 async function readVimScreen(page: Page) {
   const rows = await page.evaluate(
-    () => (window as Window & { __paseoTerminal: { rows: number } }).__paseoTerminal.rows,
+    () => (window as Window & { __clisbotTerminal: { rows: number } }).__clisbotTerminal.rows,
   );
   const text = await getTerminalBufferText(page);
   const numberedLines = text
@@ -560,9 +560,9 @@ async function openPhoneTerminalHistory(page: Page) {
   await openPhoneTerminal(page);
   await expect.poll(() => getTerminalBufferText(page)).toContain("HISTORY_150");
   await expect
-    .poll(() => page.evaluate(() => window.__paseoTerminal!.buffer.active.baseY))
+    .poll(() => page.evaluate(() => window.__clisbotTerminal!.buffer.active.baseY))
     .toBeGreaterThan(0);
-  await page.evaluate(() => window.__paseoTerminal!.scrollToBottom());
+  await page.evaluate(() => window.__clisbotTerminal!.scrollToBottom());
   await expect.poll(() => viewport(page)).toBeGreaterThan(0);
 }
 
@@ -605,10 +605,10 @@ async function openPhoneInputCapture(page: Page, mode: "alternate" | "mouse") {
   await input(page).press("x");
   await expect.poll(() => getTerminalBufferText(page)).toContain("TOUCH_INPUT_READY");
   await expect
-    .poll(() => page.evaluate(() => window.__paseoTerminal!.buffer.active.type))
+    .poll(() => page.evaluate(() => window.__clisbotTerminal!.buffer.active.type))
     .toBe(mode === "alternate" ? "alternate" : "normal");
   await expect
-    .poll(() => page.evaluate(() => window.__paseoTerminal!.modes.mouseTrackingMode))
+    .poll(() => page.evaluate(() => window.__clisbotTerminal!.modes.mouseTrackingMode))
     .toBe(mode === "mouse" ? "vt200" : "none");
 }
 
@@ -667,7 +667,7 @@ async function dragTerminalWithFinger(
       .locator(".xterm-screen");
     const box = await screen.boundingBox();
     if (!box) throw new Error("Terminal screen is not visible");
-    const rows = await page.evaluate(() => window.__paseoTerminal!.rows);
+    const rows = await page.evaluate(() => window.__clisbotTerminal!.rows);
     const lineHeight = box.height / rows;
     const before = (await viewport(page))!;
     const session = await page.context().newCDPSession(page);

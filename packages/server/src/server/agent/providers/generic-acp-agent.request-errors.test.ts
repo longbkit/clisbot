@@ -35,7 +35,7 @@ async function withFakeACPAgent(
   mode: "reject-set-mode" | "reject-set-config-option",
   run: (command: [string, ...string[]], cwd: string) => Promise<void>,
 ): Promise<void> {
-  const testDir = await mkdtemp(path.join(tmpdir(), "paseo-acp-request-errors-"));
+  const testDir = await mkdtemp(path.join(tmpdir(), "clisbot-acp-request-errors-"));
   try {
     const scriptPath = path.join(testDir, "fake-acp-agent.cjs");
     await writeFile(scriptPath, fakeACPAgentScript, "utf8");

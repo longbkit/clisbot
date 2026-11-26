@@ -8,7 +8,7 @@ export interface WorkerTerminalState {
   hasOutput: boolean;
   title?: string;
 }
-import type { TerminalActivity, TerminalActivityState } from "@getpaseo/protocol/terminal-activity";
+import type { TerminalActivity, TerminalActivityState } from "@clisbot/protocol/terminal-activity";
 import type { CaptureTerminalLinesResult } from "./terminal-capture.js";
 
 export interface WorkerTerminalInfo {
@@ -34,10 +34,10 @@ export interface WorkerCreateTerminalOptions {
   activityToken?: string;
   activityUrl?: string | null;
   // The worker outlives the daemon that started it, so the controlling daemon
-  // sends its own environment and Paseo CLI path with every create instead of
+  // sends its own environment and Clisbot CLI path with every create instead of
   // letting the worker reuse whatever it inherited at launch.
   baseEnv?: Record<string, string>;
-  paseoCliPath?: string | null;
+  clisbotCliPath?: string | null;
 }
 
 // Bumped when a request, response or event changes shape. The frozen envelope never changes
@@ -49,7 +49,7 @@ export const TERMINAL_WORKER_PROTOCOL_VERSION = 6;
 
 // Test-only: the protocol version a worker reports, so tests can stand up older and newer
 // workers from one build.
-export const TERMINAL_WORKER_PROTOCOL_OVERRIDE_ENV = "PASEO_TERMINAL_WORKER_PROTOCOL_OVERRIDE";
+export const TERMINAL_WORKER_PROTOCOL_OVERRIDE_ENV = "CLISBOT_TERMINAL_WORKER_PROTOCOL_OVERRIDE";
 
 /** How a daemon at `current` treats a worker reporting `reported`. */
 export type TerminalWorkerProtocolFit = "current" | "previous" | "obsolete" | "newer";
@@ -58,7 +58,7 @@ export function classifyTerminalWorkerProtocol(
   reported: unknown,
   current: number = TERMINAL_WORKER_PROTOCOL_VERSION,
 ): TerminalWorkerProtocolFit {
-  // A version this daemon cannot read comes from a Paseo it does not know: treat it as newer.
+  // A version this daemon cannot read comes from a Clisbot it does not know: treat it as newer.
   if (typeof reported !== "number" || !Number.isSafeInteger(reported)) return "newer";
   if (reported === current) return "current";
   // Protocols 1 through 4 were unreleased; they have no draining adapter.

@@ -1,8 +1,5 @@
 import equal from "fast-deep-equal";
-import type {
-  ScriptStatusUpdateMessage,
-  SessionOutboundMessage,
-} from "@getpaseo/protocol/messages";
+import type { ScriptStatusUpdateMessage, SessionOutboundMessage } from "@clisbot/protocol/messages";
 import {
   normalizeProjectDescriptor,
   normalizeWorkspaceDescriptor,

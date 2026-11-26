@@ -177,7 +177,7 @@ describe("workspace ranking", () => {
       id: "long-input",
       title: "Long input",
       // "login" is a subsequence of "long-input", the weakest kind of match.
-      subtitle: "Local · paseo · feature/long-input",
+      subtitle: "Local · clisbot · feature/long-input",
       agents: [login],
       opened,
     });
@@ -209,7 +209,7 @@ describe("workspace ranking", () => {
     const row = workspace({
       id: "fix-login-bug",
       title: "fix-login-bug",
-      subtitle: "paseo · fix/login-bug",
+      subtitle: "clisbot · fix/login-bug",
       agents: [agent("agent-login", "Login page fix")],
     });
     const rank = createWorkspaceRanker();
@@ -231,7 +231,7 @@ describe("workspace ranking", () => {
     const loose = workspace({
       id: "loose-own",
       title: "Long input",
-      subtitle: "Local · paseo · feature/long-input",
+      subtitle: "Local · clisbot · feature/long-input",
       activityAt: new Date("2026-10-17T00:00:00Z"),
     });
     const viaAgent = workspace({

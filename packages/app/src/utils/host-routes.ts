@@ -1,5 +1,5 @@
 import { Buffer } from "buffer";
-import { buildAgentDeepLinkRoute } from "@getpaseo/protocol/agent-deep-link";
+import { buildAgentDeepLinkRoute } from "@clisbot/protocol/agent-deep-link";
 
 type NullableString = string | null | undefined;
 const BASE64_WORKSPACE_ID_PREFIX = "b64_";

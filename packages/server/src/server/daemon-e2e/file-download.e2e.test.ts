@@ -73,7 +73,7 @@ describe("daemon E2E", () => {
       const cwd = tmpCwd();
       writeFileSync(path.join(cwd, "download.bin"), "download bytes");
       try {
-        // The web UI behind a remapped port (for example Docker -p 8080:6767): the page is at
+        // The web UI behind a remapped port (for example Docker -p 8080:6868): the page is at
         // http://127.0.0.1:8080 and the app sends the request to localhost:8080. The WebSocket
         // accepts this origin, so the download must as well.
         const token = await ctx.client.requestDownloadToken(cwd, "download.bin");

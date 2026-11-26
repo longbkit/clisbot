@@ -6,7 +6,7 @@ import { writeFileAtomic, writeJsonFileAtomic } from "./atomic-file.js";
 
 let directory: string;
 beforeEach(async () => {
-  directory = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-atomic-file-"));
+  directory = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-atomic-file-"));
 });
 afterEach(async () => {
   await fs.rm(directory, { recursive: true, force: true });

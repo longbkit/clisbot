@@ -8,10 +8,10 @@ category: Plugins
 
 # Plugin hooks
 
-Use `server.addHook(name, handler)` in `index.server.ts`. Hooks run while the plugin is enabled, even with no app connected. `addHook` is available from Paseo 0.14; set `requirements.paseo` to the release you build against.
+Use `server.addHook(name, handler)` in `index.server.ts`. Hooks run while the plugin is enabled, even with no app connected. `addHook` is available from Clisbot 0.14; set `requirements.clisbot` to the release you build against.
 
 ```ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 
 export default function contribute(server: PluginServerContext) {
   const remove = server.addHook("agent.open.before", async ({ request }) => ({
@@ -24,10 +24,10 @@ export default function contribute(server: PluginServerContext) {
 
 ## Naming and timing
 
-Names follow `subject.operation.position`: the subject, the operation, then `before` or `after`. The name identifies a lifecycle position. Whether Paseo waits is a per-hook property shown in the table below. `workspace` covers every workspace; `worktree` covers only git worktrees.
+Names follow `subject.operation.position`: the subject, the operation, then `before` or `after`. The name identifies a lifecycle position. Whether Clisbot waits is a per-hook property shown in the table below. `workspace` covers every workspace; `worktree` covers only git worktrees.
 
-- Waiting hooks finish before Paseo continues. Throwing, returning invalid data, or exceeding 30 seconds fails the operation with `Plugin <id> <hook> failed: …`. Request-changing hooks receive `{ request }` and may return a complete replacement request or `undefined`.
-- Notifications receive the event object and return `Promise<void>`. Paseo does not wait; errors are logged against the plugin and the operation continues. `agent.turn.before` and `agent.permission.before` are notifications fired when a turn starts or a permission becomes pending.
+- Waiting hooks finish before Clisbot continues. Throwing, returning invalid data, or exceeding 30 seconds fails the operation with `Plugin <id> <hook> failed: …`. Request-changing hooks receive `{ request }` and may return a complete replacement request or `undefined`.
+- Notifications receive the event object and return `Promise<void>`. Clisbot does not wait; errors are logged against the plugin and the operation continues. `agent.turn.before` and `agent.permission.before` are notifications fired when a turn starts or a permission becomes pending.
 
 All handlers must be async. Turn completion includes success, failure, and cancellation; inspect `outcome`. Permission completion includes every resolution; inspect `resolution`.
 
@@ -45,7 +45,7 @@ server.addHook("worktree.create.after", async ({ worktree }) => {
 });
 ```
 
-Paseo only sees the returned promise, so detached work gets no error reporting and no cancellation `signal`.
+Clisbot only sees the returned promise, so detached work gets no error reporting and no cancellation `signal`.
 
 ## Hooks
 
@@ -106,12 +106,12 @@ type PluginTurnOutcome =
 
 ## Metadata
 
-Agents and workspaces carry a `metadata` record for plugin data. Keys are strings, values are any JSON value, and Paseo stores the record without reading a key. Prefix keys with your plugin id so plugins do not collide. Labels stay strings for filtering and tagging; use metadata for structured data.
+Agents and workspaces carry a `metadata` record for plugin data. Keys are strings, values are any JSON value, and Clisbot stores the record without reading a key. Prefix keys with your plugin id so plugins do not collide. Labels stay strings for filtering and tagging; use metadata for structured data.
 
 Set metadata when you create the agent or workspace, or change it later. `null` removes a key, and any other value replaces the key's whole value:
 
 ```ts
-const agent = await paseo.agents.create({
+const agent = await clisbot.agents.create({
   config: { provider: "codex/gpt-5.5" },
   cwd: "/projects/shop",
   metadata: { "linear.issue": { id: "ENG-123" } },
@@ -119,7 +119,7 @@ const agent = await paseo.agents.create({
 
 agent.metadata; // { "linear.issue": { id: "ENG-123" } }
 await agent.setMetadata({ "linear.issue": null });
-await paseo.workspaces.ref(workspaceId).setMetadata({ "linear.issue": { id: "ENG-123" } });
+await clisbot.workspaces.ref(workspaceId).setMetadata({ "linear.issue": { id: "ENG-123" } });
 ```
 
 Metadata survives a daemon restart. Every hook payload carries it: `workspace.create.before` and `agent.create.before` receive the metadata the caller sent, and the `after` hooks and `agent.open.before` receive what is stored. Against a host that predates metadata, these calls throw "Update the host to use metadata."
@@ -172,7 +172,7 @@ server.addHook("workspace.archive.after", async ({ workspace }) => {
 
 ## worktree.create.before {#worktreecreatebefore}
 
-Choose the location and creation options for a new worktree. Paseo awaits this hook before `git worktree add`, on creation from the app, CLI, MCP, and agent creation. Receives `{ request }`; return a complete replacement request or `undefined` to keep it. Throwing, invalid returned data, or a 30-second timeout aborts creation with the plugin and hook named in the error.
+Choose the location and creation options for a new worktree. Clisbot awaits this hook before `git worktree add`, on creation from the app, CLI, MCP, and agent creation. Receives `{ request }`; return a complete replacement request or `undefined` to keep it. Throwing, invalid returned data, or a 30-second timeout aborts creation with the plugin and hook named in the error.
 
 ```ts
 import { basename, dirname, join } from "node:path";
@@ -186,7 +186,7 @@ server.addHook("worktree.create.before", async ({ request }) => ({
 }));
 ```
 
-For source `/home/me/src/paseo` and branch `feature/x`, this creates `/home/me/src/paseo.feature-x`. See the complete [worktree-placement example](https://github.com/getpaseo/paseo/tree/main/plugin-examples/worktree-placement).
+For source `/home/me/src/clisbot` and branch `feature/x`, this creates `/home/me/src/clisbot.feature-x`. See the complete [worktree-placement example](https://github.com/longbkit/clisbot/tree/main/plugin-examples/worktree-placement).
 
 | Request field                             | Meaning                                                                                                                                           |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -204,15 +204,15 @@ For source `/home/me/src/paseo` and branch `feature/x`, this creates `/home/me/s
 
 Once `path` is returned, `slug` only feeds branch-off naming; the CLI looks up worktrees by the basename of their path.
 
-Every field except `repoRoot` and `sourceCheckout` is transformable. Return all required facts for the chosen `kind`. Paseo resolves the Git source plan after this hook, so handlers can change the branch and base before fetching refs, while Git can still choose a unique final branch name afterward.
+Every field except `repoRoot` and `sourceCheckout` is transformable. Return all required facts for the chosen `kind`. Clisbot resolves the Git source plan after this hook, so handlers can change the branch and base before fetching refs, while Git can still choose a unique final branch name afterward.
 
-Paseo resolves symlinked parents and validates the returned path. It must be absolute, must not exist, and must not be the filesystem root, your home directory, the repository root, inside a `.git` directory, or an ancestor of the repository. An existing destination fails creation; Paseo never adds a suffix to a plugin-chosen path. The plugin must leave directory creation to Paseo.
+Clisbot resolves symlinked parents and validates the returned path. It must be absolute, must not exist, and must not be the filesystem root, your home directory, the repository root, inside a `.git` directory, or an ancestor of the repository. An existing destination fails creation; Clisbot never adds a suffix to a plugin-chosen path. The plugin must leave directory creation to Clisbot.
 
 Ordering: `worktree.create.before` → worktree manager `create` (or `git worktree add`) → `worktree.create.after` → workspace registration. To delegate `git worktree add`, removal, and restoration to an external tool such as Worktrunk, register a [worktree manager](/docs/plugins/reference#worktree-managers) with `server.registerWorktreeManager()` instead of creating directories inside `worktree.create.before`. Restoring a missing worktree recreates it at its recorded path without running creation hooks, delegating to the owning manager's optional `restore` handler when present.
 
 ## worktree.create.after
 
-Paseo waits for this hook after a new git worktree exists and before workspace registration, setup, terminals, or agents. Receives `{ worktree: { path, branch, sourceCheckout } }`: the absolute worktree path, branch name, and source checkout directory. There is no workspace id yet. Return nothing; write files directly into the worktree. Throwing or exceeding 30 seconds aborts creation and removes the new worktree.
+Clisbot waits for this hook after a new git worktree exists and before workspace registration, setup, terminals, or agents. Receives `{ worktree: { path, branch, sourceCheckout } }`: the absolute worktree path, branch name, and source checkout directory. There is no workspace id yet. Return nothing; write files directly into the worktree. Throwing or exceeding 30 seconds aborts creation and removes the new worktree.
 
 This covers branch-off, branch checkout, and PR checkout creation. Restoring a missing archived worktree uses a separate recovery path and does not fire this hook.
 
@@ -288,8 +288,8 @@ Receives `{ request }`; only `env`, `appendSystemPrompt`, `tools`, and `mcpServe
 Do not await a write to the agent being opened: `setMetadata`, `setLabels`, or an option, model, thinking or mode change. The write waits for the open to finish, the open waits for your hook, so the hook times out and the open fails. Start the write without awaiting it; it runs right after the open:
 
 ```ts
-server.addHook("agent.open.before", async ({ request }, { paseo }) => {
-  void paseo.agents
+server.addHook("agent.open.before", async ({ request }, { clisbot }) => {
+  void clisbot.agents
     .ref(request.agentId)
     .setMetadata({ "my.plugin": { openedBy: "hook" } })
     .catch((error) => console.error(error));
@@ -340,7 +340,7 @@ server.addHook("agent.open.before", async ({ request }) => ({
 
 Instructions follow the saved agent prompt and daemon instructions, in plugin order. They are not saved in the agent configuration and are ignored for history opens. Reload the plugin after changing its data to apply new instructions on the next reopen. Running turns continue; removing an instruction does not remove conversation history. Internal agents also receive these instructions. The ACP adapter does not send system instructions to its providers. Plugin providers receive the composed prompt, but must apply it themselves.
 
-Codex instruction updates require Codex 0.121.0 or newer with a recognizable version reported by the app server. Source builds reporting `0.0.0` must use a versioned build. Paseo adds a current instruction snapshot to existing threads; earlier snapshots remain in the conversation. A crash during an update or rewinding a thread can repeat a snapshot.
+Codex instruction updates require Codex 0.121.0 or newer with a recognizable version reported by the app server. Source builds reporting `0.0.0` must use a versioned build. Clisbot adds a current instruction snapshot to existing threads; earlier snapshots remain in the conversation. A crash during an update or rewinding a thread can repeat a snapshot.
 
 ### Inject environment variables on every session opening
 
@@ -382,10 +382,10 @@ server.addHook("agent.open.before", async ({ request }) => {
 `request.mcpServers` uses the same server configurations as `AgentSessionConfig.mcpServers`.
 The map starts empty for each plugin and accumulates across that plugin's own callbacks. It never
 contains the agent's saved servers or another plugin's servers. Replace the map to add, replace,
-or remove this plugin's entries; returning `undefined` preserves it. Paseo merges the plugins'
+or remove this plugin's entries; returning `undefined` preserves it. Clisbot merges the plugins'
 final maps in plugin-ID order.
 
-A name colliding with a saved server, Paseo's internal `paseo` server, or another plugin's server
+A name colliding with a saved server, Clisbot's internal `clisbot` server, or another plugin's server
 fails the session open and names the server and both sources. A provider without MCP support fails
 with `does not support MCP servers`, naming the plugin. Opens with `purpose: "history"` ignore
 these servers. Install, disable, and reload changes reach existing agents through the
@@ -400,7 +400,7 @@ This example gives `append_workspace_note` only to agents with the label `notes/
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { defineAgentTool, type PluginServerContext } from "@getpaseo/plugin/server";
+import { defineAgentTool, type PluginServerContext } from "@clisbot/plugin/server";
 
 const appendWorkspaceNote = defineAgentTool({
   name: "append_workspace_note",
@@ -428,7 +428,7 @@ export default function contribute(server: PluginServerContext) {
 Set the label when creating an agent with the SDK:
 
 ```ts
-const agent = await paseo.agents.create({
+const agent = await clisbot.agents.create({
   config: { provider: "codex/gpt-5.4" },
   cwd: "/projects/shop",
   labels: { "notes/enabled": "true" },
@@ -450,7 +450,7 @@ callbacks in that plugin; replace the array to add or remove tools. Returning `u
 the request. Tools are ignored for `purpose: "history"`.
 
 Import `defineAgentTool`, `AgentToolDefinition`, `AgentToolContext`, and `AgentToolResult` from
-`@getpaseo/plugin/server`. The helper infers the validated input from your Zod schema:
+`@clisbot/plugin/server`. The helper infers the validated input from your Zod schema:
 
 ```ts
 declare function defineAgentTool<Input extends z.ZodType>(tool: {
@@ -474,37 +474,37 @@ interface AgentToolResult {
 | Execution context | Value                                                                                               |
 | ----------------- | --------------------------------------------------------------------------------------------------- |
 | `agent`           | Calling agent as a `PluginHookAgent`, including `id`, `workspaceId`, `provider`, `cwd`, and `title` |
-| `paseo`           | SDK connected to this daemon                                                                        |
+| `clisbot`         | SDK connected to this daemon                                                                        |
 | `signal`          | Abort signal for this tool call; pass it to file operations or external requests                    |
 
 `execute` runs in the plugin process. Closures and the original Zod schema stay there; only tool
-metadata and call inputs/results cross the process boundary. Paseo validates input before calling
+metadata and call inputs/results cross the process boundary. Clisbot validates input before calling
 `execute`. Invalid input returns schema issues to the agent. A thrown error becomes
 `{ isError: true, text: message }` and the plugin keeps running. Canceling the call or closing its
 transport aborts `signal` and discards the result. Tool calls have a 10 minute ceiling, separate
 from the 30 second hook timeout. Closing or reopening an agent session drops its old definitions.
 
 Return model-visible text in `text`. `structuredContent` must be JSON-serializable; when `text` is
-omitted, Paseo formats that value as text for the model. Set `isError: true` to report a tool error.
+omitted, Clisbot formats that value as text for the model. Set `isError: true` to report a tool error.
 
-Paseo delivers attached tools through its agent tool transport, using MCP or native registration
+Clisbot delivers attached tools through its agent tool transport, using MCP or native registration
 as the provider supports. The same definition and callback work with either. Attached tools obey
-the [same gates as Paseo tools](/docs/mcp#limit-paseo-tools-by-provider). Only that agent sees them.
+the [same gates as Clisbot tools](/docs/mcp#limit-clisbot-tools-by-provider). Only that agent sees them.
 
-Names must match `/^[a-z][a-z0-9_]*$/` and be at most 64 characters. A name colliding with a Paseo
+Names must match `/^[a-z][a-z0-9_]*$/` and be at most 64 characters. A name colliding with a Clisbot
 tool or another plugin's tool on the same agent fails the session open and names both owners.
 A duplicate name within one plugin also fails the session open. Agents the callback does not
 target are unaffected.
 
-| Change                                                        | When the agent receives it                                                                                                                                                                                 |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Start, stop, or reload a plugin declaring `agent.open.before` | Open sessions become stale. Each reopens before its next idle prompt; a running turn continues without interruption. The next prompt after that reopen reuses the session.                                 |
-| Change which agents the callback targets                      | Run `paseo plugin reload agent-tools` after editing this example, then send the agent a prompt when it is idle.                                                                                            |
-| Apply immediately                                             | Call `await paseo.agents.ref(id).reload({ requestId: "reload-notes" })`. `requestId` is optional. This reopens the provider session, reruns hooks with `reason: "refresh"`, and interrupts a running turn. |
-| Read the current snapshot                                     | Call `await paseo.agents.ref(id).refresh()`. This reads state without reopening the session.                                                                                                               |
+| Change                                                        | When the agent receives it                                                                                                                                                                                   |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Start, stop, or reload a plugin declaring `agent.open.before` | Open sessions become stale. Each reopens before its next idle prompt; a running turn continues without interruption. The next prompt after that reopen reuses the session.                                   |
+| Change which agents the callback targets                      | Run `clisbot plugin reload agent-tools` after editing this example, then send the agent a prompt when it is idle.                                                                                            |
+| Apply immediately                                             | Call `await clisbot.agents.ref(id).reload({ requestId: "reload-notes" })`. `requestId` is optional. This reopens the provider session, reruns hooks with `reason: "refresh"`, and interrupts a running turn. |
+| Read the current snapshot                                     | Call `await clisbot.agents.ref(id).refresh()`. This reads state without reopening the session.                                                                                                               |
 
 If an automatic reopen fails, the triggering prompt fails with that error. See the
-[complete agent-tools example](https://github.com/getpaseo/paseo/tree/main/plugin-examples/agent-tools).
+[complete agent-tools example](https://github.com/longbkit/clisbot/tree/main/plugin-examples/agent-tools).
 
 ## agent.close.after
 
@@ -542,13 +542,13 @@ A live turn completes, fails, or is canceled. Receives `{ agent, turnId, outcome
 
 ### Send a follow-up when a turn ends
 
-Copy [server/inspect.ts](https://github.com/getpaseo/paseo/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts)
-into your plugin. The helper imports types from `@getpaseo/protocol/agent-types`; add
-`@getpaseo/protocol` at the version matching your daemon to your development dependencies
+Copy [server/inspect.ts](https://github.com/longbkit/clisbot/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts)
+into your plugin. The helper imports types from `@clisbot/protocol/agent-types`; add
+`@clisbot/protocol` at the version matching your daemon to your development dependencies
 and install them before loading the plugin. `latestOutputText` joins text chunks after the latest user message.
 
 ```ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { latestOutputText } from "./server/inspect";
 
 export default function contribute(server: PluginServerContext) {
@@ -557,7 +557,7 @@ export default function contribute(server: PluginServerContext) {
       return;
     }
 
-    const agent = context.paseo.agents.ref(event.agent.id);
+    const agent = context.clisbot.agents.ref(event.agent.id);
     const page = await agent.timeline.refetch({ direction: "tail", limit: 1, wholeTurns: true });
     const turn = page.entries.filter((entry) => entry.turnId === event.turnId);
     const text = latestOutputText(turn.map(({ item }) => item));
@@ -585,10 +585,10 @@ A permission or question becomes pending. Receives `{ agent, request }`; `reques
 
 ### Answer a permission request
 
-Using `shellCommand` from the same [helper file](https://github.com/getpaseo/paseo/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts):
+Using `shellCommand` from the same [helper file](https://github.com/longbkit/clisbot/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts):
 
 ```ts
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { shellCommand } from "./server/inspect";
 
 export default function contribute(server: PluginServerContext) {
@@ -598,7 +598,7 @@ export default function contribute(server: PluginServerContext) {
       return;
     }
 
-    const agent = context.paseo.agents.ref(event.agent.id);
+    const agent = context.clisbot.agents.ref(event.agent.id);
     if (/\brm\s+-rf\b/.test(command)) {
       await agent.respondToPermission({
         requestId: event.request.id,
@@ -660,9 +660,9 @@ server.addHook("agent.turn.after", async ({ agent }) => {
 Creation request
   → agent.create.before hooks (plugin-ID order; registration order within each plugin)
   → resolve defaults and validate provider configuration
-  → derive launch configuration with Paseo runtime tools and daemon prompt
+  → derive launch configuration with Clisbot runtime tools and daemon prompt
   → agent.open.before hooks (same ordering; env and plugin-local tools and MCP servers)
-  → set PASEO_AGENT_ID, PASEO_AGENT_CWD, and PASEO_WORKSPACE_ID when the agent has a workspace
+  → set CLISBOT_AGENT_ID, CLISBOT_AGENT_CWD, and CLISBOT_WORKSPACE_ID when the agent has a workspace
   → open provider session and save agent configuration
 ```
 
@@ -681,7 +681,7 @@ replaces that scope's prior value.
 
 | Contract                           | Behavior                                                                                                         |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `context.paseo`                    | Existing SDK connected to this daemon                                                                            |
+| `context.clisbot`                  | Existing SDK connected to this daemon                                                                            |
 | `context.signal`                   | Aborted on invocation timeout or plugin stop; pass to external requests                                          |
 | Input data                         | Detached snapshot; change state through returned requests or SDK commands                                        |
 | Registration result                | Idempotent remover, e.g. `const remove = server.addHook(...); remove();`                                         |
@@ -694,15 +694,15 @@ replaces that scope's prior value.
 
 ## Complete examples
 
-| Plugin                                                                                                 | Includes                                                                         |
-| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| [lifecycle-logger](https://github.com/getpaseo/paseo/tree/main/plugin-examples/lifecycle-logger)       | Agent, workspace, and worktree hooks; JSON logs with environment values redacted |
-| [lifecycle-actions](https://github.com/getpaseo/paseo/tree/main/plugin-examples/lifecycle-actions)     | Follow-ups, permissions, environment, provider switching, worktree selection     |
-| [agent-configuration](https://github.com/getpaseo/paseo/tree/main/plugin-examples/agent-configuration) | MCP injection and Codex sandbox/approval options                                 |
-| [agent-tools](https://github.com/getpaseo/paseo/tree/main/plugin-examples/agent-tools)                 | Label-targeted tools and file operations in the plugin process                   |
-| [worktrunk](https://github.com/getpaseo/paseo/tree/main/plugin-examples/worktrunk)                     | Worktree manager (`create`, `remove`, `restore`) and agent activity markers      |
+| Plugin                                                                                                   | Includes                                                                         |
+| -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [lifecycle-logger](https://github.com/longbkit/clisbot/tree/main/plugin-examples/lifecycle-logger)       | Agent, workspace, and worktree hooks; JSON logs with environment values redacted |
+| [lifecycle-actions](https://github.com/longbkit/clisbot/tree/main/plugin-examples/lifecycle-actions)     | Follow-ups, permissions, environment, provider switching, worktree selection     |
+| [agent-configuration](https://github.com/longbkit/clisbot/tree/main/plugin-examples/agent-configuration) | MCP injection and Codex sandbox/approval options                                 |
+| [agent-tools](https://github.com/longbkit/clisbot/tree/main/plugin-examples/agent-tools)                 | Label-targeted tools and file operations in the plugin process                   |
+| [worktrunk](https://github.com/longbkit/clisbot/tree/main/plugin-examples/worktrunk)                     | Worktree manager (`create`, `remove`, `restore`) and agent activity markers      |
 
-Read logger output with `paseo plugin logs lifecycle-logger` or the host's `daemon.log`.
+Read logger output with `clisbot plugin logs lifecycle-logger` or the host's `daemon.log`.
 
 ## Renamed hooks
 

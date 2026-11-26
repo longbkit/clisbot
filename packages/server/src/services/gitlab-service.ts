@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parseGitRemoteLocation } from "@getpaseo/protocol/git-remote";
+import { parseGitRemoteLocation } from "@clisbot/protocol/git-remote";
 import { findExecutable } from "../executable-resolution/executable-resolution.js";
 import {
   createCachedCliPathResolver,
@@ -58,8 +58,8 @@ import {
   CHECK_TRAIT_ACTION_REQUIRED,
   CHECK_TRAIT_MANUAL,
   CHECK_TRAIT_WARNING,
-} from "@getpaseo/protocol/check-traits";
-import { GITLAB_ACTIVE_PIPELINE_STATUS_SET } from "@getpaseo/protocol/gitlab-pipeline";
+} from "@clisbot/protocol/check-traits";
+import { GITLAB_ACTIVE_PIPELINE_STATUS_SET } from "@clisbot/protocol/gitlab-pipeline";
 import { createGitLabChangeRequestSource } from "./gitlab-change-requests.js";
 import { isGitLabStatusFacts, type GitLabStatusFacts } from "./gitlab-facts.js";
 

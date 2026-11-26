@@ -360,7 +360,7 @@ interface ComposerControlsProps {
   onActionComplete?: () => void;
 }
 
-/** A row of Paseo-owned controls that share one open list at a time. */
+/** A row of Clisbot-owned controls that share one open list at a time. */
 export function ComposerControls({
   items,
   onOpenIdChange,

@@ -16,7 +16,7 @@ interface DiagnosticEntry {
 }
 
 export interface DaemonDiagnosticsOptions {
-  paseoHome: string;
+  clisbotHome: string;
   serverId: string | undefined;
   daemonVersion: string | undefined;
   daemonRuntimeConfig: DaemonRuntimeConfig | undefined;
@@ -62,7 +62,7 @@ const LOG_TAIL_MAX_BYTES = 64 * 1024;
 
 export async function collectDaemonDiagnostics(options: DaemonDiagnosticsOptions): Promise<string> {
   const sections: string[] = [
-    formatSection("Paseo diagnostics", [
+    formatSection("Clisbot diagnostics", [
       { label: "Collected at", value: new Date().toISOString() },
       { label: "Server ID", value: options.serverId ?? "unknown" },
       { label: "Daemon version", value: options.daemonVersion ?? "unknown" },
@@ -133,7 +133,7 @@ function collectProcessEntries(options: DaemonDiagnosticsOptions): DiagnosticEnt
     { label: "PATH", value: getEnvValue("PATH", "Path") ?? "unset" },
     { label: "Shell", value: formatDaemonShell() },
     { label: "Uptime", value: formatDurationMs(process.uptime() * 1000) },
-    { label: "Paseo home", value: options.paseoHome },
+    { label: "Clisbot home", value: options.clisbotHome },
     { label: "RSS", value: formatBytes(memory.rss) },
     {
       label: "Heap used",
@@ -167,11 +167,11 @@ function collectSystemEntries(): DiagnosticEntry[] {
 }
 
 async function collectDiskEntries(options: DaemonDiagnosticsOptions): Promise<DiagnosticEntry[]> {
-  const stats = await statfs(options.paseoHome);
+  const stats = await statfs(options.clisbotHome);
   const freeBytes = stats.bavail * stats.bsize;
   const totalBytes = stats.blocks * stats.bsize;
   return [
-    { label: "Path", value: options.paseoHome },
+    { label: "Path", value: options.clisbotHome },
     { label: "Free", value: `${formatBytes(freeBytes)} / ${formatBytes(totalBytes)}` },
   ];
 }
@@ -424,7 +424,7 @@ async function checkTool(command: string, args: string[]): Promise<string> {
 }
 
 async function safeLogTailSection(options: DaemonDiagnosticsOptions): Promise<string> {
-  const logPath = path.join(options.paseoHome, "daemon.log");
+  const logPath = path.join(options.clisbotHome, "daemon.log");
   try {
     const tail = await tailFile(logPath, LOG_TAIL_LINES, LOG_TAIL_MAX_BYTES);
     return ["Daemon log tail", `  Path: ${logPath}`, tail ? tail : "  No log lines found"].join(
@@ -556,7 +556,7 @@ export function redactDiagnostic(
   }
 
   return redacted
-    .replace(/paseo:\/\/\S+/gi, "paseo://[redacted]")
+    .replace(/clisbot:\/\/\S+/gi, "clisbot://[redacted]")
     .replace(
       /([?&](?:password|token|secret|key|publicKey|daemonPublicKeyB64)=)[^&\s"']+/gi,
       "$1[redacted]",

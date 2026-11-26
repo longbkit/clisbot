@@ -1,6 +1,6 @@
 ---
 title: Muse Code
-description: Run Meta's Muse Code in Paseo with your installed muse CLI.
+description: Run Meta's Muse Code in Clisbot with your installed muse CLI.
 nav: Muse Code
 order: 29
 category: Providers
@@ -8,11 +8,11 @@ category: Providers
 
 # Muse Code
 
-Paseo runs Meta's Muse Code through your installed `muse` CLI (`muse serve`) over the Muse Session Protocol (MSP). It uses your existing Muse credentials and configuration.
+Clisbot runs Meta's Muse Code through your installed `muse` CLI (`muse serve`) over the Muse Session Protocol (MSP). It uses your existing Muse credentials and configuration.
 
 ## Getting started
 
-Muse Code is built into Paseo and enabled by default. Use Muse 1.3.0 or later (verified with 1.4.1).
+Muse Code is built into Clisbot and enabled by default. Use Muse 1.3.0 or later (verified with 1.4.1).
 
 1. Install Muse Code on your daemon host:
 
@@ -21,7 +21,7 @@ Muse Code is built into Paseo and enabled by default. Use Muse 1.3.0 or later (v
    ```
 
 2. Sign in with `muse login`, or set `META_API_KEY` in the daemon environment.
-3. In Paseo, choose **Muse Code** when you start an agent.
+3. In Clisbot, choose **Muse Code** when you start an agent.
 
 Your Muse configuration determines the available models. If `muse` is outside your daemon PATH or you need custom environment variables, see [Custom providers](/docs/custom-providers) and configure `agents.providers.muse`.
 
@@ -35,7 +35,7 @@ Approval modes control tool decisions separately from provider options. **Defaul
 
 ## Provider options
 
-By default, Paseo launches Muse with the sandbox disabled (`--disable-sandbox`) and workspace trust enabled (`--trust-workspace`). Muse can install packages with your npm cache and load project rules, skills, and configuration.
+By default, Clisbot launches Muse with the sandbox disabled (`--disable-sandbox`) and workspace trust enabled (`--trust-workspace`). Muse can install packages with your npm cache and load project rules, skills, and configuration.
 
 | Option            | Default        | Effect                                                                                                                          |
 | ----------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -43,7 +43,7 @@ By default, Paseo launches Muse with the sandbox disabled (`--disable-sandbox`) 
 | `sandbox.network` | `"proxy-only"` | Sandbox network policy: `"proxy-only"`, `"restricted"`, or `"enabled"`. With sandbox disabled, Muse allows full network access. |
 | `trustWorkspace`  | `true`         | Lets Muse load project rules, skills, and configuration.                                                                        |
 
-To change defaults for every Muse agent, configure `agents.providers.muse.options` in `~/.paseo/config.json` on your daemon host:
+To change defaults for every Muse agent, configure `agents.providers.muse.options` in `~/.clisbot/config.json` on your daemon host:
 
 ```json
 {
@@ -64,7 +64,7 @@ You can also pass per-agent `providerOptions` when you create an agent. The daem
 
 ## Limitations in Muse 1.4.1
 
-- Paseo MCP tools are unavailable because Muse drops the returned tool namespace before matching an MCP call. This upstream issue must be fixed in Muse before Muse agents can use Paseo tools.
+- Clisbot MCP tools are unavailable because Muse drops the returned tool namespace before matching an MCP call. This upstream issue must be fixed in Muse before Muse agents can use Clisbot tools.
 - Compaction needs a model context limit. If your endpoint does not report one, configure `context_compaction.provider_context_limit_tokens` in Muse for the selected model.
 - Usage windows appear only when Muse reports them. An empty `usage/read` response leaves subscription usage unavailable.
 - If native subagent tools are missing, set `MUSE_EXPERIMENTAL_SDK_ENABLED=on` in the provider environment. Linked child sessions appear only when Muse supplies `childSessionId`.

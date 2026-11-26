@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   TerminalStreamOpcode,
   decodeTerminalStreamFrame,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@clisbot/protocol/binary-frames/index";
 import {
   createTerminalRestoreDelivery,
   encodeTerminalRestoreFrame,

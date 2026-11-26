@@ -11,7 +11,7 @@ const releaseDate = "2026-09-04T00:00:00.000Z";
 const scriptPath = fileURLToPath(new URL("./validate-desktop-manifests.mjs", import.meta.url));
 
 function withManifest(contents, run) {
-  const dir = mkdtempSync(path.join(tmpdir(), "paseo-validate-desktop-manifest-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "clisbot-validate-desktop-manifest-"));
   const manifestPath = path.join(dir, "latest-mac.yml");
   try {
     writeFileSync(manifestPath, contents);

@@ -8,13 +8,13 @@ It creates the file if it does not exist.
 Install on a daemon with plugins enabled:
 
 ```bash
-paseo plugin install /absolute/path/to/plugin-examples/agent-tools
+clisbot plugin install /absolute/path/to/plugin-examples/agent-tools
 ```
 
 Create a labeled agent through the SDK:
 
 ```ts
-const agent = await paseo.agents.create({
+const agent = await clisbot.agents.create({
   config: { provider: "codex/gpt-5.4" },
   cwd: "/projects/shop",
   labels: { "notes/enabled": "true" },
@@ -22,11 +22,11 @@ const agent = await paseo.agents.create({
 ```
 
 The session-open callback also runs when an agent resumes or reloads. After changing an existing
-agent's labels, call `paseo.agents.ref(id).reload()` to apply the selection immediately. This
+agent's labels, call `clisbot.agents.ref(id).reload()` to apply the selection immediately. This
 interrupts a running turn. `refresh()` reads the agent snapshot without reopening its session.
 
 From the repository root, `npm run typecheck` includes this example. Outside this repository,
-use `paseo plugin init` to create the package and TypeScript setup, then copy `index.server.ts`
+use `clisbot plugin init` to create the package and TypeScript setup, then copy `index.server.ts`
 and the manifest into that project.
 
 See [Attach tools to agents](../../public-docs/plugins/hooks.md#attach-tools-to-agents)

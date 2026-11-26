@@ -36,7 +36,7 @@ function buildCmdTrampoline(shimPath: string): string {
     "@echo off",
     `set "BUNDLED_CLI=${shimPath}"`,
     `if not exist "%BUNDLED_CLI%" (`,
-    `  echo Paseo CLI not found at %BUNDLED_CLI% — is Paseo installed? 1>&2`,
+    `  echo Clisbot CLI not found at %BUNDLED_CLI% — is Clisbot installed? 1>&2`,
     `  exit /b 1`,
     `)`,
     `call "%BUNDLED_CLI%" %*`,
@@ -67,7 +67,7 @@ export async function installCli(): Promise<InstallStatus> {
 }
 
 /**
- * Removes the CLI only when the file at the target is the one this app installs, so a `paseo` the
+ * Removes the CLI only when the file at the target is the one this app installs, so a `clisbot` the
  * user put there some other way survives. The shell rc PATH line stays: it is harmless and other
  * tools in ~/.local/bin rely on it.
  */
@@ -76,7 +76,7 @@ export async function uninstallCli(): Promise<InstallStatus> {
   if (await isOwnInstall(targetPath)) {
     await fs.unlink(targetPath);
   } else if (await pathOrSymlinkExists(targetPath)) {
-    log.warn("[integrations] Left a paseo CLI this app did not install", { targetPath });
+    log.warn("[integrations] Left a clisbot CLI this app did not install", { targetPath });
   }
   return getCliInstallStatus();
 }

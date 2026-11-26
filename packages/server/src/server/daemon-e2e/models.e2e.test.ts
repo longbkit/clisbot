@@ -5,7 +5,7 @@ import path from "node:path";
 import { loadConfig } from "../config.js";
 import { findExecutable } from "../../executable-resolution/executable-resolution.js";
 import { BuiltinPluginLoader } from "../plugins/builtin/index.js";
-import { createTestPaseoDaemon } from "../test-utils/paseo-daemon.js";
+import { createTestClisbotDaemon } from "../test-utils/clisbot-daemon.js";
 import { DaemonClient } from "../test-utils/daemon-client.js";
 import { execFileSync } from "node:child_process";
 import { createDaemonTestContext } from "../test-utils/index.js";
@@ -112,12 +112,12 @@ test("Antigravity creates an agent and answers a prompt with real agy", async ({
     skip("agy is not resolvable");
     return;
   }
-  const cwd = await mkdtemp(path.join(os.tmpdir(), "paseo-antigravity-e2e-"));
-  const daemon = await createTestPaseoDaemon({
+  const cwd = await mkdtemp(path.join(os.tmpdir(), "clisbot-antigravity-e2e-"));
+  const daemon = await createTestClisbotDaemon({
     agentClients: {},
     mcpEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(undefined, ["antigravity-provider"]),
-    providerOverrides: { antigravity: { command: [command], paseoTools: { enabled: false } } },
+    providerOverrides: { antigravity: { command: [command], clisbotTools: { enabled: false } } },
   });
   const client = new DaemonClient({
     url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -145,7 +145,7 @@ test("Antigravity creates an agent and answers a prompt with real agy", async ({
         type: "notification",
         level: "warning",
         message:
-          "Antigravity is running with full access\nAntigravity's CLI cannot ask for permission when another app drives it, so Paseo starts it with --dangerously-skip-permissions. Every tool call, including shell commands, runs without asking.",
+          "Antigravity is running with full access\nAntigravity's CLI cannot ask for permission when another app drives it, so Clisbot starts it with --dangerously-skip-permissions. Every tool call, including shell commands, runs without asking.",
       },
     ]);
     await client.sendMessage(agent.id, "Reply with exactly ANTIGRAVITY_E2E_OK. No tools.");
@@ -166,11 +166,11 @@ test("Antigravity creates an agent and answers a prompt with real agy", async ({
 }, 120000);
 
 test("bundled fx requires a config entry and lists models instead of its providers", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-fx-optin-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-fx-optin-"));
   const record = path.join(root, "launches.txt");
   await writeFile(record, "");
-  const daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: root,
+  const daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: root,
     cleanup: false,
     mcpEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(undefined, ["fx-provider"]),
@@ -206,11 +206,11 @@ test("bundled fx requires a config entry and lists models instead of its provide
 }, 60000);
 
 test("bundled Hoplite requires a config entry and removal survives restart", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-hoplite-optin-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-hoplite-optin-"));
   const record = path.join(root, "launches.txt");
   await writeFile(record, "");
   const options = {
-    paseoHomeRoot: root,
+    clisbotHomeRoot: root,
     cleanup: false,
     mcpEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(undefined, [
@@ -218,7 +218,7 @@ test("bundled Hoplite requires a config entry and removal survives restart", asy
       "antigravity-provider",
     ]),
   };
-  let daemon = await createTestPaseoDaemon(options);
+  let daemon = await createTestClisbotDaemon(options);
   const connect = async () => {
     const client = new DaemonClient({
       url: `ws://127.0.0.1:${daemon.port}/ws`,
@@ -288,10 +288,10 @@ test("bundled Hoplite requires a config entry and removal survives restart", asy
     ).toBe(false);
     await client.close();
     await daemon.close();
-    daemon = await createTestPaseoDaemon({
+    daemon = await createTestClisbotDaemon({
       ...options,
       staticDir: daemon.staticDir,
-      providerOverrides: loadConfig(daemon.paseoHome, { env: {} }).providerOverrides,
+      providerOverrides: loadConfig(daemon.clisbotHome, { env: {} }).providerOverrides,
     });
     client = await connect();
     expect(
@@ -304,16 +304,16 @@ test("bundled Hoplite requires a config entry and removal survives restart", asy
     ).toBe(false);
     expect((await client.getDaemonConfig()).config.providers?.hoplite).toBeUndefined();
     const persisted = JSON.parse(
-      await readFile(path.join(daemon.paseoHome, "config.json"), "utf8"),
+      await readFile(path.join(daemon.clisbotHome, "config.json"), "utf8"),
     );
     expect(persisted.agents?.providers?.hoplite).toBeUndefined();
     const launchesAfterRemoval = await readFile(record, "utf8");
     await client.close();
     await daemon.close();
-    daemon = await createTestPaseoDaemon({
+    daemon = await createTestClisbotDaemon({
       ...options,
       staticDir: daemon.staticDir,
-      providerOverrides: loadConfig(daemon.paseoHome, { env: {} }).providerOverrides,
+      providerOverrides: loadConfig(daemon.clisbotHome, { env: {} }).providerOverrides,
     });
     client = await connect();
     const restarted = await client.getProvidersSnapshot();
@@ -345,11 +345,11 @@ test("provider installation reaches the client: version unchanged, Install link 
       },
     },
   });
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: { codex },
     mcpEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(undefined, ["muse-provider"]),
-    providerOverrides: { muse: { command: ["paseo-e2e-missing-muse"] } },
+    providerOverrides: { muse: { command: ["clisbot-e2e-missing-muse"] } },
   });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
@@ -367,7 +367,7 @@ test("provider installation reaches the client: version unchanged, Install link 
       provider: "muse",
       error: null,
       installation: {
-        installUrl: "https://paseo.sh/docs/muse-code",
+        installUrl: "https://clisbot.com/docs/muse-code",
         inspection: { status: "not_installed" },
       },
     });
@@ -396,11 +396,11 @@ test("provider update checks reach the client: versions unchanged, failures inco
       },
     },
   });
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: { codex, claude },
     mcpEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(undefined, ["muse-provider"]),
-    providerOverrides: { muse: { command: ["paseo-e2e-missing-muse"] } },
+    providerOverrides: { muse: { command: ["clisbot-e2e-missing-muse"] } },
   });
   const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
   try {
@@ -451,7 +451,7 @@ test("a provider update outlives the client that started it and a new client rea
       },
     },
   });
-  const daemon = await createTestPaseoDaemon({
+  const daemon = await createTestClisbotDaemon({
     agentClients: { codex },
     mcpEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(undefined, []),
@@ -521,9 +521,9 @@ test("a provider update outlives the client that started it and a new client rea
 }, 60000);
 
 test("bundled goose lists configured providers and switches models across providers", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-goose-models-"));
-  const daemon = await createTestPaseoDaemon({
-    paseoHomeRoot: root,
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-goose-models-"));
+  const daemon = await createTestClisbotDaemon({
+    clisbotHomeRoot: root,
     cleanup: false,
     mcpEnabled: false,
     builtinPlugins: new BuiltinPluginLoader(undefined, ["goose-provider"]),

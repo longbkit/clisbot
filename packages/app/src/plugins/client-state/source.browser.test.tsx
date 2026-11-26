@@ -7,7 +7,7 @@ import { fr } from "@/i18n/resources/fr";
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { createEntityRefs, PluginClientStateProvider } from "@getpaseo/plugin/client/host";
+import { createEntityRefs, PluginClientStateProvider } from "@clisbot/plugin/client/host";
 import {
   useAgents,
   useWorkspaces,
@@ -15,7 +15,7 @@ import {
   useAgent,
   type WorkspaceRef,
   type AgentRef,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { createPluginClientStateSource, type PluginConnectedHostsSource } from "./source";
 import { agent, workspace } from "./fixtures";
@@ -270,7 +270,7 @@ it("shows a restored child in the nested example while its cached parent remains
     id: "restored-child",
     title: "Restored child",
     parentAgentId: parent.id,
-    labels: { "paseo.parent-agent-id": parent.id },
+    labels: { "clisbot.parent-agent-id": parent.id },
     archivedAt: parent.archivedAt,
   };
   const store = useSessionStore.getState();

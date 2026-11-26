@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { WaitForFinishResult } from "@getpaseo/client/internal/daemon-client";
+import type { WaitForFinishResult } from "@clisbot/client/internal/daemon-client";
 import type { AgentStreamEvent } from "../../agent-sdk-types.js";
 import {
   HostObservationError,

@@ -1,4 +1,4 @@
-import type { AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
+import type { AgentPermissionRequest } from "@clisbot/protocol/agent-types";
 
 /**
  * Pending permission structure

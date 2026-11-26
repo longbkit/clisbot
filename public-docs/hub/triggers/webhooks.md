@@ -14,7 +14,7 @@ On a self-hosted Hub, configure a [public HTTPS address](/docs/hub/self-hosting#
 
 ## Create a webhook trigger
 
-Choose **Webhook received** in the Hub dashboard trigger editor, or save `.paseo/triggers/alert-handler.yml` and run `paseo hub deploy`:
+Choose **Webhook received** in the Hub dashboard trigger editor, or save `.clisbot/triggers/alert-handler.yml` and run `clisbot hub deploy`:
 
 ```yaml
 name: alert-handler
@@ -56,7 +56,7 @@ Create its Bearer secret in one of two ways:
 1. In the Hub dashboard, open the saved trigger and choose **Create secret** (or **Rotate secret** later). Copy the secret immediately because Hub displays it only once.
 2. Through the public API, send `POST /api/v1/triggers/webhook-secret` with `{"triggerId":"<trigger-id>"}` using an organization credential that holds `configuration:install`. Hub returns `{ "path": "/webhooks/wh_...", "secret": "whsec_..." }`.
 
-Rotating a secret invalidates the previous secret immediately. Redeploying the same trigger `name` with `webhook.received` via `paseo hub deploy` keeps both the endpoint path and its active secret intact.
+Rotating a secret invalidates the previous secret immediately. Redeploying the same trigger `name` with `webhook.received` via `clisbot hub deploy` keeps both the endpoint path and its active secret intact.
 
 ## Send a webhook request
 
@@ -102,6 +102,6 @@ Runs appear in [Activity](/docs/hub/activity) under the source `webhook.received
 
 Hub frames the webhook body and delivery metadata (`contentType` and `receivedAt`) as untrusted external data.
 
-If your `run.prompt` omits `${{ paseo.prompt }}`, Hub appends the framed webhook payload to the end of your instructions automatically. To control where the payload appears inside your prompt, insert `${{ paseo.prompt }}` where you want it placed.
+If your `run.prompt` omits `${{ clisbot.prompt }}`, Hub appends the framed webhook payload to the end of your instructions automatically. To control where the payload appears inside your prompt, insert `${{ clisbot.prompt }}` where you want it placed.
 
-Include `${{ paseo.context }}` if you also want the structured `webhook` metadata object (`contentType` and `receivedAt`). To post findings to Slack or Discord from a webhook run, add [Integration tools](/docs/hub/tools).
+Include `${{ clisbot.context }}` if you also want the structured `webhook` metadata object (`contentType` and `receivedAt`). To post findings to Slack or Discord from a webhook run, add [Integration tools](/docs/hub/tools).

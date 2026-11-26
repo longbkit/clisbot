@@ -34,9 +34,9 @@ export async function reopenPairingLinkWithSavedHosts(page: Page, link: string):
   for (const target of ["/", link]) {
     // The fixture otherwise replaces the registry on every document load.
     await page.evaluate(() => {
-      const nonce = localStorage.getItem("@paseo:e2e-seed-nonce");
+      const nonce = localStorage.getItem("@clisbot:e2e-seed-nonce");
       if (!nonce) throw new Error("Expected the e2e seed nonce before reopening a pairing link.");
-      localStorage.setItem("@paseo:e2e-disable-default-seed-once", nonce);
+      localStorage.setItem("@clisbot:e2e-disable-default-seed-once", nonce);
     });
     await page.goto(target);
   }

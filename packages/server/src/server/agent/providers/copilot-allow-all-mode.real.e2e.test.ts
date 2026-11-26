@@ -53,7 +53,7 @@ describe("Copilot ACP provider (real) Allow All mode", () => {
       );
 
       // This is the same provider writer called by ACPAgentSession. Assert its
-      // untransformed ACP response, since Paseo's displayed mode hides this bug.
+      // untransformed ACP response, since Clisbot's displayed mode hides this bug.
       const result = await writeCopilotProviderMode({
         connection,
         sessionId: session.sessionId,

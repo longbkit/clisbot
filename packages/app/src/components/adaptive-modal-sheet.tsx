@@ -249,7 +249,7 @@ const styles = StyleSheet.create((theme) => ({
 
 const WEB_EXIT_DURATION_MS = 160;
 const WEB_ENTER_DURATION_MS = 160;
-const WEB_ENTER_ANIMATION_NAME = "paseo-modal-enter";
+const WEB_ENTER_ANIMATION_NAME = "clisbot-modal-enter";
 
 // The desktop card fades in; the dim lands at once, so the screen behind is never seen undimmed
 // while the dialog arrives. A CSS animation runs from the card's first paint, so a dialog that opens

@@ -1,12 +1,12 @@
 ---
 title: 触发器 YAML 参考
-description: .paseo/triggers/*.yml 中自包含 Hub 触发器文档的完整字段参考。
+description: .clisbot/triggers/*.yml 中自包含 Hub 触发器文档的完整字段参考。
 nav: 触发器 YAML 参考
 ---
 
 # 触发器 YAML 参考 {#trigger-yaml-reference}
 
-每个 `.paseo/triggers/<name>.yml` 文件定义一个自包含的 Hub 触发器。Hub 控制台的 YAML 视图和 `POST /api/v1/triggers/install` 接受相同的格式。
+每个 `.clisbot/triggers/<name>.yml` 文件定义一个自包含的 Hub 触发器。Hub 控制台的 YAML 视图和 `POST /api/v1/triggers/install` 接受相同的格式。
 
 ## 顶层字段 {#top-level-fields}
 
@@ -44,7 +44,7 @@ nav: 触发器 YAML 参考
 
 worktree 模式：
 
-- `branch-off`：需要 `newBranch` 和可选的 `base`。在 `newBranch` 中嵌入 `${{ paseo.execution.id }}`（例如 `trigger-${{ paseo.execution.id }}`），让每次执行获得唯一分支并在重试时保持一致。`newBranch` 只接受 `${{ paseo.execution.id }}` 表达式。
+- `branch-off`：需要 `newBranch` 和可选的 `base`。在 `newBranch` 中嵌入 `${{ clisbot.execution.id }}`（例如 `trigger-${{ clisbot.execution.id }}`），让每次执行获得唯一分支并在重试时保持一致。`newBranch` 只接受 `${{ clisbot.execution.id }}` 表达式。
 - `checkout-branch`：需要字面量 `branch`。
 - `checkout-pr`：需要正整数 `prNumber`。
 
@@ -78,7 +78,7 @@ run:
     daemon: devbox
     cwd: /workspace/project
   agent:
-    select: ${{ paseo.inputs.agent }}
+    select: ${{ clisbot.inputs.agent }}
     choices:
       codex-read:
         provider: codex
@@ -95,11 +95,11 @@ run:
 
 `run.continuation` 控制新到达的事件是复用现有 Agent 还是启动新 Agent：
 
-| 值                                                        | 行为                                                                                                          |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `{ mode: conversation }`                                  | 默认值。在同一 Slack 或 Discord 讨论串、GitHub issue 或 PR、Linear issue 上复用 Agent；无对话时启动新 Agent。 |
-| `{ mode: key, key: "ticket-${{ paseo.inputs.ticket }}" }` | 按求值后的键复用 Agent（最长 512 个字符的非空字符串）。                                                       |
-| `{ mode: new }`                                           | 每次到达都启动全新的 Agent。                                                                                  |
+| 值                                                          | 行为                                                                                                          |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `{ mode: conversation }`                                    | 默认值。在同一 Slack 或 Discord 讨论串、GitHub issue 或 PR、Linear issue 上复用 Agent；无对话时启动新 Agent。 |
+| `{ mode: key, key: "ticket-${{ clisbot.inputs.ticket }}" }` | 按求值后的键复用 Agent（最长 512 个字符的非空字符串）。                                                       |
+| `{ mode: new }`                                             | 每次到达都启动全新的 Agent。                                                                                  |
 
 持续运行的 Agent 会保留原有的 daemon、工作目录、worktree 分支、Agent 配置、`background` 标志和工具授权。如果对同一个延续键修改其中任一项，运行会失败，需先切换到 `{ mode: new }` 或更换延续键。
 
@@ -107,21 +107,21 @@ run:
 
 ## 提示词、上下文与标题 {#prompt-context-and-title}
 
-| 字段              | 必填 | 默认值  | 说明                                                                    |
-| ----------------- | ---- | ------- | ----------------------------------------------------------------------- |
-| `prompt`          | 是   | 无      | 发送给 Agent 的指令文本。                                               |
-| `title`           | 否   | 无      | 可选的 Paseo 工作区标题模板（字面文本加 `${{ paseo.execution.id }}`）。 |
-| `max_runtime`     | 否   | `2h`    | 运行硬性上限，最长 `24h`。                                              |
-| `idle_timeout`    | 否   | `10m`   | 空闲超时，不能超过 `max_runtime`。                                      |
-| `startup_timeout` | 否   | `2m`    | 创建 worktree 和启动 Provider 的等待预算，最长 `24h`。                  |
-| `auto_archive`    | 否   | `true`  | 执行结束后归档工作区。                                                  |
-| `background`      | 否   | `false` | 创建在默认工作区列表中隐藏的后台工作区。旧版 daemon 会忽略它。          |
+| 字段              | 必填 | 默认值  | 说明                                                                        |
+| ----------------- | ---- | ------- | --------------------------------------------------------------------------- |
+| `prompt`          | 是   | 无      | 发送给 Agent 的指令文本。                                                   |
+| `title`           | 否   | 无      | 可选的 Clisbot 工作区标题模板（字面文本加 `${{ clisbot.execution.id }}`）。 |
+| `max_runtime`     | 否   | `2h`    | 运行硬性上限，最长 `24h`。                                                  |
+| `idle_timeout`    | 否   | `10m`   | 空闲超时，不能超过 `max_runtime`。                                          |
+| `startup_timeout` | 否   | `2m`    | 创建 worktree 和启动 Provider 的等待预算，最长 `24h`。                      |
+| `auto_archive`    | 否   | `true`  | 执行结束后归档工作区。                                                      |
+| `background`      | 否   | `false` | 创建在默认工作区列表中隐藏的后台工作区。旧版 daemon 会忽略它。              |
 
 提示词表达式：
 
-- `${{ paseo.prompt }}` 插入 Provider 事件收到的完整消息文本，或 `webhook.received` 包装后的 webhook 请求体。对于 `webhook.received`，省略 `${{ paseo.prompt }}` 时会自动追加包装后的请求体。
-- `${{ paseo.context }}` 为本次运行显式开启 Provider 上下文物化（讨论串历史、issue 元数据、定时元数据或附件描述符），以 JSON 渲染。除非显式编写 `${{ paseo.context }}`，Hub 不会自动注入环境上下文。
-- `${{ paseo.inputs.<name> }}` 插入已声明的输入值。
+- `${{ clisbot.prompt }}` 插入 Provider 事件收到的完整消息文本，或 `webhook.received` 包装后的 webhook 请求体。对于 `webhook.received`，省略 `${{ clisbot.prompt }}` 时会自动追加包装后的请求体。
+- `${{ clisbot.context }}` 为本次运行显式开启 Provider 上下文物化（讨论串历史、issue 元数据、定时元数据或附件描述符），以 JSON 渲染。除非显式编写 `${{ clisbot.context }}`，Hub 不会自动注入环境上下文。
+- `${{ clisbot.inputs.<name> }}` 插入已声明的输入值。
 
 请用清晰边界（例如 `<user-prompt>...</user-prompt>`）包裹不可信外部文本。
 
@@ -151,4 +151,4 @@ run:
 
 - `run.tools` 授予受控的 Slack 和 Discord MCP 工具（针对显式频道 ID 的 `read` 和 `post`）。参见[集成工具](/docs/hub/tools)。
 - `run.github` 签发受控的 `GH_TOKEN` 和隔离的 git 配置。参见 [GitHub 访问](/docs/hub/github)。
-- `run.env` 注入环境变量，包括 `${{ paseo.connections.<slug>.token }}`。
+- `run.env` 注入环境变量，包括 `${{ clisbot.connections.<slug>.token }}`。

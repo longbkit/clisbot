@@ -31,7 +31,7 @@ test("built output compiles and starts every listed built-in", async () => {
   );
   const settingsDirectory = await mkdtemp(path.join(os.tmpdir(), "builtin-dist-settings-"));
   const runtime = new PluginRuntime(pino({ level: "silent" }), version, { settingsDirectory });
-  runtime.bindPaseoSessionHost({
+  runtime.bindClisbotSessionHost({
     async attachPluginSocket(_pluginId, socket) {
       const closed = new Promise((resolve) => socket.once("close", resolve));
       socket.on("message", (data) => {

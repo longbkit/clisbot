@@ -2,7 +2,11 @@ import pino from "pino";
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
 
-import type { PaseoToolCatalog, PaseoToolDefinition, PaseoToolResult } from "../../tools/types.js";
+import type {
+  ClisbotToolCatalog,
+  ClisbotToolDefinition,
+  ClisbotToolResult,
+} from "../../tools/types.js";
 import {
   handleOmpHostToolRuntimeEvent,
   OmpHostToolRouter,
@@ -11,7 +15,7 @@ import {
 import type { OmpRpcHostToolResult } from "./rpc-types.js";
 import { FakeOmp } from "./test-utils/fake-omp.js";
 
-function createCatalog(tools: PaseoToolDefinition[]): PaseoToolCatalog {
+function createCatalog(tools: ClisbotToolDefinition[]): ClisbotToolCatalog {
   const toolMap = new Map(tools.map((tool) => [tool.name, tool]));
   return {
     tools: toolMap,
@@ -26,7 +30,7 @@ function createCatalog(tools: PaseoToolDefinition[]): PaseoToolCatalog {
 
 class OmpHostToolHarness {
   private readonly logger = pino({ level: "silent" });
-  private resolveControlledResult: ((result: PaseoToolResult) => void) | null = null;
+  private resolveControlledResult: ((result: ClisbotToolResult) => void) | null = null;
   private controlledSignal: AbortSignal | null = null;
   private resolveControlledStart: (() => void) | null = null;
   private readonly controlledStart = new Promise<void>((resolve) => {
@@ -35,13 +39,13 @@ class OmpHostToolHarness {
   private readonly router: OmpHostToolRouter;
 
   private constructor(
-    private readonly catalog: PaseoToolCatalog,
+    private readonly catalog: ClisbotToolCatalog,
     private readonly runtimeSession: Awaited<ReturnType<FakeOmp["startSession"]>>,
   ) {
     this.router = new OmpHostToolRouter({ runtimeSession, catalog, logger: this.logger });
   }
 
-  static async withTools(tools: PaseoToolDefinition[]): Promise<OmpHostToolHarness> {
+  static async withTools(tools: ClisbotToolDefinition[]): Promise<OmpHostToolHarness> {
     const omp = new FakeOmp();
     const runtimeSession = await omp.startSession({ cwd: "/workspace/project" });
     return new OmpHostToolHarness(createCatalog(tools), runtimeSession);
@@ -49,13 +53,13 @@ class OmpHostToolHarness {
 
   static async cancellable(): Promise<OmpHostToolHarness> {
     let harness: OmpHostToolHarness;
-    const tool: PaseoToolDefinition = {
+    const tool: ClisbotToolDefinition = {
       name: "wait_for_agent",
-      description: "Wait for a Paseo agent.",
+      description: "Wait for a Clisbot agent.",
       handler: async (_input, context) => {
         harness.controlledSignal = context.signal ?? null;
         harness.resolveControlledStart?.();
-        return await new Promise<PaseoToolResult>((resolve) => {
+        return await new Promise<ClisbotToolResult>((resolve) => {
           harness.resolveControlledResult = resolve;
         });
       },
@@ -108,7 +112,7 @@ class OmpHostToolHarness {
     );
   }
 
-  completeControlledCall(result: PaseoToolResult): void {
+  completeControlledCall(result: ClisbotToolResult): void {
     if (!this.resolveControlledResult) throw new Error("Controlled host tool has not started");
     this.resolveControlledResult(result);
   }
@@ -135,12 +139,12 @@ class OmpHostToolHarness {
 }
 
 describe("OMP host tools", () => {
-  test("marks every caller-scoped Paseo tool essential for direct invocation", () => {
+  test("marks every caller-scoped Clisbot tool essential for direct invocation", () => {
     const catalog = createCatalog([
       {
         name: "create_agent",
         title: "Create agent",
-        description: "Create a Paseo agent.",
+        description: "Create a Clisbot agent.",
         inputSchema: { initialPrompt: z.string().describe("Prompt for the new agent.") },
         handler: async () => ({ content: [] }),
       },
@@ -155,7 +159,7 @@ describe("OMP host tools", () => {
       {
         name: "create_agent",
         label: "Create agent",
-        description: "Create a Paseo agent.",
+        description: "Create a Clisbot agent.",
         loadMode: "essential",
         parameters: expect.objectContaining({ type: "object", required: ["initialPrompt"] }),
       },
@@ -172,7 +176,7 @@ describe("OMP host tools", () => {
     const omp = await OmpHostToolHarness.withTools([
       {
         name: "create_agent",
-        description: "Create a Paseo agent.",
+        description: "Create a Clisbot agent.",
         handler: async (input, context) => {
           context.sendUpdate?.({ content: [{ type: "text", text: "creating" }] });
           return { content: [], structuredContent: { input, agentId: "child-1" } };

@@ -1,4 +1,4 @@
-import { BUILTIN_PROVIDER_IDS } from "@getpaseo/protocol/provider-manifest";
+import { BUILTIN_PROVIDER_IDS } from "@clisbot/protocol/provider-manifest";
 import { describe, expect, test } from "vitest";
 
 import { createTestLogger } from "../../test-utils/test-logger.js";

@@ -27,7 +27,7 @@ describe("desktop opener", () => {
     for (const input of [
       "file:///private/data",
       "javascript:alert(1)",
-      "paseo://settings",
+      "clisbot://settings",
       "/docs",
       null,
     ]) {

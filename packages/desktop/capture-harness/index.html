@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Paseo Browser Capture Harness</title>
+    <title>Clisbot Browser Capture Harness</title>
     <style>
       html,
       body {
@@ -14,7 +14,7 @@
         font-family: Arial, sans-serif;
       }
 
-      #paseo-browser-resident-webviews {
+      #clisbot-browser-resident-webviews {
         position: fixed;
         left: 0;
         top: 0;
@@ -42,12 +42,12 @@
       <label for="host-composer">Host composer</label>
       <input id="host-composer" name="host-composer" autocomplete="off" />
     </form>
-    <div id="paseo-browser-resident-webviews" aria-hidden="true"></div>
+    <div id="clisbot-browser-resident-webviews" aria-hidden="true"></div>
 
     <script>
       const RESIDENT_VIEWPORT_WIDTH = 1280;
       const RESIDENT_VIEWPORT_HEIGHT = 800;
-      const host = document.getElementById("paseo-browser-resident-webviews");
+      const host = document.getElementById("clisbot-browser-resident-webviews");
       const hostComposer = document.getElementById("host-composer");
       const hostComposerForm = document.getElementById("host-composer-form");
       let hostComposerEnterEvents = 0;
@@ -90,7 +90,7 @@
         const webview = document.createElement("webview");
         webview.id = `target-webview-${index + 1}`;
         webview.className = "capture-harness-webview";
-        webview.setAttribute("data-paseo-browser-id", browserId);
+        webview.setAttribute("data-clisbot-browser-id", browserId);
         webview.setAttribute("partition", partition);
         webview.setAttribute("allowpopups", "true");
         webview.setAttribute("spellcheck", "false");
@@ -105,7 +105,7 @@
         const webview = createHarnessWebview({
           sourceUrl,
           browserId: `capture-harness-${index + 1}`,
-          partition: `persist:paseo-capture-harness-${index + 1}`,
+          partition: `persist:clisbot-capture-harness-${index + 1}`,
         });
         host.appendChild(webview);
         webviews.push(webview);

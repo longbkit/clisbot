@@ -92,7 +92,7 @@ describe("listProjectSuggestions", () => {
     root = realpathSync.native(mkdtempSync(path.join(tmpdir(), "project-suggestions-")));
     gitService = new WorkspaceGitServiceImpl({
       logger: createTestLogger(),
-      paseoHome: path.join(root, ".paseo"),
+      clisbotHome: path.join(root, ".clisbot"),
     });
   });
 

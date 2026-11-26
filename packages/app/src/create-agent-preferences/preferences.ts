@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AgentProvider } from "@getpaseo/protocol/agent-types";
+import type { AgentProvider } from "@clisbot/protocol/agent-types";
 
 const optionsSchema = z.record(z.string(), z.json());
 

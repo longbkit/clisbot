@@ -59,11 +59,11 @@ async function configureRemote(input: {
 }
 
 export const createTempGitRepo = async (
-  prefix = "paseo-e2e-",
+  prefix = "clisbot-e2e-",
   options?: {
     withRemote?: boolean;
     originUrl?: string;
-    paseoConfig?: Record<string, unknown>;
+    clisbotConfig?: Record<string, unknown>;
     files?: Array<{ path: string; content: string }>;
     branches?: string[];
   },
@@ -73,14 +73,14 @@ export const createTempGitRepo = async (
   const withRemote = options?.withRemote ?? false;
 
   execSync("git init -b main", { cwd: repoPath, stdio: "ignore" });
-  execSync('git config user.email "e2e@paseo.test"', { cwd: repoPath, stdio: "ignore" });
-  execSync('git config user.name "Paseo E2E"', { cwd: repoPath, stdio: "ignore" });
+  execSync('git config user.email "e2e@clisbot.test"', { cwd: repoPath, stdio: "ignore" });
+  execSync('git config user.name "Clisbot E2E"', { cwd: repoPath, stdio: "ignore" });
   execSync("git config commit.gpgsign false", { cwd: repoPath, stdio: "ignore" });
   await writeFile(path.join(repoPath, "README.md"), "# Temp Repo\n");
-  if (options?.paseoConfig) {
+  if (options?.clisbotConfig) {
     await writeFile(
-      path.join(repoPath, "paseo.json"),
-      JSON.stringify(options.paseoConfig, null, 2),
+      path.join(repoPath, "clisbot.json"),
+      JSON.stringify(options.clisbotConfig, null, 2),
     );
   }
   for (const file of options?.files ?? []) {
@@ -89,8 +89,8 @@ export const createTempGitRepo = async (
     await writeFile(filePath, file.content);
   }
   execSync("git add README.md", { cwd: repoPath, stdio: "ignore" });
-  if (options?.paseoConfig) {
-    execSync("git add paseo.json", { cwd: repoPath, stdio: "ignore" });
+  if (options?.clisbotConfig) {
+    execSync("git add clisbot.json", { cwd: repoPath, stdio: "ignore" });
   }
   for (const file of options?.files ?? []) {
     execSync(`git add ${JSON.stringify(file.path)}`, { cwd: repoPath, stdio: "ignore" });
@@ -106,7 +106,7 @@ export const createTempGitRepo = async (
         stdio: "ignore",
       });
     }
-    const markerPath = `.paseo-e2e-${branch.replace(/[^a-zA-Z0-9._-]/g, "-")}.txt`;
+    const markerPath = `.clisbot-e2e-${branch.replace(/[^a-zA-Z0-9._-]/g, "-")}.txt`;
     await writeFile(path.join(repoPath, markerPath), `branch ${branch}\n`);
     execSync(`git add ${JSON.stringify(markerPath)}`, { cwd: repoPath, stdio: "ignore" });
     execSync(`git commit -m ${JSON.stringify(`Add ${branch} marker`)}`, {
@@ -142,7 +142,7 @@ export const createTempGitRepo = async (
  * A plain (non-git) directory opened as a project. The daemon shows its
  * basename as the project name, since there's no remote to group under.
  */
-export async function createTempDirectory(prefix = "paseo-e2e-dir-"): Promise<TempDirectory> {
+export async function createTempDirectory(prefix = "clisbot-e2e-dir-"): Promise<TempDirectory> {
   const dirPath = await mkdtemp(path.join(await resolveTempRoot(), prefix));
   await writeFile(path.join(dirPath, "README.md"), "# Temp Directory\n");
   return {
@@ -177,15 +177,15 @@ export function commitLocalOnly(repoPath: string, marker: string): string {
  */
 export async function trackForkUpstream(repoPath: string): Promise<string> {
   const upstreamDir = path.join(repoPath, "upstream.git");
-  const upstreamClone = await mkdtemp(path.join(await resolveTempRoot(), "paseo-e2e-upstream-"));
+  const upstreamClone = await mkdtemp(path.join(await resolveTempRoot(), "clisbot-e2e-upstream-"));
   await mkdir(upstreamDir, { recursive: true });
   execSync(`git init --bare -b main ${upstreamDir}`, { cwd: repoPath, stdio: "ignore" });
   execSync(`git remote add upstream ${upstreamDir}`, { cwd: repoPath, stdio: "ignore" });
   execSync("git push upstream main", { cwd: repoPath, stdio: "ignore" });
 
   execSync(`git clone ${upstreamDir} ${upstreamClone}`, { stdio: "ignore" });
-  execSync('git config user.email "e2e@paseo.test"', { cwd: upstreamClone, stdio: "ignore" });
-  execSync('git config user.name "Paseo E2E"', { cwd: upstreamClone, stdio: "ignore" });
+  execSync('git config user.email "e2e@clisbot.test"', { cwd: upstreamClone, stdio: "ignore" });
+  execSync('git config user.name "Clisbot E2E"', { cwd: upstreamClone, stdio: "ignore" });
   execSync("git config commit.gpgsign false", { cwd: upstreamClone, stdio: "ignore" });
   execSync('git commit --allow-empty -m "upstream only"', {
     cwd: upstreamClone,
@@ -221,7 +221,7 @@ export async function readWorktreeBaseMetadata(
     .toString()
     .trim();
   const metadata = JSON.parse(
-    await readFile(path.join(gitDir, "paseo", "worktree.json"), "utf8"),
+    await readFile(path.join(gitDir, "clisbot", "worktree.json"), "utf8"),
   ) as { baseRefName?: string; baseRef?: string };
   if (!metadata.baseRefName) {
     throw new Error(`worktree.json has no baseRefName: ${worktreePath}`);

@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, rm, mkdir, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { expect, test } from "vitest";
-import { DiffOpcode, type DiffFrame } from "@getpaseo/protocol/binary-frames/index";
+import { DiffOpcode, type DiffFrame } from "@clisbot/protocol/binary-frames/index";
 import { DiffSubscriptions } from "./index.js";
 import { createFileObserver } from "../file-observer/index.js";
 import {

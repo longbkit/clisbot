@@ -44,7 +44,7 @@ function historyAgent(input: {
         currentBranch: input.branch === undefined ? "billing-cleanup" : input.branch,
         remoteUrl: null,
         worktreeRoot: cwd,
-        isPaseoOwnedWorktree: false,
+        isClisbotOwnedWorktree: false,
         mainRepoRoot: null,
       },
     },

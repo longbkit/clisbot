@@ -1,4 +1,4 @@
-// Derived from cprecioso/paseo-worktreeinclude (MIT); see ./LICENSE in the plugin root.
+// Derived from cprecioso/clisbot-worktreeinclude (MIT); see ./LICENSE in the plugin root.
 // Copyright (c) 2026 Carlos Precioso.
 import { execFile } from "node:child_process";
 import { constants, existsSync } from "node:fs";
@@ -157,7 +157,7 @@ async function matchIncludePatterns(
   entries: string[],
   ignoreCase: boolean,
 ): Promise<string[]> {
-  const scratch = await mkdtemp(join(tmpdir(), "paseo-worktree-include-"));
+  const scratch = await mkdtemp(join(tmpdir(), "clisbot-worktree-include-"));
   try {
     // An empty template keeps the user's template `info/exclude` out of the matching.
     await git(scratch, ["init", "-q", "--template="]);

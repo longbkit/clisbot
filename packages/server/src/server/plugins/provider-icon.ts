@@ -1,6 +1,6 @@
 import { readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
-import { findSvgIconProblem } from "@getpaseo/plugin";
+import { findSvgIconProblem } from "@clisbot/plugin";
 
 export async function readPluginProviderIcon(
   pluginDirectory: string,

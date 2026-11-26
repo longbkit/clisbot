@@ -2,7 +2,7 @@ import { promises as fs, type Dirent } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import type { Logger } from "pino";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 
 import { writeJsonFileAtomic } from "../atomic-file.js";
 import {
@@ -15,7 +15,7 @@ import { toStoredAgentRecord } from "./agent-projections.js";
 import type { ManagedAgent } from "./agent-manager.js";
 import type { AgentSessionConfig } from "./agent-sdk-types.js";
 import { AgentOwnerSchema, daemonExecutionKey, type DaemonAgentOwner } from "./agent-owner.js";
-import { controlsFromFeatures } from "@getpaseo/protocol/option-controls";
+import { controlsFromFeatures } from "@clisbot/protocol/option-controls";
 import { foldFeatureValues } from "./option-controls.js";
 
 const SERIALIZABLE_CONFIG_SCHEMA = z

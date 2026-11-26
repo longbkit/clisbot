@@ -163,7 +163,7 @@ export class DaemonStartService {
 }
 
 let singletonDaemonStartService: DaemonStartService | null = null;
-const DAEMON_START_SERVICE_GLOBAL_KEY = "__paseoDaemonStartService";
+const DAEMON_START_SERVICE_GLOBAL_KEY = "__clisbotDaemonStartService";
 
 type DaemonStartServiceGlobal = typeof globalThis & {
   [DAEMON_START_SERVICE_GLOBAL_KEY]?: DaemonStartService;

@@ -49,7 +49,7 @@ export function composerModelFromHalves(input: {
       assertUnlocked(composerInput.isLocked);
       composerInput.insertText(text);
     },
-    // Only an item inside this composer can hold it, so the user was here when they asked. Paseo
+    // Only an item inside this composer can hold it, so the user was here when they asked. Clisbot
     // has no way to name a draft from outside it and does not pull the user back to one.
     async focus(options) {
       if (!composerInput.isRevealed()) throw new Error("The composer is not on screen.");

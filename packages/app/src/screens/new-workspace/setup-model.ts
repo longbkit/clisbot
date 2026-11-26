@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
-import type { CheckoutWorktree } from "@getpaseo/protocol/messages";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
+import type { CheckoutWorktree } from "@clisbot/protocol/messages";
 import { applyMetadataPatch } from "@/composer/draft/metadata";
 import {
   branchNameFromRef,
@@ -24,7 +24,7 @@ type RefKind = PickerItem["kind"];
 interface SetupState {
   pickerSelection: PickerSelectionState;
   manualIsolation: Isolation | null;
-  /** The name for a new worktree branch; null lets Paseo pick one. */
+  /** The name for a new worktree branch; null lets Clisbot pick one. */
   branch: string | null;
   /** The created workspace's metadata. */
   metadata: Readonly<Record<string, JsonValue>>;

@@ -18,7 +18,7 @@ Hub 将 Provider 令牌保留在服务端，并在每次工具调用时校验连
 4. 在 **Channel IDs** 中输入允许访问的频道 ID。
 5. 选择 **Read messages**、**Post messages** 或两者。
 
-在 `.paseo/triggers/*.yml` 中添加 `run.tools`：
+在 `.clisbot/triggers/*.yml` 中添加 `run.tools`：
 
 ```yaml
 name: nightly-digest
@@ -74,6 +74,6 @@ run:
 ## 校验与行为 {#enforcement-and-behavior}
 
 - Hub 会在每次工具调用时对照声明的 `connection`、`actions` 和 `channels` 进行校验。只有在讨论串父频道位于 `channels` 白名单内时，才允许访问对应的 Discord 讨论串和论坛帖子。
-- 当 Hub 配置了 HTTPS 地址且记录了 daemon Agent 时，拥有 `post` 权限的 Agent 会在请求上下文中收到该次运行的 **Open in Paseo** URL，方便摘要和报告直接链接到会话。
+- 当 Hub 配置了 HTTPS 地址且记录了 daemon Agent 时，拥有 `post` 权限的 Agent 会在请求上下文中收到该次运行的 **Open in Clisbot** URL，方便摘要和报告直接链接到会话。
 - 由于工具契约绑定在活动会话上，修改持续运行的触发器中的 `run.tools` 时，下一次运行需要使用 **New agent**（`continuation: { mode: new }`）或新的延续键。
 - 如果你的 `run.tools` 块使用了 YAML 锚点或别名，请在 YAML 视图中编辑触发器，以便 Hub 完整保留这些引用。

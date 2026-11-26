@@ -1,10 +1,10 @@
-import type { PaseoApi } from "@getpaseo/client";
+import type { ClisbotApi } from "@clisbot/client";
 import type { z } from "zod";
 import type { PluginHookAgent } from "./lifecycle.js";
 
 export interface AgentToolContext {
   agent: PluginHookAgent;
-  paseo: PaseoApi;
+  clisbot: ClisbotApi;
   signal: AbortSignal;
 }
 

@@ -5,7 +5,7 @@ import type { AgentHandle } from "./rewind-flow";
 import { openSubagentsTrack } from "./subagents";
 
 export const WORKFLOW_ROW_DESCRIPTION = "Verify the workflow row lifecycle";
-export const WORKFLOW_ROW_MARKER = "PASEO_WORKFLOW_ROW_OK";
+export const WORKFLOW_ROW_MARKER = "CLISBOT_WORKFLOW_ROW_OK";
 
 export async function askClaudeToRunWorkflow(
   handle: AgentHandle,

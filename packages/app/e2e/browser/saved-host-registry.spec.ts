@@ -5,9 +5,9 @@ import { renameHostFromSettings } from "../support/helpers/hosts";
 import { getServerId } from "../support/helpers/server-id";
 import { openHostSection, selectSettingsHost } from "../support/helpers/settings";
 
-const REGISTRY_KEY = "@paseo:daemon-registry";
-const SEED_NONCE_KEY = "@paseo:e2e-seed-nonce";
-const DISABLE_DEFAULT_SEED_ONCE_KEY = "@paseo:e2e-disable-default-seed-once";
+const REGISTRY_KEY = "@clisbot:daemon-registry";
+const SEED_NONCE_KEY = "@clisbot:e2e-seed-nonce";
+const DISABLE_DEFAULT_SEED_ONCE_KEY = "@clisbot:e2e-disable-default-seed-once";
 
 // What a build with a connection kind this one doesn't know leaves in the registry: an extra
 // connection on a host this build can reach, and a host reached only through it.

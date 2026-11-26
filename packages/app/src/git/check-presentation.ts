@@ -2,7 +2,7 @@ import {
   CHECK_TRAIT_ACTION_REQUIRED,
   CHECK_TRAIT_MANUAL,
   CHECK_TRAIT_WARNING,
-} from "@getpaseo/protocol/check-traits";
+} from "@clisbot/protocol/check-traits";
 
 export interface PresentableCheck {
   status: string;

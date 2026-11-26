@@ -9,7 +9,7 @@ import { OmpAgentClient } from "./agent.js";
 import { FakeOmp } from "./test-utils/fake-omp.js";
 
 test("archived OMP history replays messages and todos without leaving a runtime", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "paseo-omp-history-purpose-"));
+  const directory = await mkdtemp(join(tmpdir(), "clisbot-omp-history-purpose-"));
   const sessionFile = join(directory, "session.jsonl");
   const entries = [
     { type: "session", id: "root", parentId: null },

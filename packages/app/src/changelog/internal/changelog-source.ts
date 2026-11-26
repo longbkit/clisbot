@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { parseChangelog, type ChangelogRelease } from "./parse-changelog";
 
-const CHANGELOG_URL = "https://raw.githubusercontent.com/getpaseo/paseo/main/CHANGELOG.md";
+const CHANGELOG_URL = "https://raw.githubusercontent.com/longbkit/clisbot/main/CHANGELOG.md";
 
 export type ChangelogState =
   | { status: "loading" }

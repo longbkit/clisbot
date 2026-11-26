@@ -66,7 +66,7 @@ describe("@tintinweb/pi-subagents adapter", () => {
         id: "call_458926",
         item: {
           type: "assistant_message",
-          text: "Agent completed in 6.6s (1 tool uses, 18.8k token).\n\nThe workspace directory `/tmp/paseo-pi-extension-phase3/workspace` is empty (no files or hidden dotfiles).",
+          text: "Agent completed in 6.6s (1 tool uses, 18.8k token).\n\nThe workspace directory `/tmp/clisbot-pi-extension-phase3/workspace` is empty (no files or hidden dotfiles).",
         },
       },
     ]);

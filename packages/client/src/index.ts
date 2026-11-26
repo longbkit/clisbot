@@ -1,15 +1,15 @@
-import { workspaceLabelKey } from "@getpaseo/protocol/workspace-labels";
+import { workspaceLabelKey } from "@clisbot/protocol/workspace-labels";
 export type { TerminalReplayEvent, TerminalStreamEvent } from "./terminal-stream-router.js";
-import type { AgentAddress } from "@getpaseo/protocol/addresses";
-import { parentAddressLabels } from "@getpaseo/protocol/agent-labels";
-export type { AgentAddress } from "@getpaseo/protocol/addresses";
-import { createHostActions, type PaseoHostActions } from "./hosts/index.js";
-export type { PaseoHostActions } from "./hosts/index.js";
-export type { HostAdd, HostUpdate, HostSummary, HostDirectory } from "@getpaseo/protocol/hosts";
+import type { AgentAddress } from "@clisbot/protocol/addresses";
+import { parentAddressLabels } from "@clisbot/protocol/agent-labels";
+export type { AgentAddress } from "@clisbot/protocol/addresses";
+import { createHostActions, type ClisbotHostActions } from "./hosts/index.js";
+export type { ClisbotHostActions } from "./hosts/index.js";
+export type { HostAdd, HostUpdate, HostSummary, HostDirectory } from "@clisbot/protocol/hosts";
 import type { OwnedSubscription } from "./connection/index.js";
 export type { OwnedSubscription, SubscriptionObserver } from "./connection/index.js";
 import type { DaemonClientConfig } from "./daemon-client.js";
-import type { AgentPermissionResponse, JsonValue } from "@getpaseo/protocol/agent-types";
+import type { AgentPermissionResponse, JsonValue } from "@clisbot/protocol/agent-types";
 import type {
   AgentSnapshotPayload,
   CreationSnapshot,
@@ -37,25 +37,25 @@ import type {
   SessionOutboundMessage,
   WorkspaceDescriptorPayload,
   WorkspaceCreateRequest,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import { DaemonClient, type CreateAgentRequestOptions } from "./daemon-client.js";
 import {
   createTerminalActions,
-  type PaseoTerminalActions,
-  type PaseoWorkspaceTerminalActions,
+  type ClisbotTerminalActions,
+  type ClisbotWorkspaceTerminalActions,
 } from "./terminals/index.js";
 export type {
-  PaseoTerminal,
-  PaseoTerminalActions,
-  PaseoTerminalHandle,
-  PaseoTerminalCreateOptions,
-  PaseoTerminalListOptions,
-  PaseoTerminalListResult,
-  PaseoTerminalCaptureOptions,
-  PaseoTerminalCaptureResult,
-  PaseoWorkspaceTerminalActions,
+  ClisbotTerminal,
+  ClisbotTerminalActions,
+  ClisbotTerminalHandle,
+  ClisbotTerminalCreateOptions,
+  ClisbotTerminalListOptions,
+  ClisbotTerminalListResult,
+  ClisbotTerminalCaptureOptions,
+  ClisbotTerminalCaptureResult,
+  ClisbotWorkspaceTerminalActions,
 } from "./terminals/index.js";
-import type { PluginTimelineItem } from "@getpaseo/protocol/agent-types";
+import type { PluginTimelineItem } from "@clisbot/protocol/agent-types";
 import type {
   AgentBackgroundWorkItem,
   FetchAgentsEntry,
@@ -82,14 +82,14 @@ export type ConnectionState =
   | { status: "disconnected"; reason?: string }
   | { status: "disposed" };
 
-export interface PaseoLogger {
+export interface ClisbotLogger {
   debug(obj: object, msg?: string): void;
   info(obj: object, msg?: string): void;
   warn(obj: object, msg?: string): void;
   error(obj: object, msg?: string): void;
 }
 
-export interface PaseoClientConfig {
+export interface ClisbotClientConfig {
   capabilities?: DaemonClientConfig["capabilities"];
   url: string;
   clientId?: string;
@@ -98,7 +98,7 @@ export interface PaseoClientConfig {
   password?: string;
   authHeader?: string;
   suppressSendErrors?: boolean;
-  logger?: PaseoLogger;
+  logger?: ClisbotLogger;
   connectTimeoutMs?: number;
   e2ee?: {
     enabled?: boolean;
@@ -113,87 +113,87 @@ export interface PaseoClientConfig {
   runtimeMetricsWindowMs?: number;
 }
 
-export type PaseoWorkspace = WorkspaceDescriptorPayload;
-export type PaseoAgent = AgentSnapshotPayload;
-export type PaseoAgentListOptions = FetchAgentsOptions;
-export type PaseoProject = WorkspaceProjectDescriptorPayload;
-export type PaseoProjectListOptions = Omit<ProjectListRequestMessage, "type" | "requestId"> & {
+export type ClisbotWorkspace = WorkspaceDescriptorPayload;
+export type ClisbotAgent = AgentSnapshotPayload;
+export type ClisbotAgentListOptions = FetchAgentsOptions;
+export type ClisbotProject = WorkspaceProjectDescriptorPayload;
+export type ClisbotProjectListOptions = Omit<ProjectListRequestMessage, "type" | "requestId"> & {
   requestId?: string;
 };
-export type PaseoProjectListResult = ProjectListResponseMessage["payload"];
-export type PaseoProjectUpdate = Extract<
+export type ClisbotProjectListResult = ProjectListResponseMessage["payload"];
+export type ClisbotProjectUpdate = Extract<
   SessionOutboundMessage,
   { type: "project.update" }
 >["payload"];
-export type PaseoProjectUpdateHandler = (update: PaseoProjectUpdate) => void;
+export type ClisbotProjectUpdateHandler = (update: ClisbotProjectUpdate) => void;
 
-export interface PaseoAgentListResult {
-  subscription?: OwnedSubscription<PaseoAgentListResult>;
+export interface ClisbotAgentListResult {
+  subscription?: OwnedSubscription<ClisbotAgentListResult>;
   requestId: string;
   subscriptionId?: string | null;
   entries: FetchAgentsEntry[];
   pageInfo: FetchAgentsPageInfo;
 }
-export type PaseoWorkspaceListOptions = Omit<
+export type ClisbotWorkspaceListOptions = Omit<
   FetchWorkspacesRequestMessage,
   "type" | "requestId"
 > & {
   requestId?: string;
 };
 
-export interface PaseoWorkspaceListResult {
-  subscription?: OwnedSubscription<PaseoWorkspaceListResult>;
+export interface ClisbotWorkspaceListResult {
+  subscription?: OwnedSubscription<ClisbotWorkspaceListResult>;
   requestId: string;
   subscriptionId?: string | null;
-  entries: PaseoWorkspace[];
+  entries: ClisbotWorkspace[];
   pageInfo: FetchWorkspacesResponseMessage["payload"]["pageInfo"];
 }
 
-export interface PaseoWorkspaceOpenOptions {
+export interface ClisbotWorkspaceOpenOptions {
   cwd: string;
   requestId?: string;
 }
 
-export type PaseoWorkspaceCreateOptions = Omit<
+export type ClisbotWorkspaceCreateOptions = Omit<
   WorkspaceCreateRequest,
   "type" | "requestId" | "agent" | "subscribe"
 > & {
   requestId?: string;
   agent?: Omit<
-    PaseoAgentCreateOptions,
+    ClisbotAgentCreateOptions,
     "worktree" | "git" | "onEvent" | "idempotencyKey" | "requestId"
   >;
   onEvent?: (snapshot: CreationSnapshot) => void;
 };
 
-export interface PaseoWorkspaceArchiveResult {
+export interface ClisbotWorkspaceArchiveResult {
   requestId: string;
   workspaceId: string;
   archivedAt: string | null;
   error: string | null;
 }
 
-export type PaseoWorkspaceUpdate = Extract<
+export type ClisbotWorkspaceUpdate = Extract<
   SessionOutboundMessage,
   { type: "workspace_update" }
 >["payload"];
 
-export type PaseoWorkspaceUpdateHandler = (update: PaseoWorkspaceUpdate) => void;
+export type ClisbotWorkspaceUpdateHandler = (update: ClisbotWorkspaceUpdate) => void;
 
-export interface PaseoWorkspaceHandle {
+export interface ClisbotWorkspaceHandle {
   readonly id: string;
   readonly projectId: string | null;
   readonly directory: string | null;
   readonly name: string | null;
-  readonly status: PaseoWorkspace["status"] | null;
-  /** Data plugins stored on the workspace. Paseo never reads a key. */
-  readonly metadata: NonNullable<PaseoWorkspace["metadata"]> | null;
+  readonly status: ClisbotWorkspace["status"] | null;
+  /** Data plugins stored on the workspace. Clisbot never reads a key. */
+  readonly metadata: NonNullable<ClisbotWorkspace["metadata"]> | null;
   readonly agents: {
-    create(options: PaseoWorkspaceAgentCreateOptions): Promise<PaseoAgentHandle>;
+    create(options: ClisbotWorkspaceAgentCreateOptions): Promise<ClisbotAgentHandle>;
   };
-  readonly terminals: PaseoWorkspaceTerminalActions;
-  current(): PaseoWorkspace | null;
-  refresh(options?: { requestId?: string }): Promise<PaseoWorkspace | null>;
+  readonly terminals: ClisbotWorkspaceTerminalActions;
+  current(): ClisbotWorkspace | null;
+  refresh(options?: { requestId?: string }): Promise<ClisbotWorkspace | null>;
   setTitle(title: string | null, requestId?: string): Promise<{ title: string | null }>;
   /** Top-level keys replace; `null` removes the key. Needs a host with `entityMetadata`. */
   setMetadata(patch: Record<string, JsonValue>): Promise<void>;
@@ -203,76 +203,76 @@ export interface PaseoWorkspaceHandle {
     baseRef: string;
     requestId?: string;
   }): Promise<{ baseRef: string | null }>;
-  archive(requestId?: string): Promise<PaseoWorkspaceArchiveResult>;
+  archive(requestId?: string): Promise<ClisbotWorkspaceArchiveResult>;
   /**
    * Subscribes to already-emitted daemon workspace_update events for this id.
    * This returns a local unsubscribe function; it does not own app cache state or
    * send a daemon unsubscribe RPC. Call `workspaces.list({ subscribe: {} })` when
    * the daemon should start streaming workspace directory updates.
    */
-  subscribe(handler: (update: PaseoWorkspaceUpdate) => void): () => void;
+  subscribe(handler: (update: ClisbotWorkspaceUpdate) => void): () => void;
 }
 
-export interface PaseoProjectActions {
-  list(options?: PaseoProjectListOptions): Promise<PaseoProjectListResult>;
-  subscribe(handler: PaseoProjectUpdateHandler): () => void;
+export interface ClisbotProjectActions {
+  list(options?: ClisbotProjectListOptions): Promise<ClisbotProjectListResult>;
+  subscribe(handler: ClisbotProjectUpdateHandler): () => void;
 }
 
-export interface PaseoWorkspaceActions {
-  list(options: PaseoWorkspaceListOptions & { subscribe: {} }): Promise<
-    PaseoWorkspaceListResult & {
+export interface ClisbotWorkspaceActions {
+  list(options: ClisbotWorkspaceListOptions & { subscribe: {} }): Promise<
+    ClisbotWorkspaceListResult & {
       subscriptionId: string;
-      subscription: OwnedSubscription<PaseoWorkspaceListResult>;
+      subscription: OwnedSubscription<ClisbotWorkspaceListResult>;
     }
   >;
-  list(options?: PaseoWorkspaceListOptions): Promise<PaseoWorkspaceListResult>;
-  ref(workspace: string | PaseoWorkspace): PaseoWorkspaceHandle;
+  list(options?: ClisbotWorkspaceListOptions): Promise<ClisbotWorkspaceListResult>;
+  ref(workspace: string | ClisbotWorkspace): ClisbotWorkspaceHandle;
   open(
-    input: string | PaseoWorkspaceOpenOptions,
+    input: string | ClisbotWorkspaceOpenOptions,
     requestId?: string,
-  ): Promise<PaseoWorkspaceHandle>;
-  create(options: PaseoWorkspaceCreateOptions): Promise<PaseoWorkspaceHandle>;
+  ): Promise<ClisbotWorkspaceHandle>;
+  create(options: ClisbotWorkspaceCreateOptions): Promise<ClisbotWorkspaceHandle>;
   archive(
-    workspace: string | PaseoWorkspaceHandle,
+    workspace: string | ClisbotWorkspaceHandle,
     requestId?: string,
-  ): Promise<PaseoWorkspaceArchiveResult>;
+  ): Promise<ClisbotWorkspaceArchiveResult>;
   /**
    * Local event subscription over the low-level driver's workspace_update stream.
    * The returned function only removes this SDK listener.
    */
-  subscribe(handler: PaseoWorkspaceUpdateHandler): () => void;
+  subscribe(handler: ClisbotWorkspaceUpdateHandler): () => void;
 }
 
-type PaseoAgentSessionConfig = CreateAgentRequestMessage["config"];
-export type PaseoAgentProvider = PaseoAgentSessionConfig["provider"];
+type ClisbotAgentSessionConfig = CreateAgentRequestMessage["config"];
+export type ClisbotAgentProvider = ClisbotAgentSessionConfig["provider"];
 
-export type PaseoProviderFeatureValues = Record<string, unknown>;
+export type ClisbotProviderFeatureValues = Record<string, unknown>;
 
-export interface PaseoAgentConfig {
+export interface ClisbotAgentConfig {
   /** Provider and model in `provider/model` format. */
   provider: string;
-  modeId?: PaseoAgentSessionConfig["modeId"];
-  thinkingOptionId?: PaseoAgentSessionConfig["thinkingOptionId"];
+  modeId?: ClisbotAgentSessionConfig["modeId"];
+  thinkingOptionId?: ClisbotAgentSessionConfig["thinkingOptionId"];
   /** @deprecated Put these in `options`; they are folded into it on send. */
-  featureValues?: PaseoProviderFeatureValues;
+  featureValues?: ClisbotProviderFeatureValues;
   /**
    * JSON-safe provider settings, validated by the selected provider. They include the settings the
    * provider offers a composer control for, such as `service_tier` or `fast_mode`.
    */
-  options?: PaseoAgentSessionConfig["providerOptions"];
-  systemPrompt?: PaseoAgentSessionConfig["systemPrompt"];
-  toolPolicy?: PaseoAgentSessionConfig["toolPolicy"];
-  mcpServers?: PaseoAgentSessionConfig["mcpServers"];
+  options?: ClisbotAgentSessionConfig["providerOptions"];
+  systemPrompt?: ClisbotAgentSessionConfig["systemPrompt"];
+  toolPolicy?: ClisbotAgentSessionConfig["toolPolicy"];
+  mcpServers?: ClisbotAgentSessionConfig["mcpServers"];
 }
 
-export interface PaseoAgentCreateOptions {
+export interface ClisbotAgentCreateOptions {
   idempotencyKey?: string;
   agentId?: string;
   onEvent?: (snapshot: CreationSnapshot) => void;
-  config: PaseoAgentConfig;
+  config: ClisbotAgentConfig;
   cwd: string;
-  parent?: string | AgentAddress | PaseoAgentHandle;
-  title?: PaseoAgentSessionConfig["title"];
+  parent?: string | AgentAddress | ClisbotAgentHandle;
+  title?: ClisbotAgentSessionConfig["title"];
   env?: CreateAgentRequestMessage["env"];
   prompt?: string;
   clientMessageId?: string;
@@ -294,14 +294,14 @@ export interface PaseoAgentCreateOptions {
   metadata?: CreateAgentRequestMessage["metadata"];
 }
 
-export type PaseoWorkspaceAgentCreateOptions = Omit<PaseoAgentCreateOptions, "cwd">;
+export type ClisbotWorkspaceAgentCreateOptions = Omit<ClisbotAgentCreateOptions, "cwd">;
 
-export interface PaseoAgentRefetchResult {
-  agent: PaseoAgent;
+export interface ClisbotAgentRefetchResult {
+  agent: ClisbotAgent;
   project: ProjectPlacementPayload | null;
 }
 
-export interface PaseoAgentTimelineRefetchOptions {
+export interface ClisbotAgentTimelineRefetchOptions {
   direction?: FetchAgentTimelineDirection;
   cursor?: FetchAgentTimelineCursor;
   limit?: number;
@@ -314,34 +314,40 @@ export interface PaseoAgentTimelineRefetchOptions {
   requestId?: string;
 }
 
-export type PaseoAgentSendOptions = SendMessageOptions;
+export type ClisbotAgentSendOptions = SendMessageOptions;
 
-export interface PaseoAgentRunOptions extends PaseoAgentSendOptions {
+export interface ClisbotAgentRunOptions extends ClisbotAgentSendOptions {
   timeoutMs?: number;
 }
 
-export type PaseoAgentRunResult = WaitForFinishResult;
-export type PaseoAgentPermissionResponse = AgentPermissionResponse;
+export type ClisbotAgentRunResult = WaitForFinishResult;
+export type ClisbotAgentPermissionResponse = AgentPermissionResponse;
 
-export interface PaseoAgentRespondToPermissionOptions {
+export interface ClisbotAgentRespondToPermissionOptions {
   requestId: string;
-  response: PaseoAgentPermissionResponse;
+  response: ClisbotAgentPermissionResponse;
 }
 
-export interface PaseoAgentCommandsOptions {
+export interface ClisbotAgentCommandsOptions {
   requestId?: string;
 }
 
-export type PaseoAgentCommandsResult = ListCommandsResponse["payload"];
+export type ClisbotAgentCommandsResult = ListCommandsResponse["payload"];
 
-export type PaseoAgentUpdate = Extract<SessionOutboundMessage, { type: "agent_update" }>["payload"];
+export type ClisbotAgentUpdate = Extract<
+  SessionOutboundMessage,
+  { type: "agent_update" }
+>["payload"];
 
-export type PaseoAgentStream = Extract<SessionOutboundMessage, { type: "agent_stream" }>["payload"];
+export type ClisbotAgentStream = Extract<
+  SessionOutboundMessage,
+  { type: "agent_stream" }
+>["payload"];
 
-export type PaseoAgentUpdateHandler = (update: PaseoAgentUpdate) => void;
+export type ClisbotAgentUpdateHandler = (update: ClisbotAgentUpdate) => void;
 
-export type PaseoAgentTimelineEvent =
-  | PaseoAgentStream
+export type ClisbotAgentTimelineEvent =
+  | ClisbotAgentStream
   | {
       agentId: string;
       event: { type: "replacement"; epoch: string };
@@ -353,16 +359,16 @@ export type PaseoAgentTimelineEvent =
     }
   | { agentId: string; event: { type: "error"; error: string } };
 
-export type PaseoAgentTimelineSubscription = ReturnType<DaemonClient["subscribeAgentTimeline"]>;
+export type ClisbotAgentTimelineSubscription = ReturnType<DaemonClient["subscribeAgentTimeline"]>;
 
-export interface PaseoAgentTimelineHandle {
+export interface ClisbotAgentTimelineHandle {
   append(item: Omit<PluginTimelineItem, "pluginId">): Promise<{ seq: number; epoch: string }>;
   /**
    * Fetches a fresh timeline page through the existing daemon RPC. If the daemon
    * includes an agent snapshot in the response, the parent handle is updated to
    * that value.
    */
-  refetch(options?: PaseoAgentTimelineRefetchOptions): Promise<FetchAgentTimelinePayload>;
+  refetch(options?: ClisbotAgentTimelineRefetchOptions): Promise<FetchAgentTimelinePayload>;
   /**
    * Delivers live events only. After reconnect, subscription_restored precedes
    * subsequent updates. History may have been missed; use refetch() to request
@@ -371,19 +377,22 @@ export interface PaseoAgentTimelineHandle {
    * Await the returned unsubscribe function's `ready` promise before starting
    * work that must be observed. It rejects if establishment fails.
    */
-  subscribe(handler: (event: PaseoAgentTimelineEvent) => void): PaseoAgentTimelineSubscription;
+  subscribe(handler: (event: ClisbotAgentTimelineEvent) => void): ClisbotAgentTimelineSubscription;
 }
 
-export type PaseoAgentBackgroundWorkItem = AgentBackgroundWorkItem;
+export type ClisbotAgentBackgroundWorkItem = AgentBackgroundWorkItem;
 
-export interface PaseoAgentBackgroundWorkHandle {
+export interface ClisbotAgentBackgroundWorkHandle {
   /** Stop one item and wait for provider confirmation. */
   stop(
-    item: PaseoAgentBackgroundWorkItem,
+    item: ClisbotAgentBackgroundWorkItem,
     options?: { requestId?: string; timeout?: number },
   ): Promise<void>;
   /** Reads the agent's current background work once. */
-  list(options?: { requestId?: string; timeout?: number }): Promise<PaseoAgentBackgroundWorkItem[]>;
+  list(options?: {
+    requestId?: string;
+    timeout?: number;
+  }): Promise<ClisbotAgentBackgroundWorkItem[]>;
   /**
    * Calls `listener` with the agent's current list once the subscription is established, again
    * after each reconnect, then with the full list each time it changes. Returns the unsubscribe
@@ -394,17 +403,17 @@ export interface PaseoAgentBackgroundWorkHandle {
    * reconnect reads the list again.
    */
   subscribe(
-    listener: (items: PaseoAgentBackgroundWorkItem[]) => void,
-    options?: PaseoAgentBackgroundWorkSubscribeOptions,
+    listener: (items: ClisbotAgentBackgroundWorkItem[]) => void,
+    options?: ClisbotAgentBackgroundWorkSubscribeOptions,
   ): () => void;
 }
 
-export interface PaseoAgentBackgroundWorkSubscribeOptions {
+export interface ClisbotAgentBackgroundWorkSubscribeOptions {
   /** Receives the error when reading the agent's current list fails. */
   onError?: (error: unknown) => void;
 }
 
-export interface PaseoAgentHandle {
+export interface ClisbotAgentHandle {
   readonly id: string;
   readonly address: AgentAddress;
   /**
@@ -416,34 +425,34 @@ export interface PaseoAgentHandle {
    */
   readonly workspaceId: string | null;
   readonly cwd: string | null;
-  readonly status: PaseoAgent["status"] | null;
-  readonly capabilities: PaseoAgent["capabilities"] | null;
-  readonly availableModes: PaseoAgent["availableModes"] | null;
-  readonly pendingPermissions: PaseoAgent["pendingPermissions"] | null;
-  readonly activeTurn: NonNullable<PaseoAgent["activeTurn"]> | null;
-  readonly lastUsage: NonNullable<PaseoAgent["lastUsage"]> | null;
-  readonly lastError: NonNullable<PaseoAgent["lastError"]> | null;
+  readonly status: ClisbotAgent["status"] | null;
+  readonly capabilities: ClisbotAgent["capabilities"] | null;
+  readonly availableModes: ClisbotAgent["availableModes"] | null;
+  readonly pendingPermissions: ClisbotAgent["pendingPermissions"] | null;
+  readonly activeTurn: NonNullable<ClisbotAgent["activeTurn"]> | null;
+  readonly lastUsage: NonNullable<ClisbotAgent["lastUsage"]> | null;
+  readonly lastError: NonNullable<ClisbotAgent["lastError"]> | null;
   /** @deprecated Use `controls` and `options`. */
-  readonly features: NonNullable<PaseoAgent["features"]> | null;
+  readonly features: NonNullable<ClisbotAgent["features"]> | null;
   /** The provider options the agent runs with: `config.json` defaults merged with its own. */
-  readonly options: NonNullable<PaseoAgent["options"]> | null;
+  readonly options: NonNullable<ClisbotAgent["options"]> | null;
   /** How the provider wants its options drawn. Controls hold no value; read `options`. */
-  readonly controls: NonNullable<PaseoAgent["controls"]> | null;
-  /** Data plugins stored on the agent. Paseo never reads a key. */
-  readonly metadata: NonNullable<PaseoAgent["metadata"]> | null;
-  readonly runtimeInfo: NonNullable<PaseoAgent["runtimeInfo"]> | null;
-  readonly archivedAt: NonNullable<PaseoAgent["archivedAt"]> | null;
-  readonly timeline: PaseoAgentTimelineHandle;
-  readonly backgroundWork: PaseoAgentBackgroundWorkHandle;
-  current(): PaseoAgent | null;
-  refresh(requestId?: string): Promise<PaseoAgentRefetchResult | null>;
+  readonly controls: NonNullable<ClisbotAgent["controls"]> | null;
+  /** Data plugins stored on the agent. Clisbot never reads a key. */
+  readonly metadata: NonNullable<ClisbotAgent["metadata"]> | null;
+  readonly runtimeInfo: NonNullable<ClisbotAgent["runtimeInfo"]> | null;
+  readonly archivedAt: NonNullable<ClisbotAgent["archivedAt"]> | null;
+  readonly timeline: ClisbotAgentTimelineHandle;
+  readonly backgroundWork: ClisbotAgentBackgroundWorkHandle;
+  current(): ClisbotAgent | null;
+  refresh(requestId?: string): Promise<ClisbotAgentRefetchResult | null>;
   /**
    * Reopens the provider session with current configuration, rerunning session-open hooks.
    * Interrupts a running turn and returns the refreshed snapshot.
    */
-  reload(options?: { requestId?: string }): Promise<PaseoAgentRefetchResult | null>;
-  send(text: string, options?: PaseoAgentSendOptions): Promise<void>;
-  respondToPermission(options: PaseoAgentRespondToPermissionOptions): Promise<void>;
+  reload(options?: { requestId?: string }): Promise<ClisbotAgentRefetchResult | null>;
+  send(text: string, options?: ClisbotAgentSendOptions): Promise<void>;
+  respondToPermission(options: ClisbotAgentRespondToPermissionOptions): Promise<void>;
   /**
    * Changes the agent's own options: top-level keys replace, `null` removes the key so the
    * `config.json` default (or the provider's own default) applies again. Resolves once the
@@ -453,9 +462,9 @@ export interface PaseoAgentHandle {
   /** Top-level keys replace; `null` removes the key. Needs a host with `entityMetadata`. */
   setMetadata(patch: Record<string, JsonValue>): Promise<void>;
   /** Sends a prompt and resolves when that turn finishes or needs attention. */
-  run(text: string, options?: PaseoAgentRunOptions): Promise<PaseoAgentRunResult>;
+  run(text: string, options?: ClisbotAgentRunOptions): Promise<ClisbotAgentRunResult>;
   /** Waits for the current turn, including one started with `prompt`. */
-  waitForFinish(timeoutMs?: number): Promise<PaseoAgentRunResult>;
+  waitForFinish(timeoutMs?: number): Promise<ClisbotAgentRunResult>;
   /**
    * Asks the running session for the slash commands and skills it actually
    * loaded. Providers answer from the live session, so this sees built-in and
@@ -463,111 +472,111 @@ export interface PaseoAgentHandle {
    * `error` string; a provider that cannot answer reports it there rather than
    * rejecting.
    */
-  commands(options?: PaseoAgentCommandsOptions): Promise<PaseoAgentCommandsResult>;
+  commands(options?: ClisbotAgentCommandsOptions): Promise<ClisbotAgentCommandsResult>;
   archive(): Promise<{ archivedAt: string }>;
   detach(): Promise<void>;
-  subscribe(handler: (update: PaseoAgentUpdate) => void): () => void;
+  subscribe(handler: (update: ClisbotAgentUpdate) => void): () => void;
 }
 
-export interface PaseoAgentActions {
-  list(options: PaseoAgentListOptions & { subscribe: {} }): Promise<
-    PaseoAgentListResult & {
+export interface ClisbotAgentActions {
+  list(options: ClisbotAgentListOptions & { subscribe: {} }): Promise<
+    ClisbotAgentListResult & {
       subscriptionId: string;
-      subscription: OwnedSubscription<PaseoAgentListResult>;
+      subscription: OwnedSubscription<ClisbotAgentListResult>;
     }
   >;
-  list(options?: PaseoAgentListOptions): Promise<PaseoAgentListResult>;
-  ref(agent: string | PaseoAgent): PaseoAgentHandle;
-  create(options: PaseoAgentCreateOptions): Promise<PaseoAgentHandle>;
+  list(options?: ClisbotAgentListOptions): Promise<ClisbotAgentListResult>;
+  ref(agent: string | ClisbotAgent): ClisbotAgentHandle;
+  create(options: ClisbotAgentCreateOptions): Promise<ClisbotAgentHandle>;
   /**
    * Local event subscription over the low-level driver's agent_update stream.
    * The returned function only removes this SDK listener.
    */
-  subscribe(handler: PaseoAgentUpdateHandler): () => void;
+  subscribe(handler: ClisbotAgentUpdateHandler): () => void;
 }
 
-export type PaseoProviderModelsResult = ListProviderModelsResponseMessage["payload"];
-export type PaseoProviderModesResult = ListProviderModesResponseMessage["payload"];
-type PaseoProviderControlsDraft = ProviderControlsListRequestMessage["draftConfig"];
-export interface PaseoProviderControlsInput extends Omit<
-  PaseoProviderControlsDraft,
+export type ClisbotProviderModelsResult = ListProviderModelsResponseMessage["payload"];
+export type ClisbotProviderModesResult = ListProviderModesResponseMessage["payload"];
+type ClisbotProviderControlsDraft = ProviderControlsListRequestMessage["draftConfig"];
+export interface ClisbotProviderControlsInput extends Omit<
+  ClisbotProviderControlsDraft,
   "provider" | "model"
 > {
   /** Provider and model in `provider/model` format. */
   provider: string;
 }
-export type PaseoProviderControlsResult = ProviderControlsListResponseMessage["payload"];
-/** @deprecated Use `PaseoProviderControlsInput`. */
-export type PaseoProviderFeaturesInput = Omit<
+export type ClisbotProviderControlsResult = ProviderControlsListResponseMessage["payload"];
+/** @deprecated Use `ClisbotProviderControlsInput`. */
+export type ClisbotProviderFeaturesInput = Omit<
   ListProviderFeaturesRequestMessage["draftConfig"],
   "provider" | "model"
 > & { provider: string };
-/** @deprecated Use `PaseoProviderControlsResult`. */
-export type PaseoProviderFeaturesResult = ListProviderFeaturesResponseMessage["payload"];
-export type PaseoProviderAvailabilityResult = ListAvailableProvidersResponse["payload"];
-export type PaseoProviderSnapshotResult = GetProvidersSnapshotResponseMessage["payload"];
-export type PaseoProviderSnapshotUpdate = Extract<
+/** @deprecated Use `ClisbotProviderControlsResult`. */
+export type ClisbotProviderFeaturesResult = ListProviderFeaturesResponseMessage["payload"];
+export type ClisbotProviderAvailabilityResult = ListAvailableProvidersResponse["payload"];
+export type ClisbotProviderSnapshotResult = GetProvidersSnapshotResponseMessage["payload"];
+export type ClisbotProviderSnapshotUpdate = Extract<
   SessionOutboundMessage,
   { type: "providers_snapshot_update" }
 >["payload"];
-export type PaseoProviderRefreshResult = RefreshProvidersSnapshotResponseMessage["payload"];
-export type PaseoProviderDiagnosticResult = ProviderDiagnosticResponseMessage["payload"];
-export type PaseoProviderUsageResult = ProviderUsageListResponseMessage["payload"];
-export interface PaseoProviderUsageOptions {
+export type ClisbotProviderRefreshResult = RefreshProvidersSnapshotResponseMessage["payload"];
+export type ClisbotProviderDiagnosticResult = ProviderDiagnosticResponseMessage["payload"];
+export type ClisbotProviderUsageResult = ProviderUsageListResponseMessage["payload"];
+export interface ClisbotProviderUsageOptions {
   requestId?: string;
 }
 
-export interface PaseoProviderListOptions {
+export interface ClisbotProviderListOptions {
   cwd?: string;
   requestId?: string;
 }
 
-export interface PaseoProviderRefreshOptions {
+export interface ClisbotProviderRefreshOptions {
   cwd?: string;
-  providers?: PaseoAgentProvider[];
+  providers?: ClisbotAgentProvider[];
   requestId?: string;
 }
 
-export interface PaseoProviderWaitOptions extends PaseoProviderListOptions {
+export interface ClisbotProviderWaitOptions extends ClisbotProviderListOptions {
   timeoutMs?: number;
 }
 
-export interface PaseoProviderActions {
+export interface ClisbotProviderActions {
   listModels(
-    provider: PaseoAgentProvider,
-    options?: PaseoProviderListOptions,
-  ): Promise<PaseoProviderModelsResult>;
+    provider: ClisbotAgentProvider,
+    options?: ClisbotProviderListOptions,
+  ): Promise<ClisbotProviderModelsResult>;
   listModes(
-    provider: PaseoAgentProvider,
-    options?: PaseoProviderListOptions,
-  ): Promise<PaseoProviderModesResult>;
+    provider: ClisbotAgentProvider,
+    options?: ClisbotProviderListOptions,
+  ): Promise<ClisbotProviderModesResult>;
   /**
    * The controls a draft agent would show and the options it would run with, resolved by the
    * daemon from `config.json` defaults and the draft's own `providerOptions`.
    */
   listControls(
-    draftConfig: PaseoProviderControlsInput,
+    draftConfig: ClisbotProviderControlsInput,
     options?: { requestId?: string },
-  ): Promise<PaseoProviderControlsResult>;
+  ): Promise<ClisbotProviderControlsResult>;
   /** @deprecated Use `listControls`. */
   listFeatures(
-    draftConfig: PaseoProviderFeaturesInput,
+    draftConfig: ClisbotProviderFeaturesInput,
     options?: { requestId?: string },
-  ): Promise<PaseoProviderFeaturesResult>;
-  listAvailable(options?: { requestId?: string }): Promise<PaseoProviderAvailabilityResult>;
-  snapshot(options?: PaseoProviderListOptions): Promise<PaseoProviderSnapshotResult>;
+  ): Promise<ClisbotProviderFeaturesResult>;
+  listAvailable(options?: { requestId?: string }): Promise<ClisbotProviderAvailabilityResult>;
+  snapshot(options?: ClisbotProviderListOptions): Promise<ClisbotProviderSnapshotResult>;
   /** Resolves after the daemon's lazy provider discovery has finished. */
-  waitForReady(options?: PaseoProviderWaitOptions): Promise<PaseoProviderSnapshotResult>;
-  refresh(options?: PaseoProviderRefreshOptions): Promise<PaseoProviderRefreshResult>;
+  waitForReady(options?: ClisbotProviderWaitOptions): Promise<ClisbotProviderSnapshotResult>;
+  refresh(options?: ClisbotProviderRefreshOptions): Promise<ClisbotProviderRefreshResult>;
   diagnostic(
-    provider: PaseoAgentProvider,
+    provider: ClisbotAgentProvider,
     options?: { requestId?: string },
-  ): Promise<PaseoProviderDiagnosticResult>;
-  listUsage(options?: PaseoProviderUsageOptions): Promise<PaseoProviderUsageResult>;
-  subscribe(handler: (update: PaseoProviderSnapshotUpdate) => void): () => void;
+  ): Promise<ClisbotProviderDiagnosticResult>;
+  listUsage(options?: ClisbotProviderUsageOptions): Promise<ClisbotProviderUsageResult>;
+  subscribe(handler: (update: ClisbotProviderSnapshotUpdate) => void): () => void;
 }
 
-export interface PaseoConfigActions {
+export interface ClisbotConfigActions {
   /**
    * Reads daemon config through the existing config RPC. Provider profiles,
    * custom provider entries, keys/env, custom binaries, and provider enablement
@@ -587,32 +596,32 @@ export interface PaseoConfigActions {
   ): Promise<{ requestId: string; config: MutableDaemonConfig }>;
 }
 
-export interface PaseoApi {
-  readonly hosts: PaseoHostActions;
+export interface ClisbotApi {
+  readonly hosts: ClisbotHostActions;
   dispose(): Promise<void>;
   observeEvents: DaemonClient["observeEvents"];
-  readonly terminals: PaseoTerminalActions;
-  readonly workspaces: PaseoWorkspaceActions;
-  readonly projects: PaseoProjectActions;
-  readonly agents: PaseoAgentActions;
-  readonly providers: PaseoProviderActions;
-  readonly config: PaseoConfigActions;
+  readonly terminals: ClisbotTerminalActions;
+  readonly workspaces: ClisbotWorkspaceActions;
+  readonly projects: ClisbotProjectActions;
+  readonly agents: ClisbotAgentActions;
+  readonly providers: ClisbotProviderActions;
+  readonly config: ClisbotConfigActions;
 }
 
-export interface PaseoClient extends PaseoApi {
+export interface ClisbotClient extends ClisbotApi {
   connect(): Promise<void>;
   close(): Promise<void>;
   ensureConnected(): void;
   getConnectionState(): ConnectionState;
 }
 
-export function createPaseoClient(config: PaseoClientConfig): PaseoClient {
+export function createClisbotClient(config: ClisbotClientConfig): ClisbotClient {
   const daemonClient = new DaemonClient({
     ...config,
     clientId: config.clientId ?? createGeneratedClientId(),
     clientType: "cli",
   });
-  const api = createPaseoApi(daemonClient);
+  const api = createClisbotApi(daemonClient);
   return {
     ...api,
     connect: () => daemonClient.connect(),
@@ -629,7 +638,7 @@ export function createPaseoClient(config: PaseoClientConfig): PaseoClient {
 }
 
 function toDaemonAgentCreateOptions(
-  options: PaseoAgentCreateOptions,
+  options: ClisbotAgentCreateOptions,
   placement?: { workspaceId: string; cwd: string },
   serverId?: string,
 ): CreateAgentRequestOptions {
@@ -665,16 +674,16 @@ function toDaemonAgentCreateOptions(
   };
 }
 
-export function createPaseoApi(
+export function createClisbotApi(
   daemonClient: DaemonClient,
   scopeOptions?: { signal?: AbortSignal },
-): PaseoApi {
+): ClisbotApi {
   const handles = new Set<{ release(): Promise<void> }>();
-  const agentListeners = new Set<PaseoAgentUpdateHandler>();
-  const workspaceListeners = new Set<PaseoWorkspaceUpdateHandler>();
+  const agentListeners = new Set<ClisbotAgentUpdateHandler>();
+  const workspaceListeners = new Set<ClisbotWorkspaceUpdateHandler>();
   const lifetime = new AbortController();
   const own = <T extends { release(): Promise<void> }>(create: () => T): T => {
-    if (lifetime.signal.aborted) throw new Error("Paseo API is disposed");
+    if (lifetime.signal.aborted) throw new Error("Clisbot API is disposed");
     const handle = create();
     handles.add(handle);
     const release = handle.release.bind(handle);
@@ -684,15 +693,15 @@ export function createPaseoApi(
     };
     return handle;
   };
-  const listenAgents = (handler: PaseoAgentUpdateHandler) => {
-    if (lifetime.signal.aborted) throw new Error("Paseo API is disposed");
+  const listenAgents = (handler: ClisbotAgentUpdateHandler) => {
+    if (lifetime.signal.aborted) throw new Error("Clisbot API is disposed");
     agentListeners.add(handler);
     return () => {
       agentListeners.delete(handler);
     };
   };
-  const listenWorkspaces = (handler: PaseoWorkspaceUpdateHandler) => {
-    if (lifetime.signal.aborted) throw new Error("Paseo API is disposed");
+  const listenWorkspaces = (handler: ClisbotWorkspaceUpdateHandler) => {
+    if (lifetime.signal.aborted) throw new Error("Clisbot API is disposed");
     workspaceListeners.add(handler);
     return () => {
       workspaceListeners.delete(handler);
@@ -705,7 +714,7 @@ export function createPaseoApi(
     () => own(() => daemonClient.observeAgentBackgroundWork()),
   );
   const createAgent = async (
-    options: PaseoAgentCreateOptions,
+    options: ClisbotAgentCreateOptions,
     placement?: { workspaceId: string; cwd: string },
   ) => {
     const serverId = daemonClient.getLastServerInfoMessage()?.serverId;
@@ -775,16 +784,18 @@ export function createPaseoApi(
     };
   };
 
-  function listWorkspaces(options: PaseoWorkspaceListOptions & { subscribe: {} }): Promise<
-    PaseoWorkspaceListResult & {
+  function listWorkspaces(options: ClisbotWorkspaceListOptions & { subscribe: {} }): Promise<
+    ClisbotWorkspaceListResult & {
       subscriptionId: string;
-      subscription: OwnedSubscription<PaseoWorkspaceListResult>;
+      subscription: OwnedSubscription<ClisbotWorkspaceListResult>;
     }
   >;
-  function listWorkspaces(options?: PaseoWorkspaceListOptions): Promise<PaseoWorkspaceListResult>;
+  function listWorkspaces(
+    options?: ClisbotWorkspaceListOptions,
+  ): Promise<ClisbotWorkspaceListResult>;
   async function listWorkspaces(
-    options?: PaseoWorkspaceListOptions,
-  ): Promise<PaseoWorkspaceListResult> {
+    options?: ClisbotWorkspaceListOptions,
+  ): Promise<ClisbotWorkspaceListResult> {
     if (!options?.subscribe) return daemonClient.fetchWorkspaces(options);
     if (options.subscribe.subscriptionId !== undefined)
       throw new Error("Subscription IDs are assigned by the host");
@@ -799,14 +810,14 @@ export function createPaseoApi(
     return { ...(await subscription.ready), subscription };
   }
 
-  function listAgents(options: PaseoAgentListOptions & { subscribe: {} }): Promise<
-    PaseoAgentListResult & {
+  function listAgents(options: ClisbotAgentListOptions & { subscribe: {} }): Promise<
+    ClisbotAgentListResult & {
       subscriptionId: string;
-      subscription: OwnedSubscription<PaseoAgentListResult>;
+      subscription: OwnedSubscription<ClisbotAgentListResult>;
     }
   >;
-  function listAgents(options?: PaseoAgentListOptions): Promise<PaseoAgentListResult>;
-  async function listAgents(options?: PaseoAgentListOptions): Promise<PaseoAgentListResult> {
+  function listAgents(options?: ClisbotAgentListOptions): Promise<ClisbotAgentListResult>;
+  async function listAgents(options?: ClisbotAgentListOptions): Promise<ClisbotAgentListResult> {
     if (!options?.subscribe) return daemonClient.fetchAgents(options);
     if (options.subscribe.subscriptionId !== undefined)
       throw new Error("Subscription IDs are assigned by the host");
@@ -823,7 +834,7 @@ export function createPaseoApi(
 
   return {
     dispose,
-    hosts: createHostActions(daemonClient, { own, signal: lifetime.signal, api: createPaseoApi }),
+    hosts: createHostActions(daemonClient, { own, signal: lifetime.signal, api: createClisbotApi }),
     observeEvents,
     terminals,
     projects: {
@@ -906,18 +917,18 @@ export function createPaseoApi(
   };
 }
 
-type WorkspaceHandleFactory = (workspace: string | PaseoWorkspace) => PaseoWorkspaceHandle;
-type AgentHandleFactory = (agent: string | PaseoAgent) => PaseoAgentHandle;
+type WorkspaceHandleFactory = (workspace: string | ClisbotWorkspace) => ClisbotWorkspaceHandle;
+type AgentHandleFactory = (agent: string | ClisbotAgent) => ClisbotAgentHandle;
 type CreateAgent = (
-  options: PaseoAgentCreateOptions,
+  options: ClisbotAgentCreateOptions,
   placement?: { workspaceId: string; cwd: string },
-) => Promise<PaseoAgentHandle>;
+) => Promise<ClisbotAgentHandle>;
 
 function createWorkspaceHandleFactory(
   daemonClient: DaemonClient,
   createAgent: CreateAgent,
-  terminals: PaseoTerminalActions,
-  listen: (handler: PaseoWorkspaceUpdateHandler) => () => void,
+  terminals: ClisbotTerminalActions,
+  listen: (handler: ClisbotWorkspaceUpdateHandler) => () => void,
 ): WorkspaceHandleFactory {
   return (workspace) => {
     const id = typeof workspace === "string" ? workspace : workspace.id;
@@ -1001,7 +1012,7 @@ function createWorkspaceHandleFactory(
 
 function createAgentHandleFactory(
   daemonClient: DaemonClient,
-  listen: (handler: PaseoAgentUpdateHandler) => () => void,
+  listen: (handler: ClisbotAgentUpdateHandler) => () => void,
   subscribeTimeline: DaemonClient["subscribeAgentTimeline"],
   observeBackgroundWork: () => ReturnType<DaemonClient["observeAgentBackgroundWork"]>,
 ): AgentHandleFactory {
@@ -1010,7 +1021,7 @@ function createAgentHandleFactory(
     let current = typeof agent === "string" ? null : agent;
 
     let serverId = daemonClient.getLastServerInfoMessage()?.serverId;
-    const handle: PaseoAgentHandle = {
+    const handle: ClisbotAgentHandle = {
       id,
       get address() {
         serverId ??= daemonClient.getLastServerInfoMessage()?.serverId;
@@ -1214,9 +1225,9 @@ function createAgentHandleFactory(
 async function openWorkspace(
   daemonClient: DaemonClient,
   createWorkspaceHandle: WorkspaceHandleFactory,
-  input: string | PaseoWorkspaceOpenOptions,
+  input: string | ClisbotWorkspaceOpenOptions,
   requestId?: string,
-): Promise<PaseoWorkspaceHandle> {
+): Promise<ClisbotWorkspaceHandle> {
   const options = typeof input === "string" ? { cwd: input, requestId } : input;
   const result = await daemonClient.openProject(options.cwd, options.requestId);
   if (result.error || !result.workspace) {
@@ -1225,14 +1236,14 @@ async function openWorkspace(
   return createWorkspaceHandle(result.workspace);
 }
 
-function resolveWorkspaceId(workspace: string | PaseoWorkspaceHandle): string {
+function resolveWorkspaceId(workspace: string | ClisbotWorkspaceHandle): string {
   return typeof workspace === "string" ? workspace : workspace.id;
 }
 
 function foreignParentHandle(
-  parent: PaseoAgentCreateOptions["parent"],
+  parent: ClisbotAgentCreateOptions["parent"],
   serverId: string | undefined,
-): PaseoAgentHandle | null {
+): ClisbotAgentHandle | null {
   if (!parent || typeof parent === "string" || !("address" in parent)) return null;
   return parent.address.serverId === serverId ? null : parent;
 }
@@ -1240,15 +1251,15 @@ function foreignParentHandle(
 // A host inherits background from a caller it can see. A parent on another host is invisible to
 // it, so a handle passes its own value on. A bare foreign address can't; pass background then.
 async function inheritParentBackground(
-  options: PaseoAgentCreateOptions,
-  parent: PaseoAgentHandle,
-): Promise<PaseoAgentCreateOptions> {
+  options: ClisbotAgentCreateOptions,
+  parent: ClisbotAgentHandle,
+): Promise<ClisbotAgentCreateOptions> {
   const snapshot = parent.current() ?? (await parent.refresh())?.agent;
   return snapshot?.background ? { ...options, background: true } : options;
 }
 
 function encodeParent(
-  parent: string | AgentAddress | PaseoAgentHandle,
+  parent: string | AgentAddress | ClisbotAgentHandle,
   serverId?: string,
 ): Pick<CreateAgentRequestOptions, "callerAgentId" | "labels"> {
   if (typeof parent === "string") return { callerAgentId: parent };
@@ -1272,8 +1283,8 @@ function parseProviderModel(selection: string): { provider: string; model: strin
 
 function listProviderUsage(
   daemonClient: DaemonClient,
-  options?: PaseoProviderUsageOptions,
-): Promise<PaseoProviderUsageResult> {
+  options?: ClisbotProviderUsageOptions,
+): Promise<ClisbotProviderUsageResult> {
   daemonClient.ensureConnected();
   // COMPAT(providerUsageList): added in v0.1.98, remove after 2027-02-28 once daemon floor >= v0.1.98.
   if (daemonClient.getLastServerInfoMessage()?.features?.providerUsageList !== true) {
@@ -1286,26 +1297,26 @@ async function waitForProvidersReady(
   daemonClient: DaemonClient,
   observation: ReturnType<DaemonClient["observeEvents"]>,
   signal: AbortSignal,
-  options: PaseoProviderWaitOptions = {},
-): Promise<PaseoProviderSnapshotResult> {
+  options: ClisbotProviderWaitOptions = {},
+): Promise<ClisbotProviderSnapshotResult> {
   const { timeoutMs = 60_000, ...snapshotOptions } = options;
 
   try {
     await observation.ready;
-    if (signal.aborted) throw new Error("Paseo API is disposed");
-    return await new Promise<PaseoProviderSnapshotResult>((resolve, reject) => {
+    if (signal.aborted) throw new Error("Clisbot API is disposed");
+    return await new Promise<ClisbotProviderSnapshotResult>((resolve, reject) => {
       let settled = false;
       let requestId: string | null = null;
       let snapshotCwd: string | undefined;
-      const pendingUpdates = new Map<string | undefined, PaseoProviderSnapshotUpdate>();
-      let latestEntries: PaseoProviderSnapshotResult["entries"] = [];
+      const pendingUpdates = new Map<string | undefined, ClisbotProviderSnapshotUpdate>();
+      let latestEntries: ClisbotProviderSnapshotResult["entries"] = [];
 
       const cleanup = () => {
         clearTimeout(timeout);
         unsubscribe();
         signal.removeEventListener("abort", abort);
       };
-      const finish = (snapshot: PaseoProviderSnapshotResult) => {
+      const finish = (snapshot: ClisbotProviderSnapshotResult) => {
         if (settled) return;
         settled = true;
         cleanup();
@@ -1317,7 +1328,7 @@ async function waitForProvidersReady(
         cleanup();
         reject(error instanceof Error ? error : new Error(String(error)));
       };
-      const updateMatches = (update: PaseoProviderSnapshotUpdate) => update.cwd === snapshotCwd;
+      const updateMatches = (update: ClisbotProviderSnapshotUpdate) => update.cwd === snapshotCwd;
 
       const unsubscribe = observation.subscribe({
         snapshot: () => {},
@@ -1334,7 +1345,7 @@ async function waitForProvidersReady(
           finish({ ...update, requestId });
         },
       });
-      const abort = () => fail(new Error("Paseo API is disposed"));
+      const abort = () => fail(new Error("Clisbot API is disposed"));
       signal.addEventListener("abort", abort, { once: true });
 
       const timeout = setTimeout(() => {
@@ -1379,7 +1390,7 @@ function createGeneratedClientId(): string {
     typeof globalThis.crypto?.randomUUID === "function"
       ? globalThis.crypto.randomUUID()
       : Math.random().toString(36).slice(2);
-  return `paseo-sdk-${randomId}`;
+  return `clisbot-sdk-${randomId}`;
 }
 
 export type { DiffCompare, DiffState, DiffEntry, ResolvedShas } from "./diff/index.js";

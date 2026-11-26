@@ -3,7 +3,7 @@ import type {
   AgentOptionSelectControl,
   AgentOptionToggleControl,
   ProviderOptions,
-} from "@getpaseo/protocol/agent-types";
+} from "@clisbot/protocol/agent-types";
 
 /**
  * The composer's option controls. A control only describes how to draw one option key; the

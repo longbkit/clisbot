@@ -28,8 +28,8 @@ async function replaceWithMountEffectItem(directory: string) {
   await writeFile(
     path.join(directory, "index.client.tsx"),
     `import { useEffect } from "react";
-import { useNewWorkspace } from "@getpaseo/plugin/client";
-import { Action } from "@getpaseo/plugin/client/ui";
+import { useNewWorkspace } from "@clisbot/plugin/client";
+import { Action } from "@clisbot/plugin/client/ui";
 function OnMount() {
   const newWorkspace = useNewWorkspace();
   useEffect(() => {
@@ -55,8 +55,8 @@ export default function contribute(client) {
 async function replaceWithProjectSearchItem(directory: string) {
   await writeFile(
     path.join(directory, "index.client.tsx"),
-    `import { useNewWorkspace } from "@getpaseo/plugin/client";
-import { Combobox } from "@getpaseo/plugin/client/ui";
+    `import { useNewWorkspace } from "@clisbot/plugin/client";
+import { Combobox } from "@clisbot/plugin/client/ui";
 function ProjectIssues() {
   const { project } = useNewWorkspace();
   const name = project?.name ?? "";

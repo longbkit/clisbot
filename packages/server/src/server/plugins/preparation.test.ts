@@ -17,7 +17,7 @@ describe("runPluginBuild", () => {
   });
 
   it("executes build commands in the target directory", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const logger = createTestLogger();
 
@@ -43,7 +43,7 @@ describe("runPluginBuild", () => {
   });
 
   it.runIf(process.platform === "win32")("executes Windows command scripts (.cmd)", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const logger = createTestLogger();
     const scriptPath = path.join(directory, "build.cmd");
@@ -58,7 +58,7 @@ describe("runPluginBuild", () => {
   it.runIf(process.platform === "win32")(
     "executes bare Windows command scripts resolved through PATH",
     async () => {
-      const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+      const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
       directories.push(directory);
       const logger = createTestLogger();
 
@@ -70,7 +70,7 @@ describe("runPluginBuild", () => {
   );
 
   it("passes arguments unchanged to a native executable", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const logger = createTestLogger();
 
@@ -92,7 +92,7 @@ describe("runPluginBuild", () => {
   });
 
   it.runIf(process.platform !== "win32")("executes POSIX shell scripts", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const logger = createTestLogger();
     const scriptPath = path.join(directory, "build.sh");
@@ -106,7 +106,7 @@ describe("runPluginBuild", () => {
   });
 
   it("throws when a build command exits with a non-zero code", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const logger = createTestLogger();
 
@@ -120,7 +120,7 @@ describe("runPluginBuild", () => {
   });
 
   it("forwards build progress and output from the worker to the caller's logger", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const records: Array<{ msg: string; output?: string }> = [];
     const logger = pino(
@@ -144,29 +144,29 @@ describe("runPluginBuild", () => {
   });
 
   it("uses the caller's current environment across consecutive builds", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
-    const previous = process.env.PASEO_PLUGIN_TEST_BUILD_VALUE;
+    const previous = process.env.CLISBOT_PLUGIN_TEST_BUILD_VALUE;
     const command = [
       process.execPath,
       "-e",
-      'require("node:fs").writeFileSync(process.argv[1], process.env.PASEO_PLUGIN_TEST_BUILD_VALUE);',
+      'require("node:fs").writeFileSync(process.argv[1], process.env.CLISBOT_PLUGIN_TEST_BUILD_VALUE);',
     ];
     try {
-      process.env.PASEO_PLUGIN_TEST_BUILD_VALUE = "first";
+      process.env.CLISBOT_PLUGIN_TEST_BUILD_VALUE = "first";
       await runPluginBuild(directory, [[...command, "first.txt"]], createTestLogger());
-      process.env.PASEO_PLUGIN_TEST_BUILD_VALUE = "second";
+      process.env.CLISBOT_PLUGIN_TEST_BUILD_VALUE = "second";
       await runPluginBuild(directory, [[...command, "second.txt"]], createTestLogger());
       expect(await readFile(path.join(directory, "first.txt"), "utf8")).toBe("first");
       expect(await readFile(path.join(directory, "second.txt"), "utf8")).toBe("second");
     } finally {
-      if (previous === undefined) delete process.env.PASEO_PLUGIN_TEST_BUILD_VALUE;
-      else process.env.PASEO_PLUGIN_TEST_BUILD_VALUE = previous;
+      if (previous === undefined) delete process.env.CLISBOT_PLUGIN_TEST_BUILD_VALUE;
+      else process.env.CLISBOT_PLUGIN_TEST_BUILD_VALUE = previous;
     }
   });
 
   it("handles empty or undefined build commands gracefully", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "paseo-plugin-build-"));
+    const directory = await mkdtemp(path.join(tmpdir(), "clisbot-plugin-build-"));
     directories.push(directory);
     const logger = createTestLogger();
 

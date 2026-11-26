@@ -19,7 +19,7 @@ export interface MatchOptions {
   fuzzy?: FuzzyPolicy | null;
   /**
    * Match characters in order within one whitespace-delimited word, so `pasbab`
-   * finds `paseo-babysit`, but `labdes` cannot join "Label as Design". Defaults to on.
+   * finds `clisbot-babysit`, but `labdes` cannot join "Label as Design". Defaults to on.
    */
   subsequence?: boolean;
 }

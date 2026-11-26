@@ -5,7 +5,7 @@ import {
 } from "../support/helpers/new-workspace";
 import { readFile, mkdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { connectDaemonClient } from "../support/helpers/daemon-client-loader";
 import { expect, test } from "../support/fixtures";
 import { gotoAppShell, openSettings } from "../support/helpers/app";
@@ -121,7 +121,7 @@ test.describe("Settings host page", () => {
   }) => {
     const password = "e2e host password";
     const daemon = await startIsolatedHostDaemon("srv_e2e_password_host", {
-      environment: { ...process.env, PASEO_PASSWORD: password },
+      environment: { ...process.env, CLISBOT_PASSWORD: password },
     });
     try {
       await seedSavedSettingsHosts(page, [
@@ -169,7 +169,9 @@ test.describe("Settings host page", () => {
     });
     const originalPid = (await client.getDaemonStatus()).pid;
     const expectLiveSavedSetting = async (enabled: boolean) => {
-      const saved = JSON.parse(await readFile(path.join(daemon.paseoHome, "config.json"), "utf8"));
+      const saved = JSON.parse(
+        await readFile(path.join(daemon.clisbotHome, "config.json"), "utf8"),
+      );
       expect(saved.agents.idleRuntimeCleanup).toBe(enabled);
       expect((await client.getDaemonConfig()).config.idleRuntimeCleanup).toBe(enabled);
       expect((await client.reloadDaemonConfig()).restartRequiredPaths).toEqual([]);
@@ -225,7 +227,7 @@ test.describe("Settings host page", () => {
 
   test("a failed idle release save stays visible and retry applies it live", async ({ page }) => {
     const daemon = await startIsolatedHostDaemon("srv_e2e_idle_release_failure");
-    const configPath = path.join(daemon.paseoHome, "config.json");
+    const configPath = path.join(daemon.clisbotHome, "config.json");
     try {
       await seedSavedSettingsHosts(page, [
         { serverId: daemon.serverId, label: "Failure host", endpoint: `127.0.0.1:${daemon.port}` },

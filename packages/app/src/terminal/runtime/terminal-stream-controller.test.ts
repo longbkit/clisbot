@@ -1,5 +1,5 @@
 import { resolveTerminalRestoreOptions } from "./terminal-restore-options";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,7 +12,7 @@ function terminalOutput(text: string): Uint8Array {
   return new TextEncoder().encode(text);
 }
 
-type StreamEvent = import("@getpaseo/client").TerminalStreamEvent;
+type StreamEvent = import("@clisbot/client").TerminalStreamEvent;
 type TerminalStreamEvent = StreamEvent extends infer Event
   ? Event extends StreamEvent
     ? Omit<Event, "subscriptionId">
@@ -98,7 +98,7 @@ class FakeTerminalStreamClient implements TerminalStreamControllerClient {
 function createHarness(input?: { client?: FakeTerminalStreamClient }) {
   const client = input?.client ?? new FakeTerminalStreamClient();
   const outputs: Array<{ terminalId: string; data: Uint8Array }> = [];
-  const replays: import("@getpaseo/client").TerminalReplayEvent[] = [];
+  const replays: import("@clisbot/client").TerminalReplayEvent[] = [];
   const statuses: TerminalStreamControllerStatus[] = [];
   const exits: string[] = [];
   const controller = new TerminalStreamController({
@@ -130,7 +130,7 @@ describe("terminal-stream-controller", () => {
     harness.controller.setTerminal({ terminalId: "term-1" });
     await flushAsyncWork();
 
-    const replay: import("@getpaseo/client").TerminalReplayEvent[] = [
+    const replay: import("@clisbot/client").TerminalReplayEvent[] = [
       { type: "begin", rows: 24, cols: 80, retainedHistoryLines: 400 },
       { type: "data", data: terminalOutput("hello") },
       { type: "end" },
@@ -212,7 +212,7 @@ describe("terminal-stream-controller", () => {
     controller.setTerminal({ terminalId: "term-1" });
     await flushAsyncWork();
     const restoreData = terminalOutput("restored");
-    const replay: import("@getpaseo/client").TerminalReplayEvent[] = [
+    const replay: import("@clisbot/client").TerminalReplayEvent[] = [
       { type: "begin" },
       { type: "data", data: restoreData },
       { type: "end" },

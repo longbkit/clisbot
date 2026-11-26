@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "vitest";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { useSessionStore } from "@/stores/session-store";
 import type { UserMessageItem } from "@/types/stream";
 import { createMessageSubmissionWriter } from "./writer";

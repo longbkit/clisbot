@@ -7,7 +7,7 @@ const ANSI_PATTERN = new RegExp(`${ESCAPE}\\[[0-9;]*m`, "g");
 
 describe("renderPairingQr", () => {
   it("renders a theme-independent QR code with a four-module quiet zone", async () => {
-    const url = "https://app.paseo.sh/#offer=test-pairing-offer";
+    const url = "https://app.clisbot.com/#offer=test-pairing-offer";
     const qr = await renderPairingQr(url);
     const styledLines = qr.split("\n");
     const visibleLines = qr.replace(ANSI_PATTERN, "").split("\n");

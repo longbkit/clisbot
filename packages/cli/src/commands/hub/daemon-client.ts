@@ -1,6 +1,6 @@
 import type { DaemonTarget } from "../../utils/daemon-target.js";
 import { connectToDaemon } from "../../utils/client.js";
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 
 export interface HubStatus {
   state: string;

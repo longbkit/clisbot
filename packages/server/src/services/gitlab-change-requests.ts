@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { normalizeHost } from "@getpaseo/protocol/git-remote";
-import { GITLAB_ACTIVE_PIPELINE_STATUS_SET } from "@getpaseo/protocol/gitlab-pipeline";
+import { normalizeHost } from "@clisbot/protocol/git-remote";
+import { GITLAB_ACTIVE_PIPELINE_STATUS_SET } from "@clisbot/protocol/gitlab-pipeline";
 import {
   ChangeRequestRateLimitError,
   createPerHostChangeRequestPoller,

@@ -6,7 +6,7 @@ import pino from "pino";
 import { ClaudeAgentClient } from "./agent.js";
 
 test("lists a session containing a large image record and retains the final prompt", async () => {
-  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-import-image-"));
+  const configDir = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-import-image-"));
   try {
     const project = path.join(configDir, "projects", "image-project");
     await fs.mkdir(project, { recursive: true });

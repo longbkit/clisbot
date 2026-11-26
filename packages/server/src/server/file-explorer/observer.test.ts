@@ -49,7 +49,7 @@ afterEach(async () => {
 });
 
 async function workspace() {
-  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-file-observer-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-file-observer-"));
   roots.push(root);
   await writeFile(path.join(root, "file.txt"), "one", "utf8");
   return root;
@@ -100,7 +100,7 @@ describe("FileObserver", () => {
 
   test("publishes shared watcher updates in each subscriber's path coordinates", async () => {
     const root = await workspace();
-    const aliasParent = await mkdtemp(path.join(os.tmpdir(), "paseo-file-observer-alias-"));
+    const aliasParent = await mkdtemp(path.join(os.tmpdir(), "clisbot-file-observer-alias-"));
     roots.push(aliasParent);
     const aliasRoot = path.join(aliasParent, "workspace-link");
     await symlink(root, aliasRoot, "dir");

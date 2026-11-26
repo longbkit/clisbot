@@ -3,8 +3,8 @@ import { Trans, useTranslation } from "react-i18next";
 import {
   MockupStageWindow,
   MockupStep,
-  OpenInPaseoChip,
-  PaseoBotAvatar,
+  OpenInClisbotChip,
+  ClisbotBotAvatar,
   type SourceMockupProps,
   WindowTrafficLights,
 } from "./shared";
@@ -53,7 +53,7 @@ function ScheduleChrome() {
         <WindowTrafficLights />
         <div className="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px] text-white/65">
           <Clock className="h-3.5 w-3.5 shrink-0 text-accent-text" aria-hidden="true" />
-          <span className="wrap-anywhere">.paseo/triggers/daily-ci-optimizer.yml</span>
+          <span className="wrap-anywhere">.clisbot/triggers/daily-ci-optimizer.yml</span>
         </div>
       </div>
       <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-brand-green/50 bg-brand-green/20 px-2 py-0.5 text-[10.5px] font-medium text-accent-text">
@@ -185,10 +185,10 @@ function ScheduleSlackDigestCard() {
       </div>
 
       <div className="flex items-start gap-2.5 px-3.5 py-3">
-        <PaseoBotAvatar size="sm" className="mt-0.5 h-8 w-8" />
+        <ClisbotBotAvatar size="sm" className="mt-0.5 h-8 w-8" />
         <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex items-center gap-1.5">
-            <span className="text-[13px] font-bold text-[#F8F8F8]">paseo-bot</span>
+            <span className="text-[13px] font-bold text-[#F8F8F8]">clisbot-bot</span>
             <span className="rounded-[3px] bg-[#2C2D30] px-1.5 py-[1px] text-[9.5px] font-semibold uppercase tracking-wide text-[#ABABAD]">
               {t("hub.demo.shared.appBadge")}
             </span>
@@ -198,7 +198,7 @@ function ScheduleSlackDigestCard() {
             <Trans i18nKey="hub.demo.schedules.slackSummary" components={SCHEDULE_COMPONENTS} />
           </p>
           <div className="flex flex-wrap items-center gap-2 pt-0.5">
-            <OpenInPaseoChip variant="slack" />
+            <OpenInClisbotChip variant="slack" />
             <span className="text-[11px] text-[#ABABAD]">{t("hub.demo.schedules.notifiedMo")}</span>
           </div>
         </div>

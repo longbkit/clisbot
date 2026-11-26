@@ -1,4 +1,4 @@
-import type { AcpConfigChange, AcpConfigureContext } from "@getpaseo/plugin/server/acp";
+import type { AcpConfigChange, AcpConfigureContext } from "@clisbot/plugin/server/acp";
 import { describe, expect, it } from "vitest";
 import { legacyModes } from "./legacy-modes.js";
 

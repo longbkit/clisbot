@@ -21,8 +21,8 @@ import {
   type EditingTextInputHandle,
 } from "@/components/ui/text-input";
 
-const RELAY_DOCS_URL = "https://paseo.sh/docs/security";
-export const CONNECTIVITY_DOCS_URL = "https://paseo.sh/docs/connectivity";
+const RELAY_DOCS_URL = "https://clisbot.com/docs/security";
+export const CONNECTIVITY_DOCS_URL = "https://clisbot.com/docs/connectivity";
 export const TAILSCALE_DOCS_URL = `${CONNECTIVITY_DOCS_URL}#tailscale`;
 const FLEX_ONE_STYLE = { flex: 1 } as const;
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);

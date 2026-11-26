@@ -1,6 +1,6 @@
 import { i18n } from "@/i18n/i18next";
-import type { PluginClientSnapshot, PluginClientStateSource } from "@getpaseo/plugin/client/host";
-import type { PluginTerminalSnapshot } from "@getpaseo/plugin";
+import type { PluginClientSnapshot, PluginClientStateSource } from "@clisbot/plugin/client/host";
+import type { PluginTerminalSnapshot } from "@clisbot/plugin";
 import { useCreateFlowStore } from "@/stores/create-flow-store";
 import { useSessionStore, type SessionState } from "@/stores/session-store";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";

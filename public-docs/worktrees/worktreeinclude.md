@@ -1,6 +1,6 @@
 ---
 title: .worktreeinclude
-description: Copy gitignored local files into new Paseo worktrees.
+description: Copy gitignored local files into new Clisbot worktrees.
 nav: .worktreeinclude
 order: 12
 category: Workspaces
@@ -8,7 +8,7 @@ category: Workspaces
 
 # .worktreeinclude
 
-Add `.worktreeinclude` at the root of your source checkout to copy local configuration into new [Git worktrees](/docs/worktrees). Paseo copies matching gitignored files before setup, terminals, and the first Agent start.
+Add `.worktreeinclude` at the root of your source checkout to copy local configuration into new [Git worktrees](/docs/worktrees). Clisbot copies matching gitignored files before setup, terminals, and the first Agent start.
 
 ## Copy your local configuration
 
@@ -19,7 +19,7 @@ For a project whose `.gitignore` includes `.env` and `config/*.local.json`, crea
 config/*.local.json
 ```
 
-When you create a worktree through Paseo, an existing `.env` and matching files such as `config/dev.local.json` are copied to the same relative paths in the new worktree. Their contents stay out of Git.
+When you create a worktree through Clisbot, an existing `.env` and matching files such as `config/dev.local.json` are copied to the same relative paths in the new worktree. Their contents stay out of Git.
 
 Commit `.worktreeinclude` to share the patterns with your team. Each teammate supplies their own ignored files in the checkout they create worktrees from.
 
@@ -36,7 +36,7 @@ config/*.local.json
 
 A pattern only selects files that Git already ignores. Adding a path here does not ignore it, so also configure `.gitignore` when needed. Tracked files and untracked files that Git does not ignore are excluded.
 
-Paseo does not search inside a directory that Git ignores as a whole, such as `node_modules/`, unless a pattern names that directory or a path inside it. A bare name like `.env` matches `.env` and `apps/web/.env`, but not `node_modules/pkg/.env`. To copy from inside an ignored directory, name it in the pattern, as in `node_modules/pkg/.env` or `.secrets/`. A pattern with a glob in its first directory name, such as `**/.env` or `*/.env`, searches every ignored directory, including `node_modules/`, so name the directory instead when it is large.
+Clisbot does not search inside a directory that Git ignores as a whole, such as `node_modules/`, unless a pattern names that directory or a path inside it. A bare name like `.env` matches `.env` and `apps/web/.env`, but not `node_modules/pkg/.env`. To copy from inside an ignored directory, name it in the pattern, as in `node_modules/pkg/.env` or `.secrets/`. A pattern with a glob in its first directory name, such as `**/.env` or `*/.env`, searches every ignored directory, including `node_modules/`, so name the directory instead when it is large.
 
 ## When files are copied
 
@@ -60,4 +60,4 @@ Use `.worktreeinclude` for files that already exist locally. Use a [setup hook](
 }
 ```
 
-Put this configuration in `paseo.json` on the base branch used for the new worktree. Copied files are available when setup runs.
+Put this configuration in `clisbot.json` on the base branch used for the new worktree. Copied files are available when setup runs.

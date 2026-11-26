@@ -1,10 +1,10 @@
 import { createRequire } from "node:module";
-import * as pluginSharedRuntime from "@getpaseo/plugin";
-import * as pluginProviderRuntime from "@getpaseo/plugin/server/provider";
-import * as pluginAcpRuntime from "@getpaseo/plugin/server/acp";
-import * as pluginUsageRuntime from "@getpaseo/plugin/server/usage";
-import * as pluginServerRuntime from "@getpaseo/plugin/server";
-import type { PluginServerContribution } from "@getpaseo/plugin/server";
+import * as pluginSharedRuntime from "@clisbot/plugin";
+import * as pluginProviderRuntime from "@clisbot/plugin/server/provider";
+import * as pluginAcpRuntime from "@clisbot/plugin/server/acp";
+import * as pluginUsageRuntime from "@clisbot/plugin/server/usage";
+import * as pluginServerRuntime from "@clisbot/plugin/server";
+import type { PluginServerContribution } from "@clisbot/plugin/server";
 import * as zod from "zod";
 import { isPluginClientOnlySdkSpecifier } from "./plugin-sdk-specifiers.js";
 
@@ -14,14 +14,13 @@ function runtimeRequire(name: string): unknown {
   if (isPluginClientOnlySdkSpecifier(name)) {
     throw new Error(`${name} is available only in plugin client code`);
   }
-  if (name === "@getpaseo/plugin") return pluginSharedRuntime;
-  if (name === "@getpaseo/plugin/server") return pluginServerRuntime;
-  if (name === "@getpaseo/plugin/server/provider") return pluginProviderRuntime;
-  if (name === "@getpaseo/plugin/server/acp") return pluginAcpRuntime;
-  if (name === "@getpaseo/plugin/server/usage") return pluginUsageRuntime;
+  if (name === "@clisbot/plugin") return pluginSharedRuntime;
+  if (name === "@clisbot/plugin/server") return pluginServerRuntime;
+  if (name === "@clisbot/plugin/server/provider") return pluginProviderRuntime;
+  if (name === "@clisbot/plugin/server/acp") return pluginAcpRuntime;
+  if (name === "@clisbot/plugin/server/usage") return pluginUsageRuntime;
   if (name === "zod") return zod;
-  if (name === "@getpaseo/plugin/client/host")
-    throw new Error(`${name} is private to the app host`);
+  if (name === "@clisbot/plugin/client/host") throw new Error(`${name} is private to the app host`);
   return nodeRequire(name);
 }
 

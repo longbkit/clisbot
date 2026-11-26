@@ -5,9 +5,9 @@ import {
   DaemonInstanceError,
   retryUnconfirmedTerminalCleanup,
   TerminalCleanupNotConfirmedError,
-} from "@getpaseo/server/daemon-control";
+} from "@clisbot/server/daemon-control";
 import { setTimeout as delay } from "node:timers/promises";
-import type { DaemonGetStatusResponse } from "@getpaseo/protocol/messages";
+import type { DaemonGetStatusResponse } from "@clisbot/protocol/messages";
 import { connectToDaemon } from "../../utils/client.js";
 import { withOutput, type CommandOptions } from "../../output/index.js";
 import { addJsonAndDaemonHostOptions } from "../../utils/command-options.js";

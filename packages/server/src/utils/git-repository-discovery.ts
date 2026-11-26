@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { lstat, realpath, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import type { ProcessEnvRecord } from "../server/paseo-env.js";
+import type { ProcessEnvRecord } from "../server/clisbot-env.js";
 import { execCommand } from "./spawn.js";
 
 const EXPLICIT_BARE_REPOSITORY = ["-c", "safe.bareRepository=explicit"];
@@ -32,7 +32,7 @@ const repositoryRoots = new AsyncLocalStorage<readonly RepositoryRoot[]>();
  * Runs `operation` with `root` named as the repository of every git command
  * whose cwd is exactly `root`.
  *
- * Paseo records a bare repository as a repository root when only its linked
+ * Clisbot records a bare repository as a repository root when only its linked
  * checkouts use it. Git has no `.git` to find there, so those commands receive
  * the bare repository through `GIT_DIR`. A root with a `.git` keeps normal
  * discovery, and directories below `root` are not affected.

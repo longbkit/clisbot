@@ -1,5 +1,5 @@
 /**
- * The part of `@getpaseo/expo-two-way-audio` that owns the native engine's lifetime.
+ * The part of `@clisbot/expo-two-way-audio` that owns the native engine's lifetime.
  * Each platform keeps a single engine per app: `initialize()` reuses it, `tearDown()` frees it.
  */
 export interface NativeAudioEngineLifecycle {

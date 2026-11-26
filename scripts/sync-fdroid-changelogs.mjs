@@ -7,7 +7,7 @@
 //      version codes (see packages/app/native-release-version.js). A single
 //      hand-written file matches no published APK, which silently costs the
 //      "What's New" entry and the Latest tab placement that depends on it.
-//   2. F-Droid caps a changelog at 500 characters. Real Paseo entries run into
+//   2. F-Droid caps a changelog at 500 characters. Real Clisbot entries run into
 //      the thousands, so they have to be compressed rather than copied.
 //
 // This must run before the release tag is created: fdroidserver only reads
@@ -28,7 +28,7 @@ const rootDir = path.resolve(__dirname, "..");
 
 // F-Droid's documented cap. fdroidserver truncates past this, so stay under it.
 const CHANGELOG_CHARACTER_LIMIT = 500;
-const FULL_NOTES_FOOTER = "Full notes: https://paseo.sh/changelog";
+const FULL_NOTES_FOOTER = "Full notes: https://clisbot.com/changelog";
 const DEFAULT_LOCALE = "en-US";
 const METADATA_DIR = path.join("fastlane", "metadata", "android");
 

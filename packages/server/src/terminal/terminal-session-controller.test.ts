@@ -9,7 +9,7 @@ import {
   TerminalStreamOpcode,
   decodeTerminalStreamFrame,
   type TerminalStreamFrame,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@clisbot/protocol/binary-frames/index";
 import type { ServerMessage, TerminalSession } from "./terminal.js";
 import {
   TerminalSessionController,
@@ -362,9 +362,9 @@ describe("terminal-session-controller legacy terminal creation", () => {
   });
 });
 
-describe("terminal-session-controller with terminals held by a newer Paseo", () => {
+describe("terminal-session-controller with terminals held by a newer Clisbot", () => {
   const incompatible = new TerminalWorkerIncompatibleError({
-    paseoVersion: "9.9.9",
+    clisbotVersion: "9.9.9",
     protocolVersion: 7,
   });
 
@@ -546,7 +546,7 @@ describe("terminal-session-controller subdirectory aggregation", () => {
 
   test("keeps nested workspace terminals out of the parent workspace terminal list", async () => {
     const rootCwd = "/work/repo";
-    const worktreeCwd = "/work/repo/.dev/paseo-home/worktrees/hash/feature-a";
+    const worktreeCwd = "/work/repo/.dev/clisbot-home/worktrees/hash/feature-a";
     const rootTerminal = listSession({ id: "root-term", name: "Terminal 1", cwd: rootCwd });
     const worktreeTerminal = listSession({
       id: "worktree-term",

@@ -1,4 +1,4 @@
-import type { AcpToolCallSnapshot } from "@getpaseo/plugin/server/acp";
+import type { AcpToolCallSnapshot } from "@clisbot/plugin/server/acp";
 import { describe, expect, it } from "vitest";
 import { fileToolTransformer } from "./file-tools.js";
 

@@ -1,5 +1,5 @@
 import { generateMessageId } from "@/types/stream";
-import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
+import type { SessionOutboundMessage } from "@clisbot/protocol/messages";
 import { i18n } from "@/i18n/i18next";
 
 const MAX_CHUNKS_PER_FLUSH_TURN = 128;

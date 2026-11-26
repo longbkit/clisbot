@@ -1,6 +1,6 @@
 import type { AgentTimelineItem } from "./agent-sdk-types.js";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
-import { PluginIdSchema } from "@getpaseo/protocol/plugin-config";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
+import { PluginIdSchema } from "@clisbot/protocol/plugin-config";
 
 export const PLUGIN_TIMELINE_DATA_MAX_BYTES = 64 * 1024;
 

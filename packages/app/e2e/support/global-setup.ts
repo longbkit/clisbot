@@ -18,8 +18,10 @@ export interface WaitForServerOptions {
 type ServerProbe = (host: string, port: number) => Promise<void>;
 
 const RESERVED_LOCAL_PORTS = new Set([
-  6767, // Installed daemon.
-  6768, // Developer daemon.
+  6767, // Legacy installed daemon.
+  6868, // Clisbot daemon.
+  6768, // Legacy dev daemon.
+  6869, // Clisbot dev daemon.
   61680, // OpenCode's default local server.
 ]);
 
@@ -136,7 +138,7 @@ function startMetro(port: number, buffer: ReturnType<typeof createLineBuffer>): 
       BROWSER: "none",
       // Automation never opens native DevTools or installs its desktop shell.
       EXPO_UNSTABLE_HEADLESS: "1",
-      ...(process.env.E2E_DESKTOP_RUNTIME === "1" ? { PASEO_WEB_PLATFORM: "electron" } : {}),
+      ...(process.env.E2E_DESKTOP_RUNTIME === "1" ? { CLISBOT_WEB_PLATFORM: "electron" } : {}),
     },
     stdio: ["ignore", "pipe", "pipe"],
     detached: false,
@@ -158,9 +160,9 @@ async function loadHarnessEnvironment(repoRoot: string): Promise<void> {
 }
 
 export default async function globalSetup() {
-  if (process.env.PASEO_REPLICA_CACHE_MEASUREMENT === "1") {
-    if (!process.env.PASEO_REPLICA_CACHE_MEASUREMENT_URL) {
-      throw new Error("PASEO_REPLICA_CACHE_MEASUREMENT_URL must be set for live measurement");
+  if (process.env.CLISBOT_REPLICA_CACHE_MEASUREMENT === "1") {
+    if (!process.env.CLISBOT_REPLICA_CACHE_MEASUREMENT_URL) {
+      throw new Error("CLISBOT_REPLICA_CACHE_MEASUREMENT_URL must be set for live measurement");
     }
     return;
   }

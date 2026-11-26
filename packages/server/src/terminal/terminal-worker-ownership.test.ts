@@ -57,8 +57,8 @@ describe("terminal worker ownership", () => {
         pid: process.pid,
         socketPath:
           process.platform === "win32"
-            ? "\\\\.\\pipe\\paseo-absent-ownership-test"
-            : "/tmp/paseo-absent-ownership-test.sock",
+            ? "\\\\.\\pipe\\clisbot-absent-ownership-test"
+            : "/tmp/clisbot-absent-ownership-test.sock",
       }),
     ).toEqual({ status: "gone" });
   });

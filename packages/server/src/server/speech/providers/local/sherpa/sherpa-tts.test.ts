@@ -17,7 +17,7 @@ function createTts(
   beforeGenerate?: () => Promise<void>,
   modelId: LocalTtsModelId = "kokoro-en-v0_19",
 ) {
-  const modelDir = mkdtempSync(join(tmpdir(), "paseo-tts-"));
+  const modelDir = mkdtempSync(join(tmpdir(), "clisbot-tts-"));
   directories.push(modelDir);
   // Data directories have no extension; everything else is a model file.
   for (const name of engineFiles(getLocalTtsEngine(modelId))) {

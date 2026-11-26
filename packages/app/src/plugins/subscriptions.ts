@@ -1,5 +1,5 @@
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import type { PluginSubscribe } from "@getpaseo/plugin/client/host";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
+import type { PluginSubscribe } from "@clisbot/plugin/client/host";
 
 /**
  * Plugin subscriptions on the installation's client. The client re-subscribes after a reconnect;

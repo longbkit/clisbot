@@ -1,4 +1,4 @@
-import type { WorkspaceScriptPayload } from "@getpaseo/protocol/messages";
+import type { WorkspaceScriptPayload } from "@clisbot/protocol/messages";
 import type { Theme } from "@/styles/theme";
 
 /**

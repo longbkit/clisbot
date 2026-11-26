@@ -10,14 +10,14 @@ import { fileURLToPath } from "node:url";
 import { resolveAutocompletePlacement } from "./autocomplete-placement.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../..");
-const env = (name, fallback) => process.env[`PASEO_COMPOSER_KEYBOARD_${name}`] ?? fallback;
+const env = (name, fallback) => process.env[`CLISBOT_COMPOSER_KEYBOARD_${name}`] ?? fallback;
 const serverId = env("SERVER_ID");
 const agentId = env("AGENT_ID");
 const workspaceId = env("WORKSPACE_ID");
 const scenario = env("SCENARIO", "all");
 if (!serverId || !workspaceId || (scenario === "all" && !agentId)) {
   throw new Error(
-    "Set PASEO_COMPOSER_KEYBOARD_SERVER_ID, _AGENT_ID (an idle chat) and _WORKSPACE_ID (its workspace)",
+    "Set CLISBOT_COMPOSER_KEYBOARD_SERVER_ID, _AGENT_ID (an idle chat) and _WORKSPACE_ID (its workspace)",
   );
 }
 const draftId = env("DRAFT_ID", "composer-keyboard");
@@ -246,16 +246,16 @@ async function runHost(host) {
 // iPhone for growth and a small phone (SE) for previews, with Codex selected.
 async function runLiveGrowth() {
   await clearInput("live-growth");
-  ad("type", "Please do the following now /paseo");
+  ad("type", "Please do the following now /clisbot");
   const before = await settledPlacement("live-growth-before", true);
-  assertPlacement("before growth", before, "/paseo");
+  assertPlacement("before growth", before, "/clisbot");
   const inputHeight = (snap) =>
     snap.data.nodes.find((node) => node.type === "TextView").rect.height;
   ad("type", "--", "-committee");
   const grown = await settledPlacement("live-growth-after", true);
   if (inputHeight(grown) <= inputHeight(before))
     throw new Error("Draft did not wrap onto a new line");
-  assertPlacement("live growth without reopening", grown, "/paseo-committee");
+  assertPlacement("live growth without reopening", grown, "/clisbot-committee");
   const deleteKey = grown.data.nodes.find(
     (node) => node.type === "Key" && node.label === "delete",
   ).rect;
@@ -271,16 +271,16 @@ async function runLiveGrowth() {
   const shrunk = await settledPlacement("live-growth-shrunk", true);
   if (inputHeight(shrunk) !== inputHeight(before))
     throw new Error("Draft did not shrink back to one line");
-  assertPlacement("live shrink without reopening", shrunk, "/paseo");
+  assertPlacement("live shrink without reopening", shrunk, "/clisbot");
   ad("type", "--", "-committ");
   const partial = await settledPlacement("live-growth-partial", true);
-  if (!sameText(composerText(partial), "Please do the following now /paseo-committ")) {
+  if (!sameText(composerText(partial), "Please do the following now /clisbot-committ")) {
     throw new Error("Could not prepare a partial command for selection");
   }
-  const row = assertPlacement("partial command after growth", partial, "/paseo-committee");
+  const row = assertPlacement("partial command after growth", partial, "/clisbot-committee");
   ad("press", String(row.x), String(row.y));
   await waitFor("live-growth-selected", (snap) =>
-    sameText(composerText(snap), "Please do the following now /paseo-committee "),
+    sameText(composerText(snap), "Please do the following now /clisbot-committee "),
   );
   await clearInput("live-growth-done");
 }
@@ -303,9 +303,9 @@ async function runBoundedPreview() {
     selectionKeyboard: "hidden",
   });
   await runCase("preview", "longest", {
-    text: `${prefix}/paseo-plug`,
-    expected: "/paseo-plugin",
-    inserted: `${prefix}/paseo-plugin `,
+    text: `${prefix}/clisbot-plug`,
+    expected: "/clisbot-plugin",
+    inserted: `${prefix}/clisbot-plugin `,
     selectionKeyboard: "shown",
   });
   await runCase("preview", "short", {
@@ -320,7 +320,7 @@ async function runBoundedPreview() {
 if (scenario !== "all") {
   ad(
     "open",
-    `paseo://h/${serverId}/workspace/${workspaceId}?open=draft%3A${draftId}`,
+    `clisbot://h/${serverId}/workspace/${workspaceId}?open=draft%3A${draftId}`,
     "--platform",
     "ios",
     ...deviceArgs,
@@ -334,9 +334,9 @@ if (scenario !== "all") {
 }
 
 const hosts = [
-  ["chat", `paseo://h/${serverId}/agent/${agentId}`],
-  ["workspace-draft", `paseo://h/${serverId}/workspace/${workspaceId}?open=draft%3A${draftId}`],
-  ["new-workspace", `paseo://new?serverId=${serverId}`],
+  ["chat", `clisbot://h/${serverId}/agent/${agentId}`],
+  ["workspace-draft", `clisbot://h/${serverId}/workspace/${workspaceId}?open=draft%3A${draftId}`],
+  ["new-workspace", `clisbot://new?serverId=${serverId}`],
 ];
 for (const [host, url] of hosts) {
   ad("open", url, "--platform", "ios", ...deviceArgs);

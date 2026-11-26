@@ -14,12 +14,12 @@ import { tmpdir, userInfo } from "node:os";
 import { basename, delimiter, dirname, extname, join, resolve as resolvePath } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { createExternalProcessEnv } from "../server/paseo-env.js";
+import { createExternalProcessEnv } from "../server/clisbot-env.js";
 import {
   resolveExternalProcessPath,
-  resolvePaseoCliBinDir,
-  resolvePaseoCliExecutablePath,
-} from "./paseo-cli-path.js";
+  resolveClisbotCliBinDir,
+  resolveClisbotCliExecutablePath,
+} from "./clisbot-cli-path.js";
 import { writePrivateFileAtomicSync } from "../server/private-files.js";
 import {
   findExecutable,
@@ -33,9 +33,9 @@ import {
   type CaptureTerminalLinesResult,
 } from "./terminal-capture.js";
 import type { TerminalReplayOptions, TerminalReplayMetadata } from "./terminal-replay.js";
-import { TerminalInputModeTracker } from "@getpaseo/protocol/terminal-input-mode";
+import { TerminalInputModeTracker } from "@clisbot/protocol/terminal-input-mode";
 import { TerminalActivityTracker } from "./activity/terminal-activity-tracker.js";
-import type { TerminalActivity, TerminalActivityState } from "@getpaseo/protocol/terminal-activity";
+import type { TerminalActivity, TerminalActivityState } from "@clisbot/protocol/terminal-activity";
 
 const require = createRequire(import.meta.url);
 let nodePtySpawnHelperChecked = false;
@@ -155,9 +155,9 @@ export interface CreateTerminalOptions {
   args?: string[];
   // Environment the terminal starts from instead of this process's own. A detached terminal
   // worker outlives the daemon that launched it, so each create carries the controlling
-  // daemon's environment and its resolved Paseo CLI path.
+  // daemon's environment and its resolved Clisbot CLI path.
   baseEnv?: Record<string, string>;
-  paseoCliPath?: string | null;
+  clisbotCliPath?: string | null;
 }
 
 function toTerminalActivity(snapshot: {
@@ -188,8 +188,8 @@ interface BuildTerminalEnvironmentInput {
   env: Record<string, string>;
   baseEnv?: Record<string, string>;
   zshShellIntegrationDir?: string;
-  paseoCliBinDir?: string | null;
-  paseoHookCliPath?: string | null;
+  clisbotCliBinDir?: string | null;
+  clisbotHookCliPath?: string | null;
 }
 
 interface EnsureNodePtySpawnHelperExecutableOptions {
@@ -416,7 +416,7 @@ export async function resolveTerminalSpawnCommand(
   return { command: resolved, args };
 }
 
-export { resolvePaseoCliBinDir, resolvePaseoCliExecutablePath };
+export { resolveClisbotCliBinDir, resolveClisbotCliExecutablePath };
 
 export function resolveZshShellIntegrationDir(): string {
   return fileURLToPath(new URL("./shell-integration/zsh", import.meta.url));
@@ -429,7 +429,7 @@ function resolveZshShellIntegrationRuntimeDir(): string {
   } catch {
     // keep fallback
   }
-  return join(tmpdir(), `${username}-paseo-zsh-${process.pid}`);
+  return join(tmpdir(), `${username}-clisbot-zsh-${process.pid}`);
 }
 
 function prepareZshShellIntegrationRuntimeDir(sourceDir = resolveZshShellIntegrationDir()): string {
@@ -442,8 +442,8 @@ function prepareZshShellIntegrationRuntimeDir(sourceDir = resolveZshShellIntegra
     readFileSync(join(readableSourceDir, ".zshenv")),
   );
   writePrivateFileAtomicSync(
-    join(runtimeDir, "paseo-integration.zsh"),
-    readFileSync(join(readableSourceDir, "paseo-integration.zsh")),
+    join(runtimeDir, "clisbot-integration.zsh"),
+    readFileSync(join(readableSourceDir, "clisbot-integration.zsh")),
   );
   return runtimeDir;
 }
@@ -459,13 +459,15 @@ export function buildTerminalEnvironment(
       TERM_PROGRAM: "kitty",
     },
   );
-  const envWithAgentHooks = prependPaseoCliToPath(
+  const envWithAgentHooks = prependClisbotCliToPath(
     baseEnv,
-    input.paseoCliBinDir === undefined ? resolvePaseoCliBinDir() : input.paseoCliBinDir,
+    input.clisbotCliBinDir === undefined ? resolveClisbotCliBinDir() : input.clisbotCliBinDir,
   );
-  const envWithHookCli = injectPaseoHookCli(
+  const envWithHookCli = injectClisbotHookCli(
     envWithAgentHooks,
-    input.paseoHookCliPath === undefined ? resolvePaseoCliExecutablePath() : input.paseoHookCliPath,
+    input.clisbotHookCliPath === undefined
+      ? resolveClisbotCliExecutablePath()
+      : input.clisbotHookCliPath,
   );
 
   if (basename(input.shell) !== "zsh") {
@@ -475,12 +477,12 @@ export function buildTerminalEnvironment(
   const originalZdotdir = envWithHookCli.ZDOTDIR ?? "";
   return {
     ...envWithHookCli,
-    PASEO_ZSH_ZDOTDIR: originalZdotdir,
+    CLISBOT_ZSH_ZDOTDIR: originalZdotdir,
     ZDOTDIR: prepareZshShellIntegrationRuntimeDir(input.zshShellIntegrationDir),
   };
 }
 
-function injectPaseoHookCli(
+function injectClisbotHookCli(
   env: Record<string, string>,
   cliPath: string | null,
 ): Record<string, string> {
@@ -490,28 +492,28 @@ function injectPaseoHookCli(
 
   return {
     ...env,
-    PASEO_HOOK_CLI: resolvePath(resolveExternalProcessPath(cliPath)),
+    CLISBOT_HOOK_CLI: resolvePath(resolveExternalProcessPath(cliPath)),
   };
 }
 
 // The environment and CLI path a terminal starts from: the caller's when it sends them (the
 // daemon controlling a detached worker does), this process's otherwise.
 function resolveTerminalEnvironmentSource(
-  input: Pick<CreateTerminalOptions, "baseEnv" | "paseoCliPath">,
-): Pick<BuildTerminalEnvironmentInput, "baseEnv" | "paseoCliBinDir" | "paseoHookCliPath"> {
+  input: Pick<CreateTerminalOptions, "baseEnv" | "clisbotCliPath">,
+): Pick<BuildTerminalEnvironmentInput, "baseEnv" | "clisbotCliBinDir" | "clisbotHookCliPath"> {
   const source: Pick<
     BuildTerminalEnvironmentInput,
-    "baseEnv" | "paseoCliBinDir" | "paseoHookCliPath"
+    "baseEnv" | "clisbotCliBinDir" | "clisbotHookCliPath"
   > = {};
   if (input.baseEnv) source.baseEnv = input.baseEnv;
-  if (input.paseoCliPath !== undefined) {
-    source.paseoCliBinDir = input.paseoCliPath ? dirname(input.paseoCliPath) : null;
-    source.paseoHookCliPath = input.paseoCliPath;
+  if (input.clisbotCliPath !== undefined) {
+    source.clisbotCliBinDir = input.clisbotCliPath ? dirname(input.clisbotCliPath) : null;
+    source.clisbotHookCliPath = input.clisbotCliPath;
   }
   return source;
 }
 
-function prependPaseoCliToPath(
+function prependClisbotCliToPath(
   env: Record<string, string>,
   cliBinDir: string | null,
 ): Record<string, string> {
@@ -765,7 +767,7 @@ export async function createTerminal(
     command,
     args = [],
     baseEnv,
-    paseoCliPath,
+    clisbotCliPath,
   } = options;
   const resolvedShell = shell ?? resolveDefaultTerminalShell({ env: baseEnv });
 
@@ -813,9 +815,9 @@ export async function createTerminal(
     env: {
       ...env,
       ...activityEnv,
-      PASEO_WORKSPACE_ID: workspaceId,
+      CLISBOT_WORKSPACE_ID: workspaceId,
     },
-    ...resolveTerminalEnvironmentSource({ baseEnv, paseoCliPath }),
+    ...resolveTerminalEnvironmentSource({ baseEnv, clisbotCliPath }),
   });
 
   await assertTerminalCommandCanStart({ command, cwd, env: terminalEnv });

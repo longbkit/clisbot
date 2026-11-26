@@ -1,4 +1,4 @@
-// Shared bits of the Paseo UI, drawn small. Everything here is presentational —
+// Shared bits of the Clisbot UI, drawn small. Everything here is presentational —
 // no state, no interactivity. Colors come from the `--color-mock-*` tokens in
 // styles.css, which are copied from the app's default dark theme.
 

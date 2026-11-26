@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { UsageProblem } from "@getpaseo/protocol/messages";
+import type { UsageProblem } from "@clisbot/protocol/messages";
 import { i18n } from "@/i18n/i18next";
 import { formatAgo } from "./format";
 

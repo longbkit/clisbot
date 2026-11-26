@@ -1,4 +1,4 @@
-import type { AcpTransformer } from "@getpaseo/plugin/server/acp";
+import type { AcpTransformer } from "@clisbot/plugin/server/acp";
 
 // Hermes offers each edit mode twice: as an ACP session mode and as a value of its
 // `edit_approval_policy` config option (`acp_adapter/modes.py`). Agents created before Hermes was

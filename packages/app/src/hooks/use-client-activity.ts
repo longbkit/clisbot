@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import { getIsElectron, isWeb, isNative } from "@/constants/platform";
 import { readDesktopSystemIdleTimeMs } from "@/desktop/electron/idle";
 import { invokeDesktopCommand } from "@/desktop/electron/invoke";

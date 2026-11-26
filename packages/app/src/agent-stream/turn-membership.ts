@@ -1,4 +1,4 @@
-import { continuesTimelineTurn, isTimelineTurnTrigger } from "@getpaseo/protocol/timeline-turn";
+import { continuesTimelineTurn, isTimelineTurnTrigger } from "@clisbot/protocol/timeline-turn";
 import type { StreamItem } from "@/types/stream";
 
 /**

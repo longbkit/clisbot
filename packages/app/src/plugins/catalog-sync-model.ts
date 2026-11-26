@@ -1,5 +1,5 @@
 import type { AudioEngine } from "@/audio";
-import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { PluginRegistry } from "./registry";
 import { pluginSettingsKey, pluginSettingsPrefix } from "./settings/query";
 

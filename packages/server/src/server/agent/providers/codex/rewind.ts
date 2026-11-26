@@ -78,7 +78,7 @@ export async function revertCodexConversation(input: {
     serviceTier: input.serviceTier ?? null,
     ...(input.config ? { config: input.config } : {}),
     ...(input.developerInstructions ? { developerInstructions: input.developerInstructions } : {}),
-    // Paseo re-reads the rewound thread through paged history, not the fork reply.
+    // Clisbot re-reads the rewound thread through paged history, not the fork reply.
     excludeTurns: true,
     persistExtendedHistory: true,
   };

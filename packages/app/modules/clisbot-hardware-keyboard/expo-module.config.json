@@ -1,0 +1,9 @@
+{
+  "platforms": ["ios", "android"],
+  "ios": {
+    "modules": ["ClisbotHardwareKeyboardModule"]
+  },
+  "android": {
+    "modules": ["sh.clisbot.keyboard.ClisbotHardwareKeyboardModule"]
+  }
+}

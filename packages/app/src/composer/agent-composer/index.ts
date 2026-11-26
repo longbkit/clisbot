@@ -1,5 +1,5 @@
 import { QueryObserver, type QueryClient } from "@tanstack/react-query";
-import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
+import type { ProviderSnapshotEntry } from "@clisbot/protocol/agent-types";
 import { providersSnapshotQuery } from "@/data/providers-snapshot";
 import { replicaQueryOptions } from "@/data/query";
 import { queryClient as singletonQueryClient } from "@/data/query-client";

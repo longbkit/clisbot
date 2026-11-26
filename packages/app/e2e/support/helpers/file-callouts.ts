@@ -25,7 +25,7 @@ export async function recordFileCallouts(page: Page): Promise<void> {
     };
     const observer = new MutationObserver(record);
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-    Object.assign(globalThis, { __PASEO_RECORDED_FILE_CALLOUTS__: callouts });
+    Object.assign(globalThis, { __CLISBOT_RECORDED_FILE_CALLOUTS__: callouts });
   });
 }
 
@@ -42,7 +42,7 @@ export async function expectNoFileCalloutWasRendered(page: Page): Promise<void> 
 function recordedFileCallouts(page: Page): Promise<string[]> {
   return page.evaluate(
     () =>
-      (globalThis as typeof globalThis & { __PASEO_RECORDED_FILE_CALLOUTS__?: string[] })
-        .__PASEO_RECORDED_FILE_CALLOUTS__ ?? [],
+      (globalThis as typeof globalThis & { __CLISBOT_RECORDED_FILE_CALLOUTS__?: string[] })
+        .__CLISBOT_RECORDED_FILE_CALLOUTS__ ?? [],
   );
 }

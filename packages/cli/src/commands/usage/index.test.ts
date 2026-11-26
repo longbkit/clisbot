@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { UsageReportEntry } from "@getpaseo/protocol/messages";
+import type { UsageReportEntry } from "@clisbot/protocol/messages";
 import { render } from "../../output/index.js";
 import { createCli } from "../../cli.js";
 import { runUsageCommand } from "./index.js";

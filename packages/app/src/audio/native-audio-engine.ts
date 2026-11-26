@@ -18,7 +18,7 @@ interface MicrophonePermission {
   granted: boolean;
 }
 
-/** The surface of `@getpaseo/expo-two-way-audio` the engine drives. */
+/** The surface of `@clisbot/expo-two-way-audio` the engine drives. */
 export interface TwoWayAudioModule {
   initialize(): Promise<boolean>;
   tearDown(): void;

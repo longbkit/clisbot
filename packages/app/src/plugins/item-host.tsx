@@ -1,5 +1,5 @@
 import { useMemo, type ComponentType } from "react";
-import type { PluginHostProps } from "@getpaseo/plugin/client";
+import type { PluginHostProps } from "@clisbot/plugin/client";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useToast } from "@/contexts/toast-api-context";
 import { useHosts } from "@/runtime/host-runtime";

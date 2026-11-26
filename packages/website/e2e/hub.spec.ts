@@ -4,7 +4,7 @@ import { expect, test, waitForHydration, type Page } from "./fixtures";
 async function openHub(page: Page, width = 1024) {
   await page.setViewportSize({ width, height: 900 });
   await page.goto("/hub");
-  await expect(page.getByRole("heading", { name: "Paseo Hub", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Clisbot Hub", level: 1 })).toBeVisible();
 }
 
 async function tabIntoNextPreview(page: Page) {
@@ -101,7 +101,7 @@ for (const width of [320, 768, 1024]) {
 test("the Slack starter forwards the mention and declares a thread reply", async ({ page }) => {
   await openHub(page);
   const starter = page.locator("pre").filter({ hasText: "name: slack-help" });
-  await expect(starter).toContainText("${{ paseo.prompt }}");
+  await expect(starter).toContainText("${{ clisbot.prompt }}");
   await expect(starter).toContainText("hub.reply");
   await expect(starter).toContainText("slack.reply:");
 });
@@ -141,7 +141,7 @@ test("Hub previews have room for their final rows with larger text", async ({ pa
   await openHub(page, 1280);
   await useLargerText(page);
   await waitForHydration(page);
-  await expectPreviewRowsFit(page, "GitHub", "Open in Paseo");
+  await expectPreviewRowsFit(page, "GitHub", "Open in Clisbot");
   await expectPreviewRowsFit(page, "Discord", "Message #engineering");
 });
 
@@ -150,7 +150,7 @@ test("preview results fit on a narrow phone with larger text", async ({ page }) 
   await openHub(page, 320);
   await useLargerText(page);
   await waitForHydration(page);
-  await expectPreviewRowsFit(page, "Discord", "Fix stale worktrees", "getpaseo/paseo#2825");
+  await expectPreviewRowsFit(page, "Discord", "Fix stale worktrees", "longbkit/clisbot#2825");
   await expectPreviewRowsFit(page, "Schedules", "tests passed");
 });
 
@@ -159,7 +159,7 @@ test("Hub previews keep their rows visible with twice the default font size", as
   await openHub(page, 320);
   await useLargerText(page, "200%");
   await waitForHydration(page);
-  await expectPreviewRowsFit(page, "Slack", "Open in Paseo");
+  await expectPreviewRowsFit(page, "Slack", "Open in Clisbot");
   await expectPreviewRowsFit(page, "Linear", "PAS-418");
   await expectPreviewRowsFit(page, "Discord", "tests passed", "Message #engineering");
 });

@@ -7,14 +7,14 @@ import type {
   ProviderInstallationUpdateCheck,
   ProviderInstallationUpdateCleared,
   ProviderInstallationUpdateProgress,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import {
   ProviderInspectionSchema,
   ProviderUpdateCheckSchema,
   ProviderUpdateReportSchema,
   ProviderUpdateResultSchema,
   type ProviderUpdateResult,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 import type {
   AgentClient,
   AgentClientInstallationContext,

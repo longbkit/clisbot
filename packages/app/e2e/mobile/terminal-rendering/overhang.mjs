@@ -19,24 +19,24 @@ import { RULER_CELLS } from "./fixture.mjs";
 //   PLATFORM=android ANDROID_SERIAL=emulator-5554 node e2e/mobile/terminal-rendering/overhang.mjs
 //   PLATFORM=ios IOS_DEVICE="iPhone 17" node e2e/mobile/terminal-rendering/overhang.mjs
 const platform = process.env.PLATFORM ?? "android";
-const appId = process.env.PASEO_TERMINAL_RENDERING_APP_ID ?? "sh.paseo.debug";
-const label = process.env.PASEO_TERMINAL_RENDERING_LABEL ?? "overhang";
+const appId = process.env.CLISBOT_TERMINAL_RENDERING_APP_ID ?? "sh.clisbot.debug";
+const label = process.env.CLISBOT_TERMINAL_RENDERING_LABEL ?? "overhang";
 const session = process.env.AGENT_DEVICE_SESSION ?? `terminal-rendering-${platform}`;
 const artifacts = resolve(
-  process.env.PASEO_TERMINAL_RENDERING_ARTIFACTS ??
-    resolve(homedir(), ".paseo/artifacts/terminal-rendering", platform),
+  process.env.CLISBOT_TERMINAL_RENDERING_ARTIFACTS ??
+    resolve(homedir(), ".clisbot/artifacts/terminal-rendering", platform),
   label,
 );
-const fixtureDir = process.env.PASEO_TERMINAL_RENDERING_FIXTURE_DIR ?? tmpdir();
+const fixtureDir = process.env.CLISBOT_TERMINAL_RENDERING_FIXTURE_DIR ?? tmpdir();
 const screenshotArgs =
   platform === "ios"
-    ? ["--pixel-density", process.env.PASEO_TERMINAL_RENDERING_PIXEL_DENSITY ?? "3"]
+    ? ["--pixel-density", process.env.CLISBOT_TERMINAL_RENDERING_PIXEL_DENSITY ?? "3"]
     : [];
 const env = {
   ...process.env,
   AGENT_DEVICE_STATE_DIR:
     process.env.AGENT_DEVICE_STATE_DIR ??
-    resolve(homedir(), ".paseo/artifacts/terminal-rendering/device-state"),
+    resolve(homedir(), ".clisbot/artifacts/terminal-rendering/device-state"),
 };
 mkdirSync(artifacts, { recursive: true });
 
@@ -166,7 +166,7 @@ assert.ok(
   size.rows > PARK_ROW && size.columns > WRITE_COLUMN,
   `Terminal too small: ${JSON.stringify(size)}`,
 );
-const scriptPath = resolve(fixtureDir, "paseo-terminal-overhang.sh");
+const scriptPath = resolve(fixtureDir, "clisbot-terminal-overhang.sh");
 writeFileSync(scriptPath, fixtureScript());
 await runCommand(`sh ${scriptPath}`);
 

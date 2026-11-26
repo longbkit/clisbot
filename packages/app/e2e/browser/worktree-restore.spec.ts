@@ -491,7 +491,7 @@ async function captureBranchlessRestoreStep(page: Page, filename: string): Promi
   const screenshotDirectory = path.join(
     process.cwd(),
     ".artifacts",
-    "paseo-branchless-restore-evidence",
+    "clisbot-branchless-restore-evidence",
   );
   mkdirSync(screenshotDirectory, { recursive: true });
   await page.screenshot({ path: path.join(screenshotDirectory, filename), fullPage: true });

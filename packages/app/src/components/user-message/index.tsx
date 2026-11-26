@@ -2,7 +2,7 @@ import { useState, useCallback, useLayoutEffect, useMemo, useRef, type ReactNode
 import { View, type LayoutChangeEvent, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
-import type { AgentMessage } from "@getpaseo/protocol/agent-message";
+import type { AgentMessage } from "@clisbot/protocol/agent-message";
 import { Button } from "@/components/ui/button";
 import { EdgeFade } from "@/components/ui/edge-fade";
 import { useProviderIcon } from "@/components/provider-icons";

@@ -29,16 +29,16 @@ interface TestContext {
   system: unknown[];
 }
 
-test("a shared plugin binds Paseo sessions without involving unrelated sessions", async () => {
-  const home = await mkdtemp(path.join(tmpdir(), "paseo-shared-bridge-"));
-  const bridge = new OpenCodeBridge({ paseoHome: home, logger: createTestLogger() });
+test("a shared plugin binds Clisbot sessions without involving unrelated sessions", async () => {
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-shared-bridge-"));
+  const bridge = new OpenCodeBridge({ clisbotHome: home, logger: createTestLogger() });
   const tool = { name: "echo", description: "echo", inputSchema: { value: z.string() } };
   const tools = new Map([[tool.name, tool]]);
   // Session-only tools must survive plugin reload without a global definition.
   bridge.setManifestCatalog({ tools: new Map() });
   await bridge.start();
   const unbind = bridge.bindSession({
-    sessionId: "paseo",
+    sessionId: "clisbot",
     env: {},
     tools: {
       tools,
@@ -48,7 +48,7 @@ test("a shared plugin binds Paseo sessions without involving unrelated sessions"
       }),
     },
   });
-  expect(() => bridge.bindSession({ sessionId: "paseo", env: {} })).toThrow("already bound");
+  expect(() => bridge.bindSession({ sessionId: "clisbot", env: {} })).toThrow("already bound");
   try {
     const plugin = {
       package: await bridge.materializeV2Plugin(),
@@ -104,7 +104,9 @@ test("a shared plugin binds Paseo sessions without involving unrelated sessions"
       },
       session: {
         context: async () =>
-          structured ? [{ type: "user", metadata: { paseoOutputSchema: { type: "string" } } }] : [],
+          structured
+            ? [{ type: "user", metadata: { clisbotOutputSchema: { type: "string" } } }]
+            : [],
         get: async () => ({ parentID: "" }),
         hook: async (_name: string, fn: (input: TestContext) => Promise<void>) => {
           hooks.push(fn);
@@ -113,55 +115,59 @@ test("a shared plugin binds Paseo sessions without involving unrelated sessions"
       },
     };
     let dispose = await module.default.setup(context);
-    await rpc.bind({ sessionID: "paseo", ...plugin.options });
-    await rpc.refresh({ sessionID: "paseo", ...plugin.options });
+    await rpc.bind({ sessionID: "clisbot", ...plugin.options });
+    await rpc.refresh({ sessionID: "clisbot", ...plugin.options });
     expect(refreshed).toEqual(["provider", "model", "agent", "command", "skill"]);
     await expect(
-      rpc.bind({ sessionID: "paseo", ...plugin.options, token: "another-daemon" }),
-    ).resolves.toEqual({ error: "OpenCode session is already bound to another Paseo bridge" });
-    const own = { sessionID: "paseo", tools: { paseo_echo: {}, native: {} }, system: [] };
+      rpc.bind({ sessionID: "clisbot", ...plugin.options, token: "another-daemon" }),
+    ).resolves.toEqual({ error: "OpenCode session is already bound to another Clisbot bridge" });
+    const own = { sessionID: "clisbot", tools: { clisbot_echo: {}, native: {} }, system: [] };
     for (const hook of hooks) await hook(own);
-    expect(Object.keys(own.tools)).toEqual(["paseo_echo", "native"]);
+    expect(Object.keys(own.tools)).toEqual(["clisbot_echo", "native"]);
     expect(
-      await installed.get("paseo_echo")!.execute({ value: "ok" }, { sessionID: "paseo" }),
+      await installed.get("clisbot_echo")!.execute({ value: "ok" }, { sessionID: "clisbot" }),
     ).toMatchObject({ content: [{ type: "text", text: "ok" }] });
     await dispose();
     hooks.length = 0;
     installed.clear();
     dispose = await module.default.setup(context);
-    const afterReload = { sessionID: "paseo", tools: { paseo_echo: {}, native: {} }, system: [] };
+    const afterReload = {
+      sessionID: "clisbot",
+      tools: { clisbot_echo: {}, native: {} },
+      system: [],
+    };
     for (const hook of hooks) await hook(afterReload);
-    expect(Object.keys(afterReload.tools)).toEqual(["paseo_echo", "native"]);
+    expect(Object.keys(afterReload.tools)).toEqual(["clisbot_echo", "native"]);
     expect(
-      await installed.get("paseo_echo")!.execute({ value: "reloaded" }, { sessionID: "paseo" }),
+      await installed.get("clisbot_echo")!.execute({ value: "reloaded" }, { sessionID: "clisbot" }),
     ).toMatchObject({ content: [{ type: "text", text: "reloaded" }] });
     await bridge.close();
     await dispose();
     hooks.length = 0;
     installed.clear();
     dispose = await module.default.setup(context);
-    const unrelated = { sessionID: "other", tools: { paseo_echo: {}, native: {} }, system: [] };
+    const unrelated = { sessionID: "other", tools: { clisbot_echo: {}, native: {} }, system: [] };
     for (const hook of hooks) await hook(unrelated);
     expect(Object.keys(unrelated.tools)).toEqual(["native"]);
     structured = true;
     const structuredOnly = {
       sessionID: "other",
-      tools: { paseo_structured_output: {} },
+      tools: { clisbot_structured_output: {} },
       system: [],
     };
     for (const hook of hooks) await hook(structuredOnly);
-    expect(Object.keys(structuredOnly.tools)).toEqual(["paseo_structured_output"]);
+    expect(Object.keys(structuredOnly.tools)).toEqual(["clisbot_structured_output"]);
     const restarted = new OpenCodeBridge({
-      paseoHome: home,
+      clisbotHome: home,
       logger: createTestLogger(),
       port: Number(new URL(plugin.options.baseUrl).port),
     });
     restarted.setManifestCatalog({ tools });
     await restarted.start();
-    const releaseRestarted = restarted.bindSession({ sessionId: "paseo", env: {} });
+    const releaseRestarted = restarted.bindSession({ sessionId: "clisbot", env: {} });
     try {
       await expect(
-        rpc.bind({ sessionID: "paseo", ...restarted.sharedV2Connection() }),
+        rpc.bind({ sessionID: "clisbot", ...restarted.sharedV2Connection() }),
       ).resolves.toEqual({});
     } finally {
       releaseRestarted();
@@ -176,14 +182,14 @@ test("a shared plugin binds Paseo sessions without involving unrelated sessions"
 });
 
 test("a shared plugin rebinds a session after the previous bridge stops listening", async () => {
-  const home = await mkdtemp(path.join(tmpdir(), "paseo-shared-bridge-refused-"));
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-shared-bridge-refused-"));
   const previous = createServer((_request, response) => {
     response.writeHead(200, { "Content-Type": "application/json", Connection: "close" });
     response.end(JSON.stringify({ tools: [] }));
   });
   await new Promise<void>((resolve) => previous.listen(0, "127.0.0.1", resolve));
   const previousPort = (previous.address() as AddressInfo).port;
-  const current = new OpenCodeBridge({ paseoHome: home, logger: createTestLogger() });
+  const current = new OpenCodeBridge({ clisbotHome: home, logger: createTestLogger() });
   current.setManifestCatalog({ tools: new Map() });
   let rpc: Record<string, (input: Binding) => Promise<unknown>> = {};
   let dispose: (() => Promise<void>) | undefined;
@@ -217,16 +223,16 @@ test("a shared plugin rebinds a session after the previous bridge stops listenin
         hook: async () => ({ dispose: async () => {} }),
       },
     });
-    await expect(rpc.bind({ sessionID: "paseo", ...plugin.options })).resolves.toEqual({});
+    await expect(rpc.bind({ sessionID: "clisbot", ...plugin.options })).resolves.toEqual({});
     await current.start();
     // The restarted daemon owns the agent again, so its bridge serves this session.
-    releaseCurrent = current.bindSession({ sessionId: "paseo", env: {} });
+    releaseCurrent = current.bindSession({ sessionId: "clisbot", env: {} });
     await new Promise<void>((resolve) => {
       previous.close(() => resolve());
       previous.closeAllConnections();
     });
     await expect(
-      rpc.bind({ sessionID: "paseo", ...current.sharedV2Connection() }),
+      rpc.bind({ sessionID: "clisbot", ...current.sharedV2Connection() }),
     ).resolves.toEqual({});
   } finally {
     await dispose?.();
@@ -314,17 +320,17 @@ async function registerAtLocation(bridge: OpenCodeBridge, home: string) {
 test.each([false, true])(
   "rebinds an existing session after an owner stops and its definition changes (second retained session: %s)",
   async (second) => {
-    const home = await mkdtemp(path.join(tmpdir(), "paseo-upgrade-repro-"));
-    const old = new OpenCodeBridge({ paseoHome: home, logger: createTestLogger() });
-    const peer = new OpenCodeBridge({ paseoHome: home, logger: createTestLogger() });
-    const next = new OpenCodeBridge({ paseoHome: home, logger: createTestLogger() });
+    const home = await mkdtemp(path.join(tmpdir(), "clisbot-upgrade-repro-"));
+    const old = new OpenCodeBridge({ clisbotHome: home, logger: createTestLogger() });
+    const peer = new OpenCodeBridge({ clisbotHome: home, logger: createTestLogger() });
+    const next = new OpenCodeBridge({ clisbotHome: home, logger: createTestLogger() });
     let location: Awaited<ReturnType<typeof registerAtLocation>> | undefined;
     try {
       await old.start();
       addSession(old, "first", { echo: "echo v1" });
       location = await registerAtLocation(old, home);
       await location.bind(old, "first");
-      expect(await location.visible("first")).toHaveProperty("paseo_echo.description", "echo v1");
+      expect(await location.visible("first")).toHaveProperty("clisbot_echo.description", "echo v1");
       if (second) {
         addSession(old, "second", { echo: "echo v1" });
         await location.bind(old, "second");
@@ -339,8 +345,8 @@ test.each([false, true])(
       await next.start();
       addSession(next, "first", { echo: "echo v2" });
       await expect(location.bind(next, "first")).resolves.toEqual({});
-      expect(await location.visible("first")).toHaveProperty("paseo_echo.description", "echo v2");
-      expect(await location.visible("peer")).toHaveProperty("paseo_extra");
+      expect(await location.visible("first")).toHaveProperty("clisbot_echo.description", "echo v2");
+      expect(await location.visible("peer")).toHaveProperty("clisbot_extra");
     } finally {
       await location?.dispose();
       await old.close();
@@ -352,8 +358,8 @@ test.each([false, true])(
 );
 
 test("binding another session at the same location preserves the first session's tools", async () => {
-  const home = await mkdtemp(path.join(tmpdir(), "paseo-upgrade-scope-repro-"));
-  const bridge = new OpenCodeBridge({ paseoHome: home, logger: createTestLogger() });
+  const home = await mkdtemp(path.join(tmpdir(), "clisbot-upgrade-scope-repro-"));
+  const bridge = new OpenCodeBridge({ clisbotHome: home, logger: createTestLogger() });
   let location: Awaited<ReturnType<typeof registerAtLocation>> | undefined;
   try {
     await bridge.start();
@@ -361,16 +367,16 @@ test("binding another session at the same location preserves the first session's
     addSession(bridge, "second", { echo: "echo" });
     location = await registerAtLocation(bridge, home);
     await location.bind(bridge, "first");
-    expect(await location.visible("first")).toHaveProperty("paseo_extra");
+    expect(await location.visible("first")).toHaveProperty("clisbot_extra");
     await location.bind(bridge, "second");
-    expect(await location.visible("second")).not.toHaveProperty("paseo_extra");
-    expect(await location.visible("first")).toHaveProperty("paseo_extra");
+    expect(await location.visible("second")).not.toHaveProperty("clisbot_extra");
+    expect(await location.visible("first")).toHaveProperty("clisbot_extra");
 
     addSession(bridge, "conflict", { echo: "echo different" });
     await expect(location.bind(bridge, "conflict")).rejects.toThrow(
-      "Conflicting Paseo tool definition: echo",
+      "Conflicting Clisbot tool definition: echo",
     );
-    expect(await location.visible("first")).toHaveProperty("paseo_echo.description", "echo");
+    expect(await location.visible("first")).toHaveProperty("clisbot_echo.description", "echo");
   } finally {
     await location?.dispose();
     await bridge.close();

@@ -7,10 +7,10 @@ import {
   type ProviderLaunch,
   type ProviderRegistration,
   type ProviderStatus,
-} from "@getpaseo/plugin/server/provider";
+} from "@clisbot/plugin/server/provider";
 import { serveArgs } from "./options.js";
 import { Usage } from "./usage.js";
-import { execCommand } from "@getpaseo/plugin/server";
+import { execCommand } from "@clisbot/plugin/server";
 import { Catalog, launchKey } from "./catalog.js";
 import { MspConnection } from "./connection.js";
 import { MuseError, actionableError } from "./errors.js";
@@ -48,9 +48,9 @@ export function createMuseProvider(
     label: "Muse Code",
     icon: "icon.svg",
     command: ["muse"],
-    docsUrl: "https://paseo.sh/docs/supported-providers/muse-code",
+    docsUrl: "https://clisbot.com/docs/supported-providers/muse-code",
     installation: {
-      installUrl: "https://paseo.sh/docs/muse-code",
+      installUrl: "https://clisbot.com/docs/muse-code",
       async inspect({ launch, signal }) {
         if (!launch?.resolved) return { status: "not_installed" };
         const version = await readVersion(launch, signal);

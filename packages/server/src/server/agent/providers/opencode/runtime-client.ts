@@ -29,7 +29,7 @@ const OPENCODE_INSTALL_URL = "https://opencode.ai/docs/";
 // Agents share a long-lived OpenCode server, and this client keeps the protocol it chose for the
 // version it found. Neither changes until the daemon restarts.
 const OPENCODE_UPDATED =
-  "OpenCode is updated. Restart the Paseo daemon to use the new version; agents keep the running OpenCode server until then.";
+  "OpenCode is updated. Restart the Clisbot daemon to use the new version; agents keep the running OpenCode server until then.";
 
 // Keep the minimum aligned with the SDK and binary exercised by CI.
 const MINIMUM_V2: readonly [number, number] = [0, 10];
@@ -45,7 +45,7 @@ export function openCodeMajorVersion(output: string): 1 | 2 {
     const patch = Number(version[3]);
     if (minor < minimumMinor || (minor === minimumMinor && patch < minimumPatch))
       throw new Error(
-        `OpenCode ${version[1]}.${version[2]}.${version[3]} is too old for this Paseo integration. Update OpenCode to 2.${minimumMinor}.${minimumPatch} or newer, then refresh the provider in Paseo.`,
+        `OpenCode ${version[1]}.${version[2]}.${version[3]} is too old for this Clisbot integration. Update OpenCode to 2.${minimumMinor}.${minimumPatch} or newer, then refresh the provider in Clisbot.`,
       );
     return 2;
   }

@@ -20,7 +20,7 @@ import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import { Caret, DiffStat } from "./atoms";
 import { HostBadge } from "./hosts";
-import { PaseoMark } from "./icons";
+import { ClisbotMark } from "./icons";
 import { FADE_IN, FADE_OUT } from "./motion";
 import { DELEGATED_TASKS, SUBAGENTS_CLICK, tasksDelegated } from "./orchestration";
 import { useSceneClock } from "./player";
@@ -69,20 +69,20 @@ function TurnFooter({ duration }: { duration: string }) {
 const BUILT_IN_LABELS = { read: "Read", write: "Write", shell: "Shell" } as const;
 
 function toolCallLabel(call: ToolCall): string {
-  return call.kind === "paseo" ? call.label : BUILT_IN_LABELS[call.kind];
+  return call.kind === "clisbot" ? call.label : BUILT_IN_LABELS[call.kind];
 }
 
 function ToolCallIcon({ kind }: { kind: ToolCall["kind"] }) {
   if (kind === "read") return <Eye size={14} />;
   if (kind === "write") return <Pencil size={14} />;
-  if (kind === "paseo") return <PaseoMark size={14} />;
+  if (kind === "clisbot") return <ClisbotMark size={14} />;
   return <SquareTerminal size={14} />;
 }
 
 /**
  * One tool call row, drawn like the app's collapsed timeline item
  * (`packages/app/src/components/message.tsx`): icon, label, then the summary,
- * all muted and in the UI font. A Paseo call that targets another machine ends
+ * all muted and in the UI font. A Clisbot call that targets another machine ends
  * with that host's badge, which the app's row does not draw.
  */
 export function ToolCallRow({ call }: { call: ToolCall }) {
@@ -93,7 +93,7 @@ export function ToolCallRow({ call }: { call: ToolCall }) {
       </span>
       <span className="shrink-0">{toolCallLabel(call)}</span>
       {call.detail ? <span className="min-w-0 truncate">{call.detail}</span> : null}
-      {call.kind === "paseo" && call.host ? <HostBadge host={call.host} glyph={13} /> : null}
+      {call.kind === "clisbot" && call.host ? <HostBadge host={call.host} glyph={13} /> : null}
     </div>
   );
 }
@@ -102,12 +102,12 @@ export function AgentTranscript() {
   return (
     <div className="space-y-[13px] pt-[2px]">
       <Para>
-        The homepage is built. It leads with Paseo&rsquo;s actual value, then uses the product
+        The homepage is built. It leads with Clisbot&rsquo;s actual value, then uses the product
         itself to prove the story instead of falling back to generic dashboard art.
       </Para>
       <div>
         <Bullet>Reworked the hero around &ldquo;The control plane for coding agents.&rdquo;</Bullet>
-        <Bullet>Built desktop and mobile scenes from real Paseo workflows and assets.</Bullet>
+        <Bullet>Built desktop and mobile scenes from real Clisbot workflows and assets.</Bullet>
         <Bullet>Added believable agent, review, plugin, shipping, and host states.</Bullet>
         <Bullet>
           Matched the app&rsquo;s tabs, explorer, diff tree, controls, and layout rails.
@@ -115,9 +115,9 @@ export function AgentTranscript() {
       </div>
       <TurnFooter duration="31m 46s" />
       <UserBubble>Create a PR</UserBubble>
-      <Para>PR opened: Rebuild the homepage around live Paseo workflows.</Para>
+      <Para>PR opened: Rebuild the homepage around live Clisbot workflows.</Para>
       <span className="block text-[13.5px] text-mock-accent-bright">
-        https://github.com/getpaseo/paseo/pull/3981
+        https://github.com/longbkit/clisbot/pull/3981
       </span>
       <div>
         <Bullet>Ships the new product-led hero and interactive desktop mockup.</Bullet>

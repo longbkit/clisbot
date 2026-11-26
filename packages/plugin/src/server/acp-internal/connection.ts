@@ -21,7 +21,7 @@ import {
   type Stream,
 } from "@agentclientprotocol/sdk";
 import { z } from "zod";
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import type {
   AcpConfigAccess,
   AcpConfigChange,
@@ -524,7 +524,7 @@ class AcpRuntime {
           runtime.connection.initialize({
             protocolVersion: PROTOCOL_VERSION,
             clientCapabilities: {},
-            clientInfo: { name: "paseo", version: "1" },
+            clientInfo: { name: "clisbot", version: "1" },
           }),
         ),
         options.options.acpOptions?.startupTimeoutMs ?? 10_000,
@@ -604,7 +604,7 @@ class AcpRuntime {
     this.mcpServerNames = mcpServers.map((server) => server.name);
     let nativeSessionId = readNativeSessionId(input.persistence);
     const metadata: Record<string, unknown> = {
-      _paseo: {
+      _clisbot: {
         systemPrompt: input.config.systemPrompt,
         providerOptions: input.config.providerOptions,
         toolPolicy: input.config.toolPolicy,
@@ -2188,10 +2188,10 @@ function ownConnectorStream(source: Stream): {
     async close(options?: { force?: boolean; timeoutMs?: number }) {
       if (!closing) {
         const closeWrite = options?.force
-          ? writer.abort(new Error("Paseo aborted the ACP connector"))
+          ? writer.abort(new Error("Clisbot aborted the ACP connector"))
           : writer.close();
         closing = Promise.allSettled([
-          reader.cancel(new Error("Paseo closed the ACP connector")),
+          reader.cancel(new Error("Clisbot closed the ACP connector")),
           closeWrite,
         ]).then((results) => {
           if (options?.timeoutMs === undefined) return undefined;

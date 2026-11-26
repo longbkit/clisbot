@@ -1,0 +1,6 @@
+{
+  "id": "provider-direct-example",
+  "requirements": {
+    "clisbot": ">=0.8.0"
+  }
+}

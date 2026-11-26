@@ -1,5 +1,5 @@
 import { realpath } from "node:fs/promises";
-import type { ProviderUpdateCheck } from "@getpaseo/plugin/server/provider";
+import type { ProviderUpdateCheck } from "@clisbot/plugin/server/provider";
 
 /**
  * Returns the newest version a provider's release channel offers for the installed executable.
@@ -76,7 +76,7 @@ export function homebrewCaskOf(executablePath: string): string | null {
 }
 
 async function fetchRelease(url: string, signal: AbortSignal): Promise<Response> {
-  const response = await fetch(url, { signal, headers: { "User-Agent": "paseo" } });
+  const response = await fetch(url, { signal, headers: { "User-Agent": "clisbot" } });
   if (!response.ok) throw new Error(`${url} returned ${response.status}`);
   return response;
 }

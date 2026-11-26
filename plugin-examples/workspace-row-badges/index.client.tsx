@@ -1,9 +1,6 @@
-import { useWorkspace } from "@getpaseo/plugin/client";
-import type {
-  PluginClientContext,
-  PluginWorkspaceRowBadgeItemProps,
-} from "@getpaseo/plugin/client";
-import { WorkspaceRowBadge } from "@getpaseo/plugin/client/ui";
+import { useWorkspace } from "@clisbot/plugin/client";
+import type { PluginClientContext, PluginWorkspaceRowBadgeItemProps } from "@clisbot/plugin/client";
+import { WorkspaceRowBadge } from "@clisbot/plugin/client/ui";
 
 function WorkspaceAttention({ workspaceId }: PluginWorkspaceRowBadgeItemProps) {
   const status = useWorkspace(workspaceId, (workspace) => workspace.status);
@@ -17,7 +14,7 @@ function WorkspaceAttention({ workspaceId }: PluginWorkspaceRowBadgeItemProps) {
 }
 
 export default function contribute(client: PluginClientContext) {
-  // Apps older than this API do not have the method, and requirements.paseo cannot exclude them.
+  // Apps older than this API do not have the method, and requirements.clisbot cannot exclude them.
   if (!client.addWorkspaceRowBadgeItem) return () => {};
   client.addWorkspaceRowBadgeItem({
     id: "attention",

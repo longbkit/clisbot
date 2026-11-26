@@ -161,7 +161,7 @@ async function configureOverviewToolCalls(
   await page.addInitScript(
     ({ display, expandReasoning }) => {
       localStorage.setItem(
-        "@paseo:app-settings",
+        "@clisbot:app-settings",
         JSON.stringify({ chatDisplay: display, autoExpandReasoning: expandReasoning }),
       );
     },

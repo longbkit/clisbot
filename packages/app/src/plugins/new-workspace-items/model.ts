@@ -1,5 +1,5 @@
-import type { JsonValue } from "@getpaseo/protocol/agent-types";
-import type { PluginHostProps, PluginNewWorkspace } from "@getpaseo/plugin/client";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
+import type { PluginHostProps, PluginNewWorkspace } from "@clisbot/plugin/client";
 import type { PickerItem } from "@/screens/new-workspace-picker-item";
 import type { SetupCommands } from "@/screens/new-workspace/setup-model";
 import { cloneAndFreeze, ownCopy } from "../freeze";

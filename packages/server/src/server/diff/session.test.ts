@@ -4,11 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import pino from "pino";
 import { expect, test } from "vitest";
-import {
-  decodeDiffFrame,
-  DiffOpcode,
-  type DiffFrame,
-} from "@getpaseo/protocol/binary-frames/index";
+import { decodeDiffFrame, DiffOpcode, type DiffFrame } from "@clisbot/protocol/binary-frames/index";
 import { DiffSession, DiffSubscriptions } from "./index.js";
 import { createFileObserver } from "../file-observer/index.js";
 import { SessionDelivery } from "../session/owned-subscriptions/index.js";

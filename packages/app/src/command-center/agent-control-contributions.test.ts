@@ -3,7 +3,7 @@ import type {
   AgentMode,
   AgentOptionControl,
   AgentSelectOption,
-} from "@getpaseo/protocol/agent-types";
+} from "@clisbot/protocol/agent-types";
 import type { ProviderSelectorProvider } from "@/provider-selection/provider-selection";
 import type { CommandCenterContribution } from "./contributions";
 import {

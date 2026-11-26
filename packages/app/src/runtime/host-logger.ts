@@ -1,4 +1,4 @@
-import type { Logger } from "@getpaseo/client/internal/daemon-client";
+import type { Logger } from "@clisbot/client/internal/daemon-client";
 
 export function createHostLogger(
   readServerId: () => string | undefined,

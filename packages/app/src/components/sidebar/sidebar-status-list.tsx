@@ -1,4 +1,4 @@
-import { useWorkspaceRowPress } from "../../../modules/paseo-press-feedback";
+import { useWorkspaceRowPress } from "../../../modules/clisbot-press-feedback";
 import { PressHighlight as Pressable } from "@/components/ui/press-highlight";
 import {
   memo,

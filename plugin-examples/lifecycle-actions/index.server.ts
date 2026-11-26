@@ -1,4 +1,4 @@
-import type { PluginServerContext } from "@getpaseo/plugin/server";
+import type { PluginServerContext } from "@clisbot/plugin/server";
 import { latestOutputText, shellCommand } from "./server/inspect";
 
 export default function contribute(server: PluginServerContext) {
@@ -22,7 +22,7 @@ export default function contribute(server: PluginServerContext) {
     if (event.outcome.kind === "canceled" || event.agent.background) {
       return;
     }
-    const agent = context.paseo.agents.ref(event.agent.id);
+    const agent = context.clisbot.agents.ref(event.agent.id);
     const page = await agent.timeline.refetch({ direction: "tail", limit: 1, wholeTurns: true });
     const turn = page.entries.filter((entry) => entry.turnId === event.turnId);
     const text = latestOutputText(turn.map(({ item }) => item));
@@ -38,7 +38,7 @@ export default function contribute(server: PluginServerContext) {
       return;
     }
 
-    const agent = context.paseo.agents.ref(event.agent.id);
+    const agent = context.clisbot.agents.ref(event.agent.id);
     if (/\brm\s+-rf\b/.test(command)) {
       await agent.respondToPermission({
         requestId: event.request.id,
@@ -63,7 +63,7 @@ export default function contribute(server: PluginServerContext) {
       ...request,
       env: {
         ...request.env,
-        PASEO_HOOK_CREATE_EXAMPLE: "created",
+        CLISBOT_HOOK_CREATE_EXAMPLE: "created",
       },
     };
   });
@@ -89,7 +89,7 @@ export default function contribute(server: PluginServerContext) {
       ...request,
       env: {
         ...request.env,
-        PASEO_HOOK_OPEN_EXAMPLE: "opened",
+        CLISBOT_HOOK_OPEN_EXAMPLE: "opened",
       },
     };
   });

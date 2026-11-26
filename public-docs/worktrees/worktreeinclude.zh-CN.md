@@ -1,6 +1,6 @@
 ---
 title: .worktreeinclude
-description: 将 Git 忽略的本地文件复制到新的 Paseo worktree。
+description: 将 Git 忽略的本地文件复制到新的 Clisbot worktree。
 nav: .worktreeinclude
 order: 12
 category: Workspaces
@@ -8,7 +8,7 @@ category: Workspaces
 
 # .worktreeinclude
 
-在源检出的根目录添加 `.worktreeinclude`，将本地配置复制到新的 [Git worktree](/docs/worktrees)。Paseo 会在 setup、终端和首个 Agent 启动之前复制匹配的 Git 忽略文件。
+在源检出的根目录添加 `.worktreeinclude`，将本地配置复制到新的 [Git worktree](/docs/worktrees)。Clisbot 会在 setup、终端和首个 Agent 启动之前复制匹配的 Git 忽略文件。
 
 ## 复制本地配置 {#copy-your-local-configuration}
 
@@ -19,7 +19,7 @@ category: Workspaces
 config/*.local.json
 ```
 
-通过 Paseo 创建 worktree 时，已有的 `.env` 和 `config/dev.local.json` 等匹配文件会被复制到新 worktree 中的相同相对路径。文件内容仍不会纳入 Git。
+通过 Clisbot 创建 worktree 时，已有的 `.env` 和 `config/dev.local.json` 等匹配文件会被复制到新 worktree 中的相同相对路径。文件内容仍不会纳入 Git。
 
 提交 `.worktreeinclude`，与团队共享这些模式。每位团队成员在用于创建 worktree 的检出中提供自己的忽略文件。
 
@@ -36,7 +36,7 @@ config/*.local.json
 
 模式只会选择 Git 已忽略的文件。在此添加路径不会使 Git 忽略该文件，需要时还应配置 `.gitignore`。已跟踪的文件和未被 Git 忽略的未跟踪文件都不会被复制。
 
-对于被 Git 整体忽略的目录（例如 `node_modules/`），除非某个模式指明了该目录或其中的路径，否则 Paseo 不会在其中查找。像 `.env` 这样的纯文件名会匹配 `.env` 和 `apps/web/.env`，但不会匹配 `node_modules/pkg/.env`。要从被忽略的目录中复制文件，请在模式中写出该目录，例如 `node_modules/pkg/.env` 或 `.secrets/`。第一级目录名中带有通配符的模式（例如 `**/.env` 或 `*/.env`）会在所有被忽略的目录中查找，包括 `node_modules/`，因此目录较大时请直接写出目录。
+对于被 Git 整体忽略的目录（例如 `node_modules/`），除非某个模式指明了该目录或其中的路径，否则 Clisbot 不会在其中查找。像 `.env` 这样的纯文件名会匹配 `.env` 和 `apps/web/.env`，但不会匹配 `node_modules/pkg/.env`。要从被忽略的目录中复制文件，请在模式中写出该目录，例如 `node_modules/pkg/.env` 或 `.secrets/`。第一级目录名中带有通配符的模式（例如 `**/.env` 或 `*/.env`）会在所有被忽略的目录中查找，包括 `node_modules/`，因此目录较大时请直接写出目录。
 
 ## 文件复制时机 {#when-files-are-copied}
 
@@ -60,4 +60,4 @@ config/*.local.json
 }
 ```
 
-将此配置放入新 worktree 所用基准分支的 `paseo.json` 中。setup 运行时，复制的文件已可使用。
+将此配置放入新 worktree 所用基准分支的 `clisbot.json` 中。setup 运行时，复制的文件已可使用。

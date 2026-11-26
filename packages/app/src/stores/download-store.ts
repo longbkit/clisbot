@@ -335,7 +335,7 @@ function buildDownloadUrl(baseUrl: string, token: string): string {
 
 /**
  * Fetches the file instead of navigating to it. The app runs on another origin than the host
- * (paseo://app on desktop), so a link to the download URL navigates the whole window, and any
+ * (clisbot://app on desktop), so a link to the download URL navigates the whole window, and any
  * response that is not the file (a proxy's 401 page, a 404) replaces the app.
  */
 async function fetchDownload(fetchFile: typeof fetch, url: string): Promise<Blob> {

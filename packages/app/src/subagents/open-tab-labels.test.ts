@@ -4,7 +4,7 @@ import type { WorkspaceTab } from "@/workspace-tabs/model";
 import { shallow } from "zustand/shallow";
 import { getAgentTabsNeedingOpenLabel, selectOpenTabAgents } from "./open-tab-labels";
 
-const label = "paseo.open-agent-tab.client-1";
+const label = "clisbot.open-agent-tab.client-1";
 
 function tab(agentId: string, createdAt: number): WorkspaceTab {
   return { tabId: `agent_${agentId}`, target: { kind: "agent", agentId }, createdAt };

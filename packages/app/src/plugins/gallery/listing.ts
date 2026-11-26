@@ -1,9 +1,9 @@
-import type { PluginListItem } from "@getpaseo/protocol/messages";
+import type { PluginListItem } from "@clisbot/protocol/messages";
 import {
   pluginMediaKind,
   type PluginListingIndex,
   type PluginListing,
-} from "@getpaseo/protocol/plugin-registry";
+} from "@clisbot/protocol/plugin-registry";
 
 export type DirectorySort = "popular" | "recent" | "name";
 export const ALL_CATEGORIES = "all";

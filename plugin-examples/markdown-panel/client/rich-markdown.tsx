@@ -5,8 +5,8 @@ import {
   type PluginFilePanelProps,
   useFileText,
   useTabState,
-} from "@getpaseo/plugin/client";
-import { Loading, Markdown } from "@getpaseo/plugin/client/ui";
+} from "@clisbot/plugin/client";
+import { Loading, Markdown } from "@clisbot/plugin/client/ui";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { type MarkdownEditorHandle, mountEditor } from "./web";

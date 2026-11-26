@@ -2,7 +2,7 @@ import {
   decodeDiffFrame,
   type DiffEntry as WireEntry,
   type DiffBegin,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@clisbot/protocol/binary-frames/index";
 import type {
   DiffSubscribeRequest,
   SubscribeCheckoutDiffRequest,
@@ -10,10 +10,10 @@ import type {
   DiffSubscribeResponse,
   SubscribeCheckoutDiffResponse,
   ParsedDiffFile,
-} from "@getpaseo/protocol/messages";
+} from "@clisbot/protocol/messages";
 import type { OwnedSubscription, SubscriptionObserver } from "../connection/index.js";
 import { DiffStream } from "./stream.js";
-export type { DiffEndpoint } from "@getpaseo/protocol/messages";
+export type { DiffEndpoint } from "@clisbot/protocol/messages";
 export type DiffCompare = Omit<DiffSubscribeRequest, "type" | "requestId">;
 
 export type DiffEntry = Omit<WireEntry, "body">;

@@ -146,8 +146,8 @@ import { useAppSettings } from "@/hooks/use-settings";
 import { RenderProfile } from "@/utils/render-profiler";
 import { AfterPaintPublication } from "@/composer/after-paint-publication";
 import { isWeb, isNative } from "@/constants/platform";
-import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
-import type { AgentMetric } from "@getpaseo/protocol/agent-types";
+import type { ForgeSearchItem } from "@clisbot/protocol/messages";
+import type { AgentMetric } from "@clisbot/protocol/agent-types";
 import type {
   AttachmentMetadata,
   ComposerAttachment,

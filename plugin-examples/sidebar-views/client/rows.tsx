@@ -8,7 +8,7 @@ import {
   type AgentRef,
   type ProjectRef,
   type PluginSidebarViewProps,
-} from "@getpaseo/plugin/client";
+} from "@clisbot/plugin/client";
 
 export function Heading({ title, view }: { title: string; view: PluginSidebarViewProps }) {
   const style = useMemo(

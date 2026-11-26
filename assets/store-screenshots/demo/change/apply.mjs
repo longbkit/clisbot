@@ -1,4 +1,4 @@
-// Applies the demo change to a checkout of the Paseo repository.
+// Applies the demo change to a checkout of the Clisbot repository.
 import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

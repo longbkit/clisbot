@@ -62,13 +62,13 @@ test("Files Refresh reveals new files when a cached collapsed folder is reopened
   await expectExplorerEntryVisible(page, "guide.md");
   await collapseFolder(page, "docs");
   await expectExplorerEntryHidden(page, "guide.md");
-  await createFileOutsidePaseo("docs/NEW.md");
+  await createFileOutsideClisbot("docs/NEW.md");
   await refreshFiles(page);
   await expandFolder(page, "docs");
   await expectExplorerEntryVisible(page, "guide.md");
   await expectExplorerEntryVisible(page, "NEW.md");
 
-  await createFileOutsidePaseo("docs/NEXT.md");
+  await createFileOutsideClisbot("docs/NEXT.md");
   await refreshFiles(page);
   await expectExplorerEntryVisible(page, "NEXT.md");
 });
@@ -79,7 +79,7 @@ async function refreshFiles(page: import("@playwright/test").Page): Promise<void
   await expect(refresh).toBeEnabled();
 }
 
-async function createFileOutsidePaseo(filePath: string): Promise<void> {
+async function createFileOutsideClisbot(filePath: string): Promise<void> {
   await writeFile(path.join(workspace.repoPath, filePath), "# New output\n");
 }
 
@@ -92,7 +92,7 @@ test("Files Refresh ignores an old reply for a folder collapsed while loading", 
   await expandFolder(page, "docs");
   await reply.waitUntilHeld();
   await collapseFolder(page, "docs");
-  await createFileOutsidePaseo("docs/DELAYED.md");
+  await createFileOutsideClisbot("docs/DELAYED.md");
   await refreshFiles(page);
   await reply.release();
   await expandFolder(page, "docs");

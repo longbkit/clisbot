@@ -12,7 +12,7 @@ Use semantic GitHub events to start an agent from one GitHub action. First conne
 
 ## Triage new issues
 
-`.paseo/triggers/triage-issue.yml`:
+`.clisbot/triggers/triage-issue.yml`:
 
 ```yaml
 name: triage-issue
@@ -39,7 +39,7 @@ run:
   prompt: |
     Triage the new issue, apply appropriate labels with gh, and post a short summary using reply.
     Event context:
-    ${{ paseo.context }}
+    ${{ clisbot.context }}
     Call finish_execution when done.
 ```
 
@@ -47,7 +47,7 @@ run:
 
 ## Review pull requests
 
-`.paseo/triggers/review-pr.yml`:
+`.clisbot/triggers/review-pr.yml`:
 
 ```yaml
 name: review-pr
@@ -77,7 +77,7 @@ run:
     Fetch live PR state with gh pr view before reviewing and before posting.
     Skip posting if the PR is draft or its head SHA changed.
     Event context:
-    ${{ paseo.context }}
+    ${{ clisbot.context }}
     Call finish_execution when done.
 ```
 
@@ -87,7 +87,7 @@ Pull request context includes `github.pull_request.draft` and `github.pull_reque
 
 ## Respond to comments
 
-`.paseo/triggers/respond-issue-comment.yml`:
+`.clisbot/triggers/respond-issue-comment.yml`:
 
 ```yaml
 name: respond-issue-comment
@@ -96,8 +96,8 @@ on:
     connection: acme-github
     filters:
       repo: acme/project
-      contains: "@paseo"
-      exclude_contains: "@paseo-deploy"
+      contains: "@clisbot"
+      exclude_contains: "@clisbot-deploy"
       from_users: [maintainer]
 run:
   target:
@@ -112,10 +112,10 @@ run:
     Answer the issue comment using reply, then call finish_execution.
 
     <user-prompt>
-    ${{ paseo.prompt }}
+    ${{ clisbot.prompt }}
     </user-prompt>
     Event context:
-    ${{ paseo.context }}
+    ${{ clisbot.context }}
   outputs:
     github.reply:
       max: 1
@@ -130,7 +130,7 @@ On `github.issue_comment_created`, `github.pull_request_comment_created`, `githu
 
 ## Start work on a label
 
-`.paseo/triggers/implement-ready-issue.yml`:
+`.clisbot/triggers/implement-ready-issue.yml`:
 
 ```yaml
 name: implement-ready-issue
@@ -147,7 +147,7 @@ run:
     cwd: /workspace/project
     worktree:
       mode: branch-off
-      newBranch: trigger-${{ paseo.execution.id }}
+      newBranch: trigger-${{ clisbot.execution.id }}
       base: origin/main
   agent:
     provider: codex
@@ -165,7 +165,7 @@ run:
     Implement the labeled issue on this worktree branch, push it, and open a pull request with gh.
     Post the PR link to the issue using reply, then call finish_execution.
     Event context:
-    ${{ paseo.context }}
+    ${{ clisbot.context }}
 ```
 
 `label` matches the exact label added by this event, case-insensitively. Use `github.pull_request_label_added` for labels added to pull requests.
@@ -203,6 +203,6 @@ Use `from_users: ["*"]` to accept pushes from any sender. Hub does not extract t
 
 ## Replies and GitHub tokens
 
-GitHub triggers on an issue or pull request automatically grant the `reply` tool (`github.reply`), which posts a comment on that issue or pull request and appends an **Open in Paseo** link when Hub runs over HTTPS. Add `run.outputs.github.reply` when you want to cap `max` replies or set `required: true`.
+GitHub triggers on an issue or pull request automatically grant the `reply` tool (`github.reply`), which posts a comment on that issue or pull request and appends an **Open in Clisbot** link when Hub runs over HTTPS. Add `run.outputs.github.reply` when you want to cap `max` replies or set `required: true`.
 
 A GitHub trigger grants no `GH_TOKEN` by default. Add a [`run.github` block](/docs/hub/github) when the agent needs `git` or `gh` access to push branches, open pull requests, or edit labels.

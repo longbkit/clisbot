@@ -17,14 +17,14 @@ function transactionPhase(transaction: unknown): string | undefined {
 }
 
 describe("workspace labels", () => {
-  let paseoHome: string;
+  let clisbotHome: string;
   let registry: FileBackedWorkspaceRegistry;
   let labels: WorkspaceLabelService;
 
   beforeEach(async () => {
-    paseoHome = await mkdtemp(join(tmpdir(), "paseo-labels-"));
+    clisbotHome = await mkdtemp(join(tmpdir(), "clisbot-labels-"));
     registry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "workspaces.json"),
+      join(clisbotHome, "projects", "workspaces.json"),
       createTestLogger(),
     );
     await registry.upsert(
@@ -38,11 +38,11 @@ describe("workspace labels", () => {
         updatedAt: "2026-08-14T00:00:00.000Z",
       }),
     );
-    labels = createWorkspaceLabelService({ paseoHome, workspaceRegistry: registry });
+    labels = createWorkspaceLabelService({ clisbotHome, workspaceRegistry: registry });
   });
 
   afterEach(async () => {
-    await rm(paseoHome, { recursive: true, force: true });
+    await rm(clisbotHome, { recursive: true, force: true });
   });
 
   test("normalizes identity, preserves the target definition, persists assignments, and stays silent on no-op", async () => {
@@ -70,12 +70,12 @@ describe("workspace labels", () => {
     expect(updates).toHaveLength(1);
 
     const reloaded = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "workspaces.json"),
+      join(clisbotHome, "projects", "workspaces.json"),
       createTestLogger(),
     );
     expect((await reloaded.get("wks_one"))?.labels).toEqual(["Needs review"]);
     const reloadedLabels = createWorkspaceLabelService({
-      paseoHome,
+      clisbotHome,
       workspaceRegistry: reloaded,
     });
     const persisted = await reloadedLabels.subscribe({ onChange: () => undefined });
@@ -306,7 +306,7 @@ describe("workspace labels", () => {
   test("blocks when assignment persistence and rollback both fail", async () => {
     let failWrites = false;
     const failingRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "failing-workspaces.json"),
+      join(clisbotHome, "projects", "failing-workspaces.json"),
       createTestLogger(),
       {
         writeRecords: async (filePath, records) => {
@@ -327,7 +327,7 @@ describe("workspace labels", () => {
       }),
     );
     const failingLabels = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "failing"),
+      clisbotHome: join(clisbotHome, "failing"),
       workspaceRegistry: failingRegistry,
     });
     failWrites = true;
@@ -349,7 +349,7 @@ describe("workspace labels", () => {
   test("restores workspace state when catalog persistence fails and keeps the catalog cache authoritative", async () => {
     let failCatalog = true;
     const failingLabels = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "catalog-failure"),
+      clisbotHome: join(clisbotHome, "catalog-failure"),
       workspaceRegistry: registry,
       writeCatalog: async (filePath, definitions) => {
         if (failCatalog && definitions.length > 0) throw new Error("catalog disk full");
@@ -381,7 +381,7 @@ describe("workspace labels", () => {
   test("restores rename and delete assignment rewrites when catalog persistence fails", async () => {
     let failingCatalog: "priority" | "empty" | null = null;
     const failingLabels = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "rewrite-catalog-failure"),
+      clisbotHome: join(clisbotHome, "rewrite-catalog-failure"),
       workspaceRegistry: registry,
       writeCatalog: async (filePath, definitions) => {
         if (
@@ -421,7 +421,7 @@ describe("workspace labels", () => {
     let workspaceWrite = 0;
     let interruptWorkspaceWrite = false;
     const interruptedRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "interrupted-workspaces.json"),
+      join(clisbotHome, "projects", "interrupted-workspaces.json"),
       createTestLogger(),
       {
         writeRecords: async (filePath, records) => {
@@ -445,7 +445,7 @@ describe("workspace labels", () => {
       }),
     );
     const interrupted = createWorkspaceLabelService({
-      paseoHome,
+      clisbotHome,
       workspaceRegistry: interruptedRegistry,
       writeCatalog: writeJsonFileAtomic,
     });
@@ -467,11 +467,11 @@ describe("workspace labels", () => {
     expect(catalogPublications).toEqual([]);
 
     const recoveredRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "interrupted-workspaces.json"),
+      join(clisbotHome, "projects", "interrupted-workspaces.json"),
       createTestLogger(),
     );
     const recovered = createWorkspaceLabelService({
-      paseoHome,
+      clisbotHome,
       workspaceRegistry: recoveredRegistry,
     });
     await recovered.initialize();
@@ -485,7 +485,7 @@ describe("workspace labels", () => {
   test("aborts a pre-commit workspace write failure without publishing either surface", async () => {
     let failNextWorkspaceWrite = false;
     const recoveringRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "recovering-workspaces.json"),
+      join(clisbotHome, "projects", "recovering-workspaces.json"),
       createTestLogger(),
       {
         writeRecords: async (filePath, records) => {
@@ -509,7 +509,7 @@ describe("workspace labels", () => {
       }),
     );
     const recovering = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "recovering"),
+      clisbotHome: join(clisbotHome, "recovering"),
       workspaceRegistry: recoveringRegistry,
     });
     await recovering.setAssignment({
@@ -538,7 +538,7 @@ describe("workspace labels", () => {
   test("treats the journal phase rewrite as the commit point", async () => {
     let failCommitMarker = false;
     const markerLabels = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "commit-marker"),
+      clisbotHome: join(clisbotHome, "commit-marker"),
       workspaceRegistry: registry,
       writeTransaction: async (filePath, transaction) => {
         if (failCommitMarker && transactionPhase(transaction) === "committed") {
@@ -568,11 +568,11 @@ describe("workspace labels", () => {
     expect(catalogPublications).toEqual([]);
 
     const restartedRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "workspaces.json"),
+      join(clisbotHome, "projects", "workspaces.json"),
       createTestLogger(),
     );
     const restarted = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "commit-marker"),
+      clisbotHome: join(clisbotHome, "commit-marker"),
       workspaceRegistry: restartedRegistry,
     });
     await restarted.initialize();
@@ -588,7 +588,7 @@ describe("workspace labels", () => {
     const catalogPublications: unknown[] = [];
     registry.subscribeToMutations((mutation) => workspacePublications.push(mutation));
     const preparedLabels = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "prepared-write"),
+      clisbotHome: join(clisbotHome, "prepared-write"),
       workspaceRegistry: registry,
       writeTransaction: async () => {
         throw new Error("journal unavailable");
@@ -610,11 +610,11 @@ describe("workspace labels", () => {
     expect(catalogPublications).toEqual([]);
 
     const restartedRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "workspaces.json"),
+      join(clisbotHome, "projects", "workspaces.json"),
       createTestLogger(),
     );
     const restarted = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "prepared-write"),
+      clisbotHome: join(clisbotHome, "prepared-write"),
       workspaceRegistry: restartedRegistry,
     });
     await restarted.initialize();
@@ -626,7 +626,7 @@ describe("workspace labels", () => {
   test("rolls back a durable prepared marker whose acknowledgement is lost before allowing registry writes", async () => {
     let losePreparedAcknowledgement = false;
     const preparedLabels = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "prepared-lost-ack"),
+      clisbotHome: join(clisbotHome, "prepared-lost-ack"),
       workspaceRegistry: registry,
       writeTransaction: async (filePath, transaction) => {
         await writeJsonFileAtomic(filePath, transaction);
@@ -661,11 +661,11 @@ describe("workspace labels", () => {
     expect(workspacePublications).toHaveLength(1);
 
     const restartedRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "workspaces.json"),
+      join(clisbotHome, "projects", "workspaces.json"),
       createTestLogger(),
     );
     const restarted = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "prepared-lost-ack"),
+      clisbotHome: join(clisbotHome, "prepared-lost-ack"),
       workspaceRegistry: restartedRegistry,
     });
     await restarted.initialize();
@@ -683,7 +683,7 @@ describe("workspace labels", () => {
   test("rolls back a durable catalog write whose acknowledgement is lost before allowing registry writes", async () => {
     let loseCatalogAcknowledgement = false;
     const catalogLabels = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "catalog-lost-ack"),
+      clisbotHome: join(clisbotHome, "catalog-lost-ack"),
       workspaceRegistry: registry,
       writeCatalog: async (filePath, definitions) => {
         await writeJsonFileAtomic(filePath, definitions);
@@ -719,11 +719,11 @@ describe("workspace labels", () => {
     const archivedAt = "2099-01-02T00:00:00.000Z";
     await registry.archive("wks_one", archivedAt);
     const restartedRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "workspaces.json"),
+      join(clisbotHome, "projects", "workspaces.json"),
       createTestLogger(),
     );
     const restarted = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "catalog-lost-ack"),
+      clisbotHome: join(clisbotHome, "catalog-lost-ack"),
       workspaceRegistry: restartedRegistry,
     });
     await restarted.initialize();
@@ -740,7 +740,7 @@ describe("workspace labels", () => {
   test("rolls back a durable workspace write whose acknowledgement is lost before allowing later writes", async () => {
     let loseWorkspaceAcknowledgement = false;
     const lostAckRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "lost-ack-workspaces.json"),
+      join(clisbotHome, "projects", "lost-ack-workspaces.json"),
       createTestLogger(),
       {
         writeRecords: async (filePath, records) => {
@@ -764,7 +764,7 @@ describe("workspace labels", () => {
       }),
     );
     const workspaceLabels = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "workspace-lost-ack"),
+      clisbotHome: join(clisbotHome, "workspace-lost-ack"),
       workspaceRegistry: lostAckRegistry,
     });
     await workspaceLabels.setAssignment({
@@ -790,11 +790,11 @@ describe("workspace labels", () => {
     const archivedAt = "2099-01-03T00:00:00.000Z";
     await lostAckRegistry.archive("wks_lost_ack", archivedAt);
     const restartedRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "lost-ack-workspaces.json"),
+      join(clisbotHome, "projects", "lost-ack-workspaces.json"),
       createTestLogger(),
     );
     const restarted = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "workspace-lost-ack"),
+      clisbotHome: join(clisbotHome, "workspace-lost-ack"),
       workspaceRegistry: restartedRegistry,
     });
     await restarted.initialize();
@@ -811,7 +811,7 @@ describe("workspace labels", () => {
   test("reports an uncertain outcome when the committed marker is durable before its write rejects", async () => {
     let rejectAfterCommittedWrite = false;
     const uncertainLabels = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "uncertain-commit-marker"),
+      clisbotHome: join(clisbotHome, "uncertain-commit-marker"),
       workspaceRegistry: registry,
       writeTransaction: async (filePath, transaction) => {
         await writeJsonFileAtomic(filePath, transaction);
@@ -850,11 +850,11 @@ describe("workspace labels", () => {
     expect(catalogPublications).toEqual([]);
 
     const restartedRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "workspaces.json"),
+      join(clisbotHome, "projects", "workspaces.json"),
       createTestLogger(),
     );
     const restarted = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "uncertain-commit-marker"),
+      clisbotHome: join(clisbotHome, "uncertain-commit-marker"),
       workspaceRegistry: restartedRegistry,
     });
     await restarted.initialize();
@@ -869,7 +869,7 @@ describe("workspace labels", () => {
   test("keeps a rejected mutation aborted when prepared-journal cleanup also fails", async () => {
     let failAfterCatalog = false;
     const cleanupLabels = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "prepared-cleanup"),
+      clisbotHome: join(clisbotHome, "prepared-cleanup"),
       workspaceRegistry: registry,
       writeCatalog: async (filePath, definitions) => {
         if (failAfterCatalog && definitions.some((label) => label.name === "Priority")) {
@@ -894,11 +894,11 @@ describe("workspace labels", () => {
     expect((await registry.get("wks_one"))?.labels).toEqual(["Urgent"]);
 
     const restartedRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "workspaces.json"),
+      join(clisbotHome, "projects", "workspaces.json"),
       createTestLogger(),
     );
     const restarted = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "prepared-cleanup"),
+      clisbotHome: join(clisbotHome, "prepared-cleanup"),
       workspaceRegistry: restartedRegistry,
     });
     await restarted.initialize();
@@ -911,7 +911,7 @@ describe("workspace labels", () => {
   test("reports success after the commit point even when committed-journal cleanup fails", async () => {
     let failCleanup = false;
     const cleanupLabels = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "committed-cleanup"),
+      clisbotHome: join(clisbotHome, "committed-cleanup"),
       workspaceRegistry: registry,
       removeTransaction: async (filePath) => {
         if (failCleanup) throw new Error("journal cleanup unavailable");
@@ -933,11 +933,11 @@ describe("workspace labels", () => {
     await registry.archive("wks_one", archivedAt);
 
     const restartedRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "workspaces.json"),
+      join(clisbotHome, "projects", "workspaces.json"),
       createTestLogger(),
     );
     const restarted = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "committed-cleanup"),
+      clisbotHome: join(clisbotHome, "committed-cleanup"),
       workspaceRegistry: restartedRegistry,
       removeTransaction: async () => {
         throw new Error("journal cleanup still unavailable");
@@ -954,11 +954,11 @@ describe("workspace labels", () => {
     ]);
 
     const repeatedRegistry = new FileBackedWorkspaceRegistry(
-      join(paseoHome, "projects", "workspaces.json"),
+      join(clisbotHome, "projects", "workspaces.json"),
       createTestLogger(),
     );
     const repeated = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "committed-cleanup"),
+      clisbotHome: join(clisbotHome, "committed-cleanup"),
       workspaceRegistry: repeatedRegistry,
       removeTransaction: async () => {
         throw new Error("journal cleanup still unavailable");
@@ -1023,7 +1023,7 @@ describe("workspace labels", () => {
 
   test("expires a bounded journal to a coherent snapshot", async () => {
     const bounded = createWorkspaceLabelService({
-      paseoHome: join(paseoHome, "bounded"),
+      clisbotHome: join(clisbotHome, "bounded"),
       workspaceRegistry: registry,
       journalLimit: 1,
     });

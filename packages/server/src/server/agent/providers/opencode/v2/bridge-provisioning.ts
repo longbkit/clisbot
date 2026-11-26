@@ -5,7 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { writeFileAtomic } from "../../../../atomic-file.js";
 
 const PACKAGE = JSON.stringify({
-  name: "paseo-managed-bridge",
+  name: "clisbot-managed-bridge",
   private: true,
   type: "module",
   exports: { "./server": "./server.js" },
@@ -19,7 +19,7 @@ export function openCodeConfigDirectory(env: NodeJS.ProcessEnv): string {
 }
 
 export async function hasManagedBridge(configDirectory: string): Promise<boolean> {
-  const directory = path.join(configDirectory, "plugins", "paseo-managed-bridge");
+  const directory = path.join(configDirectory, "plugins", "clisbot-managed-bridge");
   const [manifest, artifact] = await Promise.all([
     readFile(path.join(directory, "package.json"), "utf8").catch(() => ""),
     readFile(path.join(directory, "server.js")).catch(() => undefined),
@@ -31,7 +31,7 @@ export async function provisionLocalBridge(input: {
   configDirectory: string;
   artifact: string;
 }): Promise<void> {
-  const directory = path.join(input.configDirectory, "plugins", "paseo-managed-bridge");
+  const directory = path.join(input.configDirectory, "plugins", "clisbot-managed-bridge");
   await mkdir(path.dirname(directory), { recursive: true });
   let created = false;
   try {
@@ -43,7 +43,7 @@ export async function provisionLocalBridge(input: {
   const manifest = path.join(directory, "package.json");
   if (created) await writeFileAtomic(manifest, PACKAGE);
   else if (!isManagedPackage(await readManagedManifest(manifest)))
-    throw new Error(`Cannot install OpenCode bridge: ${directory} is not managed by Paseo`);
+    throw new Error(`Cannot install OpenCode bridge: ${directory} is not managed by Clisbot`);
   const artifact = await readFile(input.artifact);
   const state = await readFile(path.join(path.dirname(input.artifact), "state.mjs"));
   const stateTarget = path.join(directory, "state.mjs");
@@ -69,7 +69,7 @@ function isManagedPackage(content: string): boolean {
     return false;
   const exports = manifest.exports as Record<string, unknown>;
   return (
-    manifest.name === "paseo-managed-bridge" &&
+    manifest.name === "clisbot-managed-bridge" &&
     manifest.private === true &&
     manifest.type === "module" &&
     exports["./server"] === "./server.js"

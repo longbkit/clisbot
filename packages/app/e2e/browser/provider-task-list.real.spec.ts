@@ -58,7 +58,7 @@ test.describe("real provider composer task lists", () => {
       page,
     }, testInfo) => {
       const cwd = realpathSync(
-        mkdtempSync(path.join(tmpdir(), `paseo-task-list-${scenario.provider}-`)),
+        mkdtempSync(path.join(tmpdir(), `clisbot-task-list-${scenario.provider}-`)),
       );
       let handle: AgentHandle | undefined;
 
@@ -90,7 +90,7 @@ test.describe("real provider composer task lists", () => {
   }
 
   test("Codex genuine Plan mode keeps the existing plan card", async ({ page }, testInfo) => {
-    const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-genuine-codex-plan-")));
+    const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-genuine-codex-plan-")));
     let handle: AgentHandle | undefined;
 
     try {
@@ -229,7 +229,7 @@ async function expectWorkspaceRunning(page: Page, workspaceId: string): Promise<
 
 test("Claude keeps background work visible while accepting another turn", async ({ page }) => {
   test.setTimeout(300_000);
-  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-background-work-")));
+  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-background-work-")));
   let handle: AgentHandle | undefined;
   try {
     handle = await launchAgent({ page, provider: "claude", cwd, mode: "full-access" });
@@ -255,9 +255,9 @@ test("Claude keeps background work visible while accepting another turn", async 
 test("Claude background work remains readable in dark mode", async ({ page }) => {
   test.setTimeout(300_000);
   await page.addInitScript(() => {
-    localStorage.setItem("@paseo:app-settings", JSON.stringify({ theme: "pureBlack" }));
+    localStorage.setItem("@clisbot:app-settings", JSON.stringify({ theme: "pureBlack" }));
   });
-  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-background-dark-")));
+  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-background-dark-")));
   let handle: AgentHandle | undefined;
   try {
     handle = await launchAgent({ page, provider: "claude", cwd, mode: "full-access" });
@@ -278,7 +278,7 @@ test("Claude background work remains readable in dark mode", async ({ page }) =>
 test("Claude background work opens in a compact sheet", async ({ page }) => {
   test.setTimeout(300_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-background-compact-")));
+  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-background-compact-")));
   let handle: AgentHandle | undefined;
   try {
     handle = await launchAgent({ page, provider: "claude", cwd, mode: "full-access" });
@@ -321,7 +321,7 @@ test("background work updates the sidebar before the agent is opened", async ({ 
 
 test("Codex keeps a live command visible after its turn", async ({ page }) => {
   test.setTimeout(300_000);
-  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-codex-background-")));
+  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-codex-background-")));
   let handle: AgentHandle | undefined;
   try {
     handle = await launchAgent({
@@ -352,7 +352,7 @@ test("Codex keeps a live command visible after its turn", async ({ page }) => {
 
 test("OpenCode keeps a live command visible after its turn", async ({ page }) => {
   test.setTimeout(300_000);
-  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "paseo-opencode-background-")));
+  const cwd = realpathSync(mkdtempSync(path.join(tmpdir(), "clisbot-opencode-background-")));
   let handle: AgentHandle | undefined;
   try {
     handle = await launchAgent({

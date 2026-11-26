@@ -10,7 +10,7 @@ const record: TerminalWorkerRecord = {
   createdAt: "now",
   identity: { startedAt: "now", commandLine: "worker" },
   protocolVersion: 1,
-  paseoVersion: "test",
+  clisbotVersion: "test",
   socketPath: "socket",
   secret: "secret",
   terminals: [{ id: "terminal", pid: 124, startedAt: "now" }],

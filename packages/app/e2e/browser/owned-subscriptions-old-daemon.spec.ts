@@ -66,10 +66,10 @@ async function startPublishedDaemonAgent(options: {
       });
       await page.addInitScript(
         ({ seededHost, preferences, settings }) => {
-          localStorage.setItem("@paseo:e2e", "1");
-          localStorage.setItem("@paseo:daemon-registry", JSON.stringify([seededHost]));
-          localStorage.setItem("@paseo:create-agent-preferences", JSON.stringify(preferences));
-          if (settings) localStorage.setItem("@paseo:app-settings", JSON.stringify(settings));
+          localStorage.setItem("@clisbot:e2e", "1");
+          localStorage.setItem("@clisbot:daemon-registry", JSON.stringify([seededHost]));
+          localStorage.setItem("@clisbot:create-agent-preferences", JSON.stringify(preferences));
+          if (settings) localStorage.setItem("@clisbot:app-settings", JSON.stringify(settings));
         },
         { seededHost: host, preferences: buildCreateAgentPreferences(), settings: appSettings },
       );

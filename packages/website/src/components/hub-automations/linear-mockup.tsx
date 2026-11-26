@@ -5,8 +5,8 @@ import {
   MoAvatar,
   MockupStageWindow,
   MockupStep,
-  OpenInPaseoChip,
-  PaseoBotAvatar,
+  OpenInClisbotChip,
+  ClisbotBotAvatar,
   type SourceMockupProps,
   WindowTrafficLights,
 } from "./shared";
@@ -81,7 +81,7 @@ function LinearActivityFeed() {
         <span className="min-w-0">
           <strong className="font-medium text-[#ECEEF4]">mo</strong>{" "}
           {t("hub.demo.linear.assignedEvent")}{" "}
-          <strong className="font-medium text-[#ECEEF4]">paseo-bot</strong>
+          <strong className="font-medium text-[#ECEEF4]">clisbot-bot</strong>
         </span>
         <span className="ml-auto shrink-0 text-[11px] text-[#6D7385]">11m</span>
       </MockupStep>
@@ -99,10 +99,10 @@ function LinearRunStatusRow() {
       delay={STEP_DELAYS.running}
       className="flex items-center gap-2.5 rounded-lg border border-[#242834] bg-[#171A21] px-3 py-2 text-[12px]"
     >
-      <PaseoBotAvatar size="sm" rounded="rounded-full" />
+      <ClisbotBotAvatar size="sm" rounded="rounded-full" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-medium text-[#ECEEF4]">paseo-bot</span>
+          <span className="font-medium text-[#ECEEF4]">clisbot-bot</span>
           <span className="text-[#6D7385]">·</span>
           <span className="text-[#9DA3B4]">
             <Trans i18nKey="hub.demo.linear.runningOn" components={LINEAR_COMPONENTS} />
@@ -126,8 +126,8 @@ function LinearBotCommentCard() {
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <PaseoBotAvatar size="sm" rounded="rounded-full" />
-          <span className="text-[12.5px] font-semibold text-[#F1F3F8]">paseo-bot</span>
+          <ClisbotBotAvatar size="sm" rounded="rounded-full" />
+          <span className="text-[12.5px] font-semibold text-[#F1F3F8]">clisbot-bot</span>
           <span className="rounded bg-[#252936] px-1.5 py-[1px] text-[10px] font-medium uppercase tracking-wide text-[#9DA3B4]">
             {t("hub.demo.shared.appBadge")}
           </span>
@@ -145,7 +145,7 @@ function LinearBotCommentCard() {
           <span>#2822</span>
           <span className="text-[#6CB17B]">· {t("hub.demo.shared.testsPassed")}</span>
         </span>
-        <OpenInPaseoChip variant="brand" />
+        <OpenInClisbotChip variant="brand" />
       </div>
     </MockupStep>
   );
@@ -158,7 +158,7 @@ function LinearChrome() {
         <WindowTrafficLights />
         <div className="flex flex-wrap items-center gap-1 text-[11.5px] text-[#8A8F9E]">
           <LinearIcon className="h-3.5 w-3.5 text-[#5E6AD2]" />
-          <span>Paseo</span>
+          <span>Clisbot</span>
           <ChevronRight className="h-3 w-3 text-[#555B6E]" aria-hidden="true" />
           <span>Core</span>
           <ChevronRight className="h-3 w-3 text-[#555B6E]" aria-hidden="true" />
@@ -198,8 +198,8 @@ function LinearPropertiesSidebar() {
 
       <LinearPropRow label={t("hub.demo.linear.assignee")}>
         <span className="inline-flex items-center gap-1.5 text-[#ECEEF4]">
-          <PaseoBotAvatar size="xs" rounded="rounded-full" />
-          <span>paseo-bot</span>
+          <ClisbotBotAvatar size="xs" rounded="rounded-full" />
+          <span>clisbot-bot</span>
         </span>
       </LinearPropRow>
 

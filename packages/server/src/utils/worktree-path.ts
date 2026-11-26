@@ -81,7 +81,7 @@ export async function validateWorktreePath(options: {
   }
   if (!allowExistingPath && ((await pathExists(normalized)) || (await pathExists(candidate)))) {
     throw new Error(
-      `The returned path already exists: ${normalized}. Paseo creates the returned path.`,
+      `The returned path already exists: ${normalized}. Clisbot creates the returned path.`,
     );
   }
   return normalized;
