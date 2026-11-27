@@ -1236,6 +1236,9 @@ class StrictHost {
   holdNextAnswer = false;
   /** Every connection finds the Host away: calls fail before anything is written. */
   away = false;
+  /** The snapshot calls the agent idle while the Host still holds its run, as
+   * the daemon does while a turn starts or closes (`hasInFlightRun`). */
+  snapshotIdle = false;
   readonly delivered: { messageId: string; turn: string | null }[] = [];
   /** Every send that reached the Host, delivered or not. */
   readonly attempts: string[] = [];
@@ -1306,8 +1309,8 @@ class StrictHost {
     if (message["type"] === "fetch_agent_request") {
       const agent = {
         id: message["agentId"],
-        status: this.turn === null ? "idle" : "running",
-        activeTurn: this.turn === null ? null : { turnId: this.turn },
+        status: this.turn === null || this.snapshotIdle ? "idle" : "running",
+        activeTurn: this.turn === null || this.snapshotIdle ? null : { turnId: this.turn },
       };
       this.answer("fetch_agent_response", requestId, { agent, project: null, error: null });
       return;
@@ -1352,6 +1355,17 @@ class StrictHost {
     }
     reply();
   }
+}
+
+/** The bound session's turn ends, as its terminal stream event tells the plane. */
+async function turnEnds(flow: {
+  plane: { onStreamEvent: ReturnType<typeof makePlane>["plane"]["onStreamEvent"] };
+}) {
+  await flow.plane.onStreamEvent("agent-0", {
+    type: "turn_completed",
+    provider: "codex",
+    turnId: "ended",
+  });
 }
 
 describe("a follow-up Steer on a Host with the input queue", () => {
@@ -1537,10 +1551,10 @@ describe("a follow-up Steer on a Host with the input queue", () => {
       host.beforeSend = () => {
         host.turn = null;
       };
-      const refused = await flow.send(followUp).catch((error: unknown) => error);
-      assert.match(String(refused), /Active turn changed/);
-      const record = await rowOfMessage(followUp);
-      await flow.redeliver(followUp, record.id);
+      const refused = await flow.send(followUp);
+      assert.equal(refused.result.outcome?.kind, "held", "queued behind the turn, not retried");
+      await turnEnds(flow);
+      await flow.flush();
       assert.deepEqual(host.deliveriesOf(messageIdOf(followUp)), [
         { messageId: messageIdOf(followUp), turn: null },
       ]);
@@ -1560,12 +1574,148 @@ describe("a follow-up Steer on a Host with the input queue", () => {
       host.beforeSend = () => {
         host.turn = null;
       };
-      await flow.send(followUp).catch(() => undefined);
-      const record = await rowOfMessage(followUp);
-      // The refused attempt keeps its receipt there: the retry is refused for good, so the
-      // drain dead-letters it at once and tells the sender. No Hub-side order avoids this.
-      await assert.rejects(flow.redeliver(followUp, record.id), AgentRequestRefusedError);
+      assert.equal((await flow.send(followUp)).result.outcome?.kind, "held");
+      await turnEnds(flow);
+      // The refused attempt keeps its receipt there: the queued send is refused for good, so
+      // the drain dead-letters it at once and tells the sender. No Hub-side order avoids this.
+      await assert.rejects(flow.flush(), AgentRequestRefusedError);
       assert.deepEqual(host.deliveriesOf(messageIdOf(followUp)), []);
+    } finally {
+      await flow.stop();
+    }
+  });
+});
+
+describe("a follow-up the Host refuses to steer", () => {
+  /** One Hub process over a strict Host; the follow-up window stays open. */
+  async function hubOver(host: StrictHost) {
+    const daemon = makeDaemon();
+    const connection = host.connect(createMemorySteerTargets());
+    daemon.daemon.sendAgentMessage = (agentId, text, options) =>
+      connection.sendAgentMessage(agentId, text, options);
+    const flow = makePlane(makeRoute({ followUp: { mode: "auto", ttlMinutes: 60 } }), daemon);
+    await flow.plane.start(daemon.daemon, store);
+    const stop = async () => {
+      await flow.plane.stop();
+      connection.stop();
+    };
+    return { ...flow, stop };
+  }
+  const idOf = (message: InboundMessage) => channelMessageId(message);
+  /** The flush rows admitted for this conversation (a start recovers other tests' too). */
+  const flushesOf = (
+    flow: { flushes: { admission: HeldFlushAdmission; id: string }[] },
+    message: InboundMessage,
+  ) =>
+    flow.flushes.filter(
+      ({ admission }) => admission.externalThreadId === message.conversation.threadId,
+    );
+
+  it("queues it behind a running turn the Host cannot name, and sends it once as the next turn", async () => {
+    // Production: the Host's snapshot called the agent idle while it held a run, so the Hub
+    // named no turn, every attempt was refused ("Active turn identity is unavailable"), and the
+    // drain dead-lettered the message after eight. The refusal must queue it instead.
+    const say = conversation();
+    const host = new StrictHost();
+    const flow = await hubOver(host);
+    try {
+      await flow.send(say("start the build"));
+      host.snapshotIdle = true;
+      const followUp = say("also check the logs");
+      const sent = await flow.send(followUp);
+      assert.equal(sent.result.outcome?.kind, "held");
+      assert.deepEqual(host.attempts.filter((id) => id === idOf(followUp)).length, 1);
+      assert.deepEqual(host.deliveriesOf(idOf(followUp)), [], "nothing reached the agent yet");
+      assert.equal(flushesOf(flow, followUp).length, 0, "it waits for the running turn");
+
+      host.turn = null;
+      host.snapshotIdle = false;
+      await turnEnds(flow);
+      assert.equal(flushesOf(flow, followUp).length, 1);
+      await flow.flush();
+      assert.deepEqual(host.deliveriesOf(idOf(followUp)), [
+        { messageId: idOf(followUp), turn: null },
+      ]);
+    } finally {
+      await flow.stop();
+    }
+  });
+
+  it("queues it again, under a new flush row, when the Host still refuses after a turn end", async () => {
+    const say = conversation();
+    const host = new StrictHost();
+    const flow = await hubOver(host);
+    try {
+      await flow.send(say("start the build"));
+      host.snapshotIdle = true;
+      const followUp = say("also check the logs");
+      assert.equal((await flow.send(followUp)).result.outcome?.kind, "held");
+      // A turn end reaches the plane while the Host still holds a run.
+      await turnEnds(flow);
+      await flow.flush();
+      assert.deepEqual(host.deliveriesOf(idOf(followUp)), []);
+      assert.equal(flushesOf(flow, followUp).length, 1, "held again until the next turn end");
+
+      host.turn = null;
+      await turnEnds(flow);
+      const [refused, retry] = flushesOf(flow, followUp);
+      assert.ok(refused !== undefined && retry !== undefined, "a flush row of its own");
+      assert.notEqual(refused.id, retry.id);
+      await flow.flush();
+      assert.deepEqual(host.deliveriesOf(idOf(followUp)), [
+        { messageId: idOf(followUp), turn: null },
+      ]);
+    } finally {
+      await flow.stop();
+    }
+  });
+
+  it("holds a later message behind the queued one, so neither overtakes the other", async () => {
+    const say = conversation();
+    const host = new StrictHost();
+    const flow = await hubOver(host);
+    try {
+      await flow.send(say("start the build"));
+      host.snapshotIdle = true;
+      const first = say("also check the logs");
+      const second = say("and the tests");
+      assert.equal((await flow.send(first)).result.outcome?.kind, "held");
+      host.snapshotIdle = false;
+      assert.equal((await flow.send(second)).result.outcome?.kind, "held");
+      assert.deepEqual(host.deliveriesOf(idOf(second)), [], "it did not steer past the first");
+
+      host.turn = null;
+      await turnEnds(flow);
+      await flow.flush();
+      const next = host.turn;
+      assert.ok(next !== null, "the queued message started the next turn");
+      await flow.flush();
+      assert.deepEqual(
+        host.delivered.slice(-2).map(({ messageId }) => messageId),
+        [idOf(first), idOf(second)],
+      );
+      assert.deepEqual(host.deliveriesOf(idOf(second)), [{ messageId: idOf(second), turn: next }]);
+    } finally {
+      await flow.stop();
+    }
+  });
+
+  it("sends it at once when the Host's turn ended while the refused send was on its way", async () => {
+    const say = conversation();
+    const host = new StrictHost();
+    const flow = await hubOver(host);
+    try {
+      await flow.send(say("start the build"));
+      host.snapshotIdle = true;
+      const followUp = say("one more thing");
+      host.beforeSend = () => void turnEnds(flow);
+      assert.equal((await flow.send(followUp)).result.outcome?.kind, "held");
+      assert.equal(flushesOf(flow, followUp).length, 1, "no turn left to wait for");
+      host.turn = null;
+      await flow.flush();
+      assert.deepEqual(host.deliveriesOf(idOf(followUp)), [
+        { messageId: idOf(followUp), turn: null },
+      ]);
     } finally {
       await flow.stop();
     }

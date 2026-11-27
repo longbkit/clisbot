@@ -47,6 +47,7 @@ import {
 } from "./follow-up.js";
 import { mayUseChannelRoute } from "../policy/gate.js";
 import { mentionTrigger, type Trigger } from "../rule-trigger.js";
+import { isSteerRefusal, SteerRefusedError } from "../daemon/steer-target.js";
 import { admitInbound } from "./admission.js";
 import { messagesOf, type BindingInbox, type Delivery, type PreparedDelivery } from "./inbox.js";
 import { deliveryMessageId, renderConversationPrompt } from "./prompt.js";
@@ -607,6 +608,8 @@ export class BindingEngine {
       await this.deliverPrompt(agentId, delivery, route);
     } catch (error) {
       this.context.processing?.close(leaseId);
+      // Refused before the agent saw it: the caller queues it behind the running turn.
+      if (isSteerRefusal(error)) throw new SteerRefusedError(agentId, error);
       throw error;
     }
     this.markActive(agentId);

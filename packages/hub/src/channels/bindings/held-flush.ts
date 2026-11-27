@@ -91,6 +91,8 @@ export interface HeldBinding {
   settings: ConversationSettings;
   /** The session the binding is bound to, when it is. */
   agentId?: string | undefined;
+  /** The flush row whose Steer the Host refused: the next flush is a row of its own. */
+  retryOf?: string | undefined;
 }
 
 export interface HeldFlushSchedulerDeps {
@@ -111,16 +113,20 @@ function defaultSchedule(callback: () => void, delayMs: number): () => void {
 }
 
 /** The flush row for a binding's held rows: one per newest held message, so
- * a repeated wake admits it once and a later message gets its own. */
+ * a repeated wake admits it once and a later message gets its own. A batch
+ * queued again after its flush `retryOf` was refused gets one per refused
+ * flush: the queue admits an event id once. */
 export function heldFlushAdmission(
   scope: ChannelInboxScope,
   held: readonly ChannelIngressQueueRecord[],
+  retryOf?: string,
 ): HeldFlushAdmission | undefined {
   const newest = held.at(-1);
   const key = parseInboxBindingKey(scope.bindingKey);
   if (newest === undefined || key === undefined) return undefined;
+  const after = retryOf === undefined ? "" : `:after:${retryOf}`;
   return {
-    externalEventId: `held-flush:${scope.bindingKey}:${newest.id}`,
+    externalEventId: `held-flush:${scope.bindingKey}:${newest.id}${after}`,
     externalConversationId: key.externalConversationId,
     externalThreadId: key.externalThreadId,
     laneKey: newest.laneKey,
@@ -203,7 +209,7 @@ export class HeldFlushScheduler {
       this.rearm(bindingKey, wait);
       return;
     }
-    await this.admitFlush(binding.scope, held);
+    await this.admitFlush(binding.scope, held, binding.retryOf);
     this.watched.delete(bindingKey);
   }
 
@@ -233,8 +239,9 @@ export class HeldFlushScheduler {
   private async admitFlush(
     scope: ChannelInboxScope,
     held: readonly ChannelIngressQueueRecord[],
+    retryOf?: string,
   ): Promise<void> {
-    const flush = heldFlushAdmission(scope, held);
+    const flush = heldFlushAdmission(scope, held, retryOf);
     if (flush !== undefined) await this.deps.admit(flush);
   }
 }
