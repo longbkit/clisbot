@@ -95,7 +95,9 @@ test("Hub writes an inbound channel attachment to the bound agent's Host through
   const written = await hub.requestOrdinary({ ...input, requestId: "write-channel-file" });
   if (written.type !== "channel.file.write.response") throw new Error(JSON.stringify(written));
   expect(written.payload.receivedBytes).toBe(8);
-  expect(written.payload.path).toMatch(/\/uploads\/channel\/a{64}\/25\.11\.csv$/);
+  expect(
+    written.payload.path?.endsWith(path.join("uploads", "channel", "a".repeat(64), "25.11.csv")),
+  ).toBe(true);
   expect(await readFile(written.payload.path!, "utf8")).toBe("a,b\n1,2\n");
   expect(
     await hub.requestOrdinary({ ...input, agentId: "missing", requestId: "write-unknown-agent" }),
