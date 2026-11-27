@@ -21,6 +21,7 @@ import type { ChannelStore } from "../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import { isHostNotConnected } from "./daemon/enrolled-client.js";
+import { SteerRefusedError } from "./daemon/steer-target.js";
 import { AgentEventOrder } from "./plane/agent-event-order.js";
 import type { InboundReplyParams } from "./loader/host.js";
 import { isOpenAudience, type CompiledAudienceRule } from "./config/audience.js";
@@ -1228,7 +1229,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     }
     const held = plain ? await conversationFlow?.hold(message, route) : undefined;
     if (held === undefined)
-      return dispatchDirectAgentMessage({ message }, account, route, executionLease);
+      return dispatchDirectAgentMessage(
+        { message },
+        account,
+        route,
+        executionLease,
+        plain ? {} : undefined,
+      );
     executionLimiter?.complete(executionLease);
     const heldOutcome = result(false, { kind: "held", reason: held });
     return recordChannelActivity(message, account, route, {
@@ -1263,8 +1270,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       notice: (message, account, route, kind) => postWaitNotice(message, account, route, kind),
       mayUse: async (message, account, route) =>
         (await mayUseChannel(message, account, route)).allowed,
-      dispatch: (delivery, account, route) =>
-        dispatchDirectAgentMessage(delivery, account, route, undefined),
+      dispatch: (delivery, account, route, flushId) =>
+        dispatchDirectAgentMessage(delivery, account, route, undefined, { flushId }),
     };
   }
 
@@ -1380,11 +1387,17 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     });
   }
 
+  /**
+   * `queueable` = the delivery is stored (an admitted message as written, or a
+   * flush row's held batch), so a Steer the Host refuses can wait behind the
+   * running turn instead of being retried into a dead letter.
+   */
   async function dispatchDirectAgentMessage(
     delivery: Delivery,
     account: CompiledChannelAccount,
     route: CompiledRoute,
     executionLease: ExecutionLease | undefined,
+    queueable?: { flushId?: string | undefined },
   ): Promise<PlaneInboundResult> {
     const message = delivery.message;
     let outcome: InboundOutcome;
@@ -1396,6 +1409,22 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       executionLimiter?.complete(executionLease);
       if (error instanceof ChannelPlacementRefusedError)
         return refusePlacement(message, account, route, error);
+      const queued =
+        error instanceof SteerRefusedError && queueable !== undefined
+          ? await conversationFlow!.queueRefusedSteer(
+              delivery,
+              route,
+              error.agentId,
+              queueable.flushId,
+            )
+          : undefined;
+      if (queued !== undefined) {
+        return recordChannelActivity(message, account, route, {
+          result: result(false, { kind: "held", reason: queued }),
+          outcomeDetail: queued,
+          limitDecision: "allowed",
+        });
+      }
       // The message is retried; a Host that is away can stay away, so say so.
       if (isHostNotConnected(error)) {
         await postWaitNotice(message, account, route, "host-away").catch(() => undefined);
