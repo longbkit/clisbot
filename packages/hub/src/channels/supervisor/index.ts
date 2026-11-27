@@ -1811,6 +1811,8 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     snapshot: ChannelControlPlaneSnapshot,
   ): Promise<DaemonConnection> {
     const steerTargets = this.store.steerTargets.forOrganization(snapshot.organizationId);
+    // The Host may not share this Hub's filesystem: downloaded files are written to it.
+    const inboundFilesDir = this.downloadsDir(handle);
     const host = await this.resolveEnrolledHost(compiled, snapshot);
     if (host !== undefined) {
       this.logger.info?.("channel drives its Host over the Host's own connection", {
@@ -1828,6 +1830,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       }
       return connectEnrolledChannelDaemon({
         steerTargets,
+        inboundFilesDir,
         hostLabel: host.label,
         hostId: host.id,
         timeline: {
@@ -1859,7 +1862,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     }
     this.applyChannelAdmissionTicket(daemonOptions, handle, compiled, snapshot);
     await this.applyDaemonTarget(daemonOptions, handle, compiled, snapshot);
-    return connectChannelDaemon({ ...daemonOptions, steerTargets });
+    return connectChannelDaemon({ ...daemonOptions, steerTargets, inboundFilesDir });
   }
 
   /** This Hub reaches Hosts over their own connections, and was not told to dial one. */
@@ -2170,18 +2173,9 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         account: handle.accountId,
       }),
       // Group G: the account's inbound-media download dir (the L2 transport
-      // streams Bot API files here; the `[Attached files]` manifest points
-      // the agent at absolute paths under it).
-      mediaDownloadDir: this.accountDir(
-        {
-          // A started handle always carries its organization; the fallback only
-          // keeps the path total for a handle still being reconciled.
-          organizationId: handle.organizationId ?? "unscoped",
-          channel: handle.channel,
-          accountId: handle.accountId,
-        },
-        "downloads",
-      ),
+      // streams Bot API files here; the `[Attached files]` manifest names them,
+      // and the daemon client writes each to the Host before a prompt goes out).
+      mediaDownloadDir: this.downloadsDir(handle),
       // COMPAT(clisbot-control-plane): the native approval card's
       // button-click seam. The vertical's L2 transport (Slack Socket Mode
       // `interactive` events; Telegram `callback_query` — the poll loop's
@@ -2346,6 +2340,20 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
    * on Slack and on Telegram, would otherwise share a poll offset, a dedupe
    * cache and a downloads dir — one account reading another's inbound state.
    */
+  /** The account's inbound-media downloads (`mediaDownloadDir`). */
+  private downloadsDir(handle: AccountHandle): string {
+    return this.accountDir(
+      {
+        // A started handle always carries its organization; the fallback only
+        // keeps the path total for a handle still being reconciled.
+        organizationId: handle.organizationId ?? "unscoped",
+        channel: handle.channel,
+        accountId: handle.accountId,
+      },
+      "downloads",
+    );
+  }
+
   private accountDir(
     scope: { organizationId: string; channel: string; accountId: string },
     leaf: string,

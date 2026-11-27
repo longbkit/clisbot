@@ -3435,8 +3435,34 @@ export const ChannelFileReadResponseSchema = z.object({
   }),
 });
 
+// An inbound channel attachment the Hub downloaded, written to the Host that runs
+// the Agent it is sent to (`channelFileWrite`). The Hub sends it in order from
+// offset 0; the last chunk answers with the file's Host path.
+export const ChannelFileWriteRequestSchema = z.object({
+  type: z.literal("channel.file.write.request"),
+  requestId: z.string(),
+  agentId: z.string(),
+  /** Names the file across attempts: the same file always lands on the same Host path. */
+  fileId: z.string().regex(/^[a-f0-9]{64}$/),
+  fileName: z.string().min(1),
+  size: z.number().int().nonnegative(),
+  offset: z.number().int().nonnegative(),
+  /** Base64 of the bytes at `offset`. */
+  data: z.string(),
+});
+export const ChannelFileWriteResponseSchema = z.object({
+  type: z.literal("channel.file.write.response"),
+  payload: z.object({
+    requestId: z.string(),
+    receivedBytes: z.number().int().nonnegative(),
+    /** Set once the whole file is written. */
+    path: z.string().nullable(),
+  }),
+});
+
 export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ChannelFileReadRequestSchema,
+  ChannelFileWriteRequestSchema,
   HostsListRequestSchema,
   HostsAddRequestSchema,
   HostsUpdateRequestSchema,
@@ -4056,6 +4082,7 @@ export const ServerInfoStatusPayloadSchema = z
         // COMPAT(agentForkContext): added in v0.1.102, remove gate after 2026-12-28.
         agentForkContext: z.boolean().optional(),
         channelFileRead: z.boolean().optional(),
+        channelFileWrite: z.boolean().optional(),
         // COMPAT(agentForkContextCursor): added in v0.1.108, remove gate after 2027-01-14.
         agentForkContextCursor: z.boolean().optional(),
         // COMPAT(providerSubagents): added in v0.1.107, remove gate after 2027-01-12.
@@ -7375,6 +7402,7 @@ export const AgentSkillsImportLegacySelectionResponseSchema = z.object({
 
 export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ChannelFileReadResponseSchema,
+  ChannelFileWriteResponseSchema,
   HostsListResponseSchema,
   HostsChangedSchema,
   HostsAddResponseSchema,

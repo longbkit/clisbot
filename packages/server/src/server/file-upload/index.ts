@@ -379,7 +379,7 @@ const MAX_FILE_NAME_BYTES = 255;
 
 // Keeps the client's file name, replacing only what cannot appear in a single
 // file name on Linux, macOS, or Windows.
-function sanitizeFileName(value: string): string {
+export function sanitizeFileName(value: string): string {
   const name = basename(value)
     .replace(/[\p{Cc}\\/:*?"<>|]/gu, "_")
     .trim();

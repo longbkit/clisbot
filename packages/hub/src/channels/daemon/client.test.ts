@@ -1,5 +1,8 @@
 import { createDeferredCore } from "@clisbot/channels-core/shared/deferred";
 import { createServer, type Server } from "node:http";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import { WebSocketServer } from "ws";
@@ -122,6 +125,10 @@ class FakeDaemon {
   clients: Set<import("ws").WebSocket>;
   port = 0;
   channelFileRead = true;
+  /** Advertise `channelFileWrite`; written files land in `hostFiles`, keyed by Host path. */
+  channelFileWrite = false;
+  readonly hostFiles = new Map<string, Buffer>();
+  private readonly partFiles = new Map<string, Buffer>();
   agentProjectId: string | null = "project-channel";
   /** Advertise the Host input queue, whose strict Steer needs the running turn named. */
   hostInputQueue = false;
@@ -189,6 +196,7 @@ class FakeDaemon {
                 branchSuggestionPaging: true,
                 agentConfigApply: true,
                 channelFileRead: this.channelFileRead,
+                ...(this.channelFileWrite ? { channelFileWrite: true } : {}),
                 ...(this.hostInputQueue ? { hostInputQueue: true } : {}),
               },
             },
@@ -207,6 +215,20 @@ class FakeDaemon {
     this.respond(client, message);
   }
 
+  /** The Host's side of `channel.file.write.request`: its own filesystem, not the Hub's. */
+  private writeHostFile(message: RecordedMessage): Record<string, unknown> {
+    const fileId = String(message["fileId"]);
+    const before = message["offset"] === 0 ? Buffer.alloc(0) : this.partFiles.get(fileId)!;
+    const bytes = Buffer.concat([before, Buffer.from(String(message["data"]), "base64")]);
+    if (bytes.length < Number(message["size"])) {
+      this.partFiles.set(fileId, bytes);
+      return { receivedBytes: bytes.length, path: null };
+    }
+    const path = `/host-home/uploads/channel/${fileId}/${String(message["fileName"])}`;
+    this.hostFiles.set(path, bytes);
+    return { receivedBytes: bytes.length, path };
+  }
+
   /** The error a send is declined with; `undefined` accepts it. */
   private sendRefusal(message: RecordedMessage): string | undefined {
     const queued = this.sendRefusals.shift();
@@ -223,6 +245,9 @@ class FakeDaemon {
         project: { projectKey: this.agentProjectId },
         error: null,
       },
+      ...(message.type === "channel.file.write.request"
+        ? { "channel.file.write.request": this.writeHostFile(message) }
+        : {}),
       "channel.file.read.request": {
         data: Buffer.from(message["offset"] === 0 ? "first" : "second").toString("base64"),
         size: 11,
@@ -626,6 +651,104 @@ describe("a channel Steer on a Host with the input queue", () => {
     });
     assert.equal(sends().at(-1)?.["activeTurnBehavior"], "interrupt");
     assert.equal("expectedTurnId" in sends().at(-1)!, false);
+  });
+});
+
+describe("a channel attachment the Hub downloaded, sent to a Host on another machine", () => {
+  let downloads: string;
+  let hubHome: string;
+
+  beforeAll(async () => {
+    hubHome = await mkdtemp(join(tmpdir(), "hub-inbound-files-"));
+    downloads = join(hubHome, "channels", "org", "slack", "sale-clisbot", "downloads");
+    await mkdir(downloads, { recursive: true });
+  });
+
+  afterAll(async () => {
+    await rm(hubHome, { recursive: true, force: true });
+  });
+
+  async function hostWith(channelFileWrite: boolean) {
+    const daemon = new FakeDaemon();
+    daemon.channelFileWrite = channelFileWrite;
+    await daemon.listen(0);
+    const client = connectChannelDaemon({
+      host: `127.0.0.1:${daemon.port}`,
+      rpcTimeoutMs: 5000,
+      inboundFilesDir: downloads,
+    });
+    await client.waitForConnected(5000);
+    const sent = () =>
+      daemon.messages
+        .filter((message) => message.type === "send_agent_message_request")
+        .map((message) => String(message["text"]));
+    return { daemon, client, sent };
+  }
+
+  /** What the Slack vertical folds into the message for one downloaded file. */
+  async function downloaded(name: string, bytes: Buffer) {
+    const hubPath = join(downloads, `1764212400-1-${name}`);
+    await writeFile(hubPath, bytes);
+    const manifest = `[Attached files]\n1. ${name} (document, ${bytes.length} bytes) → ${hubPath}`;
+    return { hubPath, text: `please compare these\n\n${manifest}` };
+  }
+
+  it("writes the file to the Host and names the Host's copy, never the Hub path", async () => {
+    // Production: the agent was given /var/lib/ai-cowork/channels/<org>/slack/.../downloads/...,
+    // a path on the Hub's volume that does not exist on the Host.
+    const { daemon, client, sent } = await hostWith(true);
+    try {
+      const csv = Buffer.alloc(700 * 1024, "a,b,c\n");
+      const { hubPath, text } = await downloaded("PUS_25.11.csv", csv);
+      await client.sendAgentMessage("agent-1", text, {
+        steer: true,
+        source: channelSource,
+        messageId: "msg-file",
+      });
+      const prompt = sent().at(-1)!;
+      assert.equal(prompt.includes(hubPath), false);
+      const [hostPath, bytes] = [...daemon.hostFiles].at(-1)!;
+      assert.ok(prompt.includes(`(document, ${csv.length} bytes) → ${hostPath}`));
+      assert.deepEqual(bytes, csv, "the Host has the whole file");
+      const writes = daemon.messages.filter((m) => m.type === "channel.file.write.request");
+      assert.deepEqual(
+        writes.map((m) => m["offset"]),
+        [0, 512 * 1024],
+      );
+
+      // A retried send is the same request: the same Host path, so the receipt matches.
+      await client.sendAgentMessage("agent-1", text, {
+        steer: true,
+        source: channelSource,
+        messageId: "msg-file",
+      });
+      assert.equal(sent().at(-1), prompt);
+    } finally {
+      client.stop();
+      await daemon.close();
+    }
+  });
+
+  it("says the Host must be updated, instead of a Hub path, when it cannot receive files", async () => {
+    const { daemon, client, sent } = await hostWith(false);
+    try {
+      const { hubPath, text } = await downloaded("25.11.csv", Buffer.from("a,b\n1,2\n"));
+      await client.sendAgentMessage("agent-1", text, {
+        steer: true,
+        source: channelSource,
+        messageId: "msg-file",
+      });
+      const prompt = sent().at(-1)!;
+      assert.equal(prompt.includes(hubPath), false);
+      assert.match(prompt, /1\. 25\.11\.csv \(document, 8 bytes\) — not sent: update Clisbot/);
+      assert.equal(
+        daemon.messages.some((m) => m.type === "channel.file.write.request"),
+        false,
+      );
+    } finally {
+      client.stop();
+      await daemon.close();
+    }
   });
 });
 

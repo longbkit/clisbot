@@ -228,7 +228,7 @@ import { ProjectConfigSession } from "./session/project-config/project-config-se
 import { DaemonSession, type DaemonRuntimeConfig } from "./session/daemon/daemon-session.js";
 import type { DaemonWebSocketRuntimeDiagnosticSnapshot } from "./session/daemon/diagnostics.js";
 import type { HubRelationshipManagement } from "./hub/relationship-controller.js";
-import { readChannelFileChunk } from "./hub/channel-file.js";
+import { readChannelFileChunk, writeChannelFileChunk } from "./hub/channel-file.js";
 import { HubExecutionController } from "./hub/execution-controller.js";
 import type { HubExecutionAgents } from "./hub/daemon-executions.js";
 import { DownloadTokenStore } from "./file-download/token-store.js";
@@ -3360,6 +3360,21 @@ export class Session {
     }
   }
 
+  /** An inbound channel attachment for an Agent this Host runs (`hub/channel-file.ts`). */
+  private async writeChannelFile(
+    msg: Extract<SessionInboundMessage, { type: "channel.file.write.request" }>,
+  ): Promise<void> {
+    const known =
+      this.agentManager.getAgent(msg.agentId) ?? (await this.agentStorage.get(msg.agentId));
+    if (!known || !(await this.resourceAuthorizer.allowsAgent(msg.agentId)))
+      throw new Error(`Agent not found: ${msg.agentId}`);
+    const result = await writeChannelFileChunk(this.clisbotHome, msg);
+    this.emit({
+      type: "channel.file.write.response",
+      payload: { requestId: msg.requestId, ...result },
+    });
+  }
+
   private dispatchHubExecutionMessage(msg: SessionInboundMessage): Promise<void> | undefined {
     if (msg.type === "channel.file.read.request") {
       return readChannelFileChunk(this.agentManager.getAgent(msg.agentId)?.config, msg).then(
@@ -3372,6 +3387,7 @@ export class Session {
         },
       );
     }
+    if (msg.type === "channel.file.write.request") return this.writeChannelFile(msg);
     if (msg.type === "hub.execution.agent.create.request") {
       return this.hubExecutionController?.createAgent(msg);
     }

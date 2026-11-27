@@ -1,8 +1,13 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { open } from "node:fs/promises";
+import { mkdir, open, rename, stat as statPath, writeFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  CHANNEL_FILE_WRITE_CHUNK_BYTES,
+  CHANNEL_FILE_WRITE_MAX_BYTES,
+} from "@clisbot/protocol/channel-files";
 import type { AgentSessionConfig } from "../agent/agent-sdk-types.js";
+import { sanitizeFileName } from "../file-upload/index.js";
 
 /** Channel tools run as the agent's Host user. Do not impose a second,
  * Project-root filesystem policy on files the agent sends. The Hub must prove
@@ -49,4 +54,52 @@ export async function readChannelFileChunk(
   } finally {
     await file.close();
   }
+}
+
+/** One chunk of an inbound channel attachment, as the Hub sends it. */
+export interface ChannelFileWriteChunk {
+  fileId: string;
+  fileName: string;
+  size: number;
+  offset: number;
+  data: string;
+}
+
+/**
+ * Write one chunk of an inbound channel attachment the Hub downloaded. The Hub
+ * and this Host need not share a filesystem, so the Agent is pointed at this
+ * copy, never at the Hub's. A file lives at
+ * `<clisbotHome>/uploads/channel/<fileId>/<name>`, beside the app's uploads;
+ * `fileId` is fixed per file, so a retried prompt names the same path and a
+ * finished file is not written twice. Chunks arrive in order from offset 0
+ * into a `.part` file, renamed once complete.
+ */
+export async function writeChannelFileChunk(
+  clisbotHome: string,
+  chunk: ChannelFileWriteChunk,
+): Promise<{ receivedBytes: number; path: string | null }> {
+  if (chunk.size > CHANNEL_FILE_WRITE_MAX_BYTES)
+    throw new Error(`File exceeds the channel file limit of ${CHANNEL_FILE_WRITE_MAX_BYTES} bytes`);
+  const bytes = Buffer.from(chunk.data, "base64");
+  if (bytes.length > CHANNEL_FILE_WRITE_CHUNK_BYTES)
+    throw new Error("Channel file chunk is too large");
+  if (chunk.offset + bytes.length > chunk.size) throw new Error("Channel file chunk past its end");
+  const directory = path.join(clisbotHome, "uploads", "channel", chunk.fileId);
+  const finalPath = path.join(directory, sanitizeFileName(chunk.fileName));
+  const finished = await sizeOf(finalPath);
+  if (finished === chunk.size) return { receivedBytes: chunk.size, path: finalPath };
+  const partPath = `${finalPath}.part`;
+  if (chunk.offset === 0) await mkdir(directory, { recursive: true });
+  else if ((await sizeOf(partPath)) !== chunk.offset)
+    throw new Error("Channel file chunk out of order; send the file again from the start");
+  await writeFile(partPath, bytes, { flag: chunk.offset === 0 ? "w" : "a" });
+  const receivedBytes = chunk.offset + bytes.length;
+  if (receivedBytes < chunk.size) return { receivedBytes, path: null };
+  await rename(partPath, finalPath);
+  return { receivedBytes, path: finalPath };
+}
+
+async function sizeOf(file: string): Promise<number | undefined> {
+  const found = await statPath(file).catch(() => undefined);
+  return found?.isFile() ? found.size : undefined;
 }

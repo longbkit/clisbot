@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "vitest";
 import type { SessionOutboundMessage } from "../messages.js";
 import { HubRelationshipHarness } from "./test-utils/relationship-harness.js";
 import { createHash } from "node:crypto";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 let relationship: HubRelationshipHarness | null = null;
@@ -69,6 +69,37 @@ test("Hub reads an attachment on the bound agent's Host through the session wire
   ).toMatchObject({
     type: "rpc_error",
   });
+});
+
+test("Hub writes an inbound channel attachment to the bound agent's Host through the session wire", async () => {
+  const hub = await HubRelationshipHarness.startWithAgentMcp();
+  relationship = hub;
+  await hub.beginConnect().result;
+  hub.connectLatestSocket();
+  const created = await hub.requestOrdinary({
+    type: "create_agent_request",
+    requestId: "create-inbound-file-agent",
+    config: { provider: "codex", cwd: hub.repoRoot() },
+  });
+  if (created.type !== "status" || created.payload.status !== "agent_created")
+    throw new Error("Agent was not created");
+  const input = {
+    type: "channel.file.write.request",
+    agentId: created.payload.agent.id,
+    fileId: "a".repeat(64),
+    fileName: "25.11.csv",
+    size: 8,
+    offset: 0,
+    data: Buffer.from("a,b\n1,2\n").toString("base64"),
+  };
+  const written = await hub.requestOrdinary({ ...input, requestId: "write-channel-file" });
+  if (written.type !== "channel.file.write.response") throw new Error(JSON.stringify(written));
+  expect(written.payload.receivedBytes).toBe(8);
+  expect(written.payload.path).toMatch(/\/uploads\/channel\/a{64}\/25\.11\.csv$/);
+  expect(await readFile(written.payload.path!, "utf8")).toBe("a,b\n1,2\n");
+  expect(
+    await hub.requestOrdinary({ ...input, agentId: "missing", requestId: "write-unknown-agent" }),
+  ).toMatchObject({ type: "rpc_error" });
 });
 
 test("Hub retries one durable daemon execution across concurrency and reconstruction", async () => {
