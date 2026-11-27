@@ -1,9 +1,9 @@
 import { afterEach, expect, it } from "vitest";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { readChannelFileChunk } from "./channel-file.js";
+import { readChannelFileChunk, writeChannelFileChunk } from "./channel-file.js";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -73,4 +73,60 @@ it("refuses a changed file between chunks", async () => {
   await expect(
     readChannelFileChunk(config, { ...request, offset: 1, version: first.version }),
   ).rejects.toThrow("File changed");
+});
+
+async function homeFixture() {
+  const home = await mkdtemp(path.join(tmpdir(), "channel-host-home-"));
+  roots.push(home);
+  return home;
+}
+const fileId = "f".repeat(64);
+function chunksOf(bytes: Buffer, size = 512 * 1024) {
+  const chunks = [];
+  for (let offset = 0; offset < bytes.length || offset === 0; offset += size) {
+    chunks.push({
+      fileId,
+      fileName: "PUS_25.11.csv",
+      size: bytes.length,
+      offset,
+      data: bytes.subarray(offset, offset + size).toString("base64"),
+    });
+    if (bytes.length === 0) break;
+  }
+  return chunks;
+}
+
+it("writes an inbound channel file in order under the Host's uploads and names it once complete", async () => {
+  const home = await homeFixture();
+  const bytes = Buffer.alloc(700_000, 44);
+  const [first, second] = chunksOf(bytes);
+  expect(await writeChannelFileChunk(home, first!)).toEqual({
+    receivedBytes: 512 * 1024,
+    path: null,
+  });
+  const done = await writeChannelFileChunk(home, second!);
+  expect(done).toEqual({
+    receivedBytes: bytes.length,
+    path: path.join(home, "uploads", "channel", fileId, "PUS_25.11.csv"),
+  });
+  expect(await readFile(done.path!)).toEqual(bytes);
+  expect(await readdir(path.dirname(done.path!))).toEqual(["PUS_25.11.csv"]);
+
+  // A retried prompt sends the file again: the finished copy answers at once, unchanged.
+  expect(await writeChannelFileChunk(home, first!)).toEqual(done);
+});
+
+it("refuses a chunk out of order, a file over the limit and a name that climbs out", async () => {
+  const home = await homeFixture();
+  const bytes = Buffer.alloc(700_000, 44);
+  const [, second] = chunksOf(bytes);
+  await expect(writeChannelFileChunk(home, second!)).rejects.toThrow(/out of order/);
+  await expect(
+    writeChannelFileChunk(home, { ...chunksOf(Buffer.from("x"))[0]!, size: 100 * 1024 * 1024 + 1 }),
+  ).rejects.toThrow("File exceeds the channel file limit of 104857600 bytes");
+  const climbed = await writeChannelFileChunk(home, {
+    ...chunksOf(Buffer.from("x"))[0]!,
+    fileName: "../../outside.txt",
+  });
+  expect(climbed.path).toBe(path.join(home, "uploads", "channel", fileId, "outside.txt"));
 });

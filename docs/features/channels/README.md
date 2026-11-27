@@ -121,6 +121,7 @@ One inbound message walks this path. Each row is the file to open.
 | Session workspace   | `channels/workspace-organization.ts:71`                            | Which workspace a created session lands in (`workspace.organize`). See [workspace organization](../workspace-organization/README.md).  |
 | Message tool        | `channels/channel-reply.ts:92`, `channel-message-tool.ts:128`      | The MCP `message` tool and the per-channel action catalog.                                                                             |
 | Outbound media      | `channels/media/outbound-stager.ts:183`                            | A send's `media`/`attachments`/`buffer` → one staged local file per attachment. See below.                                             |
+| Inbound media       | `channels/daemon/inbound-files.ts`                                 | A received file, downloaded on the Hub, written to the Agent's Host before the prompt goes out. See below.                             |
 | Channel agent tools | `channels/channel-agent-tools.ts:70`                               | Mounts `plugin.agentTools` on the reply MCP server, authorized per call.                                                               |
 | Streaming producer  | `channels/streaming/producer.ts:88`                                | Turns the turn's accumulating text into an edit-in-place draft.                                                                        |
 
@@ -137,6 +138,29 @@ Dialing the daemon back (`channels/daemon/ws-client.ts`) is kept for the two cas
 `startAccount` gets two views of the same account (`account-carriers.ts:24`): a **flat** `ctx.account` and a **nested** `cfg.channels.<ch>.accounts.<id>`. Upstream code reads one or the other depending on which module it came from, so both are built, from the same source, every time. Connection credentials always beat authored config — an operator cannot override a stored token from a config file.
 
 This is also the seam that once broke every non-token channel at a stroke: an earlier version forwarded only `botToken`/`appToken`, which silently disabled Feishu, Google Chat, and Zalo starts. Build the carrier for the fields the vertical actually reads, and add a case to `account-carriers.test.ts`.
+
+### Inbound files
+
+A vertical downloads a message's files into the account's downloads dir on the
+Hub (`mediaDownloadDir`) and folds an `[Attached files]` manifest into the text,
+one line per file ending in `→ <path>`. That path is on the Hub. The Hub and the
+Host share a filesystem only when both run on one machine; a cowork Hub and its
+sandbox Hosts are separate pods, and an Agent given the Hub path cannot read the
+file.
+
+So before any prompt goes out, the Host client (`channels/daemon/client.ts`
+`sendAgentMessage`) writes each listed file to the Host with
+`channel.file.write.request` (512 KiB base64 chunks, in order) and rewrites its
+line to the Host's copy, `<CLISBOT_HOME>/uploads/channel/<fileId>/<name>`.
+`fileId` hashes the Agent, the Hub path, the size and the mtime, so a retried
+prompt names the same Host path and the daemon's receipt sees the same request.
+A file that cannot go says why on its line instead of a path: no longer on the
+Hub, over `CHANNEL_FILE_WRITE_MAX_BYTES` (100 MB, `@clisbot/protocol/channel-files`),
+or a Host without `server_info.features.channelFileWrite` (asked to update).
+Only lines naming a file inside the account's own downloads dir, symlinks
+resolved, are touched: a sender can type a manifest line, and the Hub never
+reads anything else for it. The RPC needs `hub.execute`, and the Host writes
+only under its own uploads dir.
 
 ### Outbound files
 

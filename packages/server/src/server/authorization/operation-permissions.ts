@@ -26,6 +26,7 @@ const INBOUND_PERMISSION = {
   "chat.discussion.stop.request": "workspace.write",
 
   "channel.file.read.request": "hub.execute",
+  "channel.file.write.request": "hub.execute",
   "project.git.inspect.request": "workspace.read",
   "project.git.fetch.request": "workspace.write",
   "hosts.list.request": "tunnel.manage",
@@ -293,6 +294,7 @@ const OUTBOUND_PERMISSION = {
   "chat.updated": "workspace.read",
   "chat.transcript.appended": "workspace.read",
   "channel.file.read.response": "hub.execute",
+  "channel.file.write.response": "hub.execute",
   "hosts.list.response": "tunnel.manage",
   "hosts.changed": "tunnel.manage",
   "hosts.add.response": "tunnel.manage",

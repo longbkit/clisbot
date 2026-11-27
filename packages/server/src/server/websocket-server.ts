@@ -2670,7 +2670,9 @@ export class VoiceAssistantWebSocketServer {
         daemonSelfUpdate: this.daemonRuntimeConfig?.desktopManaged !== true,
         // COMPAT(agentForkContext): added in v0.1.102, remove gate after 2026-12-28.
         agentForkContext: true,
-        ...(this.hubRelationships?.status().daemonId != null ? { channelFileRead: true } : {}),
+        ...(this.hubRelationships?.status().daemonId != null
+          ? { channelFileRead: true, channelFileWrite: true }
+          : {}),
         // COMPAT(agentForkContextCursor): added in v0.1.108, remove gate after 2027-01-14.
         agentForkContextCursor: true,
         // COMPAT(providerSubagents): added in v0.1.107, remove gate after 2027-01-12.
