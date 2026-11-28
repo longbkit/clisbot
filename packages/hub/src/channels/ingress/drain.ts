@@ -29,12 +29,23 @@ import {
   type IngressRetryPolicyConfig,
 } from "@clisbot/channels-core/channels/message/ingress-retry-policy";
 import { ChannelIngressQueueClaimConflictError } from "../../db/channels.js";
+import { isTransientDatabaseFault } from "../../db/errors.js";
 import { CHANNEL_INGRESS_MAX_AGE_MS, CHANNEL_INGRESS_DISPATCH_TIMEOUT_MS } from "./budget.js";
 import {
   ingressAttempt,
   INGRESS_OUTCOME_UNKNOWN,
   ChannelIngressDispatchInterruptedError,
 } from "./attempt.js";
+
+/**
+ * How soon a message comes back after the Hub's own database failed its
+ * dispatch (a query deadline, a dropped connection). Such a fault says nothing
+ * about the message, so it is back-pressure, not an attempt: the row is
+ * released unattempted, and only the event's age (`CHANNEL_INGRESS_MAX_AGE_MS`)
+ * ends it. Counted as attempts, eight slow queries in a row dead-lettered user
+ * messages while the queue table was too large to read in time.
+ */
+export const HUB_DATABASE_RETRY_MS = 30_000;
 
 /** Claim lease. Refreshed at a third of it while a dispatch is in flight. */
 export const DEFAULT_INGRESS_CLAIM_LEASE_MS = 30_000;
@@ -456,6 +467,14 @@ async function processClaim(
         reason: INGRESS_OUTCOME_UNKNOWN,
         message: error.message,
       });
+    } else if (isTransientDatabaseFault(error)) {
+      const reason = `the Hub database did not answer in time: ${formatError(error)}`;
+      await settleDeferral(
+        options,
+        claim,
+        { kind: "deferred", reason, retryAfterMs: HUB_DATABASE_RETRY_MS },
+        pass,
+      );
     } else await settleFailure(options, claim, error, pass);
     return;
   }

@@ -17,9 +17,16 @@
  * refused attempt's receipt, so after the drop the next attempt reads the turn
  * again.
  *
- * A Host before 2.2.2 keeps a refused attempt's receipt. A turn that ends
- * between the read and the send is refused there, and the message dead-letters:
- * no Hub-side order closes that window, only the Host update does.
+ * A Steer can still be refused: the Host's snapshot can call the agent idle
+ * while it holds a run (a turn still starting, one the Host is still closing),
+ * the turn can end between the read and the send, or the provider cannot steer.
+ * The Hub then queues the follow-up behind the running turn
+ * (`SteerRefusedError`, `bindings/conversation-flow.ts`) instead of retrying it
+ * into a dead letter.
+ *
+ * A Host before 2.2.2 keeps a refused attempt's receipt, so the queued message
+ * is refused again when it is sent and dead-letters: no Hub-side order closes
+ * that window, only the Host update does.
  */
 
 import { HostNotReachedError } from "./enrolled-client.js";
@@ -68,6 +75,21 @@ export function runningTurnOf(agent: Record<string, unknown> | undefined): Steer
 export function isSteerRefusal(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return STEER_REFUSALS.some((refusal) => message.startsWith(refusal));
+}
+
+/**
+ * A channel follow-up the Host refused to steer into the agent's running turn,
+ * before the agent saw it. Nothing was delivered and the Host freed the
+ * receipt, so the message can wait for that turn to end and be sent then.
+ */
+export class SteerRefusedError extends Error {
+  constructor(
+    readonly agentId: string,
+    refusal: unknown,
+  ) {
+    super(refusal instanceof Error ? refusal.message : String(refusal), { cause: refusal });
+    this.name = "SteerRefusedError";
+  }
 }
 
 /** The turn to name: the recorded one, else the Host's, recorded first. */

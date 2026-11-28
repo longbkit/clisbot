@@ -9,6 +9,7 @@ import { TransactionRollback } from "../index.js";
 import type {
   DatabaseRuntime,
   DatabaseRuntimeBundle,
+  OnlineIndex,
   DrizzleHandle,
   QueryResult,
   QueryRow,
@@ -115,6 +116,17 @@ class EmbeddedRuntime implements DatabaseRuntime {
     // generics are invariant, so the implementation-specific result type is hidden here.
     // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
     return this.database as unknown as DrizzleHandle;
+  }
+
+  /** One in-process connection and no concurrent writers: a plain build is the online one. */
+  async buildIndexOnline(index: OnlineIndex): Promise<"present" | "built"> {
+    const found = await this.client.query<{ name: string }>(
+      "select indexname as name from pg_indexes where indexname = $1",
+      [index.name],
+    );
+    if (found.rows.length > 0) return "present";
+    await this.client.exec(`create index "${index.name}" on "${index.table}" ${index.definition}`);
+    return "built";
   }
 
   async migrate(): Promise<void> {

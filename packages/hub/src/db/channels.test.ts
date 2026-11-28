@@ -694,6 +694,7 @@ describe("channel_ingress_queue", () => {
     assert.equal(completed.status, "completed");
     assert.equal(
       await store.pruneChannelIngress({
+        limit: 1_000,
         organizationId: ORGANIZATION_ID,
         completedOlderThan: stamp,
       }),
@@ -701,6 +702,7 @@ describe("channel_ingress_queue", () => {
     );
     assert.equal(
       await store.pruneChannelIngress({
+        limit: 1_000,
         organizationId: ORGANIZATION_ID,
         completedOlderThan: new Date(stamp.getTime() + 1),
       }),
@@ -772,6 +774,7 @@ describe("channel_ingress_queue", () => {
     // resubmitted does not.
     assert.equal(
       await store.pruneChannelIngress({
+        limit: 1_000,
         organizationId: ORGANIZATION_ID,
         pendingOlderThan: new Date(base.getTime() + 5_000),
       }),
@@ -1040,9 +1043,14 @@ describe("channel_ingress_queue", () => {
       ).map((row) => row.id);
 
     // The cutoff is exclusive: a row admitted exactly at it stays.
-    await store.pruneChannelIngress({ organizationId: ORGANIZATION_ID, pendingOlderThan: base });
+    await store.pruneChannelIngress({
+      limit: 1_000,
+      organizationId: ORGANIZATION_ID,
+      pendingOlderThan: base,
+    });
     assert.deepEqual((await pending()).sort(), [stale, fresh].sort());
     await store.pruneChannelIngress({
+      limit: 1_000,
       organizationId: ORGANIZATION_ID,
       pendingOlderThan: new Date(base.getTime() + 1),
     });
@@ -1133,6 +1141,7 @@ describe("channel_steer_targets", () => {
     };
     await store.inbox.markSent(scope, [record.id], "steer-carried");
     await store.pruneChannelIngress({
+      limit: 1_000,
       organizationId: ORGANIZATION_ID,
       completedOlderThan: new Date(Date.now() + 60_000),
     });

@@ -14,6 +14,7 @@ import type { InboundReplyParams } from "../loader/host.js";
 import { claimedInbound } from "../ingress/claimed-inbound.js";
 import { INGRESS_OUTCOME_UNKNOWN } from "../ingress/attempt.js";
 import { readInboundKind } from "../plane/inbound-kinds.js";
+import { SteerRefusedError } from "../daemon/steer-target.js";
 import type {
   InboundMessage,
   InboundOutcome,
@@ -59,11 +60,12 @@ export interface ConversationPlaneSeams {
     account: CompiledChannelAccount,
     route: CompiledRoute,
   ): Promise<boolean>;
-  /** Send a delivery the way an admitted message is sent. */
+  /** Send a flush row's held batch the way an admitted message is sent. */
   dispatch(
     delivery: Delivery,
     account: CompiledChannelAccount,
     route: CompiledRoute,
+    flushId: string,
   ): Promise<PlaneInboundResult>;
 }
 
@@ -127,6 +129,10 @@ export class ConversationFlow {
    * queued message steers, and nobody is told about a Host that went away
    * while this process was down. */
   private readonly runningTurns = new Map<string, TurnAddress>();
+  /** Agents whose running turn refused a Steer, with the sequence that send
+   * began at: the Host holds a run the plane may not know of (one started from
+   * the app, or before a restart). What is queued behind it waits for its end. */
+  private readonly refusedSteers = new Map<string, number>();
   /** Orders sends against turn ends: a turn can end (a fast finish, a failed
    * start) before the send that started it returns. */
   private sequence = 0;
@@ -154,7 +160,7 @@ export class ConversationFlow {
       inbox: this.inbox,
       // Held rows are timed by their database arrival, so the wall clock.
       now: () => Date.now(),
-      isTurnRunning: (agentId) => this.runningTurns.has(agentId),
+      isTurnRunning: (agentId) => this.turnRunning(agentId),
       admit: (flush) => deps.admitHeldFlush?.(flush) ?? Promise.resolve(),
       logger: deps.logger,
     });
@@ -184,7 +190,18 @@ export class ConversationFlow {
     this.sendsInFlight += 1;
     let agentId: string | undefined;
     try {
-      const outcome = await this.deps.plane.engine().deliver(delivery, account, route, subscribe);
+      const outcome = await this.deps.plane
+        .engine()
+        .deliver(delivery, account, route, subscribe)
+        .catch((error: unknown) => {
+          if (error instanceof SteerRefusedError) {
+            agentId = error.agentId;
+            // A turn end seen after the send began may be the one that refused it.
+            if ((this.turnEndedAt.get(agentId) ?? 0) < sentAt)
+              this.refusedSteers.set(agentId, sentAt);
+          }
+          throw error;
+        });
       const started = outcome.kind === "bound" || outcome.kind === "steered";
       if (started) agentId = outcome.agentId;
       if (started && (this.turnEndedAt.get(outcome.agentId) ?? 0) < sentAt) {
@@ -222,9 +239,8 @@ export class ConversationFlow {
    */
   async reconcileTurns(): Promise<void> {
     const read = this.deps.readRunningAgentIds;
-    if (read === undefined || this.stopped || this.reconciling || this.runningTurns.size === 0) {
-      return;
-    }
+    const counted = this.runningTurns.size + this.refusedSteers.size;
+    if (read === undefined || this.stopped || this.reconciling || counted === 0) return;
     this.reconciling = true;
     try {
       const readFrom = this.sequence;
@@ -239,24 +255,42 @@ export class ConversationFlow {
         if (this.stopped) return;
         if (running.has(agentId)) continue;
         // Re-checked per agent: ending one awaits, and a send may start meanwhile.
-        if (!this.quietSince(readFrom, agentId, at)) continue;
+        if (this.runningTurns.get(agentId) !== at) continue;
+        if (!this.quietSince(readFrom, agentId, at.sentAt)) continue;
         this.deps.logger.warn("channel turn ended without its terminal event", { agentId });
         // Ended first (its synchronous part), so nothing can re-check it meanwhile.
         const ended = this.turnEnded(agentId);
         await this.unconfirmed(at);
         await ended;
       }
+      await this.reconcileRefusedSteers(readFrom, running);
       this.forgetMarksBefore(readFrom);
     } finally {
       this.reconciling = false;
     }
   }
 
+  /**
+   * Release what waits behind a refused Steer once the Host calls its agent
+   * idle. The Host's snapshot can call an agent idle while it still holds a
+   * run, so the queued message may be refused again: it then waits for the
+   * next turn end or read, never in a tight loop.
+   */
+  private async reconcileRefusedSteers(
+    readFrom: number,
+    running: ReadonlySet<string>,
+  ): Promise<void> {
+    for (const [agentId, sentAt] of Array.from(this.refusedSteers)) {
+      if (this.stopped) return;
+      if (running.has(agentId) || this.refusedSteers.get(agentId) !== sentAt) continue;
+      if (this.quietSince(readFrom, agentId, sentAt)) await this.turnEnded(agentId);
+    }
+  }
+
   /** Nothing since `readFrom` could have started a newer turn on this agent. */
-  private quietSince(readFrom: number, agentId: string, at: TurnAddress): boolean {
+  private quietSince(readFrom: number, agentId: string, sentAt: number): boolean {
     return (
-      this.runningTurns.get(agentId) === at &&
-      at.sentAt <= readFrom &&
+      sentAt <= readFrom &&
       this.sendsInFlight === 0 &&
       this.unnamedSendReturnedAt <= readFrom &&
       (this.sendReturnedAt.get(agentId) ?? 0) <= readFrom &&
@@ -268,7 +302,7 @@ export class ConversationFlow {
   private forgetMarksBefore(readFrom: number): void {
     for (const marks of [this.sendReturnedAt, this.streamSeenAt]) {
       for (const [agentId, at] of marks) {
-        if (at <= readFrom && !this.runningTurns.has(agentId)) marks.delete(agentId);
+        if (at <= readFrom && !this.turnRunning(agentId)) marks.delete(agentId);
       }
     }
   }
@@ -316,8 +350,15 @@ export class ConversationFlow {
   async turnEnded(agentId: string): Promise<void> {
     this.sequence += 1;
     this.turnEndedAt.set(agentId, this.sequence);
-    if (!this.runningTurns.delete(agentId)) return;
+    const started = this.runningTurns.delete(agentId);
+    const refused = this.refusedSteers.delete(agentId);
+    if (!started && !refused) return;
     await this.scheduler.turnEnded(agentId);
+  }
+
+  /** The plane started a turn on this agent, or the Host refused to steer one. */
+  private turnRunning(agentId: string): boolean {
+    return this.runningTurns.has(agentId) || this.refusedSteers.has(agentId);
   }
 
   /**
@@ -329,6 +370,16 @@ export class ConversationFlow {
   async hostLost(): Promise<void> {
     const interrupted = [...this.runningTurns];
     this.runningTurns.clear();
+    // A turn that only refused a Steer was not started here: nobody is told, and
+    // what waits on it is free.
+    const started = new Set(interrupted.map(([agentId]) => agentId));
+    const refused = [...this.refusedSteers.keys()].filter((agentId) => !started.has(agentId));
+    this.refusedSteers.clear();
+    for (const agentId of refused) {
+      this.sequence += 1;
+      this.turnEndedAt.set(agentId, this.sequence);
+      await this.scheduler.turnEnded(agentId);
+    }
     for (const [agentId, at] of interrupted) {
       this.sequence += 1;
       this.turnEndedAt.set(agentId, this.sequence);
@@ -366,14 +417,18 @@ export class ConversationFlow {
   /**
    * Hold an admitted message when its Route batches, or when `whenBusy: queue`
    * and its binding's turn is running or already holds messages (a later one
-   * never overtakes them). Returns why it was held; undefined = send it now.
+   * never overtakes them). A binding whose turn refused a Steer queues the
+   * same way, whatever its Route says. Returns why it was held; undefined =
+   * send it now.
    */
   async hold(message: InboundMessage, route: CompiledRoute): Promise<string | undefined> {
     if (this.deps.admitHeldFlush === undefined || message.ingressId === undefined) return undefined;
-    const settings = conversationSettings(route.defaults);
+    const routeSettings = conversationSettings(route.defaults);
     // The common Route neither batches nor queues: no read on its hot path.
-    if (settings.batching === undefined && settings.whenBusy !== "queue") return undefined;
+    if (!holds(routeSettings) && this.refusedSteers.size === 0) return undefined;
     const agentId = await this.boundAgent(message, route);
+    const settings = this.waitingSettings(routeSettings, agentId);
+    if (!holds(settings)) return undefined;
     const reason = await this.holdReason(message, settings, agentId, route);
     if (reason === undefined) return undefined;
     const scope = await this.inbox.hold(message, route);
@@ -398,11 +453,13 @@ export class ConversationFlow {
       return { reason: "the account is not serving", retryAfterMs: HELD_FLUSH_RETRY_MS };
     }
     const route = await this.servingRoute(batch.delivery.message, account);
-    const sent = route && (await this.deps.plane.dispatch(batch.delivery, account, route));
+    const sent = route && (await this.deps.plane.dispatch(batch.delivery, account, route, flushId));
     if (sent?.deferred !== undefined) return sent.deferred;
     const kind = sent?.outcome?.kind;
     if (kind === "bound" || kind === "steered") {
       await this.scheduler.flushNow(batch.scope);
+    } else if (kind === "held") {
+      // Queued again behind the turn that refused it: the rows stay held.
     } else {
       await this.inbox.fileUndelivered(batch.scope, batch.rows);
     }
@@ -448,11 +505,53 @@ export class ConversationFlow {
       });
   }
 
+  /**
+   * The Host refused to steer the agent's running turn before the agent saw
+   * the delivery, which it does when it cannot name or steer that turn. A
+   * follow-up is never dropped for it: it is queued behind the turn as
+   * `whenBusy: queue` would, and sent as the next prompt when the turn ends.
+   * The send is the same request (same rows, same receipt key), and the Host
+   * freed the refused attempt's receipt, so it is delivered once.
+   *
+   * `flushId` = the delivery is that flush's held batch, already held; else it
+   * is one admitted message. Returns why it waits; undefined = it cannot be
+   * held (no flush queue, or not a stored message), and the caller retries.
+   */
+  async queueRefusedSteer(
+    delivery: Delivery,
+    route: CompiledRoute,
+    agentId: string,
+    flushId?: string,
+  ): Promise<string | undefined> {
+    if (this.deps.admitHeldFlush === undefined) return undefined;
+    const message = delivery.message;
+    if (flushId === undefined && (delivery.held !== undefined || message.ingressId === undefined))
+      return undefined;
+    const settings = this.waitingSettings(conversationSettings(route.defaults), agentId);
+    const scope =
+      flushId === undefined
+        ? await this.inbox.hold(message, route)
+        : this.inbox.scopeOf(message, route);
+    await this.scheduler.watch({ scope, settings, agentId, retryOf: flushId });
+    this.deps.logger.info?.("channel steer refused; queued behind the running turn", { agentId });
+    return "held until the running turn ends";
+  }
+
+  /** A binding whose turn refused a Steer waits for that turn, as `whenBusy: queue` does. */
+  private waitingSettings(
+    settings: ConversationSettings,
+    agentId: string | undefined,
+  ): ConversationSettings {
+    if (agentId === undefined || !this.refusedSteers.has(agentId)) return settings;
+    return { ...settings, whenBusy: "queue" };
+  }
+
   stop(): void {
     this.stopped = true;
     if (this.reconcileTimer !== undefined) clearInterval(this.reconcileTimer);
     this.scheduler.stop();
     this.runningTurns.clear();
+    this.refusedSteers.clear();
     this.turnEndedAt.clear();
     this.sendReturnedAt.clear();
     this.streamSeenAt.clear();
@@ -515,7 +614,7 @@ export class ConversationFlow {
   ): Promise<string | undefined> {
     if (settings.batching !== undefined) return "held for a batch";
     if (settings.whenBusy !== "queue") return undefined;
-    if (agentId !== undefined && this.runningTurns.has(agentId)) {
+    if (agentId !== undefined && this.turnRunning(agentId)) {
       return "held until the running turn ends";
     }
     const holding = await this.inbox.holds(this.inbox.scopeOf(message, route));
@@ -535,4 +634,9 @@ export class ConversationFlow {
     );
     return binding?.status === "bound" ? (binding.agentId ?? undefined) : undefined;
   }
+}
+
+/** The Route holds messages back at all: it batches, or queues behind a running turn. */
+function holds(settings: ConversationSettings): boolean {
+  return settings.batching !== undefined || settings.whenBusy === "queue";
 }
