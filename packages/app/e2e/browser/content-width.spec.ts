@@ -39,12 +39,18 @@ test("resizes mounted chat content and keeps timeline and composer on one rail b
     await page.setViewportSize(ULTRAWIDE_VIEWPORT);
     await openAgentRoute(page, agent);
     await expectChatOutlinePrompts(page, 2);
-    const reply = page.getByTestId("assistant-message").first();
-    const turnFooter = page.getByTestId("turn-footer").first();
+    const replyText = page.getByTestId("assistant-message");
+    // The reply column includes the sender's avatar, and the footer reserves the same gutter.
+    // Measure the full row on both surfaces so the 40px avatar is part of the comparison.
+    const reply = page.getByTestId("actor-response-row").filter({ has: replyText }).first();
+    const turnFooter = page
+      .getByTestId("actor-gutter-inset")
+      .filter({ has: page.getByTestId("turn-footer") })
+      .first();
     const composer = page.getByTestId("message-input-root");
     await expectContentColumnWidth(reply, DEFAULT_COLUMN);
     await expectSharedHorizontalRail(turnFooter, composer);
-    const originalReply = await reply.elementHandle();
+    const originalReply = await replyText.first().elementHandle();
 
     // In the transition band (pane ~930px >= 918px, < 820 + 120), Default clears the outline on one rail.
     await page.setViewportSize(TRANSITION_VIEWPORT);
