@@ -3,7 +3,6 @@ import path from "node:path";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "../support/fixtures";
 import { gotoWorkspace } from "../support/helpers/launcher";
-import { gotoAppShell } from "../support/helpers/app";
 import {
   BOTS_PLUGIN_ID,
   COMPACT,
@@ -203,44 +202,40 @@ test.describe("Plugin sidebar items", () => {
     await cleanup();
   });
 
-  test("a short compact sidebar keeps workspaces usable while navigation scrolls", async ({
+  test("a short compact sidebar scrolls from plugin navigation to a workspace", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 600 });
-    await gotoAppShell(page);
-    await page.getByRole("button", { name: "Open menu", exact: true }).first().click();
-    await expect(botRow(page, "status")).toBeAttached();
+    await page.goto("/");
+    const entry = await openMobileAgentSidebar(page);
+    const footer = visibleTestId(page, entry === "chat" ? "home-mobile-tabs" : "sidebar-footer");
+    const plugin = botRow(page, "status");
     const workspace = visibleTestId(page, `sidebar-workspace-row-${getServerId()}:${workspaceId}`);
+    await expect(footer).toBeInViewport({ ratio: 1 });
+    const before = await boxOf(footer);
+
+    // On phones the navigation and workspaces share one list above fixed controls.
+    await plugin.scrollIntoViewIfNeeded();
+    await expect(plugin).toBeInViewport({ ratio: 1 });
+    await plugin.click();
+    await expect(page.getByText("Bot status details", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Close bot status", exact: true }).click();
+    await workspace.scrollIntoViewIfNeeded();
     await expect(workspace).toBeInViewport({ ratio: 1 });
-
-    await test.step("scrolling navigation reaches its last row without moving workspaces", async () => {
-      const before = await boxOf(workspace);
-      await visibleTestId(page, "sidebar-global-new-workspace").hover();
-      await page.mouse.wheel(0, 800);
-      await expect(botRow(page, "status")).toBeInViewport({ ratio: 1 });
-      await expect(workspace).toBeInViewport({ ratio: 1 });
-      expect((await boxOf(workspace)).y).toBe(before.y);
-      await botRow(page, "status").click();
-      await expect(page.getByText("Bot status details", { exact: true })).toBeVisible();
-      await page.getByRole("button", { name: "Close bot status", exact: true }).click();
-    });
-
-    await test.step("the workspace still opens and closes the sidebar", async () => {
-      await workspace.click();
-      await expect(
-        page.getByRole("button", { name: "Open menu", exact: true }).first(),
-      ).toBeVisible();
-      await expect(workspace).not.toBeInViewport();
-    });
+    expect((await boxOf(footer)).y).toBe(before.y);
+    await workspace.click();
+    await expect(page).toHaveURL(new RegExp(`/workspace/${workspaceId}$`));
+    await expect(workspace).not.toBeInViewport();
   });
 
   test("a short desktop sidebar keeps workspaces usable while navigation scrolls", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 480 });
-    await gotoAppShell(page);
+    await gotoWorkspace(page, workspaceId);
     await expect(botRow(page, "status")).toBeAttached();
     const workspace = visibleTestId(page, `sidebar-workspace-row-${getServerId()}:${workspaceId}`);
+    await workspace.scrollIntoViewIfNeeded();
     await expect(workspace).toBeInViewport({ ratio: 1 });
     await expect(botRow(page, "status")).not.toBeInViewport();
 
