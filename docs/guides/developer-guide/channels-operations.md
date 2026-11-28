@@ -126,12 +126,12 @@ Nothing is destroyed. Connections, thread bindings, delivery-ledger rows, queue 
 
 All four verbs are organization-scoped on the management API under `/api/management/v1/organizations/{orgId}/`, behind the `manageChannels` capability — owner and admin hold it by default. It is separate from `manageResources` because a channel account is a live credential to an outside workspace and its backlog holds message content: an organization can grant Project and daemon administration without granting the channel plane. Writing or deleting a channel bot Connection (`POST`/`DELETE /connections` with an `accountId`) is on the same capability, for the same reason; every other Connection stays on `manageResources`.
 
-| Verb     | Route                           | Notes                                                                                                                                                                                                            |
-| -------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| status   | `GET channel-ingress`           | Depth per account plus an organization total.                                                                                                                                                                    |
-| list     | `GET channel-ingress/events`    | `channel`, `accountId` (rejected without `channel`), `status`, `limit` 1–200, `offset`.                                                                                                                          |
-| resubmit | `POST channel-ingress/resubmit` | Body `{ ids: [...] }`, 1–200 rows.                                                                                                                                                                               |
-| prune    | `POST channel-ingress/prune`    | Body `{ completedOlderThanMs?, deadLetteredOlderThanMs? }`; absent falls back to the retention TTL. `completedOlderThanMs` is refused under an hour: a completed row is the replay guard for its provider event. |
+| Verb     | Route                           | Notes                                                                                                                                                                                                                                                                                                                                           |
+| -------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| status   | `GET channel-ingress`           | Depth per account plus an organization total.                                                                                                                                                                                                                                                                                                   |
+| list     | `GET channel-ingress/events`    | `channel`, `accountId` (rejected without `channel`), `status`, `limit` 1–200, `offset`.                                                                                                                                                                                                                                                         |
+| resubmit | `POST channel-ingress/resubmit` | Body `{ ids: [...] }`, 1–200 rows.                                                                                                                                                                                                                                                                                                              |
+| prune    | `POST channel-ingress/prune`    | Body `{ completedOlderThanMs?, deadLetteredOlderThanMs? }`; absent falls back to the retention TTL. `completedOlderThanMs` is refused under an hour: a completed row is the replay guard for its provider event. Runs the sweep's batches for at most 20 s and answers `{ deleted, caughtUp }`; `caughtUp: false` leaves the rest to the sweep. |
 
 The app renders all four under **Channels → Operations**.
 
@@ -145,9 +145,9 @@ Per-account depth is also merged into `channel-accounts/status`, because the que
 
 Resubmitting a dead-lettered row restarts its retry budget and its retention age, not its place in the lane: `created_at` is arrival order, so a recovered event is answered before the messages that arrived while it sat in the dead letter.
 
-Dead-lettering needs **both** conditions: the attempt ceiling reached _and_ the row at least 24 hours old. A row that fails eight times in a minute keeps retrying — the minimum age is what stops a transient outage from burning the whole budget.
+A row dead-letters after eight failed attempts (upstream's 24-hour minimum age is off in the Hub drain), or once it is older than the 10-minute event budget (`CHANNEL_INGRESS_MAX_AGE_MS`), whichever comes first.
 
-A **deferral** is not a failure. Route concurrency and rate ceilings release the row unattempted, due again after a backoff, without spending retry budget.
+A **deferral** is not a failure. Route concurrency and rate ceilings release the row unattempted, due again after a backoff, without spending retry budget. So does a fault of the Hub's own database during dispatch (a query deadline, a canceled statement, a dropped connection, `isTransientDatabaseFault` in `db/errors.ts`): the row comes back after 30 s and only the event budget ends it. Counted as attempts, eight slow queries dead-lettered user messages while the queue table was too large to read in time.
 
 Because a release gives the attempt back, the retry ceiling can never end a row the plane keeps deferring — so releases have their own budget: 50 releases, or 24 hours since admission, and the row dead-letters with `failed_reason: release-budget-exhausted` and a `channel inbound event released past its budget` error line. Back-pressure that never clears is a stuck lane, and the operator has to be able to see it and resubmit.
 
@@ -155,11 +155,13 @@ Some failures skip retry entirely and dead-letter on the first attempt: an unpar
 
 ### Retention
 
-One hourly sweep per supervisor, across every organization with queued rows. Completed and dead-lettered rows are kept 30 days. A sweep fault does not kill the timer; the next tick retries.
+One sweep per supervisor, hourly, across every organization with queued rows. Completed and dead-lettered rows are kept 30 days. The sweep deletes in batches of 2 000 rows, one statement each, for at most 60 s; with expired rows left it comes back after a minute instead of an hour, and logs `channel ingress queue pruned` with `deleted` and `caughtUp` per organization. A single unbounded DELETE per status used to hit the 3 s query deadline once a few hundred thousand rows had expired, so retention failed every hour and the table grew without bound. A sweep fault does not kill the timer; the next tick retries.
 
 The sweep also deletes `pending` and `failed` rows admitted (or resubmitted) more than 30 days ago. The release budget already ends anything a drain can still claim, so what is left at that age is a row no drain reaches: an account deleted with a backlog behind it, or a lane whose head was lost. A `claimed` row is never swept — lease recovery owns it.
 
-Fusion exposes TTL cutoffs only. Upstream also caps completed and failed rows per queue by count; until an operator hits that shape, the TTLs are the whole policy.
+Upstream also caps completed and failed rows per queue by count (20 000); the Hub does not. A completed row is also the event-id replay guard and part of a binding's inbox (kept context, the rows a replayed prompt re-reads), both documented for 30 days, and a count cap would cut that to hours on a busy account. With the sweep keeping up, the table holds 30 days of traffic (`channels/ingress/retention.ts`).
+
+Three indexes on the table are built at start with `CREATE INDEX CONCURRENTLY` on a connection of their own, not in a migration (`db/channel-ingress-indexes.ts`): the migrator runs in one transaction on the pool's 3 s deadline, and a plain build on a million-row table would block writes and fail every boot. They serve the held-binding scan, the thread-snapshot check and the sweep's batches; until a build finishes those queries are slow, and `channel ingress index built` / `channel ingress index build failed; retried at the next start` say how it went. A failed build leaves nothing in the way: an invalid index is dropped and rebuilt on the next start.
 
 ### Resubmitting
 

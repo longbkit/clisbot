@@ -36,6 +36,7 @@ import { fileURLToPath } from "node:url";
 import { loadChannelControlPlane, type ChannelControlPlaneSnapshot } from "../control-plane.js";
 import type { CompiledChannelAccount } from "../config/compile.js";
 import { ChannelStore } from "../../db/channels.js";
+import { ensureChannelIngressIndexes } from "../../db/channel-ingress-indexes.js";
 import { ChannelReplyCapabilityStore } from "../../db/channel-reply-capabilities.js";
 import type { ChannelIngressQueueRecord } from "../../db/types.js";
 import {
@@ -830,6 +831,14 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     // Retention is queue state, not account state: it runs even when no
     // account starts, so a decommissioned account's rows still age out.
     this.retentionSweep.start();
+    void ensureChannelIngressIndexes(this.options.databaseRuntime, {
+      built: (detail) => this.logger.info?.("channel ingress index built", detail),
+      failed: ({ index, error }) =>
+        this.logger.warn("channel ingress index build failed; retried at the next start", {
+          index,
+          error: errorMessage(error),
+        }),
+    });
     // Agents outlive the Hub process: adopt the reply capabilities the daemon
     // still holds MCP URLs for before any of them is steered (D-W4-01).
     try {

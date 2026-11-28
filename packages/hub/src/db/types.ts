@@ -2099,6 +2099,8 @@ export interface PruneChannelIngressInput {
    * account deleted with a backlog behind it.
    */
   pendingOlderThan?: Date;
+  /** The most rows one call deletes (`ChannelStore.pruneChannelIngress`). */
+  limit: number;
 }
 
 /**

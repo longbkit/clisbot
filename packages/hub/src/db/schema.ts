@@ -2757,6 +2757,8 @@ export const channelIngressQueue = pgTable(
         table.createdAt,
       )
       .where(sql`${table.inboxState} is not null`),
+    // Two more indexes on this table are built online at start, not here:
+    // `channel-ingress-indexes.ts` says why.
     index("channel_ingress_queue_sent_in_idx")
       .on(table.organizationId, table.sentIn)
       .where(sql`${table.sentIn} is not null`),

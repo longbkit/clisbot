@@ -583,6 +583,54 @@ describe("channel ingress drain", () => {
     assert.deepEqual(delivered, ["stop"]);
   });
 
+  it("does not spend a message's attempts on the Hub's own database timing out", async () => {
+    // Production: lookups on an oversized queue table hit the 3 s query deadline
+    // ("Failed query: …"), eight times, and the drain dead-lettered user messages.
+    const accountId = "hub-database-slow";
+    await admit(accountId, "waits-for-database");
+    let slow = 10;
+    const drain = drainFor(accountId, {
+      dispatch: async () => {
+        if (slow === 0) return;
+        slow -= 1;
+        const timeout = Object.assign(new Error("canceling statement due to statement timeout"), {
+          code: "57014",
+        });
+        throw new Error("Failed query: select id from channel_ingress_queue", { cause: timeout });
+      },
+    });
+    for (let pass = 0; pass < 10; pass += 1) {
+      const result = await drain.drainOnce();
+      assert.equal(result.deferred, 1);
+      assert.equal(result.deadLettered, 0);
+      const row = await readEvent(accountId, "waits-for-database");
+      assert.equal(row.status, "pending");
+      assert.equal(row.attempts, 0, "the attempt is given back");
+      assert.ok(row.availableAt.getTime() > Date.now() + 20_000, "it comes back in about 30 s");
+      await bundle.runtime.query(
+        `update channel_ingress_queue set available_at = now() where id = $1`,
+        [row.id],
+      );
+    }
+    assert.equal((await drain.drainOnce()).completed, 1);
+    assert.equal((await readEvent(accountId, "waits-for-database")).status, "completed");
+    await drain.stop();
+  });
+
+  it("still spends attempts on a failure that is not the Hub's database", async () => {
+    const accountId = "host-failure";
+    await admit(accountId, "host-down");
+    const drain = drainFor(accountId, {
+      dispatch: async () => {
+        throw new Error("Failed to send agent message");
+      },
+    });
+    const result = await drain.drainOnce();
+    assert.equal(result.retried, 1);
+    assert.equal((await readEvent(accountId, "host-down")).attempts, 1);
+    await drain.stop();
+  });
+
   it("dead-letters a missing delivery record on the first attempt and frees its lane", async () => {
     const accountId = "missing-delivery-record";
     await admit(accountId, "poison");

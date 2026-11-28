@@ -4,7 +4,19 @@
 // upstream db files keep their byte-identical surface. An unmodified upstream Hub
 // never imports this module.
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import * as schema from "./schema.js";
 import { ChannelAccessStore } from "./channel-access.js";
 import { ChannelDeliveryRetryStore } from "./channel-delivery-retries.js";
@@ -1083,51 +1095,47 @@ export class ChannelStore {
   }
 
   /**
-   * Retention sweep over terminal rows. Completed rows are the replay guard, so
-   * pruning one lets its provider event be admitted again — keep the cutoff
-   * well past the provider's own replay window (upstream default: 30 days).
+   * One bounded step of the retention sweep: delete at most `limit` rows past
+   * their cutoffs, terminal rows first. Fewer than `limit` deleted means none
+   * is left. Each statement deletes one batch, so the step stays inside the
+   * pool's query deadline however far behind retention is; the sweep repeats
+   * it within a time budget (`channels/ingress/retention.ts`). Completed rows
+   * are the replay guard, so pruning one lets its provider event be admitted
+   * again — keep the cutoff well past the provider's own replay window
+   * (upstream default: 30 days).
    */
   async pruneChannelIngress(input: PruneChannelIngressInput): Promise<number> {
+    const queue = schema.channelIngressQueue;
+    const expired: SQL[][] = [];
+    if (input.completedOlderThan !== undefined)
+      expired.push([
+        eq(queue.status, "completed"),
+        lt(queue.completedAt, input.completedOlderThan),
+      ]);
+    if (input.deadLetteredOlderThan !== undefined)
+      expired.push([
+        eq(queue.status, "dead_letter"),
+        lt(queue.failedAt, input.deadLetteredOlderThan),
+      ]);
+    if (input.pendingOlderThan !== undefined)
+      expired.push([
+        inArray(queue.status, ["pending", "failed"]),
+        // A resubmitted row's age runs from the resubmit, not from the
+        // arrival the lane still orders it by.
+        lt(sql`coalesce(${queue.resubmittedAt}, ${queue.createdAt})`, input.pendingOlderThan),
+      ]);
     let deleted = 0;
-    if (input.completedOlderThan !== undefined) {
-      const result = await this.database
-        .delete(schema.channelIngressQueue)
-        .where(
-          and(
-            eq(schema.channelIngressQueue.organizationId, input.organizationId),
-            eq(schema.channelIngressQueue.status, "completed"),
-            lt(schema.channelIngressQueue.completedAt, input.completedOlderThan),
-          ),
-        );
+    for (const condition of expired) {
+      if (deleted === input.limit) return deleted;
+      const batch = this.database
+        .select({ id: queue.id })
+        .from(queue)
+        .where(and(eq(queue.organizationId, input.organizationId), ...condition))
+        .limit(input.limit - deleted);
+      const result = await this.database.delete(queue).where(inArray(queue.id, batch));
       deleted += result.rowCount;
     }
-    if (input.deadLetteredOlderThan !== undefined) {
-      const result = await this.database
-        .delete(schema.channelIngressQueue)
-        .where(
-          and(
-            eq(schema.channelIngressQueue.organizationId, input.organizationId),
-            eq(schema.channelIngressQueue.status, "dead_letter"),
-            lt(schema.channelIngressQueue.failedAt, input.deadLetteredOlderThan),
-          ),
-        );
-      deleted += result.rowCount;
-    }
-    if (input.pendingOlderThan !== undefined) {
-      const result = await this.database.delete(schema.channelIngressQueue).where(
-        and(
-          eq(schema.channelIngressQueue.organizationId, input.organizationId),
-          inArray(schema.channelIngressQueue.status, ["pending", "failed"]),
-          // A resubmitted row's age runs from the resubmit, not from the
-          // arrival the lane still orders it by.
-          lt(
-            sql`coalesce(${schema.channelIngressQueue.resubmittedAt}, ${schema.channelIngressQueue.createdAt})`,
-            input.pendingOlderThan,
-          ),
-        ),
-      );
-      deleted += result.rowCount;
-    }
+    if (deleted === input.limit) return deleted;
     const cutoffs = [
       input.completedOlderThan,
       input.deadLetteredOlderThan,

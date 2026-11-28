@@ -31,7 +31,7 @@ import {
   type ChannelIngressHealth,
 } from "../channels/ingress/health.js";
 import type { ChannelAccountStatusEntry } from "../channels/supervisor/types.js";
-import { CHANNEL_INGRESS_RETENTION_DEFAULTS } from "../channels/ingress/retention.js";
+import { pruneExpiredIngress } from "../channels/ingress/retention.js";
 
 const MAX_PAGE = 200;
 
@@ -165,22 +165,34 @@ export async function channelIngressResubmit(
   return { resubmitted: rows.map(channelIngressEntryView) };
 }
 
-/** `hub.channels.ingress.prune`: the retention sweep, run now, on demand. */
+/**
+ * `hub.channels.ingress.prune`: the retention sweep, run now, on demand, for
+ * at most `PRUNE_REQUEST_BUDGET_MS`. Whatever is left past that the hourly
+ * sweep takes; `caughtUp: false` says some is.
+ */
 export async function channelIngressPrune(
   runtime: DatabaseRuntime,
   organizationId: string,
   body: z.infer<typeof channelIngressPruneBodySchema>,
   now: Date = new Date(),
-): Promise<{ deleted: number }> {
+): Promise<{ deleted: number; caughtUp: boolean }> {
   requireChannelPlane();
-  const completedTtlMs =
-    body.completedOlderThanMs ?? CHANNEL_INGRESS_RETENTION_DEFAULTS.completedTtlMs;
-  const deadLetteredTtlMs =
-    body.deadLetteredOlderThanMs ?? CHANNEL_INGRESS_RETENTION_DEFAULTS.deadLetteredTtlMs;
-  const deleted = await new ChannelStore(runtime).pruneChannelIngress({
+  return pruneExpiredIngress({
+    store: new ChannelStore(runtime),
     organizationId,
-    completedOlderThan: new Date(now.getTime() - completedTtlMs),
-    deadLetteredOlderThan: new Date(now.getTime() - deadLetteredTtlMs),
+    now: now.getTime(),
+    deadline: Date.now() + PRUNE_REQUEST_BUDGET_MS,
+    retention: {
+      ...(body.completedOlderThanMs === undefined
+        ? {}
+        : { completedTtlMs: body.completedOlderThanMs }),
+      ...(body.deadLetteredOlderThanMs === undefined
+        ? {}
+        : { deadLetteredTtlMs: body.deadLetteredOlderThanMs }),
+      // The manual prune never touched non-terminal rows: an infinite TTL keeps it so.
+      unreachablePendingTtlMs: Number.POSITIVE_INFINITY,
+    },
   });
-  return { deleted };
 }
+
+const PRUNE_REQUEST_BUDGET_MS = 20_000;
