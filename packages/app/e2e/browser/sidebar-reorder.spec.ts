@@ -43,6 +43,8 @@ async function quickDragFirstRowAfterSecond(
 ) {
   await expect(rows).toHaveCount(2);
   const before = await rowTestIds(rows);
+  await rows.nth(1).scrollIntoViewIfNeeded();
+  await rows.nth(0).hover();
   const sourceBox = await visibleBoundingBox(rows.nth(0));
   const targetBox = await visibleBoundingBox(rows.nth(1));
 
