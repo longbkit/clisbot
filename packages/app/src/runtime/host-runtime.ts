@@ -3923,6 +3923,10 @@ export class HostRuntimeStore {
     ).then(() => undefined);
   }
 
+  flushDirectoryUpdates(serverId: string): void {
+    this.directorySyncByServer.get(serverId)?.flushLiveUpdates();
+  }
+
   async refreshAgentDirectory(
     input: AgentDirectoryRefreshInput,
   ): Promise<RefreshAgentDirectoryResult> {
