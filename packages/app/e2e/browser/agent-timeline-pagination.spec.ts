@@ -228,6 +228,7 @@ test.describe("Agent timeline pagination", () => {
       await makeLoadedTimelineFitViewport(page);
       const history = await holdOlderHistoryPages(page, agent);
       await openAgentTimeline(page, agent);
+      await expectTimelinePromptVisible(page, agent.newestPrompt);
       await scrollTimelineToOldestLoadedEdge(page);
       await history.expectRequestedPages(1);
       await expect(page.getByTestId("load-older-history-spinner")).toBeVisible();
@@ -268,7 +269,12 @@ test.describe("Agent timeline pagination", () => {
       await scrollTimelineUntilOlderHistoryIsReachable(page, agent.oldestPrompt);
 
       const hydration = await holdReplicaHydration(page, agent);
-      await reloadAgentTimelineFromPersistedReplica(page, agent);
+      // An unchanged cached cursor is certified without fetching any rows.
+      // Advance the Host while offline so the test exercises a delayed catch-up.
+      await reloadAgentTimelineFromPersistedReplica(page, agent, async () => {
+        await agent.client.sendAgentMessage(agent.agentId, "emit 1 coalesced agent stream updates");
+        await agent.client.waitForFinish(agent.agentId, 15_000);
+      });
       await hydration.waitForDelayedResponse();
       await hydration.expectPending();
       const livePrompt = await sendLiveTurnBeforeHydration(agent);

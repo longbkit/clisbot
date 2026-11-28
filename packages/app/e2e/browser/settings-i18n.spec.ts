@@ -52,7 +52,8 @@ for (const scenario of [
     test.setTimeout(120_000);
     if (scenario.phone) await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(({ language, initial }) => {
-      if (!localStorage.getItem("@clisbot:app-settings")) {
+      if (!sessionStorage.getItem("chat-display-seeded")) {
+        sessionStorage.setItem("chat-display-seeded", "1");
         localStorage.setItem(
           "@clisbot:app-settings",
           JSON.stringify({ language, ...(initial ? { toolCallDetailLevel: initial } : {}) }),
@@ -61,13 +62,12 @@ for (const scenario of [
     }, scenario);
     const labels =
       scenario.language === "vi"
-        ? ["Tóm tắt", "Đầy đủ chi tiết", "Tóm tắt kèm lệnh cuối"]
-        : ["Summary", "Full detail", "Summary with latest call"];
+        ? ["Thu gọn lệnh gọi công cụ", "Đầy đủ", "Tóm tắt kèm lệnh cuối", "Thu gọn lượt"]
+        : ["Collapse tool calls", "Full", "Summary with latest call", "Collapse turns"];
     await page.goto("/settings/chat");
     const readPreference = () =>
       page.evaluate(
-        () =>
-          JSON.parse(localStorage.getItem("@clisbot:app-settings") ?? "null").toolCallDetailLevel,
+        () => JSON.parse(localStorage.getItem("@clisbot:app-settings") ?? "null").chatDisplay,
       );
     await expect(page.getByRole("button", { name: new RegExp(labels[2]) })).toBeVisible();
     expect(await readPreference()).toBe("summary-with-latest-call");
@@ -81,15 +81,15 @@ for (const scenario of [
     await page.screenshot({ path });
     await testInfo.attach("settings-options", { path, contentType: "image/png" });
     await page.getByRole("menuitem", { name: labels[0], exact: true }).click();
-    await expect.poll(readPreference).toBe("overview");
+    await expect.poll(readPreference).toBe("collapseToolCalls");
     await page.reload();
     await expect(page.getByRole("button", { name: new RegExp(`: ${labels[0]}$`) })).toBeVisible();
-    expect(await readPreference()).toBe("overview");
+    expect(await readPreference()).toBe("collapseToolCalls");
     await page.getByRole("button", { name: new RegExp(`: ${labels[0]}$`) }).click();
     await page.getByRole("menuitem", { name: labels[1], exact: true }).click();
-    await expect.poll(readPreference).toBe("detailed");
+    await expect.poll(readPreference).toBe("full");
     await page.reload();
     await expect(page.getByRole("button", { name: new RegExp(`: ${labels[1]}$`) })).toBeVisible();
-    expect(await readPreference()).toBe("detailed");
+    expect(await readPreference()).toBe("full");
   });
 }

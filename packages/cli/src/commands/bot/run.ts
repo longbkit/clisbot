@@ -732,12 +732,13 @@ async function openDaemonWithRetry(
 ): Promise<DaemonClient> {
   const deadline = Date.now() + DAEMON_READY_TIMEOUT_MS;
   let lastError: unknown;
-  const useInstance =
-    host === undefined || password === undefined || loadConfig(home).devicePairingEnabled;
+  const paired = loadConfig(home).devicePairingEnabled;
+  const useInstance = host === undefined || password === undefined || paired;
   const target = useInstance ? undefined : daemonHostWithPassword(host, password);
   for (;;) {
     try {
       return await connectToDaemon({
+        preferLocalCredential: paired,
         target:
           target === undefined ? { kind: "instance", home } : { kind: "endpoint", host: target },
       });

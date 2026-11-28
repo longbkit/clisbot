@@ -24,6 +24,7 @@ export interface ConnectOptions {
   target: DaemonTarget;
   timeout?: number;
   instance?: DaemonInstance;
+  preferLocalCredential?: boolean;
 }
 export function resolveClientClisbotHome(
   target: DaemonTarget,
@@ -175,10 +176,10 @@ export function resolveDaemonPassword(host: string): string | undefined {
 export function resolveDaemonCredential(
   host: string,
   home: string,
-  selectedInstance = false,
+  preferLocalCredential = false,
 ): { kind: "password"; password: string } | { kind: "localCredential"; token: string } | null {
   const password = resolveDaemonPassword(host);
-  if (password && !selectedInstance) return { kind: "password", password };
+  if (password && !preferLocalCredential) return { kind: "password", password };
   // A selected installation's rotating credential also works with device pairing.
   const token = readLocalCredentialForTarget(home, host);
   if (token) return { kind: "localCredential", token };
@@ -197,7 +198,11 @@ async function connectSelectedDaemon(options: ConnectOptions): Promise<DaemonCli
           })
         ).listen;
   const home = resolveClientClisbotHome(options.target);
-  const credential = resolveDaemonCredential(host, home, options.target.kind === "instance");
+  const credential = resolveDaemonCredential(
+    host,
+    home,
+    options.target.kind === "instance" && options.preferLocalCredential === true,
+  );
   const clientId = await getOrCreateCliClientId(home);
   const deadline = Date.now() + timeout;
   async function connect(resolveAccessTicket?: () => Promise<string>): Promise<DaemonClient> {

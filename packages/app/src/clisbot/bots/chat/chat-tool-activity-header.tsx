@@ -1,3 +1,7 @@
+import {
+  ToolCallExpansionContext,
+  useAgentToolCallExpansion,
+} from "@/tool-calls/expansion-context";
 import { useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -133,13 +137,14 @@ function ToolActivitySection({
   const { t } = useTranslation();
   const client = useHostRuntimeClient(header.serverId);
   const bot = botIdentity(header.bots, entry.botId);
+  const expansion = useAgentToolCallExpansion(bot.agentId ?? bot.botId);
   const state = entry.turnActive
     ? t("bots.chat.toolActivity.running")
     : t("bots.chat.toolActivity.lastTurn");
   const count = toolActivityCountLabel(t, entry.activity);
   const { items } = entry.activity;
   return (
-    <>
+    <ToolCallExpansionContext.Provider value={expansion}>
       {separated ? <DropdownMenuSeparator /> : null}
       <DropdownMenuLabel numberOfLines={1}>
         {[bot.name, state, count].filter(Boolean).join(" · ")}
@@ -149,7 +154,7 @@ function ToolActivitySection({
           renderLiveItem(item, header.serverId, index === items.length - 1, bot, client, true),
         )}
       </View>
-    </>
+    </ToolCallExpansionContext.Provider>
   );
 }
 

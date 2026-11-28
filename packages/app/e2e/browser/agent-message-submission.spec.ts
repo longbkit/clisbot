@@ -21,7 +21,7 @@ import {
   composerLocator,
   expectQueuedMessageButton,
   fillComposerDraft,
-  holdSendButton,
+  queueFromHeldSend,
   sendDraftToQueue,
   startRunningMockAgent,
   submitMessage,
@@ -525,16 +525,9 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
     );
     const requestsBeforeRelease = rememberTimelineRequestCounts(gate, target.agentId);
     gate.releaseHeldAgentStreamEvent("turn_started");
-    // The chat never saw the hidden prompt's live row, so the reply's first row is a gap.
-    // The chat recovers the missing rows once, while its workspace is still evicted.
-    await expect
-      .poll(() => gate.getTimelineRequestCount("after", target.agentId))
-      .toBe(requestsBeforeRelease.after + 1);
-    await gate.waitForServerMessage(
-      "fetch_agent_timeline_response",
-      gate.getClientRequestCount("fetch_agent_timeline_request"),
-    );
+    // Hidden views retain their subscription but resolve missing rows on reveal.
     const requestsBeforeReturn = rememberTimelineRequestCounts(gate, target.agentId);
+    expect(requestsBeforeReturn).toEqual(requestsBeforeRelease);
     await waitForWorkspaceInSidebar(page, {
       serverId: getServerId(),
       workspaceId: target.workspaceId,
@@ -559,6 +552,7 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
     // tail on return, without replaying or repeatedly fetching hidden output.
     expect(rememberTimelineRequestCounts(gate, target.agentId)).toEqual({
       ...requestsBeforeReturn,
+      fetches: requestsBeforeReturn.fetches + 1,
       tail: requestsBeforeReturn.tail + 1,
     });
   } finally {
@@ -1351,7 +1345,9 @@ test.describe("Agent message submission", () => {
     }
   });
 
-  test("queues a draft by holding Send while a tap still steers", async ({ page }, testInfo) => {
+  test("queues a draft from the held Send menu while a tap still steers", async ({
+    page,
+  }, testInfo) => {
     test.setTimeout(120_000);
     const gate = await gateNextAgentMessage(page);
     const agent = await startRunningMockAgent(page, {
@@ -1364,9 +1360,9 @@ test.describe("Agent message submission", () => {
       await expectAgentReadyToInterrupt(page);
 
       const queuedPrompt = "Queue this follow-up by holding Send.";
-      await test.step("holding Send queues the draft", async () => {
+      await test.step("choosing Queue from the held Send menu queues the draft", async () => {
         await fillComposerDraft(page, queuedPrompt);
-        await holdSendButton(page, "Send and steer");
+        await queueFromHeldSend(page, "Send and steer", queuedPrompt);
         await expectQueuedMessageButton(page);
         await expectComposerDraft(page, "");
         await expectAgentReadyToInterrupt(page);
