@@ -17,10 +17,17 @@ import {
   recordTrailingActionFrames,
   sweepModelTriggerLabels,
 } from "../support/helpers/composer-control-density";
+import {
+  composerModelChip,
+  composerPickerPanel,
+  openComposerPicker,
+  closeComposerPicker,
+} from "../support/helpers/composer-picker";
 import { clickNewChat, gotoWorkspace } from "../support/helpers/launcher";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 import { seedWorkspace, type SeededWorkspace } from "../support/helpers/seed-client";
 
+const COMBINED_PICKER = process.env.EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER !== "0";
 const SETTLE_MS = 1_000;
 const TRAILING_ACTION_SETTLE_MS = 500;
 const VOICE_MODE = "Enable Voice mode";
@@ -229,6 +236,18 @@ test.describe("Composer controls folding on a touch device", () => {
     });
     try {
       await openAgentRoute(page, session);
+      if (COMBINED_PICKER) {
+        await openComposerPicker(page);
+        await closeComposerPicker(page);
+        for (const width of [640, 390, 1194]) {
+          await page.setViewportSize({ width, height: 834 });
+          await expect(composerModelChip(page)).toBeVisible();
+          await expect(composerPickerPanel(page)).toHaveCount(0);
+        }
+        await openComposerPicker(page);
+        await closeComposerPicker(page);
+        return;
+      }
       const thinking = page.getByTestId("agent-thinking-selector").filter({ visible: true });
       const thinkingMenu = page.getByTestId("combobox-desktop-container");
 
@@ -249,53 +268,76 @@ test.describe("Composer controls folding on a touch device", () => {
 });
 
 test.describe("Folded model control on a phone", () => {
-  // Wide enough for "Ten second stream" and "Low" side by side; narrower, they no longer fit.
-  test.use({ viewport: { width: 480, height: 844 }, isMobile: true, hasTouch: true });
+  // Start with room for both labels, then follow the toolbar through progressively narrower sizes.
+  test.use({ viewport: { width: 600, height: 844 }, isMobile: true, hasTouch: true });
   test.describe.configure({ timeout: 180_000 });
 
-  test("hides the thinking label before the model label truncates", async ({ page }) => {
-    const session = await seedMockAgentWorkspace({
-      repoPrefix: "composer-density-labels-",
-      title: "Label priority chat",
-      model: "ten-second-stream",
-    });
-    try {
-      await recordModelTriggerFramesFromLoad(page);
-      await openAgentRoute(page, session);
-      await expect(
-        page.getByTestId("combined-model-selector-thinking-label").filter({ visible: true }),
-      ).toHaveText("Low");
-      await readSettledModelTriggerLabels(page);
-      // From the first frame on, the control never guesses: it paints both labels only once it
-      // has measured that they fit.
-      await expectNoFrameTruncatesModelBesideThinking(page);
+  test(
+    COMBINED_PICKER
+      ? "keeps the active model and effort readable on the compact picker"
+      : "hides the thinking label before the model label truncates",
+    async ({ page }) => {
+      const session = await seedMockAgentWorkspace({
+        repoPrefix: "composer-density-labels-",
+        title: "Label priority chat",
+        model: "ten-second-stream",
+      });
+      try {
+        if (COMBINED_PICKER) {
+          await openAgentRoute(page, session);
+          const chip = composerModelChip(page);
+          for (const width of [480, 390, 320, 280]) {
+            await page.setViewportSize({ width, height: 844 });
+            await expect(chip).toHaveAccessibleName(/Ten second stream.*Low/i);
+            await chip.scrollIntoViewIfNeeded();
+            await expect(chip).toBeInViewport({ ratio: 1 });
+            await expect(chip).toContainText(/Ten second stream/i);
+          }
+          await openComposerPicker(page);
+          await expect(
+            composerPickerPanel(page).getByTestId("composer-picker-reasoning"),
+          ).toBeVisible();
+          return;
+        }
+        await page.setViewportSize({ width: 1194, height: 844 });
+        await recordModelTriggerFramesFromLoad(page);
+        await openAgentRoute(page, session);
+        await expect(thinkingControl(page, "Low")).toBeVisible();
+        await page.setViewportSize({ width: 480, height: 844 });
+        await expect(
+          page.getByTestId("combined-model-selector-model-label").filter({ visible: true }),
+        ).toHaveText("Ten second stream");
+        await readSettledModelTriggerLabels(page);
+        // From the first frame on, the control never guesses: it paints both labels only once it
+        // has measured that they fit.
+        await expectNoFrameTruncatesModelBesideThinking(page);
 
-      const sweep = await sweepModelTriggerLabels(page, {
-        from: 480,
-        to: 280,
-        step: 4,
-        height: 844,
-      });
+        const sweep = await sweepModelTriggerLabels(page, {
+          from: 480,
+          to: 280,
+          step: 4,
+          height: 844,
+        });
 
-      expect(sweep.widest).toMatchObject({
-        modelText: "Ten second stream",
-        thinkingShown: true,
-        modelTruncated: false,
-      });
-      expect(sweep.thinkingHidden).toMatchObject({
-        modelText: "Ten second stream",
-        modelTruncated: false,
-      });
-      expect(sweep.modelTruncated.width).toBeLessThan(sweep.thinkingHidden.width);
-      // A clean tail: the label ends on a whole word and the ellipsis, never on a space.
-      expect(sweep.modelTruncated).toMatchObject({
-        modelText: "Ten second…",
-        thinkingShown: false,
-      });
-    } finally {
-      await session.cleanup();
-    }
-  });
+        expect(sweep.widest).toMatchObject({
+          modelText: "Ten second stream",
+          modelTruncated: false,
+        });
+        expect(sweep.thinkingHidden).toMatchObject({
+          modelText: "Ten second stream",
+          modelTruncated: false,
+        });
+        expect(sweep.modelTruncated.width).toBeLessThan(sweep.thinkingHidden.width);
+        // A clean tail: the label ends on a whole word and the ellipsis, never on a space.
+        expect(sweep.modelTruncated).toMatchObject({
+          modelText: "Ten second…",
+          thinkingShown: false,
+        });
+      } finally {
+        await session.cleanup();
+      }
+    },
+  );
 });
 
 test.describe("Composer toolbar rails on touch", () => {
