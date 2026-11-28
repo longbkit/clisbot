@@ -4,6 +4,21 @@ import registry from "./registry.fixture.json" with { type: "json" };
 import { CATEGORIES } from "../src/plugins/categories";
 import copy from "../src/i18n/resources/en.json" with { type: "json" };
 
+// Registry fixtures retain real avatar and thumbnail URLs. Their remote servers do
+// not participate in the local directory, hydration or no-JavaScript journeys.
+test.beforeEach(async ({ page }) => {
+  await page.route(
+    /^https:\/\/(?:github\.com|(?:avatars|raw)\.githubusercontent\.com)\//,
+    (route) => {
+      if (route.request().resourceType() !== "image") return route.fallback();
+      return route.fulfill({
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"></svg>',
+      });
+    },
+  );
+});
+
 async function openPlugins(page: Page) {
   // Image hosts must not gate testing the directory controls.
   await page.goto("/plugins", { waitUntil: "domcontentloaded" });

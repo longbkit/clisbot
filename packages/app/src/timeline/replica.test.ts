@@ -1936,6 +1936,18 @@ describe("the turn footer changes together with its messages", () => {
     chat.owner.dispose();
   });
 
+  it("captures a turn that started while the initial timeline check was pending", () => {
+    const chat = createCheckedChat("Half");
+    chat.owner.replaceVisibleAgentIds("test", [AGENT_ID]);
+    chat.owner.setConnected(true);
+    agentIsRunning();
+    leaveAndReturn(chat.owner, "reconnect");
+    idleSnapshotArrives();
+
+    expect(footer()).toBe("running");
+    chat.owner.dispose();
+  });
+
   it("freshness check: behind holds the turn until the fetched rows land with the completed footer", async () => {
     const chat = createCheckedChat("Half");
     agentIsRunning();

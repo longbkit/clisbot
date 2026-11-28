@@ -1391,10 +1391,10 @@ export function createViewedTimelineSync(ports: ViewedTimelineSyncPorts): Viewed
     let statusChanged = false;
     if (options.resetCatchUpStatus) {
       for (const agentId of nextDesired) {
-        if (!visibilityCatchUpPending.has(agentId)) {
-          markCatchUpOwed(agentId);
-          statusChanged = true;
-        }
+        if (!visibilityCatchUpPending.has(agentId)) statusChanged = true;
+        // Even a pending check can outlive the start of a turn. Capture the turn on
+        // disconnect so an idle snapshot cannot settle its footer ahead of its messages.
+        markCatchUpOwed(agentId);
         if (visibilityCatchUpErrors.delete(agentId)) statusChanged = true;
         if (manualRetries.delete(agentId)) statusChanged = true;
       }

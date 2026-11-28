@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, sep } from "node:path";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { createWatcherLivenessCanary } from "../watcher-liveness-canary.js";
 import {
   createFileObserver,
@@ -336,38 +336,49 @@ test("unsubscribe cancels reconciliation queued by a write burst", async () => {
   expect(callback).toHaveBeenCalledTimes(callsAtClose);
 }, 20_000);
 
-test("aborting a pending subscription stops its startup scan and rejects", async () => {
-  const root = await createRoot();
-  // More directories than the Linux backend watches: a scan that keeps walking after the abort
-  // fails on the directory limit instead of rejecting with the abort reason.
-  await Promise.all(
-    Array.from({ length: 80 }, (_, outer) =>
-      Promise.all(
-        Array.from({ length: 70 }, (__, inner) =>
-          mkdir(join(root, `dir-${outer}`, `nested-${inner}`), { recursive: true }),
-        ),
-      ),
-    ),
-  );
-  const observer = createObserver();
-  const controller = new AbortController();
-  const reason = new Error("setup deadline passed");
-  const callback = vi.fn();
+describe("pending startup scan", () => {
+  let root: string;
 
-  const subscription = observer.subscribe(root, callback, { signal: controller.signal });
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  controller.abort(reason);
+  // Creating and removing 5,600 directories on Windows can take longer than the
+  // cancellation under test. Finish setup before the subscription's deadline starts.
+  beforeAll(async () => {
+    root = await mkdtemp(join(tmpdir(), "clisbot-observer-startup-"));
+    // More directories than the Linux backend watches: a scan that keeps walking after the abort
+    // fails on the directory limit instead of rejecting with the abort reason.
+    for (let outer = 0; outer < 80; outer++) {
+      const parent = join(root, `dir-${outer}`);
+      await mkdir(parent);
+      await Promise.all(
+        Array.from({ length: 70 }, (_, inner) => mkdir(join(parent, `nested-${inner}`))),
+      );
+    }
+  }, 120_000);
 
-  await expect(subscription).rejects.toBe(reason);
-  expect(observer.getDiagnostics()).toMatchObject({
-    activeObservationCount: 0,
-    nativeHandleCount: 0,
-    pendingReconciliationWorkCount: 0,
-  });
-  await writeFile(join(root, "dir-0", "after-abort.txt"), "late");
-  await new Promise((resolve) => setTimeout(resolve, 100));
-  expect(callback).not.toHaveBeenCalled();
-}, 20_000);
+  afterAll(async () => {
+    if (root) await rm(root, { recursive: true, force: true });
+  }, 120_000);
+
+  test("aborting a pending subscription stops its startup scan and rejects", async () => {
+    const observer = createObserver();
+    const controller = new AbortController();
+    const reason = new Error("setup deadline passed");
+    const callback = vi.fn();
+
+    const subscription = observer.subscribe(root, callback, { signal: controller.signal });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    controller.abort(reason);
+
+    await expect(subscription).rejects.toBe(reason);
+    expect(observer.getDiagnostics()).toMatchObject({
+      activeObservationCount: 0,
+      nativeHandleCount: 0,
+      pendingReconciliationWorkCount: 0,
+    });
+    await writeFile(join(root, "dir-0", "after-abort.txt"), "late");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(callback).not.toHaveBeenCalled();
+  }, 20_000);
+});
 
 test.each([false, true])(
   "closing waits for a starting backend to release its watcher (aborted: %s)",
