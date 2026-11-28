@@ -274,3 +274,15 @@ Clisbot tabs route group; nine Chinese fallback or unsupported Hub documentation
 archived or redirected. Clisbot keeps the runtime client identifier and the two previously removed
 Chinese legal pages out of source. Full path reconciliation and review decisions are recorded in
 the promotion evidence directory.
+
+### Promotion branch CI on 28 November
+
+CI run 46109244037 on c686f0dba exposed regressions beyond the local playbook checks. A human message sent during agent initialization could wait behind the create operation. The wire path now rejects it before it claims a receipt, so the same message ID can be retried after readiness. The real daemon test exercises both sends. An omitted forward timeline page limit is bounded at 200, while an explicit zero still requests full history. The browser Host listing tool follows the Browser opt-in like the other browser tools.
+
+The Linux and Windows desktop shells now keep the window drag surface above the scrolling navigation. The light theme retains its raised white selection style. Search gives an exact Host or Project name precedence for keyboard scoping. Docker personal onboarding uses the selected home's rotating Host credential and asks the local Hub for an operator-authorized pairing invitation. The container test uses loopback transport, verifies the Hub's own CLI approval page, and checks that its dashboard stays closed. The separate account-mode smoke still exercises the account claim and cookie.
+
+Eight affected server files passed 475 tests locally. The two desktop drag scenarios and both CLI SIGINT modes passed. Browser CI on this promotion also reported timeline, send, composer and Changes-pane failures. Those findings remain open until verified on the subsequent candidate.
+
+Run 46133358595 on `5577da207` passed 17 of 21 jobs. The desktop, CLI, app unit, quality and six browser shards passed. The remaining failures included a user-visible reconnect race. If a turn started while the first timeline check was pending, disconnecting could miss the active turn. An idle snapshot then marked the reply complete while the screen still showed 117 of its eventual 6,427 characters. The fix captures the turn on disconnect even when a check is already pending. The regression test failed before the fix. All 68 replica tests passed afterwards.
+
+The same review isolated three test setup problems. Home and its Add Host dialog both expose a Connect button, so the browser exercise now selects the one in the dialog. The plugin directory tests use local image responses for GitHub artwork while continuing to check the original URLs and server-rendered content in Chromium and WebKit. The Windows storage and file observation tests retain their 9,000 updates and 5,600 nested directories. Fixture setup now batches journal writes and finishes creating the directory tree before timing cancellation.

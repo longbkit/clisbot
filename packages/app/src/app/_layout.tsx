@@ -667,9 +667,11 @@ function CompactSidebarHost({
       collapsable={false}
       style={[
         layoutStyles.compactSidebarHost,
-        { opacity: visible ? 1 : 0 },
-        // DOM descendants can override pointer-events:none.
-        isWeb && !visible && { display: "none" },
+        {
+          opacity: visible ? 1 : 0,
+          // The web-only style hides descendants while preserving their measured scroll ranges.
+          ...(isWeb && !visible ? { visibility: "hidden" as const } : {}),
+        },
       ]}
       pointerEvents={interactive ? "box-none" : "none"}
       accessibilityElementsHidden={!interactive}

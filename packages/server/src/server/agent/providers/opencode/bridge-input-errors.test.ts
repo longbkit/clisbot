@@ -108,7 +108,7 @@ test("bridge preserves tool failure messages and classifies invalid requests as 
       path.join(clisbotHome, "schedules", "broken.json"),
       JSON.stringify({ id: "broken", prompt: 17 }),
     );
-    expect(await agentStorage.list()).toEqual([]);
+    expect(await agentStorage.listAll()).toEqual([]);
     const observed = [];
     for (const [tool, body, expected] of [
       [

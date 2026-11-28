@@ -52,7 +52,9 @@ function ReleaseNotes({ release }: { release: ChangelogRelease }) {
   }
   return (
     <>
-      <ReactMarkdown components={patchMarkdownComponents}>{release.highlights}</ReactMarkdown>
+      <div className="changelog-highlights">
+        <ReactMarkdown components={patchMarkdownComponents}>{release.highlights}</ReactMarkdown>
+      </div>
       {release.sections ? (
         <details className="changelog-all-changes">
           <summary className="changelog-all-changes-summary">

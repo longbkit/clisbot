@@ -42,6 +42,7 @@ import {
   expectMobileExplorerHidden,
   expectMobileExplorerVisible,
   openMobileAgentSidebarWithKeyboard,
+  swipeFromLeftEdge,
   swipeOpenMobileExplorer,
 } from "../support/helpers/sidebar";
 
@@ -459,7 +460,7 @@ test("fullscreen Send keeps the configured queue behavior while an agent runs", 
   }
 });
 
-test("editing a queued draft restores its original height with the focus hint visible", async ({
+test("editing a queued draft restores its original height in the compact composer", async ({
   page,
 }) => {
   await configureComposerQueueSend(page);
@@ -473,12 +474,24 @@ test("editing a queued draft restores its original height with the focus hint vi
     const draft = "Please review the latest changes.\nPlease review the latest changes.";
     await fillComposerDraft(page, draft);
     const originalHeight = await composerHeight(page);
+    const originalWidth = await composerLocator(page).evaluate((el) => el.clientWidth);
     await queueComposerWithButton(page);
     await expect(composerLocator(page)).toHaveValue("");
     await composerLocator(page).blur();
-    await expect(page.getByText(/ to focus$/)).toBeVisible();
-    await page.getByRole("button", { name: "Edit queued message", exact: true }).click();
+    const focusHint = page.getByText(/ to focus$/);
+    if (CHAT_LAYOUT) await expect(focusHint).toBeHidden();
+    else await expect(focusHint).toBeVisible();
+    await page.getByTestId("queue-row-more").click();
+    await page.getByTestId("queue-row-edit").click();
     await expect(composerLocator(page)).toHaveValue(draft);
+    await expect(
+      page.getByTestId("composer-send-button").filter({ visible: true }),
+    ).toHaveAccessibleName("Save changes");
+    if (CHAT_LAYOUT) {
+      await expect
+        .poll(() => composerLocator(page).evaluate((el) => el.clientWidth))
+        .toBe(originalWidth);
+    }
     await expectComposerHeight(page, originalHeight);
   } finally {
     await agent.cleanup();
@@ -584,7 +597,7 @@ test("a real compact overlay over a fullscreen editor leaves the exit action alo
     if (usesChatNavigation) {
       // Home V2 deliberately removes the left drawer, including while fullscreen.
       // Prove that swipe leaves the editor intact, then cover it with the real Explorer.
-      await openMobileAgentSidebarWithKeyboard(page);
+      await swipeFromLeftEdge(page);
       await expectMobileAgentSidebarHidden(page);
       await expectComposerFullscreenControls(page);
       await expect(composerLocator(page)).toHaveValue(draft);

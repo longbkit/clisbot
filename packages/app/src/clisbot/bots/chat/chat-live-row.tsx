@@ -1,3 +1,7 @@
+import {
+  ToolCallExpansionContext,
+  useAgentToolCallExpansion,
+} from "@/tool-calls/expansion-context";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
 import type { ChatToolDisplay } from "@clisbot/protocol/chats/tool-display";
 import { PermissionRequestCard } from "@/agent-stream/view";
@@ -68,6 +72,7 @@ export const ChatLiveRow = memo(function ChatLiveRow({
   toolDisplay?: ChatToolDisplay;
 }) {
   const client = useHostRuntimeClient(serverId);
+  const expansion = useAgentToolCallExpansion(bot.agentId ?? bot.botId);
   const face = useMemo(
     () => (
       <BotFace botId={bot.botId} name={bot.name} avatar={bot.avatar} size={ACTOR_AVATAR_SIZE} />
@@ -90,22 +95,24 @@ export const ChatLiveRow = memo(function ChatLiveRow({
   // A finished turn whose only leftovers are tool calls the header now shows draws nothing.
   if (!hasContent) return null;
   return (
-    <ActorResponseRow face={face} name={bot.name} opensGroup={row.opensGroup}>
-      {liveRowItems(row, toolDisplay, bot, serverId, client)}
-      {row.permissions.map((permission) => (
-        <PermissionRequestCard
-          key={permission.key}
-          permission={permission}
-          serverId={serverId}
-          client={client}
-        />
-      ))}
-      {row.showWorkingIndicator === false && metadata ? (
-        <ResponseFooter>{metadata}</ResponseFooter>
-      ) : null}
-      {showWorking ? (
-        <RunningTurnFooter inFlightTurnStartedAt={row.startedAt ?? null} metadata={metadata} />
-      ) : null}
-    </ActorResponseRow>
+    <ToolCallExpansionContext.Provider value={expansion}>
+      <ActorResponseRow face={face} name={bot.name} opensGroup={row.opensGroup}>
+        {liveRowItems(row, toolDisplay, bot, serverId, client)}
+        {row.permissions.map((permission) => (
+          <PermissionRequestCard
+            key={permission.key}
+            permission={permission}
+            serverId={serverId}
+            client={client}
+          />
+        ))}
+        {row.showWorkingIndicator === false && metadata ? (
+          <ResponseFooter>{metadata}</ResponseFooter>
+        ) : null}
+        {showWorking ? (
+          <RunningTurnFooter inFlightTurnStartedAt={row.startedAt ?? null} metadata={metadata} />
+        ) : null}
+      </ActorResponseRow>
+    </ToolCallExpansionContext.Provider>
   );
 });

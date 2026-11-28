@@ -228,8 +228,14 @@ async function openContribution(page: Page, title: string, expectedBody: string)
 }
 
 async function leavePluginSettings(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Back", exact: true }).click();
-  await expect(page).not.toHaveURL(/\/settings\//);
+  const visited = new Set<string>();
+  while (new URL(page.url()).pathname.startsWith("/settings")) {
+    const current = page.url();
+    expect(visited.has(current), "Back should leave each settings page once").toBe(false);
+    visited.add(current);
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expect(page).not.toHaveURL(current);
+  }
 }
 
 async function openContributionFromSettings(

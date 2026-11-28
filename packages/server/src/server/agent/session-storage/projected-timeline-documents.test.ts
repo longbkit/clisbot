@@ -18,12 +18,12 @@ afterEach(async () => {
     await fs.rm(directory, { recursive: true, force: true });
   }
 });
-async function fixture(rows: AgentTimelineRow[]) {
+async function fixture(rows: AgentTimelineRow[], batchSize = 32) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "timeline-documents-"));
   directories.push(directory);
   const store = new FileAgentTimelineStore(async () => directory);
-  for (let start = 0; start < rows.length; start += 32)
-    await store.bulkInsert("a", rows.slice(start, start + 32));
+  for (let start = 0; start < rows.length; start += batchSize)
+    await store.bulkInsert("a", rows.slice(start, start + batchSize));
   return { directory, store };
 }
 function message(seq: number, size = 16 * 1024): AgentTimelineRow {
@@ -71,7 +71,8 @@ describe("projected timeline documents", () => {
       if (row.item.type === "tool_call") row.item.callId = `child-${i % 3}`;
       rows.push(row);
     }
-    const { store } = await fixture(rows);
+    // Build the same 9,050 durable rows without forcing hundreds of separate fsyncs.
+    const { store } = await fixture(rows, 256);
     const read = vi.spyOn(SessionEventStream.prototype, "read");
     const page = await store.fetchProjectedCommitted("a", {
       pagingMode: "source_ranges",

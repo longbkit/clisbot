@@ -2090,7 +2090,13 @@ export function NewWorkspaceScreen({
     isCompact,
     isPending,
     pluginItems: (
-      <PluginNewWorkspaceItems serverId={selectedServerId} screen={pluginScreen} setup={setup} />
+      <NewWorkspaceProjectItems
+        serverId={selectedServerId}
+        screen={pluginScreen}
+        setup={setup}
+        startKind={startKind}
+        connected={isConnected}
+      />
     ),
     project: {
       anchorRef: projectPickerAnchorRef,
@@ -2399,6 +2405,22 @@ function startTitle(home: boolean, t: TFunction): string {
  * The setup model, built with what the screen has this render so a plugin item's mount effect can
  * already run commands, and kept current on every commit.
  */
+function NewWorkspaceProjectItems({
+  startKind,
+  connected,
+  ...props
+}: {
+  startKind: string;
+  connected: boolean;
+  serverId: string;
+  screen: NewWorkspaceItemsScreen;
+  setup: NewWorkspaceSetup;
+}) {
+  if (HOME_V2_ENABLED && (startKind !== "project" || !props.screen.project || !connected))
+    return null;
+  return <PluginNewWorkspaceItems {...props} />;
+}
+
 function usePluginSetup(input: {
   serverId: string;
   project: Parameters<typeof getHostProjectId>[0] | null;

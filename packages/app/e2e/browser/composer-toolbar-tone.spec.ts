@@ -10,6 +10,8 @@ import {
 } from "../support/helpers/composer-toolbar-tone";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 
+const USES_CLISBOT_PICKER = process.env.EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER !== "0";
+const MODEL_CHIP = "composer-model-chip";
 const THINKING = "agent-thinking-selector";
 const MODE = "mode-control";
 const ATTACH = "message-input-attach-button";
@@ -36,27 +38,37 @@ async function openSeededComposer(
   }
 }
 
+function readAttachmentGlyph(page: import("@playwright/test").Page) {
+  return async () => (await readComposerControlTone(composerControl(page, ATTACH))).glyph;
+}
+
 test.describe("Composer toolbar glyph tone", () => {
   test.describe.configure({ timeout: 180_000 });
 
   test.describe("on a touch screen", () => {
     test.use({ hasTouch: true, viewport: { width: 1024, height: 1366 } });
 
-    test("a glyph beside its label matches the label while an icon-only glyph stays foreground", async ({
-      page,
-    }) => {
+    test("paints labelled and icon-only actions with their layout tones", async ({ page }) => {
       const agent = await openSeededComposer(page, "composer-tone-touch-");
       try {
-        const thinking = await readComposerControlTone(composerControl(page, THINKING));
+        const selection = await readComposerControlTone(
+          composerControl(page, USES_CLISBOT_PICKER ? MODEL_CHIP : THINKING),
+        );
         const mode = await readComposerControlTone(composerControl(page, MODE));
         const attach = await readComposerControlTone(composerControl(page, ATTACH));
 
-        expectGlyphMatchesLabel(thinking, "thinking");
+        expectGlyphMatchesLabel(selection, "model or thinking selection");
         expectGlyphMatchesLabel(mode, "mode");
         expectIconOnlyGlyph(attach, "attach");
-        expect(attach.glyph, "an icon-only glyph is brighter than a labelled glyph").not.toBe(
-          thinking.label,
-        );
+        if (USES_CLISBOT_PICKER) {
+          expect(attach.glyph, "the chat paperclip and model label share their resting tone").toBe(
+            selection.label,
+          );
+        } else {
+          expect(attach.glyph, "an icon-only glyph is brighter than a labelled glyph").not.toBe(
+            selection.label,
+          );
+        }
       } finally {
         await agent.cleanup();
       }
@@ -66,22 +78,31 @@ test.describe("Composer toolbar glyph tone", () => {
   test.describe("on a compact non-touch window", () => {
     test.use({ hasTouch: false, viewport: { width: 590, height: 844 } });
 
-    test("the icon-only thinking glyph stays foreground and the labelled mode glyph matches its label", async ({
-      page,
-    }) => {
+    test("preserves the compact model, mode and attachment tones", async ({ page }) => {
       const agent = await openSeededComposer(page, "composer-tone-compact-");
       try {
-        const thinking = await readComposerControlTone(composerControl(page, THINKING));
+        const selection = await readComposerControlTone(
+          composerControl(page, USES_CLISBOT_PICKER ? MODEL_CHIP : THINKING),
+        );
         const mode = await readComposerControlTone(composerControl(page, MODE));
         const attach = await readComposerControlTone(composerControl(page, ATTACH));
 
-        expectIconOnlyGlyph(thinking, "thinking");
         expectGlyphMatchesLabel(mode, "mode");
         expectIconOnlyGlyph(attach, "attach");
-        expect(thinking.glyph, "the icon-only glyphs share one tone").toBe(attach.glyph);
-        expect(thinking.glyph, "an icon-only glyph is brighter than a labelled glyph").not.toBe(
-          mode.label,
-        );
+        if (USES_CLISBOT_PICKER) {
+          expectGlyphMatchesLabel(selection, "combined model and effort");
+          expect(attach.glyph, "the chat paperclip rests at the model chip tone").toBe(
+            selection.label,
+          );
+          await composerControl(page, ATTACH).hover();
+          await expect.poll(readAttachmentGlyph(page)).not.toBe(selection.label);
+        } else {
+          expectIconOnlyGlyph(selection, "thinking");
+          expect(selection.glyph, "the icon-only glyphs share one tone").toBe(attach.glyph);
+          expect(selection.glyph, "an icon-only glyph is brighter than a labelled glyph").not.toBe(
+            mode.label,
+          );
+        }
       } finally {
         await agent.cleanup();
       }
@@ -89,12 +110,31 @@ test.describe("Composer toolbar glyph tone", () => {
   });
 
   test.describe("on a folded compact non-touch window", () => {
-    test.use({ hasTouch: false, viewport: { width: 480, height: 844 } });
+    test.use({ hasTouch: false, colorScheme: "light", viewport: { width: 490, height: 844 } });
 
     test("the empty composer placeholder is quieter than its labels", async ({ page }) => {
-      const agent = await openSeededComposer(page, "composer-tone-placeholder-", COMBINED_MODEL);
+      const agent = await openSeededComposer(
+        page,
+        "composer-tone-placeholder-",
+        USES_CLISBOT_PICKER ? MODEL_CHIP : COMBINED_MODEL,
+      );
       try {
         const placeholder = await readComposerPlaceholderTone(composerLocator(page));
+        // Clisbot's light theme has a dedicated placeholder token (#a1a1aa).
+        expect(placeholder, "the composer paints the light-theme placeholder tone").toBe(
+          "rgb(161, 161, 170)",
+        );
+        if (USES_CLISBOT_PICKER) {
+          const chip = composerControl(page, MODEL_CHIP);
+          await expect(chip).toHaveAccessibleName(/Ten second stream.*Low/i);
+          const { label } = await readComposerControlTone(chip);
+          expect(label).not.toBeNull();
+          expect(
+            placeholder,
+            "the placeholder stays distinct from the compact model and effort label",
+          ).not.toBe(label);
+          return;
+        }
         const extraMuted = await readComposerTextTone(
           composerControl(page, "combined-model-selector-thinking-label"),
         );
@@ -102,9 +142,10 @@ test.describe("Composer toolbar glyph tone", () => {
           composerControl(page, "combined-model-selector-model-label"),
         );
 
-        expect(placeholder, "the composer paints a placeholder").not.toBeNull();
         expect(extraMuted, "the folded thinking label paints the extra-muted tone").not.toBeNull();
-        expect(placeholder, "the placeholder uses the extra-muted tone").toBe(extraMuted);
+        expect(placeholder, "the placeholder stays distinct from the effort label").not.toBe(
+          extraMuted,
+        );
         expect(placeholder, "the placeholder is quieter than a labelled glyph").not.toBe(muted);
       } finally {
         await agent.cleanup();
@@ -118,10 +159,12 @@ test.describe("Composer toolbar glyph tone", () => {
     test("a labelled glyph stays muted and matches its label", async ({ page }) => {
       const agent = await openSeededComposer(page, "composer-tone-pointer-");
       try {
-        const thinking = await readComposerControlTone(composerControl(page, THINKING));
+        const selection = await readComposerControlTone(
+          composerControl(page, USES_CLISBOT_PICKER ? MODEL_CHIP : THINKING),
+        );
         const mode = await readComposerControlTone(composerControl(page, MODE));
 
-        expectGlyphMatchesLabel(thinking, "thinking");
+        expectGlyphMatchesLabel(selection, "model or thinking selection");
         expectGlyphMatchesLabel(mode, "mode");
       } finally {
         await agent.cleanup();

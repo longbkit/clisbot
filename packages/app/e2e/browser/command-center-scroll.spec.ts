@@ -6,7 +6,7 @@ import {
   observeCommandCenterRowRenders,
   searchCommandCenter,
   warmCommandCenterRows,
-  expectOnlyCommandCenterRowRendered,
+  expectOnlyCommandCenterRowsRendered,
   expectCommandCenterWorkspaceWindow,
   scrollToOldestCommandCenterWorkspace,
 } from "../support/helpers/command-center-performance";
@@ -87,7 +87,7 @@ test("live search updates render only the changed row and keep workspaces virtua
     await gotoAppShell(page);
     const panel = await openCommandCenterWithKeyboard(page);
 
-    await test.step("renaming a matched agent re-renders only its workspace", async () => {
+    await test.step("renaming a matched agent re-renders its own result and its workspace", async () => {
       await searchCommandCenter(panel, "Search agent 002");
       const agentLine = panel
         .getByTestId(`command-center-workspace-${getServerId()}:${seeded.workspaceId}`)
@@ -96,7 +96,11 @@ test("live search updates render only the changed row and keep workspaces virtua
       await warmCommandCenterRows(page);
       await seeded.client.updateAgent(seeded.agents[2].id, { name: "Search agent 002 revised" });
       await expect(agentLine).toHaveText("Search agent 002 revised");
-      await expectOnlyCommandCenterRowRendered(page, agentWorkspaceRowId);
+      const agentKey = `${getServerId()}:${seeded.agents[2].id}`;
+      await expect(panel.getByTestId(`command-center-agent-${agentKey}`)).toContainText(
+        "Search agent 002 revised",
+      );
+      await expectOnlyCommandCenterRowsRendered(page, agentWorkspaceRowId, `agent:${agentKey}`);
     });
 
     await test.step("renaming a workspace re-renders only its row", async () => {
@@ -108,7 +112,7 @@ test("live search updates render only the changed row and keep workspaces virtua
         "Search workspace 039 revised",
       );
       await expect(panel.getByText("Search workspace 039 revised", { exact: true })).toBeVisible();
-      await expectOnlyCommandCenterRowRendered(
+      await expectOnlyCommandCenterRowsRendered(
         page,
         `workspace:${getServerId()}:${seeded.workspaces[39].id}`,
       );

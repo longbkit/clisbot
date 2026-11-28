@@ -407,6 +407,7 @@ export async function expectLoadedTimelineDoesNotScroll(page: Page): Promise<voi
 export async function reloadAgentTimelineFromPersistedReplica(
   page: Page,
   agent: LongTimelineAgent,
+  whileDisconnected?: () => Promise<void>,
 ): Promise<void> {
   // The tail's size is the cache's business: 256 KB of compact items with the offline cache, the
   // last 50 without it (docs/features/offline/offline-cache.md). The reload needs the newest row.
@@ -422,7 +423,14 @@ export async function reloadAgentTimelineFromPersistedReplica(
     })
     .toBe(true);
 
-  await page.reload();
+  if (whileDisconnected) {
+    const url = page.url();
+    await page.goto("about:blank");
+    await whileDisconnected();
+    await page.goto(url);
+  } else {
+    await page.reload();
+  }
   await expectTimelinePromptVisible(page, agent.newestPrompt);
 }
 

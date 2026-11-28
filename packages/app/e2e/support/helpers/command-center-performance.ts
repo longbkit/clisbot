@@ -72,7 +72,7 @@ async function countRowRendersOverQuietPeriod() {
   ).length;
 }
 
-export async function expectOnlyCommandCenterRowRendered(page: Page, resultId: string) {
+export async function expectOnlyCommandCenterRowsRendered(page: Page, ...resultIds: string[]) {
   await page.evaluate(
     () =>
       new Promise<void>((resolve) =>
@@ -86,7 +86,9 @@ export async function expectOnlyCommandCenterRowRendered(page: Page, resultId: s
       ),
     ),
   );
-  expect(renders).toEqual({ [`CommandCenterResultRow:${resultId}`]: { render: 1 } });
+  expect(renders).toEqual(
+    Object.fromEntries(resultIds.map((id) => [`CommandCenterResultRow:${id}`, { render: 1 }])),
+  );
 }
 
 const WORKSPACE_ROWS =

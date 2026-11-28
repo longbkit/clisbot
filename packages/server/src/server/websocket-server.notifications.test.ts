@@ -65,8 +65,8 @@ interface WebSocketServerInternals {
     agentId: string;
     reason: string;
     preview?: string;
-    providerId?: string;
-    timestamp?: string;
+    provider: string;
+    attentionTimestamp: Date | null;
   }): Promise<void>;
 }
 
@@ -648,11 +648,15 @@ async function contentDeliveries(
   return counts();
 }
 
+// Each call models a distinct unread finish, even within the same millisecond.
+let nextFinishAt = 1;
+
 async function finish(
   server: VoiceAssistantWebSocketServer,
   reason: "finished" | "permission" | "error" = "finished",
 ) {
   await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
+    attentionTimestamp: new Date(nextFinishAt++),
     agentId: "agent-1",
     provider: "claude",
     reason,
@@ -1434,6 +1438,7 @@ describe("push audience before Expo", () => {
     installHub(server, fakeHub);
 
     await asInternals<WebSocketServerInternals>(server).broadcastAgentAttention({
+      attentionTimestamp: new Date(),
       agentId: "agent-1",
       provider: "claude",
       reason: testCase.reason,

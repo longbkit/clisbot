@@ -33,3 +33,33 @@ index 48e3771..0fba1af 100644
                  }
              } else {
                  mFabricUIManager.synchronouslyUpdateViewOnUIThread(viewTag, props)
+diff --git a/node_modules/react-native-reanimated/src/layoutReanimation/web/domUtils.ts b/node_modules/react-native-reanimated/src/layoutReanimation/web/domUtils.ts
+--- a/node_modules/react-native-reanimated/src/layoutReanimation/web/domUtils.ts
++++ b/node_modules/react-native-reanimated/src/layoutReanimation/web/domUtils.ts
+@@ -159,4 +159,9 @@
+   child.onanimationend = function (event: AnimationEvent) {
+-    parent.removeChild(child);
++    // A descendant's animation can finish first; wait for this exit.
++    if (event.target !== child) return;
++    child.onanimationend = originalOnAnimationEnd;
++    if (child.parentNode === parent) {
++      parent.removeChild(child);
++    }
+-
++
+     // Given that this function overrides onAnimationEnd, it won't be null
+diff --git a/node_modules/react-native-reanimated/lib/module/layoutReanimation/web/domUtils.js b/node_modules/react-native-reanimated/lib/module/layoutReanimation/web/domUtils.js
+--- a/node_modules/react-native-reanimated/lib/module/layoutReanimation/web/domUtils.js
++++ b/node_modules/react-native-reanimated/lib/module/layoutReanimation/web/domUtils.js
+@@ -106,4 +106,9 @@
+   child.onanimationend = function (event) {
+-    parent.removeChild(child);
++    // A descendant's animation can finish first; wait for this exit.
++    if (event.target !== child) return;
++    child.onanimationend = originalOnAnimationEnd;
++    if (child.parentNode === parent) {
++      parent.removeChild(child);
++    }
+-
++
+     // Given that this function overrides onAnimationEnd, it won't be null

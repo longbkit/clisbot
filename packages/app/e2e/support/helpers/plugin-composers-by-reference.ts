@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { gotoAppShell } from "./app";
+import { composerModelChip, composerPickerPanel } from "./composer-picker";
 import { attachComposerTestImage, openImageLightbox } from "./composer";
 import {
   contextWindowDetails,
@@ -146,7 +147,7 @@ export async function withComposerToolsExample(
         }),
       insertChecklistFromControlsSheet: () =>
         test.step("press the Action in the composer's controls sheet", async () => {
-          await page.getByRole("button", { name: /^Select model/ }).click();
+          await page.getByRole("button", { name: "Open agent features" }).click();
           await page.getByText("Insert checklist", { exact: true }).click();
         }),
       expectComposerReadyToType: (text) =>
@@ -495,8 +496,13 @@ export default function contribute(client) {
           });
           await page.keyboard.press("ControlOrMeta+n");
           await expect(page).toHaveURL(/\/new(?:\?.*)?$/);
-          // A compact composer mounts plugin items inside its controls sheet.
-          await page.getByRole("button", { name: /^Select model/ }).click();
+          if (process.env.EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER === "0") {
+            // The classic compact composer mounts its plugins inside the controls sheet.
+            await page.getByRole("button", { name: /^Select model/ }).click();
+          } else {
+            await page.getByTestId("agent-controls-features").click();
+            await expect(page.getByTestId("agent-features-sheet")).toBeVisible();
+          }
           await page.waitForFunction(() => (globalThis as HeldComposerGlobal).heldComposer);
           await tapSheetBackdrop(page);
           await expectNoSheetOpen(page);
@@ -508,6 +514,14 @@ export default function contribute(client) {
         }),
       openThinkingPicker: () =>
         test.step("open the thinking picker in the New workspace composer", async () => {
+          if (process.env.EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER !== "0") {
+            await composerModelChip(page).click();
+            await expect(composerPickerPanel(page)).toBeVisible();
+            await expect(
+              composerPickerPanel(page).getByTestId("composer-picker-reasoning"),
+            ).toBeVisible();
+            return;
+          }
           await page
             .getByRole("button", { name: /^Select thinking option/ })
             .filter({ visible: true })

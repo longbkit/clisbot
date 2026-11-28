@@ -2,6 +2,7 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { StreamItem } from "@/types/stream";
+import { createNearBottom } from "./near-bottom";
 import { useReadingAnchor } from "./use-reading-anchor";
 const f = vi.hoisted(() => ({ restore: vi.fn(), items: [] as unknown[], epoch: "epoch" }));
 vi.mock("@/stores/session-store", () => ({
@@ -42,10 +43,12 @@ it("restores the retained row at the same offset without fetching", async () => 
       getMessageOffset: () => -32,
     },
   };
+  const nearBottom = createNearBottom();
+  nearBottom.set(false);
   const base = {
     serverId: "host",
     agentId: "agent",
-    nearBottom: false,
+    nearBottom,
     ready: true,
     head: [],
     viewportRef,
@@ -79,10 +82,12 @@ it("fetches an evicted canonical anchor once and waits for its row before scroll
       getMessageOffset: () => 12,
     },
   };
+  const nearBottom = createNearBottom();
+  nearBottom.set(false);
   const base = {
     serverId: "host",
     agentId: "agent",
-    nearBottom: false,
+    nearBottom,
     ready: true,
     head: [],
     viewportRef,

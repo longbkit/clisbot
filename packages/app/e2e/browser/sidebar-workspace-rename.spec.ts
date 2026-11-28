@@ -180,7 +180,10 @@ test.describe("Sidebar workspace rename", () => {
 
       await expect(input).toHaveValue("Held title");
       await expect(input).not.toBeEditable();
-      await expect(row).not.toContainText("main");
+      // Branch metadata can still say main while the editable title is replaced.
+      await expect(
+        row.getByTestId(`sidebar-workspace-title-${getServerId()}:${workspace.workspaceId}`),
+      ).toHaveCount(0);
 
       gate.releaseHeldServerMessage("workspace_update");
       await expect(input).toHaveCount(0);

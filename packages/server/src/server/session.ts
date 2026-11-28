@@ -9940,8 +9940,7 @@ export class Session {
         }
       : undefined;
     // Clisbot reads history through its projected (durable session storage) path, paged here.
-    const requestedLimit = msg.limit;
-    const pageLimit = requestedLimit ?? (direction === "after" ? 0 : 200);
+    const pageLimit = msg.limit ?? 200;
 
     try {
       const { snapshot, agentPayload } = await this.resolveTimelineAgent(msg.agentId);
@@ -9956,8 +9955,7 @@ export class Session {
           ? msg.pagingMode
           : undefined,
         allowDeferredPayloads: msg.allowDeferredPayloads,
-        // Whole turns apply to plain projected pages; source-range pages carry their own context.
-        wholeTurns: msg.wholeTurns === true && msg.pagingMode !== "source_ranges",
+        wholeTurns: msg.wholeTurns === true,
       });
       const startCursor =
         selectedTimeline.startSeq !== null
@@ -10538,6 +10536,11 @@ export class Session {
       if (msg.expectedTurnId && !this.optionsInputQueues?.enabled)
         throw new Error("Exact turn steering is disabled on this Host");
 
+      // Registration exposes the agent before its lifecycle lane becomes available.
+      // Reject a human send before recording a receipt or waiting on that lane.
+      if (!msg.sourceAgentId && this.agentManager.getAgent(agentId)?.lifecycle === "initializing") {
+        throw new Error(`Agent '${agentId}' is still initializing`);
+      }
       const messageId = resolveClientMessageId(msg.messageId);
       const files = await this.workspaceFilesSession.attachMessageFiles(
         agentId,

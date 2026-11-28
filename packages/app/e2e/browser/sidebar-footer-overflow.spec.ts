@@ -3,6 +3,7 @@ import { addProjectFlow } from "../support/helpers/add-project-flow";
 import { gotoAppShell } from "../support/helpers/app";
 import {
   chooseFooterOverflowAction,
+  configureFiveFooterActions,
   expectFooterLine,
   expectFooterMenusInsideViewport,
   expectFooterNeverClipped,
@@ -15,7 +16,7 @@ import {
 import { addOfflineHostsAndReload } from "../support/helpers/hosts";
 import { openCompactSidebar } from "../support/helpers/usage-sidebar-item";
 
-const TOUCH_CONTROL = 44;
+const TOUCH_CONTROL = 48;
 const MIN_SIDEBAR_WIDTH = 200;
 const ALL_INLINE = [
   "sidebar-add-project",
@@ -24,7 +25,7 @@ const ALL_INLINE = [
   "sidebar-help",
   "sidebar-settings",
 ];
-// Five 44pt buttons and the row's padding need 236pt; 200pt holds three and the caret.
+// Keep the touch targets at the same 48pt size as the rest of the Clisbot sidebar.
 const NARROW_TOUCH_LINE = [
   "sidebar-add-project",
   "sidebar-hosts-trigger",
@@ -33,6 +34,7 @@ const NARROW_TOUCH_LINE = [
 ];
 
 test.describe("Sidebar footer on a touch screen", () => {
+  test.beforeEach(configureFiveFooterActions);
   test.use({ viewport: { width: 1280, height: 800 }, hasTouch: true });
 
   test("a narrow docked sidebar moves the actions it can't fit behind a caret", async ({
@@ -41,12 +43,15 @@ test.describe("Sidebar footer on a touch screen", () => {
     await seedDockedSidebarWidth(page, MIN_SIDEBAR_WIDTH);
     await watchFooterClipping(page);
     await gotoAppShell(page);
-    await expectFooterLine(page, { testIDs: NARROW_TOUCH_LINE, controlSize: TOUCH_CONTROL });
+    await expectFooterLine(page, {
+      testIDs: ["sidebar-add-project", "sidebar-footer-overflow", "sidebar-settings"],
+      controlSize: TOUCH_CONTROL,
+    });
     await expectFooterNeverClipped(page);
 
     await test.step("Help opens as a page of the overflow menu", async () => {
       await openFooterOverflow(page);
-      await expectFooterOverflowActions(page, ["Usage", "Help and support"]);
+      await expectFooterOverflowActions(page, ["Usage", "Hosts", "Help and support"]);
       await chooseFooterOverflowAction(page, "Help and support");
       await expect(page.getByRole("menuitem", { name: "What's new" })).toBeVisible();
       await expect(page.getByTestId("sidebar-help-menu")).toHaveCount(0);
@@ -64,11 +69,11 @@ test.describe("Sidebar footer on a touch screen", () => {
     });
 
     await test.step("Add project and Settings shortcuts still work", async () => {
-      await page.keyboard.press("Control+o");
+      await page.keyboard.press("ControlOrMeta+o");
       await expect(addProjectFlow(page)).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(addProjectFlow(page)).toBeHidden();
-      await page.keyboard.press("Control+,");
+      await page.keyboard.press("ControlOrMeta+,");
       await expect(page).toHaveURL(/\/settings\/general$/);
     });
   });
@@ -80,13 +85,17 @@ test.describe("Sidebar footer on a touch screen", () => {
 });
 
 test.describe("Sidebar footer in a compact overlay narrower than the footer", () => {
+  test.beforeEach(configureFiveFooterActions);
   test.use({ viewport: { width: 220, height: 800 }, hasTouch: true });
 
   test("the overflow menu reaches the hidden actions", async ({ page }) => {
     await watchFooterClipping(page);
     await gotoAppShell(page);
     await openCompactSidebar(page);
-    await expectFooterLine(page, { testIDs: NARROW_TOUCH_LINE, controlSize: TOUCH_CONTROL });
+    await expectFooterLine(page, {
+      testIDs: NARROW_TOUCH_LINE.toReversed(),
+      controlSize: TOUCH_CONTROL,
+    });
     await expectFooterNeverClipped(page);
     await openFooterOverflow(page);
     await expectFooterOverflowActions(page, ["Usage", "Help and support"]);
@@ -96,6 +105,7 @@ test.describe("Sidebar footer in a compact overlay narrower than the footer", ()
 
 test.describe("Sidebar footer on a short, narrow phone", () => {
   // 164pt for buttons holds Settings, Add project and the caret, so Hosts moves behind it.
+  test.beforeEach(configureFiveFooterActions);
   test.use({ viewport: { width: 180, height: 360 }, hasTouch: true });
 
   test("the overflow Hosts page scrolls to its last host and Add host", async ({ page }) => {
@@ -109,19 +119,40 @@ test.describe("Sidebar footer on a short, narrow phone", () => {
     );
     await openCompactSidebar(page);
     await expectFooterLine(page, {
-      testIDs: ["sidebar-add-project", "sidebar-footer-overflow", "sidebar-settings"],
+      testIDs: ["sidebar-settings", "sidebar-footer-overflow", "sidebar-add-project"],
       controlSize: TOUCH_CONTROL,
     });
     await openFooterOverflow(page);
     await expectFooterOverflowActions(page, ["Usage", "Hosts", "Help and support"]);
     await expectFooterMenusInsideViewport(page);
     await chooseFooterOverflowAction(page, "Hosts");
-    await expectFooterMenusInsideViewport(page);
-    const addHost = page.getByRole("menuitem", { name: "Add host" });
+    const lastHost = page.getByTestId("sidebar-host-row-overflow-host-9");
+    await lastHost.scrollIntoViewIfNeeded();
+    await expect(lastHost).toBeInViewport();
+    await lastHost.click();
+    await openFooterOverflow(page);
+    await chooseFooterOverflowAction(page, "Hosts");
+    await expect(
+      page.getByRole("button", { name: "Open Overflow host 9 settings", exact: true }),
+    ).toBeAttached();
+    const addHost = page.getByTestId("sidebar-host-add");
     await addHost.scrollIntoViewIfNeeded();
-    await expect(page.getByRole("menuitem", { name: "Overflow host 9" })).toBeVisible();
     await expect(addHost).toBeInViewport();
     await addHost.click();
     await expect(page.getByText("Add connection", { exact: true })).toBeVisible();
+  });
+});
+
+test.describe("Default Clisbot footer", () => {
+  test.use({ viewport: { width: 200, height: 700 }, hasTouch: true });
+  test("keeps New visible and Search reachable when space runs out", async ({ page }) => {
+    await watchFooterClipping(page);
+    await gotoAppShell(page);
+    await openCompactSidebar(page);
+    await expect(page.getByTestId("sidebar-new")).toBeInViewport();
+    await openFooterOverflow(page);
+    await chooseFooterOverflowAction(page, "Search");
+    await expect(page.getByTestId("command-center-input")).toBeVisible();
+    await expectFooterNeverClipped(page);
   });
 });

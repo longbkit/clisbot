@@ -65,6 +65,7 @@ function assertIntegratedHub(name) {
     import http from 'node:http';
     const origin = 'http://localhost:6868';
     const page = await fetch(origin);
+    assert.ok(page.headers.get('content-type')?.includes('text/html'));
     assert.match(await page.text(), /__CLISBOT_HUB_ENABLED__=true/);
     const headers = { 'content-type': 'application/json', origin };
     const claim = await fetch(origin + '/api/auth/clisbot/claim-instance', { method: 'POST', headers, body: JSON.stringify({ email: 'smoke@example.test', password: 'isolated-smoke-password' }) });
@@ -121,10 +122,19 @@ function assertDaemonSocket(name) {
     "-e",
     `
     import assert from 'node:assert/strict';
+    import { createRequire } from 'node:module';
+    const WebSocket = createRequire('/usr/local/lib/node_modules/@clisbot/server/package.json')('ws');
+    import { setTimeout as delay } from 'node:timers/promises';
     async function connect(protocol) {
       return new Promise((resolve, reject) => {
         const socket = new WebSocket('ws://localhost:6868/ws', protocol ? [protocol] : []);
         const timeout = setTimeout(() => { socket.close(); reject(Error('daemon hello timed out')); }, 5000);
+        socket.once('unexpected-response', (request, response) => {
+          clearTimeout(timeout);
+          response.resume();
+          request.destroy();
+          resolve(response.statusCode);
+        });
         socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'hello', clientId: 'docker-smoke', clientType: 'cli', protocolVersion: 1 })));
         socket.addEventListener('message', event => {
           const message = JSON.parse(event.data);
@@ -133,10 +143,17 @@ function assertDaemonSocket(name) {
           }
         });
         socket.addEventListener('close', event => { clearTimeout(timeout); resolve(event.code); });
-        socket.addEventListener('error', () => { clearTimeout(timeout); reject(Error('daemon WebSocket failed')); });
+        socket.addEventListener('error', event => { clearTimeout(timeout); reject(event.error); });
       });
     }
-    assert.equal(await connect(), 4401, 'daemon hello rejects missing credentials');
+    // HTTP health can be available while the WebSocket listener is starting.
+    const deadline = Date.now() + 30_000;
+    let anonymous = await connect();
+    while (anonymous === 503 && Date.now() < deadline) {
+      await delay(100);
+      anonymous = await connect();
+    }
+    assert.equal(anonymous, 4401, 'daemon hello rejects missing credentials');
     assert.equal(await connect('clisbot.bearer.wrong-password'), 4401, 'daemon rejects wrong password');
     assert.equal(await connect('clisbot.bearer.isolated-container-test'), 'server_info', 'daemon admits its password');
   `,
@@ -265,24 +282,36 @@ try {
     const deps = createBotStartDeps(home, process.env);
     assert.equal((await deps.ensureDaemonUp(home, process.env)).daemon, 'started');
     await deps.waitDaemonUp(home);
+    const { saveTransportChoice } = await import('/usr/local/lib/node_modules/@clisbot/cli/dist/commands/serve/transport-choice.js');
+    saveTransportChoice(home, 'local');
     const hub = await deps.ensureHubUp(home, process.env);
     await deps.waitHubReady(hub.url);
     const start = await fetch(hub.url + '/api/v1/cli-authorizations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
     assert.equal(start.status, 201);
     const login = await start.json();
-    assert.equal(new URL(login.verificationUri).origin, 'http://127.0.0.1:7181');
+    assert.equal(new URL(login.verificationUri).origin, hub.url);
+    assert.equal(new URL(login.verificationUri).pathname, '/cli-login');
     const page = await fetch(login.verificationUriComplete);
     assert.equal(page.status, 200);
-    assert.match(await page.text(), /__CLISBOT_HUB_ENABLED__=true/);
+    assert.ok(page.headers.get('content-type')?.includes('text/html'));
+    assert.equal(new URL(page.url).pathname, '/cli-login');
+    assert.ok((await page.text()).toLowerCase().includes('<html'));
     assert.equal((await fetch(hub.url)).status, 404, 'Hub remains backend only');
-    const claim = await fetch('http://127.0.0.1:7181/api/auth/clisbot/claim-instance', { method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1:7181' }, body: JSON.stringify({ email: 'onboarding@example.test', password: 'isolated-onboarding-owner' }) });
-    assert.equal(claim.status, 200, await claim.text());
+    const { localHubPairingOffer } = await import('/usr/local/lib/node_modules/@clisbot/cli/dist/commands/hub/device-pairing.js');
+    const identity = await fetch(new URL('/api/auth/clisbot/device/identity', hub.url));
+    assert.equal(identity.status, 200);
+    const device = await identity.json();
+    assert.equal(device.devicePairing, true);
+    const offer = await localHubPairingOffer({ home });
+    assert.equal(offer.hubId, device.hubId);
+    assert.equal(offer.origin, hub.url);
+    assert.ok(offer.pairing);
   `,
   );
   console.log(
     JSON.stringify({
       localOnboarding:
-        "shared UI, CLI verification URL and account claim passed on custom daemon port",
+        "personal Host onboarding, Hub CLI approval page and local pairing offer passed",
     }),
   );
 } finally {

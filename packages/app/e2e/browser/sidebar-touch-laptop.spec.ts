@@ -1,6 +1,7 @@
 import { expect, test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
 import {
+  configureFiveFooterActions,
   expectFooterActionsInline,
   seedDockedSidebarWidth,
 } from "../support/helpers/sidebar-footer-overflow";
@@ -18,6 +19,7 @@ test.use({
 test("a touchscreen laptop keeps sidebar actions visible with a fine primary pointer", async ({
   page,
 }) => {
+  await configureFiveFooterActions({ page });
   await seedDockedSidebarWidth(page, 200);
   await gotoAppShell(page);
   expect(

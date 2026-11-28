@@ -189,13 +189,20 @@ export function collapseTurns(input: CollapseTurnsInput): TurnCollapse {
   };
 
   for (let index = 0; index < tail.length; index += 1) {
-    if (
-      !(index === 0 && isTurnTrigger(tail[index]!)) &&
-      !isTurnBoundary(tail[index - 1] ?? null, tail[index] ?? null)
-    )
+    const item = tail[index]!;
+    const previous = tail[index - 1] ?? null;
+    // A scheduled turn can record its notification immediately before the visible trigger.
+    // Anchor its summary to the trigger so the heartbeat badge stays above the folded work.
+    const followsNotice =
+      previous?.kind === "notification" &&
+      previous.heartbeatRun !== undefined &&
+      item.kind === "tool_call" &&
+      item.payload.source === "agent" &&
+      item.payload.data.name === "heartbeat";
+    if (!(index === 0 && isTurnTrigger(item)) && !followsNotice && !isTurnBoundary(previous, item))
       continue;
     flushRun(index);
-    output.push(tail[index]!);
+    output.push(item);
     runStart = index + 1;
   }
   flushRun(tail.length);

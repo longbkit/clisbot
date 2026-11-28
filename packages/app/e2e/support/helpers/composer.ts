@@ -95,12 +95,19 @@ export async function sendDraftToQueue(page: Page): Promise<void> {
   await composerInput(page).press("Control+Enter");
 }
 
-/** Long-press the Send button: the composer takes the draft while the pointer is still down. */
-export async function holdSendButton(page: Page, label: string): Promise<void> {
+/** Select the one-time queue action from the held Send menu. */
+export async function queueFromHeldSend(page: Page, label: string, draft: string): Promise<void> {
+  const queue = page.getByTestId("composer-send-once-queue");
   await page.getByRole("button", { name: label, exact: true }).hover();
   await page.mouse.down();
-  await expect(composerInput(page)).toHaveValue("", { timeout: 5_000 });
-  await page.mouse.up();
+  try {
+    await expect(queue).toBeVisible();
+  } finally {
+    await page.mouse.up();
+  }
+  await expect(composerInput(page)).toHaveValue(draft);
+  await queue.click();
+  await expect(composerInput(page)).toHaveValue("");
 }
 
 export async function expectQueuedMessageButton(page: Page): Promise<void> {

@@ -74,12 +74,19 @@ function enableDictationCapability(message: WebSocketMessage): WebSocketMessage 
   return JSON.stringify(envelope);
 }
 
-async function installSyntheticMicrophone(page: Page): Promise<void> {
-  await page.addInitScript(() => {
+async function installSyntheticMicrophone(page: Page, respectPermission = false): Promise<void> {
+  await page.addInitScript((checkBrowserPermission) => {
     const mediaDevices = navigator.mediaDevices;
+    const getUserMedia = mediaDevices.getUserMedia.bind(mediaDevices);
     Object.defineProperty(mediaDevices, "getUserMedia", {
       configurable: true,
-      value: async () => {
+      value: async (constraints: MediaStreamConstraints) => {
+        if (checkBrowserPermission) {
+          const permission = await navigator.permissions.query({
+            name: "microphone" as PermissionName,
+          });
+          if (permission.state !== "granted") return getUserMedia(constraints);
+        }
         const context = new AudioContext();
         const oscillator = context.createOscillator();
         const destination = context.createMediaStreamDestination();
@@ -88,7 +95,7 @@ async function installSyntheticMicrophone(page: Page): Promise<void> {
         return destination.stream;
       },
     });
-  });
+  }, respectPermission);
 }
 
 async function installDictationFailureHarness(page: Page) {
@@ -214,7 +221,7 @@ test.describe("New Workspace dictation submit", () => {
 });
 
 async function startDictationWithShortcut(page: Page): Promise<void> {
-  await composerLocator(page).press("Control+d");
+  await composerLocator(page).press("ControlOrMeta+d");
 }
 
 test("dictation shortcut leaves retained fullscreen and exposes recording controls", async ({
@@ -251,7 +258,7 @@ test("dictation shortcut leaves retained fullscreen and exposes recording contro
     await resizeComposerViewport(page, "portrait");
     await enterComposerFullscreen(page);
     await resizeComposerViewport(page, "landscape");
-    await composerLocator(page).press("Control+Shift+d");
+    await composerLocator(page).press("ControlOrMeta+Shift+d");
     await expect(page.getByRole("button", { name: "Exit fullscreen", exact: true })).toHaveCount(0);
     await expect(
       page.getByText("Realtime voice is disabled in this test.", { exact: true }),
@@ -286,34 +293,48 @@ function expectDictationPermissionError(page: Page) {
   );
 }
 
-test("keeps the draft and retries from the mic after access is restored", async ({ page }) => {
-  const agent = await seedMockAgentWorkspace({
-    repoPrefix: "dictation-permission-",
-    title: "Dictation permission",
+for (const scenario of [
+  { name: "retries from the mic", draft: "", start: startDictationByMic },
+  {
+    name: "preserves the typed draft on a shortcut retry",
+    draft: "Keep my draft",
+    start: startDictationWithShortcut,
+  },
+]) {
+  test(`dictation ${scenario.name} after microphone access is restored`, async ({ page }) => {
+    const agent = await seedMockAgentWorkspace({
+      repoPrefix: "dictation-permission-",
+      title: "Dictation permission",
+    });
+    const { draft, start } = scenario;
+    // Headless Chrome on macOS can stall opening even its fake device after a real
+    // permission grant. Exercise Chromium's denial and supply audio only once granted.
+    if (process.platform === "darwin") await installSyntheticMicrophone(page, true);
+    await installDictationFailureHarness(page);
+    try {
+      await openAgentRoute(page, agent);
+      await expectComposerVisible(page);
+      await fillComposerDraft(page, draft);
+
+      const setMicrophonePermission = await controlMicrophonePermission(page);
+      await setMicrophonePermission("denied");
+      await start(page);
+      await expectDictationPermissionError(page);
+      await expect(composerLocator(page)).toHaveValue(draft);
+
+      await setMicrophonePermission("granted");
+      await start(page);
+      await expect(
+        page.getByRole("button", { name: "Cancel dictation", exact: true }),
+      ).toBeVisible();
+      await expect(page.getByText("Allow microphone access and try again.")).toHaveCount(0);
+      await page.getByRole("button", { name: "Cancel dictation", exact: true }).click();
+      await expect(composerLocator(page)).toHaveValue(draft);
+    } finally {
+      await agent.cleanup();
+    }
   });
-  const draft = "Keep my draft";
-  await installDictationFailureHarness(page);
-  try {
-    await openAgentRoute(page, agent);
-    await expectComposerVisible(page);
-    await fillComposerDraft(page, draft);
-
-    const setMicrophonePermission = await controlMicrophonePermission(page);
-    await setMicrophonePermission("denied");
-    await startDictationByMic(page);
-    await expectDictationPermissionError(page);
-    await expect(composerLocator(page)).toHaveValue(draft);
-
-    await setMicrophonePermission("granted");
-    await startDictationByMic(page);
-    await expect(page.getByRole("button", { name: "Cancel dictation", exact: true })).toBeVisible();
-    await expect(page.getByText("Allow microphone access and try again.")).toHaveCount(0);
-    await page.getByRole("button", { name: "Cancel dictation", exact: true }).click();
-    await expect(composerLocator(page)).toHaveValue(draft);
-  } finally {
-    await agent.cleanup();
-  }
-});
+}
 
 test("shows dictation failure when the terminal prompt starts it by shortcut", async ({ page }) => {
   const workspace = await seedWorkspace({ repoPrefix: "terminal-dictation-permission-" });
@@ -333,7 +354,7 @@ test("shows dictation failure when the terminal prompt starts it by shortcut", a
 
     const setMicrophonePermission = await controlMicrophonePermission(page);
     await setMicrophonePermission("denied");
-    await terminalPromptInput(page).press("Control+d");
+    await terminalPromptInput(page).press("ControlOrMeta+d");
     await expectDictationPermissionError(page);
   } finally {
     await profiles.restore();

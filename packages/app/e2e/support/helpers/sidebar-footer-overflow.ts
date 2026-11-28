@@ -1,7 +1,19 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { seedSidebarFooterPreferences } from "./sidebar-nav-settings";
+
+export function configureFiveFooterActions({ page }: { page: Page }) {
+  return seedSidebarFooterPreferences(page, [
+    { key: "new", visible: false },
+    { key: "search", visible: false },
+    { key: "add-project", visible: true },
+  ]);
+}
 
 /** Every footer control that can sit in the icon line, caret included. */
 const FOOTER_LINE_TEST_IDS = [
+  "sidebar-new",
+  "sidebar-footer-search",
+  "sidebar-import-session",
   "sidebar-add-project",
   "sidebar-usage-icon",
   "sidebar-hosts-trigger",

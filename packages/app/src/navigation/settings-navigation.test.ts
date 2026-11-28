@@ -2,7 +2,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { router, navigateToLastWorkspace, platform } = vi.hoisted(() => ({
-  platform: { isWeb: false },
+  platform: {
+    isWeb: false,
+    get isNative() {
+      return !this.isWeb;
+    },
+  },
   router: {
     canGoBack: vi.fn(() => true),
     back: vi.fn(),

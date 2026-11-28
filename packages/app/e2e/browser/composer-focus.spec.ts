@@ -34,6 +34,7 @@ import {
   expectMobileExplorerVisible,
   openMobileAgentSidebar,
   openMobileAgentSidebarWithKeyboard,
+  swipeFromLeftEdge,
   swipeOpenMobileExplorer,
 } from "../support/helpers/sidebar";
 import { switchWorkspaceViaSidebar } from "../support/helpers/workspace-ui";
@@ -383,7 +384,7 @@ for (const panel of COMPACT_PANELS) {
           };
           await test.step("the removed left-edge drawer does not steal an untouched editor", async () => {
             await expectComposerNotFocused(page);
-            await openMobileAgentSidebarWithKeyboard(page);
+            await swipeFromLeftEdge(page);
             await expectMobileAgentSidebarHidden(page);
             await expect(page).toHaveURL(workUrl);
             await expectComposerNotFocused(page);

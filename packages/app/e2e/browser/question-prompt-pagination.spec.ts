@@ -59,6 +59,8 @@ async function openLinkedQuestions(page: Page, context: BrowserContext) {
 }
 
 async function dragAcross(page: Page, target: Locator) {
+  await target.scrollIntoViewIfNeeded();
+  await target.hover({ trial: true });
   const bounds = await target.boundingBox();
   if (!bounds) throw new Error("Text is not visible");
   const y = bounds.y + bounds.height / 2;

@@ -4,6 +4,8 @@ import {
   composerModelChip,
   composerPickerPanel,
   composerPickerSearch,
+  openComposerPicker,
+  showComposerPickerProvider,
 } from "../support/helpers/composer-picker";
 import { expect, test, type Page } from "../support/fixtures";
 import { clickNewChat, gotoWorkspace } from "../support/helpers/launcher";
@@ -211,13 +213,8 @@ async function openTimedOutProvider(page: Page, workspaceId: string, width: numb
   await clickNewChat(page);
   await expectComposerVisible(page);
   await page.setViewportSize({ width, height: 900 });
-  await page.getByRole("button", { name: /Select model/ }).click();
-  if (width < 600) {
-    await page.getByTestId("agent-controls-model").click();
-  } else {
-    await page.getByRole("button", { name: "Back", exact: true }).click();
-  }
-  await page.getByTestId("model-provider-picker-timeout").click();
+  await openComposerPicker(page);
+  await showComposerPickerProvider(page, "picker-timeout");
   await expect(page.getByText(/Timed out refreshing Pi timeout/)).toBeVisible();
 }
 

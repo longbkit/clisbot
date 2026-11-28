@@ -6,7 +6,10 @@ export async function enrollPersonalDaemon(
   home: string,
   hubOrigin: string,
 ): Promise<"connected" | "account-approval-required"> {
-  const client = await connectToDaemon({ target: { kind: "instance", home } });
+  const client = await connectToDaemon({
+    target: { kind: "instance", home },
+    preferLocalCredential: true,
+  });
   try {
     const current = (await client.getHubStatus()).status;
     if (current.hubOrigin) {

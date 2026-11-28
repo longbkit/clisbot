@@ -42,11 +42,14 @@ export async function expectStandaloneSidebarHostSettingsButton(page: Page) {
 }
 
 export async function activateSidebarHostSettingsWithKeyboard(page: Page) {
-  const host = page.getByRole("button", { name: TEST_HOST_LABEL, exact: true });
-  await expect(host).toBeFocused();
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("Tab");
-  await expect(sidebarHostSettingsButton(page)).toBeFocused();
+  const gear = sidebarHostSettingsButton(page);
+  await expect(gear).toBeVisible();
+  // Search and the Host rows precede the per-Host action in the picker tab order.
+  for (let tab = 0; tab < 8; tab++) {
+    if (await gear.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press("Tab");
+  }
+  await expect(gear).toBeFocused();
   await page.keyboard.press("Enter");
 }
 
@@ -873,7 +876,14 @@ export async function captureCompactSidebarReturn(page: Page, returnAction: () =
     const start = performance.now();
     function sample() {
       if (capture.stopped) return;
-      const close = document.querySelector('[data-testid="sidebar-close"]');
+      const close = Array.from(
+        document.querySelectorAll('[data-testid="sidebar-footer-bottom-line"]'),
+      ).find(
+        (element) =>
+          element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) &&
+          element.getBoundingClientRect().left >= 0 &&
+          element.getBoundingClientRect().right <= innerWidth,
+      );
       capture.frames.push({
         time: performance.now() - start,
         pathname: location.pathname,
@@ -913,29 +923,50 @@ export async function captureCompactSidebarReturn(page: Page, returnAction: () =
   });
 }
 
-export async function captureCompactSidebarContext(page: Page) {
+export async function captureCompactSidebarContext(
+  page: Page,
+  position: "middle" | "end" = "middle",
+) {
   const sidebar = await page.getByTestId("sidebar-project-workspace-list-scroll").elementHandle();
   if (!sidebar) throw new Error("Open sidebar has no workspace list");
   await expect
     .poll(() => sidebar.evaluate((el) => el.scrollHeight - el.clientHeight))
     .toBeGreaterThan(0);
-  const offset = await sidebar.evaluate((el) => {
-    el.scrollTop = el.scrollHeight;
+  const offset = await sidebar.evaluate((el, anchor) => {
+    const end = el.scrollHeight - el.clientHeight;
+    el.scrollTop = anchor === "end" ? end : Math.floor(end / 2);
     return el.scrollTop;
-  });
+  }, position);
   expect(offset).toBeGreaterThan(0);
   return async () => {
     expect(await sidebar.evaluate((el) => el.isConnected)).toBe(true);
-    expect(await sidebar.evaluate((el) => el.scrollTop)).toBe(offset);
+    const current = await sidebar.evaluate((el) => ({
+      offset: el.scrollTop,
+      end: el.scrollHeight - el.clientHeight,
+    }));
+    expect(current.offset).toBe(position === "end" ? current.end : offset);
     await sidebar.dispose();
   };
 }
 
 export async function expectCompactSidebarOpen(page: Page) {
-  await expect(page.getByRole("button", { name: "Close sidebar", exact: true })).toBeInViewport();
+  await expect(
+    page
+      .getByRole("button", { name: "Close sidebar", exact: true })
+      .or(page.getByRole("tab", { name: "Chat", selected: true, exact: true }))
+      .filter({ visible: true })
+      .first(),
+  ).toBeInViewport();
 }
 
 export async function closeCompactSidebar(page: Page) {
+  if (await page.getByRole("tab", { name: "Chat", selected: true, exact: true }).isVisible()) {
+    await page.getByRole("tab", { name: "Home", exact: true }).click();
+    await expect(
+      page.getByRole("tab", { name: "Home", selected: true, exact: true }),
+    ).toBeInViewport();
+    return;
+  }
   await page.getByRole("button", { name: "Close sidebar", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Open menu", exact: true }).first(),

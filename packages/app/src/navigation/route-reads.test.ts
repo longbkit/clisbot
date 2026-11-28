@@ -14,6 +14,10 @@ const ALLOWED_ROUTE_READS: Record<string, { reads: number; reason: string }> = {
     reads: 1,
     reason: "OverlayProviders scopes web confirmations; stable children",
   },
+  "navigation/settings-presentation/index.ts": {
+    reads: 2,
+    reason: "Settings route entry and dismiss actions share the current Settings visit",
+  },
   "app/index.tsx": { reads: 1, reason: "startup route leaf" },
   "app/h/[serverId]/workspace/[workspaceId]/index.tsx": { reads: 1, reason: "session leaf" },
   "screens/workspace/workspace-header-menu.tsx": { reads: 1, reason: "session leaf header" },

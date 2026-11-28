@@ -207,6 +207,14 @@ describe("durable projected timeline", () => {
     rows.push(plugin(rows.length + 1, 2));
     for (const row of rows) await store.bulkInsert("a", [row]);
     const maxSeq = rows.length;
+    const capped = await store.fetchProjectedCommitted("a", {
+      wholeTurns: true,
+      pagingMode: "source_ranges",
+      limit: 20,
+    });
+    expect(capped.endSeq).toBe(maxSeq);
+    expect(capped.startSeq).toBeGreaterThan(1);
+    expect(capped.hasOlder).toBe(true);
 
     for (const pagingMode of ["source_ranges", undefined] as const) {
       const seen: string[] = [];
@@ -670,6 +678,58 @@ describe("durable whole-turn pages", () => {
       cursors,
       [1, 2, 5],
     );
+  });
+
+  it("keeps a tool from an earlier turn as context without certifying its intervening history", async () => {
+    const { store } = await fixture();
+    const rows = turnRows(3, () => 4);
+    rows[1] = { ...tool(2, "old", "running"), turnId: undefined };
+    rows[11] = { ...tool(12, "old", "completed"), turnId: undefined };
+    await store.bulkInsert("a", rows);
+    const page = await store.fetchProjectedCommitted("a", {
+      wholeTurns: true,
+      pagingMode: "source_ranges",
+      limit: 1,
+    });
+    expect([page.startSeq, page.endSeq]).toEqual([9, 12]);
+    expect(page.entries.map((row) => row.seqStart)).toEqual([9, 10, 11]);
+    expect(page.contextEntries?.[0]?.sourceSeqRanges).toEqual([
+      { startSeq: 2, endSeq: 2 },
+      { startSeq: 12, endSeq: 12 },
+    ]);
+  });
+
+  it("keeps certified source-range pages whole when a cursor lands inside a turn", async () => {
+    const { store, directory } = await fixture();
+    await store.bulkInsert(
+      "a",
+      turnRows(3, (turn) => (turn === 1 ? 700 : 4)),
+    );
+    const reader = new FileAgentTimelineStore(async () => directory);
+    const epoch = await reader.getEpoch("a");
+    const options = { wholeTurns: true, pagingMode: "source_ranges" as const, limit: 2 };
+    const tail = await reader.fetchProjectedCommitted("a", { ...options, direction: "tail" });
+    expect([tail.startSeq, tail.endSeq]).toEqual([705, 708]);
+    for (const seq of [705, 400]) {
+      const before = await reader.fetchProjectedCommitted("a", {
+        ...options,
+        direction: "before",
+        cursor: { epoch, seq },
+      });
+      expect([before.startSeq, before.endSeq, before.hasOlder, before.hasNewer]).toEqual([
+        5,
+        704,
+        true,
+        true,
+      ]);
+      expect(before.entries).toHaveLength(700);
+    }
+    const after = await reader.fetchProjectedCommitted("a", {
+      ...options,
+      direction: "after",
+      cursor: { epoch, seq: 400 },
+    });
+    expect([after.startSeq, after.endSeq]).toEqual([401, 402]);
   });
 
   it("returns a whole turn that straddles several storage pages", async () => {

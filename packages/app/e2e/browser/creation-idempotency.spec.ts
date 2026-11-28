@@ -227,8 +227,11 @@ test("editing a failed New workspace submission starts without a request key con
     await fillComposerDraft(page, "Start original worktree task.");
     await page.getByRole("button", { name: "Create", exact: true }).click();
 
-    const composerError = page.getByTestId("composer-error").filter({ visible: true }).first();
-    await expect(composerError).toContainText("Unable to resolve repository default branch");
+    const formError = page
+      .getByRole("alert")
+      .filter({ hasText: "Unable to resolve repository default branch" });
+    await expect(formError).toBeVisible();
+    await expect(page.getByTestId("app-toast")).toHaveCount(0);
     // The failure renders once in the composer alert, not duplicated in a top toast.
     await expect(page.getByText("Unable to resolve repository default branch")).toHaveCount(1);
 
@@ -267,8 +270,9 @@ test("switching only the launch target after a failed New workspace creation sta
     await workspaceProvision.fail();
     await page.getByRole("button", { name: "Create", exact: true }).click();
     await expect(
-      page.getByTestId("composer-error").filter({ visible: true }).first(),
-    ).toContainText("Workspace provisioning failed for test");
+      page.getByRole("alert").filter({ hasText: "Workspace provisioning failed for test" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("app-toast")).toHaveCount(0);
 
     await selectLaunchOption(page, "promptless-shell");
     await submitTerminalLaunch(page);

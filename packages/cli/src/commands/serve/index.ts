@@ -315,7 +315,10 @@ async function configureDaemonRelay(home: string, enabled: boolean): Promise<voi
   // Adding Hub/web must not disconnect an app already using daemon relay.
   // Explicit daemon config owns disabling an existing transport.
   if (!enabled) return;
-  const client = await connectToDaemon({ target: { kind: "instance", home } });
+  const client = await connectToDaemon({
+    target: { kind: "instance", home },
+    preferLocalCredential: true,
+  });
   try {
     const config = (await client.getDaemonConfig()).config;
     if (config.relay?.enabled !== enabled) await client.patchDaemonConfig({ relay: { enabled } });
@@ -359,7 +362,10 @@ async function prepareDaemon(home: string, relay: boolean): Promise<{ origin: st
       );
   }
   if (running) {
-    const client = await connectToDaemon({ target: { kind: "instance", home } });
+    const client = await connectToDaemon({
+      target: { kind: "instance", home },
+      preferLocalCredential: true,
+    });
     try {
       if (client.getLastServerInfoMessage()?.features?.devicePairing !== true)
         throw new Error(

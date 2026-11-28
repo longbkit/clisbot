@@ -1,3 +1,4 @@
+import { useReadRoutePath } from "@/navigation/route-source";
 import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
 import { PendingChatPresentation } from "@/clisbot/home/pending-chat-presentation";
 import { profileNativeRegion } from "@/utils/render-profiler";
@@ -18,10 +19,13 @@ import { useAddHost } from "@/hosts/add-host";
 import { GitBranch, X } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
+import {
+  TitlebarDragRegion,
+  WINDOW_CONTENT_DATASET,
+} from "@/components/desktop/titlebar-drag-region";
 import { SidebarActiveFilters } from "@/components/sidebar/display-preferences/active-filters";
 import { SidebarDisplayPreferencesMenu } from "@/components/sidebar/display-preferences/menu";
 import { SidebarToastRegion } from "@/components/sidebar/sidebar-toast-region";
@@ -162,21 +166,27 @@ export const LeftSidebar = memo(function LeftSidebar({
     void openProjectPicker();
   }, [openProjectPicker]);
 
+  const readPath = useReadRoutePath();
   const handleSettings = useCallback(() => {
-    openSettingsFromSidebar({ workspace: activeWorkspace, isCompact: isCompactLayout });
-  }, [activeWorkspace, isCompactLayout]);
+    openSettingsFromSidebar({
+      pathname: readPath(),
+      workspace: activeWorkspace,
+      isCompact: isCompactLayout,
+    });
+  }, [activeWorkspace, isCompactLayout, readPath]);
 
   const handleAddHost = useAddHost();
 
   const handleOpenHostSettings = useCallback(
     (serverId: string) => {
       openSettingsFromSidebar({
+        pathname: readPath(),
         workspace: activeWorkspace,
         isCompact: isCompactLayout,
         route: buildSettingsHostSectionRoute(serverId, "host"),
       });
     },
-    [activeWorkspace, isCompactLayout],
+    [activeWorkspace, isCompactLayout, readPath],
   );
 
   const labels = useMemo(
@@ -330,7 +340,7 @@ function MobileSidebar({
           <View style={styles.sidebarContent} pointerEvents="auto">
             <WindowChromeSafeArea placement="below" />
             {HOME_V2_ENABLED ? (
-              <MobileToolbar />
+              <MobileToolbar onSettings={handleSettings} onHostSettings={handleOpenHostSettings} />
             ) : (
               <SidebarNavGroup
                 style={styles.sidebarHeaderGroup}
@@ -480,42 +490,54 @@ function DesktopSidebar({
               ) : null}
             </View>
           ) : (
-            <TitlebarDragRegion />
+            <View style={styles.desktopDragStrip} testID="sidebar-nav-drag-strip">
+              <TitlebarDragRegion />
+            </View>
           )}
-          <SidebarNavGroup style={sidebarHeaderGroupStyle} />
         </View>
+        <View style={styles.sidebarContent}>
+          <ScrollView
+            testID="sidebar-nav-scroll"
+            dataSet={WINDOW_CONTENT_DATASET}
+            style={styles.navScroll}
+            showsVerticalScrollIndicator={false}
+            alwaysBounceVertical={false}
+          >
+            <SidebarNavGroup style={sidebarHeaderGroupStyle} />
+          </ScrollView>
 
-        <SidebarMetadataNotice />
-        <SidebarViewSlot dismiss={closeSidebar}>
-          <SidebarToastRegion active={active}>
-            {isInitialLoad && !hasActiveHostFilter ? (
-              <SidebarAgentListSkeleton />
-            ) : (
-              <SidebarWorkspaceList
-                collapsedProjectKeys={collapsedProjectKeys}
-                onToggleProjectCollapsed={toggleProjectCollapsed}
-                shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
-                groupMode={groupMode}
-                workspaceGroups={workspaceGroups}
-                projectIconTargets={projectIconTargets}
-                pinnedGroups={pinnedGroups}
-                projects={projects}
-                hasProjectsBeforeFilter={hasProjectsBeforeFilter}
-                hasActiveProjectFilter={hasActiveProjectFilter}
-                workspaceEntriesByKey={workspaceEntriesByKey}
-                isRefreshing={isManualRefresh && isRevalidating}
-                onRefresh={handleRefresh}
-                onAddProject={handleOpenProject}
-                onImportSession={handleImportSession}
-                onWorkspacePress={closeSidebar}
-                parentGestureRef={closeGestureRef}
-                dragGestureHostActive={active}
-                listLeadingComponent={botsAndChatsSectionsElement}
-                listHeaderComponent={workspacesSectionHeaderElement}
-              />
-            )}
-          </SidebarToastRegion>
-        </SidebarViewSlot>
+          <SidebarMetadataNotice />
+          <SidebarViewSlot dismiss={closeSidebar}>
+            <SidebarToastRegion active={active}>
+              {isInitialLoad && !hasActiveHostFilter ? (
+                <SidebarAgentListSkeleton />
+              ) : (
+                <SidebarWorkspaceList
+                  collapsedProjectKeys={collapsedProjectKeys}
+                  onToggleProjectCollapsed={toggleProjectCollapsed}
+                  shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
+                  groupMode={groupMode}
+                  workspaceGroups={workspaceGroups}
+                  projectIconTargets={projectIconTargets}
+                  pinnedGroups={pinnedGroups}
+                  projects={projects}
+                  hasProjectsBeforeFilter={hasProjectsBeforeFilter}
+                  hasActiveProjectFilter={hasActiveProjectFilter}
+                  workspaceEntriesByKey={workspaceEntriesByKey}
+                  isRefreshing={isManualRefresh && isRevalidating}
+                  onRefresh={handleRefresh}
+                  onAddProject={handleOpenProject}
+                  onImportSession={handleImportSession}
+                  onWorkspacePress={closeSidebar}
+                  parentGestureRef={closeGestureRef}
+                  dragGestureHostActive={active}
+                  listLeadingComponent={botsAndChatsSectionsElement}
+                  listHeaderComponent={workspacesSectionHeaderElement}
+                />
+              )}
+            </SidebarToastRegion>
+          </SidebarViewSlot>
+        </View>
 
         <SidebarCalloutSlot />
 
@@ -651,6 +673,8 @@ const styles = StyleSheet.create((theme) => ({
   sidebarDragArea: {
     position: "relative",
   },
+  desktopDragStrip: { height: theme.spacing[2] },
+  navScroll: { flexGrow: 0, flexShrink: 1, maxHeight: "50%" },
   desktopChromeRow: {
     position: "relative",
     height: HEADER_INNER_HEIGHT,

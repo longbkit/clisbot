@@ -260,34 +260,37 @@ export async function expectFooterIconRow(
 ): Promise<void> {
   const actions = options.actions ?? ["sidebar-new", "sidebar-footer-search"];
   // Read one browser-frame snapshot: the compact drawer can translate between separate RPCs.
-  const { bar, boxes: renderedBoxes } = await page
-    .locator('[data-testid="sidebar-footer-bottom-line"]:visible')
-    .evaluate(
-      (line, testIDs) => {
-        const box = (element: Element) => {
-          const { x, y, width, height } = element.getBoundingClientRect();
-          return { testID: element.getAttribute("data-testid"), x, y, width, height };
-        };
-        const present = testIDs
-          .map((testID) => line.querySelector(`[data-testid="${testID}"]`))
-          .filter((element): element is Element => element !== null)
-          .filter((element) => element.getClientRects().length > 0);
-        // Document order is the order the bar renders its items in.
-        present.sort((a, b) =>
-          a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
-        );
-        const style = getComputedStyle(line);
-        const lineBox = box(line);
-        return {
-          bar: {
-            left: lineBox.x + Number.parseFloat(style.paddingLeft),
-            right: lineBox.x + lineBox.width - Number.parseFloat(style.paddingRight),
-          },
-          boxes: present.map(box),
-        };
-      },
-      [...FOOTER_ACTION_TEST_IDS, ...FOOTER_CONTROL_TEST_IDS],
-    );
+  const {
+    bar,
+    packed,
+    boxes: renderedBoxes,
+  } = await page.locator('[data-testid="sidebar-footer-bottom-line"]:visible').evaluate(
+    (line, testIDs) => {
+      const box = (element: Element) => {
+        const { x, y, width, height } = element.getBoundingClientRect();
+        return { testID: element.getAttribute("data-testid"), x, y, width, height };
+      };
+      const present = testIDs
+        .map((testID) => line.querySelector(`[data-testid="${testID}"]`))
+        .filter((element): element is Element => element !== null)
+        .filter((element) => element.getClientRects().length > 0);
+      // Document order is the order the bar renders its items in.
+      present.sort((a, b) =>
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+      );
+      const style = getComputedStyle(line);
+      const lineBox = box(line);
+      return {
+        bar: {
+          left: lineBox.x + Number.parseFloat(style.paddingLeft),
+          right: lineBox.x + lineBox.width - Number.parseFloat(style.paddingRight),
+        },
+        packed: line.getAttribute("data-packed") === "true",
+        boxes: present.map(box),
+      };
+    },
+    [...FOOTER_ACTION_TEST_IDS, ...FOOTER_CONTROL_TEST_IDS],
+  );
   const expectedOrder = [...actions, ...FOOTER_CONTROL_TEST_IDS];
   expect(renderedBoxes.map((box) => box.testID)).toEqual(
     options.compact ? expectedOrder.toReversed() : expectedOrder,
@@ -319,7 +322,7 @@ export async function expectFooterIconRow(
     .slice(1)
     .map((box, index) => box.x - (controls[index]!.x + controls[index]!.width));
   for (const gap of gaps) {
-    if (options.compact) expect(gap).toBeGreaterThanOrEqual(0);
+    if (options.compact || packed) expect(gap).toBeGreaterThanOrEqual(0);
     else expect(gap).toBeGreaterThan(0);
     expect(Math.abs(gap - gaps[0]!)).toBeLessThan(FOOTER_GEOMETRY_TOLERANCE);
   }
@@ -327,7 +330,7 @@ export async function expectFooterIconRow(
   expect(Math.abs(last.x + last.width - rightEdge)).toBeLessThan(FOOTER_GEOMETRY_TOLERANCE);
   const lastAction = boxes[actions.length - 1]!;
   const sameLine = lastAction.y + lastAction.height > first!.y;
-  if (sameLine) expect(lastAction.x + lastAction.width).toBeLessThan(first!.x);
+  if (sameLine) expect(lastAction.x + lastAction.width).toBeLessThanOrEqual(first!.x);
   else expect(lastAction.y + lastAction.height).toBeLessThanOrEqual(first!.y);
 }
 

@@ -330,9 +330,6 @@ test("MCP delegates to self and B and opens both qualified children in ordinary 
       workspaceId: fleet.workspace.workspaceId,
       agentId: fleet.parent.id,
     });
-    const messageGroups = page.getByTestId("tool-call-group").filter({ hasText: "Agent message" });
-    await expect(messageGroups.first()).toBeVisible();
-    for (const group of await messageGroups.all()) await group.getByRole("button").first().click();
     await expect(
       page.getByRole("button", { name: /Agent finished.*MCP child on A/ }),
     ).toBeVisible();

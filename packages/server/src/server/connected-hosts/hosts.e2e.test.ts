@@ -2247,6 +2247,7 @@ test(
     await mcp.connect(
       new StreamableHTTPClientTransport(
         new URL(`http://127.0.0.1:${a.port}/mcp/agents?callerAgentId=${parent.id}`),
+        agentMcpTransportOptions(a.daemon.agentManager.getMcpAuthToken()),
       ),
     );
     const remoteMode = async (provider: string, settings?: { modeId: string }) => {
@@ -2801,6 +2802,7 @@ test.each([false, true])(
     await mcp.connect(
       new StreamableHTTPClientTransport(
         new URL(`http://127.0.0.1:${a.port}/mcp/agents?callerAgentId=${parent.id}`),
+        agentMcpTransportOptions(a.daemon.agentManager.getMcpAuthToken()),
       ),
     );
     cleanup.push(() => mcp.close());

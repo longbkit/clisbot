@@ -125,6 +125,10 @@ async function recordTurnEnd(
   await openAgentRoute(page, { workspaceId: agent.workspaceId, agentId: agent.agentId });
   await expectAgentIdle(page);
 
+  await expect(
+    page.getByTestId("assistant-message").filter({ hasText: "Completed 4 commands" }).last(),
+  ).toBeVisible();
+
   if (input.reply === null) {
     gate.setAgentStreamItemSuppressed("assistant_message", true);
   } else {

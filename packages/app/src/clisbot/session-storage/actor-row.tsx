@@ -219,5 +219,9 @@ export function ActorGutterInset({
 }): ReactNode {
   const compact = useIsCompactFormFactor();
   if (!enabled || compact) return children;
-  return <View style={styles.gutterInset}>{children}</View>;
+  return (
+    <View testID="actor-gutter-inset" style={styles.gutterInset}>
+      {children}
+    </View>
+  );
 }

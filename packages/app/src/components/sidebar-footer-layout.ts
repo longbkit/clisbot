@@ -7,14 +7,19 @@ export const SIDEBAR_FOOTER_ACTIONS = [
   "settings",
 ] as const;
 
-export type SidebarFooterAction = (typeof SIDEBAR_FOOTER_ACTIONS)[number];
+export type SidebarFooterAction =
+  | (typeof SIDEBAR_FOOTER_ACTIONS)[number]
+  | "search"
+  | "import-session";
 
 /** The order actions keep their place in a row too narrow for all of them. */
 const KEEP_ORDER: readonly SidebarFooterAction[] = [
   "settings",
   "add-project",
   "hosts",
+  "search",
   "usage",
+  "import-session",
   "help",
 ];
 

@@ -1,4 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Settings2 } from "lucide-react-native";
+import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
+import { Button } from "@/components/ui/button";
+import { PluginComposerItems, usePluginComposerItemCount } from "@/plugins/composer-items";
+import {
+  PluginToolbarSlot,
+  usePluginToolbarWidth,
+} from "@/composer/agent-controls/plugin-toolbar-slot";
+import { useComposerSheetBridge } from "@/composer/agent-controls/sheet-bridge";
 import { View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { formatThinkingOptionLabel } from "@/agent-controls/labels";
@@ -87,6 +97,7 @@ const EMPTY_FEATURE_PRESENCE: ComposerControlPresence["features"] = [];
 function useComposerControlDensity(input: {
   isCompact: boolean;
   hasMode: boolean;
+  pluginItemsWidth: number;
   geometry: ComposerToolbarGeometry;
 }) {
   const { geometry } = input;
@@ -101,11 +112,10 @@ function useComposerControlDensity(input: {
       hasThinking: false,
       hasMode: input.hasMode,
       features: EMPTY_FEATURE_PRESENCE,
-      // The picker renders no plugin items in its row.
-      pluginItemsWidth: 0,
+      pluginItemsWidth: input.pluginItemsWidth,
       fontScale,
     }),
-    [fontScale, input.hasMode],
+    [fontScale, input.hasMode, input.pluginItemsWidth],
   );
   const update = useCallback(
     (availableWidth: number) => {
@@ -134,6 +144,42 @@ function useComposerControlDensity(input: {
     if (availableWidthRef.current > 0) update(availableWidthRef.current);
   }, [update]);
   return { density, handleLayout };
+}
+
+function PluginItemsOverflow({
+  serverId,
+  disabled,
+}: {
+  serverId: string | null;
+  disabled: boolean;
+}) {
+  const { t } = useTranslation();
+  const bridge = useComposerSheetBridge();
+  const [open, setOpen] = useState(false);
+  const show = useCallback(() => setOpen(true), []);
+  const close = useCallback(() => setOpen(false), []);
+  const header = useMemo(() => ({ title: t("agentControls.features.title") }), [t]);
+  return (
+    <>
+      <Button
+        variant="ghost"
+        leftIcon={Settings2}
+        accessibilityLabel={t("agentControls.features.open")}
+        testID="agent-controls-features"
+        disabled={disabled}
+        onPress={show}
+      />
+      <AdaptiveModalSheet
+        header={header}
+        visible={open}
+        onClose={close}
+        contextBridge={bridge}
+        testID="agent-features-sheet"
+      >
+        <PluginComposerItems serverId={serverId} surface="sheet" />
+      </AdaptiveModalSheet>
+    </>
+  );
 }
 
 export function PickerAgentControls({
@@ -167,9 +213,12 @@ export function PickerAgentControls({
   // As the upstream toolbar: control sizes follow the window layout, not a narrow pane.
   const toolbarSizing = controlSizingForLayout(isCompactFormFactor);
   const toolbarGeometry = useMemo(() => composerToolbarGeometry(toolbarSizing), [toolbarSizing]);
+  const pluginItemCount = usePluginComposerItemCount(modelSelectorServerId);
+  const { width: pluginItemsWidth, onLayout: handlePluginLayout } = usePluginToolbarWidth();
   const { density, handleLayout } = useComposerControlDensity({
     isCompact,
     hasMode: Boolean(modeControl),
+    pluginItemsWidth,
     geometry: toolbarGeometry,
   });
   const presentation = resolveComposerControlPresentation(density);
@@ -208,10 +257,10 @@ export function PickerAgentControls({
     (featureId: string, value: unknown) => onSetFeature?.(featureId, value),
     [onSetFeature],
   );
-  if (!onSelectModel && !modeControl) return null;
+  if (!onSelectModel && !modeControl && !pluginItemCount) return null;
   return (
     <ComposerControlLayoutProvider value={layoutContextValue}>
-      <View style={styles.container} onLayout={handleLayout}>
+      <View style={styles.container} onLayout={handleLayout} testID="agent-controls-toolbar">
         <ComposerPickerControls
           provider={provider}
           providers={providers}
@@ -239,6 +288,17 @@ export function PickerAgentControls({
           onOpen={onModelSelectorOpen}
           onClose={onDropdownClose}
         />
+        {!isCompact ? (
+          <PluginToolbarSlot
+            serverId={modelSelectorServerId}
+            width={pluginItemsWidth}
+            fits={!presentation.aggregateFeatures}
+            onLayout={handlePluginLayout}
+          />
+        ) : null}
+        {pluginItemCount > 0 && (isCompact || presentation.aggregateFeatures) ? (
+          <PluginItemsOverflow serverId={modelSelectorServerId} disabled={disabled} />
+        ) : null}
       </View>
     </ComposerControlLayoutProvider>
   );

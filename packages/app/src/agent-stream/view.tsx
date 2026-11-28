@@ -519,8 +519,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       [isMobile],
     );
     const nearBottom = useNearBottom(agentId);
-    // The reading anchor stops restoring once the reader returns to the end.
-    const isNearBottom = useIsNearBottom(nearBottom);
     const [expandedInlineToolCallIds, setExpandedInlineToolCallIds] = useState<Set<string>>(
       new Set(),
     );
@@ -745,7 +743,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       serverId: resolvedServerId,
       agentId,
       active: isActive,
-      nearBottom: isNearBottom,
+      nearBottom,
       ready: isAuthoritativeHistoryReady,
       items: effectiveStreamItems,
       head: effectiveStreamHead,

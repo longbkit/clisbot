@@ -33,6 +33,7 @@ function scenario() {
     } as never),
   );
   const observation = createFinishObservation({
+    waitForResume: async () => {},
     serverId: "origin",
     logger: createTestLogger(),
     agentManager: {

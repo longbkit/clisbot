@@ -1690,6 +1690,8 @@ describe("Codex app-server provider", () => {
       await createProviderWithFakeAppServer(beforeRestart).createSession(createConfig());
     const originalTurn = await first.startTurn("before restart");
     await beforeRestart.waitForTurnStart();
+    beforeRestart.startsTurn({ threadId: "thread-1", turnId: "native-original-turn" });
+    await vi.waitFor(() => expect(first.describePersistence()).not.toBeNull());
     const handle = first.describePersistence()!;
     await first.close();
 
@@ -8656,52 +8658,54 @@ describe("Codex denied plan approvals", () => {
 });
 
 describe("Codex idle release", () => {
-  function completeRootTurn(session: CodexTestSession): void {
-    asInternals(session).handleNotification("turn/completed", {
+  async function completeRootTurn(session: CodexTestSession): Promise<void> {
+    await asInternals(session).handleNotification("turn/completed", {
       threadId: "test-thread",
       turn: { id: "test-turn", status: "completed" },
     });
   }
 
-  test("certifies once the root turn completes with nothing left running", () => {
+  test("certifies once the root turn completes with nothing left running", async () => {
     const session = createSession();
     expect(session.isIdleForRelease?.()).toBe(false);
 
-    completeRootTurn(session);
+    await completeRootTurn(session);
     expect(session.isIdleForRelease?.()).toBe(true);
   });
 
-  test("holds a session whose command outlives its turn", () => {
+  test("holds a session whose command outlives its turn", async () => {
     const session = createSession();
     const commandItem = (status: string) => ({
       threadId: "test-thread",
       turnId: "test-turn",
       item: { type: "commandExecution", id: "call-bg", command: "sleep 40", status },
     });
-    asInternals(session).handleNotification("item/started", commandItem("inProgress"));
-    completeRootTurn(session);
+    await asInternals(session).handleNotification("item/started", commandItem("inProgress"));
+    await completeRootTurn(session);
     expect(session.isIdleForRelease?.()).toBe(false);
 
-    asInternals(session).handleNotification("item/completed", commandItem("completed"));
+    await asInternals(session).handleNotification("item/completed", commandItem("completed"));
     expect(session.isIdleForRelease?.()).toBe(true);
   });
 
-  test("holds a session with an active goal", () => {
+  test("holds a session with an active goal", async () => {
     const session = createSession();
-    asInternals(session).handleNotification("thread/goal/updated", {
+    await asInternals(session).handleNotification("thread/goal/updated", {
       threadId: "test-thread",
       goal: { objective: "ship it", status: "active" },
     });
-    completeRootTurn(session);
+    await completeRootTurn(session);
     expect(session.isIdleForRelease?.()).toBe(false);
 
-    asInternals(session).handleNotification("thread/goal/cleared", { threadId: "test-thread" });
+    await asInternals(session).handleNotification("thread/goal/cleared", {
+      threadId: "test-thread",
+    });
     expect(session.isIdleForRelease?.()).toBe(true);
   });
 
   test("never certifies a closed session", async () => {
     const session = createSession();
-    completeRootTurn(session);
+    await completeRootTurn(session);
     await session.close();
     expect(session.isIdleForRelease?.()).toBe(false);
   });

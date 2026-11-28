@@ -54,11 +54,7 @@ export async function recordFirstLaunch(page: Page): Promise<void> {
         observer.disconnect();
         return;
       }
-      if (
-        document.querySelector(
-          '[data-testid="open-project-submit"], [data-testid="sidebar-settings"]',
-        )
-      ) {
+      if (document.querySelector('[data-testid="home-scroll"], [data-testid="sidebar-settings"]')) {
         record.appBeforeSetup = true;
       }
     });
@@ -79,7 +75,7 @@ export function loadingScreen(page: Page): Locator {
 
 /** The empty home a host with no projects lands on. */
 export function emptyHome(page: Page): Locator {
-  return page.getByTestId("open-project-submit");
+  return page.getByTestId("home-scroll");
 }
 
 export function setupModal(page: Page): Locator {
@@ -124,12 +120,12 @@ export async function addProjectFromSetup(page: Page, projectPath: string): Prom
   await expect(addProjectFlow(page)).toBeVisible({ timeout: 30_000 });
   await chooseAddProjectMethod(page, "directory-search");
   await addProjectFlowInput(page).fill(projectPath);
-  await page.keyboard.press("Enter");
+  await addProjectFlowInput(page).press("Control+Enter");
   await expect(addProjectFlow(page)).toHaveCount(0, { timeout: 30_000 });
 }
 
 export async function showSetupAgainFromSettings(page: Page): Promise<void> {
-  await page.locator('[data-testid="sidebar-settings"]:visible').first().click();
+  await page.getByRole("tab", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Show setup again", exact: true }).click();
 }
 

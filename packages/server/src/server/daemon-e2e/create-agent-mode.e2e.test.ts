@@ -3,6 +3,7 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { expect, test } from "vitest";
+import { agentMcpTransportOptions } from "../test-utils/clisbot-daemon.js";
 import { createDaemonTestContext } from "../test-utils/index.js";
 
 test("an attended MCP caller can discover and supply a cross-provider child mode", async () => {
@@ -21,6 +22,7 @@ test("an attended MCP caller can discover and supply a cross-provider child mode
     await mcp.connect(
       new StreamableHTTPClientTransport(
         new URL(`http://127.0.0.1:${ctx.daemon.port}/mcp/agents?callerAgentId=${parent.id}`),
+        agentMcpTransportOptions(ctx.daemon.daemon.agentManager.getMcpAuthToken()),
       ),
     );
     const { tools } = await mcp.listTools();

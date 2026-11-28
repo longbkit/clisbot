@@ -203,17 +203,18 @@ async function waitForDesktopStatus(page) {
   );
 }
 
-async function settleDesktopStartup(page) {
-  await expect(
-    page.getByRole("button", { name: "Desktop browser workspace 1", exact: true }),
-  ).toBeVisible({ timeout: timeoutMs });
+async function settleDesktopStartup(page, serverId) {
   // The dev launcher supplies its package directory as an open-project request.
   // Before the local host connects, that request opens the connection prompt.
   // Finish startup before exercising the unrelated Settings/browser workflows.
   const connectionPrompt = page.getByTestId("add-host-method-modal");
-  if (await connectionPrompt.isVisible()) {
+  await page.addLocatorHandler(connectionPrompt, async () => {
     await connectionPrompt.getByRole("button", { name: "Close", exact: true }).click();
-    await expect(connectionPrompt).toBeHidden();
+  });
+  try {
+    await openWorkspaceFromList(page, serverId, workspaceIds[0]);
+  } finally {
+    await page.removeLocatorHandler(connectionPrompt);
   }
 }
 
@@ -350,8 +351,9 @@ async function connectBrowserToolClient(daemonPort, callerAgentId) {
   return experimental_createMCPClient({ transport });
 }
 
-async function openBrowserWorkspace(page, workspaceKey) {
-  await page.getByTestId(`sidebar-workspace-row-${workspaceKey}`).click({ timeout: timeoutMs });
+async function openBrowserWorkspace(page, serverId, workspaceId) {
+  const workspaceKey = `${serverId}:${workspaceId}`;
+  await openWorkspaceFromList(page, serverId, workspaceId);
   await expect(page.getByTestId(`workspace-deck-entry-${workspaceKey}`)).toBeVisible();
 }
 
@@ -368,7 +370,7 @@ async function listBrowserHosts(client) {
 }
 
 async function expectBrowserHostNameInCommandCenter(page, name) {
-  await page.getByTestId("sidebar-search").click();
+  await openCommandCenter(page);
   const search = page.getByTestId("command-center-input");
   await search.fill("Copy browser host name");
   const action = page.getByRole("button", { name: /Copy browser host name/ });
@@ -378,15 +380,15 @@ async function expectBrowserHostNameInCommandCenter(page, name) {
   await expect(page.getByText("Copied", { exact: true })).toBeVisible();
 }
 
-async function verifyBrowserHostRouting({ page, client, targetUrl, workspaceKey }) {
-  await openBrowserWorkspace(page, workspaceKey);
+async function verifyBrowserHostRouting({ page, client, targetUrl, serverId, workspaceId }) {
+  await openBrowserWorkspace(page, serverId, workspaceId);
   await expect.poll(async () => (await listBrowserHosts(client)).length).toBe(1);
   const [firstHost] = await listBrowserHosts(client);
   await expectBrowserHostNameInCommandCenter(page, firstHost.label);
   const secondWindow = await openSecondDesktopWindow(page);
 
   try {
-    await openBrowserWorkspace(secondWindow, workspaceKey);
+    await openBrowserWorkspace(secondWindow, serverId, workspaceId);
     await expect.poll(async () => (await listBrowserHosts(client)).length).toBe(2);
     const secondHost = (await listBrowserHosts(client)).find(
       (host) => host.browserHostId !== firstHost.browserHostId,
@@ -1476,7 +1478,7 @@ async function main() {
     await setWindowHidden(inspectorPort, false);
     await hideDeveloperToasts(page);
     const status = await waitForDesktopStatus(page);
-    await settleDesktopStartup(page);
+    await settleDesktopStartup(page, status.serverId);
 
     const checkPluginLinks = () =>
       runPluginLinksRegression({
@@ -1537,7 +1539,8 @@ async function main() {
         page,
         client: routingClient,
         targetUrl: target.url,
-        workspaceKey: `${status.serverId}:${typingAgent.workspaceId}`,
+        serverId: status.serverId,
+        workspaceId: typingAgent.workspaceId,
       });
     } finally {
       await routingClient.close();

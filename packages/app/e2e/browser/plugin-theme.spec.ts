@@ -108,6 +108,14 @@ test("keeps plugin workspace timestamps readable on state surfaces and honors ov
   try {
     await client.patchDaemonConfig({ pluginsEnabled: true });
     await client.installDirectoryPlugin(directory);
+    // This fixture measures the workspace row's fill. Expanded agent lines
+    // own their own selection surface when session details are enabled.
+    await page.addInitScript(() => {
+      const key = "@clisbot:app-settings";
+      const settings = JSON.parse(localStorage.getItem(key) ?? "{}");
+      settings.sidebarWorkspaceSessions = { ...settings.sidebarWorkspaceSessions, visible: false };
+      localStorage.setItem(key, JSON.stringify(settings));
+    });
     await selectTheme(page, "Solarized Dark");
     await openAgentRoute(page, selected);
     const selectedRow = page.getByTestId(

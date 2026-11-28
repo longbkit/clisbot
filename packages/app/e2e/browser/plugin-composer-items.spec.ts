@@ -35,8 +35,8 @@ test("a toolbar without room moves a plugin toggle to the overflow sheet and bac
     await composer.setWindowWidth(1000);
     await composer.expectToggleInlineAtFullDensity();
     // Too narrow for full labels, wide enough that the controls have not folded away.
-    await composer.setWindowWidth(880);
-    await composer.expectToolbarWidthBetween(300, 395);
+    await composer.setWindowWidth(808);
+    await composer.expectToolbarWidthBetween(215, 330);
     await composer.expectToggleInOverflow();
     await composer.closeOverflowSheet();
     await composer.setWindowWidth(1000);
@@ -49,8 +49,8 @@ test("an open plugin picker closes when its trigger moves to the overflow", asyn
   await withPickerComposerItem(page, async (composer) => {
     await composer.setWindowWidth(1000);
     await composer.openInlinePicker();
-    await composer.setWindowWidth(880);
-    await composer.expectToolbarWidthBetween(300, 395);
+    await composer.setWindowWidth(808);
+    await composer.expectToolbarWidthBetween(215, 330);
     await composer.expectPickerClosed();
   });
 });
@@ -60,10 +60,10 @@ test("the toolbar settles on one density without flipping as the window widens",
 }) => {
   test.setTimeout(120_000);
   await withToggleAndWatcherComposerItems(page, async (composer) => {
-    await composer.setWindowWidth(880);
-    await composer.expectToolbarWidthBetween(300, 395);
+    await composer.setWindowWidth(808);
+    await composer.expectToolbarWidthBetween(215, 330);
     await composer.startRecordingDensity();
-    for (let width = 880; width <= 1000; width += 8) await composer.setWindowWidth(width);
+    for (let width = 808; width <= 1000; width += 8) await composer.setWindowWidth(width);
     await composer.expectAtMostOneDensityChange();
   });
 });

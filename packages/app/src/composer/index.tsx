@@ -3057,8 +3057,10 @@ function ComposerContentImpl({
     }),
     [handleEditQueuedMessage, handleSendQueuedNow, handleSteerQueuedNow, handleDeleteQueuedMessage],
   );
-  let primarySubmitLabel = submitButtonAccessibilityLabel;
-  if (queueEditor) primarySubmitLabel = t("composer.hostQueue.save");
+  const queueSaveLabel = queueEditor ? t("composer.hostQueue.save") : undefined;
+  const primarySubmitLabel = queueSaveLabel ?? submitButtonAccessibilityLabel;
+  const compactQueueSave = Boolean(queueEditor) && chatLayout && isCompactFormFactor;
+  const visibleSubmitLabel = compactQueueSave ? undefined : (queueSaveLabel ?? submitLabel);
   const queueList = (
     <>
       {clientQueue.items.length > 0 || queueEditor?.owner === "client" ? (
@@ -3224,7 +3226,7 @@ function ComposerContentImpl({
                   allowEmptySubmit={Boolean(queueEditor) || allowEmptySubmit}
                   submitButtonAccessibilityLabel={primarySubmitLabel}
                   submitButtonTestID={submitButtonTestID}
-                  submitIcon={submitIcon}
+                  submitIcon={compactQueueSave ? "check" : submitIcon}
                   isSubmitDisabled={
                     isSubmitDisabled || queueEditor?.stale === true || queueEditPending
                   }
@@ -3269,7 +3271,7 @@ function ComposerContentImpl({
                   inputMode={inputMode}
                   readOnly={readOnly}
                   textReplacement={textReplacement}
-                  submitLabel={queueEditor ? t("composer.hostQueue.save") : submitLabel}
+                  submitLabel={visibleSubmitLabel}
                 />
               </RenderProfile>
               <Combobox

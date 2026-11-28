@@ -1,4 +1,3 @@
-import { getServerId } from "../support/helpers/server-id";
 import { runWorkspaceActionFromCommandCenter } from "../support/helpers/command-center-workspace-actions";
 import { spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
@@ -547,7 +546,7 @@ async function expectFingerNavigationInput(page: Page, mode: "alternate" | "mous
 }
 
 async function openPhoneTerminalHistory(page: Page) {
-  await harness.createTerminal({
+  const terminal = await harness.createTerminal({
     name: "Finger scroll history",
     command: "bash",
     args: [
@@ -557,7 +556,7 @@ async function openPhoneTerminalHistory(page: Page) {
       "for i in $(seq 1 150); do echo HISTORY_$i; done; exec sleep 300",
     ],
   });
-  await openPhoneTerminal(page);
+  await openPhoneTerminal(page, terminal.id);
   await expect.poll(() => getTerminalBufferText(page)).toContain("HISTORY_150");
   await expect
     .poll(() => page.evaluate(() => window.__clisbotTerminal!.buffer.active.baseY))
@@ -583,7 +582,7 @@ async function blurTerminalInput(page: Page) {
 
 async function openPhoneInputCapture(page: Page, mode: "alternate" | "mouse") {
   const escapes = mode === "alternate" ? "\x1b[?1049h\x1b[?1h" : "\x1b[?1000h\x1b[?1006h";
-  await harness.createTerminal({
+  const terminal = await harness.createTerminal({
     name: "Touch application input",
     command: process.execPath,
     args: [
@@ -600,7 +599,7 @@ async function openPhoneInputCapture(page: Page, mode: "alternate" | "mouse") {
     `,
     ],
   });
-  await openPhoneTerminal(page);
+  await openPhoneTerminal(page, terminal.id);
   await expect.poll(() => getTerminalBufferText(page)).toContain("TOUCH_START_READY");
   await input(page).press("x");
   await expect.poll(() => getTerminalBufferText(page)).toContain("TOUCH_INPUT_READY");
@@ -612,13 +611,11 @@ async function openPhoneInputCapture(page: Page, mode: "alternate" | "mouse") {
     .toBe(mode === "mouse" ? "vt200" : "none");
 }
 
-async function openPhoneTerminal(page: Page) {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Open menu", exact: true }).click();
-  await page.getByTestId(`sidebar-workspace-row-${getServerId()}:${harness.workspaceId}`).click();
+async function openPhoneTerminal(page: Page, terminalId: string) {
+  await page.goto(buildTerminalWorkspaceUrl(harness.workspaceId, terminalId));
   await expect(page.getByRole("textbox", { name: "Terminal input" })).toBeVisible();
   await expect(page.getByTestId("terminal-surface").filter({ visible: true })).toBeVisible();
-  // The terminal stays mounted while the sidebar's closing backdrop still intercepts input.
+  // Wait until this terminal can receive the first real touch.
   await expect
     .poll(() =>
       page

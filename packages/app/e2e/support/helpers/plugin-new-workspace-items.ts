@@ -3,6 +3,8 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { gotoAppShell } from "./app";
+import { reloadPreservingHostRegistry } from "./hosts";
+import { DEVICE_FORM_PREFERENCES_KEY } from "./form-preferences";
 import {
   archiveWorkspaceFromDaemon,
   assertNewWorkspaceSidebarAndHeader,
@@ -193,10 +195,16 @@ export async function withNewWorkspaceIssuesExample(
       reopenWithoutPlugin: () =>
         test.step("reopen the screen without the plugin", async () => {
           await client.removePlugin(PLUGIN_ID);
-          // Leaving the screen drops its in-memory choice, so only the saved preference is left.
-          await page.goBack();
-          await expect(page.getByTestId("workspace-create-isolation-trigger")).toHaveCount(0);
-          await openNewWorkspaceComposer(page, project);
+          // The normal navigation seed overwrites preferences. Reload the same project with its saved choice.
+          await expect
+            .poll(() =>
+              page.evaluate(
+                (key) => JSON.parse(localStorage.getItem(key) ?? "{}").isolation,
+                DEVICE_FORM_PREFERENCES_KEY,
+              ),
+            )
+            .toBe("worktree");
+          await reloadPreservingHostRegistry(page);
           await expect(page.getByRole("button", { name: "Mount", exact: true })).toHaveCount(0);
         }),
       createWorkspace: (createOptions) =>

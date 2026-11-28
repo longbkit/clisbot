@@ -1,3 +1,5 @@
+import { KeyboardActionDispatcherProvider } from "@/keyboard/keyboard-action-dispatcher-context";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // @vitest-environment jsdom
 import React, { useState } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -82,6 +84,7 @@ afterEach(() => cleanup());
 /** Stands in for the live composer: a pick from another provider opens the switch review. */
 function Harness(props: { closeOnProviderChange?: boolean; onPick: () => void }) {
   const [review, setReview] = useState(false);
+  const [queryClient] = useState(() => new QueryClient());
   const controls: ComposerPickerControlsProps = {
     provider: "codex",
     providers: [],
@@ -108,7 +111,11 @@ function Harness(props: { closeOnProviderChange?: boolean; onPick: () => void })
   };
   return (
     <>
-      <ComposerPickerControls {...controls} />
+      <QueryClientProvider client={queryClient}>
+        <KeyboardActionDispatcherProvider>
+          <ComposerPickerControls {...controls} />
+        </KeyboardActionDispatcherProvider>
+      </QueryClientProvider>
       {review ? <div role="dialog" data-testid="provider-switch-review" /> : null}
     </>
   );

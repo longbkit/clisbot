@@ -4,7 +4,10 @@ import { editPersistedConfig } from "@clisbot/server/configuration";
 
 /** Update the existing policy live; forwarded public Host/Origin headers still reach daemon admission. */
 export async function configureServingAdmission(home: string, origins: string[]): Promise<void> {
-  const client = await connectToDaemon({ target: { kind: "instance", home } });
+  const client = await connectToDaemon({
+    target: { kind: "instance", home },
+    preferLocalCredential: true,
+  });
   try {
     const config = (await client.getDaemonConfig()).config;
     const hostnames =

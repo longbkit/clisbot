@@ -387,9 +387,9 @@ for (const behavior of ["Steer", "Interrupt", "Queue"] as const) {
       await composer.press("Control+Enter");
       await expect(composer).toHaveValue("");
       await expect(page.getByText("Follow-up", { exact: true })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Send queued message" })).toHaveCount(
-        behavior === "Queue" ? 1 : 0,
-      );
+      await expect(
+        page.getByTestId("queue-row-text-label").filter({ hasText: /^Follow-up$/ }),
+      ).toHaveCount(behavior === "Queue" ? 1 : 0);
     } finally {
       await agent.cleanup();
     }

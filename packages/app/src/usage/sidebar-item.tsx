@@ -64,18 +64,15 @@ export function useUsageSummary(): readonly PinnedUsageSource[] {
  * Pressing it opens the Usage modal.
  */
 export function UsageSidebarItem({
-  sources: providedSources,
+  sources,
   reserveSpace = false,
 }: {
-  /** Upstream lifts the summary to the caller; Clisbot callers may still omit it. */
-  sources?: readonly PinnedUsageSource[];
+  sources: readonly PinnedUsageSource[];
   reserveSpace?: boolean;
-} = {}) {
+}) {
   const { t } = useTranslation();
   const label = t(builtinSidebarNavLabelKey("usage"));
   const openUsage = useOpenSidebarUsage();
-  const summary = useUsageSummary();
-  const sources = providedSources ?? summary;
   if (sources.length === 0)
     return reserveSpace ? (
       <Pressable

@@ -60,6 +60,7 @@ export interface TrailingActionFrame {
   /** Every trailing action on screen, as `label` or `label (disabled)`. */
   actions: string[];
   slotX: number | null;
+  circleX: number | null;
   micX: number | null;
   ringX: number | null;
   ringWidth: number | null;
@@ -112,6 +113,7 @@ export async function recordTrailingActionFrames(page: Page): Promise<void> {
       frames.push({
         atMs: Math.round(performance.now() - start),
         actions,
+        circleX: control('[data-testid="composer-circle"]')?.getBoundingClientRect().x ?? null,
         slotX: slot ? slot.getBoundingClientRect().x : null,
         micX: mic ? mic.getBoundingClientRect().x : null,
         ringX: ring ? ring.getBoundingClientRect().x : null,
@@ -143,21 +145,32 @@ export async function readTrailingActionFrames(page: Page): Promise<TrailingActi
  * Every frame of the span shows exactly one trailing action, in the one slot, moving straight from
  * `from` to `to`, with the mic and context ring where they started.
  */
+function trailingSlotIsStable(frame: TrailingActionFrame, first: TrailingActionFrame): boolean {
+  if (first.circleX === null) return frame.slotX === first.slotX && frame.micX === first.micX;
+  // Chat's primary circle swaps Dictation for Send. Realtime voice is beside it when empty.
+  const empty = frame.actions[0] === "Enable Voice mode";
+  return (
+    frame.circleX === first.circleX &&
+    (empty
+      ? frame.micX === frame.circleX && frame.slotX !== null && frame.slotX < frame.circleX
+      : frame.micX === null && frame.slotX === frame.circleX)
+  );
+}
+
 export function expectTrailingActionSwap(
   frames: TrailingActionFrame[],
   expected: { from: string; to: string },
 ): void {
   expect(frames.length).toBeGreaterThan(1);
   const [first] = frames;
-  const wrongFrames = frames.filter(
+  const wrongFrame = frames.find(
     (frame) =>
       frame.actions.length !== 1 ||
-      frame.slotX !== first.slotX ||
-      frame.micX !== first.micX ||
+      !trailingSlotIsStable(frame, first) ||
       frame.ringX !== first.ringX ||
       frame.ringWidth !== first.ringWidth,
   );
-  expect(wrongFrames, `frames that moved or showed the wrong action`).toEqual([]);
+  expect(wrongFrame, `control geometry changed from ${JSON.stringify(first)}`).toBeUndefined();
   const sequence = frames
     .map((frame) => frame.actions[0])
     .filter((action, index, all) => action !== all[index - 1]);
@@ -371,6 +384,28 @@ export async function readComposerToolbarRails(page: Page): Promise<ComposerTool
  * corner, as far from the right edge as from the bottom edge. Within half a pixel.
  */
 export async function expectComposerToolbarOnTextRails(page: Page): Promise<void> {
+  if (process.env.EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER !== "0") {
+    const pill = page.getByTestId("composer-pill").filter({ visible: true });
+    const face = pill.getByTestId("composer-commands-face");
+    const circle = pill
+      .getByTestId("composer-circle")
+      .locator('[data-testid$="-face"]')
+      .filter({ visible: true })
+      .last();
+    await expect(circle).toBeVisible();
+    const [container, left, right] = await Promise.all([
+      pill.boundingBox(),
+      face.boundingBox(),
+      circle.boundingBox(),
+    ]);
+    if (!container || !left || !right)
+      throw new Error("The chat composer controls must be painted");
+    expect(
+      Math.abs(left.x - container.x - (container.x + container.width - right.x - right.width)),
+    ).toBeLessThan(1.5);
+    expect(Math.abs(left.y + left.height / 2 - right.y - right.height / 2)).toBeLessThan(1.5);
+    return;
+  }
   const rails = await readComposerToolbarRails(page);
   // A precision of 0 digits passes within half a pixel.
   expect(rails.inkLeft).toBeCloseTo(rails.textLeft, 0);

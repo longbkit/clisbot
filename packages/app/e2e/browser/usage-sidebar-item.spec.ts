@@ -8,7 +8,11 @@ import {
   openProjectViaDaemon,
 } from "../support/helpers/new-workspace";
 import { getServerId } from "../support/helpers/server-id";
-import { openCompactSettings, openSettingsHostSection } from "../support/helpers/settings";
+import {
+  closeCompactSettings,
+  openCompactSettings,
+  openSettingsHostSection,
+} from "../support/helpers/settings";
 import {
   expectFooterItemSetting,
   expectFooterSeparator,
@@ -137,14 +141,16 @@ test.describe("Usage item", () => {
     ]);
 
     await page.setViewportSize(COMPACT);
+    await expectPinnedUsage(page, ["47% 5h"]);
+    await openCompactSettings(page, new URL(startingUrl).pathname);
     await expect(usageItem(page)).toHaveCount(0);
     const requestsBeforeHiding = usage.listRequests();
     await page.clock.fastForward(5 * 60_000);
     expect(usage.listRequests()).toEqual(requestsBeforeHiding);
 
+    await closeCompactSettings(page);
     await openCompactSidebar(page);
     await expectPinnedUsage(page, ["47% 5h"]);
-    await expect(page.getByTestId("agent-list-backdrop")).toBeVisible();
     usedPct = 53;
     await page.clock.fastForward(5 * 60_000);
     await expectPinnedUsage(page, ["53% 5h"]);

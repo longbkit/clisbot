@@ -77,15 +77,16 @@ export function useStreamHistoryWindow(input: {
   }
 
   useEffect(() => {
-    setWindow((current) =>
-      reconcileHistoryWindow({
-        current,
-        boundaryIndex,
-        initialBoundaryItemId,
-        hasItems: items.length > 0,
-      }),
-    );
-  }, [boundaryIndex, initialBoundaryItemId, items.length]);
+    const reconciled = reconcileHistoryWindow({
+      current: window,
+      boundaryIndex,
+      initialBoundaryItemId,
+      hasItems: items.length > 0,
+    });
+    if (reconciled !== window) {
+      setWindow((current) => (current === window ? reconciled : current));
+    }
+  }, [boundaryIndex, initialBoundaryItemId, items.length, window]);
 
   const revealLoadedHistory = useCallback(
     (itemId?: string): boolean => {

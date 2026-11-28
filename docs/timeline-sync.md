@@ -75,7 +75,10 @@ does not change the collapse state of a turn already displayed.
 `features.wholeTurnTimeline` receive it; other hosts receive the existing item-based request.
 Reading history remains available on older hosts, whose pages can still split turns. Forward
 catch-up stays incremental, but its reset snapshot honors a supported whole-turn request.
-Source coverage still includes interleaved tool updates.
+A source-range tail or backward page grows to the canonical turn boundaries when requested.
+An interleaved update to an older tool contributes context and does not expand coverage back
+to the original tool. Boundary scans are bounded to 8,192 rows per edge. If the expanded
+turn exceeds the projection memory budget, the daemon returns the ordinary certified page.
 
 Canonical IDs define runs. With missing IDs, human prompts, heartbeats and typed received
 agent messages each start a fallback turn. This deterministic fallback is shared by paging

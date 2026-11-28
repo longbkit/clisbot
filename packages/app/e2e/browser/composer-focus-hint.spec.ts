@@ -101,11 +101,19 @@ async function expectFirstVisibleHintHasSpace(page: Page): Promise<void> {
     .toBe(true);
 }
 
+const compactChatLayout = process.env.EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER !== "0";
+
 const FRENCH_LAYOUTS = [
-  { name: "phone width", width: 390, placeholder: "Message, @fichiers, /commandes" },
+  {
+    name: "phone width",
+    width: 390,
+    placeholder: compactChatLayout ? "Message…" : "Message, @fichiers, /commandes",
+    showsHint: !compactChatLayout,
+  },
   {
     name: "desktop width",
     width: 1024,
+    showsHint: true,
     placeholder:
       "Écrivez à l’agent, mentionnez des @fichiers ou utilisez les /commandes et /skills",
   },
@@ -123,7 +131,7 @@ for (const layout of FRENCH_LAYOUTS) {
 
       try {
         await useLanguage(page, "fr");
-        await recordFirstVisibleHint(page);
+        if (layout.showsHint) await recordFirstVisibleHint(page);
         await openAgentRoute(page, agent);
         const input = page.getByRole("textbox", { name: "Écrire à l’agent…" }).first();
         await expect(input).toBeVisible();
@@ -131,6 +139,10 @@ for (const layout of FRENCH_LAYOUTS) {
         await input.blur();
 
         const hint = page.getByText(/pour saisir$/).first();
+        if (!layout.showsHint) {
+          await expect(hint).toBeHidden();
+          return;
+        }
         await expect(hint).toBeVisible();
         // The input takes the hint's width on the render after the hint lays out.
         await expect.poll(() => placeholderOverlaps(input, hint)).toBe(false);

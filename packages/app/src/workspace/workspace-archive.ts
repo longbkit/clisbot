@@ -195,6 +195,9 @@ export async function undoWorkspaceArchiveOptimistically(input: {
   }
   try {
     await input.client.undoWorkspaceArchive(workspaceId);
+    // Recovery events precede the reply on the wire, but the directory batches them by frame.
+    // Restore all visible agents before tab reconciliation can prune the retained layout.
+    getHostRuntimeStore().flushDirectoryUpdates(serverId);
   } catch (error) {
     if (isWorkspaceArchiveIntentCurrent(intent)) {
       getHostRuntimeStore().removeWorkspaceSnapshot(serverId, workspaceId);

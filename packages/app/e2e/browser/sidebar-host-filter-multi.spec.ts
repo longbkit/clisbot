@@ -146,10 +146,9 @@ test.describe("Sidebar host filter (multi-select)", () => {
       await expect(workspaceRow).toBeVisible();
 
       await openSidebarHostPicker(page);
-      await page
-        .getByTestId(`sidebar-host-row-${serverId}`)
-        .getByRole("button", { name: /Open .* settings/ })
-        .click();
+      const settings = page.getByTestId(`sidebar-host-row-${serverId}-settings`);
+      await expect(settings).toHaveAccessibleName(/Open .* settings/);
+      await settings.click();
       await expectAppRoute(page, buildSettingsHostSectionRoute(serverId, "host"));
     } finally {
       await seeded.cleanup();
@@ -173,7 +172,8 @@ test.describe("Sidebar host filter (multi-select)", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("add-host-method-modal")).toHaveCount(0);
 
-    await page.getByTestId("settings-hosts").click();
+    await openSidebarHostPicker(page);
+    await page.getByRole("button", { name: "Open All hosts settings", exact: true }).click();
     await expectAppRoute(page, buildHubSettingsRoute("hosts"));
     await expectButtonLabelCentered(page.getByTestId("settings-hosts-add-host"));
     await page.getByTestId("settings-hosts-add-host").click();
@@ -238,7 +238,7 @@ interface RowGeometry {
   height: number;
   /** Height of the row's parent minus its borders: equals `height` when nothing pads the row. */
   slotHeight: number;
-  padding: string;
+  paddingBlock: string;
   iconCenterX: number;
   iconCenterY: number;
   labelLeft: number;
@@ -263,7 +263,7 @@ async function rowGeometry(row: Locator, label: string): Promise<RowGeometry> {
     return {
       height: element.getBoundingClientRect().height,
       slotHeight: slot.getBoundingClientRect().height - slotBorders,
-      padding: `${rowStyle.paddingTop} ${rowStyle.paddingRight} ${rowStyle.paddingBottom} ${rowStyle.paddingLeft}`,
+      paddingBlock: `${rowStyle.paddingTop} ${rowStyle.paddingBottom}`,
       iconCenterX: iconBox.left + iconBox.width / 2,
       iconCenterY: iconBox.top + iconBox.height / 2,
       labelLeft: labelBox.left,
@@ -283,8 +283,8 @@ async function expectAddHostOnHostRowRails(page: Page) {
   expect(Math.abs(addHost.iconCenterX - hostRow.iconCenterX), measured).toBeLessThanOrEqual(1);
   expect(Math.abs(addHost.labelLeft - hostRow.labelLeft), measured).toBeLessThanOrEqual(1);
   expect(Math.abs(addHost.iconCenterY - addHost.labelCenterY), measured).toBeLessThanOrEqual(1);
-  // A one-line menu row: the list rows' padding, and nothing added around it by the footer.
-  expect(addHost.padding, measured).toBe(hostRow.padding);
+  // A one-line footer keeps the list's vertical rhythm. Host rows reserve a trailing gear.
+  expect(addHost.paddingBlock, measured).toBe(hostRow.paddingBlock);
   expect(Math.abs(addHost.slotHeight - addHost.height), measured).toBeLessThanOrEqual(1);
 }
 

@@ -106,25 +106,31 @@ export function FooterIconButton({
   );
 }
 
-export function FooterSearchField() {
-  const { t } = useTranslation();
-  const shortcutKeys = useShortcutKeys("toggle-command-center");
-  const setCommandCenterOpen = useKeyboardShortcutsStore((state) => state.setCommandCenterOpen);
+export function useOpenFooterSearch() {
   const compact = useIsCompactFormFactor();
-  const { finePointer } = usePointerCapabilities();
   const showMobileAgent = usePanelStore((state) => state.showMobileAgent);
-  const openSearch = useCallback(() => {
+  const setCommandCenterOpen = useKeyboardShortcutsStore((state) => state.setCommandCenterOpen);
+  return useCallback(() => {
     if (compact && !HOME_V2_ENABLED) showMobileAgent();
     setCommandCenterOpen(true);
   }, [compact, showMobileAgent, setCommandCenterOpen]);
+}
+
+export function FooterSearchField({ iconOnly = false }: { iconOnly?: boolean }) {
+  const { t } = useTranslation();
+  const shortcutKeys = useShortcutKeys("toggle-command-center");
+  const compact = useIsCompactFormFactor();
+  const { finePointer } = usePointerCapabilities();
+  const openSearch = useOpenFooterSearch();
   const showLabel = useFooterSearchLabelFits(compact);
   return (
     <Pressable
       style={[
         styles.footerSearchField,
         compact || !finePointer ? styles.footerTouchSearchField : null,
-        compact ? styles.footerCompactSearchField : null,
-        showLabel.fits ? null : styles.footerSearchIconOnly,
+        compact || iconOnly ? styles.footerCompactSearchField : null,
+        iconOnly && !compact && finePointer ? styles.packedDesktopSearchField : null,
+        showLabel.fits && !iconOnly ? null : styles.footerSearchIconOnly,
       ]}
       onLayout={compact ? showLabel.measureField : undefined}
       testID="sidebar-footer-search"
@@ -133,7 +139,7 @@ export function FooterSearchField() {
       onPress={openSearch}
     >
       <SearchIcon />
-      {showLabel.fits ? (
+      {showLabel.fits && !iconOnly ? (
         <Text style={styles.footerSearchLabel} numberOfLines={1}>
           {t("sidebar.sections.search")}
         </Text>
@@ -328,6 +334,7 @@ const styles = StyleSheet.create((theme) => ({
     minWidth: MIN_TOUCH_TARGET_SIZE,
     overflow: "hidden",
   },
+  packedDesktopSearchField: { minWidth: density.iconButton },
   footerSearchIconOnly: {
     justifyContent: "center",
   },

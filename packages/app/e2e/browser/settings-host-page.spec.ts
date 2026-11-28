@@ -385,8 +385,9 @@ async function openNewWorkspaceAddHost(page: import("@playwright/test").Page) {
 
 async function connectToTestHost(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "Direct connection", exact: true }).click();
-  await page.getByRole("textbox", { name: "Host", exact: true }).fill("127.0.0.1");
-  await page.getByRole("textbox", { name: "Port", exact: true }).fill(String(getE2EDaemonPort()));
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByTestId("add-host-modal")).toBeHidden({ timeout: 30_000 });
+  const dialog = page.getByTestId("add-host-modal");
+  await dialog.getByRole("textbox", { name: "Host", exact: true }).fill("127.0.0.1");
+  await dialog.getByRole("textbox", { name: "Port", exact: true }).fill(String(getE2EDaemonPort()));
+  await dialog.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(dialog).toBeHidden({ timeout: 30_000 });
 }

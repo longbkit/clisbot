@@ -328,7 +328,10 @@ test.describe("Compact file search context", () => {
         await expect(searchFiles).toHaveText("Search files");
         await expect(searchFiles).toBeEnabled();
         await searchFiles.click();
-        await expect(page.getByTestId("command-center-files-scope")).toHaveText("Files");
+        await expect(page.getByTestId("command-center-input")).toHaveAttribute(
+          "placeholder",
+          "Search files...",
+        );
       } else {
         // Legacy opens the list over this same Work route. Selecting an already
         // current workspace need not close it; use its actual navigation Search.

@@ -74,6 +74,26 @@ describe("useOverlayRegistration in the browser", () => {
 
     expect(openerFocusCalls).toBe(1);
   });
+
+  it("preserves focus in a new overlay opened between detach and close", async () => {
+    await renderHarness(true, true);
+    await renderHarness(true, false);
+    const nextContainer = document.createElement("div");
+    document.body.append(nextContainer);
+    const nextRoot = createRoot(nextContainer);
+    try {
+      flushSync(() => nextRoot.render(<OverlayHarness active showScope />));
+      await nextFrame();
+      const input = nextContainer.querySelector("input");
+      expect(input).toBeInstanceOf(HTMLInputElement);
+      expect(document.activeElement).toBe(input);
+      await renderHarness(false, false);
+      expect(document.activeElement).toBe(input);
+    } finally {
+      nextRoot.unmount();
+      nextContainer.remove();
+    }
+  });
 });
 
 describe("hasOpenDomPopover", () => {

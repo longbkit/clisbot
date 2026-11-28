@@ -435,6 +435,18 @@ export async function openMobileAgentSidebarWithKeyboard(page: Page): Promise<vo
   await page.keyboard.press("ControlOrMeta+b");
 }
 
+/** Exercise the left-edge gesture independently from the sidebar keyboard shortcut. */
+export async function swipeFromLeftEdge(page: Page): Promise<void> {
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error("viewport size is required");
+  const y = Math.round(viewport.height / 2);
+  await page.mouse.move(8, y);
+  await page.mouse.down();
+  await page.mouse.move(40, y, { steps: 4 });
+  await page.mouse.move(Math.round(viewport.width * 0.7), y, { steps: 12 });
+  await page.mouse.up();
+}
+
 /** Drag from the right edge to open the compact Explorer over the agent. */
 export async function swipeOpenMobileExplorer(page: Page): Promise<void> {
   const viewport = page.viewportSize();

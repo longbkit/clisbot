@@ -145,6 +145,7 @@ const en = {
       },
     },
     tools: {
+      browser_list_hosts: "List browser hosts",
       browser_list_tabs: "List open tabs",
       browser_new_tab: "Open a tab",
       browser_navigate: "Go to a page",
@@ -355,6 +356,7 @@ const ar: ToolsCopy = {
       },
     },
     tools: {
+      browser_list_hosts: "عرض مضيفي المتصفح المتاحين",
       browser_list_tabs: "عرض علامات التبويب المفتوحة",
       browser_new_tab: "فتح علامة تبويب",
       browser_navigate: "الانتقال إلى صفحة",
@@ -567,6 +569,7 @@ const es: ToolsCopy = {
       },
     },
     tools: {
+      browser_list_hosts: "Listar los hosts de navegador disponibles",
       browser_list_tabs: "Listar las pestañas abiertas",
       browser_new_tab: "Abrir una pestaña",
       browser_navigate: "Ir a una página",
@@ -779,6 +782,7 @@ const fr: ToolsCopy = {
       },
     },
     tools: {
+      browser_list_hosts: "Lister les hôtes de navigateur disponibles",
       browser_list_tabs: "Lister les onglets ouverts",
       browser_new_tab: "Ouvrir un onglet",
       browser_navigate: "Aller à une page",
@@ -989,6 +993,7 @@ const ja: ToolsCopy = {
       },
     },
     tools: {
+      browser_list_hosts: "利用可能なブラウザーホストを一覧表示",
       browser_list_tabs: "開いているタブを一覧表示",
       browser_new_tab: "タブを開く",
       browser_navigate: "ページに移動",
@@ -1197,6 +1202,7 @@ const ko: ToolsCopy = {
       },
     },
     tools: {
+      browser_list_hosts: "사용 가능한 브라우저 호스트 목록 보기",
       browser_list_tabs: "열린 탭 목록 보기",
       browser_new_tab: "탭 열기",
       browser_navigate: "페이지로 이동",
@@ -1408,6 +1414,7 @@ const ptBR: ToolsCopy = {
       },
     },
     tools: {
+      browser_list_hosts: "Listar os hosts de navegador disponíveis",
       browser_list_tabs: "Listar as abas abertas",
       browser_new_tab: "Abrir uma aba",
       browser_navigate: "Ir para uma página",
@@ -1620,6 +1627,7 @@ const ru: ToolsCopy = {
       },
     },
     tools: {
+      browser_list_hosts: "Показать доступные хосты браузера",
       browser_list_tabs: "Показать открытые вкладки",
       browser_new_tab: "Открыть вкладку",
       browser_navigate: "Перейти на страницу",
@@ -1829,6 +1837,7 @@ const vi: ToolsCopy = {
       },
     },
     tools: {
+      browser_list_hosts: "Liệt kê các Host có trình duyệt",
       browser_list_tabs: "Liệt kê các tab đang mở",
       browser_new_tab: "Mở một tab",
       browser_navigate: "Đi tới một trang",
@@ -2034,6 +2043,7 @@ const zhCN: ToolsCopy = {
       },
     },
     tools: {
+      browser_list_hosts: "列出可用的浏览器主机",
       browser_list_tabs: "列出打开的标签页",
       browser_new_tab: "打开标签页",
       browser_navigate: "前往页面",

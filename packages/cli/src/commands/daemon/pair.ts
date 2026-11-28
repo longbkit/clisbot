@@ -122,7 +122,7 @@ export async function resolveLocalPairingOffer(options: {
     return resolveDaemonPairingOffer(
       { kind: "instance", home: options.clisbotHome },
       options.enableRelay,
-      pairingOptions,
+      { ...pairingOptions, preferLocalCredential: config.devicePairingEnabled },
     );
 
   return generateLocalPairingOffer({
@@ -150,7 +150,10 @@ async function approvedLocalHubOffer(
 ): Promise<DevicePairingOffer["hub"]> {
   const local = resolveLocalHubState({ home });
   if (!local.running || !local.state || !(await readDaemonInstance(home))) return undefined;
-  const client = await connectToDaemon({ target: { kind: "instance", home } });
+  const client = await connectToDaemon({
+    target: { kind: "instance", home },
+    preferLocalCredential: true,
+  });
   try {
     const relationship = (await client.getHubStatus()).status;
     if (relationship.state !== "connected" || relationship.hubOrigin !== local.state.url)
@@ -174,6 +177,7 @@ async function resolveDaemonPairingOffer(
   target: DaemonTarget,
   enableRelay: boolean | undefined,
   options: {
+    preferLocalCredential?: boolean;
     devicePairing?: boolean;
     label?: string;
     ttlMs?: number;
@@ -183,6 +187,7 @@ async function resolveDaemonPairingOffer(
 ): Promise<PairingOffer> {
   const client = await connectToDaemon({
     target,
+    preferLocalCredential: options.preferLocalCredential,
     timeout: PAIRING_DAEMON_RPC_TIMEOUT_MS,
   });
 

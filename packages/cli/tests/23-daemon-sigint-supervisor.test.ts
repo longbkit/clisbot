@@ -210,9 +210,10 @@ try {
     console.log("Foreground SIGINT reached the supervisor. The worker and ACP processes exited.");
 
     daemon = await startSupervisor();
-    const restoredIdle = (await daemon.client.fetchAgentTimeline(idle.id)).agent;
-    assert.equal(restoredIdle?.status, "idle");
-    assert.equal(restoredIdle?.requiresAttention, false);
+    // Reading durable history does not start a provider process.
+    const storedIdle = (await daemon.client.fetchAgentTimeline(idle.id)).agent;
+    assert.equal(storedIdle?.status, "closed");
+    assert.equal(storedIdle.requiresAttention, false);
     await waitFor(async () => {
       const { agent } = (await daemon!.client.fetchAgent(running.id)) ?? {};
       if (agent?.status === "idle" && agent.attentionReason === "finished") return agent;
@@ -224,8 +225,19 @@ try {
         { type: "prompt", sessionId: sessions[1].sessionId, text: resumePrompt },
       ],
     );
+    const followUp = "Continue the idle session.";
+    await daemon.client.sendMessage(idle.id, followUp);
+    const restoredIdle = await waitFor(async () => {
+      const { agent } = (await daemon!.client.fetchAgent(idle.id)) ?? {};
+      if (agent?.status === "idle" && agent.attentionReason === "finished") return agent;
+    }, "idle ACP did not reopen and complete its next turn");
+    assert.equal(restoredIdle.persistence?.sessionId, idle.persistence?.sessionId);
+    assert.deepEqual(
+      (await readEvents()).filter((event) => event.type === "prompt" && event.text === followUp),
+      [{ type: "prompt", sessionId: sessions[0].sessionId, text: followUp }],
+    );
     console.log(
-      "Idle ACP reopened without error attention. The interrupted ACP turn resumed once.",
+      "Idle ACP history stayed cold, its next turn reopened it, and the interrupted ACP turn resumed once.",
     );
     await interruptForeground(daemon);
   }

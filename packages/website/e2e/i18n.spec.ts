@@ -323,6 +323,8 @@ test("waits for scripts before enabling the language menu", async ({ page }) => 
     await expect(languageButton(page)).toBeDisabled();
 
     releaseScripts();
+    // Hydration and responsive styles settle before the desktop trigger receives the click.
+    await expect(languageButton(page)).toBeEnabled();
     await languageButton(page).click();
     await expect(page.getByRole("menuitemradio", { name: "English" })).toBeVisible();
   });

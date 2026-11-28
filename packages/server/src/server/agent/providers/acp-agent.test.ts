@@ -1644,7 +1644,7 @@ describe("ACPAgentSession Zed parity", () => {
   });
 
   test("observed ACP auto-accept waits for shared durable admission before native allow", async () => {
-    const session = createSessionWithConfig({ featureValues: { auto_accept: true } });
+    const session = createSessionWithConfig({ providerOptions: { auto_accept: true } });
     asInternals<ACPSessionInternals>(session).sessionId = "session-1";
     const events: AgentStreamEvent[] = [];
     session.subscribe((event) => events.push(event));
@@ -1681,7 +1681,7 @@ describe("ACPAgentSession Zed parity", () => {
   });
 
   test("failed observed ACP auto-accept retains a live request without native forwarding", async () => {
-    const session = createSessionWithConfig({ featureValues: { auto_accept: true } });
+    const session = createSessionWithConfig({ providerOptions: { auto_accept: true } });
     asInternals<ACPSessionInternals>(session).sessionId = "session-1";
     session.setAutomaticPermissionResponder(async () => {
       throw new Error("ENOSPC");
@@ -5307,7 +5307,7 @@ describe("ACP process release when the agent stops answering", () => {
     });
 
     await expect(
-      client.listFeatures({ provider: "grok", cwd: "/tmp/clisbot-acp-test" }),
+      client.listControls({ provider: "grok", cwd: "/tmp/clisbot-acp-test" }),
     ).rejects.toThrow("ACP initialize timed out");
     expect(terminator.terminated).toContain(child);
   });

@@ -235,7 +235,7 @@ async function withToolbarPlugin(
           const toggle = toolbar(page).getByRole("button", { name: ONE_TOGGLE_NAME, exact: true });
           await expect(toggle).toBeVisible();
           await expect(agentFeaturesButton(page)).toHaveCount(0);
-          await expect(toolbar(page).getByTestId("agent-thinking-selector")).toHaveText("Low");
+          await expect(toolbar(page).getByTestId("composer-model-chip")).toContainText("Low");
           const row = await toolbar(page).boundingBox();
           const box = await toggle.boundingBox();
           expect(box && row && box.x + box.width <= row.x + row.width).toBe(true);

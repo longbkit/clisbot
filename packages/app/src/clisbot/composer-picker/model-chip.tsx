@@ -52,7 +52,11 @@ export const ModelChip = forwardRef<View, ModelChipProps>(function ModelChip(pro
           />
         </View>
       ) : null}
-      <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
+      <Text
+        style={[styles.label, keepName && styles.compactLabel]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
         {props.label}
       </Text>
     </ComboboxTrigger>
@@ -73,8 +77,9 @@ const styles = StyleSheet.create((theme) => ({
   },
   keepName: {
     flexShrink: 0,
-    maxWidth: 160,
+    maxWidth: "100%",
   },
+  compactLabel: { maxWidth: 120 },
   hovered: {
     backgroundColor: theme.colors.surface2,
   },
