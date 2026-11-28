@@ -122,9 +122,11 @@ test("projects and pinned chats reorder while ordinary workspaces stay newest fi
     await secondProject.client.setWorkspacePinned(secondProject.workspaceId, true);
     const secondProjectWorkspaceTestId = `sidebar-workspace-row-${getServerId()}:${secondProject.workspaceId}`;
     await quickDragFirstRowAfterSecond(
-      page.locator(
-        `[data-testid="${firstWorkspaceTestId}"], [data-testid="${secondProjectWorkspaceTestId}"]`,
-      ),
+      page
+        .getByTestId("sidebar-pinned-section")
+        .locator(
+          `[data-testid="${firstWorkspaceTestId}"], [data-testid="${secondProjectWorkspaceTestId}"]`,
+        ),
       pressWorkspaceRow,
     );
   } finally {
