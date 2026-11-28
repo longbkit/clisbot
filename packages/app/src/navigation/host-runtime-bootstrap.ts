@@ -193,8 +193,12 @@ function resolveReadyIndexStartupRoute(input: ResolveIndexStartupRouteInput): St
 
   // Home V2 is where a known Host is used, online or not; a first run with no Host at all still
   // goes to Welcome, which is the only screen that connects one.
-  if (HOME_V2_ENABLED && input.hosts.length > 0)
+  if (HOME_V2_ENABLED && input.hosts.length > 0) {
+    if (input.isWaitingForSetup && !shouldRestoreWorkspaceSelection(input)) {
+      return { kind: "splash" };
+    }
     return { kind: "redirect", href: buildOpenProjectRoute() };
+  }
 
   if (!input.isWorkspaceSelectionLoaded) {
     return { kind: "splash" };

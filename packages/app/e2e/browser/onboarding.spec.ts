@@ -96,7 +96,12 @@ test("a new user is walked through setup once", async ({ page }, testInfo) => {
       await addProjectFromSetup(page, repo.path);
       await expectSetupStep(page, "Add your projects");
       await expect(setupModal(page).getByText(repo.path, { exact: true })).toBeVisible();
-      await expect(setupModal(page).getByText("Added", { exact: true })).toBeVisible();
+      await expect(
+        setupModal(page)
+          .getByTestId("onboarding-added-project")
+          .filter({ hasText: repo.path })
+          .getByText("Added", { exact: true }),
+      ).toBeVisible();
       await page.screenshot({ path: testInfo.outputPath("3-projects.png") });
     });
 
@@ -113,11 +118,9 @@ test("a new user is walked through setup once", async ({ page }, testInfo) => {
     await test.step("Skip setup closes it for good", async () => {
       await skipSetup(page);
       await page.reload();
-      await expect(
-        page.locator('[data-testid^="sidebar-project-row-"]').filter({
-          hasText: path.basename(repo.path),
-        }),
-      ).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByRole("button", { name: "Workspace project" })).toContainText(
+        path.basename(repo.path),
+      );
       await expect(setupModal(page)).toHaveCount(0);
     });
   } finally {
@@ -131,7 +134,6 @@ test("a provider removed in setup can be added back and removed again", async ({
   const host = await startSetupHost("re-add");
   const detail = setupSheet(page, "provider-settings-sheet");
   const remove = detail.getByTestId("provider-remove");
-  page.on("dialog", (dialog) => void dialog.accept());
 
   try {
     await openAppAsNewUser(page, host);
@@ -141,6 +143,11 @@ test("a provider removed in setup can be added back and removed again", async ({
     await openAddProvider(page);
     await installAcpCatalogProvider(page, "Junie");
     await remove.click();
+    await page
+      .getByRole("dialog")
+      .filter({ hasText: "Remove Junie?" })
+      .getByRole("button", { name: "Remove", exact: true })
+      .click();
     await expect(detail).toHaveCount(0);
 
     // Adding it back opens the same provider's sheet, which must not still be removing it.
@@ -349,12 +356,10 @@ test("setup suggests the repos the user already ran agents in", async ({ page },
       await projectSuggestion(page, scratchName).click();
       await setupPrimaryButton(page, "Continue").click();
       await expectSetupStep(page, "Let agents use Clisbot");
-      await expect(
-        page.locator('[data-testid^="sidebar-project-row-"]').filter({ hasText: repoName }),
-      ).toBeVisible({ timeout: 60_000 });
-      await expect(
-        page.locator('[data-testid^="sidebar-project-row-"]').filter({ hasText: scratchName }),
-      ).toHaveCount(0);
+      await goToSetupStep(page, "Projects");
+      const added = setupModal(page).getByTestId("onboarding-added-project");
+      await expect(added.filter({ hasText: repo.path })).toBeVisible();
+      await expect(added.filter({ hasText: scratchName })).toHaveCount(0);
     });
   } finally {
     await host.close();
@@ -370,9 +375,7 @@ test("an existing user only sees setup when they ask for it", async ({ page }) =
 
   try {
     await openAppAsNewUser(page, host);
-    await expect(
-      page.getByTestId(`sidebar-workspace-row-${host.serverId}:${workspace.workspaceId}`),
-    ).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId("home-scroll")).toBeVisible({ timeout: 60_000 });
     await expect(setupModal(page)).toHaveCount(0);
 
     await showSetupAgainFromSettings(page);
@@ -418,7 +421,7 @@ test("setup choices carry over to Settings and the phone step pairs over relay",
 
     await test.step("Finish closes setup and Settings shows the same Clisbot tools value", async () => {
       await finishSetup(page);
-      await page.locator('[data-testid="sidebar-settings"]:visible').first().click();
+      await page.getByRole("tab", { name: "Settings", exact: true }).click();
       await openSettingsHostSection(page, host.serverId, "agents");
       await expect(clisbotToolsSwitch(page)).toBeChecked();
       await page.screenshot({ path: testInfo.outputPath("7-settings-agents.png") });

@@ -47,6 +47,7 @@ export function ProjectsStep({
           {projectRootPaths.map((rootPath, index) => (
             <View
               key={rootPath}
+              testID="onboarding-added-project"
               style={[settingsStyles.row, index > 0 && settingsStyles.rowBorder]}
             >
               <View style={settingsStyles.rowContent}>
