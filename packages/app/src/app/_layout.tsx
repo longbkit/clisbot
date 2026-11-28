@@ -667,9 +667,11 @@ function CompactSidebarHost({
       collapsable={false}
       style={[
         layoutStyles.compactSidebarHost,
-        { opacity: visible ? 1 : 0 },
-        // Keep scroll geometry while Settings covers the list. Hidden descendants cannot receive input.
-        isWeb && !visible && ({ visibility: "hidden" } as const),
+        {
+          opacity: visible ? 1 : 0,
+          // The web-only style hides descendants while preserving their measured scroll ranges.
+          ...(isWeb && !visible ? { visibility: "hidden" as const } : {}),
+        },
       ]}
       pointerEvents={interactive ? "box-none" : "none"}
       accessibilityElementsHidden={!interactive}
