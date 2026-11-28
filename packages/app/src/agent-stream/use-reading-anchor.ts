@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { StreamItem } from "@/types/stream";
 import { useSessionStore } from "@/stores/session-store";
+import type { NearBottom } from "./near-bottom";
 import type { StreamViewportHandle } from "./strategy";
 
 interface ReadingAnchor {
@@ -23,7 +24,7 @@ export function useReadingAnchor(input: {
   serverId: string;
   agentId: string;
   active: boolean;
-  nearBottom: boolean;
+  nearBottom: NearBottom;
   ready: boolean;
   items: readonly StreamItem[];
   head?: readonly StreamItem[];
@@ -92,12 +93,17 @@ export function useReadingAnchor(input: {
         seq: cursor.seqStart ?? cursor.seq,
         offset: viewportRef.current?.getMessageOffset?.(itemId),
       };
-      saved.current = nearBottom ? null : lastReported.current;
+      saved.current = nearBottom.get() ? null : lastReported.current;
     },
     [active, nearBottom, items, head, viewportRef, pending],
   );
-  useEffect(() => {
-    if (active && !pending) saved.current = nearBottom ? null : lastReported.current;
+  useLayoutEffect(() => {
+    if (!active || pending) return;
+    const updateAnchor = () => {
+      saved.current = nearBottom.get() ? null : lastReported.current;
+    };
+    updateAnchor();
+    return nearBottom.subscribe(updateAnchor);
   }, [active, nearBottom, pending]);
   useEffect(() => {
     if (!active || !pending || !ready || error) return;

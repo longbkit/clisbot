@@ -2,7 +2,7 @@ import { useState, useSyncExternalStore } from "react";
 
 /**
  * Whether the reader is at the end of the timeline. The viewport writes it and only the
- * scroll-to-bottom button reads it, so detaching from the end (a scroll, or a disclosure
+ * scroll-to-bottom button renders from it, so detaching from the end (a scroll, or a disclosure
  * that opens below its trigger) re-renders the button and not the timeline.
  */
 export interface NearBottom {
@@ -11,7 +11,7 @@ export interface NearBottom {
   get: () => boolean;
 }
 
-function createNearBottom(): NearBottom {
+export function createNearBottom(): NearBottom {
   let value = true;
   const listeners = new Set<() => void>();
   return {

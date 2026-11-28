@@ -44,6 +44,7 @@ for (const kind of ["group", "direct"] as const) {
             [
               "agent_stream",
               "fetch_agent_timeline_response",
+              "chat.transcript.fetch.response",
               "chat.updated",
               "chat.transcript.appended",
             ].includes(message.type)
@@ -137,19 +138,26 @@ for (const kind of ["group", "direct"] as const) {
         await writeFile(testInfo.outputPath("frames.json"), JSON.stringify(frames, null, 2));
         await expect(screen).not.toContainText(marker);
         // Reload forces authoritative history rather than relying on completion timing.
-        const historyBeforeReload = frames.filter(
-          (frame) => (frame as { type: string }).type === "fetch_agent_timeline_response",
-        ).length;
+        const historyBeforeReload = frames.length;
         await page.reload();
         await expect(screen.getByText("Check fixture status", { exact: true })).toBeVisible();
         await expect
-          .poll(
-            () =>
-              frames.filter(
-                (frame) => (frame as { type: string }).type === "fetch_agent_timeline_response",
-              ).length,
+          .poll(() =>
+            frames.slice(historyBeforeReload).some((frame) => {
+              const history = frame as {
+                type: string;
+                payload?: { entries?: unknown[]; lines?: unknown[] };
+              };
+              const payload = history.payload;
+              if (kind === "group" && history.type === "chat.transcript.fetch.response") {
+                return JSON.stringify(payload?.lines ?? []).includes("Check fixture status");
+              }
+              const rows =
+                history.type === "fetch_agent_timeline_response" ? payload?.entries : undefined;
+              return rows !== undefined && JSON.stringify(rows).includes("Check fixture status");
+            }),
           )
-          .toBeGreaterThan(historyBeforeReload);
+          .toBe(true);
         await page.screenshot({
           path: testInfo.outputPath("reloaded.png"),
           animations: "disabled",
