@@ -15,7 +15,7 @@ import {
 } from "../timeline-projection.js";
 import { continuesTimelineTurn, isTimelineTurnTrigger } from "@clisbot/protocol/timeline-turn";
 import { selectProjectedTimelinePage } from "./timeline-page.js";
-import { selectSourceRanges } from "./source-range-selection.js";
+import { selectSourceRanges, selectTurnSourceRanges } from "./source-range-selection.js";
 import { ToolRowProjection, projectionRowBytes } from "./tool-row-projection.js";
 import { SESSION_STORAGE_LIMITS } from "./paged-journal.js";
 import type { SessionEventState, SessionEventStream } from "./session-event-log.js";
@@ -643,6 +643,35 @@ export class ProjectedTimeline {
     return { rows: tail, complete: true };
   }
 
+  /** Locate the turn boundary in canonical order. An old tool's projected anchor can be
+   * far outside the turn, so its min/max envelope cannot define the page's coverage. */
+  private async sourceTurnEdge(seq: number, bound: number): Promise<number> {
+    const step = Math.sign(bound - seq);
+    const stop = seq + step * Math.min(Math.abs(bound - seq), MAX_WINDOW_ROWS);
+    const budget = new ProjectionBudget();
+    while (seq !== stop) {
+      const next = seq + step * Math.min(Math.abs(stop - seq), MERGE_STEP_ROWS);
+      try {
+        const rows = await this.readRange(Math.min(seq, next), Math.max(seq, next), budget);
+        if (rows.length !== Math.abs(next - seq) + 1) return seq;
+        for (let offset = 0; offset < rows.length - 1; offset++) {
+          const i = step > 0 ? offset : rows.length - 2 - offset;
+          const left = rows[i]!;
+          const right = rows[i + 1]!;
+          if (
+            !continuesTimelineTurn(left.turnId, right.turnId, isTimelineTurnTrigger(right.item))
+          ) {
+            return step > 0 ? left.seq : right.seq;
+          }
+        }
+      } finally {
+        budget.release();
+      }
+      seq = next;
+    }
+    return seq;
+  }
+
   /** Select only after every source range traversed by the page is present. Distant
    * tool rows complete an entry but cannot certify unread seqs between its updates. */
   private async sourceRangePage(
@@ -651,7 +680,9 @@ export class ProjectedTimeline {
     cursorSeq: number | undefined,
     limit: number,
     budget: ProjectionBudget,
+    wholeTurns = false,
   ): Promise<ProjectedTimelinePageSelection> {
+    let certifiedTurns: TimelineSeqRange | undefined;
     const entries = new Map<number, TimelineProjectionEntry>();
     const visited = new Set<number>();
     const readRanges: { startSeq: number; endSeq: number }[] = [];
@@ -679,8 +710,25 @@ export class ProjectedTimeline {
       const retained = [...entries.values()];
       budget.release();
       budget.reserve(JSON.stringify(retained).length * 2);
-      const page = selectSourceRanges(retained, state, direction, cursorSeq, limit, readRanges);
-      if (!("missingSeq" in page)) return page;
+      let page = certifiedTurns
+        ? selectTurnSourceRanges(retained, state, certifiedTurns, readRanges)
+        : selectSourceRanges(retained, state, direction, cursorSeq, limit, readRanges);
+      if (!("missingSeq" in page)) {
+        if (
+          certifiedTurns ||
+          !wholeTurns ||
+          direction === "after" ||
+          page.startSeq === null ||
+          page.endSeq === null
+        )
+          return page;
+        const startSeq = await this.sourceTurnEdge(page.startSeq, state.minSeq);
+        const endSeq = await this.sourceTurnEdge(page.endSeq, state.maxSeq);
+        if (startSeq === page.startSeq && endSeq === page.endSeq) return page;
+        certifiedTurns = { startSeq, endSeq };
+        page = selectTurnSourceRanges(retained, state, certifiedTurns, readRanges);
+        if (!("missingSeq" in page)) return page;
+      }
       if (visited.has(page.missingSeq)) throw new Error("Invalid projected source reference");
       visited.add(page.missingSeq);
       nextDirection = direction === "after" ? "after" : "before";
@@ -764,13 +812,24 @@ export class ProjectedTimeline {
     try {
       let page: ProjectedTimelinePageSelection;
       if (options.pagingMode === "source_ranges") {
-        page = await this.sourceRangePage(
-          state,
-          control.selectedDirection,
-          options.cursor?.seq,
-          Math.min(control.limit, 200),
-          budget,
-        );
+        const read = (wholeTurns: boolean) =>
+          this.sourceRangePage(
+            state,
+            control.selectedDirection,
+            options.cursor?.seq,
+            Math.min(control.limit, 200),
+            budget,
+            wholeTurns,
+          );
+        try {
+          page = await read(options.wholeTurns === true);
+        } catch (error) {
+          // A single huge turn can exceed the shared projection budget. The
+          // ordinary certified page still lets the client make forward progress.
+          if (!options.wholeTurns || !(error instanceof ProjectionBudgetExceededError)) throw error;
+          budget.release();
+          page = await read(false);
+        }
       } else {
         page = await this.rowPage(state, control, options, budget);
       }

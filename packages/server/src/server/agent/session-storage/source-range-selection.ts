@@ -55,7 +55,7 @@ export function selectSourceRanges(
     }
     const { entry, range } = source;
     selected.set(entry.seqStart, entry);
-    seq = forward ? range.endSeq + 1 : range.startSeq - 1;
+    seq = forward ? range.endSeq + 1 : Math.max(range.startSeq, minSeq) - 1;
   }
   if (!selected.size)
     return {
@@ -81,5 +81,22 @@ export function selectSourceRanges(
     endSeq,
     hasOlder: startSeq > state.minSeq,
     hasNewer: endSeq < state.maxSeq,
+  };
+}
+
+/** Certify every sequence of the expanded turn, retaining snapshots anchored outside it as context. */
+export function selectTurnSourceRanges(
+  entries: readonly TimelineProjectionEntry[],
+  state: SessionEventState,
+  coverage: TimelineSeqRange,
+  readRanges: readonly TimelineSeqRange[],
+): ProjectedTimelinePageSelection | { missingSeq: number } {
+  const bounds = { ...state, minSeq: coverage.startSeq, maxSeq: coverage.endSeq };
+  const page = selectSourceRanges(entries, bounds, "tail", undefined, Infinity, readRanges);
+  if ("missingSeq" in page) return page;
+  return {
+    ...page,
+    hasOlder: coverage.startSeq > state.minSeq,
+    hasNewer: coverage.endSeq < state.maxSeq,
   };
 }

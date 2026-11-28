@@ -9955,8 +9955,7 @@ export class Session {
           ? msg.pagingMode
           : undefined,
         allowDeferredPayloads: msg.allowDeferredPayloads,
-        // Whole turns apply to plain projected pages; source-range pages carry their own context.
-        wholeTurns: msg.wholeTurns === true && msg.pagingMode !== "source_ranges",
+        wholeTurns: msg.wholeTurns === true,
       });
       const startCursor =
         selectedTimeline.startSeq !== null
