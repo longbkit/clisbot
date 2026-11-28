@@ -2,6 +2,7 @@ import type { CDPSession, Locator } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type Page } from "../support/fixtures";
+import { closeMobileExplorer, expectMobileExplorerHidden } from "../support/helpers/sidebar";
 import { seedSubagent } from "../support/helpers/subagents";
 import { expectWorkspaceHeaderVisible, submitMessage } from "../support/helpers/composer";
 import { openAgentRoute, seedMockAgentWorkspace } from "../support/helpers/mock-agent";
@@ -936,10 +937,18 @@ test.describe("touch composer tracks", () => {
       await expect.poll(() => trackScrollOffset(track)).toBeGreaterThan(0);
       await expect(page.getByTestId("sidebar-sessions")).not.toBeInViewport();
       await expect(page.getByTestId("workspace-explorer-sidebar")).not.toBeInViewport();
-      await page.getByRole("button", { name: "Open menu" }).click();
-      await expect(page.getByTestId("sidebar-sessions")).toBeInViewport({ ratio: 1 });
-      await page.getByTestId("sidebar-close").click();
-      await expect(page.getByTestId("sidebar-sessions")).not.toBeInViewport();
+      if (await page.getByRole("button", { name: "Back", exact: true }).isVisible()) {
+        // Chat navigation replaces the left drawer. The Explorer can still cover the work pane.
+        await page.getByRole("button", { name: "Open Explorer sidebar" }).click();
+        await expect(page.getByTestId("workspace-explorer-sidebar")).toBeInViewport();
+        await closeMobileExplorer(page);
+        await expectMobileExplorerHidden(page);
+      } else {
+        await page.getByRole("button", { name: "Open menu" }).click();
+        await expect(page.getByTestId("sidebar-sessions")).toBeInViewport({ ratio: 1 });
+        await page.getByTestId("sidebar-close").click();
+        await expect(page.getByTestId("sidebar-sessions")).not.toBeInViewport();
+      }
       await expect(changes).toBeInViewport();
       await changes.click();
       await expect(
