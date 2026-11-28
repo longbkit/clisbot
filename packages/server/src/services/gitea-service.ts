@@ -79,8 +79,11 @@ const CURRENT_PR_HEAD_SHA_CACHE_TTL_MS = 30_000;
 // the sweep to the 250 most recent Actions tasks.
 const GITEA_ACTION_PAGE_LIMIT = 50;
 const GITEA_ACTION_MAX_PAGES = 5;
-// PullRequestFlowAGit in forgejo models/issues/pull.go
+// PullRequestFlowGithub / PullRequestFlowAGit in forgejo models/issues/pull.go
+const GITEA_PULL_REQUEST_FLOW_GITHUB = 0;
 const GITEA_PULL_REQUEST_FLOW_AGIT = 1;
+// Repository permissions that imply push access, from the collaborator permission endpoint.
+const GITEA_WRITE_PERMISSIONS: ReadonlySet<string> = new Set(["owner", "admin", "write"]);
 
 /**
  * Fields requested from `tea pr list -o json`. tea's default field set omits the
@@ -232,6 +235,7 @@ const GiteaPullRequestRepoSchema = z
 const GiteaPullRequestApiSchema = z
   .object({
     flow: z.number().optional(),
+    user: z.object({ login: z.string().optional() }).passthrough().nullable().optional(),
     head: z
       .object({
         ref: z.string().optional(),
@@ -245,6 +249,8 @@ const GiteaPullRequestApiSchema = z
       .optional(),
   })
   .passthrough();
+
+const GiteaRepoPermissionApiSchema = z.object({ permission: z.string().optional() }).passthrough();
 
 const GiteaCurrentPullRequestApiSchema = z
   .object({
@@ -1465,6 +1471,8 @@ export function createGiteaService(options: CreateGiteaServiceOptions = {}): For
     headOwnerLogin: string | null;
     headRepositorySshUrl: string | null;
     headRepositoryUrl: string | null;
+    sourceTrust: "trusted" | "untrusted";
+    authorLogin: string | null;
   }> {
     const sameRepo = {
       isCrossRepository: false,
@@ -1475,7 +1483,8 @@ export function createGiteaService(options: CreateGiteaServiceOptions = {}): For
     };
     const { owner, name } = parseGiteaRepoFromUrl(summary.url);
     if (!owner || !name) {
-      return sameRepo;
+      // origin unknown: keep the same-repo checkout shape, but never trust it
+      return { ...sameRepo, sourceTrust: "untrusted", authorLogin: null };
     }
     const pr = await runJson(
       [
@@ -1488,17 +1497,75 @@ export function createGiteaService(options: CreateGiteaServiceOptions = {}): For
     const headRepo = pr.head?.repo ?? null;
     const baseRepo = pr.base?.repo ?? null;
     const headRefKind = resolveHeadRefKind(pr, summary.number);
-    if (baseRepo?.id == null || headRepo?.id === baseRepo.id) {
-      return { ...sameRepo, headRefKind };
+    const authorLogin = pr.user?.login?.trim() || null;
+    if (baseRepo?.id == null) {
+      return { ...sameRepo, headRefKind, sourceTrust: "untrusted", authorLogin };
     }
+    if (headRepo?.id === baseRepo.id) {
+      const sourceTrust = await resolveSameRepoSourceTrust({
+        cwd,
+        owner,
+        name,
+        pr,
+        headRefKind,
+        authorLogin,
+      });
+      return { ...sameRepo, headRefKind, sourceTrust, authorLogin };
+    }
+    return { ...toCrossRepoCheckoutFacts(headRepo), headRefKind, authorLogin };
+  }
+
+  function toCrossRepoCheckoutFacts(headRepo: z.infer<typeof GiteaPullRequestRepoSchema> | null): {
+    isCrossRepository: true;
+    headOwnerLogin: string | null;
+    headRepositorySshUrl: string | null;
+    headRepositoryUrl: string | null;
+    sourceTrust: "untrusted";
+  } {
     // headRepo is null when the fork was deleted
     return {
       isCrossRepository: true,
-      headRefKind,
       headOwnerLogin: headRepo?.owner?.login ?? null,
       headRepositorySshUrl: headRepo?.ssh_url ?? null,
       headRepositoryUrl: headRepo?.html_url ?? null,
+      sourceTrust: "untrusted",
     };
+  }
+
+  /**
+   * A same-repository PR is not proof of write access on Gitea/Forgejo: AGit PRs
+   * (pushed to refs/for/<branch>) can be opened by anyone who can read the repo and
+   * still report head.repo == base.repo. Only an explicit GitHub-style flow with a real
+   * branch implies a writer pushed it; everything else (AGit, unknown flow, pull-ref
+   * heads) needs the author's write permission confirmed, and fails closed otherwise.
+   */
+  async function resolveSameRepoSourceTrust(input: {
+    cwd: string;
+    owner: string;
+    name: string;
+    pr: z.infer<typeof GiteaPullRequestApiSchema>;
+    headRefKind: "branch" | "pull-ref";
+    authorLogin: string | null;
+  }): Promise<"trusted" | "untrusted"> {
+    if (input.pr.flow === GITEA_PULL_REQUEST_FLOW_GITHUB && input.headRefKind === "branch") {
+      return "trusted";
+    }
+    if (!input.authorLogin) return "untrusted";
+    try {
+      const result = await runJson(
+        [
+          "api",
+          `repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.name)}/collaborators/${encodeURIComponent(input.authorLogin)}/permission`,
+        ],
+        { cwd: input.cwd },
+        GiteaRepoPermissionApiSchema,
+      );
+      const permission = result.permission?.trim().toLowerCase();
+      return permission && GITEA_WRITE_PERMISSIONS.has(permission) ? "trusted" : "untrusted";
+    } catch {
+      // Gitea only lets repo admins query other users' permissions; unknown stays untrusted
+      return "untrusted";
+    }
   }
 
   async function listPullRequestItems(input: {
@@ -2056,6 +2123,8 @@ export function createGiteaService(options: CreateGiteaServiceOptions = {}): For
         headRepositoryUrl: fork.headRepositoryUrl,
         isCrossRepository: fork.isCrossRepository,
         headRefKind: fork.headRefKind,
+        sourceTrust: fork.sourceTrust,
+        authorLogin: fork.authorLogin,
       };
     },
 

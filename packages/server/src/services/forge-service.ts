@@ -41,6 +41,16 @@ export interface PullRequestCheckoutTarget {
   isCrossRepository: boolean;
   /** "pull-ref" when headRefName is a synthetic pull ref, not a real branch name (agit PRs, deleted branches); undefined means "branch" */
   headRefKind?: "branch" | "pull-ref";
+  /**
+   * Whether the forge confirmed that the head commits were pushed by someone with write access to
+   * the base repository. Only "trusted" lets repository automation (clisbot.json setup) run
+   * without an explicit approval. Undefined means the adapter could not confirm it and is treated
+   * as untrusted: same-repository alone is not proof (Gitea/Forgejo AGit PRs live in the base
+   * repository but can be opened by read-only users).
+   */
+  sourceTrust?: "trusted" | "untrusted";
+  /** Change-request author login, when known. Used to describe untrusted same-repository heads. */
+  authorLogin?: string | null;
 }
 
 export interface PullRequestCheckoutRef {

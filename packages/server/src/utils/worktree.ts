@@ -193,6 +193,10 @@ export type WorktreeSource =
       localBranchName?: string;
       pushRemoteUrl?: string;
       trackOriginHead?: boolean;
+      /** True only when the forge confirmed the head comes from a writer of the base repo. */
+      sourceTrusted?: boolean;
+      /** Human-readable origin shown when automation is blocked for an untrusted head. */
+      untrustedSourceLabel?: string;
     }
   | {
       kind: "checkout-github-pr";

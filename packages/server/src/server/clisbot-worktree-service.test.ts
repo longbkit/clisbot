@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import type { ForgeService } from "../services/forge-service.js";
 import type { WorkspaceGitRuntimeSnapshot, WorkspaceGitService } from "./workspace-git-service.js";
@@ -24,6 +24,9 @@ import { createWorktree, getClisbotWorktreesRoot } from "../utils/worktree.js";
 import { isPlatform } from "../test-utils/platform.js";
 import { areEquivalentPaths, createRealpathAwarePathMatcher } from "../utils/path.js";
 import { deriveProjectKey } from "./project-key.js";
+import { createGiteaService, type TeaCommandRunner } from "../services/gitea-service.js";
+import { createClisbotWorktreeWorkflow } from "./worktree-session.js";
+import { assertWorkspaceAutomationAllowedForWorkspace } from "./workspace-automation-gate.js";
 
 const cleanupPaths: string[] = [];
 
@@ -1391,3 +1394,247 @@ test("preserves an explicitly chosen branch when the first Agent supplies naming
     }).trim(),
   ).toBe("fix/login");
 });
+
+describe("CB-03: change-request trust", () => {
+  test("an AGit PR from an author without write access is untrusted and its setup never runs", async () => {
+    const { tempDir, repoDir, setupMarker } = createAgitPrRemoteRepo();
+    cleanupPaths.push(tempDir);
+    const clisbotHome = path.join(tempDir, ".clisbot");
+    const deps = createDeps();
+    const gitea = createAgitGiteaService({ authorPermission: "read" });
+    deps.workspaceGitService.resolveForge = async () => ({
+      forge: "gitea",
+      host: "gitea.example.com",
+      service: gitea.service,
+    });
+
+    const run = await runCreateWorktreeWorkflow({ repoDir, clisbotHome, deps });
+
+    expect(run.created.intent).toMatchObject({ kind: "checkout-change-request" });
+    expect(run.created.intent).not.toHaveProperty("headRepository");
+    expect(
+      existsSync(path.join(run.created.worktree.worktreePath, "clisbot.json")),
+      "the PR commit carrying clisbot.json was checked out",
+    ).toBe(true);
+    expect(run.created.workspace.untrustedSource).toEqual({
+      kind: "change_request",
+      forge: "gitea",
+      number: 5,
+      headRepository: "@attacker",
+    });
+    expect(gitea.calls).toContainEqual([
+      "api",
+      "repos/owner/repo/collaborators/attacker/permission",
+    ]);
+    expect(run.setupStarts).toBe(0);
+    expect(existsSync(setupMarker)).toBe(false);
+  });
+
+  test("an AGit PR whose author permission cannot be read fails closed", async () => {
+    const { tempDir, repoDir, setupMarker } = createAgitPrRemoteRepo();
+    cleanupPaths.push(tempDir);
+    const clisbotHome = path.join(tempDir, ".clisbot");
+    const deps = createDeps();
+    const gitea = createAgitGiteaService({ authorPermission: "forbidden" });
+    deps.workspaceGitService.resolveForge = async () => ({
+      forge: "gitea",
+      host: "gitea.example.com",
+      service: gitea.service,
+    });
+
+    const run = await runCreateWorktreeWorkflow({ repoDir, clisbotHome, deps });
+
+    expect(run.created.workspace.untrustedSource).toMatchObject({ number: 5 });
+    expect(run.setupStarts).toBe(0);
+    expect(existsSync(setupMarker)).toBe(false);
+  });
+
+  test("an AGit PR from an author with write access stays trusted and runs setup", async () => {
+    const { tempDir, repoDir, setupMarker } = createAgitPrRemoteRepo();
+    cleanupPaths.push(tempDir);
+    const clisbotHome = path.join(tempDir, ".clisbot");
+    const deps = createDeps();
+    const gitea = createAgitGiteaService({ authorPermission: "write" });
+    deps.workspaceGitService.resolveForge = async () => ({
+      forge: "gitea",
+      host: "gitea.example.com",
+      service: gitea.service,
+    });
+
+    const run = await runCreateWorktreeWorkflow({ repoDir, clisbotHome, deps });
+
+    expect(run.created.workspace.untrustedSource).toBeUndefined();
+    expect(run.setupStarts).toBe(1);
+    expect(readFileSync(setupMarker, "utf8")).toBe("ran");
+  });
+
+  test("a change request whose forge gives no trust signal is untrusted", async () => {
+    const { tempDir, repoDir, setupMarker } = createAgitPrRemoteRepo();
+    cleanupPaths.push(tempDir);
+    const clisbotHome = path.join(tempDir, ".clisbot");
+    const deps = createDeps();
+    // same-repo shape with no sourceTrust: what a stale or incomplete adapter returns
+    deps.github = {
+      ...createGitHubServiceStub(),
+      getPullRequestCheckoutTarget: async ({ number }) => ({
+        number,
+        baseRefName: "main",
+        headRefName: `pr-${number}`,
+        headOwnerLogin: null,
+        headRepositorySshUrl: null,
+        headRepositoryUrl: null,
+        isCrossRepository: false,
+      }),
+    };
+
+    const run = await runCreateWorktreeWorkflow({
+      repoDir,
+      clisbotHome,
+      deps,
+      forge: "github",
+    });
+
+    expect(run.created.workspace.untrustedSource).toEqual({
+      kind: "change_request",
+      forge: "github",
+      number: 5,
+      headRepository: "an unverified source",
+    });
+    expect(run.setupStarts).toBe(0);
+    expect(existsSync(setupMarker)).toBe(false);
+  });
+});
+
+async function runCreateWorktreeWorkflow(input: {
+  repoDir: string;
+  clisbotHome: string;
+  deps: ReturnType<typeof createDeps>;
+  forge?: string;
+}): Promise<{
+  created: Awaited<ReturnType<typeof createClisbotWorktree>>;
+  setupStarts: number;
+}> {
+  const setupRuns: Promise<void>[] = [];
+  const registry = {
+    get: async (workspaceId: string) => input.deps.workspaces.get(workspaceId) ?? null,
+  };
+  const created = await createClisbotWorktreeWorkflow(
+    {
+      clisbotHome: input.clisbotHome,
+      createClisbotWorktree: (worktreeInput) => createClisbotWorktree(worktreeInput, input.deps),
+      warmWorkspaceGitData: async () => {},
+      autoNameWorkspaceBranchForFirstAgent: () => {},
+      startWorkspaceSetup: (_workspaceId, operation) => {
+        setupRuns.push(operation(new AbortController().signal));
+      },
+      assertWorkspaceAutomationAllowed: (workspaceId) =>
+        assertWorkspaceAutomationAllowedForWorkspace(registry, workspaceId),
+      emitWorkspaceUpdateForWorkspaceId: async () => {},
+      cacheWorkspaceSetupSnapshot: () => {},
+      emit: () => {},
+      sessionLogger: createTestLogger(),
+      terminalManager: null,
+      serviceProxy: null,
+      scriptRuntimeStore: null,
+      getDaemonTcpPort: null,
+      getDaemonTcpHost: null,
+      onScriptsChanged: null,
+    },
+    {
+      cwd: input.repoDir,
+      checkoutSource: { kind: "change_request", forge: input.forge ?? "gitea", number: 5 },
+      clisbotHome: input.clisbotHome,
+    },
+  );
+  // setup is scheduled on the next macrotask
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await Promise.all(setupRuns);
+  return { created, setupStarts: setupRuns.length };
+}
+
+function createAgitGiteaService(options: { authorPermission: "read" | "write" | "forbidden" }): {
+  service: ForgeService;
+  calls: string[][];
+} {
+  const calls: string[][] = [];
+  const runner: TeaCommandRunner = async (args) => {
+    calls.push(args);
+    const endpoint = args[0] === "api" ? args[1] : undefined;
+    if (endpoint?.endsWith("/permission")) {
+      if (options.authorPermission === "forbidden") {
+        throw new Error("403 Forbidden");
+      }
+      return { stdout: JSON.stringify({ permission: options.authorPermission }), stderr: "" };
+    }
+    if (endpoint === "repos/owner/repo/pulls/5") {
+      // AGit shape: pushed to refs/for/main, so the head lives in the base repository
+      return {
+        stdout: JSON.stringify({
+          flow: 1,
+          user: { login: "attacker" },
+          head: { ref: "refs/pull/5/head", repo: { id: 1 } },
+          base: { repo: { id: 1 } },
+        }),
+        stderr: "",
+      };
+    }
+    if (args[0] === "pr" && args[1] === "5") {
+      return {
+        stdout: JSON.stringify({
+          index: 5,
+          title: "Innocent change",
+          state: "open",
+          labels: [],
+          user: "attacker",
+          body: "",
+          url: "https://gitea.example.com/owner/repo/pulls/5",
+          base: "main",
+          head: "refs/pull/5/head",
+          headSha: "",
+          mergeable: true,
+          hasMerged: false,
+        }),
+        stderr: "",
+      };
+    }
+    throw new Error(`unexpected tea call: ${args.join(" ")}`);
+  };
+  return {
+    service: createGiteaService({
+      runner,
+      resolveTeaPath: async () => "/usr/bin/tea",
+      resolveRemoteUrl: async () => "https://gitea.example.com/owner/repo.git",
+    }),
+    calls,
+  };
+}
+
+/** Origin with refs/pull/5/head adding a clisbot.json whose setup writes a marker file. */
+function createAgitPrRemoteRepo(): { tempDir: string; repoDir: string; setupMarker: string } {
+  const { tempDir, repoDir } = createGitRepo();
+  const setupMarker = path.join(tempDir, "setup-ran");
+  execFileSync("git", ["checkout", "-b", "agit-topic"], { cwd: repoDir, stdio: "pipe" });
+  writeFileSync(
+    path.join(repoDir, "clisbot.json"),
+    JSON.stringify({
+      worktree: {
+        setup: [`node -e "require('fs').writeFileSync('${setupMarker}', 'ran')"`],
+      },
+    }),
+  );
+  commitAll(repoDir, "agit change");
+  const prHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoDir, stdio: "pipe" })
+    .toString()
+    .trim();
+  execFileSync("git", ["checkout", "main"], { cwd: repoDir, stdio: "pipe" });
+  execFileSync("git", ["branch", "-D", "agit-topic"], { cwd: repoDir, stdio: "pipe" });
+
+  const remoteDir = path.join(tempDir, "remote.git");
+  execFileSync("git", ["clone", "--bare", repoDir, remoteDir], { stdio: "pipe" });
+  execFileSync("git", [`--git-dir=${remoteDir}`, "update-ref", "refs/pull/5/head", prHead], {
+    stdio: "pipe",
+  });
+  execFileSync("git", ["remote", "add", "origin", remoteDir], { cwd: repoDir, stdio: "pipe" });
+  execFileSync("git", ["fetch", "origin"], { cwd: repoDir, stdio: "pipe" });
+  return { tempDir, repoDir, setupMarker };
+}

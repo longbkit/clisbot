@@ -484,7 +484,8 @@ const PullRequestCheckoutTargetSchema = z.object({
           number: z.number(),
           baseRefName: z.string().catch(""),
           headRefName: z.string().catch(""),
-          isCrossRepository: z.boolean().catch(false),
+          // No default: a missing value must not read as "same repository" (fail closed).
+          isCrossRepository: z.boolean().nullable().optional().catch(null),
           headRepositoryOwner: z
             .object({
               login: z.string().catch(""),
@@ -3521,8 +3522,11 @@ function toPullRequestCheckoutTarget(
     headOwnerLogin: pullRequest.headRepositoryOwner?.login || null,
     headRepositorySshUrl: pullRequest.headRepository?.sshUrl || null,
     headRepositoryUrl: pullRequest.headRepository?.url || null,
-    isCrossRepository: pullRequest.isCrossRepository,
+    isCrossRepository: pullRequest.isCrossRepository === true,
     headRefKind: "branch",
+    // GitHub has no AGit-style flow: a same-repository head branch can only be pushed by someone
+    // with write access to the base repository. Anything but an explicit `false` stays untrusted.
+    sourceTrust: pullRequest.isCrossRepository === false ? "trusted" : "untrusted",
   };
 }
 
