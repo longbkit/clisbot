@@ -20,6 +20,16 @@ import {
 const state = vi.hoisted(() => ({
   secrets: new Map<string, string>(),
   factory: undefined as WebSocketFactory | undefined,
+  googleInputs: [] as Record<string, unknown>[],
+}));
+vi.mock("./google-sign-in", () => ({
+  requiresOfficialGoogleWeb: () => false,
+  prepareGooglePopup: () => undefined,
+  openOfficialHubGoogle: () => undefined,
+  acquireGoogleIdToken: async (input: Record<string, unknown>) => {
+    state.googleInputs.push(input);
+    return "google-id-token";
+  },
 }));
 vi.mock("expo-crypto", () => ({
   getRandomBytesAsync: async (size: number) => randomBytes(size),
@@ -43,6 +53,7 @@ vi.mock("@/runtime/websocket-factory", () => ({
 afterEach(() => {
   state.secrets.clear();
   state.factory = undefined;
+  state.googleInputs = [];
 });
 
 async function service(key: ReturnType<typeof generateKeyPair>, route: string) {
@@ -60,6 +71,7 @@ async function service(key: ReturnType<typeof generateKeyPair>, route: string) {
     rejectPairing: false,
     accountEntry: false,
     rejectCredential: false,
+    googleChallenge: undefined as Record<string, unknown> | undefined,
   };
   sockets.on("connection", (socket) => {
     let channel: Awaited<ReturnType<typeof createDaemonChannel>>;
@@ -88,7 +100,9 @@ async function service(key: ReturnType<typeof generateKeyPair>, route: string) {
         const identity = control.accountEntry && request.path.endsWith("/identity");
         const signedIn = control.accountEntry && request.path === "/api/auth/sign-in/email";
         let responseBody: Record<string, unknown> = { route };
-        if (challenge)
+        if (control.googleChallenge && request.path.endsWith("/google/challenge"))
+          responseBody = control.googleChallenge;
+        else if (challenge)
           responseBody = {
             hubId: "hub-one",
             challengeId: "ephemeral-challenge",
@@ -404,6 +418,50 @@ test("an explicit account retry uses a fresh challenge after the sign-in respons
     ).toHaveLength(2);
     expect((await readDeviceCredential("hub-one"))?.key).toEqual(originalKey);
     expect((await readDeviceCredential("hub-one"))?.credentialId).toBe("account-credential");
+  } finally {
+    transport.close();
+    await hub.close();
+  }
+});
+
+test("CB-04: Google sign-in binds the token to the pinned Hub, not to parameters a Hub supplies", async () => {
+  const key = generateKeyPair();
+  const hub = await service(key, "direct");
+  hub.control.accountEntry = true;
+  // A malicious Hub relays another Hub's transaction, client ID and nonce.
+  hub.control.googleChallenge = {
+    transactionId: "relayed-transaction-from-target-hub",
+    clientId: "target-hub.apps.googleusercontent.com",
+    nonce: "target-hub-nonce-relayed-verbatim",
+    hubId: "target-hub",
+    expiresAt: Date.now() + 300_000,
+  };
+  state.factory = (url, options) =>
+    new WebSocket(url, options?.protocols) as unknown as WebSocketLike;
+  const publicKey = exportPublicKey(key.publicKey);
+  const transport = new PairedHubTransport({ hubId: "hub-one", publicKey, origin: hub.origin });
+  try {
+    await expect(transport.signInWithGoogle()).rejects.toThrow();
+    // The challenge names a different Hub than the one pinned: Google is never started.
+    expect(state.googleInputs).toEqual([]);
+
+    hub.control.googleChallenge = { ...hub.control.googleChallenge, hubId: "hub-one" };
+    await transport.signInWithGoogle();
+    // The app never forwards a Hub-supplied nonce; the managed page derives it from the identity
+    // this app pinned and authenticated (backend ID + E2EE key) and the transaction.
+    expect(state.googleInputs).toEqual([
+      {
+        clientId: "target-hub.apps.googleusercontent.com",
+        transactionId: "relayed-transaction-from-target-hub",
+        hubId: "hub-one",
+        hubKey: publicKey,
+      },
+    ]);
+    const exchange = hub.received.find((value) => value.path.endsWith("/google/sign-in"))!;
+    expect(JSON.parse(exchange.body!)).toEqual({
+      transactionId: "relayed-transaction-from-target-hub",
+      idToken: "google-id-token",
+    });
   } finally {
     transport.close();
     await hub.close();

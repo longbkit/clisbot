@@ -44,12 +44,17 @@
       <p id="status" role="status">Preparing secure sign-in…</p>
     </main>
     <script>
-      (() => {
+      (async () => {
         const params = new URLSearchParams(location.hash.slice(1));
         // Parameters and credentials never enter an HTTP query or analytics event.
         history.replaceState(null, "", location.pathname);
         const transactionId = params.get("transactionId");
-        const nonce = params.get("nonce");
+        // CB-04: the nonce is never taken from the fragment. It is derived from the Hub identity
+        // the app pinned (hubId, hubKey) and the transaction, as the verifying Hub derives it
+        // (googleSignInNonce in @clisbot/device-access/proof). A Hub relaying another Hub's
+        // transaction therefore only obtains a token that other Hub rejects.
+        const hubId = params.get("hubId");
+        const hubKey = params.get("hubKey");
         const clientId = params.get("clientId");
         const mode = params.get("mode");
         const status = document.getElementById("status");
@@ -58,8 +63,12 @@
           if (
             !transactionId ||
             !/^[A-Za-z0-9_-]{16,128}$/.test(transactionId) ||
-            !nonce ||
-            !/^[A-Za-z0-9_-]{22,128}$/.test(nonce) ||
+            !hubId ||
+            hubId.length > 128 ||
+            /[\u0000-\u001f\u007f]/.test(hubId) ||
+            !hubKey ||
+            !/^[A-Za-z0-9+/_-]{16,126}={0,2}$/.test(hubKey) ||
+            hubKey.length > 128 ||
             !clientId ||
             !/^[A-Za-z0-9._-]+\.apps\.googleusercontent\.com$/.test(clientId)
           )
@@ -117,6 +126,24 @@
             location.replace(destination.href);
           }
         };
+        const deriveNonce = async () => {
+          const digest = await crypto.subtle.digest(
+            "SHA-512",
+            new TextEncoder().encode(
+              JSON.stringify(["clisbot-google-nonce-v2", hubId, hubKey, transactionId]),
+            ),
+          );
+          let binary = "";
+          for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
+          return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        };
+        let nonce;
+        try {
+          nonce = await deriveNonce();
+        } catch {
+          status.textContent = "This browser cannot sign in securely. Return to Clisbot and retry.";
+          return;
+        }
         let attempts = 0;
         const wait = setInterval(() => {
           if (window.google?.accounts?.id) {

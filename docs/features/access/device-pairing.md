@@ -267,9 +267,15 @@ sessions and effective access. This extends the existing
    a confidential OAuth client secret with a public client or personal Hub.
 3. The client submits Google's signed ID token over the authenticated encrypted Hub channel.
    Hub validates signature, trusted issuer and configured client audience, expiry, and the
-   server-issued nonce against the pending Hub/device-bound challenge. An arbitrary nonce
-   supplied with a token is not proof of a pending login. Reject replay and cross-Hub/device
-   reuse; bind any browser-to-app handoff to the same transaction.
+   nonce against the pending Hub/device-bound challenge. An arbitrary nonce supplied with a
+   token is not proof of a pending login. Reject replay and cross-Hub/device reuse; bind any
+   browser-to-app handoff to the same transaction. The Hub never hands out the nonce: the
+   client and the managed page derive it from the identity the client pinned for the Hub it
+   is logging into (backend ID and E2EE public key) and the transaction
+   (`googleSignInNonce` in `@clisbot/device-access/proof`), and the verifying Hub recomputes
+   it from its own identity. A Hub that relays another Hub's transaction and client ID to a
+   client connected to it therefore only obtains a token bound to itself, which the other Hub
+   rejects (CB-04).
 4. Hub resolves the Google subject to its account and applies existing invitation/domain,
    account-linking and role/resource rules before issuing its own device-bound session.
    Workspace restrictions use verified provider claims, not an untrusted email suffix.

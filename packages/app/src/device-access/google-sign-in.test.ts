@@ -23,8 +23,9 @@ vi.mock("expo-linking", () => ({ createURL: () => "clisbot://hub-google" }));
 vi.mock("expo-web-browser", () => ({ openAuthSessionAsync: state.browser }));
 const input = {
   clientId: "official-client",
-  nonce: "server-issued-nonce",
   transactionId: "transaction-one",
+  hubId: "hub-one",
+  hubKey: "aHViLW9uZS1lMmVlLXB1YmxpYy1rZXktZml4dHVyZTA=",
 };
 afterEach(() => {
   vi.restoreAllMocks();
@@ -64,7 +65,11 @@ test("popup token handoff requires the trusted page, opened window and exact tra
   expect(popup.close).toHaveBeenCalled();
   const auth = new URL(popup.location.href);
   expect(auth.search).toBe("");
-  expect(new URLSearchParams(auth.hash.slice(1)).get("nonce")).toBe(input.nonce);
+  const fragment = new URLSearchParams(auth.hash.slice(1));
+  // The page derives the nonce from the pinned Hub identity; the app never forwards one.
+  expect(fragment.get("nonce")).toBeNull();
+  expect(fragment.get("hubId")).toBe(input.hubId);
+  expect(fragment.get("hubKey")).toBe(input.hubKey);
 });
 test("native handoff rejects a token from a different transaction or callback", async () => {
   state.os = "ios";
@@ -98,7 +103,11 @@ test("self-host Google handoff shares only public Hub identity and routes", () =
     publicKey: "public-key",
     origin: "https://home.example.test",
     relay: { endpoint: "relay.example.test", useTls: true },
-    pairing: { backendId: "hub-one", token: "pair-secret", expiresAt: Date.now() + 30_000 },
+    pairing: {
+      backendId: "hub-one",
+      token: "pair-secret",
+      expiresAt: Date.now() + 30_000,
+    },
     ownerSetupToken: "setup-secret",
   };
   const url = new URL(officialHubConnectionUrl(target));

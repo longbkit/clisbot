@@ -173,6 +173,13 @@ export class HubDeviceAccess {
     return prepared;
   }
 
+  /** The identity a paired app pins for this Hub: its backend ID and E2EE public key. */
+  async hubIdentity(): Promise<{ hubId: string; publicKey: string } | undefined> {
+    const publicKey = await this.publicKey;
+    if (!publicKey) return undefined;
+    return { hubId: (await this.authority.info()).backendId, publicKey };
+  }
+
   async deviceId(request: Request): Promise<string | undefined> {
     return (await this.prepare(request))?.device.id;
   }

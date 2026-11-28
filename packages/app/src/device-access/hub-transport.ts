@@ -258,14 +258,33 @@ export class PairedHubTransport implements HubTransport {
       });
       if (!challenge.ok) throw new Error(i18n.t("hub.connection.errors.googleUnavailable"));
       const transaction = (await challenge.json()) as {
-        transactionId: string;
-        nonce: string;
-        clientId: string;
-        expiresAt: number;
+        transactionId?: unknown;
+        clientId?: unknown;
+        hubId?: unknown;
+        expiresAt?: unknown;
       };
+      // A Hub that does not name itself (older Hubs) or names another Hub cannot start Google.
+      if (
+        transaction.hubId !== this.profile.hubId ||
+        typeof transaction.transactionId !== "string" ||
+        typeof transaction.clientId !== "string" ||
+        typeof transaction.expiresAt !== "number"
+      )
+        throw new Error(i18n.t("hub.connection.errors.googleUnavailable"));
       if (transaction.expiresAt <= Date.now())
         throw new Error(i18n.t("hub.connection.errors.googleChallengeExpired"));
-      const idToken = await acquireGoogleIdToken(transaction, popup);
+      // CB-04: never forward a nonce supplied by the Hub. The nonce is derived from the identity
+      // this app pinned and authenticated for the Hub it is logging into, so a Hub relaying another
+      // Hub's transaction and client ID only obtains a token that other Hub rejects.
+      const idToken = await acquireGoogleIdToken(
+        {
+          clientId: transaction.clientId,
+          transactionId: transaction.transactionId,
+          hubId: this.profile.hubId,
+          hubKey: this.profile.publicKey,
+        },
+        popup,
+      );
       const setup = context.claimInstance ? await readSecret(setupKey(this.profile.hubId)) : null;
       const response = await this.request("/api/auth/clisbot/device/google/sign-in", {
         method: "POST",
@@ -325,7 +344,11 @@ export class PairedHubTransport implements HubTransport {
       }),
     });
     if (!response.ok)
-      throw new Error(i18n.t("hub.connection.errors.pairingFailed", { status: response.status }));
+      throw new Error(
+        i18n.t("hub.connection.errors.pairingFailed", {
+          status: response.status,
+        }),
+      );
     const value = (await response.json()) as {
       hubId?: string;
       credentialId?: string;
