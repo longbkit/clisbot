@@ -170,6 +170,7 @@ export function HostPickerOption({
     return (
       <Pressable
         onPress={handleSettingsPress}
+        testID={testID ? `${testID}-settings` : undefined}
         style={styles.settingsAction}
         accessibilityRole="button"
         accessibilityLabel={`Open ${label} settings`}
@@ -181,6 +182,7 @@ export function HostPickerOption({
     handleSettingsPress,
     label,
     onOpenHostSettings,
+    testID,
     theme.colors.foregroundMuted,
     theme.iconSize.sm,
   ]);

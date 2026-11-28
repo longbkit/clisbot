@@ -55,6 +55,8 @@ function footerAction(item: SidebarFooterItem): SidebarFooterAction | "new" {
   return item.key === "usage-icon" ? "usage" : item.key;
 }
 
+const PACKED_FOOTER_DATA = { packed: "true" } as const;
+
 function useFooterLayout() {
   const compact = useIsCompactFormFactor();
   const { finePointer } = usePointerCapabilities();
@@ -112,6 +114,7 @@ export function SidebarFooter(props: SidebarFooterProps) {
             compact && styles.sidebarFooterCompact,
             packed && styles.packed,
           ]}
+          dataSet={packed ? PACKED_FOOTER_DATA : undefined}
           testID="sidebar-footer-bottom-line"
         >
           {width > 0 &&

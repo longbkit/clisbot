@@ -651,6 +651,12 @@ for (const layout of ["desktop", "phone-web"] as const) {
     }, testInfo) => {
       test.setTimeout(120_000);
       if (layout === "phone-web") await page.setViewportSize({ width: 390, height: 844 });
+      // Exercise the real first-run migration on settings without a saved display choice.
+      await page.addInitScript(() => {
+        if (sessionStorage.getItem("latest-call-seeded")) return;
+        sessionStorage.setItem("latest-call-seeded", "1");
+        localStorage.setItem("@clisbot:app-settings", "{}");
+      });
       const agent = await seedMockAgentWorkspace({
         repoPrefix: "latest-call-qa-",
         title: "Latest call QA",
@@ -670,9 +676,7 @@ for (const layout of ["desktop", "phone-web"] as const) {
         await openOverviewAgent(page, agent);
         expect(
           await page.evaluate(
-            () =>
-              JSON.parse(localStorage.getItem("@clisbot:app-settings") ?? "null")
-                .toolCallDetailLevel,
+            () => JSON.parse(localStorage.getItem("@clisbot:app-settings") ?? "null").chatDisplay,
           ),
         ).toBe("summary-with-latest-call");
         await agent.client.sendAgentMessage(
@@ -692,12 +696,14 @@ for (const layout of ["desktop", "phone-web"] as const) {
         await capture("live-long-command");
         await press(group.getByRole("button"));
         const history = layout === "desktop" ? group : page.getByTestId("tool-call-group-sheet");
-        await expect(history.getByTestId("tool-call-badge")).toHaveCount(2);
+        const calls = history.getByTestId("tool-call-badge").filter({ hasNotText: "Thinking" });
+        await expect(history.getByRole("button", { name: "Thinking", exact: true })).toBeVisible();
+        await expect(calls).toHaveCount(2);
         await capture("expanded-history");
         gate.injectToolCall("qa-long-command", command, "failed");
         await expect(group).toContainText("1 failed");
-        await expect(history.getByTestId("tool-call-badge")).toHaveCount(2);
-        await press(history.getByTestId("tool-call-badge").last().getByRole("button").first());
+        await expect(calls).toHaveCount(2);
+        await press(calls.filter({ hasText: command }).getByRole("button").first());
         await expect(
           page.getByText("QA command failed: exit 1", { exact: true }).first(),
         ).toBeVisible();
@@ -740,14 +746,14 @@ for (const layout of ["desktop", "phone-web"] as const) {
           if (layout === "phone-web") await page.setViewportSize({ width: 1280, height: 800 });
           await openSettings(page);
           await openSettingsSection(page, "chat");
-          await page.getByRole("button", { name: /^Tool call display:/ }).click();
+          await page.getByRole("button", { name: /^(Chat display|Tool call display):/ }).click();
           await page.getByRole("menuitem", { name: selection, exact: true }).click();
           await openOverviewAgent(page, agent);
           if (layout === "phone-web") await page.setViewportSize({ width: 390, height: 844 });
           await expect(page.getByText(/Let me make a small adjustment/).first()).toBeVisible();
           await page.getByTestId("tool-call-group").last().scrollIntoViewIfNeeded();
         };
-        await showInMode("Summary");
+        await showInMode("Collapse tool calls");
         const overviewGroupCount = await page.getByTestId("tool-call-group").count();
         await capture("comparison-overview");
         await showInMode("Summary with latest call");
