@@ -86,6 +86,123 @@ const WORKSPACE_FILE_MESSAGES = new Set<SessionInboundMessage["type"]>([
 ]);
 
 /**
+ * Inbound types a Project-scoped session may send that are settled by the
+ * resources they name (agent, workspace, Project, cwd), with no type-specific
+ * rule. Types that name none (lists, subscriptions, push registration) are
+ * listed because their replies are filtered per resource on the way out.
+ *
+ * Every other type that reaches the fallback is refused. Agent creation and
+ * configuration, terminals, workspace files and management, schedules, Bots,
+ * Chats and daemon-global reads have their own rules above and must not be
+ * listed here; daemon-global administration (plugins, skills, connectors
+ * settings, daemon config, restart/shutdown, pairing, Hub management and
+ * execution) is deliberately absent.
+ */
+const REFERENCED_RESOURCE_INBOUND: ReadonlySet<SessionInboundMessage["type"]> = new Set<
+  SessionInboundMessage["type"]
+>([
+  // Agents
+  "abort_request",
+  "agent.detach.request",
+  "agent.fork_context.request",
+  "agent.permissionResponses.fetch.request",
+  "agent.provider_subagents.list.request",
+  "agent.provider_subagents.timeline.get.request",
+  "agent.queue.execute.request",
+  "agent.rewind.request",
+  "agent.timeline.append.request",
+  "agent.timeline.list_prompts.request",
+  "agent.timeline.payload.get.request",
+  "agent.timeline.search.request",
+  "agent.timeline.set_subscription.request",
+  "agent.timeline.source_ranges.get.request",
+  "archive_agent_request",
+  "cancel_agent_request",
+  "channel.file.read.request",
+  "clear_agent_attention",
+  "delete_agent_request",
+  "fetch_agent_history_request",
+  "fetch_agent_request",
+  "fetch_agent_timeline_request",
+  "fetch_agents_request",
+  "refresh_agent_request",
+  // sessionMode is checked as a mode change before this fallback.
+  "send_agent_message_request",
+  "update_agent_request",
+  "wait_for_finish_request",
+  // Voice and dictation on an agent
+  "audio_played",
+  "dictation_stream_cancel",
+  "dictation_stream_chunk",
+  "dictation_stream_finish",
+  "dictation_stream_start",
+  "set_voice_mode",
+  "voice_audio_chunk",
+  // Checkouts and Git, rooted at a cwd
+  "branch_suggestions_request",
+  "checkout.commits.file_diff.request",
+  "checkout.commits.list.request",
+  "checkout.diff.get.request",
+  "checkout.discard_changes.request",
+  "checkout.forge.get_check_details.request",
+  "checkout.forge.set_auto_merge.request",
+  "checkout.github.get_check_details.request",
+  "checkout.github.set_auto_merge.request",
+  "checkout.refresh.request",
+  "checkout.rename_branch.request",
+  "checkout_commit_request",
+  "checkout_merge_from_base_request",
+  "checkout_merge_request",
+  "checkout_pr_create_request",
+  "checkout_pr_merge_request",
+  "checkout_pr_status_request",
+  "checkout_pull_request",
+  "checkout_push_request",
+  "checkout_status_request",
+  "checkout_switch_branch_request",
+  "forge.search.request",
+  "github_search_request",
+  "pull_request_timeline_request",
+  "stash_list_request",
+  "stash_pop_request",
+  "stash_save_request",
+  "subscribe_checkout_diff_request",
+  "unsubscribe_checkout_diff_request",
+  "validate_branch_request",
+  // Workspaces and Projects
+  "fetch_workspaces_request",
+  "project.icon.get.request",
+  "project.list.request",
+  "start_workspace_script_request",
+  "workspace.clear_attention.request",
+  "workspace.mark_unread.request",
+  "workspace.recovery.inspect.request",
+  "workspace.script.list.request",
+  "workspace.script.start.request",
+  "workspace.script.stop.request",
+  "workspace.setup.run.request",
+  "workspace.setup.subscribe.request",
+  "workspace_setup_status_request",
+  "fs.file.unsubscribe.request",
+  // Provider catalog, filtered by the session's Agent-configuration grants
+  "get_providers_snapshot_request",
+  "refresh_providers_snapshot_request",
+  // Per-session plumbing
+  // The handler itself refuses every Project-scoped session with an explicit reason.
+  "browser.host.register.request",
+  "creation.subscribe.request",
+  "list_available_editors_request",
+  "notifications.list_follows.request",
+  "notifications.set_follow.request",
+  "notifications.set_scope.request",
+  "push.unregister.request",
+  "register_push_token",
+  "session.events.set_subscription.request",
+  "subscription.release.request",
+  "terminal.profile.list.request",
+]);
+
+/**
  * Resolves daemon-native resources to the exact Project grants attached at
  * admission. It deliberately has no Hub role, Team, or organization concepts.
  */
@@ -805,6 +922,10 @@ export class ManagedResourceAuthorizer {
   }
 
   private async allowsReferencedResources(message: SessionInboundMessage): Promise<boolean> {
+    // Fail closed: only the types listed for this check reach it. Anything else,
+    // including a type added later, is refused until someone decides how a
+    // Project-scoped session may use it.
+    if (!REFERENCED_RESOURCE_INBOUND.has(message.type)) return false;
     // The shared overlap map returns the product privilege for known agent
     // interaction ops; anything else falls back to plain project.use. Agent
     // creation and terminal ops never reach here — earlier branches settle them.
@@ -905,7 +1026,7 @@ export class ManagedResourceAuthorizer {
       if (!request) return false;
       return this.allowsAgent(message.agentId, approvalPrivilegeFor(request));
     }
-    if (message.type === "create_agent_request") {
+    if (message.type === "create_agent_request" || message.type === "agent.create.request") {
       if (message.projectId !== undefined) {
         return this.allowsAgentConfigurationForProject(
           message.projectId,
@@ -983,6 +1104,17 @@ export class ManagedResourceAuthorizer {
       return this.allowsExistingAgentConfiguration(message.agentId, {
         featureValues: { [message.featureId]: message.value },
       });
+    }
+    if (
+      message.type === "send_agent_message_request" &&
+      message.sessionMode !== undefined &&
+      !(await this.allowsExistingAgentConfiguration(message.agentId, {
+        modeId: message.sessionMode,
+      }))
+    ) {
+      // The handler switches the agent to `sessionMode` before the prompt runs, so it is a
+      // mode change; the send itself is then judged like any other agent interaction.
+      return false;
     }
     if (message.type === "agent.config.apply.request") {
       return this.allowsExistingAgentConfiguration(message.agentId, {
@@ -1178,10 +1310,37 @@ export class ManagedResourceAuthorizer {
         .filter((workspace) => workspace.projectId === projectId && workspace.archivedAt === null)
         .map((workspace) => workspace.cwd),
     ];
+    let ownedRoot = false;
     for (const root of roots) {
-      if ((await canonicalPathForAuthorization(root)) === canonicalCwd) return true;
+      if ((await canonicalPathForAuthorization(root)) === canonicalCwd) {
+        ownedRoot = true;
+        break;
+      }
     }
-    return false;
+    if (!ownedRoot) return false;
+    return message.agent === undefined
+      ? true
+      : this.allowsInitialWorkspaceAgent(projectId, cwd, message.agent);
+  }
+
+  /**
+   * The agent a workspace is created with is an agent creation: it starts inside the source
+   * (the handler rebases its cwd onto the new workspace) and must match this Project's
+   * Agent-configuration grant exactly as `create_agent_request` would.
+   */
+  private async allowsInitialWorkspaceAgent(
+    projectId: string,
+    sourceCwd: string,
+    agent: NonNullable<
+      Extract<SessionInboundMessage, { type: "workspace.create.request" }>["agent"]
+    >,
+  ): Promise<boolean> {
+    if (agent.projectId !== undefined && agent.projectId !== projectId) return false;
+    if (agent.callerAgentId !== undefined && !(await this.allowsAgent(agent.callerAgentId))) {
+      return false;
+    }
+    if (!(await isSameOrDescendantExistingPath(sourceCwd, agent.config.cwd))) return false;
+    return this.configurationMatchesProject(projectId, agent.config, "agent.create");
   }
 
   async allowsWorktreeDestination(
