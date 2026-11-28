@@ -7,9 +7,11 @@ interface SettingsRouteEntry {
   pathname: string;
 }
 
+type SidebarOrigin = ActiveWorkspaceSelection | { listPath: string };
+
 interface SettingsSelectionState {
   selectedServerId: string | null;
-  sidebarReturn: (ActiveWorkspaceSelection & { phase: "opening" | "covered" }) | null;
+  sidebarReturn: (SidebarOrigin & { phase: "opening" | "covered" }) | null;
 }
 
 export function createSettingsPresentation() {
@@ -22,8 +24,8 @@ export function createSettingsPresentation() {
   let sidebarOffset = 0;
   let sidebarOwner: object | null = null;
 
-  function beginSidebarVisit(workspace: ActiveWorkspaceSelection) {
-    store.setState({ sidebarReturn: { ...workspace, phase: "opening" } });
+  function beginSidebarVisit(origin: SidebarOrigin) {
+    store.setState({ sidebarReturn: { ...origin, phase: "opening" } });
   }
 
   function presentContent() {
@@ -63,8 +65,10 @@ export function createSettingsPresentation() {
       const destination = parseHostWorkspaceRouteFromPathname(pathname);
       const discardSidebar =
         origin !== null &&
-        (origin.serverId !== destination?.serverId ||
-          origin.workspaceId !== destination?.workspaceId);
+        ("listPath" in origin
+          ? pathname !== origin.listPath
+          : origin.serverId !== destination?.serverId ||
+            origin.workspaceId !== destination?.workspaceId);
       clearSidebarReturn();
       sidebarOffset = 0;
       sidebarOwner = null;

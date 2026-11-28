@@ -136,7 +136,10 @@ test.describe("Settings sidebar scroll position", () => {
     await gotoAppShell(page);
     await openSettings(page);
     await scrollSettingsSidebarToEnd(page);
-    await page.setViewportSize({ width: 1000, height: 1100 });
+    const height = await page
+      .getByTestId("settings-sidebar-scroll-body")
+      .evaluate((node) => window.innerHeight + node.scrollHeight - node.clientHeight + 1);
+    await page.setViewportSize({ width: 1000, height });
     await expectSettingsSidebarScrollOffset(page, 0);
     await page.setViewportSize({ width: 1000, height: 500 });
     await openSettingsSection(page, "appearance");
@@ -498,6 +501,7 @@ test.describe("Settings — compact master-detail", () => {
     ).toBe(true);
     await expectCompactSidebarOpen(page);
     await expectContextPreserved();
+    const expectEndPreserved = await captureCompactSidebarContext(page, "end");
     await openSettingsFromCompactSidebar(page);
     const backFrames = await captureCompactSidebarReturn(page, async () => {
       await page.goBack();
@@ -515,6 +519,7 @@ test.describe("Settings — compact master-detail", () => {
     );
     expect(backWorkspaceFrames.length).toBeGreaterThan(0);
     expect(backWorkspaceFrames.every((frame) => frame.sidebarVisible)).toBe(true);
+    await expectEndPreserved();
     await expectCompactSidebarOpen(page);
     await closeCompactSidebar(page);
   });
@@ -525,7 +530,10 @@ test.describe("Settings — compact master-detail", () => {
   }) => {
     const workspace = await withWorkspace({ prefix: "settings-sidebar-resize-" });
     await openWorkspace(page, workspace);
-    await openCompactSettings(page, buildHostWorkspaceRoute(getServerId(), workspace.workspaceId));
+    const entry = await openCompactSettings(
+      page,
+      buildHostWorkspaceRoute(getServerId(), workspace.workspaceId),
+    );
     await page.setViewportSize({ width: 1000, height: 844 });
     await expect(page.getByTestId("settings-detail-pane")).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
@@ -533,9 +541,13 @@ test.describe("Settings — compact master-detail", () => {
     await expectCompactSettingsList(page);
     await closeCompactSettings(page);
     await expect(page.getByRole("button", { name: "Close sidebar", exact: true })).toBeHidden();
-    await expect(
-      page.getByRole("button", { name: "Open menu", exact: true }).first(),
-    ).toBeInViewport();
+    if (entry === "chat") {
+      await expect(page.getByRole("tab", { name: "Chat", selected: true })).toBeInViewport();
+    } else {
+      await expect(
+        page.getByRole("button", { name: "Open menu", exact: true }).first(),
+      ).toBeInViewport();
+    }
   });
 
   test("the compact tab switcher reopens after Settings hides its workspace", async ({ page }) => {
@@ -554,18 +566,15 @@ test.describe("Settings — compact master-detail", () => {
       await switcher.click();
       await expect(newAgent).toBeInViewport();
 
-      // Navigate without dismissing the sheet through its backdrop first.
-      await page
-        .getByTestId("menu-button")
-        .filter({ visible: true })
-        .first()
-        .dispatchEvent("click");
-      await page.getByTestId("sidebar-settings").first().dispatchEvent("click");
+      // The global Settings shortcut navigates while the tab switcher still owns focus.
+      const modifier = await page.evaluate(() =>
+        /Mac/.test(navigator.platform) ? "Meta" : "Control",
+      );
+      await page.keyboard.press(`${modifier}+,`);
       await expectAppRoute(page, buildSettingsRoute());
       await expect(newAgent).toHaveCount(0);
 
       await closeCompactSettings(page);
-      await closeCompactSidebar(page);
       await expect(switcher).toBeVisible();
       await expect(newAgent).toHaveCount(0);
       await switcher.click();
@@ -616,13 +625,10 @@ test.describe("Settings — compact master-detail", () => {
     await openWorkspace(page, workspace);
     await openMobileAgentSidebar(page);
     await page.getByTestId("sidebar-hosts-trigger").click();
-    await page
-      .getByTestId(`sidebar-host-row-${getServerId()}`)
-      .getByRole("button", { name: /Open .* settings/ })
-      .click();
+    await page.getByRole("button", { name: "Open localhost settings", exact: true }).click();
 
     await expectAppRoute(page, buildSettingsHostSectionRoute(getServerId(), "host"));
-    await expect(page.getByText("Overview", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit label", exact: true })).toBeVisible();
 
     await goBackInSettings(page);
     await expectCompactSettingsList(page);
@@ -797,15 +803,15 @@ test.describe("Settings entry history on phones", () => {
 
 async function measureDockedNavigation(page: import("@playwright/test").Page, width: number) {
   await page.setViewportSize({ width, height: 951 });
-  const history = page.getByRole("button", { name: /^History/ }).filter({ visible: true });
+  const home = page.getByRole("button", { name: "Home", exact: true }).filter({ visible: true });
   const settings = page
     .getByRole("button", { name: "Settings", exact: true })
     .filter({ visible: true });
-  await expect(history).toBeVisible();
+  await expect(home).toBeVisible();
   await expect(settings).toBeVisible();
   return {
     width,
-    history: await history.evaluate((el) => el.getBoundingClientRect().height),
+    home: await home.evaluate((el) => el.getBoundingClientRect().height),
     settings: await settings.evaluate((el) => el.getBoundingClientRect().height),
   };
 }
@@ -828,8 +834,8 @@ async function expectConsistentDockedNavigation(page: import("@playwright/test")
   for (const width of [600, 669, 719, 720]) {
     const narrow = await measureDockedNavigation(page, width);
     expect
-      .soft(narrow.history, `History keeps its wide-layout density at ${width}`)
-      .toBeCloseTo(wide.history, 0);
+      .soft(narrow.home, `Home keeps its wide-layout density at ${width}`)
+      .toBeCloseTo(wide.home, 0);
     expect
       .soft(narrow.settings, `Settings keeps its wide-layout density at ${width}`)
       .toBeCloseTo(wide.settings, 0);

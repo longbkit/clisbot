@@ -1,3 +1,4 @@
+import { useReadRoutePath } from "@/navigation/route-source";
 import type { SidebarWorkspaceEntry } from "@/hooks/sidebar-workspaces-view-model";
 import { PendingChatPresentation } from "@/clisbot/home/pending-chat-presentation";
 import { profileNativeRegion } from "@/utils/render-profiler";
@@ -165,21 +166,27 @@ export const LeftSidebar = memo(function LeftSidebar({
     void openProjectPicker();
   }, [openProjectPicker]);
 
+  const readPath = useReadRoutePath();
   const handleSettings = useCallback(() => {
-    openSettingsFromSidebar({ workspace: activeWorkspace, isCompact: isCompactLayout });
-  }, [activeWorkspace, isCompactLayout]);
+    openSettingsFromSidebar({
+      pathname: readPath(),
+      workspace: activeWorkspace,
+      isCompact: isCompactLayout,
+    });
+  }, [activeWorkspace, isCompactLayout, readPath]);
 
   const handleAddHost = useAddHost();
 
   const handleOpenHostSettings = useCallback(
     (serverId: string) => {
       openSettingsFromSidebar({
+        pathname: readPath(),
         workspace: activeWorkspace,
         isCompact: isCompactLayout,
         route: buildSettingsHostSectionRoute(serverId, "host"),
       });
     },
-    [activeWorkspace, isCompactLayout],
+    [activeWorkspace, isCompactLayout, readPath],
   );
 
   const labels = useMemo(
@@ -333,7 +340,7 @@ function MobileSidebar({
           <View style={styles.sidebarContent} pointerEvents="auto">
             <WindowChromeSafeArea placement="below" />
             {HOME_V2_ENABLED ? (
-              <MobileToolbar />
+              <MobileToolbar onSettings={handleSettings} onHostSettings={handleOpenHostSettings} />
             ) : (
               <SidebarNavGroup
                 style={styles.sidebarHeaderGroup}

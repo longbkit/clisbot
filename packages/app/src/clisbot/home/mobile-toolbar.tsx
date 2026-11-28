@@ -14,7 +14,13 @@ import { buildSettingsRoute } from "@/utils/host-routes";
 import { useAddHost } from "@/hosts/add-host";
 
 /** The existing sidebar actions and preferences, shared by both compact tab pages. */
-export function MobileToolbar() {
+export function MobileToolbar({
+  onSettings,
+  onHostSettings,
+}: {
+  onSettings?: () => void;
+  onHostSettings?: (serverId: string) => void;
+}) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const insetStyle = useMemo(() => ({ paddingTop: insets.top }), [insets.top]);
@@ -50,9 +56,9 @@ export function MobileToolbar() {
         top
         handleOpenProject={addProject}
         handleImportSession={importSession}
-        handleSettings={settings}
+        handleSettings={onSettings ?? settings}
         handleAddHost={addHost}
-        handleOpenHostSettings={hostSettings}
+        handleOpenHostSettings={onHostSettings ?? hostSettings}
         labels={labels}
       />
       {sheet}

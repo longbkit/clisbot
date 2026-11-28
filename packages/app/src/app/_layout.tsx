@@ -668,8 +668,8 @@ function CompactSidebarHost({
       style={[
         layoutStyles.compactSidebarHost,
         { opacity: visible ? 1 : 0 },
-        // DOM descendants can override pointer-events:none.
-        isWeb && !visible && { display: "none" },
+        // Keep scroll geometry while Settings covers the list. Hidden descendants cannot receive input.
+        isWeb && !visible && ({ visibility: "hidden" } as const),
       ]}
       pointerEvents={interactive ? "box-none" : "none"}
       accessibilityElementsHidden={!interactive}

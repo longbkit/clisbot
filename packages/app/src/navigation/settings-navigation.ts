@@ -16,6 +16,7 @@ import {
   type SettingsSectionSlug,
 } from "@/utils/host-routes";
 import type { HubSectionSlug } from "@/clisbot/hub/navigation";
+import { isListTabPath } from "@/clisbot/home/mobile-navigation";
 import { HOME_V2_ENABLED } from "@/clisbot/home/feature";
 
 import type { ActiveWorkspaceSelection } from "@/stores/last-workspace-selection";
@@ -26,13 +27,15 @@ import {
 } from "@/navigation/settings-presentation/session";
 
 export function openSettingsFromSidebar(input: {
+  pathname: string;
   workspace: ActiveWorkspaceSelection | null;
   isCompact: boolean;
   route?: Href;
 }): void {
   const panels = usePanelStore.getState();
-  if (input.isCompact && input.workspace && panels.mobilePanel.target === "agent-list") {
-    beginSettingsSidebarVisit(input.workspace);
+  const origin = isListTabPath(input.pathname) ? { listPath: input.pathname } : input.workspace;
+  if (input.isCompact && origin && panels.mobilePanel.target === "agent-list") {
+    beginSettingsSidebarVisit(origin);
   } else {
     panels.showMobileAgent();
   }
@@ -64,7 +67,11 @@ export function openProviderSettings(serverId: string, providerId: string): void
 export function returnFromSettings(view: SettingsView): void {
   if (view.kind === "root") {
     const destination = getSettingsSidebarReturn();
-    if (destination && usePanelStore.getState().mobilePanel.target === "agent-list") {
+    if (
+      destination &&
+      !("listPath" in destination) &&
+      usePanelStore.getState().mobilePanel.target === "agent-list"
+    ) {
       navigateToWorkspace({
         serverId: destination.serverId,
         workspaceId: destination.workspaceId,

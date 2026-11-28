@@ -1,7 +1,12 @@
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { usePanelStore, type LeftSidebarPresentation } from "@/stores/panel-store";
 import { useCallback, useLayoutEffect, useRef } from "react";
-import { ScrollView, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import {
+  ScrollView,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from "react-native";
 import { usePathname, useRootNavigationState } from "expo-router";
 import { useIsFocused, type ParamListBase } from "expo-router/react-navigation";
 import { useNavigation } from "expo-router";
@@ -73,6 +78,7 @@ export const selectSettingsHost = selection.selectHost;
 export function useSettingsSidebarScroll(enabled: boolean) {
   const ref = useRef<ScrollView>(null);
   const owner = useRef<ReturnType<typeof selection.attachSidebar> | null>(null);
+  const dimensions = useRef({ viewport: 0, content: 0 });
   const restore = useCallback(() => {
     if (owner.current) ref.current?.scrollTo({ y: owner.current.offset, animated: false });
   }, []);
@@ -89,5 +95,22 @@ export function useSettingsSidebarScroll(enabled: boolean) {
   const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     owner.current?.remember(event.nativeEvent.contentOffset.y);
   }, []);
-  return { ref, onScroll, onContentSizeChange: restore, scrollEventThrottle: 16 };
+  const onLayout = useCallback((event: LayoutChangeEvent) => {
+    const { viewport, content } = dimensions.current;
+    const height = event.nativeEvent.layout.height;
+    dimensions.current.viewport = height;
+    const sidebar = owner.current;
+    if (sidebar && content > 0 && viewport > 0 && height > viewport) {
+      // A growing viewport clamps the native scroll offset before its delayed scroll event.
+      sidebar.remember(Math.min(sidebar.offset, Math.max(0, content - height)));
+    }
+  }, []);
+  const onContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      dimensions.current.content = height;
+      restore();
+    },
+    [restore],
+  );
+  return { ref, onScroll, onLayout, onContentSizeChange, scrollEventThrottle: 16 };
 }

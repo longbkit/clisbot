@@ -132,6 +132,18 @@ describe("Settings sidebar presentation", () => {
 });
 
 describe("Settings sidebar return", () => {
+  it.each([
+    ["/chat", false],
+    ["/home", true],
+  ] as const)("returns a list-origin visit to %s", (destination, discard) => {
+    const settings = createSettingsPresentation();
+    settings.beginSidebarVisit({ listPath: "/chat" });
+    settings.enterRoute({ key: "settings", pathname: "/settings" }, null);
+    settings.presentContent();
+    expect(settings.enterRoute({ key: "return", pathname: destination }, null)).toBe(discard);
+    expect(settings.store.getState().sidebarReturn).toBeNull();
+  });
+
   it("retains the origin through nested Settings and consumes it on return", () => {
     const settings = createSettingsPresentation();
     const origin = { serverId: "host", workspaceId: "workspace" };

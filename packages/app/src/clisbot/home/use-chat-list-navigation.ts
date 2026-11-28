@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { useNavigationContainerRef, usePathname } from "expo-router";
 import { startArmedHermesSampling, traceInstant } from "@/performance/native-trace";
+import { getSettingsSidebarReturn } from "@/navigation/settings-presentation/session";
 import { isNative } from "@/constants/platform";
 import { usePanelStore } from "@/stores/panel-store";
 import { HOME_V2_ENABLED } from "./feature";
@@ -96,8 +97,17 @@ export function useChatListNavigation(
   // Destinations this owner already dispatched: Expo may commit one after a newer row was admitted.
   const dispatched = useRef(new Set<string>());
   useLayoutEffect(() => {
-    if (HOME_V2_ENABLED && !isNative && isListTabPath(previousPath.current) && !isListTabPath(path))
-      closeList();
+    if (
+      HOME_V2_ENABLED &&
+      !isNative &&
+      isListTabPath(previousPath.current) &&
+      !isListTabPath(path)
+    ) {
+      // The Settings visit retains this panel and its reading position until Back.
+      const retained =
+        (path === "/settings" || path.startsWith("/settings/")) && getSettingsSidebarReturn();
+      if (!retained) closeList();
+    }
     if (isListTabPath(path) && !isListTabPath(previousPath.current)) cancelPending.current?.();
     if (isListTabPath(path)) dispatched.current.clear();
     previousPath.current = path;
