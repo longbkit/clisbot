@@ -256,7 +256,10 @@ async function currentWebNetwork(origin: string, configured?: string) {
 
 async function protectedWebDaemonOrigin(home: string): Promise<string> {
   const daemon = await launchLocalDaemon({ home });
-  const client = await connectToDaemon({ target: { kind: "instance", home } });
+  const client = await connectToDaemon({
+    target: { kind: "instance", home },
+    preferLocalCredential: true,
+  });
   try {
     if (client.getLastServerInfoMessage()?.features?.devicePairing !== true)
       throw new Error(WEB_PROTECTION_REQUIRED);

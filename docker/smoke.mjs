@@ -66,8 +66,7 @@ function assertIntegratedHub(name) {
     const origin = 'http://localhost:6868';
     const page = await fetch(origin);
     assert.ok(page.headers.get('content-type')?.includes('text/html'));
-    assert.equal(new URL(page.url).pathname, '/cli-login');
-    assert.ok((await page.text()).toLowerCase().includes('<html'));
+    assert.match(await page.text(), /__CLISBOT_HUB_ENABLED__=true/);
     const headers = { 'content-type': 'application/json', origin };
     const claim = await fetch(origin + '/api/auth/clisbot/claim-instance', { method: 'POST', headers, body: JSON.stringify({ email: 'smoke@example.test', password: 'isolated-smoke-password' }) });
     assert.equal(claim.status, 200, await claim.text());
