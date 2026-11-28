@@ -148,12 +148,23 @@ function addWebOverlay(entry: WebOverlayEntry): (options?: RemoveWebOverlayOptio
     }
   });
 
+  // A still-open surface can detach its DOM scope before its close commits.
+  // Restore on the later close only while the same underlying overlay is on top.
+  let underlayAfterDetach: OverlayEntry | null | undefined;
   return (options) => {
     window.cancelAnimationFrame(focusFrame);
     const wasTop = getTopWebOverlay() === entry;
     remove();
     detachWebOverlayListeners();
-    if (!entry.manageFocus || options?.restoreFocus === false || !wasTop) return;
+    if (!entry.manageFocus) return;
+    const underlay = overlays.getTop() ?? null;
+    if (options?.restoreFocus === false) {
+      if (wasTop) underlayAfterDetach = underlay;
+      return;
+    }
+    const shouldRestore = wasTop || underlayAfterDetach === underlay;
+    underlayAfterDetach = undefined;
+    if (!shouldRestore) return;
     const parent = getTopWebOverlay();
     const parentScope = parent?.manageFocus ? parent.getScope() : null;
     const opener = entry.restoreFocus;
