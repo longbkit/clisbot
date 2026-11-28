@@ -30,8 +30,10 @@ for (const scenario of [
     if (scenario.phone) await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript((language) => {
       // An install from before the setting existed: it never chose a scope.
-      if (!localStorage.getItem("@clisbot:app-settings"))
+      if (!sessionStorage.getItem("notification-scope-seeded")) {
+        sessionStorage.setItem("notification-scope-seeded", "1");
         localStorage.setItem("@clisbot:app-settings", JSON.stringify({ language }));
+      }
     }, scenario.language);
     await page.goto("/settings/general");
 
