@@ -274,3 +274,11 @@ Clisbot tabs route group; nine Chinese fallback or unsupported Hub documentation
 archived or redirected. Clisbot keeps the runtime client identifier and the two previously removed
 Chinese legal pages out of source. Full path reconciliation and review decisions are recorded in
 the promotion evidence directory.
+
+### Promotion branch CI on 28 November
+
+CI run 46109244037 on c686f0dba exposed regressions beyond the local playbook checks. A human message sent during agent initialization could wait behind the create operation. The wire path now rejects it before it claims a receipt, so the same message ID can be retried after readiness. The real daemon test exercises both sends. An omitted forward timeline page limit is bounded at 200, while an explicit zero still requests full history. The browser Host listing tool follows the Browser opt-in like the other browser tools.
+
+The Linux and Windows desktop shells now keep the window drag surface above the scrolling navigation. The light theme retains its raised white selection style. Search gives an exact Host or Project name precedence for keyboard scoping. Docker personal onboarding uses the selected home's rotating Host credential and asks the local Hub for an operator-authorized pairing invitation. The container test uses loopback transport, verifies the Hub's own CLI approval page, and checks that its dashboard stays closed. The separate account-mode smoke still exercises the account claim and cookie.
+
+Eight affected server files passed 475 tests locally. The two desktop drag scenarios and both CLI SIGINT modes passed. Browser CI on this promotion also reported timeline, send, composer and Changes-pane failures. Those findings remain open until verified on the subsequent candidate.

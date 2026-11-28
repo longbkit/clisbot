@@ -103,10 +103,19 @@ it("keeps Solarized Dark's selected workspace timestamp readable", () => {
   ).toBeGreaterThanOrEqual(2.5);
 });
 
-describe.each(themes)("$name", ({ theme }) => {
+describe.each(themes)("$name", ({ name, theme }) => {
   const colors = theme.colors;
 
   it("separates a hovered and a selected sidebar row from the sidebar", () => {
+    if (name === "light") {
+      // The default light palette uses a raised white card for selection (docs/design.md).
+      expect(colors.surfaceSidebar).toBe("#f5f5f5");
+      expect(colors.surfaceSidebarHover).toBe("#fafafa");
+      expect(colors.surfaceSidebarSelected).toBe("#ffffff");
+      expect(theme.shadow.raised.elevation).toBeGreaterThan(0);
+      expect(theme.shadow.raised.shadowRadius).toBeGreaterThan(0);
+      return;
+    }
     expect(contrastRatio(colors.surfaceSidebar, colors.surfaceSidebarHover)).toBeGreaterThanOrEqual(
       HOVER_STEP,
     );

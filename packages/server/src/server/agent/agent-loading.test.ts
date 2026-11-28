@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import { AgentManager } from "./agent-manager.js";
@@ -516,7 +516,7 @@ test.each(["mode", "thinking", "rewind"])(
         expect(manager.getAgent(agentId)?.config.thinkingOptionId).toBe("high");
         expect(runtime.latestSession().setThinkingLevelRequests).toContain("high");
       }
-      await sendPreparedPromptToAgent({
+      const sending = sendPreparedPromptToAgent({
         agentManager: manager,
         agentStorage: storage,
         agentId,
@@ -524,6 +524,10 @@ test.each(["mode", "thinking", "rewind"])(
         prompt: "continue",
         sessionMode: "full",
       });
+      await vi.waitFor(() => expect(runtime.latestSession().prompts).toHaveLength(1));
+      runtime.latestSession().beginTurn();
+      runtime.latestSession().acceptPrompt("continue");
+      await sending;
       expect(
         runtime.recordedLaunches.filter((launch) => launch.session === sessionFile),
       ).toHaveLength(1);

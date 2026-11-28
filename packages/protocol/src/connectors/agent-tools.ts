@@ -27,6 +27,7 @@ export const AGENT_TOOL_GROUPS: readonly AgentToolGroup[] = [
     label: "Browser",
     description: "Drive the built-in browser: open pages, click, type, read and capture",
     tools: [
+      t("browser_list_hosts", "List browser hosts"),
       t("browser_list_tabs", "List open tabs"),
       t("browser_new_tab", "Open a tab"),
       t("browser_navigate", "Go to a page"),

@@ -12,14 +12,20 @@ import type {
   CommandCenterResultSection,
   CommandCenterWorkspaceResult,
 } from "@/command-center/results";
-import { PINNED_SECTION_BAND } from "@/command-center/results";
+import { LEADING_SECTION_BAND, PINNED_SECTION_BAND } from "@/command-center/results";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useSearchScopeTranslation } from "@/i18n/search-scope";
 import type { ProjectSummary } from "@/utils/projects";
 import { findScopeCandidates, type SearchViewContext } from "./candidates";
 import type { SearchScopeCatalog } from "./catalog";
 import { searchScopeChips, useSearchScopeChips } from "./chip-store";
-import { isScoped, resolveSearchScope, UNSCOPED, type SearchScopeChip } from "./model";
+import {
+  foldSearchText,
+  isScoped,
+  resolveSearchScope,
+  UNSCOPED,
+  type SearchScopeChip,
+} from "./model";
 import { buildEmptyStateRows, buildScopeRows, type ScopeRowModel, type ScopeT } from "./rows";
 import type { ScopeChipsProps } from "./scope-chips";
 import { ScopeRowAction, ScopeRowContent } from "./scope-row";
@@ -229,20 +235,28 @@ function candidateSections(input: SectionInput, scope: ReturnType<typeof resolve
         showInWorkLabel: t("showInWorkLabel", { label: model.title }),
       }),
     );
+  const projectRows = buildScopeRows(candidates.projects, context);
+  const hostRows = buildScopeRows(candidates.hosts, context);
+  const query = foldSearchText(input.query.trim());
+  // Tab accepts an exact Host or Project while the remaining queries keep upstream's action ranking.
+  const scopeBand = (rows: ScopeRowModel[]) =>
+    query && rows[0]?.chips.length && foldSearchText(rows[0].title) === query
+      ? LEADING_SECTION_BAND
+      : PINNED_SECTION_BAND;
   const sections: CommandCenterResultSection[] = [
     {
       id: "scope-projects",
-      band: PINNED_SECTION_BAND,
+      band: scopeBand(projectRows),
       rank: 0,
       title: t("sections.projects"),
-      results: toResults(buildScopeRows(candidates.projects, context)),
+      results: toResults(projectRows),
     },
     {
       id: "scope-hosts",
-      band: PINNED_SECTION_BAND,
+      band: scopeBand(hostRows),
       rank: 1,
       title: t("sections.hosts"),
-      results: toResults(buildScopeRows(candidates.hosts, context)),
+      results: toResults(hostRows),
     },
   ];
   const inScopeCandidates = [...candidates.projects, ...candidates.hosts].filter(

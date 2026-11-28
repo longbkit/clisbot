@@ -350,7 +350,7 @@ tools on upgrade. A home upgraded from v1 (`clisbot.json`) counts as new: the up
 `true` unless it kept an existing v2 `config.json`.
 
 `daemon.browserTools.enabled` is never written for the person: a new or upgraded home has no key,
-which reads as `false`, and an agent gets the 22 `browser_*` tools only after the person turns
+which reads as `false`, and an agent gets the `browser_*` tools only after the person turns
 them on (**Settings → Host → Browser tools**, or a Project's **Tools** tab). An explicit value in
 `config.json` is kept as written, on or off. Homes created from 2026-10-09 until this change had
 `enabled: true` written at creation (and v1 upgrades from 2026-10-11); that value cannot be told

@@ -27,6 +27,12 @@ function sectionHeadings(release: Locator): Locator {
   return release.getByRole("heading", { level: 4 });
 }
 
+async function expectHighlights(release: Locator): Promise<void> {
+  const highlights = release.locator(".changelog-highlights");
+  await expect(highlights).toBeVisible();
+  await expect(highlights).toHaveText(/\S/);
+}
+
 async function showAllChanges(release: Locator): Promise<void> {
   await release.getByText("Show all changes", { exact: true }).click();
   await expect(release.getByText("Hide all changes", { exact: true })).toBeVisible();
@@ -43,7 +49,7 @@ test("shows each release's highlights and opens its sections on request", async 
   const plain = releaseWithoutHighlights(page);
 
   await test.step("tucks away the sections of a release with highlights", async () => {
-    await expect(highlighted.getByRole("listitem").first()).toBeVisible();
+    await expectHighlights(highlighted);
     await expect(sectionHeadings(highlighted)).toHaveCount(0);
   });
 
@@ -70,5 +76,5 @@ test("opens a release from a deep link with its highlights in view", async ({ pa
 
   const linked = page.locator(`[id="${anchor!.slice(1)}"]`);
   await expect(linked).toBeInViewport();
-  await expect(releaseWithHighlights(page).getByRole("listitem").first()).toBeVisible();
+  await expectHighlights(releases(page).filter({ has: linked }));
 });

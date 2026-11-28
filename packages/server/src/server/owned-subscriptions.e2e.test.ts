@@ -1192,12 +1192,16 @@ test("adding raw client listeners does not create server observation demand", as
   });
   try {
     await client.connect();
+    // The Host may already have internal listeners, before this client subscribes.
+    const before = (await client.collectDiagnostics()).diagnostic;
+    const listeners = before.match(/Producer listeners: (\d+)/);
+    expect(listeners).not.toBeNull();
     const off = client.on("project.update", () => {});
     const all = client.subscribe(() => {});
     await client.ping();
     const { diagnostic } = await client.collectDiagnostics();
     expect(diagnostic).toContain("Registrations: 0");
-    expect(diagnostic).toContain("Producer listeners: 0");
+    expect(diagnostic.match(/Producer listeners: (\d+)/)?.[1]).toBe(listeners![1]);
     off();
     all();
   } finally {

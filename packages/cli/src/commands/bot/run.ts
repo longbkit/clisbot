@@ -4,7 +4,7 @@ import { prepareFreshPersonalHome } from "../serve/personal-home.js";
 
 import { hydrateBotReference, listDaemonBots, provisionDaemonBot } from "./daemon-bot.js";
 import { updateLocalWebHub } from "../serve/web.js";
-import { editPersistedConfig } from "@clisbot/server/configuration";
+import { editPersistedConfig, loadConfig } from "@clisbot/server/configuration";
 import { startPersonalHub } from "../serve/index.js";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -732,14 +732,14 @@ async function openDaemonWithRetry(
 ): Promise<DaemonClient> {
   const deadline = Date.now() + DAEMON_READY_TIMEOUT_MS;
   let lastError: unknown;
-  const target = daemonHostWithPassword(host, password);
+  const useInstance =
+    host === undefined || password === undefined || loadConfig(home).devicePairingEnabled;
+  const target = useInstance ? undefined : daemonHostWithPassword(host, password);
   for (;;) {
     try {
       return await connectToDaemon({
         target:
-          target === undefined || password === undefined
-            ? { kind: "instance", home }
-            : { kind: "endpoint", host: target },
+          target === undefined ? { kind: "instance", home } : { kind: "endpoint", host: target },
       });
     } catch (error) {
       lastError = error;

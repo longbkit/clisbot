@@ -6,7 +6,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { Text, View, type PressableStateCallbackType } from "react-native";
+import { ScrollView, Text, View, type PressableStateCallbackType } from "react-native";
 import { useTranslation } from "react-i18next";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -40,7 +40,10 @@ import {
 import type { MenuTriggerState } from "@/components/ui/menu/menu-root";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
+import {
+  TitlebarDragRegion,
+  WINDOW_CONTENT_DATASET,
+} from "@/components/desktop/titlebar-drag-region";
 import { openHostOverview } from "@/navigation/settings-navigation";
 import { pluginIconComponent } from "@/plugins/icons";
 import { PluginSidebarItem } from "@/plugins/sidebar-items";
@@ -93,17 +96,24 @@ export function NavigationRail() {
           <TitlebarDragRegion />
         </View>
         <WindowChromeSafeArea placement="below" />
-        <View style={styles.group}>
-          {railPrimary.map((section) => (
-            <RailEntry key={section.key} section={section} />
-          ))}
-        </View>
-        <View style={styles.spacer} />
-        <View style={styles.group}>
-          {railBottom.map((section) => (
-            <RailEntry key={section.key} section={section} />
-          ))}
-        </View>
+        <ScrollView
+          testID="sidebar-nav-scroll"
+          dataSet={WINDOW_CONTENT_DATASET}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.group}>
+            {railPrimary.map((section) => (
+              <RailEntry key={section.key} section={section} />
+            ))}
+          </View>
+          <View style={styles.spacer} />
+          <View style={styles.group}>
+            {railBottom.map((section) => (
+              <RailEntry key={section.key} section={section} />
+            ))}
+          </View>
+        </ScrollView>
       </View>
     </UsageSidebarRoot>
   );
@@ -440,7 +450,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   dragArea: { height: theme.spacing[3] },
   chromeSpacer: { height: theme.spacing[0] },
-  group: { gap: theme.spacing[1], alignItems: "stretch", flexShrink: 1 },
+  scrollContent: { flexGrow: 1 },
+  group: { gap: theme.spacing[1], alignItems: "stretch" },
   spacer: { flex: 1 },
   item: {
     alignItems: "center",

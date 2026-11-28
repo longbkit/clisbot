@@ -7,7 +7,11 @@ vi.mock("react-native", () => ({
   View: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   Text: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
 }));
-vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({}) } }));
+vi.mock("react-native-unistyles", () => ({
+  StyleSheet: { create: () => ({}) },
+  withUnistyles: (component: unknown) => component,
+}));
+vi.mock("@/components/ui/external-link", () => ({ ExternalLink: () => null }));
 vi.mock("@/styles/settings", () => ({ settingsStyles: {} }));
 vi.mock("./settings-info-tip", () => ({ SettingsInfoTip: () => <span>info</span> }));
 

@@ -408,7 +408,7 @@ describe("terminals across daemon restarts", { timeout: 240_000 }, () => {
     const listing = JSON.stringify({
       path: path.join(fakeBin, "global"),
       dependencies: {
-        "@clisbot/cli": {
+        clisbot: {
           version: resolveDaemonVersion(import.meta.url),
           path: SERVER_ROOT,
         },
@@ -419,9 +419,9 @@ describe("terminals across daemon restarts", { timeout: 240_000 }, () => {
       fakeNpm,
       `const args = process.argv.slice(2);
 const has = (...tokens) => tokens.every((token) => args.includes(token));
-if (has("-g", "ls", "@clisbot/cli", "--json", "--depth=0", "--long")) {
+if (has("-g", "ls", "clisbot", "--json", "--depth=0", "--long")) {
   process.stdout.write(${JSON.stringify(listing)} + "\\n");
-} else if (args[0] === "install" && has("-g", "@clisbot/cli@latest")) {
+} else if (args[0] === "install" && has("-g", "clisbot@latest")) {
   // The installed version is already the running one: nothing to do.
 } else {
   process.stderr.write("unexpected npm call: " + args.join(" ") + "\\n");

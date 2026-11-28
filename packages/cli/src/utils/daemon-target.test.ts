@@ -86,6 +86,16 @@ test("CLI selects an explicit password before a matching local credential and ne
       kind: "localCredential",
       token,
     });
+    process.env.CLISBOT_PASSWORD = "ambient";
+    expect(resolveDaemonCredential("tcp://localhost:6868", home, true)).toEqual({
+      kind: "localCredential",
+      token,
+    });
+    expect(resolveDaemonCredential("tcp://localhost:6868", home)).toEqual({
+      kind: "password",
+      password: "ambient",
+    });
+    delete process.env.CLISBOT_PASSWORD;
     expect(resolveDaemonCredential("tcp://remote.example:6868", home)).toBeNull();
     expect(resolveDaemonCredential("tcp://localhost:6868?password=explicit", home)).toEqual({
       kind: "password",

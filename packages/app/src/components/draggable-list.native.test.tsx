@@ -4,6 +4,9 @@ import { act, render } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 
 const captured = vi.hoisted(() => ({ props: {} as Record<string, (...args: unknown[]) => void> }));
+vi.mock("@/components/ui/scroll-view", () => ({
+  useContentDrag: () => ({ attach: () => () => {}, setActive: () => {} }),
+}));
 vi.mock("react-native", () => ({ RefreshControl: () => null }));
 vi.mock("react-native-unistyles", () => ({
   useUnistyles: () => ({ theme: { colors: { foregroundMuted: "#888" } } }),
@@ -40,8 +43,8 @@ it("holds deferred layout work until a drag ends or is cancelled", () => {
   expect(begin).toHaveBeenCalledTimes(1);
   act(() => captured.props.onRelease());
   expect(settled).not.toHaveBeenCalled();
-  act(() => captured.props.onDragEnd({ data: ["b", "a"] }));
-  expect(reorder).toHaveBeenCalledWith(["b", "a"]);
+  act(() => captured.props.onDragEnd({ data: ["b", "a"], from: 0, to: 1 }));
+  expect(reorder).toHaveBeenCalledWith(["b", "a"], "a");
   expect(settled).toHaveBeenCalledTimes(1);
   act(() => captured.props.onDragTerminate());
   expect(settled).toHaveBeenCalledTimes(1);

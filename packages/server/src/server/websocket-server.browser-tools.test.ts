@@ -341,7 +341,7 @@ function createVoiceAssistantWebSocketServer(params: {
     createStub<pino.Logger>(createLogger()),
     "srv-test",
     createStub<AgentManager>(agentManager),
-    createStub<AgentStorage>({ list: async () => [] }),
+    createStub<AgentStorage>({ listAll: async () => [] }),
     createStub<DownloadTokenStore>({}),
     "/tmp/clisbot-browser-tools-websocket-test",
     createStub<DaemonConfigStore>(daemonConfigStore),
