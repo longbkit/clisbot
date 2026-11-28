@@ -3,6 +3,7 @@ import { addProjectFlow } from "../support/helpers/add-project-flow";
 import { gotoAppShell } from "../support/helpers/app";
 import {
   chooseFooterOverflowAction,
+  configureFiveFooterActions,
   expectFooterLine,
   expectFooterMenusInsideViewport,
   expectFooterNeverClipped,
@@ -15,16 +16,7 @@ import {
 import { addOfflineHostsAndReload } from "../support/helpers/hosts";
 import { openCompactSidebar } from "../support/helpers/usage-sidebar-item";
 
-import { seedSidebarFooterPreferences } from "../support/helpers/sidebar-nav-settings";
-
 const TOUCH_CONTROL = 48;
-function configureFiveActions({ page }: { page: import("@playwright/test").Page }) {
-  return seedSidebarFooterPreferences(page, [
-    { key: "new", visible: false },
-    { key: "search", visible: false },
-    { key: "add-project", visible: true },
-  ]);
-}
 const MIN_SIDEBAR_WIDTH = 200;
 const ALL_INLINE = [
   "sidebar-add-project",
@@ -42,7 +34,7 @@ const NARROW_TOUCH_LINE = [
 ];
 
 test.describe("Sidebar footer on a touch screen", () => {
-  test.beforeEach(configureFiveActions);
+  test.beforeEach(configureFiveFooterActions);
   test.use({ viewport: { width: 1280, height: 800 }, hasTouch: true });
 
   test("a narrow docked sidebar moves the actions it can't fit behind a caret", async ({
@@ -93,7 +85,7 @@ test.describe("Sidebar footer on a touch screen", () => {
 });
 
 test.describe("Sidebar footer in a compact overlay narrower than the footer", () => {
-  test.beforeEach(configureFiveActions);
+  test.beforeEach(configureFiveFooterActions);
   test.use({ viewport: { width: 220, height: 800 }, hasTouch: true });
 
   test("the overflow menu reaches the hidden actions", async ({ page }) => {
@@ -113,7 +105,7 @@ test.describe("Sidebar footer in a compact overlay narrower than the footer", ()
 
 test.describe("Sidebar footer on a short, narrow phone", () => {
   // 164pt for buttons holds Settings, Add project and the caret, so Hosts moves behind it.
-  test.beforeEach(configureFiveActions);
+  test.beforeEach(configureFiveFooterActions);
   test.use({ viewport: { width: 180, height: 360 }, hasTouch: true });
 
   test("the overflow Hosts page scrolls to its last host and Add host", async ({ page }) => {

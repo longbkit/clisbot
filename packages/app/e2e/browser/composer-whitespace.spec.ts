@@ -459,7 +459,7 @@ test("fullscreen Send keeps the configured queue behavior while an agent runs", 
   }
 });
 
-test("editing a queued draft restores its original height with the focus hint visible", async ({
+test("editing a queued draft restores its original height in the compact composer", async ({
   page,
 }) => {
   await configureComposerQueueSend(page);
@@ -476,8 +476,11 @@ test("editing a queued draft restores its original height with the focus hint vi
     await queueComposerWithButton(page);
     await expect(composerLocator(page)).toHaveValue("");
     await composerLocator(page).blur();
-    await expect(page.getByText(/ to focus$/)).toBeVisible();
-    await page.getByRole("button", { name: "Edit queued message", exact: true }).click();
+    const focusHint = page.getByText(/ to focus$/);
+    if (CHAT_LAYOUT) await expect(focusHint).toBeHidden();
+    else await expect(focusHint).toBeVisible();
+    await page.getByTestId("queue-row-more").click();
+    await page.getByTestId("queue-row-edit").click();
     await expect(composerLocator(page)).toHaveValue(draft);
     await expectComposerHeight(page, originalHeight);
   } finally {
