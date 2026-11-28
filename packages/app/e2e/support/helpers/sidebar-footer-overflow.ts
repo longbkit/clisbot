@@ -2,6 +2,9 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 /** Every footer control that can sit in the icon line, caret included. */
 const FOOTER_LINE_TEST_IDS = [
+  "sidebar-new",
+  "sidebar-footer-search",
+  "sidebar-import-session",
   "sidebar-add-project",
   "sidebar-usage-icon",
   "sidebar-hosts-trigger",

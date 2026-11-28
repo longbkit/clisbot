@@ -1,5 +1,16 @@
+import { useContainerWidth } from "@/hooks/use-container-width";
+import type { SidebarFooterItem } from "@/sidebar-nav/footer-model";
+import {
+  resolveSidebarFooterLayout,
+  type SidebarFooterAction,
+} from "@/components/sidebar-footer-layout";
+import { SidebarFooterOverflowMenu } from "./sidebar-footer-overflow-menu";
 import { SPACING } from "@/styles/theme";
-import { buttonControlHeight, MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
+import {
+  buttonControlHeight,
+  MIN_TOUCH_TARGET_SIZE,
+  TOOLBAR_CONTROL_SIZES,
+} from "@/components/ui/control-geometry";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { usePointerCapabilities } from "@/hooks/pointer-capabilities";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
@@ -40,10 +51,53 @@ export interface SidebarFooterProps {
   top?: boolean;
 }
 
-export function SidebarFooter(props: SidebarFooterProps) {
+function footerAction(item: SidebarFooterItem): SidebarFooterAction | "new" {
+  return item.key === "usage-icon" ? "usage" : item.key;
+}
+
+function useFooterLayout() {
   const compact = useIsCompactFormFactor();
-  const controls = <SidebarFooterControls {...props} />;
-  const actions = <SidebarFooterActions {...props} />;
+  const { finePointer } = usePointerCapabilities();
+  const { items } = useSidebarFooterItems();
+  const { width, onLayout } = useContainerWidth();
+  const touch = compact || !finePointer;
+  const size = touch ? MIN_TOUCH_TARGET_SIZE : TOOLBAR_CONTROL_SIZES.pointer;
+  const visible = items.filter((item) => item.visible);
+  const hasNew = visible.some((item) => item.key === "new");
+  const newSize = touch ? MIN_TOUCH_TARGET_SIZE : buttonControlHeight.sm;
+  const hasSearchField = !compact && visible.some((item) => item.key === "search");
+  const padding = SPACING[2];
+  // Keep the full search field and spacing wherever they fit. In a narrower row every
+  // action is square, with New kept reachable as the entry point for all its creation flows.
+  const fullWidth =
+    padding * 2 +
+    size * visible.length +
+    (hasNew ? newSize - size : 0) +
+    padding * (visible.length - 1) +
+    (hasSearchField ? FOOTER_SEARCH_MIN_WIDTH - size : 0);
+  const packed = width < fullWidth;
+  const actions = visible.map(footerAction).filter((key) => key !== "new");
+  const layout = resolveSidebarFooterLayout({
+    rowWidth: width - (hasNew ? newSize : 0),
+    rowPadding: padding,
+    controlSize: size,
+    actions,
+  });
+  const inline = packed
+    ? visible.filter((item) => {
+        const key = footerAction(item);
+        return key === "new" || layout.inline.includes(key);
+      })
+    : visible;
+  return { compact, packed, inline, overflow: packed ? layout.overflow : [], width, onLayout };
+}
+
+export function SidebarFooter(props: SidebarFooterProps) {
+  const { compact, packed, inline, overflow, width, onLayout } = useFooterLayout();
+  const controls = (
+    <SidebarFooterControls {...props} items={inline} overflow={overflow} packed={packed} />
+  );
+  const actions = <SidebarFooterActions {...props} items={inline} packed={packed} />;
   return (
     <UsageSidebarRoot>
       <View
@@ -52,20 +106,26 @@ export function SidebarFooter(props: SidebarFooterProps) {
       >
         {props.top ? null : <SidebarFooterRows onBeforeNavigate={props.onBeforeNavigate} />}
         <View
-          style={[styles.sidebarFooter, compact && styles.sidebarFooterCompact]}
+          onLayout={onLayout}
+          style={[
+            styles.sidebarFooter,
+            compact && styles.sidebarFooterCompact,
+            packed && styles.packed,
+          ]}
           testID="sidebar-footer-bottom-line"
         >
-          {compact ? (
-            <>
-              {controls}
-              {actions}
-            </>
-          ) : (
-            <>
-              {actions}
-              {controls}
-            </>
-          )}
+          {width > 0 &&
+            (compact ? (
+              <>
+                {controls}
+                {actions}
+              </>
+            ) : (
+              <>
+                {actions}
+                {controls}
+              </>
+            ))}
         </View>
         {props.top ? <SidebarFooterRows stable onBeforeNavigate={props.onBeforeNavigate} /> : null}
       </View>
@@ -77,22 +137,24 @@ function SidebarFooterActions({
   handleOpenProject,
   handleImportSession,
   labels,
-}: SidebarFooterProps) {
+  items,
+  packed,
+}: SidebarFooterProps & { items: SidebarFooterItem[]; packed: boolean }) {
   const newAgentKeys = useShortcutKeys("new-agent");
-  const { items } = useSidebarFooterItems();
   const compact = useIsCompactFormFactor();
   const { finePointer } = usePointerCapabilities();
   const touchTarget = compact || !finePointer;
   const actions = items.filter((item) => item.visible && item.group === "actions");
   // A phone keeps every footer action on one line: search shrinks to its icon instead of wrapping.
+  const packedSize = touchTarget ? MIN_TOUCH_TARGET_SIZE : TOOLBAR_CONTROL_SIZES.pointer;
   const actionWidths: Record<string, number> = {
-    search: compact ? MIN_TOUCH_TARGET_SIZE : FOOTER_SEARCH_MIN_WIDTH,
+    search: packed || compact ? packedSize : FOOTER_SEARCH_MIN_WIDTH,
     new: touchTarget ? MIN_TOUCH_TARGET_SIZE : buttonControlHeight.sm,
-    "add-project": touchTarget ? MIN_TOUCH_TARGET_SIZE : buttonControlHeight.xs,
+    "add-project": packedSize,
   };
   const actionMinWidth =
     actions.reduce((width, item) => width + actionWidths[item.key], 0) +
-    Math.max(0, actions.length - 1) * SPACING[touchTarget ? 2 : 1];
+    Math.max(0, actions.length - 1) * (packed ? 0 : SPACING[touchTarget ? 2 : 1]);
 
   const actionNodes = actions.map((item) => {
     if (item.key === "new") {
@@ -105,7 +167,7 @@ function SidebarFooterActions({
       );
     }
     if (item.key === "search") {
-      return <FooterSearchField key={item.key} />;
+      return <FooterSearchField key={item.key} iconOnly={packed} />;
     }
     return (
       <FooterIconButton
@@ -119,7 +181,7 @@ function SidebarFooterActions({
     );
   });
   return (
-    <View style={styles.footerActions(actionMinWidth, touchTarget)}>
+    <View style={[styles.footerActions(actionMinWidth, touchTarget), packed && styles.packed]}>
       {compact ? actionNodes.toReversed() : actionNodes}
     </View>
   );
@@ -131,9 +193,16 @@ function SidebarFooterControls({
   handleOpenHostSettings,
   handleImportSession,
   labels,
-}: SidebarFooterProps) {
+  items,
+  overflow,
+  packed,
+  handleOpenProject,
+}: SidebarFooterProps & {
+  items: SidebarFooterItem[];
+  overflow: SidebarFooterAction[];
+  packed: boolean;
+}) {
   const settingsKeys = useShortcutKeys("toggle-settings");
-  const { items } = useSidebarFooterItems();
   const compact = useIsCompactFormFactor();
   const controlNodes = [
     ...items
@@ -162,18 +231,38 @@ function SidebarFooterControls({
           />
         );
       }),
-    <SidebarHelpMenu key="help" />,
-    <FooterIconButton
-      key="settings"
-      onPress={handleSettings}
-      testID="sidebar-settings"
-      label={labels.settings}
-      icon={Settings}
-      shortcutKeys={settingsKeys}
-    />,
+    items.some((item) => item.key === "help") && <SidebarHelpMenu key="help" />,
+    overflow.length > 0 && (
+      <SidebarFooterOverflowMenu
+        key="overflow"
+        actions={overflow}
+        labels={labels}
+        onAddProject={handleOpenProject}
+        onImportSession={handleImportSession}
+        onSettings={handleSettings}
+        onAddHost={handleAddHost}
+        onOpenHostSettings={handleOpenHostSettings}
+      />
+    ),
+    items.some((item) => item.key === "settings") && (
+      <FooterIconButton
+        key="settings"
+        onPress={handleSettings}
+        testID="sidebar-settings"
+        label={labels.settings}
+        icon={Settings}
+        shortcutKeys={settingsKeys}
+      />
+    ),
   ];
   return (
-    <View style={[styles.footerIconRow, compact && styles.footerIconRowCompact]}>
+    <View
+      style={[
+        styles.footerIconRow,
+        compact && styles.footerIconRowCompact,
+        packed && styles.packed,
+      ]}
+    >
       {compact ? controlNodes.toReversed() : controlNodes}
     </View>
   );
@@ -238,6 +327,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[2],
     paddingVertical: theme.spacing[3],
   },
+  packed: { gap: 0 },
   sidebarFooterCompact: {
     flexWrap: "nowrap",
   },

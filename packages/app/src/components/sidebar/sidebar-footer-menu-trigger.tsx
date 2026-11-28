@@ -5,6 +5,9 @@ import { StyleSheet } from "react-native-unistyles";
 import { DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DensityIcon } from "@/components/ui/density-icon";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { usePointerCapabilities } from "@/hooks/pointer-capabilities";
 import { density } from "@/styles/density";
 import { SidebarFooterIconHighlight } from "./sidebar-footer-icon-highlight";
 
@@ -23,12 +26,14 @@ export function SidebarFooterMenuTrigger({
   menuOpen: boolean;
   testID: string;
 }): ReactElement {
+  const compact = useIsCompactFormFactor();
+  const { finePointer } = usePointerCapabilities();
   return (
     <Tooltip delayDuration={300} enabledOnDesktop={!menuOpen}>
       <TooltipTrigger asChild>
         <View>
           <DropdownMenuTrigger
-            style={styles.trigger}
+            style={[styles.trigger, (compact || !finePointer) && styles.touchTrigger]}
             testID={testID}
             accessibilityRole="button"
             accessibilityLabel={label}
@@ -62,6 +67,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[1],
     paddingHorizontal: theme.spacing[1],
   },
+  touchTrigger: { width: MIN_TOUCH_TARGET_SIZE, height: MIN_TOUCH_TARGET_SIZE },
   tooltipText: {
     fontSize: theme.fontSize.base,
     color: theme.colors.popoverForeground,
