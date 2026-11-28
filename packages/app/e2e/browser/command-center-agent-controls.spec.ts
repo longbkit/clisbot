@@ -345,10 +345,16 @@ async function openDraftComposer(page: import("@playwright/test").Page, workspac
 async function applyCompactComposerSettings(page: import("@playwright/test").Page): Promise<void> {
   const [model, mode] = DRAFT_AGENT_CONTROL_CHOICES;
   await expectComposerVisible(page);
-  await openMobileAgentSidebar(page);
-  await openCommandCenter(page);
+  const legacySidebar = process.env.EXPO_PUBLIC_CLISBOT_HOME_V2 === "0";
+  if (legacySidebar) {
+    await openMobileAgentSidebar(page);
+    await openCommandCenter(page);
+  } else {
+    // The compact Home navigation leaves Work; open commands on the current composer.
+    await openCommandCenterWithShortcut(page);
+  }
   await chooseCommandCenterAgentControl({ page, ...mode });
-  await closeMobileAgentSidebar(page);
+  if (legacySidebar) await closeMobileAgentSidebar(page);
 
   await fillComposerDraft(page, "First line\nSecond line\nThird line");
   await enterComposerFullscreen(page);
