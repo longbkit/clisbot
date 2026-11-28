@@ -122,10 +122,19 @@ function assertDaemonSocket(name) {
     "-e",
     `
     import assert from 'node:assert/strict';
+    import { createRequire } from 'node:module';
+    const WebSocket = createRequire('/usr/local/lib/node_modules/@clisbot/server/package.json')('ws');
+    import { setTimeout as delay } from 'node:timers/promises';
     async function connect(protocol) {
       return new Promise((resolve, reject) => {
         const socket = new WebSocket('ws://localhost:6868/ws', protocol ? [protocol] : []);
         const timeout = setTimeout(() => { socket.close(); reject(Error('daemon hello timed out')); }, 5000);
+        socket.once('unexpected-response', (request, response) => {
+          clearTimeout(timeout);
+          response.resume();
+          request.destroy();
+          resolve(response.statusCode);
+        });
         socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'hello', clientId: 'docker-smoke', clientType: 'cli', protocolVersion: 1 })));
         socket.addEventListener('message', event => {
           const message = JSON.parse(event.data);
@@ -134,10 +143,17 @@ function assertDaemonSocket(name) {
           }
         });
         socket.addEventListener('close', event => { clearTimeout(timeout); resolve(event.code); });
-        socket.addEventListener('error', () => { clearTimeout(timeout); reject(Error('daemon WebSocket failed')); });
+        socket.addEventListener('error', event => { clearTimeout(timeout); reject(event.error); });
       });
     }
-    assert.equal(await connect(), 4401, 'daemon hello rejects missing credentials');
+    // HTTP health can be available while the WebSocket listener is starting.
+    const deadline = Date.now() + 30_000;
+    let anonymous = await connect();
+    while (anonymous === 503 && Date.now() < deadline) {
+      await delay(100);
+      anonymous = await connect();
+    }
+    assert.equal(anonymous, 4401, 'daemon hello rejects missing credentials');
     assert.equal(await connect('clisbot.bearer.wrong-password'), 4401, 'daemon rejects wrong password');
     assert.equal(await connect('clisbot.bearer.isolated-container-test'), 'server_info', 'daemon admits its password');
   `,
