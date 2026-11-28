@@ -215,9 +215,10 @@ test.describe("Settings sidebar scroll position", () => {
         "providers",
       ] as const) {
         await openSettingsHostSection(page, getServerId(), section);
-        await expect(page.getByTestId("page-title")).toHaveText(
-          section === "providers" ? "Providers" : "Terminals",
-        );
+        const heading = section === "providers" ? "Providers" : "Terminals";
+        await expect(
+          page.getByTestId("settings-detail-pane").getByText(heading, { exact: true }).first(),
+        ).toBeVisible();
         await expectSettingsSidebarScrollOffset(page, hostScrollTop);
       }
 
