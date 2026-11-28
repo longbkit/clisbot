@@ -474,6 +474,7 @@ test("editing a queued draft restores its original height in the compact compose
     const draft = "Please review the latest changes.\nPlease review the latest changes.";
     await fillComposerDraft(page, draft);
     const originalHeight = await composerHeight(page);
+    const originalWidth = await composerLocator(page).evaluate((el) => el.clientWidth);
     await queueComposerWithButton(page);
     await expect(composerLocator(page)).toHaveValue("");
     await composerLocator(page).blur();
@@ -483,6 +484,14 @@ test("editing a queued draft restores its original height in the compact compose
     await page.getByTestId("queue-row-more").click();
     await page.getByTestId("queue-row-edit").click();
     await expect(composerLocator(page)).toHaveValue(draft);
+    await expect(
+      page.getByTestId("composer-send-button").filter({ visible: true }),
+    ).toHaveAccessibleName("Save changes");
+    if (CHAT_LAYOUT) {
+      await expect
+        .poll(() => composerLocator(page).evaluate((el) => el.clientWidth))
+        .toBe(originalWidth);
+    }
     await expectComposerHeight(page, originalHeight);
   } finally {
     await agent.cleanup();

@@ -52,7 +52,16 @@ import {
   composerToolbarOverhang,
   resolveComposerLeadingEdge,
 } from "@/composer/input/toolbar-rails";
-import { ArrowUp, Mic, MicOff, CornerDownLeft, Paperclip, Plus, Square } from "lucide-react-native";
+import {
+  ArrowUp,
+  Check,
+  Mic,
+  MicOff,
+  CornerDownLeft,
+  Paperclip,
+  Plus,
+  Square,
+} from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useDictation } from "@/hooks/use-dictation";
 import { hasFinePointer } from "@/hooks/pointer-capabilities";
@@ -146,6 +155,8 @@ function resolveSendKeys(sendShortcut: SendShortcut): ShortcutKey[][] {
 }
 const COMPOSER_INPUT_DATASET = { composerInput: "" } as const;
 
+type SubmitIcon = "arrow" | "return" | "check";
+
 export interface AttachmentMenuItem {
   id: string;
   label: string;
@@ -182,7 +193,7 @@ export interface MessageInputProps {
   submitButtonAccessibilityLabel?: string;
   /** Optional testID for the primary submit button. */
   submitButtonTestID?: string;
-  submitIcon?: "arrow" | "return";
+  submitIcon?: SubmitIcon;
   isSubmitDisabled?: boolean;
   isSubmitLoading?: boolean;
   /** When true, keep the grown input height after submit (text is preserved, not cleared). */
@@ -472,7 +483,7 @@ function SendButtonContent({
   glyph,
 }: {
   isSubmitLoading: boolean;
-  submitIcon: "arrow" | "return";
+  submitIcon: SubmitIcon;
   submitLabel: string | undefined;
   glyph: ToolbarGlyph;
 }) {
@@ -482,17 +493,9 @@ function SendButtonContent({
   if (submitLabel) {
     return <Text style={styles.sendButtonLabel}>{submitLabel}</Text>;
   }
-  if (submitIcon === "return") {
-    return (
-      <ThemedCornerDownLeft
-        size={glyph.size}
-        strokeWidth={glyph.strokeWidth}
-        uniProps={iconAccentForegroundMapping}
-      />
-    );
-  }
+  const Icon = submitIcons[submitIcon];
   return (
-    <ThemedArrowUp
+    <Icon
       size={glyph.size}
       strokeWidth={glyph.strokeWidth}
       uniProps={iconAccentForegroundMapping}
@@ -954,7 +957,7 @@ function SendButtonTooltip({
   submitAccessibilityHint: string | undefined;
   sendButtonCombinedStyle: React.ComponentProps<typeof TooltipTrigger>["style"];
   isSubmitLoading: boolean;
-  submitIcon: "arrow" | "return";
+  submitIcon: SubmitIcon;
   submitLabel: string | undefined;
   submitButtonTestID: string | undefined;
   glyph: ToolbarGlyph;
@@ -1268,7 +1271,7 @@ interface ResolvedMessageInputProps {
   allowEmptySubmit: boolean;
   submitButtonAccessibilityLabel: string | undefined;
   submitButtonTestID: string | undefined;
-  submitIcon: "arrow" | "return";
+  submitIcon: SubmitIcon;
   isSubmitDisabled: boolean;
   isSubmitLoading: boolean;
   preserveHeightOnSubmit: boolean;
@@ -2932,7 +2935,11 @@ const ThemedPaperclip = withUnistyles(Paperclip);
 const ThemedMic = withUnistyles(Mic);
 const ThemedMicOff = withUnistyles(MicOff);
 const ThemedArrowUp = withUnistyles(ArrowUp);
-const ThemedCornerDownLeft = withUnistyles(CornerDownLeft);
+const submitIcons = {
+  arrow: ThemedArrowUp,
+  return: withUnistyles(CornerDownLeft),
+  check: withUnistyles(Check),
+};
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 
 const iconForegroundMapping = (theme: Theme) => ({ color: theme.colors.foreground });
