@@ -1458,6 +1458,23 @@ function createToolCatalog(
           .min(1)
           .optional()
           .describe("Forge for checkout-pr mode. Defaults to the source checkout."),
+        sparse: z
+          .object({
+            paths: z
+              .array(z.string().trim().min(1))
+              .min(1)
+              .describe(
+                "Repo-relative directories or files to check out. Each must exist at the start point.",
+              ),
+            includeRootFiles: z
+              .boolean()
+              .optional()
+              .describe("Also check out the files in the repository root. Defaults to true."),
+          })
+          .optional()
+          .describe(
+            "Worktree only. Check out only these paths instead of the whole repository (git sparse checkout). Omit for a full checkout.",
+          ),
       },
       outputSchema: WorkspaceAutomationSummarySchema.shape,
     },
@@ -1474,6 +1491,7 @@ function createToolCatalog(
       branch,
       prNumber,
       forge,
+      sparse,
     }) => {
       let workspace: PersistedWorkspaceRecord;
       if (isolation === "local") {
@@ -1490,6 +1508,7 @@ function createToolCatalog(
             ["branch", branch],
             ["prNumber", prNumber],
             ["forge", forge],
+            ["sparse", sparse],
           ],
           "Worktree options require isolation worktree",
         );
@@ -1529,6 +1548,7 @@ function createToolCatalog(
             ...(projectId ? { projectId } : {}),
             ...(worktreeSlug ? { worktreeSlug } : {}),
             ...worktreeTarget,
+            ...(sparse ? { sparse } : {}),
             ...(title ? { title } : {}),
             background,
             callerWorkspaceId: resolveCallerAgent()?.workspaceId,

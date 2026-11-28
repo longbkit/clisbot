@@ -2677,6 +2677,7 @@ describe("create_agent MCP tool", () => {
       mode: "checkout-branch",
       branch: "existing-work",
       worktreeSlug: "existing-work-copy",
+      sparse: { paths: ["apps/web", "libs/shared/index.ts"], includeRootFiles: false },
     });
     await invokeToolWithParsedInput(tool, {
       isolation: "worktree",
@@ -2698,8 +2699,10 @@ describe("create_agent MCP tool", () => {
         action: "checkout",
         refName: "existing-work",
         worktreeSlug: "existing-work-copy",
+        sparse: { paths: ["apps/web", "libs/shared/index.ts"], includeRootFiles: false },
       }),
     );
+    expect(createClisbotWorktree.mock.calls[1]![0]).not.toHaveProperty("sparse");
     expect(createClisbotWorktree).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
@@ -2721,6 +2724,25 @@ describe("create_agent MCP tool", () => {
         },
       }),
     );
+  });
+
+  it("refuses a sparse checkout for a local workspace", async () => {
+    const { agentManager, agentStorage } = createTestDeps();
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      createDirectoryWorkspace: vi.fn(),
+      logger,
+    });
+
+    await expect(
+      invokeToolWithParsedInput(registeredTool(server, "create_workspace"), {
+        isolation: "local",
+        path: realpathSync.native(tmpdir()),
+        sparse: { paths: ["apps/web"] },
+      }),
+    ).rejects.toThrow("Worktree options require isolation worktree");
   });
 
   it("archives a worktree-isolated workspace by workspace id", async () => {

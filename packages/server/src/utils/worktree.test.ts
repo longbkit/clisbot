@@ -25,6 +25,7 @@ import { join } from "path";
 import { createServer, type AddressInfo, type Socket } from "net";
 import { tmpdir } from "os";
 import { createRealpathAwarePathMatcher } from "./path";
+import type { SparseCheckoutRequest } from "./sparse-worktree";
 
 interface LegacyCreateWorktreeTestOptions {
   branchName: string;
@@ -342,6 +343,125 @@ describe("clisbot worktree manager", () => {
     });
 
     expect(existsSync(created.worktreePath)).toBe(false);
+  });
+
+  describe("sparse checkout", () => {
+    function git(args: string[], cwd: string): string {
+      return execFileSync("git", ["-c", "commit.gpgsign=false", ...args], {
+        cwd,
+        encoding: "utf8",
+      }).trim();
+    }
+
+    function commitMonorepo(): void {
+      for (const file of [
+        "apps/web/page.ts",
+        "apps/admin/page.ts",
+        "libs/shared/index.ts",
+        "libs/shared/README.md",
+        "libs/other/index.ts",
+      ]) {
+        mkdirSync(join(repoDir, file, ".."), { recursive: true });
+        writeFileSync(join(repoDir, file), `${file}\n`);
+      }
+      git(["add", "."], repoDir);
+      git(["commit", "-q", "-m", "monorepo"], repoDir);
+    }
+
+    function branchOff(branchName: string, sparse: SparseCheckoutRequest): Promise<WorktreeConfig> {
+      return createWorktreePrimitive({
+        cwd: repoDir,
+        worktreeSlug: branchName,
+        source: { kind: "branch-off", baseBranch: "main", branchName },
+        clisbotHome,
+        sparse,
+      });
+    }
+
+    function checkedOutFiles(worktreePath: string): string[] {
+      return git(["ls-files", "-t"], worktreePath)
+        .split("\n")
+        .filter((line) => line.startsWith("H "))
+        .map((line) => line.slice(2))
+        .filter((file) => existsSync(join(worktreePath, file)))
+        .sort();
+    }
+
+    it("checks out only the requested directories and the root files", async () => {
+      commitMonorepo();
+
+      const created = await branchOff("web-only", { paths: ["apps/web/", "./libs/shared"] });
+
+      expect(checkedOutFiles(created.worktreePath)).toEqual([
+        "apps/web/page.ts",
+        "file.txt",
+        "libs/shared/README.md",
+        "libs/shared/index.ts",
+      ]);
+      expect(git(["status", "--porcelain"], created.worktreePath)).toBe("");
+      expect(git(["branch", "--show-current"], created.worktreePath)).toBe("web-only");
+      // Directories alone use git's cone mode.
+      expect(git(["config", "--worktree", "core.sparseCheckoutCone"], created.worktreePath)).toBe(
+        "true",
+      );
+      // The source checkout stays a full checkout.
+      expect(existsSync(join(repoDir, "apps/admin/page.ts"))).toBe(true);
+    });
+
+    it("checks out single files beside directories", async () => {
+      commitMonorepo();
+
+      const created = await branchOff("with-files", {
+        paths: ["apps/web", "libs/shared/index.ts"],
+      });
+
+      expect(checkedOutFiles(created.worktreePath)).toEqual([
+        "apps/web/page.ts",
+        "file.txt",
+        "libs/shared/index.ts",
+      ]);
+      expect(git(["status", "--porcelain"], created.worktreePath)).toBe("");
+    });
+
+    it("leaves the root files out when asked", async () => {
+      commitMonorepo();
+
+      const created = await branchOff("no-root", {
+        paths: ["libs/shared"],
+        includeRootFiles: false,
+      });
+
+      expect(checkedOutFiles(created.worktreePath)).toEqual([
+        "libs/shared/README.md",
+        "libs/shared/index.ts",
+      ]);
+      expect(git(["status", "--porcelain"], created.worktreePath)).toBe("");
+    });
+
+    it.each([
+      { path: "/etc", reason: "absolute" },
+      { path: "../outside", reason: "escapes the checkout" },
+      { path: "apps/../..", reason: "escapes the checkout" },
+      { path: " ", reason: "empty" },
+    ])("refuses a $reason path before creating anything", async ({ path }) => {
+      commitMonorepo();
+
+      await expect(branchOff("refused", { paths: [path] })).rejects.toThrow(/Sparse path/);
+
+      expect(git(["branch", "--list", "refused"], repoDir)).toBe("");
+      expect(git(["worktree", "list", "--porcelain"], repoDir)).not.toContain("refused");
+    });
+
+    it("refuses a path that does not exist at the start point", async () => {
+      commitMonorepo();
+
+      await expect(branchOff("missing-path", { paths: ["apps/mobile"] })).rejects.toThrow(
+        /^Sparse path does not exist in \S*main: apps\/mobile$/,
+      );
+
+      expect(git(["branch", "--list", "missing-path"], repoDir)).toBe("");
+      expect(git(["worktree", "list", "--porcelain"], repoDir)).not.toContain("missing-path");
+    });
   });
 
   describe("branch-off from a remote-tracking base", () => {

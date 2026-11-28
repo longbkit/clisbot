@@ -32,6 +32,13 @@ import {
   writeClisbotWorktreeRuntimeMetadata,
 } from "./worktree-metadata.js";
 import { runGitCommand } from "./run-git-command.js";
+import {
+  checkOutSparseWorktree,
+  normalizeSparseCheckout,
+  planSparseCheckout,
+  type SparseCheckoutRequest,
+  worktreeStartPoint,
+} from "./sparse-worktree.js";
 import { getCurrentBranch, resolveRepositoryDefaultBranch } from "./checkout-git.js";
 import { spawnProcess } from "./spawn.js";
 import { resolveClisbotHome } from "../server/clisbot-home.js";
@@ -212,6 +219,8 @@ export interface CreateWorktreeOptions {
   source: WorktreeSource;
   clisbotHome?: string;
   worktreesRoot?: string;
+  /** Check out only these paths instead of the whole repository. Omit for a full checkout. */
+  sparse?: SparseCheckoutRequest;
 }
 
 export class BranchAlreadyCheckedOutError extends Error {
@@ -1204,8 +1213,17 @@ export const createWorktree = async ({
   worktreeSlug,
   clisbotHome,
   worktreesRoot,
+  sparse,
 }: CreateWorktreeOptions): Promise<CreatedWorktree> => {
+  const normalizedSparse = sparse ? normalizeSparseCheckout(sparse) : null;
   const sourcePlan = await resolveWorktreeSourcePlan({ cwd, source, desiredSlug: worktreeSlug });
+  const sparsePlan = normalizedSparse
+    ? await planSparseCheckout({
+        cwd,
+        startPoint: worktreeStartPoint(sourcePlan.addArguments),
+        sparse: normalizedSparse,
+      })
+    : null;
   let worktreePath = join(
     await getClisbotWorktreesRoot(cwd, clisbotHome, worktreesRoot),
     worktreeSlug,
@@ -1221,11 +1239,15 @@ export const createWorktree = async ({
   }
 
   // Primitive owner for `git worktree add`; callers route through createWorktreeCore.
-  await runGitCommand(["worktree", "add", finalWorktreePath, ...sourcePlan.addArguments], {
-    cwd,
-    timeout: 120_000,
-  });
+  const checkoutArguments = sparsePlan ? ["--no-checkout"] : [];
+  await runGitCommand(
+    ["worktree", "add", ...checkoutArguments, finalWorktreePath, ...sourcePlan.addArguments],
+    { cwd, timeout: 120_000 },
+  );
   worktreePath = normalizePathForOwnership(finalWorktreePath);
+  if (sparsePlan) {
+    await checkOutSparseWorktree({ repoCwd: cwd, worktreePath, plan: sparsePlan });
+  }
 
   if (sourcePlan.pushRemote) {
     await configureWorktreePushRemote({
