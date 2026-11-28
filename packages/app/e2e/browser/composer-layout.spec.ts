@@ -91,6 +91,16 @@ async function box(target: Locator) {
   return value;
 }
 
+function measureCommandList(element: Element) {
+  const list = element.getBoundingClientRect();
+  const rows = element.querySelectorAll('[data-testid="composer-command-name"]');
+  const fullyVisible = Array.from(rows).filter((row) => {
+    const rect = row.getBoundingClientRect();
+    return rect.height > 0 && rect.top >= list.top && rect.bottom <= list.bottom;
+  }).length;
+  return { top: list.top, bottom: list.bottom, fullyVisible };
+}
+
 async function expectInside(inner: Locator, outer: Locator) {
   const a = await box(inner);
   const b = await box(outer);
@@ -411,22 +421,18 @@ test.describe("Navigation V2 Home", () => {
     await chip.click();
     const popover = page.getByTestId("composer-autocomplete-popover");
     const names = popover.getByTestId("composer-command-name");
-    await expect(names.first()).toBeVisible({ timeout: 30_000 });
-    const listBox = await box(popover);
-    const composerBox = await box(visible(page, "composer-pill"));
-    // Home's composer sits near the top, so the list opens under it, inside the screen.
-    expect(listBox.y).toBeGreaterThan(composerBox.y + composerBox.height);
-    expect(listBox.y + listBox.height).toBeLessThanOrEqual(844);
-    let fullyVisible = 0;
-    for (const name of await names.all()) {
-      const rect = await name.boundingBox();
-      if (rect && rect.y >= listBox.y && rect.y + rect.height <= listBox.y + listBox.height) {
-        fullyVisible += 1;
-      }
-    }
-    expect(fullyVisible).toBeGreaterThanOrEqual(5);
-    // The first command, nearest the composer, is the one Enter picks; the command reads whole.
-    await expect(names.first()).toHaveText("/10-bms-qc-review-testcase-testdesign-label");
+    await expect(names.first()).toHaveText("/10-bms-qc-review-testcase-testdesign-label", {
+      timeout: 30_000,
+    });
+    // The portal can remount as Home resolves the command catalog. Measure the visible list
+    // and its rows together before interacting with the command nearest the composer.
+    await expect(async () => {
+      const composerBox = await box(visible(page, "composer-pill"));
+      const layout = await popover.evaluate(measureCommandList);
+      expect(layout.top).toBeGreaterThan(composerBox.y + composerBox.height);
+      expect(layout.bottom).toBeLessThanOrEqual(844);
+      expect(layout.fullyVisible).toBeGreaterThanOrEqual(5);
+    }).toPass({ timeout: 10_000 });
     await page.screenshot({
       path: path.resolve(
         process.cwd(),
