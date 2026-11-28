@@ -1,3 +1,8 @@
+import { useKeyboardToggle } from "@/hooks/use-keyboard-toggle";
+import {
+  useModelPickerShortcut,
+  useEffortCycleShortcut,
+} from "@/composer/agent-controls/control-items";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Keyboard, View } from "react-native";
@@ -140,6 +145,15 @@ export function ComposerPickerControls(props: ComposerPickerControlsProps) {
   // Under the chat layout's pill the panel opens above the whole composer, never over its text.
   const panelAnchorRef = useComposerFrameAnchor(anchorRef);
   const [open, setOpen] = useState(false);
+  const { action: modelShortcut } = useModelPickerShortcut(props.disabled);
+  useEffortCycleShortcut(
+    {
+      options: props.thinkingOptions,
+      selectedId: props.selectedThinkingOptionId,
+      onSelect: props.onSelectThinking,
+    },
+    props.disabled,
+  );
   const fullAutoAcceptSupported = useHostFeature(props.serverId, "fullAutoAccept");
   const labels = useChipLabels(props);
   const { onOpen, onClose } = props;
@@ -157,6 +171,16 @@ export function ComposerPickerControls(props: ComposerPickerControlsProps) {
     [onClose, onOpen],
   );
   const toggle = useCallback(() => handleOpenChange(!open), [handleOpenChange, open]);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const onSearchFocus = useCallback(() => setSearchFocused(true), []);
+  const onSearchBlur = useCallback(() => setSearchFocused(false), []);
+  useKeyboardToggle({
+    action: modelShortcut,
+    disabled: props.disabled,
+    open,
+    searchFocused,
+    onToggle: toggle,
+  });
   // The profile editor and Host settings are surfaces of their own; they open once the panel
   // has closed.
   const close = useCallback(() => handleOpenChange(false), [handleOpenChange]);
@@ -203,6 +227,8 @@ export function ComposerPickerControls(props: ComposerPickerControlsProps) {
         />
       ) : null}
       <ModelPicker
+        onSearchFocus={onSearchFocus}
+        onSearchBlur={onSearchBlur}
         open={open}
         onOpenChange={handleOpenChange}
         anchorRef={panelAnchorRef}

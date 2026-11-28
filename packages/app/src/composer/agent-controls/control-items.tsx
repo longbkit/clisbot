@@ -97,7 +97,10 @@ export function useModelPickerShortcut(disabled: boolean) {
   return { action, keys };
 }
 
-export function useEffortCycleShortcut(thinking: ThinkingControl | null, disabled: boolean) {
+export function useEffortCycleShortcut(
+  thinking: Pick<ThinkingControl, "options" | "selectedId" | "onSelect"> | null,
+  disabled: boolean,
+) {
   const { isActiveComposer } = useComposerKeyboardScope();
   const input = useComposerInput();
   const effortHandlerId = useId();

@@ -395,9 +395,7 @@ test.describe("Composer toolbar rails on touch", () => {
 test.describe("Composer trailing disc on a new chat", () => {
   test.use({ isMobile: true, hasTouch: true, viewport: { width: 1024, height: 1366 } });
 
-  test("an empty draft holds a disabled send disc until there is something to send", async ({
-    page,
-  }) => {
+  test("an empty draft only enables Send after text is entered", async ({ page }) => {
     const workspace = await seedWorkspace({ repoPrefix: "composer-placeholder-send-" });
     try {
       await gotoWorkspace(page, workspace.workspaceId);
@@ -406,7 +404,17 @@ test.describe("Composer trailing disc on a new chat", () => {
         .getByTestId("message-input-root")
         .filter({ visible: true })
         .getByRole("button", { name: "Send message", exact: true });
-      await expect(send).toBeDisabled({ timeout: 30_000 });
+      if (COMBINED_PICKER) {
+        await expect(
+          page
+            .getByTestId("composer-circle")
+            .filter({ visible: true })
+            .getByRole("button", { name: "Start dictation" }),
+        ).toBeVisible();
+        await expect(send).toHaveCount(0);
+      } else {
+        await expect(send).toBeDisabled({ timeout: 30_000 });
+      }
       await fillComposerDraft(page, "Refactor the composer toolbar");
       await expect(send).toBeEnabled();
     } finally {
@@ -464,6 +472,20 @@ test.describe("Composer model and effort shortcuts", () => {
     try {
       await openAgentRoute(page, agent);
       await expectComposerVisible(page);
+      if (COMBINED_PICKER) {
+        const chip = composerModelChip(page);
+        await expect(chip).toHaveAccessibleName(/Ten second stream.*High/i);
+        await toggleModelPickerFromComposer(page);
+        await expect(page.getByTestId("composer-picker-search")).toBeFocused();
+        await page.keyboard.press(`${SHORTCUT_MOD}+Slash`);
+        await expect(composerPickerPanel(page)).toHaveCount(0);
+        for (const effort of ["Low", "Medium", "High"]) {
+          if (effort === "High") await page.setViewportSize({ width: 480, height: 844 });
+          await cycleComposerEffort(page);
+          await expect(chip).toHaveAccessibleName(new RegExp("Ten second stream.*" + effort, "i"));
+        }
+        return;
+      }
       await expect(thinkingControl(page, "High")).toBeVisible();
 
       await test.step("Focus model search without opening its tooltip", async () => {

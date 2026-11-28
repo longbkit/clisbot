@@ -43,6 +43,8 @@ const PANEL_WIDTH_EXPANDED = 760;
 function noop() {}
 
 export interface ModelPickerProps {
+  onSearchFocus?: () => void;
+  onSearchBlur?: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   anchorRef: RefObject<View | null>;
@@ -99,12 +101,14 @@ function NarrowChip(props: { name: string; onClear: () => void }) {
 }
 
 function useSearchHeader(input: {
+  onFocus?: () => void;
+  onBlur?: () => void;
   state: ModelPickerState;
   rail: ProviderRailControl;
   open: boolean;
   isCompact: boolean;
 }): SheetHeader {
-  const { state, open, isCompact } = input;
+  const { state, open, isCompact, onFocus, onBlur } = input;
   const { t } = useTranslation();
   const [openCount, setOpenCount] = useState(0);
   useEffect(() => {
@@ -121,6 +125,8 @@ function useSearchHeader(input: {
       title: t("composer.picker.title"),
       search: {
         onChange: setQuery,
+        onFocus,
+        onBlur,
         placeholder: t("composer.picker.searchPlaceholder"),
         autoFocus: isWeb && !isCompact,
         resetKey: `${openCount}:${searchResetKey}`,
@@ -128,7 +134,7 @@ function useSearchHeader(input: {
         trailing,
       },
     }),
-    [isCompact, openCount, searchResetKey, setQuery, t, trailing],
+    [isCompact, onFocus, onBlur, openCount, searchResetKey, setQuery, t, trailing],
   );
 }
 
@@ -228,7 +234,14 @@ export function ModelPicker(props: ModelPickerProps) {
     selectedModelId: props.selectedModelId,
     open: props.open,
   });
-  const header = useSearchHeader({ state, rail, open: props.open, isCompact: props.isCompact });
+  const header = useSearchHeader({
+    state,
+    rail,
+    open: props.open,
+    isCompact: props.isCompact,
+    onFocus: props.onSearchFocus,
+    onBlur: props.onSearchBlur,
+  });
   const footer = useMemo(() => <PanelFooter {...props} />, [props]);
   const { onPickModel } = props;
   const pick = useCallback(

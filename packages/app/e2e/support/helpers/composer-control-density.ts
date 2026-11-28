@@ -384,6 +384,28 @@ export async function readComposerToolbarRails(page: Page): Promise<ComposerTool
  * corner, as far from the right edge as from the bottom edge. Within half a pixel.
  */
 export async function expectComposerToolbarOnTextRails(page: Page): Promise<void> {
+  if (process.env.EXPO_PUBLIC_CLISBOT_COMPOSER_PICKER !== "0") {
+    const pill = page.getByTestId("composer-pill").filter({ visible: true });
+    const face = pill.getByTestId("composer-commands-face");
+    const circle = pill
+      .getByTestId("composer-circle")
+      .locator('[data-testid$="-face"]')
+      .filter({ visible: true })
+      .last();
+    await expect(circle).toBeVisible();
+    const [container, left, right] = await Promise.all([
+      pill.boundingBox(),
+      face.boundingBox(),
+      circle.boundingBox(),
+    ]);
+    if (!container || !left || !right)
+      throw new Error("The chat composer controls must be painted");
+    expect(
+      Math.abs(left.x - container.x - (container.x + container.width - right.x - right.width)),
+    ).toBeLessThan(1.5);
+    expect(Math.abs(left.y + left.height / 2 - right.y - right.height / 2)).toBeLessThan(1.5);
+    return;
+  }
   const rails = await readComposerToolbarRails(page);
   // A precision of 0 digits passes within half a pixel.
   expect(rails.inkLeft).toBeCloseTo(rails.textLeft, 0);
