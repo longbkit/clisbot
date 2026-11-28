@@ -1,3 +1,4 @@
+import { composerModelChip, composerPickerPanel } from "../support/helpers/composer-picker";
 import { createMockIdleAgent } from "../support/helpers/archive-tab";
 import { openMobileAgentSidebar } from "../support/helpers/sidebar";
 import { writeFile } from "node:fs/promises";
@@ -266,8 +267,8 @@ test.describe("Settings sidebar navigation", () => {
     await gotoWorkspace(page, workspace.workspaceId);
     await clickNewChat(page);
 
-    const selector = page.getByTestId("combined-model-selector").filter({ visible: true });
-    const popover = page.getByTestId("combobox-desktop-container");
+    const selector = composerModelChip(page);
+    const popover = composerPickerPanel(page);
     await selector.click();
     await expect(popover).toBeVisible();
 
@@ -300,8 +301,8 @@ test.describe("Settings sidebar navigation", () => {
         agentId: workspace.agentId,
       });
 
-      const selector = page.getByTestId("combined-model-selector").filter({ visible: true });
-      const popover = page.getByTestId("combobox-desktop-container");
+      const selector = composerModelChip(page);
+      const popover = composerPickerPanel(page);
       await selector.click();
       await expect(popover).toBeVisible();
 

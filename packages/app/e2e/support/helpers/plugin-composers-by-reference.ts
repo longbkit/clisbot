@@ -146,7 +146,7 @@ export async function withComposerToolsExample(
         }),
       insertChecklistFromControlsSheet: () =>
         test.step("press the Action in the composer's controls sheet", async () => {
-          await page.getByRole("button", { name: /^Select model/ }).click();
+          await page.getByRole("button", { name: "Open agent features" }).click();
           await page.getByText("Insert checklist", { exact: true }).click();
         }),
       expectComposerReadyToType: (text) =>

@@ -42,11 +42,14 @@ export async function expectStandaloneSidebarHostSettingsButton(page: Page) {
 }
 
 export async function activateSidebarHostSettingsWithKeyboard(page: Page) {
-  const host = page.getByRole("button", { name: TEST_HOST_LABEL, exact: true });
-  await expect(host).toBeFocused();
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("Tab");
-  await expect(sidebarHostSettingsButton(page)).toBeFocused();
+  const gear = sidebarHostSettingsButton(page);
+  await expect(gear).toBeVisible();
+  // Search and the Host rows precede the per-Host action in the picker tab order.
+  for (let tab = 0; tab < 8; tab++) {
+    if (await gear.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press("Tab");
+  }
+  await expect(gear).toBeFocused();
   await page.keyboard.press("Enter");
 }
 
