@@ -831,6 +831,12 @@ export interface ServiceProxySubsystem {
   upgradeHandler(options: {
     passthroughUnknown: boolean;
   }): (req: IncomingMessage, socket: net.Socket, head: Buffer) => void;
+  /**
+   * True when the upgrade targets a registered service route, so the proxy owns
+   * the socket and no other upgrade listener (the daemon `/ws` server) may
+   * touch it.
+   */
+  handlesUpgrade(req: IncomingMessage): boolean;
   startStandalone(options: {
     listenTarget: ServiceProxyListenTarget;
   }): Promise<ServiceProxyListenTarget>;
@@ -932,6 +938,10 @@ class NodeServiceProxySubsystem implements ServiceProxySubsystem {
       logger: this.logger,
       passthroughUnknown: options.passthroughUnknown,
     });
+  }
+
+  handlesUpgrade(req: IncomingMessage): boolean {
+    return this.routes.classifyHost(req.headers.host).type === "registered-service";
   }
 
   async startStandalone(options: {
