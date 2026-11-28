@@ -7,13 +7,12 @@ const describeHubE2E = process.env["RUN_HUB_E2E"] === "1" ? describe : describe.
 
 describeHubE2E("Hub provider attachment capability journey", () => {
   let hub: HubHarness;
+  let trigger: Awaited<ReturnType<HubHarness["installSlackMentionTrigger"]>>;
 
   beforeEach(async () => {
     hub = await HubHarness.start();
     await hub.connectDaemon();
-    const installed = await hub.installConfiguration({ yaml: hub.slackConfigurationYaml() });
-    if (installed.status !== 201)
-      throw new Error(`Slack config install failed: ${JSON.stringify(installed)}`);
+    trigger = await hub.installSlackMentionTrigger();
   }, 120_000);
 
   afterEach(async () => {
@@ -21,7 +20,7 @@ describeHubE2E("Hub provider attachment capability journey", () => {
   }, 120_000);
 
   it("dispatches Slack context and downloads the image from the materialized Hub URL", async () => {
-    const response = await hub.deliverSlackMention();
+    const response = await hub.deliverSlackMention(trigger);
     assert.equal(response.status, 200);
 
     const launch = await hub.waitForCreatedAgentLaunch();

@@ -5,7 +5,12 @@ import {
 } from "@clisbot/protocol/plugin-registry";
 import { languageAlternates, LOCALES, localizePath } from "~/i18n";
 import { SITE_ORIGIN } from "~/meta";
-import { CACHE_POLICIES, getBlockingColdCache, type WebsiteCacheContext } from "../github-cache";
+import {
+  CACHE_POLICIES,
+  getBlockingColdCache,
+  getNonBlockingColdCache,
+  type WebsiteCacheContext,
+} from "../github-cache";
 import { handlePluginThumbnailRequest } from "./thumbnails";
 import { CATEGORIES } from "./categories";
 import {
@@ -25,15 +30,30 @@ async function documentAt(base: string, path: string): Promise<unknown> {
   if (!response.ok) throw new Error(`Plugin registry returned ${response.status}`);
   return response.json();
 }
-export function loadRegistryIndex(base: string, context: WebsiteCacheContext) {
-  return getBlockingColdCache({
+function registryIndexCache(base: string, context: WebsiteCacheContext) {
+  return {
     context,
     key: `plugins:index:v1:${base}`,
     policy: CACHE_POLICIES.pluginIndex,
-    isValue: (value): value is ReturnType<typeof PluginRegistryIndexSchema.parse> =>
+    isValue: (value: unknown): value is ReturnType<typeof PluginRegistryIndexSchema.parse> =>
       PluginRegistryIndexSchema.safeParse(value).success,
     fetchFresh: async () => PluginRegistryIndexSchema.parse(await documentAt(base, "index.json")),
-  });
+  };
+}
+export function loadRegistryIndex(base: string, context: WebsiteCacheContext) {
+  return getBlockingColdCache(registryIndexCache(base, context));
+}
+/** Count of listed plugins from the cached registry index. */
+export async function loadPluginCount(
+  base: string,
+  context: WebsiteCacheContext,
+): Promise<number | null> {
+  try {
+    const index = await getNonBlockingColdCache(registryIndexCache(base, context));
+    return index?.plugins.length ?? null;
+  } catch {
+    return null;
+  }
 }
 /** The aggregate cache is shared by browse pages and the registry build API. */
 export async function loadInstallCounts(

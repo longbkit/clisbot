@@ -5,6 +5,10 @@ import { rebrandHubDocs } from "./hub-docs.mjs";
 const upstreamPost = /^(?:hello-world|i-was-wrong-about-electron)(?:\.[A-Za-z0-9-]+)?\.md$/;
 const postsRoot = "packages/website/posts/";
 const hostedHubDoc = /^public-docs\/hub\/hosted(?:\.[A-Za-z0-9-]+)?\.md$/;
+// Reviewed v0.17.4: getpaseo/hub features the bundled Clisbot Hub does not implement (Integration
+// tools, webhook and schedule triggers). Every locale is archived; docs.ts redirects the routes.
+const unsupportedHubDoc =
+  /^public-docs\/hub\/(?:tools|triggers\/(?:webhooks|schedules))(?:\.[A-Za-z0-9-]+)?\.md$/;
 
 // Reviewed v0.13.0 translations describe upstream contracts, not these fork-owned guides.
 // Exact zh-CN paths only: new pages/locales still require individual publication review.
@@ -24,10 +28,16 @@ const divergentChineseDocs = new Set([
   "public-docs/hub/activity.zh-CN.md",
   "public-docs/hub/faq.zh-CN.md",
   "public-docs/hub/security.zh-CN.md",
+  // Reviewed v0.17.4: these translations teach getpaseo/hub-only fields, another API or a
+  // standalone Hub dashboard. Clisbot keeps its own api.zh-CN translation.
+  "public-docs/hub/api.zh-CN.md",
+  "public-docs/hub/triggers/index.zh-CN.md",
+  "public-docs/hub/configuration/reference.zh-CN.md",
+  "public-docs/hub/self-hosting/index.zh-CN.md",
 ]);
 
 export function publicationPath(path) {
-  if (hostedHubDoc.test(path) || divergentChineseDocs.has(path)) {
+  if (hostedHubDoc.test(path) || unsupportedHubDoc.test(path) || divergentChineseDocs.has(path)) {
     return `docs/audits/upstream-public-docs/${path.slice("public-docs/".length)}`;
   }
   const name = path.slice(postsRoot.length);
@@ -43,6 +53,7 @@ export function rebrandPublication(path, input, { repoSlug, original = input, si
   }
   if (path.startsWith("packages/hub/")) return rebrandHub(path, input, repoSlug);
   if (hostedHubDoc.test(path)) return archiveHostedHubDoc(original);
+  if (unsupportedHubDoc.test(path)) return archiveUnsupportedHubDoc(path, original);
   if (divergentChineseDocs.has(path)) return archiveDivergentDoc(path, original);
   input = rebrandHubDocs(path, input, siteHost);
   if (publicationPath(path) !== path) return archivePost(input);
@@ -133,6 +144,13 @@ function archiveHostedHubDoc(input) {
   if (!frontmatter) throw new Error("Review upstream Hosted Hub frontmatter before archiving");
   const notice =
     "Archived upstream Hosted Hub documentation from [getpaseo/paseo](https://github.com/getpaseo/paseo). Describes Paseo’s service, not a Clisbot-operated service. Excluded from clisbot.com/docs; Clisbot removed its Hosted Hub page in commit `7e68c03e28dea323adc3c52356cea0d2698313c1`.";
+  return input.replace(frontmatter[0], `${frontmatter[0]}\n> ${notice}\n`);
+}
+
+function archiveUnsupportedHubDoc(path, input) {
+  const frontmatter = input.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
+  if (!frontmatter) throw new Error(`Review upstream Hub feature guide before archiving: ${path}`);
+  const notice = `Archived upstream documentation from [getpaseo/paseo](https://github.com/getpaseo/paseo), source \`${path}\`. Describes a getpaseo/hub feature that the bundled Clisbot Hub (\`packages/hub\`) does not implement. Excluded from clisbot.com/docs; see \`docs/audits/upstream-public-docs/README.md\`.`;
   return input.replace(frontmatter[0], `${frontmatter[0]}\n> ${notice}\n`);
 }
 

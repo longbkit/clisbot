@@ -2,9 +2,11 @@ import type { Locator } from "@playwright/test";
 import { expect, test, type Page } from "../support/fixtures";
 import { expectAgentIdle, expectAgentReadyToInterrupt } from "../support/helpers/agent-stream";
 import {
+  blurComposerInput,
   cancelAgent,
   fillComposerDraft,
   expectComposerDraft,
+  expectComposerNotFocused,
   expectComposerVisible,
   submitMessage,
 } from "../support/helpers/composer";
@@ -63,6 +65,7 @@ test.describe("Agent message rewind", () => {
         minDistanceFromBottom: 300,
       });
       await fillComposerDraft(page, preservedDraft);
+      await blurComposerInput(page);
       rewindCompletion.clearTimelineStreamCount();
 
       const rewind = rewindConversation(page, userMessage, rewoundPrompt);
@@ -76,6 +79,7 @@ test.describe("Agent message rewind", () => {
         0,
       );
       await expectComposerDraft(page, preservedDraft);
+      await expectComposerNotFocused(page);
       await expectNearBottom(page);
     } finally {
       await agent.cleanup();

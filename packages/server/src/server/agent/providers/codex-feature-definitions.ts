@@ -1,4 +1,4 @@
-import type { AgentFeature } from "../agent-sdk-types.js";
+import type { AgentOptionControl } from "../agent-sdk-types.js";
 
 import { z } from "zod";
 
@@ -9,37 +9,54 @@ export const CodexServiceTierSchema = z.object({
 });
 export type CodexServiceTier = z.infer<typeof CodexServiceTierSchema>;
 
-function buildCodexSpeedFeature(tiers: CodexServiceTier[], value: string): AgentFeature[] {
+// Newer Codex versions accept Flex as a request option without advertising it per model.
+const CODEX_FLEX_SERVICE_TIER: CodexServiceTier = {
+  id: "flex",
+  name: "Flex",
+  description: "Slower processing, reduced usage",
+};
+
+export function codexSpeedTiers(
+  catalogTiers: CodexServiceTier[],
+  supportsUnadvertisedFlex: boolean,
+): CodexServiceTier[] {
+  if (
+    !supportsUnadvertisedFlex ||
+    catalogTiers.some((tier) => tier.id === CODEX_FLEX_SERVICE_TIER.id)
+  ) {
+    return catalogTiers;
+  }
+  return [CODEX_FLEX_SERVICE_TIER, ...catalogTiers];
+}
+
+function buildCodexSpeedControl(tiers: CodexServiceTier[]): AgentOptionControl[] {
   if (tiers.length === 0) return [];
   return [
     {
       type: "select",
-      id: "service_tier",
+      key: "service_tier",
       label: "Speed",
       description: "Choose processing speed. Faster tiers increase usage.",
       tooltip: "Select speed",
       icon: "zap",
       desktopTrigger: "icon",
-      value,
-      options: [
-        { id: "default", label: "Normal", isDefault: true },
-        ...tiers.map((tier) => ({ id: tier.id, label: tier.name })),
+      defaultValue: "default",
+      choices: [
+        { value: "default", label: "Normal" },
+        ...tiers.map((tier) => ({ value: tier.id, label: tier.name })),
       ],
     },
   ];
 }
 
-// Plan is a Codex mode, not a feature; see CODEX_PLAN_MODE in codex-app-server-agent.ts.
-export function buildCodexFeatures(input: {
+// Plan is a Codex mode, not a control; see CODEX_PLAN_MODE in codex-app-server-agent.ts.
+export function buildCodexControls(input: {
   serviceTiers: CodexServiceTier[];
-  serviceTier: string;
-}): AgentFeature[] {
-  return buildCodexSpeedFeature(input.serviceTiers, input.serviceTier);
+}): AgentOptionControl[] {
+  return buildCodexSpeedControl(input.serviceTiers);
 }
 
-export function readCodexServiceTier(values: Record<string, unknown> | undefined): string | null {
-  const tier = values?.service_tier;
-  if (typeof tier === "string") return tier;
-  // COMPAT(codexFastPreference): added in v0.10.0, remove after 2027-03-29 once saved Fast preferences have migrated.
-  return values?.fast_mode ? "fast" : null;
+export function readCodexServiceTier(options: Record<string, unknown> | undefined): string | null {
+  const tier = options?.service_tier;
+  return typeof tier === "string" ? tier : null;
 }

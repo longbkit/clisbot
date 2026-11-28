@@ -15,12 +15,19 @@ function installed(): InstalledPlugin {
     queryClient: new QueryClient(),
     clisbot: {} as InstalledPlugin["clisbot"],
     invoke: async () => undefined,
+    subscribe: () => {
+      throw new Error("Subscriptions are not used here");
+    },
     cleanup: () => {},
     settingsScreens: [],
     surfaces: [],
+    sidebarViews: [],
     sidebarItems: { header: [], footer: [] },
     legacySidebarItems: [],
+    workspaceRowBadgeItems: [],
     filePanels: [],
+    composerItems: [],
+    newWorkspaceItems: [],
     workspacePanels: [
       {
         id: "details",

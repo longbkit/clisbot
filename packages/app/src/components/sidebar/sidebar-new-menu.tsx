@@ -13,7 +13,7 @@ import {
 import { Shortcut } from "@/components/ui/shortcut";
 import { buttonControlHeight, MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { useHasFinePointer } from "@/hooks/use-fine-pointer";
+import { usePointerCapabilities } from "@/hooks/pointer-capabilities";
 import { useHoverSafeZone } from "@/hooks/use-hover-safe-zone";
 import { useOpenNewWorkspace } from "@/hooks/use-open-new-workspace";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
@@ -47,7 +47,7 @@ export function SidebarNewMenu({
 }) {
   const { t } = useTranslation();
   const compact = useIsCompactFormFactor();
-  const finePointer = useHasFinePointer();
+  const { finePointer } = usePointerCapabilities();
   const touchTarget = compact || !finePointer;
   const showMobileAgent = usePanelStore((state) => state.showMobileAgent);
   const openWorkspace = useOpenNewWorkspace(compact ? showMobileAgent : undefined);

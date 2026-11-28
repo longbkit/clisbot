@@ -9,6 +9,7 @@ const withAndroidProfileable = require("./plugins/with-android-profileable");
 const withFdroidAutolinking = require("./plugins/with-fdroid-autolinking");
 const withPasteInput = require("./plugins/with-paste-input");
 const withAndroidScroll = require("./modules/clisbot-scroll/app.plugin");
+const withAndroidDisplayMetrics = require("./modules/clisbot-display-metrics/app.plugin");
 const { getNativeReleaseVersion } = require("./native-release-version");
 const appVariant = process.env.APP_VARIANT ?? "production";
 const isFdroidBuild = process.env.CLISBOT_FDROID_BUILD === "1";
@@ -141,7 +142,7 @@ export default {
     name: variant.name,
     slug: "clisbot",
     version: nativeReleaseVersion.appVersion,
-    orientation: "portrait",
+    orientation: "default",
     icon: "./assets/images/icon.png",
     scheme: "clisbot",
     userInterfaceStyle: "automatic",
@@ -189,6 +190,7 @@ export default {
       searchPaths: ["../../node_modules", "./node_modules"],
     },
     plugins: [
+      "./modules/clisbot-hardware-keyboard/app.plugin",
       splitWebRoutes
         ? ["expo-router", { asyncRoutes: { web: true, default: false } }]
         : "expo-router",
@@ -196,6 +198,7 @@ export default {
       "expo-web-browser",
       withPasteInput,
       withAndroidScroll,
+      withAndroidDisplayMetrics,
       [withAndroidAsyncStorageSize, 64],
       withAndroidBackKeepsTask,
       withAndroidHttpPerHost,

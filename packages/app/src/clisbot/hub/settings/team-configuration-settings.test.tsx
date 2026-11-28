@@ -72,6 +72,8 @@ vi.mock("../use-connection-continuation", () => ({
   useHubConnectionContinuation: () => ({ open: vi.fn(), dismiss: vi.fn(), pending: false }),
 }));
 vi.mock("../account-provider", () => ({ useHubAccount: () => hub }));
+// Upstream v0.17: owner setup opens the add-host flow's scan step instead of /pair-scan.
+vi.mock("@/hosts/add-host", () => ({ useAddHost: () => vi.fn() }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
   // v0.8.0 moved SettingsSection under components/, which pulls in withUnistyles.

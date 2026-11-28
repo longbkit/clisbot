@@ -99,7 +99,7 @@ function PairingRow({
       {row.decidable ? (
         <View style={styles.actions}>
           <Button
-            size="xs"
+            size="sm"
             variant="secondary"
             disabled={disabled}
             loading={deciding}
@@ -107,7 +107,7 @@ function PairingRow({
           >
             {t("hub.channels.pairingPanel.approve")}
           </Button>
-          <Button size="xs" variant="outline" disabled={disabled} onPress={deny}>
+          <Button size="sm" variant="outline" disabled={disabled} onPress={deny}>
             {t("hub.channels.pairingPanel.deny")}
           </Button>
         </View>

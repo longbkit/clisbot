@@ -281,18 +281,35 @@ const verdict = async (rows: AgentTimelineRow[], boundaryMessageId: string) => {
 };
 
 describe("checkpoint safety matches the whole-history read", () => {
-  it("refuses a plugin that changes in a later turn", async () => {
+  // Upstream #8746: a plugin card folds later updates into its first row, but a fork never
+  // copies plugin cards, so an update after the checkpoint cannot reach the fork.
+  it("accepts a plugin card that changes in a later turn and copies neither version", async () => {
     const plugin = (text: string) =>
       ({ type: "plugin", pluginId: "test", id: "id", data: { text } }) as AgentTimelineItem;
-    const result = await verdict(
-      [
-        at(1, plugin("early"), "one"),
-        at(2, { type: "assistant_message", text: "answer", messageId: "anchor" }, "one"),
-        at(3, { type: "user_message", text: "question" }, "two"),
-        at(4, plugin("late"), "two"),
-      ],
-      "anchor",
-    );
+    const rows = [
+      at(1, plugin("early"), "one"),
+      at(2, { type: "assistant_message", text: "answer", messageId: "anchor" }, "one"),
+      at(3, { type: "user_message", text: "question" }, "two"),
+      at(4, plugin("late"), "two"),
+    ];
+    const { fetch } = await storeWith(rows);
+    const paged = await readAgentForkContext({ fetch, boundaryMessageId: "anchor" });
+    expect(paged).toEqual(buildAgentForkContextAttachment({ rows, boundaryMessageId: "anchor" }));
+    expect(paged.attachment.text).toContain("[Assistant] answer");
+    expect(paged.attachment.text).not.toMatch(/early|late|question/);
+  });
+
+  it("refuses a tool that changes after the checkpoint in both paths, even under plugin noise", async () => {
+    const plugin = (text: string) =>
+      ({ type: "plugin", pluginId: "test", id: "id", data: { text } }) as AgentTimelineItem;
+    const rows = [
+      at(1, plugin("early"), "one"),
+      at(2, tool("shared", "running"), "one"),
+      at(3, { type: "assistant_message", text: "answer", messageId: "anchor" }, "one"),
+      at(4, plugin("late"), "one"),
+      at(5, tool("shared", "completed"), "one"),
+    ];
+    const result = await verdict(rows, "anchor");
     expect(result.paged).toContain("Fork from a later completed response");
     expect(result.paged).toBe(result.reference);
   });
@@ -322,6 +339,69 @@ describe("checkpoint safety matches the whole-history read", () => {
     const result = await verdict(rows, "anchor");
     expect(result.paged).toContain("Fork from a later completed response");
     expect(result.paged).toBe(result.reference);
+  });
+
+  it("never copies a later result, text or metadata of a tool into an earlier reply", async () => {
+    const later = {
+      type: "tool_call",
+      callId: "bg",
+      name: "Task",
+      status: "completed",
+      error: null,
+      metadata: { secret: "LATER-METADATA" },
+      detail: {
+        type: "sub_agent",
+        subAgentType: "Explore",
+        description: "Audit",
+        log: "LATER-LOG",
+      },
+    } as AgentTimelineItem;
+    const rows = [
+      at(1, { type: "user_message", text: "audit" }, "t1"),
+      at(
+        2,
+        {
+          ...later,
+          status: "running",
+          metadata: undefined,
+          detail: { type: "sub_agent", subAgentType: "Explore", description: "Audit", log: "" },
+        } as AgentTimelineItem,
+        "t1",
+      ),
+      at(3, { type: "assistant_message", text: "Started.", messageId: "anchor" }, "t1"),
+      at(4, later, "t1"),
+      at(5, { type: "assistant_message", text: "LATER-TEXT", messageId: "after" }, "t1"),
+    ];
+    const result = await verdict(rows, "anchor");
+    expect(result.paged).toContain("Fork from a later completed response");
+    expect(result.paged).toBe(result.reference);
+    // The later reply still forks, with the final state.
+    const { fetch } = await storeWith(rows);
+    const { text } = (await readAgentForkContext({ fetch, boundaryMessageId: "after" })).attachment;
+    expect(text).toContain("LATER-TEXT");
+  });
+
+  it("reads a long checkpoint scan in bounded pages", async () => {
+    const rows = [
+      at(1, tool("shared", "running"), "turn"),
+      at(2, { type: "assistant_message", text: "answer", messageId: "anchor" }, "turn"),
+      ...Array.from({ length: 5000 }, (_, index) =>
+        at(index + 3, { type: "user_message", text: "filler" }, "turn"),
+      ),
+      at(5003, tool("shared", "completed"), "turn"),
+    ];
+    const { fetch } = await storeWith(rows);
+    const limits: number[] = [];
+    const counted: typeof fetch = (options) => {
+      limits.push(options?.limit ?? 0);
+      return fetch(options);
+    };
+    await expect(
+      readAgentForkContext({ fetch: counted, boundaryMessageId: "anchor" }),
+    ).rejects.toThrow("Fork from a later completed response");
+    expect(limits.length).toBeGreaterThan(1);
+    expect(Math.min(...limits)).toBeGreaterThan(0);
+    expect(Math.max(...limits)).toBeLessThanOrEqual(2048);
   });
 
   it("accepts an older checkpoint when later tools are unrelated", async () => {

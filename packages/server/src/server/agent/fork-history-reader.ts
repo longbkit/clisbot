@@ -1,4 +1,4 @@
-import { buildAgentForkContextAttachment } from "./activity-curator.js";
+import { buildAgentForkContextAttachment, FORK_CONTEXT_KINDS } from "./activity-curator.js";
 import type {
   AgentTimelineCursor,
   AgentTimelineFetchOptions,
@@ -117,8 +117,12 @@ async function locateMessage(
   }
 }
 
-/** Merge key of a tool lifecycle or plugin row; text merges only with its neighbour. */
+/**
+ * Merge key of a tool lifecycle row; text merges only with its neighbour. Plugin cards also fold
+ * later updates into their first row, but a fork never copies them, so they cannot change it.
+ */
 function mergeKey(row: AgentTimelineRow): string | null {
+  if (!FORK_CONTEXT_KINDS.includes(row.item.type)) return null;
   const identity = timelineItemIdentity(row.item);
   return identity === null ? null : `${row.item.type}:${identity}`;
 }
@@ -137,7 +141,7 @@ interface BoundaryEvidence {
 
 /**
  * Reads every row after the anchor once, keeping only those that can merge across it: the
- * text continuing the anchor's message and later rows of a tool or plugin already in the
+ * text continuing the anchor's message and later rows of a tool call already in the
  * window. Nothing else is held, so the scan is bounded in memory however long it runs.
  */
 async function readBoundaryEvidence(
@@ -178,7 +182,7 @@ async function readBoundaryEvidence(
 }
 
 /**
- * Older history that was not read can still hold the start of a tool or plugin that ends
+ * Older history that was not read can still hold the start of a tool call that ends
  * after the anchor. Scan it page by page for those keys, holding nothing; a match means the
  * checkpoint cannot be proven unchanged, so the fork is refused as the whole-history read
  * would refuse it.

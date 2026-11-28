@@ -2,6 +2,7 @@
   "name": "@clisbot/protocol",
   "version": "2.2.5",
   "description": "Clisbot shared protocol schemas and wire types",
+  "license": "Apache-2.0",
   "files": [
     "dist",
     "!dist/**/*.map",

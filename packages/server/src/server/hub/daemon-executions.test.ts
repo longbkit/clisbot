@@ -128,26 +128,22 @@ test("Hub MCP configuration reaches the provider alongside Clisbot MCP without e
     cwd: response.payload.agent.cwd,
   });
   expect(JSON.stringify(response.payload.agent)).not.toContain(bearer);
-  expect(JSON.stringify(response.payload.agent)).not.toContain("private-build");
+  // Provider options are not secret and appear in the snapshot's `options`.
+  expect(response.payload.agent.options).toMatchObject({
+    sandbox_workspace_write: { writable_roots: ["/var/cache/private-build"] },
+  });
   expect(JSON.stringify(response.payload.agent)).not.toContain("finish_execution");
 
-  const update = hub.hubMessages().find((message) => message.type === "hub.execution.agent.update");
-  expect(update).toMatchObject({
-    type: "hub.execution.agent.update",
-    payload: { agent: { provider: "codex" } },
+  const update = await hub.ownedUpdate(response.payload.agent.id);
+  expect(update.agent.provider).toBe("codex");
+  expect(update.agent).not.toHaveProperty("config");
+  expect(update.agent).not.toHaveProperty("mcpServers");
+  expect(update.agent.persistence?.metadata).toEqual({
+    conversationId: update.agent.persistence?.sessionId,
+    cwd: update.agent.cwd,
   });
-  if (!update || update.type !== "hub.execution.agent.update") {
-    throw new Error("Expected a Hub execution agent update");
-  }
-  expect(update.payload.agent).not.toHaveProperty("config");
-  expect(update.payload.agent).not.toHaveProperty("mcpServers");
-  expect(update.payload.agent.persistence?.metadata).toEqual({
-    conversationId: update.payload.agent.persistence?.sessionId,
-    cwd: update.payload.agent.cwd,
-  });
-  expect(JSON.stringify(update.payload.agent)).not.toContain(bearer);
-  expect(JSON.stringify(update.payload.agent)).not.toContain("private-build");
-  expect(JSON.stringify(update.payload.agent)).not.toContain("finish_execution");
+  expect(JSON.stringify(update.agent)).not.toContain(bearer);
+  expect(JSON.stringify(update.agent)).not.toContain("finish_execution");
 });
 
 test("Hub can preapprove only tools on MCP servers injected in the same request", async () => {

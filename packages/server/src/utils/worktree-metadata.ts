@@ -1,6 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "fs";
-import { isAbsolute, join, resolve } from "path";
+import { mkdir, open, realpath, rename, stat, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { constants } from "node:fs";
+import pLimit from "p-limit";
+import { dirname, isAbsolute, join, resolve } from "path";
 import { z } from "zod";
+
+const MAX_WORKTREE_METADATA_BYTES = 64 * 1024;
 
 const ChangeRequestLookupTargetSchema = z.object({
   headRef: z.string().min(1),
@@ -9,7 +14,7 @@ const ChangeRequestLookupTargetSchema = z.object({
   localBranchName: z.string().min(1).optional(),
 });
 
-// baseRefName is the display name; baseRef is the exact ref the worktree was cut from
+// baseRefName is the display name; baseRef is the checkout's current exact base
 // ("refs/remotes/upstream/main"). baseRef is optional because worktrees written before it
 // existed only have the name — there are no migrations, so readers fall back.
 const ClisbotWorktreeMetadataV1Schema = z.object({
@@ -17,6 +22,7 @@ const ClisbotWorktreeMetadataV1Schema = z.object({
   baseRefName: z.string().min(1),
   baseRef: z.string().min(1).optional(),
   changeRequestLookupTarget: ChangeRequestLookupTargetSchema.optional(),
+  worktreeManagerPluginId: z.string().min(1).optional(),
 });
 
 const ClisbotWorktreeMetadataV2Schema = z.object({
@@ -24,6 +30,7 @@ const ClisbotWorktreeMetadataV2Schema = z.object({
   baseRefName: z.string().min(1),
   baseRef: z.string().min(1).optional(),
   changeRequestLookupTarget: ChangeRequestLookupTargetSchema.optional(),
+  worktreeManagerPluginId: z.string().min(1).optional(),
   firstAgentBranchAutoName: z
     .discriminatedUnion("status", [
       z.object({
@@ -90,75 +97,78 @@ function normalizeLegacyGitHubOwnerForBranch(owner: string): string | null {
   return /^[a-z0-9-]+$/.test(normalized) ? normalized : null;
 }
 
-export function rebindClisbotWorktreeChangeRequestHint(
+export async function rebindClisbotWorktreeChangeRequestHint(
   worktreeRoot: string,
   previousBranch: string,
   currentBranch: string,
-): boolean {
-  const metadata = readClisbotWorktreeMetadata(worktreeRoot);
-  const target = getClisbotWorktreeChangeRequestHintForBranch(metadata, previousBranch);
-  if (!metadata || !target) {
-    return false;
-  }
+): Promise<boolean> {
+  return mutateMetadata(worktreeRoot, async (root) => {
+    const metadata = await readMetadataFile(root);
+    const target = getClisbotWorktreeChangeRequestHintForBranch(metadata, previousBranch);
+    if (!metadata || !target) {
+      return false;
+    }
 
-  writeClisbotWorktreeMetadataFile(worktreeRoot, {
-    ...metadata,
-    changeRequestLookupTarget: {
-      ...target,
-      ...(target.headRef === previousBranch &&
-      !target.headRepositoryOwner &&
-      target.changeRequestNumber === undefined
-        ? { headRef: currentBranch }
-        : {}),
-      localBranchName: currentBranch,
-    },
+    await writeClisbotWorktreeMetadataFile(root, {
+      ...metadata,
+      changeRequestLookupTarget: {
+        ...target,
+        ...(target.headRef === previousBranch &&
+        !target.headRepositoryOwner &&
+        target.changeRequestNumber === undefined
+          ? { headRef: currentBranch }
+          : {}),
+        localBranchName: currentBranch,
+      },
+    });
+    return true;
   });
-  return true;
 }
 
-export function pinClisbotWorktreeBranchIdentityIfMissing(
+export async function pinClisbotWorktreeBranchIdentityIfMissing(
   worktreeRoot: string,
   branch: string,
-): boolean {
-  const metadata = readClisbotWorktreeMetadata(worktreeRoot);
-  if (!metadata || metadata.changeRequestLookupTarget) {
-    return false;
-  }
-  const target = createClisbotWorktreeChangeRequestHint({
-    headRef: branch,
-    localBranchName: branch,
+): Promise<boolean> {
+  return mutateMetadata(worktreeRoot, async (root) => {
+    const metadata = await readMetadataFile(root);
+    if (!metadata || metadata.changeRequestLookupTarget) {
+      return false;
+    }
+    const target = createClisbotWorktreeChangeRequestHint({
+      headRef: branch,
+      localBranchName: branch,
+    });
+    await writeClisbotWorktreeMetadataFile(root, {
+      ...metadata,
+      changeRequestLookupTarget: target,
+    });
+    return true;
   });
-  writeClisbotWorktreeMetadataFile(worktreeRoot, {
-    ...metadata,
-    changeRequestLookupTarget: target,
-  });
-  return true;
 }
 
-function getGitDirForWorktreeRoot(worktreeRoot: string): string {
+async function getGitDirForWorktreeRoot(worktreeRoot: string): Promise<string> {
   const gitPath = join(worktreeRoot, ".git");
-  if (!existsSync(gitPath)) {
-    throw new Error(`Not a git repository: ${worktreeRoot}`);
-  }
-
-  // In a worktree checkout, `.git` is a file containing `gitdir: <path>`.
-  // In a normal checkout, `.git` is a directory.
+  let info;
   try {
-    const gitFileContent = readFileSync(gitPath, "utf8");
-    const match = gitFileContent.match(/gitdir:\s*(.+)/);
-    if (match?.[1]) {
-      const raw = match[1].trim();
-      return isAbsolute(raw) ? raw : resolve(worktreeRoot, raw);
-    }
-  } catch {
-    // If `.git` is a directory, readFileSync will throw; fall through.
+    info = await stat(gitPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT")
+      throw new Error(`Not a git repository: ${worktreeRoot}`, { cause: error });
+    throw error;
+  }
+  if (info.isDirectory()) return gitPath;
+  const gitFileContent = await readBoundedFile(gitPath);
+  const match = gitFileContent.match(/gitdir:\s*(.+)/);
+  if (match?.[1]) {
+    const raw = match[1].trim();
+    return isAbsolute(raw) ? raw : resolve(worktreeRoot, raw);
   }
 
   return gitPath;
 }
 
-export function getClisbotWorktreeMetadataPath(worktreeRoot: string): string {
-  const gitDir = getGitDirForWorktreeRoot(worktreeRoot);
+export async function getClisbotWorktreeMetadataPath(worktreeRoot: string): Promise<string> {
+  const gitDir = await getGitDirForWorktreeRoot(worktreeRoot);
   return join(gitDir, "clisbot", "worktree.json");
 }
 
@@ -213,120 +223,218 @@ function assertValidBaseRef(value: string): void {
   }
 }
 
-export function writeClisbotWorktreeMetadata(
+export async function writeClisbotWorktreeMetadata(
   worktreeRoot: string,
   options: {
     baseRefName: string;
     baseRef?: string;
     changeRequestLookupTarget?: ClisbotWorktreeChangeRequestHint;
+    worktreeManagerPluginId?: string;
   },
-): void {
-  const baseRefName = normalizeBaseRefName(options.baseRefName);
-  assertValidBaseRef(baseRefName);
-  const baseRef = options.baseRef?.trim();
-  if (baseRef) {
-    assertValidBaseRef(baseRef);
-  }
+): Promise<void> {
+  return mutateMetadata(worktreeRoot, async (root) => {
+    const baseRefName = normalizeBaseRefName(options.baseRefName);
+    assertValidBaseRef(baseRefName);
+    const baseRef = options.baseRef?.trim();
+    if (baseRef) {
+      assertValidBaseRef(baseRef);
+    }
 
-  const metadata: ClisbotWorktreeMetadata = {
-    version: 1,
-    baseRefName,
-    ...(baseRef ? { baseRef } : {}),
-    ...(options.changeRequestLookupTarget
-      ? { changeRequestLookupTarget: options.changeRequestLookupTarget }
-      : {}),
-  };
-  writeClisbotWorktreeMetadataFile(worktreeRoot, metadata);
-}
-
-export function writeClisbotWorktreeRuntimeMetadata(
-  worktreeRoot: string,
-  options: { worktreePort: number },
-): void {
-  if (!Number.isInteger(options.worktreePort) || options.worktreePort <= 0) {
-    throw new Error(`Invalid worktree runtime port: ${options.worktreePort}`);
-  }
-
-  const current = readClisbotWorktreeMetadata(worktreeRoot);
-  if (!current) {
-    throw new Error("Cannot persist worktree runtime metadata: missing base metadata");
-  }
-
-  const next: ClisbotWorktreeMetadata = {
-    ...current,
-    version: 2,
-    runtime: {
-      worktreePort: options.worktreePort,
-    },
-  };
-  writeClisbotWorktreeMetadataFile(worktreeRoot, next);
-}
-
-export function writeClisbotWorktreeFirstAgentBranchAutoNameMetadata(
-  worktreeRoot: string,
-  options: { placeholderBranchName: string },
-): void {
-  const placeholderBranchName = options.placeholderBranchName.trim();
-  if (!placeholderBranchName) {
-    throw new Error("Placeholder branch name is required");
-  }
-
-  const current = readClisbotWorktreeMetadata(worktreeRoot);
-  if (!current) {
-    throw new Error("Cannot persist first-agent branch auto-name metadata: missing base metadata");
-  }
-
-  writeClisbotWorktreeMetadataFile(worktreeRoot, {
-    ...current,
-    version: 2,
-    firstAgentBranchAutoName: {
-      status: "pending",
-      placeholderBranchName,
-    },
+    const metadata: ClisbotWorktreeMetadata = {
+      version: 1,
+      baseRefName,
+      ...(baseRef ? { baseRef } : {}),
+      ...(options.changeRequestLookupTarget
+        ? { changeRequestLookupTarget: options.changeRequestLookupTarget }
+        : {}),
+      ...(options.worktreeManagerPluginId
+        ? { worktreeManagerPluginId: options.worktreeManagerPluginId }
+        : {}),
+    };
+    await writeClisbotWorktreeMetadataFile(root, metadata);
   });
 }
 
-export function markClisbotWorktreeFirstAgentBranchAutoNameAttempted(
+export async function setClisbotWorktreeBaseRef(input: {
+  worktreeRoot: string;
+  baseRef: string;
+}): Promise<void> {
+  return mutateMetadata(input.worktreeRoot, async (root) => {
+    const current = await readMetadataFile(root);
+    if (!current) throw new Error("Cannot change base: missing worktree metadata");
+    await writeClisbotWorktreeMetadataFile(root, {
+      ...current,
+      baseRefName: branchNameFromRef(input.baseRef),
+      baseRef: input.baseRef,
+    });
+  });
+}
+
+export async function writeClisbotWorktreeRuntimeMetadata(
+  worktreeRoot: string,
+  options: { worktreePort: number },
+): Promise<void> {
+  return mutateMetadata(worktreeRoot, async (root) => {
+    if (!Number.isInteger(options.worktreePort) || options.worktreePort <= 0) {
+      throw new Error(`Invalid worktree runtime port: ${options.worktreePort}`);
+    }
+
+    const current = await readMetadataFile(root);
+    if (!current) {
+      throw new Error("Cannot persist worktree runtime metadata: missing base metadata");
+    }
+
+    const next: ClisbotWorktreeMetadata = {
+      ...current,
+      version: 2,
+      runtime: {
+        worktreePort: options.worktreePort,
+      },
+    };
+    await writeClisbotWorktreeMetadataFile(root, next);
+  });
+}
+
+export async function writeClisbotWorktreeFirstAgentBranchAutoNameMetadata(
+  worktreeRoot: string,
+  options: { placeholderBranchName: string },
+): Promise<void> {
+  return mutateMetadata(worktreeRoot, async (root) => {
+    const placeholderBranchName = options.placeholderBranchName.trim();
+    if (!placeholderBranchName) {
+      throw new Error("Placeholder branch name is required");
+    }
+
+    const current = await readMetadataFile(root);
+    if (!current) {
+      throw new Error(
+        "Cannot persist first-agent branch auto-name metadata: missing base metadata",
+      );
+    }
+
+    await writeClisbotWorktreeMetadataFile(root, {
+      ...current,
+      version: 2,
+      firstAgentBranchAutoName: {
+        status: "pending",
+        placeholderBranchName,
+      },
+    });
+  });
+}
+
+export async function markClisbotWorktreeFirstAgentBranchAutoNameAttempted(
   worktreeRoot: string,
   options: { attemptedAt?: string } = {},
-): ClisbotWorktreeMetadata | null {
-  const current = readClisbotWorktreeMetadata(worktreeRoot);
-  if (!current || current.version !== 2 || current.firstAgentBranchAutoName?.status !== "pending") {
-    return current;
-  }
+): Promise<ClisbotWorktreeMetadata | null> {
+  return mutateMetadata(worktreeRoot, async (root) => {
+    const current = await readMetadataFile(root);
+    if (
+      !current ||
+      current.version !== 2 ||
+      current.firstAgentBranchAutoName?.status !== "pending"
+    ) {
+      return current;
+    }
 
-  const next: ClisbotWorktreeMetadata = {
-    ...current,
-    firstAgentBranchAutoName: {
-      status: "attempted",
-      placeholderBranchName: current.firstAgentBranchAutoName.placeholderBranchName,
-      attemptedAt: options.attemptedAt ?? new Date().toISOString(),
-    },
-  };
-  writeClisbotWorktreeMetadataFile(worktreeRoot, next);
-  return next;
+    const next: ClisbotWorktreeMetadata = {
+      ...current,
+      firstAgentBranchAutoName: {
+        status: "attempted",
+        placeholderBranchName: current.firstAgentBranchAutoName.placeholderBranchName,
+        attemptedAt: options.attemptedAt ?? new Date().toISOString(),
+      },
+    };
+    await writeClisbotWorktreeMetadataFile(root, next);
+    return next;
+  });
 }
 
-export function readClisbotWorktreeMetadata(worktreeRoot: string): ClisbotWorktreeMetadata | null {
-  const metadataPath = getClisbotWorktreeMetadataPath(worktreeRoot);
-  if (!existsSync(metadataPath)) {
-    return null;
+export async function hasClisbotWorktreeMetadata(worktreeRoot: string): Promise<boolean> {
+  try {
+    return (await readClisbotWorktreeMetadata(worktreeRoot)) !== null;
+  } catch {
+    return false;
   }
-  const parsed = JSON.parse(readFileSync(metadataPath, "utf8"));
-  return ClisbotWorktreeMetadataSchema.parse(parsed);
 }
 
-export function requireClisbotWorktreeBaseRefName(worktreeRoot: string): string {
-  const metadataPath = getClisbotWorktreeMetadataPath(worktreeRoot);
-  const metadata = readClisbotWorktreeMetadata(worktreeRoot);
+/**
+ * Filesystem-only search for a Clisbot worktree root at or above cwd: the
+ * first directory containing a .git entry wins, and it only counts when
+ * its git admin dir holds the clisbot/worktree.json marker. Lets callers
+ * cheaply rule out plain directories before running git ownership checks.
+ */
+export async function findClisbotWorktreeRootForCwd(cwd: string): Promise<string | null> {
+  let current = resolve(cwd);
+  for (;;) {
+    if (
+      await stat(join(current, ".git")).then(
+        () => true,
+        () => false,
+      )
+    ) {
+      return (await hasClisbotWorktreeMetadata(current)) ? current : null;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
+}
+
+export async function readClisbotWorktreeMetadata(
+  worktreeRoot: string,
+): Promise<ClisbotWorktreeMetadata | null> {
+  const key = await resolveMetadataIdentity(worktreeRoot);
+  await metadataMutations.get(key)?.catch(() => {});
+  return metadataIo(() => readMetadataFile(key));
+}
+
+async function readMetadataFile(worktreeRoot: string): Promise<ClisbotWorktreeMetadata | null> {
+  const metadataPath = await getClisbotWorktreeMetadataPath(worktreeRoot);
+  try {
+    return ClisbotWorktreeMetadataSchema.parse(JSON.parse(await readBoundedFile(metadataPath)));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+// O_NONBLOCK lets us reject FIFOs by kind without hanging in open(). A fixed read also
+// caps a regular file that grows between stat and read; readFile's whole-file loop does not.
+async function readBoundedFile(path: string): Promise<string> {
+  const file = await open(path, constants.O_RDONLY | constants.O_NONBLOCK);
+  try {
+    const info = await file.stat();
+    const limit = MAX_WORKTREE_METADATA_BYTES;
+    if (!info.isFile() || info.size > limit)
+      throw new Error(`Invalid Clisbot worktree metadata file: ${path}`);
+    const buffer = Buffer.alloc(limit + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await file.read(buffer, length, buffer.length - length);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    if (length > limit) throw new Error(`Invalid Clisbot worktree metadata file: ${path}`);
+    return buffer.toString("utf8", 0, length);
+  } finally {
+    await file.close();
+  }
+}
+
+export async function requireClisbotWorktreeBaseRefName(worktreeRoot: string): Promise<string> {
+  const metadataPath = await getClisbotWorktreeMetadataPath(worktreeRoot);
+  const metadata = await readClisbotWorktreeMetadata(worktreeRoot);
   if (!metadata) {
     throw new Error(`Missing Clisbot worktree base metadata: ${metadataPath}`);
   }
   return metadata.baseRefName;
 }
 
-export function readClisbotWorktreeRuntimePort(worktreeRoot: string): number | null {
-  const metadata = readClisbotWorktreeMetadata(worktreeRoot);
+export async function readClisbotWorktreeRuntimePort(worktreeRoot: string): Promise<number | null> {
+  const metadata = await readClisbotWorktreeMetadata(worktreeRoot);
   if (!metadata) {
     return null;
   }
@@ -336,13 +444,61 @@ export function readClisbotWorktreeRuntimePort(worktreeRoot: string): number | n
   return null;
 }
 
-function writeClisbotWorktreeMetadataFile(
+async function writeClisbotWorktreeMetadataFile(
   worktreeRoot: string,
   metadata: ClisbotWorktreeMetadata,
-): void {
-  const metadataPath = getClisbotWorktreeMetadataPath(worktreeRoot);
-  mkdirSync(join(getGitDirForWorktreeRoot(worktreeRoot), "clisbot"), { recursive: true });
-  const tempPath = `${metadataPath}.${process.pid}.${Date.now()}.tmp`;
-  writeFileSync(tempPath, `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
-  renameSync(tempPath, metadataPath);
+): Promise<void> {
+  const metadataPath = await getClisbotWorktreeMetadataPath(worktreeRoot);
+  const contents = `${JSON.stringify(metadata, null, 2)}\n`;
+  if (Buffer.byteLength(contents) > MAX_WORKTREE_METADATA_BYTES) {
+    throw new Error(`Invalid Clisbot worktree metadata file: ${metadataPath}`);
+  }
+  // Never recreate an archived Git directory while a queued mutation is pending.
+  try {
+    await mkdir(join(await getGitDirForWorktreeRoot(worktreeRoot), "clisbot"));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  }
+  const tempPath = `${metadataPath}.${randomUUID()}.tmp`;
+  await writeFile(tempPath, contents, "utf8");
+  await rename(tempPath, metadataPath);
+}
+
+const metadataIo = pLimit(2);
+const metadataMutations = new Map<string, Promise<unknown>>();
+
+// Only share in-flight identity resolution: a replaced symlink must not retain an old owner.
+const metadataIdentities = new Map<string, Promise<string>>();
+
+function resolveMetadataIdentity(worktreeRoot: string): Promise<string> {
+  const path = resolve(worktreeRoot);
+  const existing = metadataIdentities.get(path);
+  if (existing) return existing;
+  const identity = metadataIo(async () => {
+    try {
+      return await realpath(path);
+    } catch {
+      return path;
+    }
+  }).finally(() => {
+    if (metadataIdentities.get(path) === identity) metadataIdentities.delete(path);
+  });
+  metadataIdentities.set(path, identity);
+  return identity;
+}
+
+async function mutateMetadata<T>(
+  worktreeRoot: string,
+  mutation: (root: string) => Promise<T>,
+): Promise<T> {
+  const key = await resolveMetadataIdentity(worktreeRoot);
+  const previous = metadataMutations.get(key) ?? Promise.resolve();
+  const pending = previous.catch(() => {}).then(() => metadataIo(() => mutation(key)));
+  metadataMutations.set(key, pending);
+  void pending
+    .finally(() => {
+      if (metadataMutations.get(key) === pending) metadataMutations.delete(key);
+    })
+    .catch(() => {});
+  return pending;
 }

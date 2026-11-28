@@ -42,7 +42,8 @@ async function baselineTimeline(context: BenchmarkContext, count: number) {
     pathToFileURL(
       path.join(baselineRoot, "packages/server/src/server/agent/timeline-projection.ts"),
     ).href
-  )) as typeof import("../../src/server/agent/timeline-projection.js");
+    // The baseline checkout predates v0.17, where this module still exported the page selector.
+  )) as typeof import("../../src/server/agent/session-storage/timeline-page.js");
   await phase(`baseline.timeline.full-load.${count}`, async (sample) => {
     const rows = Array.from({ length: count }, (_, index) => mixedRow(index + 1));
     const store = new storeModule.InMemoryAgentTimelineStore();

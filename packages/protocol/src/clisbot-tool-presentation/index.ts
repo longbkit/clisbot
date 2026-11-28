@@ -28,6 +28,8 @@ export const CLISBOT_TOOL_NAMES = Object.keys(CLISBOT_TOOL_CATALOG) as readonly 
 
 /** Returns null for tools outside the Clisbot namespace. */
 export function buildClisbotToolDisplay(input: ClisbotToolDisplayInput): ClisbotToolDisplay | null {
+  // Canonical details own internal lifecycle rows such as worktree setup.
+  if (input.detail.type !== "unknown") return null;
   const leafName = clisbotLeafName(input.toolName);
   if (!leafName) return null;
   const entry = getClisbotToolEntry(leafName);
@@ -37,6 +39,13 @@ export function buildClisbotToolDisplay(input: ClisbotToolDisplayInput): Clisbot
   const targetAgent = input.targetAgentTitle ?? readString(toolInput.agentId);
   const summary = formatContext(entry.context?.(toolInput, targetAgent));
   return { displayName: entry.label, ...(summary ? { summary } : {}) };
+}
+
+/** A semantic action label for summaries, sharing the tool presentation catalog. */
+export function getClisbotToolActionLabel(toolName: string): string | null {
+  const leafName = clisbotLeafName(toolName);
+  if (!leafName) return null;
+  return getClisbotToolEntry(leafName)?.completedLabel ?? humanizeLeafName(leafName);
 }
 
 /** The agent a Clisbot call acts on, so callers can resolve its title. */
@@ -49,7 +58,11 @@ export function getClisbotToolTargetAgentId(
 }
 
 function clisbotLeafName(toolName: string): string | null {
-  return isClisbotToolName(toolName) ? getClisbotToolLeafName(toolName) : null;
+  if (isClisbotToolName(toolName)) return getClisbotToolLeafName(toolName);
+  const normalized = toolName.trim().toLowerCase();
+  return normalized.startsWith("clisbot_") && !normalized.startsWith("clisbot__")
+    ? normalized.slice("clisbot_".length)
+    : null;
 }
 
 function readToolInput(detail: ToolCallDetail): Readonly<Record<string, unknown>> {

@@ -1,2 +1,8 @@
 export * from "./registry";
-export { getRegistry, getRegistryPlugin, getAuthorRegistry, getPluginInstallCount } from "./loader";
+export {
+  getAuthorRegistry,
+  getPluginCount,
+  getPluginInstallCount,
+  getRegistry,
+  getRegistryPlugin,
+} from "./loader";

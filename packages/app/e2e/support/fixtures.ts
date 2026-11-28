@@ -114,6 +114,8 @@ const test = daemonTest.extend<{
    * opts in with `test.use({ navigationV2: true })`.
    */
   navigationV2: boolean;
+  /** Specs start past first-run setup; onboarding specs opt out to see a fresh install. */
+  e2eOnboardingCompleted: boolean;
   clisbotE2ESetup: void;
   outdatedDaemon: OutdatedDaemon;
   desktopManagedOutdatedDaemon: OutdatedDaemon;
@@ -122,8 +124,9 @@ const test = daemonTest.extend<{
   withWorkspace: WithWorkspace;
 }>({
   navigationV2: [false, { option: true }],
+  e2eOnboardingCompleted: [true, { option: true }],
   clisbotE2ESetup: [
-    async ({ page, navigationV2 }, provide, testInfo) => {
+    async ({ page, navigationV2, e2eOnboardingCompleted }, provide, testInfo) => {
       const daemonPort = getE2EDaemonPort();
       const metroPort = process.env.E2E_METRO_PORT;
       if (!metroPort) {
@@ -167,7 +170,7 @@ const test = daemonTest.extend<{
       await pinNavigationV2(page, navigationV2);
 
       await page.addInitScript(
-        ({ daemon, preferences, seedNonce: nonce, extraHostsKey }) => {
+        ({ daemon, preferences, seedNonce: nonce, extraHostsKey, onboardingCompleted }) => {
           // `addInitScript` runs on every navigation (including reloads). Some tests intentionally
           // override storage and reload; they can opt out of seeding for the *next* navigation by
           // setting this flag before the reload.
@@ -190,12 +193,25 @@ const test = daemonTest.extend<{
           localStorage.setItem("@clisbot:daemon-registry", JSON.stringify([daemon, ...extraHosts]));
           localStorage.removeItem("@clisbot:settings");
           localStorage.setItem("@clisbot:create-agent-preferences", JSON.stringify(preferences));
+          // New installs collapse finished turns; specs assert on the rows inside them, so they
+          // start from the full chat unless they seed their own settings.
+          if (!localStorage.getItem("@clisbot:app-settings")) {
+            localStorage.setItem("@clisbot:app-settings", JSON.stringify({ chatDisplay: "full" }));
+          }
+          // The shared daemon often has no projects, which would open first-run setup over the app.
+          if (onboardingCompleted && !localStorage.getItem("@clisbot:onboarding")) {
+            localStorage.setItem(
+              "@clisbot:onboarding",
+              JSON.stringify({ completedAt: new Date(0).toISOString() }),
+            );
+          }
         },
         {
           daemon: testDaemon,
           preferences: createAgentPreferences,
           seedNonce,
           extraHostsKey: EXTRA_HOSTS_KEY,
+          onboardingCompleted: e2eOnboardingCompleted,
         },
       );
 

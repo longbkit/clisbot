@@ -50,19 +50,18 @@ v0.1.92-beta.3
 
 ### 如何加入测试版渠道 {#how-to-join-the-beta-channel}
 
-在桌面应用中：
+| 平台          | 获取测试版的方式                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| iOS 和 iPadOS | 暂无测试版：Clisbot 没有 TestFlight。请通过配对链接打开网页版。                                |
+| Android       | 从 [GitHub releases 页面](https://github.com/longbkit/clisbot/releases)的预发布版本下载 APK。  |
+| 桌面端        | 打开 **设置 → 关于**，在 **发布通道** 下选择 **Beta**。                                        |
+| CLI           | 运行 `npm install -g @clisbot/cli@beta`。直接运行 `npm install -g @clisbot/cli` 仍使用稳定版。 |
 
-1. 打开 **设置**
-2. 进入 **关于**
-3. 在 **发布通道** 下选择 **Beta**
-
-之后应用就会检查测试版更新。
+在桌面应用中选择 **Beta** 后，应用就会检查测试版更新。
 
 ## 应用商店 {#app-stores}
 
-桌面端版本和 CLI 通常最先提供。App Store 和 Play Store 的版本需要经过审核，可能会滞后。
-
-应用商店目前没有测试版渠道，只提交稳定版构建。如果你想提前使用 Android 构建，请从 [GitHub releases 页面](https://github.com/longbkit/clisbot/releases)下载 APK。
+iOS 和 Android 应用尚未上架 App Store 或 Google Play。Android 请从 [clisbot.com/download](https://clisbot.com/download) 或 [GitHub 发布页面](https://github.com/longbkit/clisbot/releases) 安装 APK，测试版 APK 在预发布版本中。在任何手机上，配对链接都会打开网页版。
 
 ## 出现问题怎么办 {#what-to-do-if-something-breaks}
 

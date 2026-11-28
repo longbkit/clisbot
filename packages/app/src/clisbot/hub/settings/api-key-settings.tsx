@@ -198,10 +198,10 @@ function NewKeySecret({
       <Text selectable style={styles.secret}>
         {secret}
       </Text>
-      <Button size="xs" variant="outline" onPress={copy}>
+      <Button size="sm" variant="outline" onPress={copy}>
         {copied ? t("hub.settings.apiKeys.copied") : t("hub.settings.apiKeys.copyKey")}
       </Button>
-      <Button size="xs" variant="ghost" onPress={dismiss}>
+      <Button size="sm" variant="ghost" onPress={dismiss}>
         {t("hub.settings.apiKeys.done")}
       </Button>
     </Alert>

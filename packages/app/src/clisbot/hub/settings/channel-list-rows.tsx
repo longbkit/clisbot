@@ -91,7 +91,7 @@ export function RuntimeDetailRow({ detail }: { detail: string }) {
         {detail}
       </Text>
       {long ? (
-        <Button size="xs" variant="ghost" onPress={toggle}>
+        <Button size="sm" variant="ghost" onPress={toggle}>
           {open ? t("hub.channels.listRows.hideDetails") : t("hub.channels.listRows.showDetails")}
         </Button>
       ) : null}

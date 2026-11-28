@@ -8,7 +8,7 @@ category: Hub
 
 # Triggers
 
-A trigger says which provider event can start an Automation. Conversation Routes are a separate way in; see [Channels](/docs/hub/channels) and [Automations](/docs/hub/automations). The [Hub workflows](/docs/hub/workflows) page covers the steps, inputs, routing, prompts, and deadlines that run after a match.
+A trigger says which provider event can start an Automation. Conversation Routes are a separate way in; see [Channels](/docs/hub/channels) and [Automations](/docs/hub/automations). [Workflow documents](/docs/hub/configuration/reference#workflow-documents) cover the steps, routing, prompts, and deadlines that run after a match.
 
 Example in the legacy [repository bundle](/docs/hub/configuration#repository-bundles) format, with a named `dev` environment and `codex` Agent:
 
@@ -30,7 +30,7 @@ steps:
       - text: ${{ clisbot.prompt }}
 ```
 
-Field-by-field detail is in the [configuration reference](/docs/hub/configuration/hub-yml).
+Field-by-field detail is in the [configuration reference](/docs/hub/configuration/reference).
 
 ## Choose the agent in Hub
 
@@ -52,7 +52,7 @@ Legacy repository bundles validate named Agent configurations against the connec
 
 For Automation requests through a Channel Route, enable **Continue the same Agent** to reuse a compatible Agent for that conversation. Each request still creates a run. Other events start new Agents; changes to targets or authority can also require a new Agent.
 
-The [continuation reference](/docs/hub/configuration/hub-yml#agent-continuation) documents `reuse: binding` and earlier-step reuse. The former `run.continuation` field is unsupported.
+The [continuation reference](/docs/hub/configuration/reference#agent-continuation) documents `reuse: binding` and earlier-step reuse. The former `run.continuation` field is unsupported.
 
 ## Events
 
@@ -64,6 +64,9 @@ The [continuation reference](/docs/hub/configuration/hub-yml#agent-continuation)
 | `github.pull_request_comment_created` | A conversation comment is created on a pull request. |
 | `github.issue_label_added`            | A label is added to an issue.                        |
 | `github.pull_request_label_added`     | A label is added to a pull request.                  |
+| `linear.comment_created`              | A comment is posted on a Linear issue.               |
+| `linear.issue_assigned`               | A Linear issue is assigned or reassigned.            |
+| `linear.issue_entered_scope`          | A Linear issue is created in or moves into scope.    |
 | `slack.mention`                       | The bot is mentioned in a channel.                   |
 | `discord.mention`                     | The bot is mentioned in a guild.                     |
 | `manual.run`                          | A run started from the API.                          |
@@ -73,8 +76,18 @@ New GitHub workflows should use a semantic event. The five legacy events remain 
 Each provider page documents its events and the data they expose:
 
 - [GitHub triggers](/docs/hub/triggers/github)
+- [Linear triggers](/docs/hub/triggers/linear)
 - [Slack triggers](/docs/hub/triggers/slack)
 - [Discord triggers](/docs/hub/triggers/discord)
+
+## Not available in Clisbot Hub
+
+Clisbot Hub rejects the following fields (`recurrence`, `run.tools`, `run.continuation`, `run.background`) during validation. Triggers configured for `schedule.tick` or `webhook.received` never run because the Hub has no event source for them.
+
+- `schedule.tick` events and their `recurrence` rule. For recurring work, use [daemon schedules](/docs/schedules) on the Host instead.
+- `webhook.received` events, webhook endpoints and webhook secrets. Start a run from a script with [manual run dispatch](/docs/hub/api#manual-run-dispatch) instead.
+- `run.tools` grants for Slack and Discord read and post tools. Replies go back to the triggering conversation through its reply capability.
+- `run.continuation` and `run.background`. See [Continue the same agent](#continue-the-same-agent).
 
 ## Filters
 
@@ -118,6 +131,6 @@ Put `allow_outputs` on the step that should reply. Use the input’s reply capab
 - Set `max` when a step needs more than one update.
 - Set `required: true` when the step must emit at least one reply before it can finish. A required type must be registered and available for the execution context.
 
-GitHub replies post a comment on the triggering issue/PR; push events have no reply target. A [`github` block](/docs/hub/github) separately grants `gh` authority. Single-`run` direct-event documents add an optional native reply unless you author an explicit grant. The [output capability reference](/docs/hub/configuration/hub-yml#output-capabilities) has the contract.
+GitHub replies post a comment on the triggering issue/PR; push events have no reply target. A [`github` block](/docs/hub/github) separately grants `gh` authority. Single-`run` direct-event documents add an optional native reply unless you author an explicit grant. The [output capability reference](/docs/hub/configuration/reference#output-capabilities) has the contract.
 
-The declaration grants the `hub.reply` tool; the prompt has to tell the agent to call it. See [Tell the agent which tool to call](/docs/hub/workflows#tell-the-agent-which-tool-to-call).
+The declaration grants the `hub.reply` tool; the prompt has to tell the agent to call it. See [Tell the agent which tool to call](/docs/hub/configuration/reference#tell-the-agent-which-tool-to-call).

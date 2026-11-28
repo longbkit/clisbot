@@ -12,6 +12,7 @@ import { resolveClisbotHome } from "../src/server/clisbot-home.js";
 import { daemonLogPath } from "../src/server/daemon-instance.js";
 import { PRIVATE_FILE_MODE } from "../src/server/private-files.js";
 import { loadPersistedConfig } from "../src/server/persisted-config.js";
+import { reapTerminalWorkers } from "../src/terminal/terminal-worker-reaper.js";
 import { runSupervisor } from "./supervisor.js";
 import { resolveSupervisorLogFile } from "./supervisor-log-config.js";
 import { applyDaemonThreadpoolEnv } from "../src/server/agent/session-storage/session-storage-io.js";
@@ -178,6 +179,10 @@ async function main(): Promise<void> {
     onWorkerExit: () =>
       updatePidLock(clisbotHome, { listen: null, serverId: null }, { ownerPid: process.pid }),
     onSupervisorExit: releaseLock,
+    cleanupTerminals: async (log) => {
+      const result = await reapTerminalWorkers({ clisbotHome, log });
+      log("Terminal worker cleanup result", { ...result });
+    },
   });
   requestSupervisorShutdown = supervisor.requestShutdown;
 }

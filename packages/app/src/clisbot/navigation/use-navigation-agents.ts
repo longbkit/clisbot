@@ -13,7 +13,7 @@ export function useNavigationAgents(): {
   display: readonly AggregatedAgent[];
   cached: ReadonlySet<string>;
 } {
-  const { agents } = useAggregatedAgents({ demand: false });
+  const { agents } = useAggregatedAgents({ demand: false, observe: true });
   const { listable, cached } = useSourceLiveness();
   const observed = useMemo(() => listedAgents(agents, listable), [agents, listable]);
   const display = useMemo(() => quietCachedAgents(observed, cached), [observed, cached]);

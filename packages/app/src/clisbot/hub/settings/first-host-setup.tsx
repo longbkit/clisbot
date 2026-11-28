@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { AddHostModal } from "@/components/add-host-modal";
+import { AddHostModal } from "@/hosts/add-host/internal/add-host-modal";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

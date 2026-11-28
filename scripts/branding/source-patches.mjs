@@ -120,10 +120,12 @@ export const sourcePatches = new Map(
   logoFiles.map((file) => [file, (input) => legacyLogo(input, file)]),
 );
 
-// Consumers of upstream's canonical brand folder exist only from v0.17.
+// Consumers that arrived with upstream's canonical brand folder in v0.17; older
+// (normalized-base) trees have none of them.
 export const brandSystemFiles = new Set([
   "packages/website/src/components/clisbot-brand.tsx",
   "packages/website/src/components/clisbot-brand.test.tsx",
+  "packages/website/src/components/hub-automations/github-mockup.tsx",
 ]);
 
 for (const file of brandedMockups) sourcePatches.set(file, (input) => mockupCopy(input, file));

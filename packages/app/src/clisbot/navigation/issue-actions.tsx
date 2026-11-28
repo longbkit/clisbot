@@ -47,7 +47,7 @@ export function IssueActions({
         <>
           {canReload ? (
             <Button
-              size="xs"
+              size="sm"
               variant="ghost"
               leftIcon={RotateCw}
               onPress={actions.reload}
@@ -58,7 +58,7 @@ export function IssueActions({
             </Button>
           ) : null}
           <Button
-            size="xs"
+            size="sm"
             variant="ghost"
             leftIcon={X}
             onPress={actions.dismiss}

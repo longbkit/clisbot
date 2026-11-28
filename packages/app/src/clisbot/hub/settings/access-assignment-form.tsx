@@ -402,7 +402,7 @@ function AgentConfigurationSection({
                 setConfigurations={setConfigurations}
               />
             ))}
-            <Button size="xs" variant="outline" disabled={pending} onPress={addConfiguration}>
+            <Button size="sm" variant="outline" disabled={pending} onPress={addConfiguration}>
               {t("hub.access.form.addAgentConfiguration")}
             </Button>
           </View>

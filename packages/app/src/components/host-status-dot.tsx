@@ -8,6 +8,8 @@ import {
   useHostRuntimeConnectionStatus,
 } from "@/runtime/host-runtime";
 
+export const HOST_STATUS_DOT_SIZE = 8;
+
 export function HostStatusDot({ serverId }: { serverId: string }) {
   const status = useHostRuntimeConnectionStatus(serverId);
   return <ConnectionStatusDot status={status} />;
@@ -71,8 +73,8 @@ function statusStyle(status: HostRuntimeConnectionStatus) {
 
 const styles = StyleSheet.create((theme) => ({
   dot: {
-    width: 8,
-    height: 8,
+    width: HOST_STATUS_DOT_SIZE,
+    height: HOST_STATUS_DOT_SIZE,
     borderRadius: theme.borderRadius.full,
   },
   dotSmall: {

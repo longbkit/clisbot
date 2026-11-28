@@ -41,7 +41,7 @@ export function TeamSettings() {
   const inviteButton = useMemo(
     () =>
       canInvite ? (
-        <Button size="xs" variant="default" disabled={actions.pending} onPress={people.openInvite}>
+        <Button size="sm" variant="default" disabled={actions.pending} onPress={people.openInvite}>
           {t("hub.team.people.invitePeople")}
         </Button>
       ) : null,

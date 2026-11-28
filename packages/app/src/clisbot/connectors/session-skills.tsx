@@ -6,7 +6,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { skillOffKey, skillsInOffList } from "@clisbot/protocol/connectors/types";
 import { SettingsSection } from "@/components/settings";
 import { i18n } from "@/i18n/i18next";
-import { useAgentCommandsQuery, type AgentSlashCommand } from "@/hooks/use-agent-commands-query";
+import { useAgentCommandsQuery, type AgentSlashCommand } from "@/agent-commands/use-query";
 import { useSessionStore } from "@/stores/session-store";
 import { settingsStyles } from "@/styles/settings";
 import { ICON_SIZE } from "@/styles/theme";

@@ -4,6 +4,7 @@ import { getWebsiteCacheContext } from "~/cloudflare-cache";
 import { selectAuthorRegistry } from "./registry";
 import {
   loadInstallCounts,
+  loadPluginCount,
   loadRegistryIndex,
   loadRegistryPlugin,
   type RegistryEnvironment,
@@ -51,3 +52,8 @@ export const getPluginInstallCount = createServerFn({ method: "GET" })
 export const getRegistryPlugin = createServerFn({ method: "GET" })
   .validator((id: string) => id)
   .handler(({ data }) => loadRegistryPlugin(registryBase(), data, getWebsiteCacheContext()));
+
+/** Listed plugin count from the cached registry index. */
+export const getPluginCount = createServerFn({ method: "GET" }).handler(() =>
+  loadPluginCount(registryBase(), getWebsiteCacheContext()),
+);

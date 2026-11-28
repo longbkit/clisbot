@@ -53,11 +53,11 @@ function NoticeRow({ reveal, list }: { reveal: OutsideFilterReveal; list: ListSe
         {message}
       </Text>
       <View style={styles.actions}>
-        <Button size="xs" variant="ghost" onPress={showAll} testID={`${list}-notice-show-all`}>
+        <Button size="sm" variant="ghost" onPress={showAll} testID={`${list}-notice-show-all`}>
           {t("notice.showAll")}
         </Button>
         {switchLabel ? (
-          <Button size="xs" variant="ghost" onPress={switchFilter} testID={`${list}-notice-switch`}>
+          <Button size="sm" variant="ghost" onPress={switchFilter} testID={`${list}-notice-switch`}>
             {t("notice.switchTo", { name: switchLabel })}
           </Button>
         ) : null}

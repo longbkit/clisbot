@@ -13,6 +13,11 @@ import type { DeferredAuthorshipProbes } from "./agent/session-storage/deferred-
 import { deleteSessionDirectory } from "./file-upload/session-files.js";
 import { startSessionFileMaintenance } from "./file-upload/session-file-maintenance.js";
 import { FileAgentTimelineStore } from "./agent/session-storage/file-agent-timeline-store.js";
+import { unarchiveWorkspaceAgents } from "./workspace-archive-service.js";
+import { createRestartRecovery } from "./agent/restart-recovery/index.js";
+import { sendPromptToAgent, unarchiveAgentState } from "./agent/agent-prompt.js";
+import { createChangeRequestWatches } from "./agent/change-request-watches/index.js";
+import { createIdleRuntimeCleanup } from "./agent/idle-runtime-cleanup/index.js";
 import {
   createFinishSubscriptions,
   createFinishObservation,
@@ -29,7 +34,8 @@ import { open, rm, stat } from "fs/promises";
 import { randomUUID } from "node:crypto";
 import { getHostName } from "./host-name.js";
 import path from "node:path";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createMcpHandler } from "@modelcontextprotocol/server";
+import { toNodeHandler } from "@modelcontextprotocol/node";
 import type { Logger } from "pino";
 import { z } from "zod";
 import { HUB_CHANNEL_CLIENT_CAPABILITIES } from "@clisbot/protocol/client-capabilities";
@@ -144,9 +150,12 @@ export async function fanOutReconciledWorkspaceUpdates(input: {
   );
 }
 
-import { VoiceAssistantWebSocketServer } from "./websocket-server.js";
+import { VoiceAssistantWebSocketServer, isDaemonOriginAllowed } from "./websocket-server.js";
 import { WorkspaceSetupRuntime } from "./workspace-setup-runtime.js";
 import { createWorkspaceLabelService } from "./workspace-labels/index.js";
+import { createChangeRequestRouter } from "../services/change-request-router.js";
+import { createForgeService } from "../services/forge-registry.js";
+import { createForgeResolver } from "../services/forge-resolver.js";
 import { createGitHubService } from "../services/github-service.js";
 import { createClisbotWorktree as createRegisteredClisbotWorktree } from "./clisbot-worktree-service.js";
 import { createWorkspaceProvisioningService } from "./session/workspace-provisioning/workspace-provisioning-service.js";
@@ -157,6 +166,7 @@ import type { OpenAiSpeechProviderConfig } from "./speech/providers/openai/confi
 import type { LocalSpeechProviderConfig } from "./speech/providers/local/config.js";
 import type { RequestedSpeechProviders } from "./speech/speech-types.js";
 import { createSpeechService } from "./speech/speech-runtime.js";
+import { createSpeechSettingsOwner } from "./speech/speech-settings.js";
 import { AgentManager } from "./agent/agent-manager.js";
 import { AgentStorage } from "./agent/agent-storage.js";
 import { attachAgentStoragePersistence } from "./persistence-hooks.js";
@@ -168,6 +178,7 @@ import {
 } from "./agent/tools/clisbot-tools.js";
 import type { ClisbotToolRuntimeContext } from "./agent/tools/types.js";
 import { createAgentProviderRuntime } from "./agent/provider-runtime.js";
+import { PROVIDER_BACKGROUND_REFRESH_INTERVAL_MS } from "./agent/provider-refresh-schedule.js";
 import { bootstrapWorkspaceRegistries } from "./workspace-registry-bootstrap.js";
 import { WorkspaceReconciliationService } from "./workspace-reconciliation-service.js";
 import {
@@ -187,7 +198,11 @@ import {
 import { connectorChatHooks } from "./connectors/connector-chats.js";
 import { DaemonConfigStore, type MutableDaemonConfig } from "./daemon-config-store.js";
 import { createOrchestrationSkills } from "./orchestration-skills/index.js";
-import { resolveConfigFromPersisted, type CliConfigOverrides } from "./config.js";
+import {
+  resolveReloadableConfig,
+  type ResolvedDaemonSettings,
+  type CliConfigOverrides,
+} from "./config.js";
 import { resolveClisbotToolPolicy } from "./agent/clisbot-tool-policy.js";
 import { resolveTerminalProfiles } from "@clisbot/protocol/terminal-profiles";
 import { BrowserToolsBroker } from "./browser-tools/broker.js";
@@ -201,10 +216,11 @@ import {
   killTerminalsForWorkspace,
   type ActiveWorkspaceRef,
 } from "./workspace-archive-service.js";
+import { WorkspaceArchiveOperations } from "./workspace-archive-operations.js";
 import { setupAutoArchiveOnMerge } from "./auto-archive-on-merge/index.js";
 import { wrapSessionMessage, type SessionOutboundMessage } from "./messages.js";
 import type { TerminalManager } from "../terminal/terminal-manager.js";
-import { createConfiguredTerminalManager } from "../terminal/terminal-manager-factory.js";
+import { startWorkerTerminalManager } from "../terminal/worker-terminal-manager.js";
 import { applyTerminalAgentHookSetting } from "../terminal/agent-hooks/terminal-agent-hook-setting.js";
 import { loadOrCreateDaemonKeyPair } from "./daemon-keypair.js";
 import { createRelayRuntime, type RelayRuntime } from "./relay-runtime.js";
@@ -228,14 +244,17 @@ import type {
   AgentProviderRuntimeSettingsMap,
   ProviderOverride,
 } from "./agent/provider-launch-config.js";
-import { loadPersistedConfig, type PersistedConfig } from "./persisted-config.js";
+import { type PersistedConfig } from "./persisted-config.js";
 import { createServiceProxySubsystem, type ServiceProxySubsystem } from "./service-proxy.js";
 import { releaseWorkspaceServicePortPlan } from "./workspace-service-port-registry.js";
 import { ScriptHealthMonitor } from "./script-health-monitor.js";
 import { createScriptStatusEmitter } from "./script-status-projection.js";
 import { WorkspaceScriptRuntimeStore } from "./workspace-script-runtime-store.js";
 import { createWorkspaceScriptsService } from "./session/workspace-scripts/workspace-scripts-service.js";
-import { assertWorkspaceAutomationAllowedForWorkspace } from "./workspace-automation-gate.js";
+import {
+  assertWorkspaceAutomationAllowedForWorkspace,
+  isCheckoutUntrusted,
+} from "./workspace-automation-gate.js";
 import { spawnWorkspaceScript } from "./worktree-bootstrap.js";
 import {
   createManagedProcessRegistry,
@@ -410,6 +429,8 @@ export interface ClisbotSpeechSttLanguages {
 
 export interface ClisbotSpeechConfig {
   providers: RequestedSpeechProviders;
+  // Where local models live, whether or not a feature currently uses the local provider.
+  localModelsDir: string;
   sttLanguages?: ClisbotSpeechSttLanguages;
   local?: ClisbotLocalSpeechConfig;
 }
@@ -420,12 +441,14 @@ export type DaemonLifecycleIntent =
       clientId: string;
       requestId: string;
       reason: string;
+      keepTerminals: boolean;
     }
   | {
       type: "restart";
       clientId: string;
       requestId: string;
       reason: string;
+      keepTerminals: boolean;
     };
 
 export interface ClisbotDaemonConfig {
@@ -445,6 +468,7 @@ export interface ClisbotDaemonConfig {
    * Off by default; never honoured under external managed access or for proxied requests.
    */
   mcpAllowAnonymous?: boolean;
+  usageEnabled?: boolean;
   browserToolsEnabled?: boolean;
   git?: {
     maxProcessesPerSecond: number;
@@ -500,6 +524,9 @@ export interface ClisbotDaemonConfig {
   dictationFinalTimeoutMs?: number;
   downloadTokenTtlMs?: number;
   agentProviderSettings?: AgentProviderRuntimeSettingsMap;
+  idleRuntimeCleanup?: boolean;
+  resumeOnStartup?: boolean;
+  resumePrompt?: string;
   providerCatalogRefreshTimeoutMs?: number;
   /** Default idle window before an agent's certified-idle provider session closes; 0 disables. */
   closeIdleSessionsAfterMs?: number;
@@ -536,13 +563,15 @@ export interface ClisbotDaemon {
   scriptRuntimeStore: WorkspaceScriptRuntimeStore;
   browserToolsBroker: BrowserToolsBroker;
   start(): Promise<void>;
-  stop(): Promise<void>;
+  /** Stops the daemon. Terminals keep running for the next daemon only with keepTerminals. */
+  stop(options?: { keepTerminals?: boolean }): Promise<void>;
   getListenTarget(): ListenTarget | null;
   getServerId(): string;
 }
 
 export interface ClisbotDaemonDependencies {
   builtinPlugins?: BuiltinPluginLoader;
+  lazyTerminalWorker?: boolean;
   hubRelationshipRemote?: HubRelationshipRemote;
   hubRelationshipClock?: HubRelationshipClock;
   hubRelationshipRetryPolicy?: HubRelationshipRetryPolicy;
@@ -600,7 +629,7 @@ function resolveExpressTrustProxySetting(config: ClisbotDaemonConfig): true | st
 }
 
 function initialManagedAccessConfig(
-  config: ClisbotDaemonConfig,
+  config: Pick<ClisbotDaemonConfig, "managedAccessMode">,
 ): MutableDaemonConfig["managedAccess"] {
   return { mode: config.managedAccessMode ?? "off" };
 }
@@ -662,14 +691,18 @@ function classifyHubAgentMode(
   }
 }
 
-function createInitialRelayConfig(config: ClisbotDaemonConfig): MutableDaemonConfig["relay"] {
+function createInitialRelayConfig(config: ResolvedDaemonSettings): MutableDaemonConfig["relay"] {
   return {
     enabled: config.relayEnabled ?? true,
     requireProtectedSecurity: config.relayRequireProtectedSecurity ?? false,
   };
 }
 
-function createInitialMutableDaemonConfig(config: ClisbotDaemonConfig): MutableDaemonConfig {
+function resolveReloadEnv(config: ClisbotDaemonConfig): NodeJS.ProcessEnv {
+  return config.configReload?.env ?? process.env;
+}
+
+function createInitialMutableDaemonConfig(config: ResolvedDaemonSettings): MutableDaemonConfig {
   const providers = config.providerOverrides ?? {};
 
   const initialConfig: MutableDaemonConfig = {
@@ -686,6 +719,7 @@ function createInitialMutableDaemonConfig(config: ClisbotDaemonConfig): MutableD
     ...(config.providerCatalogRefreshTimeoutMs !== undefined
       ? { catalogRefreshTimeoutMs: config.providerCatalogRefreshTimeoutMs }
       : {}),
+    usage: { enabled: config.usageEnabled !== false },
     browserTools: { enabled: config.browserToolsEnabled ?? false },
     providers,
     metadataGeneration: {
@@ -693,6 +727,9 @@ function createInitialMutableDaemonConfig(config: ClisbotDaemonConfig): MutableD
     },
     autoArchiveAfterMerge: config.autoArchiveAfterMerge ?? false,
     enableTerminalAgentHooks: config.enableTerminalAgentHooks ?? false,
+    idleRuntimeCleanup: config.idleRuntimeCleanup !== false,
+    resumeOnStartup: config.resumeOnStartup === true,
+    resumePrompt: config.resumePrompt ?? "Resume working.",
     appendSystemPrompt: config.appendSystemPrompt ?? "",
     pluginsEnabled: config.pluginsEnabled ?? false,
     plugins: config.plugins ?? {},
@@ -753,6 +790,12 @@ export async function createClisbotDaemon(
   const elapsed = () => `${(performance.now() - bootstrapStart).toFixed(0)}ms`;
   const daemonVersion = config.daemonVersion ?? resolveDaemonVersion(import.meta.url);
   const initialMutableConfig = createInitialMutableDaemonConfig(config);
+  const speechService = createSpeechService({
+    logger,
+    openaiConfig: config.openai,
+    speechConfig: config.speech,
+  });
+  logger.info({ elapsed: elapsed() }, "Speech service created");
   const daemonConfigStore = new DaemonConfigStore(
     config.clisbotHome,
     initialMutableConfig,
@@ -760,16 +803,21 @@ export async function createClisbotDaemon(
     {
       relayEnabledMutable: config.relayEnabledMutable ?? true,
       startupPersisted: config.configReload?.startupPersisted,
+      speech: createSpeechSettingsOwner({
+        clisbotHome: config.clisbotHome,
+        env: resolveReloadEnv(config),
+        speechService,
+      }),
       reloadSource: {
         resolve: (persisted) => {
-          const reloaded = resolveConfigFromPersisted(config.clisbotHome, persisted, {
-            env: config.configReload?.env ?? process.env,
+          const reloaded = resolveReloadableConfig(persisted, {
+            env: resolveReloadEnv(config),
             cli: config.configReload?.cli,
             relayEnabledFallback: config.configReload?.relayEnabledFallback,
           });
           return {
             mutable: createInitialMutableDaemonConfig(reloaded),
-            overrideControlledPaths: reloaded.configReload?.overrideControlledPaths ?? [],
+            overrideControlledPaths: reloaded.overrideControlledPaths,
           };
         },
       },
@@ -786,6 +834,9 @@ export async function createClisbotDaemon(
       hasAgent: (id) => agentManager.getAgent(id) !== null,
       usageSession: (id) => agentManager.usageSession(id),
       providerId: (id) => agentManager.getAgent(id)?.provider,
+      resolveLaunch: (provider) => providerSnapshotManager.resolveUsageLaunch(provider),
+      isProviderActive: (provider, options) =>
+        providerSnapshotManager.isProviderActiveForUsage(provider, options),
     },
     managedSources: new ManagedPluginSources(config.clisbotHome, {
       registries: config.pluginRegistries,
@@ -831,8 +882,12 @@ export async function createClisbotDaemon(
   });
   let boundListenTarget: ListenTarget | null = null;
   let workspaceRegistry: FileBackedWorkspaceRegistry | null = null;
-  const terminalManager = createConfiguredTerminalManager({
+  const terminalManager = await startWorkerTerminalManager({
+    clisbotHome: config.clisbotHome,
+    clisbotVersion: daemonVersion,
+    logger,
     getTerminalActivityUrl: () => createTerminalActivityUrl(boundListenTarget),
+    eagerLaunch: !dependencies.lazyTerminalWorker,
   });
   applyTerminalAgentHookSetting({ store: daemonConfigStore, logger });
 
@@ -843,6 +898,7 @@ export async function createClisbotDaemon(
   });
   const scriptRuntimeStore = new WorkspaceScriptRuntimeStore();
   const workspaceSetupRuntime = new WorkspaceSetupRuntime();
+  const workspaceArchiveOperations = new WorkspaceArchiveOperations();
   let configuredHostnames = config.hostnames ?? config.allowedHosts;
   let appBaseUrl = config.appBaseUrl ?? DEFAULT_APP_BASE_URL;
   daemonConfigStore.onFieldChange("hostnames", (value) => {
@@ -918,7 +974,7 @@ export async function createClisbotDaemon(
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin && (allowedOrigins.has("*") || allowedOrigins.has(origin))) {
+    if (origin && isDaemonOriginAllowed(origin, req.headers.host ?? null, allowedOrigins)) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
       res.setHeader(
@@ -1095,12 +1151,15 @@ export async function createClisbotDaemon(
   const github = createGitHubService();
   // Before any git read or agent launch, so a Quick chat folder never resolves to an outer repo.
   fenceQuickChatsFromGit(config.clisbotHome);
+  const forgeResolver = createForgeResolver({
+    createService: (forge) => (forge === "github" ? github : createForgeService(forge)),
+  });
   const workspaceGitService = new WorkspaceGitServiceImpl({
     logger,
     clisbotHome: config.clisbotHome,
     worktreesRoot: config.worktreesRoot,
     deps: {
-      forgeOverrides: { github },
+      forgeResolver,
     },
   });
   const workspaceRuntimeStore = createWorkspaceRuntimeStore();
@@ -1108,14 +1167,14 @@ export async function createClisbotDaemon(
   workspaceRegistry.subscribeToMutations(async (mutation) => {
     if (mutation.kind === "remove" && mutation.workspace) {
       const cwd = path.resolve(mutation.workspace.cwd);
-      const workspaces = await workspaceRegistry.list();
+      const workspaces = await workspaceRegistry.listActive();
       const hasActiveWorkspace = workspaces.some(
         (workspace) => !workspace.archivedAt && path.resolve(workspace.cwd) === cwd,
       );
       if (!hasActiveWorkspace) workspaceRuntimeStore.remove(cwd);
     }
     if (mutation.kind === "archive" && mutation.workspace) {
-      pluginRuntime.emit("workspace.archived", {
+      pluginRuntime.emit("workspace.archive.after", {
         workspace: describeHookWorkspace(mutation.workspace),
       });
     }
@@ -1123,6 +1182,13 @@ export async function createClisbotDaemon(
   const workspaceProvisioning = createWorkspaceProvisioningService({
     assertProjectDirectory: (cwd) =>
       assertNotBotProjectRoot(cwd, config.bots?.enabled ? config.bots.root : undefined),
+    unarchiveWorkspaceAgents: (request) =>
+      unarchiveWorkspaceAgents({
+        ...request,
+        agentStorage,
+        unarchiveAgent: (id) => unarchiveAgentState(agentStorage, agentManager, id),
+        sessionLogger: logger,
+      }),
     lifecycle: pluginRuntime,
     serverId,
     projectRegistry,
@@ -1142,6 +1208,7 @@ export async function createClisbotDaemon(
       managedProcesses,
       isDev: config.isDev === true,
       extraClients: config.agentClients,
+      backgroundRefresh: { intervalMs: PROVIDER_BACKGROUND_REFRESH_INTERVAL_MS },
     },
   });
   const providerSnapshotManager = agentProviderRuntime.snapshotManager;
@@ -1160,6 +1227,7 @@ export async function createClisbotDaemon(
   const agentManager = new AgentManager({
     serverId,
     pluginLifecycle: pluginRuntime,
+    pluginAgentTools: pluginRuntime,
     clients: initialAgentManagerState.clients,
     providerDefinitions: initialAgentManagerState.providerDefinitions,
     registry: agentStorage,
@@ -1184,12 +1252,40 @@ export async function createClisbotDaemon(
   const unsubscribePluginProviders =
     pluginRuntime.subscribeProviderRegistrations(syncPluginProviders);
 
+  const unsubscribePluginSessionChanges = pluginRuntime.subscribeSessionOpenChanges(() => {
+    agentManager.invalidatePluginSessions();
+  });
+
   const detachAgentStoragePersistence = attachAgentStoragePersistence(
     logger,
     agentManager,
     agentStorage,
   );
-  await closeStaleAgentRecords(agentStorage);
+  const restartRecovery = createRestartRecovery({
+    storage: agentStorage,
+    settings: () => ({
+      enabled: daemonConfigStore.get().resumeOnStartup === true,
+      prompt: daemonConfigStore.get().resumePrompt ?? "Resume working.",
+    }),
+    eligible: async (record) =>
+      !record.workspaceId || !(await workspaceRegistry?.get(record.workspaceId))?.archivedAt,
+    dispatch: (agentId, prompt) => {
+      if (!wsServer) throw new Error("Daemon is not accepting agent messages");
+      return sendPromptToAgent({
+        agentMessages: wsServer.agentMessages,
+        agentId,
+        prompt,
+        agentManager,
+        agentStorage,
+        logger,
+        unarchive: false,
+      });
+    },
+    report: (agentId, err) => logger.error({ agentId, err }, "Agent restart recovery failed"),
+  });
+  // Storage was initialized above (Clisbot initializes it before session storage wiring).
+  // prepareStartup replaces the former closeStaleAgentRecords repair of interrupted shutdowns.
+  await restartRecovery.prepareStartup();
   const deferredAuthorshipProbes = await recoverAuthorshipAtStartup(
     logger,
     agentStorage,
@@ -1241,11 +1337,13 @@ export async function createClisbotDaemon(
   const archiveWorkspaceRecordExternal = async (
     workspaceId: string,
     context?: WorkspaceArchiveContext,
+    archivedAt?: string,
   ) => {
     const existingWorkspace = await archivePersistedWorkspaceRecord({
       workspaceId,
       workspaceRegistry,
       context,
+      archivedAt,
     });
     if (!existingWorkspace || existingWorkspace.archivedAt) return;
     teardownArchivedWorkspaceRuntime(workspaceId);
@@ -1253,13 +1351,14 @@ export async function createClisbotDaemon(
   // external path→workspace adapter, not ownership: archive-by-path requests that
   // arrive with a worktree path and no workspaceId (old clients / CLI).
   const findWorkspaceIdForCwdExternal = async (cwd: string): Promise<string | null> => {
-    return resolveWorkspaceIdForPath(cwd, await workspaceRegistry.list());
+    // Explicit archive administration must prefer an archived exact match to an active ancestor.
+    return resolveWorkspaceIdForPath(cwd, await workspaceRegistry.listAll());
   };
   const ensureWorkspaceForCreateExternal = async (
     cwd: string,
     firstAgentContext?: FirstAgentContext,
     projectId?: string,
-    context?: { callerWorkspaceId?: string },
+    context?: { background?: boolean; callerWorkspaceId?: string },
   ): Promise<string> => {
     const workspace = await workspaceProvisioning.createWorkspaceForDirectory(
       cwd,
@@ -1277,7 +1376,7 @@ export async function createClisbotDaemon(
     return workspace.workspaceId;
   };
   const listActiveWorkspacesExternal = async (): Promise<ActiveWorkspaceRef[]> => {
-    const workspaces = await workspaceRegistry.list();
+    const workspaces = await workspaceRegistry.listActive();
     return workspaces
       .filter((workspace) => !workspace.archivedAt)
       .map((workspace) => ({
@@ -1287,33 +1386,22 @@ export async function createClisbotDaemon(
         worktreeRoot: workspace.worktreeRoot,
         isClisbotOwnedWorktree: workspace.isClisbotOwnedWorktree,
         mainRepoRoot: workspace.mainRepoRoot,
+        worktreeManagerPluginId: workspace.worktreeManagerPluginId,
+        untrustedSource: workspace.untrustedSource,
       }));
   };
-  const markWorkspaceArchivingExternal = (workspaceIds: Iterable<string>, archivingAt: string) => {
-    const workspaceIdList = Array.from(workspaceIds);
-    for (const session of wsServer?.listSessions() ?? []) {
-      session.markWorkspaceArchivingForExternalMutation(workspaceIdList, archivingAt);
-    }
-  };
-  const clearWorkspaceArchivingExternal = (workspaceIds: Iterable<string>) => {
-    const workspaceIdList = Array.from(workspaceIds);
-    for (const session of wsServer?.listSessions() ?? []) {
-      session.clearWorkspaceArchivingForExternalMutation(workspaceIdList);
-    }
-  };
+  const markWorkspaceArchiving = (workspaceIds: Iterable<string>, archivingAt: string) =>
+    workspaceArchiveOperations.markArchiving(workspaceIds, archivingAt);
+  const clearWorkspaceArchiving = (workspaceIds: Iterable<string>) =>
+    workspaceArchiveOperations.clearArchiving(workspaceIds);
   const emitWorkspaceUpdatesExternal = async (workspaceIds: Iterable<string>) => {
-    const workspaceIdList = Array.from(workspaceIds);
-    await Promise.all(
-      (wsServer?.listSessions() ?? []).map((session) =>
-        session.emitWorkspaceUpdatesForExternalWorkspaceIds(workspaceIdList),
-      ),
-    );
+    await wsServer?.publishWorkspaceUpdates(workspaceIds);
   };
   const ensureWorkspaceForCreateAndBroadcastExternal = async (
     cwd: string,
     firstAgentContext?: FirstAgentContext,
     projectId?: string,
-    context?: { callerWorkspaceId?: string },
+    context?: { background?: boolean; callerWorkspaceId?: string },
   ): Promise<string> => {
     const workspaceId = await ensureWorkspaceForCreateExternal(
       cwd,
@@ -1325,7 +1413,7 @@ export async function createClisbotDaemon(
     return workspaceId;
   };
   const emitWorkspaceUpdateForCwdExternal = async (cwd: string) => {
-    const workspaceIds = workspaceIdsOnCheckout(await workspaceRegistry.list(), cwd);
+    const workspaceIds = workspaceIdsOnCheckout(await workspaceRegistry.listActive(), cwd);
     await emitWorkspaceUpdatesExternal(workspaceIds);
   };
   const emitExternalSessionMessage = (message: SessionOutboundMessage) => {
@@ -1353,6 +1441,8 @@ export async function createClisbotDaemon(
   setupAutoArchiveOnMerge({
     clisbotHome: config.clisbotHome,
     clisbotWorktreesBaseRoot: config.worktreesRoot,
+    worktreeManagers: pluginRuntime,
+    workspaceArchiveOperations,
     daemonConfigStore,
     workspaceGitService,
     github,
@@ -1361,12 +1451,14 @@ export async function createClisbotDaemon(
     terminalManager,
     logger,
     findWorkspaceIdForCwd: findWorkspaceIdForCwdExternal,
+    getWorkspace: (workspaceId) => workspaceRegistry.get(workspaceId),
+    isCheckoutUntrusted: (checkoutPath) => isCheckoutUntrusted(workspaceRegistry, checkoutPath),
     listActiveWorkspaces: listActiveWorkspacesExternal,
     getAutoArchivedChangeRequestUrl: async (workspaceId) =>
       (await workspaceRegistry.get(workspaceId))?.autoArchivedChangeRequestUrl ?? null,
     archiveWorkspaceRecord: archiveWorkspaceRecordExternal,
-    markWorkspaceArchiving: markWorkspaceArchivingExternal,
-    clearWorkspaceArchiving: clearWorkspaceArchivingExternal,
+    markWorkspaceArchiving,
+    clearWorkspaceArchiving,
     emitWorkspaceUpdatesForWorkspaceIds: emitWorkspaceUpdatesExternal,
   });
 
@@ -1380,6 +1472,8 @@ export async function createClisbotDaemon(
         worktreesRoot: config.worktreesRoot,
         createClisbotWorktree: async (workflowInput, workflowOptions) => {
           return createRegisteredClisbotWorktree(workflowInput, {
+            lifecycle: pluginRuntime,
+            worktreeManagers: pluginRuntime,
             github,
             ...(workflowOptions?.resolveDefaultBranch
               ? {
@@ -1440,6 +1534,8 @@ export async function createClisbotDaemon(
       {
         clisbotHome: config.clisbotHome,
         clisbotWorktreesBaseRoot: config.worktreesRoot,
+        worktreeManagers: pluginRuntime,
+        workspaceArchiveOperations,
         github,
         workspaceGitService,
         agentManager,
@@ -1447,15 +1543,17 @@ export async function createClisbotDaemon(
         findWorkspaceIdForCwd: findWorkspaceIdForCwdExternal,
         listActiveWorkspaces: listActiveWorkspacesExternal,
         getWorkspace: (workspaceIdToGet) => workspaceRegistry.get(workspaceIdToGet),
-        archiveWorkspaceRecord: archiveWorkspaceRecordExternal,
+        archiveWorkspaceRecord: (workspaceIdToArchive, archivedAt) =>
+          archiveWorkspaceRecordExternal(workspaceIdToArchive, undefined, archivedAt),
         emitWorkspaceUpdatesForWorkspaceIds: emitWorkspaceUpdatesExternal,
-        markWorkspaceArchiving: markWorkspaceArchivingExternal,
-        clearWorkspaceArchiving: clearWorkspaceArchivingExternal,
+        markWorkspaceArchiving,
+        clearWorkspaceArchiving,
         killTerminalsForWorkspace: (workspaceIdToKill) =>
           killTerminalsForWorkspace({ terminalManager, sessionLogger: logger }, workspaceIdToKill),
         stopWorkspaceSetup: (workspaceIdToStop) => workspaceSetupRuntime.stop(workspaceIdToStop),
         assertWorkspaceAutomationAllowed: (guardedWorkspaceId) =>
           assertWorkspaceAutomationAllowedForWorkspace(workspaceRegistry, guardedWorkspaceId),
+        isCheckoutUntrusted: (checkoutPath) => isCheckoutUntrusted(workspaceRegistry, checkoutPath),
         sessionLogger: logger,
       },
       { scope: { kind: "workspace", workspaceId }, requestId },
@@ -1463,6 +1561,10 @@ export async function createClisbotDaemon(
   const hubAgentLifecycle = new CreateAgentLifecycleDispatch({
     clisbotHome: config.clisbotHome,
     worktreesRoot: config.worktreesRoot,
+    worktreeManagers: pluginRuntime,
+    workspaceArchiveOperations,
+    getWorkspace: (workspaceId) => workspaceRegistry.get(workspaceId),
+    isCheckoutUntrusted: (checkoutPath) => isCheckoutUntrusted(workspaceRegistry, checkoutPath),
     agentManager,
     agentStorage,
     github,
@@ -1472,12 +1574,12 @@ export async function createClisbotDaemon(
       archiveAgentCommand({ agentManager, agentStorage, logger }, agentId),
     findWorkspaceIdForCwd: findWorkspaceIdForCwdExternal,
     listActiveWorkspaces: listActiveWorkspacesExternal,
-    archiveWorkspaceRecord: archiveWorkspaceRecordExternal,
+    archiveWorkspaceRecord: (workspaceId) => archiveWorkspaceRecordExternal(workspaceId),
     emit: emitExternalSessionMessage,
     emitAgentRemove: async () => undefined,
     emitWorkspaceUpdatesForWorkspaceIds: emitWorkspaceUpdatesExternal,
-    markWorkspaceArchiving: markWorkspaceArchivingExternal,
-    clearWorkspaceArchiving: clearWorkspaceArchivingExternal,
+    markWorkspaceArchiving,
+    clearWorkspaceArchiving,
     killTerminalsForWorkspace: (workspaceId) =>
       killTerminalsForWorkspace({ terminalManager, sessionLogger: logger }, workspaceId),
     logger,
@@ -1526,6 +1628,10 @@ export async function createClisbotDaemon(
     },
     createExecutionAgents: (daemonId, hubOrigin) =>
       new DaemonExecutions({
+        agentMessages: () => {
+          if (!wsServer) throw new Error("Daemon is not accepting agent messages");
+          return wsServer.agentMessages;
+        },
         daemonId,
         hubOrigin,
         agentManager,
@@ -1651,6 +1757,8 @@ export async function createClisbotDaemon(
       {
         clisbotHome: config.clisbotHome,
         clisbotWorktreesBaseRoot: config.worktreesRoot,
+        worktreeManagers: pluginRuntime,
+        workspaceArchiveOperations,
         github,
         workspaceGitService,
         agentManager,
@@ -1658,10 +1766,11 @@ export async function createClisbotDaemon(
         findWorkspaceIdForCwd: findWorkspaceIdForCwdExternal,
         listActiveWorkspaces: listActiveWorkspacesExternal,
         getWorkspace: (workspaceIdToGet) => workspaceRegistry.get(workspaceIdToGet),
-        archiveWorkspaceRecord: archiveWorkspaceRecordExternal,
+        archiveWorkspaceRecord: (workspaceIdToArchive, archivedAt) =>
+          archiveWorkspaceRecordExternal(workspaceIdToArchive, undefined, archivedAt),
         emitWorkspaceUpdatesForWorkspaceIds: emitWorkspaceUpdatesExternal,
-        markWorkspaceArchiving: markWorkspaceArchivingExternal,
-        clearWorkspaceArchiving: clearWorkspaceArchivingExternal,
+        markWorkspaceArchiving,
+        clearWorkspaceArchiving,
         killTerminalsForWorkspace: (workspaceIdToKill) =>
           killTerminalsForWorkspace(
             {
@@ -1673,6 +1782,7 @@ export async function createClisbotDaemon(
         stopWorkspaceSetup: (workspaceIdToStop) => workspaceSetupRuntime.stop(workspaceIdToStop),
         assertWorkspaceAutomationAllowed: (guardedWorkspaceId) =>
           assertWorkspaceAutomationAllowedForWorkspace(workspaceRegistry, guardedWorkspaceId),
+        isCheckoutUntrusted: (checkoutPath) => isCheckoutUntrusted(workspaceRegistry, checkoutPath),
         sessionLogger: logger,
       },
       {
@@ -1694,7 +1804,28 @@ export async function createClisbotDaemon(
     resolveScheduleModeId: createScheduleModeResolver(providerSnapshotManager, logger),
   });
   await scheduleService.start();
+
+  const changeRequestWatches = createChangeRequestWatches({
+    router: createChangeRequestRouter({ forgeResolver }),
+    backgroundWork: agentManager,
+    clisbotHome: config.clisbotHome,
+    logger,
+    isActive: async (agentId) => {
+      const record = await agentStorage.get(agentId);
+      return record ? !record.archivedAt : Boolean(agentManager.getAgent(agentId));
+    },
+    messages: () => {
+      if (!wsServer) throw new Error("Daemon is not accepting agent messages");
+      return wsServer.agentMessages;
+    },
+  });
+
   agentManager.setAgentArchivedCallback(async (agentId) => {
+    await changeRequestWatches
+      .archive(agentId)
+      .catch((err) =>
+        logger.warn({ err, agentId }, "Could not remove archived agent's change request watches"),
+      );
     try {
       await scheduleService.completeForAgent(agentId);
     } catch (error) {
@@ -1724,6 +1855,10 @@ export async function createClisbotDaemon(
     botService,
     {
       rootDir: path.join(config.clisbotHome, "chats"),
+      agentMessages: () => {
+        if (!wsServer) throw new Error("Daemon is not accepting agent messages");
+        return wsServer.agentMessages;
+      },
       agentManager,
       agentStorage,
       createAgent,
@@ -1749,7 +1884,8 @@ export async function createClisbotDaemon(
     ...connectorChatHooks(chatService, agentManager),
   });
   logger.info({ elapsed: elapsed() }, "Loading persisted agent registry");
-  const persistedRecords = await agentStorage.list();
+  // Startup loads persisted agent history once before restoring the registry.
+  const persistedRecords = await agentStorage.listAll();
   logger.info(
     { elapsed: elapsed() },
     `Agent registry loaded (${persistedRecords.length} record${persistedRecords.length === 1 ? "" : "s"}); agents will initialize on demand`,
@@ -1791,6 +1927,7 @@ export async function createClisbotDaemon(
       onRemoteAuthorityChange: onRemoteAgentHostAuthorityChange,
       agentManager,
       agentStorage,
+      waitForResume: restartRecovery.waitForResume,
       serverId,
       logger,
       messages: () => {
@@ -1804,9 +1941,28 @@ export async function createClisbotDaemon(
     }),
   });
 
+  // Both idle collectors (upstream's runtime cleanup and Clisbot's idle-session reaper) keep a
+  // session that still owes a finish notification or a queued agent message.
+  const hasPendingAgentDelivery = (agentId: string) =>
+    finishSubscriptions.hasPendingForCaller(agentId) ||
+    (wsServer?.agentMessages.hasPending(agentId) ?? false);
+  agentManager.setPendingAgentDeliveryProbe(hasPendingAgentDelivery);
+  const idleRuntimeCleanup = createIdleRuntimeCleanup({
+    enabled: daemonConfigStore.get().idleRuntimeCleanup !== false,
+    runtimes: () => agentManager.getRuntimeCleanupCandidates(),
+    isProtected: hasPendingAgentDelivery,
+    logger,
+  });
+
+  const unsubscribeIdleRuntimeCleanup = connectIdleRuntimeCleanupConfig(
+    daemonConfigStore,
+    idleRuntimeCleanup,
+  );
+
   const createAgentToolHostDependencies = (
     runtime: ClisbotToolRuntimeContext,
   ): ClisbotToolHostDependencies => ({
+    changeRequestWatches,
     finishSubscriptions: () => finishSubscriptions,
     canUseRemoteHosts: canUseRemoteAgentHosts,
     agentMessages: () => {
@@ -1827,9 +1983,13 @@ export async function createClisbotDaemon(
     daemonConfigStore,
     github,
     workspaceGitService,
+    worktreeManagers: pluginRuntime,
+    workspaceArchiveOperations,
+    isCheckoutUntrusted: (checkoutPath) => isCheckoutUntrusted(workspaceRegistry, checkoutPath),
     findWorkspaceIdForCwd: findWorkspaceIdForCwdExternal,
     listActiveWorkspaces: listActiveWorkspacesExternal,
-    archiveWorkspaceRecord: archiveWorkspaceRecordExternal,
+    archiveWorkspaceRecord: (workspaceId, archivedAt) =>
+      archiveWorkspaceRecordExternal(workspaceId, undefined, archivedAt),
     emitWorkspaceUpdatesForWorkspaceIds: emitWorkspaceUpdatesExternal,
     workspaceRegistry,
     projectRegistry,
@@ -1860,10 +2020,10 @@ export async function createClisbotDaemon(
       spawnWorkspaceScript,
       assertAutomationAllowed: (workspaceId) =>
         assertWorkspaceAutomationAllowedForWorkspace(workspaceRegistry, workspaceId),
-      globalServicePorts: loadPersistedConfig(config.clisbotHome).worktrees?.servicePorts,
+      getGlobalServicePorts: () => daemonConfigStore.readServicePorts(),
     }),
-    markWorkspaceArchiving: markWorkspaceArchivingExternal,
-    clearWorkspaceArchiving: clearWorkspaceArchivingExternal,
+    markWorkspaceArchiving,
+    clearWorkspaceArchiving,
     ensureWorkspaceForCreate: createAgentCommandDependencies.ensureWorkspaceForCreate,
     createClisbotWorktree: createAgentCommandDependencies.createClisbotWorktree,
     browserToolsEnabled: runtime.browserToolsEnabled ?? browserToolsPolicy.isEnabled(),
@@ -1899,6 +2059,11 @@ export async function createClisbotDaemon(
   {
     const agentMcpRoute = "/mcp/agents";
 
+    // Stateless serving: createMcpHandler builds a fresh server per request and
+    // serves both protocol eras — modern 2026-07-28 (per-request envelope) and
+    // 2025-era clients through its stateless legacy fallback. No per-session
+    // state is retained between requests, matching the previous
+    // `sessionIdGenerator: undefined` transport.
     const createAgentMcpSession = async (
       callerAgentId: string | undefined,
       hostAuthority: NonNullable<ClisbotToolRuntimeContext["hostAuthority"]>,
@@ -1919,25 +2084,13 @@ export async function createClisbotDaemon(
         }),
       );
 
-      // Stateless mode: each HTTP request builds a fresh server + transport that is
-      // torn down when the response closes, so no per-session state is retained between
-      // requests. The agent control plane only lists and calls tools, neither of which
-      // needs cross-request state, so sessions would only pin memory for the life of the
-      // daemon (agents that exit without a clean DELETE never get reaped).
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        // NOTE: We enforce a Vite-like host allowlist at the app/websocket layer.
-        // StreamableHTTPServerTransport's built-in check requires exact Host header matches.
-        enableDnsRebindingProtection: false,
-      });
-      Object.assign(transport, {
+      const handler = createMcpHandler(() => agentMcpServer, {
+        legacy: "stateless",
         onerror: (err: Error) => {
           logger.error({ err }, "Agent MCP transport error");
         },
       });
-
-      await agentMcpServer.connect(transport);
-      return { server: agentMcpServer, transport };
+      return { handler };
     };
 
     const runAgentMcpRequest = async (
@@ -2009,17 +2162,17 @@ export async function createClisbotDaemon(
         } else if (Array.isArray(callerAgentIdRaw) && typeof callerAgentIdRaw[0] === "string") {
           callerAgentId = callerAgentIdRaw[0];
         }
-        const { server, transport } = await createAgentMcpSession(callerAgentId, hostAuthority);
-        res.on("close", () => {
-          void transport.close();
-          void server.close();
-        });
-
-        await transport.handleRequest(
-          req as unknown as IncomingMessage,
-          res as unknown as ServerResponse,
-          req.body,
-        );
+        const { handler } = await createAgentMcpSession(callerAgentId, hostAuthority);
+        try {
+          // express.json() already consumed the stream, so hand the parsed body over.
+          await toNodeHandler(handler)(
+            req as unknown as IncomingMessage,
+            res as unknown as ServerResponse,
+            req.body,
+          );
+        } finally {
+          await handler.close();
+        }
       } catch (err) {
         logger.error({ err }, "Failed to handle Agent MCP request");
         if (!res.headersSent) {
@@ -2051,13 +2204,6 @@ export async function createClisbotDaemon(
     }
     connectors.mountRelay(app);
   }
-
-  const speechService = createSpeechService({
-    logger,
-    openaiConfig: config.openai,
-    speechConfig: config.speech,
-  });
-  logger.info({ elapsed: elapsed() }, "Speech service created");
 
   logger.info({ elapsed: elapsed() }, "Bootstrap complete, ready to start listening");
 
@@ -2249,6 +2395,7 @@ export async function createClisbotDaemon(
               botService ?? undefined,
               chatService,
               connectors.service ?? undefined,
+              workspaceArchiveOperations,
             );
             pluginRuntime.bindClisbotSessionHost(wsServer);
             const timelineViewers = wsServer;
@@ -2259,7 +2406,9 @@ export async function createClisbotDaemon(
             );
             await pluginRuntime.start();
             providerSnapshotManager.settlePluginProviders();
+            restartRecovery.resumePending();
             await finishSubscriptions.start();
+            await changeRequestWatches.start();
             wsServer.beginAcceptingConnections();
             const relaySecurityLogger = logger.child({ module: "relay-security" });
             relayRuntime = createRelayRuntime({
@@ -2344,6 +2493,7 @@ export async function createClisbotDaemon(
       localCredential = null;
       await deleteLocalCredential(config.clisbotHome);
       unsubscribePluginProviders();
+      unsubscribePluginSessionChanges();
       await pluginRuntime.stopAllPlugins().catch(() => undefined);
       await serviceProxy.stopStandalone().catch(() => undefined);
       await agentProviderRuntime.shutdown().catch(() => undefined);
@@ -2355,7 +2505,9 @@ export async function createClisbotDaemon(
     }
   };
 
-  const stop = async () => {
+  const stop = async (options?: { keepTerminals?: boolean }) => {
+    const keepTerminals = options?.keepTerminals === true;
+    let terminalShutdownError: unknown = null;
     await stopSessionFileMaintenance();
     stopHubProjectPublishing();
     localCredential = null;
@@ -2365,26 +2517,61 @@ export async function createClisbotDaemon(
     // that is still open. Plugins themselves stop after agent closure below.
     unsubscribePluginProviders();
     deferredAuthorshipProbes?.stop();
+    unsubscribePluginSessionChanges();
     await hubRelationships.stop();
     workspaceReconciliation.dispose();
     scriptHealthMonitor.stop();
+    unsubscribeIdleRuntimeCleanup();
+    await idleRuntimeCleanup.close();
     // Freeze both ingress and registration before taking the agent closure snapshot.
     wsServer?.prepareForShutdown();
+    await changeRequestWatches.close();
     await finishSubscriptions.close();
     await wsServer?.agentMessages.close();
     agentManager.prepareForShutdown();
+    await restartRecovery.captureRunningAgents();
     await closeAllAgents(logger, agentManager);
     await withTimeout({
       promise: pluginRuntime.drainEvents(),
       timeoutMs: AGENT_CLOSE_TIMEOUT_MS,
       label: "drain plugin lifecycle events",
     }).catch((error) => logger.warn({ err: error }, "Plugin lifecycle events did not finish"));
-    await agentManager.flushForShutdown().catch(() => undefined);
+    let shutdownFlushTimedOut = false;
+    await withTimeout({
+      promise: agentManager.flushForShutdown(),
+      timeoutMs: AGENT_CLOSE_TIMEOUT_MS,
+      label: "flush agent shutdown tasks",
+    }).catch((error) => {
+      shutdownFlushTimedOut = true;
+      logger.warn({ err: error }, "Agent shutdown tasks did not finish before provider shutdown");
+    });
     detachAgentStoragePersistence();
     await agentStorage.flush().catch(() => undefined);
     await agentProviderRuntime.shutdown();
+    if (shutdownFlushTimedOut) {
+      await withTimeout({
+        promise: agentManager.flushForShutdown(),
+        timeoutMs: AGENT_CLOSE_TIMEOUT_MS,
+        label: "flush agent shutdown tasks after provider shutdown",
+      }).catch((error) =>
+        logger.warn({ err: error }, "Agent shutdown tasks did not finish after provider shutdown"),
+      );
+      await agentStorage.flush().catch(() => undefined);
+    }
     await pluginRuntime.stopAllPlugins();
-    terminalManager.killAll();
+    try {
+      if (keepTerminals) {
+        await terminalManager.detach();
+        logger.info("Terminals left running for the next daemon");
+      } else {
+        await terminalManager.closeTerminals();
+      }
+    } catch (error) {
+      // Finish the rest of the shutdown, then report it: the supervisor and `daemon stop`
+      // retry the cleanup from the record the reaper kept.
+      terminalShutdownError = error;
+      logger.error({ err: error }, "Terminal shutdown failed");
+    }
     await speechService.stop();
     await chatRuntime.stop();
     await scheduleService.stop().catch(() => undefined);
@@ -2393,6 +2580,7 @@ export async function createClisbotDaemon(
     if (wsServer) {
       await wsServer.close();
     }
+    forgeResolver.dispose();
     await serviceProxy.stopStandalone();
     // Force-drop remaining sockets so httpServer.close() resolves promptly.
     // We've already closed wsServer (which sent ws-layer close frames) and
@@ -2408,6 +2596,9 @@ export async function createClisbotDaemon(
     // Clean up socket files
     if (listenTarget.type === "socket" && existsSync(listenTarget.path)) {
       unlinkSync(listenTarget.path);
+    }
+    if (terminalShutdownError) {
+      throw terminalShutdownError;
     }
   };
 
@@ -2452,16 +2643,6 @@ async function recoverAuthorshipAtStartup(
   return probes;
 }
 
-async function closeStaleAgentRecords(agentStorage: AgentStorage): Promise<void> {
-  // No provider runtimes are loaded at startup. Repair interrupted
-  // shutdowns before any status consumer sees the persisted active states.
-  for (const record of await agentStorage.list()) {
-    if (record.lastStatus === "running" || record.lastStatus === "initializing") {
-      await agentStorage.upsert({ ...record, lastStatus: "closed" });
-    }
-  }
-}
-
 /**
  * Closing an agent asks its provider to close the session and waits for the
  * answer. A provider that never answers must not hold the daemon open, so a
@@ -2495,4 +2676,12 @@ function scheduleSavedLocalServices(home: string, logger: Pick<Logger, "warn">):
     );
   }, 1000);
   timer.unref();
+}
+
+export function connectIdleRuntimeCleanupConfig(
+  store: DaemonConfigStore,
+  cleanup: Pick<ReturnType<typeof createIdleRuntimeCleanup>, "setEnabled">,
+): () => void {
+  cleanup.setEnabled(store.get().idleRuntimeCleanup !== false);
+  return store.onFieldChange("idleRuntimeCleanup", (value) => cleanup.setEnabled(value !== false));
 }

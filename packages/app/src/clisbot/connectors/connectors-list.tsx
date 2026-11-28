@@ -154,7 +154,7 @@ function ListFooter({
       <Text style={settingsStyles.rowHint}>{count}</Text>
       {hasMore ? (
         <Button
-          size="xs"
+          size="sm"
           variant="ghost"
           loading={loadingMore}
           disabled={loadingMore}

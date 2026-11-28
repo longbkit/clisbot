@@ -36,7 +36,10 @@ function useCompanyHosts(): ReadonlySet<string> {
 
 /** Every agent update changes `agents`; a hidden Chats list keeps its set until it is shown. */
 function useUnreadAgents(active: boolean): ReadonlySet<string> {
-  const { agents } = useHeldWhileInactive(useAggregatedAgents({ demand: false }), active);
+  const { agents } = useHeldWhileInactive(
+    useAggregatedAgents({ demand: false, observe: true }),
+    active,
+  );
   const { listable } = useSourceLiveness();
   return useMemo(
     () =>

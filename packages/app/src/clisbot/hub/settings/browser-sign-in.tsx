@@ -25,7 +25,7 @@ function RetryToast({ message }: { message: string }) {
       <Text style={styles.text} numberOfLines={2}>
         {message}
       </Text>
-      <Button size="xs" variant="ghost" onPress={runPendingRetry} testID="hub-sign-in-retry">
+      <Button size="sm" variant="ghost" onPress={runPendingRetry} testID="hub-sign-in-retry">
         {i18n.t("hub.account.signIn.retry")}
       </Button>
     </View>

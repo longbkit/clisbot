@@ -138,6 +138,9 @@ afterEach(() => {
   cleanup();
 });
 
+const RELEASE_BOT_ON_HOST = { id: "agent-b", serverId: "host", title: "Release bot" };
+const RELEASE_BOT = { id: "agent-b", title: "Release bot" };
+
 it("left-aligns another user's message with the avatar beside the name", () => {
   const view = renderWithProviders(
     <UserMessage sender={other} isFirstInGroup isLastInGroup {...messageProps()} />,
@@ -307,4 +310,33 @@ it("keeps a leading paragraph flush without a negative margin", async () => {
   expect(
     Math.abs(paragraph.getBoundingClientRect().top - container.getBoundingClientRect().top),
   ).toBeLessThan(1);
+});
+
+// Clisbot keeps `sender` for the human (or automation) author; upstream's agent-to-agent
+// provenance arrives as `agentSender` (agent-stream/presentation.ts) and draws "Sent by".
+it("draws the human author and the sending agent together, each from its own field", () => {
+  const view = renderWithProviders(
+    <UserMessage sender={other} agentSender={RELEASE_BOT_ON_HOST} {...messageProps()} />,
+  );
+  const row = screen.getByTestId("actor-response-row");
+  expect(screen.getByRole("button", { name: "Open profile: Alex (other-id)" })).toBeTruthy();
+  expect(within(row).getByText("Sent by Release bot")).toBeTruthy();
+  // The agent attribution sits inside the message content, not in the author's name row.
+  const name = [...row.querySelectorAll<HTMLElement>("*")].find(
+    (el) => el.textContent === "Alex" && el.children.length === 0,
+  );
+  expect(name).toBeTruthy();
+  expect(view.container.textContent).not.toContain("Sent by Alex");
+});
+
+it("draws no agent attribution for a human-only message, and no human for an agent-only one", () => {
+  const human = renderWithProviders(<UserMessage sender={other} {...messageProps()} />);
+  expect(human.container.textContent).not.toContain("Sent by");
+  cleanup();
+  const agentOnly = renderWithProviders(
+    <UserMessage agentSender={RELEASE_BOT} {...messageProps()} />,
+  );
+  expect(agentOnly.container.textContent).toContain("Sent by Release bot");
+  // Without a recorded author the row keeps its own-message layout; it never borrows a human.
+  expect(screen.queryByRole("button", { name: "Open profile: Alex (other-id)" })).toBeNull();
 });

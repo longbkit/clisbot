@@ -33,7 +33,7 @@ Clisbot launches the agent CLIs you've already installed, it doesn't bundle them
 
 ### See what Clisbot sees
 
-Open **Settings → your host → Providers**, tap the provider, then tap **Diagnostic**. The rows that matter:
+Open **Settings → your host → Providers**, tap the provider, then tap **Diagnostic report**. The rows that matter:
 
 - **Resolved path** — where Clisbot found the binary, or `not found`.
 - **Daemon PATH** — the `PATH` Clisbot is searching. Compare it to `echo $PATH` in a fresh terminal.

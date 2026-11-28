@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 function languageButton(page: Page) {
   return page.getByRole("button", { name: /^(Language|语言)/ }).first();
@@ -7,6 +7,23 @@ function languageButton(page: Page) {
 async function chooseLanguage(page: Page, language: string) {
   await languageButton(page).click();
   await page.getByRole("menuitemradio", { name: language }).click();
+}
+
+async function withPageScriptsHeld(page: Page, run: (release: () => void) => Promise<void>) {
+  let releaseScripts!: () => void;
+  const scriptsReleased = new Promise<void>((resolve) => {
+    releaseScripts = resolve;
+  });
+  await page.route("**/*.js", async (route) => {
+    await scriptsReleased;
+    await route.continue();
+  });
+  try {
+    await run(releaseScripts);
+  } finally {
+    releaseScripts();
+    await page.unrouteAll({ behavior: "wait" });
+  }
 }
 
 function describeAlternates(links: Element[]): string[] {
@@ -121,6 +138,67 @@ test("switches language on the same page, keeping the query and then every link"
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 });
 
+async function openHubDoc(page: Page, prefix: string, slug: string, heading: string) {
+  await page.goto(`${prefix}/docs/hub/${slug}`);
+  await expect(page.getByRole("heading", { name: heading, level: 1 })).toBeVisible();
+}
+
+async function expectHubDocRedirect(
+  page: Page,
+  prefix: string,
+  legacySlug: string,
+  slug: string,
+  heading: string,
+) {
+  await page.goto(`${prefix}/docs/hub/${legacySlug}`);
+  await expect(page).toHaveURL(`${prefix}/docs/hub/${slug}`);
+  await expect(page.getByRole("heading", { name: heading, level: 1 })).toBeVisible();
+}
+
+// Chinese routes for these two pages intentionally serve the reviewed English original.
+for (const { locale, prefix, linear, linearApp, triggers, reference } of [
+  {
+    locale: "English",
+    prefix: "",
+    linear: "Linear triggers",
+    linearApp: "Linear for Hub",
+    triggers: "Triggers",
+    reference: "Trigger YAML reference",
+  },
+  {
+    locale: "Simplified Chinese",
+    prefix: "/zh-CN",
+    linear: "Linear 触发器",
+    linearApp: "为 Hub 配置 Linear",
+    triggers: "Triggers",
+    reference: "Trigger YAML reference",
+  },
+]) {
+  test(`opens ${locale} Hub guides and redirects legacy bookmarks`, async ({ page }) => {
+    await test.step("opens direct links to the new guides", async () => {
+      await openHubDoc(page, prefix, "triggers/linear", linear);
+      await openHubDoc(page, prefix, "self-hosting/linear-app", linearApp);
+    });
+
+    await test.step("redirects legacy guides within the same language", async () => {
+      await expectHubDocRedirect(page, prefix, "workflows", "configuration/reference", reference);
+      await expectHubDocRedirect(
+        page,
+        prefix,
+        "configuration/hub-yml",
+        "configuration/reference",
+        reference,
+      );
+    });
+
+    await test.step("redirects getpaseo/hub-only guides to the triggers page", async () => {
+      for (const legacySlug of ["tools", "triggers/webhooks", "triggers/schedules"]) {
+        await expectHubDocRedirect(page, prefix, legacySlug, "triggers", triggers);
+      }
+    });
+  });
+}
+
 test("shows the language as an abbreviation and lists every language by name", async ({ page }) => {
   await page.goto("/docs/cli#running-agents");
   const button = languageButton(page);
@@ -143,6 +221,7 @@ test("shows the language as an abbreviation and lists every language by name", a
 
 test("switches language from the keyboard", async ({ page }) => {
   await page.goto("/");
+  await expect(languageButton(page)).toBeEnabled();
   await languageButton(page).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("menuitemradio", { name: "English" })).toBeFocused();
@@ -234,5 +313,17 @@ test.describe("server-rendered changelog translation coverage", () => {
     ).toBeVisible();
     await expect(chinese.getByRole("heading", { name: "新增", exact: true }).first()).toBeVisible();
     await expect(page.getByRole("note")).toHaveCount(await english.count());
+  });
+});
+
+test("waits for scripts before enabling the language menu", async ({ page }) => {
+  await withPageScriptsHeld(page, async (releaseScripts) => {
+    await page.goto("/docs/cli#running-agents", { waitUntil: "commit" });
+    await expect(languageButton(page)).toBeVisible();
+    await expect(languageButton(page)).toBeDisabled();
+
+    releaseScripts();
+    await languageButton(page).click();
+    await expect(page.getByRole("menuitemradio", { name: "English" })).toBeVisible();
   });
 });

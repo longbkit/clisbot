@@ -8,7 +8,7 @@ import { expect, it } from "vitest";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const source =
   "node_modules/react-native-reanimated/android/src/main/java/com/swmansion/reanimated/NativeProxy.kt";
-const patch = join(root, "patches/react-native-reanimated+4.5.1.patch");
+const patch = join(root, "patches/react-native-reanimated+4.5.5.patch");
 const fixture = join(root, "packages/app/scripts/reanimated-native-guard-fixture.py");
 const studio = "/Applications/Android Studio.app/Contents";
 const kotlin = process.env.KOTLINC ?? join(studio, "plugins/Kotlin/kotlinc.ide/bin/kotlinc");

@@ -2,7 +2,7 @@
 title: Hub FAQ
 description: Common questions about personal and team Hubs, channels, access, and daemons in Clisbot Hub.
 nav: FAQ
-order: 78
+order: 84
 category: Hub
 ---
 
@@ -15,6 +15,10 @@ No. Clisbot runs agents on your machines without it. Hub adds what a single daem
 ## Personal Hub or team Hub?
 
 A personal Hub runs on one of your machines for your own channels and needs no account sign-in. A team Hub runs on a server your team operates, and members sign in. See [Hub](/docs/hub#personal-hub-or-team-hub).
+
+## Which agent providers can Hub run?
+
+Any provider configured on the target Clisbot daemon, including Claude Code, Codex, OpenCode, Pi, and custom or plugin providers. Choose Agent controls that the Host actually offers.
 
 ## Can I use a personal Hub and my company's Hub together?
 
@@ -30,7 +34,7 @@ Yes. Grant Members or Teams Host/Project access in **People & access**, and requ
 
 ## Can one organization connect several Slack workspaces or GitHub organizations?
 
-Yes. Connections belong to the organization. Add separate installations for the Slack workspaces or GitHub accounts you need.
+Yes. Connections belong to the organization. Add separate installations for the Slack workspaces, Discord servers, Linear workspaces or GitHub accounts you need, and set `connection` on a trigger event to target one.
 
 ## Where does configuration live?
 
@@ -40,7 +44,7 @@ In Hub. Edit Routes in **Channels** and Automations in **Automations** in the ap
 
 Channel inputs use Route Rules. Direct events use sender filters, with exceptions for manual and project-scout inputs. See [trigger filters](/docs/hub/triggers#filters) and review the input before enabling it.
 
-## What happens if the daemon is offline?
+## What happens when a daemon is offline?
 
 An Automation's dispatch fails and its run records the error; trigger it again once the daemon is back. Channel messages have separate [durable ingress handling](/docs/hub/activity); this is not an Automation retry queue.
 
@@ -50,8 +54,8 @@ No. The stored CLI login is a human organization credential; the enrolled daemon
 
 ## Can an Automation reply in Slack, Discord or GitHub?
 
-Yes. Native replies use `hub.reply`; GitHub replies comment on the triggering issue/PR. Trigger documents can add optional reply grants by default; review `allow_outputs` and tell the agent to call the tool. A step's [`github` block](/docs/hub/github) separately grants `git`/`gh` authority. See [Workflows](/docs/hub/workflows).
+Yes. Native replies use `hub.reply`; GitHub replies comment on the triggering issue/PR. Trigger documents can add optional reply grants by default; review `allow_outputs` and tell the agent to call the tool. A step's [`github` block](/docs/hub/github) separately grants `git`/`gh` authority. See [Workflows](/docs/hub/configuration/reference#workflow-documents).
 
-## Can I use it without GitHub?
+## Can I use Hub without GitHub?
 
-Yes. Channels and access need no GitHub. GitHub is only needed for GitHub triggers and GitHub access in workflow steps.
+Yes. Channels and access need no GitHub, and neither do Linear, Slack or Discord triggers. GitHub is only needed for GitHub triggers and GitHub access in workflow steps.

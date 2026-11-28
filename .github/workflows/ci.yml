@@ -2,8 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
-  # Every base branch, so stacked PRs and PRs into `next` get the same checks.
+    branches: [main, "release/**"]
+  # Every base branch, so stacked PRs and PRs into any base get the same checks.
   pull_request:
   merge_group:
   workflow_dispatch:
@@ -20,6 +20,8 @@ env:
   # CI does not use the CUDA execution provider, and the onnxruntime-node
   # postinstall download from NuGet is large enough to make npm ci flaky.
   ONNXRUNTIME_NODE_INSTALL: skip
+  NPM_CONFIG_AUDIT: "false"
+  NPM_CONFIG_FUND: "false"
 
 jobs:
   changes:
@@ -56,7 +58,7 @@ jobs:
           filters: .github/ci-paths.yml
 
       - name: Validate CI contracts
-        run: node --test scripts/ci-workflow.test.mjs scripts/daemon-launch-contract.test.mjs scripts/docker-container.test.mjs scripts/rebrand-clisbot.test.mjs scripts/sync-fdroid-changelogs.test.mjs scripts/channel-upstream-sync.test.mjs scripts/upload-release-assets.test.mjs
+        run: node --test scripts/ci-workflow.test.mjs scripts/daemon-launch-contract.test.mjs scripts/docker-container.test.mjs scripts/rebrand-clisbot.test.mjs scripts/sync-fdroid-changelogs.test.mjs scripts/channel-upstream-sync.test.mjs scripts/upload-release-assets.test.mjs scripts/changelog-utils.test.mjs scripts/release-version-utils.test.mjs scripts/publish-release-packages.test.mjs scripts/push-current-release-tag.test.mjs scripts/reconcile-release.test.mjs scripts/sync-release-notes-from-changelog.test.mjs
 
   quality:
     name: quality
@@ -139,11 +141,12 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && (needs.changes.outputs.full != 'false' || needs.changes.outputs.sdk != 'false') }}
         run: npm run typecheck:examples --workspace=@clisbot/client
 
+  # The locked Playwright installers do not support ubuntu-latest's Ubuntu 26.04.
   typecheck:
     name: typecheck
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.quality != 'false') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -178,8 +181,29 @@ jobs:
       - name: Run website tests
         run: npx vitest run packages/website/src --bail=1
 
+      # WebKit needs about 180 system packages (125 MB) from the Ubuntu mirror. The mirror
+      # sometimes serves them at under 100 kB/s, which turns a 1-minute step into 25 minutes.
+      # Keep the downloaded .deb files in the Actions cache so apt installs them without the mirror.
+      - name: Restore website browser system packages
+        uses: actions/cache@v4
+        with:
+          path: ~/website-browser-debs
+          key: website-browser-debs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: website-browser-debs-${{ runner.os }}-
+
       - name: Install website test browsers
-        run: npx playwright install --with-deps chromium webkit
+        run: |
+          mkdir -p ~/website-browser-debs
+          shopt -s nullglob
+          cached_debs=(~/website-browser-debs/*.deb)
+          if (( ${#cached_debs[@]} > 0 )); then
+            sudo cp "${cached_debs[@]}" /var/cache/apt/archives/
+          fi
+          npx playwright install --with-deps chromium webkit
+          archive_debs=(/var/cache/apt/archives/*.deb)
+          if (( ${#archive_debs[@]} > 0 )); then
+            cp "${archive_debs[@]}" ~/website-browser-debs/
+          fi
 
       - name: Verify website mockups
         run: npm run test:e2e --workspace=@clisbot/website
@@ -284,10 +308,7 @@ jobs:
       - name: Run server integration tests
         run: npm run test:integration --workspace=@clisbot/server
 
-  # native-recursive.ts serves darwin and win32, but windows-latest above is the only
-  # runner that exercises it. macOS — the platform the reported watcher bug was on —
-  # otherwise has no server-test coverage. Scoped to the observer/watcher suites to
-  # bound runtime.
+  # Keep this job scoped to regressions reported on macOS.
   server-tests-macos:
     name: server-tests (macos-15, file observation)
     needs: changes
@@ -314,6 +335,24 @@ jobs:
             src/server/workspace-git-service.observation.test.ts \
             src/server/workspace-git-service.observation.integration.test.ts \
             --bail=1
+
+      - name: Verify path casing on macOS
+        run: |
+          npm run test:unit --workspace=@clisbot/server -- \
+            src/server/agent/agent-storage.test.ts \
+            src/utils/directory-suggestions.test.ts \
+            --bail=1
+
+      - name: Verify plugin compiler children are reaped
+        run: |
+          npm run test:unit --workspace=@clisbot/server -- \
+            src/server/plugins/index.posix.test.ts \
+            -t "reaps compiler children" --bail=1
+
+      - name: Verify plugin session sockets survive a dead plugin child
+        run: |
+          npm run test:unit --workspace=@clisbot/server -- \
+            src/server/plugins/session-socket.posix.test.ts --bail=1
 
   desktop-tests-ubuntu:
     name: desktop-tests (ubuntu-latest)
@@ -423,7 +462,7 @@ jobs:
     name: app-tests
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.app != 'false') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -460,7 +499,7 @@ jobs:
     name: playwright (shard 1/8)
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       PLAYWRIGHT_SHARD: "1/8"
       PLAYWRIGHT_ARTIFACT: "1"
@@ -497,9 +536,9 @@ jobs:
         env:
           E2E_WORKERS: "2"
           # File groups are weighted by observed reporter durations.
-          # Share of the test list per shard, rebalanced from the Playwright step
-          # minutes of five eight-shard runs so the slowest and fastest shards meet.
-          PWTEST_SHARD_WEIGHTS: "85:94:117:128:91:103:127:85"
+          # Share of the test list per shard, rebalanced from main and PR eight-shard
+          # durations so the slowest and fastest shards meet.
+          PWTEST_SHARD_WEIGHTS: "90:114:100:104:108:112:112:90"
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4
@@ -515,7 +554,7 @@ jobs:
     name: playwright (shard 2/8)
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       PLAYWRIGHT_SHARD: "2/8"
       PLAYWRIGHT_ARTIFACT: "2"
@@ -525,7 +564,7 @@ jobs:
     name: playwright (shard 3/8)
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       PLAYWRIGHT_SHARD: "3/8"
       PLAYWRIGHT_ARTIFACT: "3"
@@ -535,7 +574,7 @@ jobs:
     name: playwright (shard 4/8)
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       PLAYWRIGHT_SHARD: "4/8"
       PLAYWRIGHT_ARTIFACT: "4"
@@ -545,7 +584,7 @@ jobs:
     name: playwright (shard 5/8)
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       PLAYWRIGHT_SHARD: "5/8"
       PLAYWRIGHT_ARTIFACT: "5"
@@ -555,7 +594,7 @@ jobs:
     name: playwright (shard 6/8)
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       PLAYWRIGHT_SHARD: "6/8"
       PLAYWRIGHT_ARTIFACT: "6"
@@ -565,7 +604,7 @@ jobs:
     name: playwright (shard 7/8)
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       PLAYWRIGHT_SHARD: "7/8"
       PLAYWRIGHT_ARTIFACT: "7"
@@ -575,7 +614,7 @@ jobs:
     name: playwright (shard 8/8)
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.full != 'false' || needs.changes.outputs.browser != 'false') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       PLAYWRIGHT_SHARD: "8/8"
       PLAYWRIGHT_ARTIFACT: "8"
@@ -613,8 +652,13 @@ jobs:
       # Source tests do not read CLISBOT_CLI_TEST_SHARD. Run them once, on the
       # shortest E2E shard, after its runner has built the server stack.
       - name: Run CLI source tests
-        if: ${{ env.CLISBOT_CLI_TEST_SHARD == '3' }}
+        if: ${{ env.CLISBOT_CLI_TEST_SHARD == '2' }}
         run: npm run test:unit --workspace=@clisbot/cli
+
+      # The dependency watchers write build outputs, so run them after the parallel CLI tests.
+      - name: Run dev watch shutdown regression
+        if: ${{ env.CLISBOT_CLI_TEST_SHARD == '3' }}
+        run: node --import tsx packages/cli/tests/23-daemon-sigint-supervisor.test.ts --dev-watch
 
   cli-tests-2:
     name: cli-tests (shard 2/3)

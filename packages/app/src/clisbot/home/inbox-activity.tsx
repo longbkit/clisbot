@@ -24,7 +24,7 @@ export function InboxActivityProvider({ children }: { children: ReactNode }) {
 }
 function ObservedInboxActivity({ children }: { children: ReactNode }) {
   // Lifted from MobileTabBar: one passive observer shared by desktop and compact navigation.
-  const { agents, directoryHealth } = useAggregatedAgents({ demand: false });
+  const { agents, directoryHealth } = useAggregatedAgents({ demand: false, observe: true });
   const result = useMemo(
     () => summarizeInboxActivity(agents, directoryHealth),
     [agents, directoryHealth],

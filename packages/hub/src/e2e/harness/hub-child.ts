@@ -1,6 +1,9 @@
 import { appendFile, writeFile } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
+import { AccessStore } from "../../access/store.js";
+import { AccessTicketService } from "../../managed-access/tickets.js";
+import { ManagementApi } from "../../management-api/index.js";
 import { createHubApplication } from "../../app.js";
 import { createPostgresTestRuntime } from "../../db/test-utils/runtime.js";
 import { dump } from "js-yaml";
@@ -15,7 +18,8 @@ import { createAuthServer } from "../../auth/server.js";
 import { composeEntitlements } from "../../auth/entitlements.js";
 import { readInstanceAuthPolicy } from "../../auth/instance-policy.js";
 import { OrganizationResources } from "../../organizations/resources.js";
-import { parseProjectConfiguration, ProjectConfigurationStore } from "../../configuration/store.js";
+import { createWorkflowConfigurationResolver } from "../../triggers/configuration.js";
+import { ProjectConfigurationStore } from "../../configuration/store.js";
 import { hashTemplate, UNLIMITED_TEMPLATE } from "../../entitlements/catalog.js";
 import { configurationBundleFixture } from "../../test-utils/configuration-bundle.js";
 
@@ -146,8 +150,15 @@ async function main(): Promise<void> {
   });
   await configuration.activate(config.id);
   const resources = new OrganizationResources(database);
+  const publicBaseUrl = requiredEnvironment("CLISBOT_HUB_APP_URL");
+  const accessStore = new AccessStore(runtime);
+  const accessTickets = new AccessTicketService(runtime, accessStore, { publicBaseUrl });
+  const resolveWorkflow = createWorkflowConfigurationResolver(database);
   const application = createHubApplication({
+    accessStore,
+    accessTickets,
     database,
+    databaseRuntime: runtime,
     entitlements: entitlements.service,
     publicApi:
       auth.publicCredentials === undefined
@@ -159,20 +170,8 @@ async function main(): Promise<void> {
         name: "discord",
         eventNames: ["e2e.discord"],
         async match(trigger) {
-          const activeConfiguration = await database.findActiveProjectConfiguration(E2E_PROJECT_ID);
-          const compiledConfiguration =
-            activeConfiguration === undefined
-              ? undefined
-              : parseProjectConfiguration(activeConfiguration);
-          const dispatchDaemon = (
-            await database.listDaemonsForOrganization(trigger.organizationId)
-          )[0];
-          if (
-            dispatchDaemon === undefined ||
-            activeConfiguration === undefined ||
-            compiledConfiguration === undefined
-          )
-            return [];
+          const stored = await resolveWorkflow(trigger);
+          if (!stored) return [];
           return [
             {
               triggerName: "e2e-discord",
@@ -184,9 +183,8 @@ async function main(): Promise<void> {
                 threadId: "thread-original",
                 messageId: "message-original",
               },
-              configurationRevisionId: activeConfiguration.id,
-              projectId: E2E_PROJECT_ID,
-              hubConfig: compiledConfiguration,
+              configurationRevisionId: stored.revision.id,
+              hubConfig: stored.configuration,
               invocation: {
                 status: "accepted",
                 prompt: "Deploy mcp-capability for phase-five-operator",
@@ -197,7 +195,7 @@ async function main(): Promise<void> {
         },
       },
     ],
-    publicBaseUrl: requiredEnvironment("CLISBOT_HUB_APP_URL"),
+    publicBaseUrl,
     completionTokenSecret: requiredEnvironment("CLISBOT_HUB_AUTH_SECRET"),
     browserOrganizationAccess: auth,
   });
@@ -208,6 +206,15 @@ async function main(): Promise<void> {
     hub,
     operations: application.operations,
     publicApi: application.publicApi,
+    managementApi: new ManagementApi({
+      database,
+      runtime,
+      auth,
+      access: accessStore,
+      tickets: accessTickets,
+      ...(auth.publicCredentials ? { credentials: auth.publicCredentials } : {}),
+      channelSupervisor: null,
+    }),
     resources,
     billing: null,
     projectDashboard: null,
@@ -239,7 +246,9 @@ async function main(): Promise<void> {
       await entitlements.close();
     },
   }));
-  const server = createFetchServer((request) => start.default.fetch(request));
+  const server = createFetchServer((request) => start.default.fetch(request), {
+    canonicalRequestOrigin: publicBaseUrl,
+  });
   server.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     void hub?.handleUpgrade?.(request, socket, head);
   });

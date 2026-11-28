@@ -26,7 +26,8 @@
     "src/server/**/*",
     "src/services/**/*",
     "src/terminal/**/*",
-    "src/utils/tool-call-parsers.ts"
+    "src/utils/tool-call-parsers.ts",
+    "src/executable-resolution/which.d.ts"
   ],
   "exclude": [
     "node_modules",

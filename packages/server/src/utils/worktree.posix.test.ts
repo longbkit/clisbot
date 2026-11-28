@@ -1,5 +1,6 @@
 // POSIX-only: git worktree and teardown shell fixtures
 /* eslint-disable max-nested-callbacks */
+import { validateWorktreePath } from "./worktree-path.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   createWorktree as createWorktreePrimitive,
@@ -12,6 +13,7 @@ import {
   getWorktreeTeardownCommands,
   isServiceScript,
   isClisbotOwnedWorktreeCwd,
+  listGitWorktrees,
   listClisbotWorktrees,
   readClisbotConfig,
   resolveWorktreeRuntimeEnv,
@@ -24,6 +26,9 @@ import type { ClisbotConfig } from "@clisbot/protocol/clisbot-config-schema";
 import {
   getClisbotWorktreeMetadataPath,
   readClisbotWorktreeMetadata,
+  writeClisbotWorktreeMetadata,
+  writeClisbotWorktreeRuntimeMetadata,
+  writeClisbotWorktreeFirstAgentBranchAutoNameMetadata,
 } from "./worktree-metadata.js";
 import {
   getCheckoutDiff,
@@ -51,8 +56,8 @@ import { delimiter, dirname, join } from "path";
 import { tmpdir } from "os";
 import net from "node:net";
 
-function loadConfigForTest(repoRoot: string): ClisbotConfig | null {
-  const result = readClisbotConfig(repoRoot);
+async function loadConfigForTest(repoRoot: string): Promise<ClisbotConfig | null> {
+  const result = await readClisbotConfig(repoRoot);
   return result.ok ? result.config : null;
 }
 
@@ -128,7 +133,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
       expect(result.worktreePath).toBe(join(clisbotHome, "worktrees", projectHash, "hello-world"));
       expect(existsSync(result.worktreePath)).toBe(true);
       expect(existsSync(join(result.worktreePath, "file.txt"))).toBe(true);
-      const metadataPath = getClisbotWorktreeMetadataPath(result.worktreePath);
+      const metadataPath = await getClisbotWorktreeMetadataPath(result.worktreePath);
       expect(existsSync(metadataPath)).toBe(true);
       const metadata = JSON.parse(readFileSync(metadataPath, "utf8"));
       expect(metadata).toMatchObject({
@@ -156,7 +161,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
       ).resolves.toMatchObject({ allowed: true, worktreeRoot: join(worktreesRoot, projectHash) });
       await expect(
         isClisbotOwnedWorktreeCwd(result.worktreePath, { clisbotHome }),
-      ).resolves.toMatchObject({ allowed: false });
+      ).resolves.toMatchObject({ allowed: true, worktreePath: result.worktreePath });
 
       const worktrees = await listClisbotWorktrees({ cwd: repoDir, clisbotHome, worktreesRoot });
       expect(worktrees.map((entry) => entry.path)).toContain(result.worktreePath);
@@ -259,7 +264,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
         cwd: result.worktreePath,
       });
 
-      const metadataPath = getClisbotWorktreeMetadataPath(result.worktreePath);
+      const metadataPath = await getClisbotWorktreeMetadataPath(result.worktreePath);
       const metadata = JSON.parse(readFileSync(metadataPath, "utf8"));
       expect(metadata).toMatchObject({
         version: 1,
@@ -322,7 +327,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
       // baseRefName must be the repo's default branch, not the checked-out branch
       // itself — otherwise the diff panel compares the branch against itself and
       // always shows no changes.
-      const metadataPath = getClisbotWorktreeMetadataPath(result.worktreePath);
+      const metadataPath = await getClisbotWorktreeMetadataPath(result.worktreePath);
       const metadata = JSON.parse(readFileSync(metadataPath, "utf8"));
       expect(metadata).toMatchObject({
         version: 1,
@@ -373,7 +378,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
       });
 
       expect(existsSync(result.worktreePath)).toBe(true);
-      const metadataPath = getClisbotWorktreeMetadataPath(result.worktreePath);
+      const metadataPath = await getClisbotWorktreeMetadataPath(result.worktreePath);
       const metadata = JSON.parse(readFileSync(metadataPath, "utf8"));
       expect(metadata).toMatchObject({ version: 1, baseRefName: "develop" });
     });
@@ -409,7 +414,9 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
 
       expect(result.branchName).toBe("main-1");
       expect(existsSync(result.worktreePath)).toBe(true);
-      expect(readClisbotWorktreeMetadata(result.worktreePath)?.changeRequestLookupTarget).toEqual({
+      expect(
+        (await readClisbotWorktreeMetadata(result.worktreePath))?.changeRequestLookupTarget,
+      ).toEqual({
         headRef: "main-1",
         localBranchName: "main-1",
       });
@@ -462,7 +469,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
         .trim();
       expect(currentBranch).toBe("user/feature");
 
-      const metadataPath = getClisbotWorktreeMetadataPath(result.worktreePath);
+      const metadataPath = await getClisbotWorktreeMetadataPath(result.worktreePath);
       const metadata = JSON.parse(readFileSync(metadataPath, "utf8"));
       expect(metadata).toMatchObject({ baseRefName: "main" });
     });
@@ -573,7 +580,9 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
         "from-origin\n",
       );
       expect(
-        JSON.parse(readFileSync(getClisbotWorktreeMetadataPath(originResult.worktreePath), "utf8")),
+        JSON.parse(
+          readFileSync(await getClisbotWorktreeMetadataPath(originResult.worktreePath), "utf8"),
+        ),
       ).toMatchObject({ baseRefName: "main" });
     });
 
@@ -614,7 +623,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
       // to the commit the worktree was cut from: "main" resolves local-first, which here is
       // a different commit than the fork's upstream.
       expect(
-        JSON.parse(readFileSync(getClisbotWorktreeMetadataPath(result.worktreePath), "utf8")),
+        JSON.parse(readFileSync(await getClisbotWorktreeMetadataPath(result.worktreePath), "utf8")),
       ).toMatchObject({ baseRefName: "main", baseRef: "refs/remotes/upstream/main" });
 
       // An untouched child must report no work of its own. Comparing against the wrong base
@@ -701,7 +710,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
       });
 
       expect(
-        JSON.parse(readFileSync(getClisbotWorktreeMetadataPath(result.worktreePath), "utf8")),
+        JSON.parse(readFileSync(await getClisbotWorktreeMetadataPath(result.worktreePath), "utf8")),
       ).toMatchObject({
         baseRefName: "release+hotfix",
         baseRef: "refs/remotes/upstream/release+hotfix",
@@ -901,7 +910,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
         worktreePath: result.worktreePath,
         branchName: result.branchName,
       });
-      expect(getWorktreeSetupCommands(result.worktreePath)).toEqual([
+      expect(await getWorktreeSetupCommands(result.worktreePath)).toEqual([
         'greeting="hello from string setup"\necho "$greeting" > setup.log',
       ]);
       expect(readFileSync(join(result.worktreePath, "setup.log"), "utf8").trim()).toBe(
@@ -970,7 +979,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
       expect(readFileSync(join(repoDir, "setup-path.log"), "utf8").trim()).toBe("shim:ok");
     });
 
-    it("treats blank lifecycle strings as empty", () => {
+    it("treats blank lifecycle strings as empty", async () => {
       writeFileSync(
         join(repoDir, "clisbot.json"),
         JSON.stringify({
@@ -981,11 +990,11 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
         }),
       );
 
-      expect(getWorktreeSetupCommands(repoDir)).toEqual([]);
-      expect(getWorktreeTeardownCommands(repoDir)).toEqual([]);
+      expect(await getWorktreeSetupCommands(repoDir)).toEqual([]);
+      expect(await getWorktreeTeardownCommands(repoDir)).toEqual([]);
     });
 
-    it("filters non-string and blank entries from lifecycle arrays", () => {
+    it("filters non-string and blank entries from lifecycle arrays", async () => {
       writeFileSync(
         join(repoDir, "clisbot.json"),
         JSON.stringify({
@@ -1006,11 +1015,11 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
         }),
       );
 
-      expect(getWorktreeSetupCommands(repoDir)).toEqual([
+      expect(await getWorktreeSetupCommands(repoDir)).toEqual([
         'echo "first" > setup-array.log',
         'echo "second" >> setup-array.log',
       ]);
-      expect(getWorktreeTeardownCommands(repoDir)).toEqual([
+      expect(await getWorktreeTeardownCommands(repoDir)).toEqual([
         'echo "first" > "$CLISBOT_SOURCE_CHECKOUT_PATH/teardown-array.log"',
         'echo "second" >> "$CLISBOT_SOURCE_CHECKOUT_PATH/teardown-array.log"',
       ]);
@@ -1141,7 +1150,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
       };
       writeFileSync(join(repoDir, "clisbot.json"), JSON.stringify(clisbotConfig));
 
-      expect(getWorktreeTerminalSpecs(repoDir)).toEqual([
+      expect(await getWorktreeTerminalSpecs(repoDir)).toEqual([
         { name: "Dev Server", command: "npm run dev" },
         { command: "cd packages/app && npm run dev" },
       ]);
@@ -1161,7 +1170,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
       };
       writeFileSync(join(repoDir, "clisbot.json"), JSON.stringify(clisbotConfig));
 
-      expect(getWorktreeTerminalSpecs(repoDir)).toEqual([
+      expect(await getWorktreeTerminalSpecs(repoDir)).toEqual([
         { name: "Watch", command: "npm run watch" },
         { command: "npm run test" },
       ]);
@@ -1179,7 +1188,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
         }),
       );
 
-      const scriptConfigs = getScriptConfigs(loadConfigForTest(repoDir));
+      const scriptConfigs = getScriptConfigs(await loadConfigForTest(repoDir));
       const typecheck = scriptConfigs.get("typecheck");
 
       expect(typecheck).toEqual({
@@ -1203,7 +1212,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
         }),
       );
 
-      const scriptConfigs = getScriptConfigs(loadConfigForTest(repoDir));
+      const scriptConfigs = getScriptConfigs(await loadConfigForTest(repoDir));
       const server = scriptConfigs.get("server");
 
       expect(server).toEqual({
@@ -1243,7 +1252,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
         }),
       );
 
-      expect(getScriptConfigs(loadConfigForTest(repoDir))).toEqual(
+      expect(getScriptConfigs(await loadConfigForTest(repoDir))).toEqual(
         new Map([
           ["valid", { command: "npm run valid" }],
           ["invalidType", { command: "npm run worker" }],
@@ -1377,6 +1386,235 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
     });
   });
 
+  describe("worktrees at explicit paths", () => {
+    let tempDir: string;
+    let repoDir: string;
+    let clisbotHome: string;
+
+    beforeEach(() => {
+      tempDir = realpathSync(mkdtempSync(join(tmpdir(), "worktree-explicit-test-")));
+      repoDir = join(tempDir, "test-repo");
+      clisbotHome = join(tempDir, "clisbot-home");
+
+      mkdirSync(repoDir, { recursive: true });
+      execFileSync("git", ["init", "-b", "main"], { cwd: repoDir });
+      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: repoDir });
+      execFileSync("git", ["config", "user.name", "Test"], { cwd: repoDir });
+      writeFileSync(join(repoDir, "file.txt"), "hello\n");
+      execFileSync("git", ["add", "."], { cwd: repoDir });
+      execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "initial"], {
+        cwd: repoDir,
+      });
+    });
+
+    afterEach(() => {
+      rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it("keeps an otherwise unreachable detached commit after deleting the worktree", async () => {
+      const result = await createWorktreePrimitive({
+        cwd: repoDir,
+        worktreeSlug: "keep-commit",
+        source: { kind: "branch-off", baseBranch: "main", branchName: "feature/keep-commit" },
+        clisbotHome,
+      });
+      execFileSync("git", ["checkout", "--detach"], { cwd: result.worktreePath });
+      writeFileSync(join(result.worktreePath, "file.txt"), "detached change\n");
+      execFileSync("git", ["add", "file.txt"], { cwd: result.worktreePath });
+      execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "detached"], {
+        cwd: result.worktreePath,
+      });
+      const commit = execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd: result.worktreePath,
+        encoding: "utf8",
+      }).trim();
+
+      await deleteClisbotWorktree({ cwd: repoDir, worktreePath: result.worktreePath, clisbotHome });
+      execFileSync("git", ["reflog", "expire", "--expire=now", "--all"], { cwd: repoDir });
+      execFileSync("git", ["gc", "--prune=now"], { cwd: repoDir });
+      expect(
+        execFileSync("git", ["cat-file", "-t", commit], { cwd: repoDir, encoding: "utf8" }).trim(),
+      ).toBe("commit");
+    });
+
+    it("places, owns, lists, and deletes a worktree outside the legacy root", async () => {
+      // Sibling layout: <repo-parent>/wt-<slug>
+
+      const result = await createWorktreePrimitive({
+        cwd: repoDir,
+        worktreeSlug: "sibling-one",
+        source: { kind: "branch-off", baseBranch: "main", branchName: "feature/sibling" },
+        clisbotHome,
+        worktreePath: join(tempDir, "wt-sibling-one"),
+      });
+
+      expect(result.worktreePath).toBe(join(tempDir, "wt-sibling-one"));
+      expect(existsSync(join(result.worktreePath, "file.txt"))).toBe(true);
+      expect(existsSync(await getClisbotWorktreeMetadataPath(result.worktreePath))).toBe(true);
+
+      const ownership = await isClisbotOwnedWorktreeCwd(result.worktreePath, { clisbotHome });
+      expect(ownership.allowed).toBe(true);
+      expect(ownership.worktreePath).toBe(result.worktreePath);
+      // A subdirectory of the worktree resolves to the worktree root.
+      mkdirSync(join(result.worktreePath, "sub"), { recursive: true });
+      const nested = await isClisbotOwnedWorktreeCwd(join(result.worktreePath, "sub"), {
+        clisbotHome,
+      });
+      expect(nested.worktreePath).toBe(result.worktreePath);
+
+      const listed = await listClisbotWorktrees({ cwd: repoDir, clisbotHome });
+      expect(listed.map((entry) => entry.path)).toContain(result.worktreePath);
+
+      await deleteClisbotWorktree({ cwd: repoDir, worktreePath: result.worktreePath, clisbotHome });
+      expect(existsSync(result.worktreePath)).toBe(false);
+    });
+
+    it("removes branches fetched by the source plan when git worktree add fails", async () => {
+      // A branch that exists only on the remote: resolving a
+      // checkout-branch plan fetches it into a local branch. A script
+      // failure must not leave that branch behind, or the next attempt
+      // would uniquify to a different branch name.
+      const remoteDir = join(tempDir, "remote.git");
+      execFileSync("git", ["clone", "--bare", repoDir, remoteDir], { cwd: tempDir });
+      execFileSync("git", ["remote", "add", "origin", remoteDir], { cwd: repoDir });
+      execFileSync("git", ["push", "origin", "main"], { cwd: repoDir });
+      execFileSync("git", ["branch", "feature/remote-check"], { cwd: repoDir });
+      execFileSync("git", ["push", "origin", "feature/remote-check"], { cwd: repoDir });
+      execFileSync("git", ["branch", "-D", "feature/remote-check"], { cwd: repoDir });
+      execFileSync("git", ["fetch", "origin"], { cwd: repoDir });
+
+      mkdirSync(join(tempDir, "occupied"));
+      writeFileSync(join(tempDir, "occupied", "keep"), "keep");
+      await expect(
+        createWorktreePrimitive({
+          cwd: repoDir,
+          worktreeSlug: "remote-check",
+          source: { kind: "checkout-branch", branchName: "feature/remote-check" },
+          clisbotHome,
+          worktreePath: join(tempDir, "occupied"),
+        }),
+      ).rejects.toThrow();
+
+      const localBranches = execFileSync("git", ["branch", "--list", "feature/remote-check"], {
+        cwd: repoDir,
+        encoding: "utf8",
+      });
+      expect(localBranches.trim()).toBe("");
+    });
+
+    it("deletes only the registered destination nested beneath the legacy root", async () => {
+      const parent = join(clisbotHome, "worktrees", "acme", "widgets");
+      const worktreePath = join(parent, "topic");
+      const siblingPath = join(parent, "sibling");
+      await createWorktreePrimitive({
+        cwd: repoDir,
+        clisbotHome,
+        worktreeSlug: "topic",
+        worktreePath,
+        source: { kind: "branch-off", branchName: "topic", baseBranch: "main" },
+      });
+      await createWorktreePrimitive({
+        cwd: repoDir,
+        clisbotHome,
+        worktreeSlug: "sibling",
+        worktreePath: siblingPath,
+        source: { kind: "branch-off", branchName: "sibling", baseBranch: "main" },
+      });
+      mkdirSync(join(worktreePath, "nested"));
+      expect(
+        await isClisbotOwnedWorktreeCwd(join(worktreePath, "nested"), { clisbotHome }),
+      ).toMatchObject({ allowed: true, worktreePath });
+      await deleteClisbotWorktree({
+        cwd: repoDir,
+        clisbotHome,
+        worktreePath,
+        registryProven: true,
+      });
+      expect(existsSync(worktreePath)).toBe(false);
+      expect(readFileSync(join(siblingPath, "file.txt"), "utf8")).toBe("hello\n");
+    });
+
+    it("rejects a destination under a symlink into .git", async () => {
+      const alias = join(tempDir, "git-alias");
+      symlinkSync(join(repoDir, ".git"), alias, "dir");
+      await expect(
+        validateWorktreePath({ candidate: join(alias, "new", "worktree"), repoPath: repoDir }),
+      ).rejects.toThrow("inside a .git directory");
+      expect(existsSync(join(repoDir, ".git", "new"))).toBe(false);
+    });
+
+    it("uses an explicit worktreePath verbatim", async () => {
+      const explicitPath = join(tempDir, "explicit-wt");
+
+      const result = await createWorktreePrimitive({
+        cwd: repoDir,
+        worktreeSlug: "explicit-one",
+        source: { kind: "branch-off", baseBranch: "main", branchName: "feature/explicit" },
+        clisbotHome,
+        worktreePath: explicitPath,
+      });
+
+      expect(result.worktreePath).toBe(explicitPath);
+      expect(existsSync(join(explicitPath, "file.txt"))).toBe(true);
+    });
+
+    it("restore recreates at the recorded path", async () => {
+      const created = await createWorktreePrimitive({
+        cwd: repoDir,
+        worktreeSlug: "restorable",
+        source: { kind: "branch-off", baseBranch: "main", branchName: "feature/restorable" },
+        clisbotHome,
+        worktreePath: join(tempDir, "wt-sibling-one"),
+      });
+      await deleteClisbotWorktree({
+        cwd: repoDir,
+        worktreePath: created.worktreePath,
+        clisbotHome,
+      });
+      expect(existsSync(created.worktreePath)).toBe(false);
+
+      const restored = await createWorktreePrimitive({
+        cwd: repoDir,
+        worktreeSlug: "restorable",
+        source: { kind: "restore", branchName: "feature/restorable", baseRef: "main" },
+        clisbotHome,
+        worktreePath: created.worktreePath,
+      });
+
+      expect(restored.worktreePath).toBe(created.worktreePath);
+      expect(existsSync(join(restored.worktreePath, "file.txt"))).toBe(true);
+    });
+
+    it("does not treat a copied marker in a non-worktree directory as ownership", async () => {
+      const created = await createWorktreePrimitive({
+        cwd: repoDir,
+        worktreeSlug: "marker-source",
+        source: { kind: "branch-off", baseBranch: "main", branchName: "feature/marker" },
+        clisbotHome,
+        worktreePath: join(tempDir, "wt-sibling-one"),
+      });
+      const metadata = await readClisbotWorktreeMetadata(created.worktreePath);
+      expect(metadata).not.toBeNull();
+
+      // A plain directory with a .git file pointing at a copied admin dir
+      // that holds a clisbot/worktree.json. Git does not list it as a
+      // worktree, so the copied marker must not prove ownership.
+      const fakeDir = join(tempDir, "fake-worktree");
+      const fakeAdmin = join(tempDir, "fake-admin");
+      mkdirSync(join(fakeAdmin, "clisbot"), { recursive: true });
+      mkdirSync(fakeDir, { recursive: true });
+      writeFileSync(join(fakeAdmin, "clisbot", "worktree.json"), JSON.stringify(metadata));
+      writeFileSync(join(fakeDir, ".git"), `gitdir: ${fakeAdmin}\n`);
+
+      const ownership = await isClisbotOwnedWorktreeCwd(fakeDir, { clisbotHome });
+      expect(ownership.allowed).toBe(false);
+      await expect(
+        deleteClisbotWorktree({ cwd: repoDir, worktreePath: fakeDir, clisbotHome }),
+      ).rejects.toThrow("Refusing to delete non-Clisbot worktree");
+      expect(existsSync(fakeDir)).toBe(true);
+    });
+  });
+
   describe("clisbot worktree manager", () => {
     let tempDir: string;
     let repoDir: string;
@@ -1471,6 +1709,55 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
       expect(remaining.map((worktree) => worktree.path)).toEqual([second.worktreePath]);
     });
 
+    it("lists every git worktree of the repository, not only Clisbot's", async () => {
+      const clisbotWorktree = await createLegacyWorktreeForTest({
+        branchName: "feature/clisbot",
+        cwd: repoDir,
+        baseBranch: "main",
+        worktreeSlug: "alpha",
+        clisbotHome,
+      });
+      const manualPath = join(tempDir, "manual");
+      execFileSync("git", ["worktree", "add", "-b", "feature/manual", manualPath], {
+        cwd: repoDir,
+      });
+      const detachedPath = join(tempDir, "detached");
+      execFileSync("git", ["worktree", "add", "--detach", detachedPath], { cwd: repoDir });
+      const removedPath = join(tempDir, "removed");
+      execFileSync("git", ["worktree", "add", "-b", "feature/removed", removedPath], {
+        cwd: repoDir,
+      });
+      rmSync(removedPath, { recursive: true, force: true });
+      // Git reports a locked worktree as neither prunable nor gone after its directory is deleted.
+      const lockedRemovedPath = join(tempDir, "locked-removed");
+      execFileSync(
+        "git",
+        ["worktree", "add", "--lock", "-b", "feature/locked", lockedRemovedPath],
+        {
+          cwd: repoDir,
+        },
+      );
+      rmSync(lockedRemovedPath, { recursive: true, force: true });
+
+      const fromProject = await listGitWorktrees({ cwd: repoDir });
+      const fromClisbotWorktree = await listGitWorktrees({ cwd: clisbotWorktree.worktreePath });
+
+      const [mainWorktree, ...linkedWorktrees] = fromProject.map(
+        ({ path, branchName, containsCwd }) => ({ path, branchName, containsCwd }),
+      );
+      expect(mainWorktree).toEqual({ path: repoDir, branchName: "main", containsCwd: true });
+      expect(linkedWorktrees.sort((a, b) => a.path.localeCompare(b.path))).toEqual(
+        [
+          { path: clisbotWorktree.worktreePath, branchName: "feature/clisbot", containsCwd: false },
+          { path: manualPath, branchName: "feature/manual", containsCwd: false },
+          { path: detachedPath, branchName: null, containsCwd: false },
+        ].sort((a, b) => a.path.localeCompare(b.path)),
+      );
+      expect(
+        fromClisbotWorktree.filter((worktree) => worktree.containsCwd).map(({ path }) => path),
+      ).toEqual([clisbotWorktree.worktreePath]);
+    });
+
     it("deletes a clisbot worktree even when given a subdirectory path", async () => {
       const created = await createLegacyWorktreeForTest({
         branchName: "main",
@@ -1562,7 +1849,7 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
         clisbotHome,
       });
 
-      expect(getWorktreeTeardownCommands(repoDir)).toEqual([
+      expect(await getWorktreeTeardownCommands(repoDir)).toEqual([
         'cleanup_message="teardown string"\necho "$cleanup_message" > "$CLISBOT_SOURCE_CHECKOUT_PATH/teardown.log"',
       ]);
       expect(readFileSync(join(repoDir, "teardown.log"), "utf8").trim()).toBe("teardown string");
@@ -1634,5 +1921,106 @@ describe.skipIf(isPlatform("win32"))("worktree POSIX-only", () => {
       expect(existsSync(created.worktreePath)).toBe(true);
       expect(existsSync(join(repoDir, "teardown-start.log"))).toBe(true);
     });
+  });
+});
+
+describe.skipIf(isPlatform("win32"))("async worktree metadata", () => {
+  it("serializes metadata mutations per worktree while another worktree progresses", async () => {
+    const root = mkdtempSync(join(tmpdir(), "worktree-metadata-order-"));
+    const first = join(root, "first");
+    const second = join(root, "second");
+    mkdirSync(join(first, ".git"), { recursive: true });
+    mkdirSync(join(second, ".git"), { recursive: true });
+    try {
+      await writeClisbotWorktreeMetadata(first, { baseRefName: "main" });
+      await writeClisbotWorktreeMetadata(second, { baseRefName: "release" });
+      const order: string[] = [];
+      const runtime = writeClisbotWorktreeRuntimeMetadata(first, { worktreePort: 4101 }).then(() =>
+        order.push("first-runtime"),
+      );
+      const unrelated = writeClisbotWorktreeRuntimeMetadata(second, { worktreePort: 4102 }).then(
+        () => order.push("second-runtime"),
+      );
+      const naming = writeClisbotWorktreeFirstAgentBranchAutoNameMetadata(first, {
+        placeholderBranchName: "topic",
+      }).then(() => order.push("first-naming"));
+      // A read issued while writes are pending observes their completed snapshot.
+      const snapshot = readClisbotWorktreeMetadata(first);
+      await Promise.all([runtime, unrelated, naming]);
+      expect(order.indexOf("first-runtime")).toBeLessThan(order.indexOf("first-naming"));
+      expect(await snapshot).toMatchObject({
+        baseRefName: "main",
+        runtime: { worktreePort: 4101 },
+        firstAgentBranchAutoName: { status: "pending", placeholderBranchName: "topic" },
+      });
+      expect(await readClisbotWorktreeMetadata(second)).toMatchObject({
+        baseRefName: "release",
+        runtime: { worktreePort: 4102 },
+      });
+      const alias = join(root, "first-alias");
+      symlinkSync(first, alias, "dir");
+      await Promise.all([
+        writeClisbotWorktreeRuntimeMetadata(first, { worktreePort: 4103 }),
+        writeClisbotWorktreeFirstAgentBranchAutoNameMetadata(alias, {
+          placeholderBranchName: "renamed",
+        }),
+      ]);
+      expect(await readClisbotWorktreeMetadata(first)).toMatchObject({
+        runtime: { worktreePort: 4103 },
+        firstAgentBranchAutoName: { placeholderBranchName: "renamed" },
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("a queued metadata mutation cannot recreate an archived Git directory", async () => {
+    const root = mkdtempSync(join(tmpdir(), "worktree-metadata-archive-"));
+    mkdirSync(join(root, ".git"));
+    try {
+      await writeClisbotWorktreeMetadata(root, { baseRefName: "main" });
+      const pending = writeClisbotWorktreeRuntimeMetadata(root, { worktreePort: 4101 });
+      // The mutation is queued in a microtask, so archive wins this ordering.
+      rmSync(join(root, ".git"), { recursive: true });
+      await expect(pending).rejects.toThrow("Not a git repository");
+      expect(existsSync(join(root, ".git"))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("recognizes a removed worktree under a symlinked ownership root", async () => {
+    const root = mkdtempSync(join(tmpdir(), "worktree-ownership-alias-"));
+    const actual = join(root, "actual");
+    const alias = join(root, "worktrees");
+    mkdirSync(actual);
+    symlinkSync(actual, alias, "dir");
+    try {
+      const cwd = join(alias, "project", "removed");
+      expect(
+        await isClisbotOwnedWorktreeCwd(cwd, { worktreesRoot: alias, knownGitCommonDir: null }),
+      ).toMatchObject({ allowed: true, worktreePath: cwd });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects oversized metadata and named pipes without reading them whole", async () => {
+    const root = mkdtempSync(join(tmpdir(), "worktree-metadata-admission-"));
+    mkdirSync(join(root, ".git", "clisbot"), { recursive: true });
+    try {
+      const path = await getClisbotWorktreeMetadataPath(root);
+      writeFileSync(path, JSON.stringify({ version: 1, baseRefName: "x".repeat(64 * 1024) }));
+      await expect(readClisbotWorktreeMetadata(root)).rejects.toThrow(
+        "Invalid Clisbot worktree metadata file",
+      );
+      rmSync(path);
+      execFileSync("mkfifo", [path]);
+      await expect(readClisbotWorktreeMetadata(root)).rejects.toThrow(
+        "Invalid Clisbot worktree metadata file",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

@@ -162,6 +162,22 @@ export function getDoc(slug: string, locale: Locale): Doc | undefined {
 }
 
 export function getLegacyDocsRedirect(pathname: string): string | undefined {
+  // These provider pages sat at the top level before they moved under Supported providers.
+  const provider = /^\/docs\/(claude-code|codex|muse-code)(\.md)?\/?$/.exec(pathname);
+  if (provider) return `/docs/supported-providers/${provider[1]}${provider[2] ?? ""}`;
+
+  // The Hub workflow and hub.yml guides merged into the YAML reference, which documents
+  // Workflow documents and legacy repository bundles.
+  const hubLegacy = /^\/docs\/hub\/(?:workflows|configuration\/hub-yml)(\.md)?\/?$/.exec(pathname);
+  if (hubLegacy) return `/docs/hub/configuration/reference${hubLegacy[1] ?? ""}`;
+
+  // Upstream getpaseo/hub pages for features the bundled Clisbot Hub does not implement.
+  // The triggers page lists them under "Not available in Clisbot Hub".
+  const hubUnavailable = /^\/docs\/hub\/(?:tools|triggers\/(?:webhooks|schedules))(\.md)?\/?$/.exec(
+    pathname,
+  );
+  if (hubUnavailable) return `/docs/hub/triggers${hubUnavailable[1] ?? ""}`;
+
   const match =
     /^\/docs\/plugins\/v0\.[78](?:(\.md)|\/(index|reference|providers|migration)(\.md)?)?\/?$/.exec(
       pathname,
@@ -186,7 +202,13 @@ function insertDocByPath(nodes: DocsNavNode[], doc: Doc, stripTopDirectory = fal
 
   // A section's top-level directory and its category name the same thing, so
   // only directories below it become collapsible groups.
-  if (stripTopDirectory) directories.shift();
+  if (
+    stripTopDirectory &&
+    directories[0] &&
+    doc.frontmatter.category?.toLowerCase().endsWith(directories[0].toLowerCase())
+  ) {
+    directories.shift();
+  }
 
   let current = nodes;
   let parent: Extract<DocsNavNode, { type: "group" }> | undefined;
@@ -286,6 +308,21 @@ export function buildDocsNavTree(docs: Doc[]): DocsNavNode[] {
 
   sortNodes(root);
   return root;
+}
+
+function navHrefs(nodes: DocsNavNode[]): string[] {
+  return nodes.flatMap((node) => {
+    if (node.type === "page") return [node.href];
+    const own = node.type === "group" && node.href !== undefined ? [node.href] : [];
+    return [...own, ...navHrefs(node.children)];
+  });
+}
+
+/** Every doc in a language, in the order the sidebar lists them. */
+export function getDocsInSidebarOrder(locale: Locale): Doc[] {
+  const docs = getDocs(locale);
+  const byHref = new Map(docs.map((doc) => [doc.href, doc]));
+  return navHrefs(buildDocsNavTree(docs)).flatMap((href) => byHref.get(href) ?? []);
 }
 
 function findNodePath(

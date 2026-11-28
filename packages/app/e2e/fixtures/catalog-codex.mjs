@@ -28,7 +28,7 @@ function send(message) {
 function respond(method, params) {
   switch (method) {
     case "initialize":
-      return {};
+      return { userAgent: "codex/0.159.0" };
     case "model/list":
       return { data: models };
     case "config/read":

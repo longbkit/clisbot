@@ -19,6 +19,11 @@ vi.mock("react-native-unistyles", () => ({
   withUnistyles: (component: unknown) => component,
 }));
 vi.mock("@/components/adaptive-modal-sheet", () => ({
+  // Upstream v0.17 moved the sheet body into SheetPane: shared snap points, a header drag area
+  // and a bottom inset around the pane content.
+  FULL_SHEET_SNAP_POINTS: ["92%"],
+  SheetDragArea: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  SheetBottomInset: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   SheetBackground: () => null,
   SheetHandle: () => null,
   SheetHeaderIconButton: () => null,
@@ -28,8 +33,10 @@ vi.mock("@/panels/register-panels", () => ({ ensurePanelsRegistered: () => {} })
 vi.mock("@/panels/panel-registry", () => ({
   getPanelRegistration: () => ({ useDescriptor: mocks.descriptor }),
 }));
-vi.mock("./workspace-sheet-environment", () => ({
-  useWorkspaceSheetEnvironment: () => (children: React.ReactNode) => (
+// Upstream v0.17 replaced ./workspace-sheet-environment with the sheet pane's own bridge.
+vi.mock("@/screens/workspace/sheet-pane", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/screens/workspace/sheet-pane")>()),
+  useSheetPaneBridge: () => (children: React.ReactNode) => (
     <div data-testid="workspace-bridge">{children}</div>
   ),
 }));

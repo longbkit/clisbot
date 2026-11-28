@@ -25,6 +25,7 @@ class IllegalViewOperationException : Exception()
 object Log {
   val warnings = mutableListOf<String>()
   fun w(label: String, message: String, error: Exception) { warnings.add(message) }
+  fun w(label: String, message: String) { warnings.add(message) }
 }
 class FakeFabric {
   var secondTagMounted = false
@@ -35,6 +36,11 @@ class FakeFabric {
     else -> Any()
   }
   fun synchronouslyUpdateViewOnUIThread(tag: Int, props: Any) { legacy.add(tag) }
+}
+// Fabric's MountingManager: a preallocated tag (3) already has view state; an unmounted one (2)
+// does not until it mounts again.
+class FakeMounting(private val fabric: FakeFabric) {
+  fun getViewExists(tag: Int): Boolean = if (tag == 2) fabric.secondTagMounted else true
 }
 class FakeMethod(private val fabric: FakeFabric) {
   val called = mutableListOf<Int>()
@@ -50,8 +56,12 @@ object SynchronousPropsBufferParser {
 }
 class NativeProxy {
   val mFabricUIManager = FakeFabric()
-  val mountingManager = Any()
+  val mountingManager = FakeMounting(mFabricUIManager)
   val updatePropsSynchronouslyMethod = FakeMethod(mFabricUIManager)
+  // The 4.5.5 backport resolves this property outside the method under test.
+  private val getViewExistsMethod by lazy {
+    runCatching { mountingManager.javaClass.getMethod("getViewExists", Int::class.javaPrimitiveType) }.getOrNull()
+  }
 %s
 }
 fun main() {

@@ -51,7 +51,7 @@ describe("session layout", () => {
       "not an agent record",
     );
     expect(
-      (await new AgentStorage(base, createTestLogger()).list()).map((item) => item.id),
+      (await new AgentStorage(base, createTestLogger()).listAll()).map((item) => item.id),
     ).toEqual(["a"]);
     expect(await rollbackSessionLayout(base)).toBe(1);
     expect(await fs.readFile(`${directory}.json`, "utf8")).toBe(bytes);
@@ -70,11 +70,11 @@ describe("session layout", () => {
     await expect(
       new AgentStorage(base, createTestLogger(), {
         sessionLayout: true,
-      }).list(),
+      }).listAll(),
     ).rejects.toThrow("Conflicting records");
     const corrupt = await temporary();
     await fs.writeFile(path.join(corrupt, "a.json"), "{");
-    await expect(new AgentStorage(corrupt, createTestLogger()).list()).rejects.toThrow();
+    await expect(new AgentStorage(corrupt, createTestLogger()).listAll()).rejects.toThrow();
   });
 });
 

@@ -31,7 +31,7 @@ Clisbot 启动的是你已经安装的 Agent CLI，它并不自带这些 CLI（�
 
 ### 查看 Clisbot 看到的内容 {#see-what-clisbot-sees}
 
-打开 **设置 → 你的主机 → Providers**，点击该 Provider，然后点击 **诊断**。重要的几行：
+打开 **设置 → 你的主机 → Providers**，点击该 Provider，然后点击 **诊断报告**。重要的几行：
 
 - **Resolved path**：Clisbot 找到二进制文件的位置，或 `not found`。
 - **Daemon PATH**：Clisbot 正在搜索的 `PATH`。把它和新终端中 `echo $PATH` 的结果进行比较。

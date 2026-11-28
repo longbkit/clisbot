@@ -8,7 +8,6 @@ import {
 } from "react";
 import { Text, View, type PressableStateCallbackType } from "react-native";
 import { useTranslation } from "react-i18next";
-import { useRouter } from "expo-router";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
@@ -46,7 +45,7 @@ import { openHostOverview } from "@/navigation/settings-navigation";
 import { pluginIconComponent } from "@/plugins/icons";
 import { PluginSidebarItem } from "@/plugins/sidebar-items";
 import { UsageSidebarRoot, useOpenSidebarUsage } from "@/usage";
-import { buildSettingsAddHostRoute } from "@/utils/host-routes";
+import { useAddHost } from "@/hosts/add-host";
 import { useOwnsWindowChromeCorner, WindowChromeSafeArea } from "@/utils/desktop-window";
 import { ICON_SIZE, ICON_STROKE_WIDTH, type Theme } from "@/styles/theme";
 import { CONTROL_HEIGHTS, MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
@@ -177,7 +176,6 @@ function RailUsage({ section }: { section: BuiltinSection }) {
 
 function RailHosts({ section }: { section: BuiltinSection }) {
   const label = useSectionLabel(section);
-  const router = useRouter();
   const status = useHostsStatus();
   const filter = useHostFilter();
   const { t } = useTranslation();
@@ -186,7 +184,7 @@ function RailHosts({ section }: { section: BuiltinSection }) {
     online: filter.online,
     total: filter.total,
   });
-  const addHost = useCallback(() => router.push(buildSettingsAddHostRoute(Date.now())), [router]);
+  const addHost = useAddHost();
   // The same pill as Home's count, coloured by the Hosts' status as the dot was.
   const badge = useMemo(
     () => (

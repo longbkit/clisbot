@@ -2,6 +2,7 @@ export { createHostChannelTransport } from "../hosts/index.js";
 import { HostTransportBudget } from "./buffering.js";
 export { HostTransportBudget } from "./buffering.js";
 import { homedir } from "node:os";
+import type { Agent } from "node:http";
 import { WebSocket } from "ws";
 import { parseHostTarget, type HostTarget } from "@clisbot/protocol/host-target";
 import { createSshTunnel, type SshTunnel } from "./ssh-tunnel.js";
@@ -22,10 +23,15 @@ export { parseHostTarget };
 export type { SshTunnel } from "./ssh-tunnel.js";
 export { createSshTunnel, resolveSshFailureDetail } from "./ssh-tunnel.js";
 
+export interface HostTransportOptions {
+  webSocketAgent?: (url: string) => Agent | undefined;
+}
+
 /** A factory owns one attempt, including a fresh SSH process and its teardown. */
 export function createHostTransportFactory(
   connection: string,
   budget = new HostTransportBudget(),
+  options: HostTransportOptions = {},
 ): DaemonTransportFactory {
   const target = parseHostTarget(connection);
   // Rises to "protected" once the daemon negotiates it, so a later attempt
@@ -71,12 +77,13 @@ export function createHostTransportFactory(
         return;
       }
       const socketPath = socketTarget.socketPath?.replace(/^~(?=\/)/, homedir());
-      let factory = createWebSocketTransportFactory((url, options) => {
+      let factory = createWebSocketTransportFactory((url, socketOptions) => {
         const socket = new WebSocket(
           socketPath && url.startsWith("ws+unix:") ? `ws+unix://${socketPath}:/ws` : url,
-          options?.protocols,
+          socketOptions?.protocols,
           {
-            headers: options?.headers,
+            headers: socketOptions?.headers,
+            agent: socketPath ? undefined : options.webSocketAgent?.(url),
             ...(socketPath ? { socketPath } : {}),
             maxPayload: 100 * 1024 * 1024,
           },
@@ -168,9 +175,15 @@ export function createHostTransportFactory(
       close();
     });
     return {
+      get supportsDrain() {
+        return transport?.supportsDrain;
+      },
+      get maxFrameBytes() {
+        return transport?.maxFrameBytes;
+      },
       send(data) {
         if (closed || !transport) throw new Error("Host transport is unavailable");
-        transport.send(data);
+        return transport.send(data);
       },
       close,
       onOpen(handler) {
@@ -194,14 +207,16 @@ export function createHostTransportFactory(
 }
 export function createHostClient(
   connection: string,
-  config: Omit<DaemonClientConfig, "url" | "transportFactory">,
+  config: Omit<DaemonClientConfig, "url"> & HostTransportOptions,
   budget?: HostTransportBudget,
 ): DaemonClient {
   const target = parseHostTarget(connection);
+  const { webSocketAgent, transportFactory, ...clientConfig } = config;
   return new DaemonClient({
-    ...config,
+    ...clientConfig,
     url: "ws://host-connector/ws",
     ...(target.password ? { password: target.password } : {}),
-    transportFactory: createHostTransportFactory(connection, budget),
+    transportFactory:
+      transportFactory ?? createHostTransportFactory(connection, budget, { webSocketAgent }),
   });
 }

@@ -13,7 +13,7 @@ import { discardAgentSend, startAgentSend } from "@/outbox/agent-delivery";
 import { deliverOrReturn } from "@/outbox/handoff";
 import { FLOATING_ACTION_BUTTON_CLEARANCE } from "@/components/ui/floating-action-button";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { buttonControlHeight } from "@/components/ui/control-geometry";
+import { controlHeightForLayout } from "@/components/ui/control-geometry";
 import { SPACING } from "@/styles/theme";
 import { i18n } from "@/i18n/i18next";
 import {
@@ -106,7 +106,9 @@ export function useReviewFeedback(input: {
     state,
     clearance:
       state.commentCount > 0
-        ? (isCompact ? FLOATING_ACTION_BUTTON_CLEARANCE : buttonControlHeight.sm + SPACING[4]) + 44
+        ? (isCompact
+            ? FLOATING_ACTION_BUTTON_CLEARANCE
+            : controlHeightForLayout("md", isCompact) + SPACING[4]) + 44
         : 0,
   };
 }

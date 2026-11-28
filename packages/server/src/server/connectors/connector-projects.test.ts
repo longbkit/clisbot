@@ -40,7 +40,7 @@ function directoryWith(bots: Partial<StoredBot>[]) {
     projectRegistry: {
       get: async (id: string) => projects.find((entry) => entry.projectId === id) ?? null,
     } as unknown as ProjectRegistry,
-    workspaceRegistry: { list: async () => workspaces } as unknown as WorkspaceRegistry,
+    workspaceRegistry: { listAll: async () => workspaces } as unknown as WorkspaceRegistry,
     botService: {
       list: async () => bots,
       subscribe: () => () => undefined,
@@ -59,7 +59,7 @@ describe("connector Project directory", () => {
     };
     const directory = createConnectorProjectDirectory({
       projectRegistry: { get: async () => null } as unknown as ProjectRegistry,
-      workspaceRegistry: { list: async () => [] } as unknown as WorkspaceRegistry,
+      workspaceRegistry: { listAll: async () => [] } as unknown as WorkspaceRegistry,
       botService: null,
       agentLabels: (agentId) => labels[agentId],
       agentCwd: () => undefined,

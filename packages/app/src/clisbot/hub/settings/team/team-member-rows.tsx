@@ -121,7 +121,7 @@ function TeamMemberRow({
             disabled={pending || teamAdmin.unsupported}
             hint={teamAdmin.unsupported ? t("hub.team.teamDetail.roles.needsNewerHub") : undefined}
           />
-          <Button size="xs" variant="ghost" disabled={pending} onPress={remove}>
+          <Button size="sm" variant="ghost" disabled={pending} onPress={remove}>
             {t("hub.team.actions.remove")}
           </Button>
         </View>

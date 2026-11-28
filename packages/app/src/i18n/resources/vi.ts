@@ -86,6 +86,7 @@ export const vi: TranslationResources = {
       daemonClientDisconnected: "Client daemon đã mất kết nối",
       noFileFound: "Không tìm thấy file cho {{token}}",
       unexpectedDictationError: "Đã xảy ra lỗi không mong muốn khi xử lý đọc chính tả.",
+      folderOutsideWorkspace: "{{path}} nằm ngoài workspace này",
     },
     connectionStatus: {
       online: "Trực tuyến",
@@ -110,7 +111,6 @@ export const vi: TranslationResources = {
       actions: "Thao tác",
       files: "File",
       workspaces: "Workspace",
-      agents: "Agent",
       newAgent: "Agent mới",
       open: "Mở {{name}}",
       openInSidePane: "Mở {{name}} ở khung bên",
@@ -132,6 +132,17 @@ export const vi: TranslationResources = {
       fastModeSearchKeywords: "nhanh tốc độ độ trễ thấp fast speed low latency",
       settingOn: "Bật",
       settingOff: "Tắt",
+      placeholderWithoutFiles: "Tìm workspace và thao tác...",
+      workspacePlaceholder: "Tìm workspace...",
+      actionPlaceholder: "Tìm thao tác...",
+      recentWorkspaces: "Workspace gần đây",
+      tabs: {
+        all: "Tất cả",
+        workspaces: "Workspace",
+        files: "Tệp",
+        actions: "Thao tác",
+      },
+      copyBrowserHostName: "Sao chép tên host của trình duyệt",
     },
   },
   composer: {
@@ -158,6 +169,8 @@ export const vi: TranslationResources = {
       sendMessage: "Gửi tin nhắn",
       queue: "Xếp hàng",
       send: "Gửi",
+      longPressToQueue: "Nhấn giữ để xếp hàng",
+      longPressToSendNow: "Nhấn giữ để gửi ngay",
     },
     cancel: {
       cancelingAgent: "Đang hủy agent",
@@ -402,6 +415,7 @@ export const vi: TranslationResources = {
       forkFailed: "Fork cuộc trò chuyện thất bại",
       openFile: "Mở file",
       copied: "Đã sao chép",
+      turnStats: "Thống kê lượt",
     },
     attachments: {
       dismissImage: "Bỏ ảnh",
@@ -433,6 +447,11 @@ export const vi: TranslationResources = {
       failedRetry: "Đọc chính tả thất bại. Nhấn thử lại.",
 
       paused: "Micrô bị gián đoạn. Đang chờ tiếp tục…",
+      insecureContext: "Mở Clisbot qua HTTPS hoặc localhost để dùng micro.",
+      unsupported: "Trình duyệt này không hỗ trợ đọc chính tả.",
+      noMicrophone: "Hãy kết nối micro rồi thử lại.",
+      permissionDenied: "Hãy cho phép truy cập micro rồi thử lại.",
+      startFailed: "Không thể bắt đầu đọc chính tả. Hãy thử lại.",
     },
     question: {
       submit: "Gửi",
@@ -462,6 +481,25 @@ export const vi: TranslationResources = {
     },
     turnFooter: {
       workedFor: "Đã làm việc trong {{duration}}",
+    },
+    backgroundWork: {
+      heartbeat: "Heartbeat",
+      pillOne: "1 tác vụ nền",
+      pillMany: "{{count}} tác vụ nền",
+      notRunning: "Không còn chạy",
+      dismiss: "Bỏ qua",
+      stop: "Dừng",
+      stopping: "Đang dừng…",
+      stopError: "Không thể xác nhận đã dừng.",
+      label: "Nền",
+      title: "Tác vụ nền",
+      waiting: "Đang chờ chi tiết tác vụ nền",
+      error: "Không thể tải tác vụ nền",
+      retry: "Thử lại",
+      running: "Tác vụ nền đang chạy",
+      shell: "Shell",
+      monitor: "Theo dõi",
+      other: "Tác vụ khác",
     },
   },
   importSession: {
@@ -593,6 +631,7 @@ export const vi: TranslationResources = {
       hostsFiltered: "Host (đang lọc)",
       settings: "Cài đặt",
       closeSidebar: "Đóng thanh bên",
+      moreActions: "Thao tác khác",
     },
     help: {
       trigger: "Trợ giúp và hỗ trợ",
@@ -694,6 +733,9 @@ export const vi: TranslationResources = {
         hostDisconnected: "Host chưa được kết nối",
         hideFailed: "Ẩn workspace thất bại",
         archiveFailed: "Lưu trữ workspace thất bại",
+        archived: "Đã lưu trữ workspace",
+        undoArchive: "Hoàn tác",
+        undoArchiveFailed: "Không thể hoàn tác lưu trữ",
       },
     },
     footer: {
@@ -707,6 +749,14 @@ export const vi: TranslationResources = {
       done: "Xong",
     },
     statusGroupAccessibility: "Nhóm {{label}}",
+    view: {
+      failed: "Không thể tải chế độ xem thanh bên.",
+      useDefault: "Dùng chế độ xem mặc định",
+      readFailed: "Không thể tải lựa chọn chế độ xem thanh bên của bạn.",
+      agentUnavailable: "Agent không còn khả dụng",
+      terminalUnavailable: "Terminal không còn khả dụng",
+      projectUnavailable: "Dự án không còn khả dụng",
+    },
   },
   desktop: {
     windowControls: {
@@ -881,6 +931,8 @@ export const vi: TranslationResources = {
       cli: {
         statusFailed: "Không thể kiểm tra trạng thái cài đặt CLI.",
         installFailed: "Không thể cài Clisbot CLI.",
+        uninstallFailed: "Không thể gỡ Clisbot CLI.",
+        keptForeign: "Đã giữ lại lệnh clisbot không do Clisbot cài. Hãy tự xóa nó để gỡ cài đặt.",
       },
     },
   },
@@ -929,9 +981,13 @@ export const vi: TranslationResources = {
     loadingCommands: "Đang tải lệnh...",
     noFiles: "Không tìm thấy file hoặc thư mục",
     noCommands: "Không tìm thấy lệnh",
-    failedToLoad: "Tải thất bại",
     chooseModelForCommands: "Chọn một mô hình để xem lệnh",
     chooseProjectForCommands: "Chọn một dự án để xem lệnh",
+    loadingProviderCommands: "Đang tải lệnh của {{provider}}...",
+    commandsFailed: "Không thể tải lệnh",
+    providerCommandsFailed: "Không thể tải lệnh của {{provider}}",
+    filesFailed: "Không thể tìm tệp",
+    skillTag: "Skill",
   },
   loadOlderHistory: {
     failed: "Không thể tải lịch sử cũ hơn",
@@ -954,6 +1010,66 @@ export const vi: TranslationResources = {
     groups: {
       managedHosts: "Host được quản lý",
       ownComputer: "Máy tính của bạn",
+    },
+    setup: {
+      title: "Clisbot",
+      stepCounter: "Bước {{current}}/{{total}}",
+      skip: "Bỏ qua thiết lập",
+      continue: "Tiếp tục",
+      finish: "Hoàn tất",
+      steps: {
+        appearance: {
+          label: "Giao diện",
+          title: "Chào mừng đến với Clisbot",
+          description: "Hãy bắt đầu bằng việc chọn giao diện",
+        },
+        providers: {
+          label: "Provider",
+          title: "Provider của bạn",
+          description: "Clisbot chạy các agent CLI đã có trên máy tính này",
+        },
+        projects: {
+          label: "Dự án",
+          title: "Thêm dự án của bạn",
+          description: "Bạn muốn agent làm việc ở đâu",
+          addProject: "Thêm dự án",
+          added: "Đã thêm",
+          suggestions: {
+            loading: "Đang tìm các thư mục bạn đã làm việc",
+            empty: "Không tìm thấy dự án gần đây",
+            lastUsed: "Dùng lần cuối {{time}}",
+            addSelected_one: "Thêm {{count}} dự án",
+            addSelected_other: "Thêm {{count}} dự án",
+            adding: "Đang thêm…",
+            addFailed: "Không thể thêm thư mục này",
+          },
+        },
+        orchestration: {
+          label: "Điều phối",
+          title: "Cho phép agent dùng Clisbot",
+          description: "Cho phép agent tạo workspace và trao đổi với agent khác",
+        },
+        phone: {
+          label: "Di động",
+          title: "Mang agent theo bên mình",
+          description:
+            "Ứng dụng di động đầy đủ tính năng cho phép bạn điều khiển mọi máy Clisbot từ điện thoại",
+          appStore: "App Store",
+          googlePlay: "Google Play",
+          connectTitle: "Chọn cách kết nối",
+          connectDocs: "Tài liệu",
+          openConnectDocs: "Mở tài liệu kết nối",
+          recommended: "Khuyên dùng",
+          relay: {
+            title: "Relay",
+            hint: "Mã hóa đầu cuối, quét mã QR",
+          },
+          tailscale: {
+            title: "Tailscale",
+            hint: "Cần thiết lập thêm",
+          },
+        },
+      },
     },
   },
   modelSelector: {
@@ -1213,6 +1329,8 @@ export const vi: TranslationResources = {
       retry: "Thử lại",
       copy: "Sao chép",
       copied: "Đã sao chép",
+      tailscaleDocs: "Thiết lập Tailscale",
+      tailscaleDocsAccessibility: "Đọc cách kết nối qua Tailscale",
     },
     hostConfirmation: {
       title: "Kết nối tới host này?",
@@ -1259,6 +1377,7 @@ export const vi: TranslationResources = {
     failed: "Tải file xuống thất bại.",
     shareFile: "Chia sẻ file",
     shareFileNamed: "Chia sẻ {{fileName}}",
+    httpFailed: "Tải tệp thất bại (HTTP {{status}}).",
   },
   menu: {
     backdrop: "Nền menu",
@@ -1466,6 +1585,7 @@ export const vi: TranslationResources = {
       fileUploaded: "Đã tải file lên",
       pasteFileFailed: "Không thể dán file: {{reason}}",
       uploadingFile: "Đang tải file lên…",
+      restoreRequiresUpdate: "Cập nhật Host để xem terminal.",
     },
     tabs: {
       loading: "Đang tải...",
@@ -1742,6 +1862,7 @@ export const vi: TranslationResources = {
           mergePrNotReady:
             "Chưa thể merge {{noun}} cho tới khi {{brand}} báo {{noun}} sẵn sàng để merge",
           autoMergeCannotDisable: "Tự động merge đang bật, nhưng tài khoản này không thể tắt",
+          pushUpstreamGone: "Không thể push vì branch mà branch này theo dõi không còn tồn tại",
         },
         toasts: {
           failedCommit: "Không thể commit",
@@ -1823,6 +1944,9 @@ export const vi: TranslationResources = {
         },
 
         all: "Tất cả thay đổi",
+        baseBranch: {
+          title: "Đổi base",
+        },
       },
       openInEditor: {
         open: "Mở",
@@ -2000,6 +2124,7 @@ export const vi: TranslationResources = {
       local: "Trên máy",
       worktree: "Worktree mới",
       label: "Cách ly",
+      existing: "Worktree có sẵn",
     },
     fields: {
       project: "Dự án",
@@ -2014,6 +2139,10 @@ export const vi: TranslationResources = {
       createWorktreeFailed: "Không thể tạo worktree",
       composerStateRequired: "Thiếu trạng thái của khung soạn tin",
       selectModel: "Hãy chọn model",
+      branchInProjectDirectory:
+        "{{branch}} đang được checkout trong thư mục dự án. Chọn Thư mục dự án để làm việc trên nó, hoặc tạo branch từ nó.",
+      branchInWorktree:
+        "{{branch}} đang được checkout tại {{path}}. Chọn worktree đó trong Worktree có sẵn, hoặc tạo branch từ nó.",
     },
     tooltips: {
       project: "Chọn dự án",
@@ -2021,14 +2150,33 @@ export const vi: TranslationResources = {
       isolation: "Chọn mức cách ly",
       startingRef: "Chọn điểm bắt đầu",
       launch: "Chọn thứ cần mở",
+      worktree: "Chọn worktree để làm việc",
     },
     refPicker: {
       startingRef: "Ref bắt đầu",
       intoBase: "vào {{baseRef}}",
       searching: "Đang tìm...",
       noMatchingRefs: "Không có ref phù hợp.",
-      searchPlaceholder: "Tìm branch và PR",
       title: "Bắt đầu từ",
+      searchBranches: "Tìm branch",
+      searchPullRequests: "Tìm pull request",
+      searchPullRequests_mr: "Tìm merge request",
+      branches: "Branch",
+      pullRequests: "Pull request",
+      pullRequests_mr: "Merge request",
+      pullRequestsShort: "PR",
+      pullRequestsShort_mr: "MR",
+      branchOff: "Tạo branch",
+      checkout: "Checkout",
+      branchOffHint: "Bắt đầu branch mới từ đây",
+      checkoutHint: "Làm việc trực tiếp trên đó",
+      base: "Base",
+      from: "từ",
+      branch: "Branch",
+      pullRequest: "Pull request",
+      pullRequest_mr: "Merge request",
+      inProjectDirectory: "Trong thư mục dự án",
+      inWorktree: "Trong một worktree",
     },
     launch: {
       title: "Mở gì",
@@ -2038,6 +2186,11 @@ export const vi: TranslationResources = {
       submit: "Mở",
       promptPlaceholder: "Prompt cho {{name}}",
       commandPlaceholder: "Chạy một lệnh, hoặc để trống để mở terminal trống",
+    },
+    worktreePicker: {
+      title: "Worktree",
+      searchPlaceholder: "Tìm worktree",
+      empty: "Không có worktree phù hợp.",
     },
   },
   branchSwitcher: {
@@ -2058,6 +2211,7 @@ export const vi: TranslationResources = {
     restore: "Khôi phục",
     later: "Để sau",
     stashRestored: "Đã khôi phục thay đổi đã stash",
+    failedToLoad: "Không thể tải branch. Mở lại bộ chọn để thử lại.",
   },
   workspaceSetup: {
     title: "Tạo workspace",
@@ -2115,6 +2269,8 @@ export const vi: TranslationResources = {
       title: "Không thể tải changelog",
       description: "Kiểm tra kết nối rồi thử lại.",
     },
+    showAllChanges: "Hiện mọi thay đổi",
+    hideAllChanges: "Ẩn mọi thay đổi",
   },
   review: {
     feedback: {
@@ -2146,7 +2302,6 @@ export const vi: TranslationResources = {
   toolCallDetails: {
     error: "Lỗi",
     empty: "Không có thêm chi tiết",
-    subAgentActivity: "Hoạt động của subagent",
     input: "Input",
     output: "Output",
   },
@@ -2176,6 +2331,7 @@ export const vi: TranslationResources = {
       other: "{{count}} lần gọi Clisbot",
     },
     and: "và",
+    thought: "Suy nghĩ",
   },
   subagents: {
     title: "Subagent",
@@ -2192,6 +2348,12 @@ export const vi: TranslationResources = {
     archiveTooltip: "Lưu trữ subagent",
     archiveFinishedAction: "Lưu trữ các subagent đã xong",
     archiveFinishedRetry: "Thử lại ({{failed}}/{{total}})",
+    parent: {
+      backToParent: "Quay lại agent cha",
+      backTo: "Quay lại {{label}}",
+      parentAgent: "Agent cha",
+      openParent: "Mở agent cha",
+    },
   },
   panels: {
     draft: {
@@ -2382,6 +2544,7 @@ export const vi: TranslationResources = {
       terminals: "Terminal",
       plugins: "Plugin",
       host: "Tổng quan",
+      voice: "Giọng nói",
     },
     plugins: pluginSettings.vi,
     metadataGeneration: {
@@ -2428,6 +2591,12 @@ export const vi: TranslationResources = {
           steer: "Chỉnh hướng",
           queue: "Xếp hàng",
         },
+        commandEnterDescriptions: {
+          interrupt: "Khi agent đang chạy, {{modifier}}+Enter sẽ ngắt. Enter xuống dòng.",
+          steer:
+            "Khi agent đang chạy, {{modifier}}+Enter sẽ điều hướng lượt hiện tại. Enter xuống dòng.",
+          queue: "Khi agent đang chạy, {{modifier}}+Enter sẽ xếp hàng. Enter xuống dòng.",
+        },
       },
       serviceUrls: {
         options: {
@@ -2445,13 +2614,16 @@ export const vi: TranslationResources = {
         label: "Luôn mở rộng phần suy luận",
         description: "Mặc định hiện đầy đủ phần suy nghĩ và chuỗi suy luận của agent",
       },
-      toolCallDetail: {
-        label: "Hiển thị lệnh gọi công cụ",
-        description: "Cách lệnh gọi công cụ hiện trên dòng thời gian",
+      chatDisplay: {
+        label: "Hiển thị chat",
+        description: "Mức độ hoạt động của agent được hiển thị trong chat",
         options: {
           "summary-with-latest-call": "Tóm tắt kèm lệnh cuối",
           overview: "Tóm tắt",
           detailed: "Đầy đủ chi tiết",
+          full: "Đầy đủ",
+          collapseToolCalls: "Thu gọn lệnh gọi công cụ",
+          collapseTurns: "Thu gọn lượt",
         },
       },
       language: {
@@ -2469,6 +2641,18 @@ export const vi: TranslationResources = {
           ru: "Tiếng Nga",
           vi: "Tiếng Việt",
           zhCN: "Tiếng Trung giản thể",
+        },
+      },
+      setup: {
+        label: "Thiết lập lần đầu",
+        description: "Đi lại các bước giao diện, provider, dự án và ghép nối điện thoại",
+        action: "Hiện lại thiết lập",
+      },
+      sendShortcut: {
+        label: "Phím tắt gửi",
+        options: {
+          enter: "Enter",
+          "mod-enter": "{{modifier}}+Enter",
         },
       },
     },
@@ -2560,6 +2744,13 @@ export const vi: TranslationResources = {
           title: "Phần đầu",
           description: "Chọn các mục hiển thị ở đầu thanh bên và thứ tự của chúng",
         },
+        view: {
+          title: "Chế độ xem thanh bên",
+          label: "Chế độ xem",
+          default: "Chế độ xem mặc định",
+          unavailable:
+            "Chế độ xem đã chọn không khả dụng hoặc đã tắt. Đang hiển thị chế độ xem mặc định.",
+        },
       },
       fonts: {
         title: "Phông chữ",
@@ -2594,9 +2785,10 @@ export const vi: TranslationResources = {
         title: "Bố cục",
         contentWidth: "Độ rộng nội dung",
         contentWidthHint: "Độ rộng tối đa của chat và tệp Markdown trên màn hình rộng",
-        contentWidthAccessibility: "Độ rộng nội dung tính bằng pixel",
-        reset: "Đặt lại",
-        resetAccessibility: "Đặt lại độ rộng nội dung về mặc định",
+        contentWidthDefault: "Mặc định",
+        contentWidthWide: "Rộng",
+        contentWidthFull: "Toàn màn hình",
+        contentWidthCustom: "Độ rộng tùy chỉnh · {{width}} px",
       },
     },
     shortcuts: {
@@ -2665,6 +2857,8 @@ export const vi: TranslationResources = {
         queueMessage: "Xếp hàng tin nhắn",
         muteUnmuteVoiceMode: "Tắt/bật tiếng chế độ giọng nói",
         switchProject: "Đổi dự án",
+        toggleModelPicker: "Bật/tắt bộ chọn model",
+        cycleEffort: "Đổi mức effort",
       },
       helpNotes: {
         showKeyboardShortcuts:
@@ -2682,11 +2876,7 @@ export const vi: TranslationResources = {
       commandLine: {
         title: "Dòng lệnh",
         description: "Điều khiển và viết script cho agent từ terminal của bạn",
-      },
-      actions: {
-        install: "Cài đặt",
-        installing: "Đang cài đặt...",
-        installed: "Đã cài đặt",
+        accessibilityLabel: "Cài Clisbot CLI",
       },
     },
     permissions: {
@@ -2777,7 +2967,6 @@ export const vi: TranslationResources = {
         saveSelectionFailed: "Không thể lưu lựa chọn skill điều phối.",
         updateAvailable: "Có bản cập nhật",
         updateTitle: "Cập nhật skill của Clisbot?",
-        updateFallback: "Đồng bộ các skill đi kèm lên Host này.",
         uninstallTitle: "Gỡ cài đặt skill của Clisbot?",
         uninstallMessage:
           "Xóa toàn bộ skill điều phối của Clisbot khỏi ~/.agents, ~/.claude, ~/.codex trên Host này.",
@@ -2791,9 +2980,6 @@ export const vi: TranslationResources = {
           "{{skills}} sẽ bị xóa khỏi ~/.agents, ~/.claude và ~/.codex trên Host này. Mọi thứ bạn đã thêm vào các thư mục skill đó cũng sẽ bị xóa.",
         saveFailed: "Không thể lưu lựa chọn skill của bạn.",
         actions: {
-          install: "Cài đặt",
-          installing: "Đang cài đặt...",
-          installed: "Đã cài đặt",
           update: "Cập nhật",
           working: "Đang xử lý...",
           remove: "Xóa",
@@ -2815,6 +3001,7 @@ export const vi: TranslationResources = {
           title: "Bật công cụ Clisbot",
           hint: "Agent sẽ quản lý được worktree, agent và lịch",
           accessibilityLabel: "Đưa công cụ Clisbot vào agent",
+          updateFailed: "Không thể cập nhật công cụ Clisbot.",
         },
         systemPrompt: {
           title: "System prompt",
@@ -2830,6 +3017,19 @@ export const vi: TranslationResources = {
       },
       agents: {
         unavailable: "Kết nối với Host này để quản lý agent",
+        resumeOnStartup: {
+          title: "Tiếp tục agent sau khi khởi động lại",
+          info: "Mở lại các agent đang làm việc khi Host dừng và gửi lời nhắc tiếp tục. Áp dụng sau cả khởi động lại bình thường lẫn sự cố.",
+          hint: "Tự động tiếp tục phần việc bị gián đoạn.",
+          prompt: "Lời nhắc tiếp tục",
+          edit: "Sửa",
+          editAccessibilityLabel: "Sửa lời nhắc",
+        },
+        idleRuntimeCleanup: {
+          title: "Giải phóng agent nhàn rỗi",
+          hint: "Giải phóng bộ nhớ sau một giờ không hoạt động.",
+          info: "Dừng tiến trình của agent nhưng vẫn giữ cuộc trò chuyện. Gửi tin nhắn để tiếp tục.\n\nPhần việc đang chạy, thông báo đang chờ và các kiểm tra an toàn của provider sẽ ngăn việc giải phóng.",
+        },
       },
       workspaces: {
         unavailable: "Kết nối với Host này để quản lý workspace",
@@ -2923,6 +3123,10 @@ export const vi: TranslationResources = {
           requestFailedMessage:
             "Không thể gửi yêu cầu khởi động lại. Clisbot sẽ tự kết nối lại — hãy thử lại khi Host hiện trạng thái trực tuyến.",
           dialogFailedMessage: "Không thể mở hộp thoại xác nhận khởi động lại.",
+          closeTerminals: "Khởi động lại và đóng terminal",
+          closeTerminalsHint: "Khởi động lại và đóng mọi terminal đang chạy trên Host này.",
+          closeTerminalsConfirmMessage:
+            "Daemon sẽ khởi động lại và đóng mọi terminal trên đó, kết thúc các chương trình đang chạy trong chúng. Ứng dụng sẽ tự kết nối lại.",
         },
         update: {
           desktopManagedHint:
@@ -3011,9 +3215,10 @@ export const vi: TranslationResources = {
         retrying: "Đang thử lại...",
         noSearchMatches: "Không có model nào khớp với tìm kiếm",
         noneDetected: "Không phát hiện model nào",
-        discovered: "Tự phát hiện",
         custom: "Model tùy chỉnh",
         updated: "Cập nhật {{time}}",
+        noCustom: "Không có model tùy chỉnh",
+        title: "Model",
       },
       diagnostic: {
         title: "Chẩn đoán",
@@ -3029,6 +3234,43 @@ export const vi: TranslationResources = {
         none: "Không có thông tin chẩn đoán",
         failedToFetch: "Không thể lấy thông tin chẩn đoán",
         unknownError: "Lỗi không xác định",
+      },
+      list: {
+        add: "Provider",
+        updatingTo: "Đang cập nhật lên {{version}}...",
+      },
+      detail: {
+        backToProviders: "Quay lại provider",
+        notOnHost: "Provider này không có trên Host này",
+        enabled: "Đã bật",
+        unavailableTitle: "{{name}} không khả dụng",
+        troubleshooting: "Khắc phục sự cố",
+        status: "Trạng thái provider",
+        checked: "Đã kiểm tra {{time}}",
+        diagnosticReport: "Báo cáo chẩn đoán",
+        docs: "Tài liệu",
+        dangerZone: "Vùng nguy hiểm",
+        removeHint: "Xóa provider này khỏi config.json",
+      },
+      installation: {
+        title: "Cài đặt",
+        version: "Phiên bản",
+        installed: "Đã cài đặt",
+        notInstalled: "Chưa cài đặt",
+        install: "Cài đặt",
+        checking: "Đang kiểm tra...",
+        failed: "Không thể kiểm tra bản cài đặt này",
+        updates: "Cập nhật",
+        upToDate: "Đã mới nhất",
+        updateAvailable: "Có bản cập nhật",
+        updateInstructions: "Hướng dẫn cập nhật",
+        update: "Cập nhật",
+        updating: "Đang cập nhật...",
+        updated: "Đã cập nhật",
+        updateFailed: "Cập nhật thất bại",
+        outputTruncated: "Output trước đó đã bị lược bỏ.",
+        updatesFailed: "Không thể kiểm tra cập nhật",
+        installInstructions: "Hướng dẫn cài đặt",
       },
     },
     project: {
@@ -3128,6 +3370,69 @@ export const vi: TranslationResources = {
       unavailable: "Không có trên Host đã kết nối",
       empty: "Các trình xem file xuất hiện ở đây khi plugin thêm vào",
     },
+    voice: {
+      offline: "Kết nối với Host này để cấu hình giọng nói.",
+      updateHost: "Cập nhật Host để cấu hình giọng nói.",
+      saveError: "Không thể cập nhật cài đặt giọng nói",
+      provider: "Provider",
+      providers: {
+        local: "Cục bộ",
+        openai: "OpenAI",
+      },
+      voice: "Giọng",
+      save: "Lưu",
+      retry: "Thử lại",
+      cancel: "Hủy",
+      model: "Model",
+      language: "Ngôn ngữ",
+      languagePlaceholder: "Tự nhận diện",
+      setBy: "Đặt bởi {{name}}",
+      unknownProvider: "Cập nhật ứng dụng để cấu hình {{provider}}",
+      sites: {
+        dictationStt: "Chuyển giọng nói thành văn bản",
+        voiceModeStt: "Nghe",
+        voiceModeTts: "Nói",
+      },
+      dictation: {
+        title: "Đọc chính tả",
+        enabled: "Đọc chính tả",
+        enabledHint: "Nói vào ô tin nhắn thay vì gõ",
+      },
+      voiceMode: {
+        title: "Chế độ giọng nói",
+        info: "Chế độ giọng nói chép lại lời bạn nói và đọc to phản hồi của agent.",
+        enabled: "Chế độ giọng nói",
+        enabledHint: "Trò chuyện với agent mà không cần dùng tay",
+      },
+      openai: {
+        apiKey: "API key",
+        apiKeyHint: "Được lưu trên Host và không bao giờ hiển thị lại.",
+        keyPlaceholder: "sk-...",
+        savedKeyPlaceholder: "Đã lưu",
+        missingKey: "Thiếu API key",
+        baseUrl: "Base URL",
+        baseUrlHint: "Dành cho máy chủ tương thích OpenAI. Để trống để dùng OpenAI.",
+      },
+      models: {
+        loading: "Đang tải model...",
+        loadError: "Không thể tải model cục bộ",
+        none: "Không có model nào",
+        downloaded: "Đã tải",
+        inUse: "Đang dùng",
+        recommended: "Khuyên dùng",
+        download: "Tải xuống",
+        downloadAction: "Tải xuống {{label}}",
+        downloading: "Đang tải xuống...",
+        downloadingPercent: "Đang tải xuống {{percent}}%",
+        extracting: "Đang giải nén...",
+        delete: "Xóa",
+        deleteAction: "Xóa {{label}}",
+        deleteTitle: "Xóa {{label}}?",
+        deleteMessage: "Thao tác này giải phóng {{size}}. Bạn có thể tải lại sau.",
+        languages: "Ngôn ngữ {{label}}",
+        moreLanguages: "{{languages}} và {{count}} ngôn ngữ khác",
+      },
+    },
   },
   hub: hub.vi,
   connectors: connectors.vi,
@@ -3187,6 +3492,7 @@ export const vi: TranslationResources = {
       days: "{{value}}n",
       hours: "{{value}}g",
       minutes: "{{value}}p",
+      pair: "{{first}} {{second}}",
     },
     timing: {
       lastUpdated: "Cập nhật gần nhất {{relativeTime}}",
@@ -3194,13 +3500,38 @@ export const vi: TranslationResources = {
       resetTimePassed: "Đã qua thời gian đặt lại",
       resettingNow: "đang đặt lại",
       resetsIn: "đặt lại sau {{duration}}",
-      runsOutNow: "sắp hết ngay",
-      runsOutIn: "hết sau {{duration}}",
       justNow: "vừa xong",
       daysAgo: "{{value}} ngày trước",
       hoursAgo: "{{value}} giờ trước",
       minutesAgo: "{{value}} phút trước",
       updated: "Đã cập nhật {{relativeTime}}",
+      resetsAtWeekday: "{{weekday}} {{time}}",
+      resetsAtDate: "{{date}}, {{time}}",
+      limitReached: "Đã đạt giới hạn",
+      mayHaveRunOut: "Có thể đã hết",
+      runsOutAt: "hết lúc {{time}}",
     },
+    checkUsage: "Kiểm tra mức dùng",
+    checkUsageHint: "Áp dụng cho {{host}} trên mọi thiết bị",
+    off: "Mức dùng đang tắt trên {{host}}.",
+    turnOn: "Bật",
+    host: "Host",
+    reorderCard: "Sắp xếp lại {{source}}",
+    sources: "Nguồn",
+    sourcesCount: "{{shown}}/{{total}}",
+    providerInactive: "Provider không hoạt động",
+    allSourcesHidden: "Không có nguồn mức dùng nào được hiển thị",
+    chooseSources: "Chọn nguồn",
+  },
+  pluginCombobox: {
+    searching: "Đang tìm…",
+    empty: "Không có kết quả",
+    failed: "Tìm kiếm thất bại: {{message}}",
+  },
+  turnSummary: {
+    details: "Xem chi tiết lượt",
+    sentBy: "Gửi bởi {{name}}",
+    showMore: "Xem thêm",
+    showLess: "Thu gọn",
   },
 };

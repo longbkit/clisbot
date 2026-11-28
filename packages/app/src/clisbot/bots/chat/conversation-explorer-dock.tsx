@@ -5,6 +5,7 @@ import {
   findPaneById,
   selectExplorerSidebarPaneId,
   selectIsExplorerSidebarVisible,
+  selectPaneFocusSuspended,
   useWorkspaceLayoutStore,
   type WorkspaceLayout,
 } from "@/stores/workspace-layout-store";
@@ -30,7 +31,6 @@ export function ConversationExplorerDock({
   hovered,
   setHovered,
   closeActions,
-  containerWidth,
   openExplorer,
 }: {
   serverId: string;
@@ -45,11 +45,13 @@ export function ConversationExplorerDock({
     DockProps,
     "onCloseTabsToLeft" | "onCloseTabsToRight" | "onCloseOtherTabs" | "onReorderTabsInPane"
   >;
-  containerWidth: number;
   openExplorer: () => void;
 }) {
   const paneId = useWorkspaceLayoutStore((state) => selectExplorerSidebarPaneId(state, layoutKey));
   const open = useWorkspaceLayoutStore((state) => selectIsExplorerSidebarVisible(state, layoutKey));
+  const paneFocusSuspended = useWorkspaceLayoutStore((state) =>
+    selectPaneFocusSuspended(state, layoutKey),
+  );
   const selectTab = useCallback(
     (id: string, tabId: string) =>
       useWorkspaceLayoutStore.getState().selectTabInPane(layoutKey, id, tabId),
@@ -62,7 +64,6 @@ export function ConversationExplorerDock({
       presentation="dock"
       isWorkspaceActive={focused}
       persistenceKey={layoutKey}
-      containerWidth={containerWidth}
       isOpen={open}
     >
       <ExplorerSidebarDock
@@ -73,6 +74,7 @@ export function ConversationExplorerDock({
         normalizedServerId={serverId}
         normalizedWorkspaceId=""
         isWorkspaceFocused={focused}
+        paneFocusSuspended={paneFocusSuspended}
         closingTabIds={EMPTY_CLOSING}
         hoveredCloseTabKey={hovered}
         setHoveredCloseTabKey={setHovered}

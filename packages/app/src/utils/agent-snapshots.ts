@@ -58,6 +58,11 @@ export function derivePendingPermissionKey(
   return `${agentId}:${fallbackId}`;
 }
 
+/** Clisbot: full auto-accept rides the snapshot only while it is on. */
+function projectFullAutoAccept(agent: Agent): Pick<AgentSnapshotPayload, "fullAutoAccept"> {
+  return agent.fullAutoAccept ? { fullAutoAccept: true } : {};
+}
+
 export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
   return {
     ...copySessionMetadata(agent),
@@ -66,28 +71,34 @@ export function projectAgentSnapshot(agent: Agent): AgentSnapshotPayload {
     cwd: agent.cwd,
     ...(agent.workspaceId ? { workspaceId: agent.workspaceId } : {}),
     model: agent.model,
-    ...(agent.features ? { features: agent.features } : {}),
+    ...(agent.options ? { options: agent.options } : {}),
+    ...(agent.controls ? { controls: agent.controls } : {}),
     thinkingOptionId: agent.thinkingOptionId ?? null,
     createdAt: agent.createdAt.toISOString(),
     updatedAt: agent.updatedAt.toISOString(),
     lastUserMessageAt: agent.lastUserMessageAt?.toISOString() ?? null,
     status: agent.status,
+    backgroundWork: agent.backgroundWork,
     ...projectActiveTurn(agent),
     capabilities: agent.capabilities,
     currentModeId: agent.currentModeId,
-    ...(agent.fullAutoAccept ? { fullAutoAccept: true } : {}),
+    ...projectFullAutoAccept(agent),
     availableModes: agent.availableModes,
     pendingPermissions: agent.pendingPermissions,
     persistence: agent.persistence,
     ...(agent.runtimeInfo ? { runtimeInfo: agent.runtimeInfo } : {}),
+    ...(agent.usageScopeKey ? { usageScopeKey: agent.usageScopeKey } : {}),
     ...(agent.lastUsage ? { lastUsage: agent.lastUsage } : {}),
+    ...(agent.sessionMetrics ? { sessionMetrics: agent.sessionMetrics } : {}),
     ...(agent.lastError ? { lastError: agent.lastError } : {}),
     title: agent.title,
     labels: agent.labels,
+    ...(agent.metadata ? { metadata: agent.metadata } : {}),
     requiresAttention: agent.requiresAttention ?? false,
     attentionReason: agent.attentionReason ?? null,
     attentionTimestamp: agent.attentionTimestamp?.toISOString() ?? null,
     archivedAt: agent.archivedAt?.toISOString() ?? null,
+    ...(agent.background ? { background: true } : {}),
   };
 }
 
@@ -114,6 +125,7 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
     id: snapshot.id,
     provider: snapshot.provider,
     status: snapshot.status,
+    backgroundWork: snapshot.backgroundWork,
     turn,
     createdAt,
     updatedAt,
@@ -126,19 +138,24 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
     pendingPermissions: snapshot.pendingPermissions ?? [],
     persistence: snapshot.persistence ?? null,
     runtimeInfo: snapshot.runtimeInfo,
+    usageScopeKey: snapshot.usageScopeKey,
     lastUsage: snapshot.lastUsage,
+    sessionMetrics: snapshot.sessionMetrics,
     lastError: snapshot.lastError ?? null,
     title: snapshot.title ?? null,
     cwd: snapshot.cwd,
     workspaceId: snapshot.workspaceId,
     model: snapshot.model ?? null,
-    features: snapshot.features,
+    options: snapshot.options,
+    controls: snapshot.controls,
     thinkingOptionId: snapshot.thinkingOptionId ?? null,
     requiresAttention: snapshot.requiresAttention ?? false,
     attentionReason: snapshot.attentionReason ?? null,
     attentionTimestamp,
     archivedAt,
+    background: snapshot.background === true,
     parentAgentId,
     labels: snapshot.labels,
+    metadata: snapshot.metadata,
   };
 }

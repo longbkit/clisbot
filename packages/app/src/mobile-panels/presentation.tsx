@@ -107,7 +107,7 @@ export function MobilePanelOverlay({
   dockVisible = false,
   frameStyle,
 }: MobilePanelOverlayProps) {
-  const { position, windowWidth } = useMobilePanelsRuntime();
+  const { leftPanelWidth, position, windowWidth } = useMobilePanelsRuntime();
   const diagnosticProps = useMemo(() => panelTraceProps(panel), [panel]);
   const showMobileAgent = usePanelStore((state) => state.showMobileAgent);
   const overlayOpen = useIsMobilePanelActive(panel);
@@ -115,19 +115,20 @@ export function MobilePanelOverlay({
   const isOpen = presented && (docked ? dockVisible : overlayOpen);
   const hostId = useId();
   const isLeft = panel === "agent-list";
+  const width = isLeft ? leftPanelWidth : windowWidth;
 
   const sidebarAnimatedStyle = useAnimatedStyle(() => {
     if (docked) return { transform: [{ translateX: 0 }] };
-    const frame = getMobilePanelFrame(position.value, windowWidth);
+    const frame = getMobilePanelFrame(position.value, width);
     return {
       transform: [{ translateX: isLeft ? frame.leftTranslateX : frame.rightTranslateX }],
     };
-  }, [docked, isLeft, windowWidth]);
+  }, [docked, isLeft, width]);
 
   const backdropAnimatedStyle = useAnimatedStyle(() => {
-    const frame = getMobilePanelFrame(position.value, windowWidth);
+    const frame = getMobilePanelFrame(position.value, width);
     return { opacity: isLeft ? frame.leftBackdropOpacity : frame.rightBackdropOpacity };
-  }, [isLeft, windowWidth]);
+  }, [isLeft, width]);
 
   const overlayAnimatedStyle = useAnimatedStyle(() => {
     if (docked) return { opacity: 1, display: "flex" as const, pointerEvents: "box-none" as const };
@@ -152,11 +153,11 @@ export function MobilePanelOverlay({
     () => [
       docked ? styles.dockedPanel : styles.panel,
       !docked && positionedPanelStyle,
-      !docked && { width: windowWidth },
+      !docked && { width },
       panelStyle,
       sidebarAnimatedStyle,
     ],
-    [docked, panelStyle, positionedPanelStyle, sidebarAnimatedStyle, windowWidth],
+    [docked, panelStyle, positionedPanelStyle, sidebarAnimatedStyle, width],
   );
   // Global screens hide retained native chrome without collapsing its scroll ranges.
   // This host guard also wins over a previously settled agent-list worklet position.

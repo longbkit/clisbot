@@ -1,6 +1,6 @@
 import type { HeartbeatRun } from "@clisbot/protocol/schedule/heartbeat-notice";
 import type { StreamItem } from "@/types/stream";
-import { startsNewTurn } from "@/agent-stream/turn-membership";
+import { startsNewTurn, isTurnTrigger } from "@/agent-stream/turn-membership";
 
 export interface TurnTiming {
   completedAt: Date;
@@ -9,7 +9,7 @@ export interface TurnTiming {
 }
 
 export interface StreamTurnTiming {
-  byAssistantId: Map<string, TurnTiming>;
+  byItemId: Map<string, TurnTiming>;
   runningStartedAt: Date | null;
   runningHeartbeatRun?: HeartbeatRun;
 }
@@ -24,7 +24,7 @@ interface OpenTurn {
 
 interface HeadTurnTiming {
   additions: Map<string, TurnTiming>;
-  byAssistantId: Map<string, TurnTiming>;
+  byItemId: Map<string, TurnTiming>;
 }
 
 interface TailTurnTiming {
@@ -41,7 +41,7 @@ const EMPTY_OPEN_TURN: OpenTurn = {
 };
 
 function closeTurn(turn: OpenTurn, into: Map<string, TurnTiming>): void {
-  if (!turn.lastItemAt || turn.assistantIds.length === 0) {
+  if (!turn.lastItemAt) {
     return;
   }
   const timing: TurnTiming = {
@@ -49,7 +49,11 @@ function closeTurn(turn: OpenTurn, into: Map<string, TurnTiming>): void {
     completedAt: turn.lastItemAt,
     durationMs: turn.userAt ? Math.max(0, turn.lastItemAt.getTime() - turn.userAt.getTime()) : null,
   };
-  for (const id of turn.assistantIds) {
+  let footerIds = turn.assistantIds;
+  if (footerIds.length === 0 && turn.previousItem?.kind === "tool_call") {
+    footerIds = [turn.previousItem.id];
+  }
+  for (const id of footerIds) {
     into.set(id, timing);
   }
 }
@@ -69,8 +73,7 @@ function walkTurns(
       closeTurn({ userAt, lastItemAt, assistantIds, previousItem, heartbeatRun }, into);
       heartbeatRun = undefined;
       userAt =
-        item.kind === "user_message" ||
-        (item.kind === "notification" && item.heartbeatRun && item.turnId)
+        isTurnTrigger(item) || (item.kind === "notification" && item.heartbeatRun && item.turnId)
           ? item.timestamp
           : null;
       lastItemAt = null;
@@ -122,7 +125,7 @@ function getTailTurnTiming(tail: StreamItem[]): TailTurnTiming {
   return timing;
 }
 
-function resolveByAssistantId(
+function resolveByItemId(
   tail: TailTurnTiming,
   additions: Map<string, TurnTiming>,
 ): Map<string, TurnTiming> {
@@ -130,14 +133,14 @@ function resolveByAssistantId(
     return tail.completed;
   }
   if (tail.lastHead && areTimingsEqual(tail.lastHead.additions, additions)) {
-    return tail.lastHead.byAssistantId;
+    return tail.lastHead.byItemId;
   }
-  const byAssistantId = new Map(tail.completed);
+  const byItemId = new Map(tail.completed);
   for (const [id, timing] of additions) {
-    byAssistantId.set(id, timing);
+    byItemId.set(id, timing);
   }
-  tail.lastHead = { additions, byAssistantId };
-  return byAssistantId;
+  tail.lastHead = { additions, byItemId };
+  return byItemId;
 }
 
 export function deriveStreamTurnTiming(params: {
@@ -153,7 +156,7 @@ export function deriveStreamTurnTiming(params: {
     closeTurn(openTurn, additions);
   }
   return {
-    byAssistantId: resolveByAssistantId(tail, additions),
+    byItemId: resolveByItemId(tail, additions),
     runningStartedAt: params.isTurnActive ? params.activeTurnStartedAt : null,
     ...(params.isTurnActive && openTurn.heartbeatRun
       ? { runningHeartbeatRun: openTurn.heartbeatRun }

@@ -1,0 +1,5 @@
+{
+  "platforms": ["android", "ios"],
+  "android": { "modules": ["sh.clisbot.pressfeedback.ClisbotPressFeedbackModule"] },
+  "ios": { "modules": ["ClisbotPressFeedbackModule"] }
+}

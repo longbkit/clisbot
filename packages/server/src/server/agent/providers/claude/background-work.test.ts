@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { ClaudeBackgroundWork } from "./background-work.js";
+import { describe, expect, it, test } from "vitest";
+
+import { ClaudeBackgroundWork, toBackgroundWorkInputs } from "./background-work.js";
 
 function stopHook(backgroundTasks: unknown[], sessionCrons: unknown[]) {
   return {
@@ -83,5 +84,23 @@ describe("ClaudeBackgroundWork", () => {
     work.observeStopHook(stopHook([{ id: "a", status: "running" }], [{ id: "c" }]));
     work.reset();
     expect(work.isIdle).toBe(true);
+  });
+});
+
+describe("toBackgroundWorkInputs", () => {
+  test("maps shells, drops subagents and workflows", () => {
+    expect(
+      toBackgroundWorkInputs([
+        { task_id: "bash-1", task_type: "local_bash", description: "sleep 20" },
+        { task_id: "agent-1", task_type: "local_agent", description: "Explore" },
+        { task_id: "wf-1", task_type: "local_workflow", description: "Run the spec workflow" },
+        { task_id: "x-1", task_type: "remote_something", description: "  " },
+        { task_id: "bash-2", task_type: "local_bash" },
+      ]),
+    ).toEqual([
+      { id: "bash-1", kind: "shell", description: "sleep 20", canStop: true },
+      { id: "x-1", kind: "other", description: null, canStop: false },
+      { id: "bash-2", kind: "shell", description: null, canStop: true },
+    ]);
   });
 });

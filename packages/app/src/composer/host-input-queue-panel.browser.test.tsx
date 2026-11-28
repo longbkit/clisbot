@@ -4,6 +4,7 @@ import { afterEach, beforeAll, expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { HostInputQueuePanel } from "./host-input-queue-panel";
 import { i18n } from "@/i18n/i18next";
+import { WindowLayoutProvider } from "@/window-layout";
 
 const layout = vi.hoisted(() => ({ compact: false }));
 vi.mock("@/constants/layout", async (importOriginal) => ({
@@ -73,15 +74,18 @@ function mount(overrides: Partial<React.ComponentProps<typeof HostInputQueuePane
   document.body.appendChild(container);
   root = createRoot(container);
   act(() =>
+    // Upstream v0.17 image lightbox pads by the window safe area, which the app root provides.
     root.render(
-      <HostInputQueuePanel
-        {...actions}
-        pending={false}
-        editor={null}
-        error={null}
-        view={DEFAULT_VIEW}
-        {...overrides}
-      />,
+      <WindowLayoutProvider>
+        <HostInputQueuePanel
+          {...actions}
+          pending={false}
+          editor={null}
+          error={null}
+          view={DEFAULT_VIEW}
+          {...overrides}
+        />
+      </WindowLayoutProvider>,
     ),
   );
   return actions;

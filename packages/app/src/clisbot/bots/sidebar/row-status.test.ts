@@ -24,7 +24,8 @@ it("DM and group badges share session permission/error/running/unread precedence
       status: "running",
       turn: { phase: "open", turnId: "turn", startedAt: new Date(), cancellationRequestId: null },
     },
-    { status: "error" },
+    // Upstream #8831: only an unread error (attention "error") shows as failed; the host sets it.
+    { status: "error", requiresAttention: true, attentionReason: "error" },
     { pendingPermissions: [{ id: "approval", provider: "mock", name: "Approval", kind: "tool" }] },
     { requiresAttention: true, attentionReason: "finished" },
   ]);

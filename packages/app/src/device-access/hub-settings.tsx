@@ -1,5 +1,5 @@
 import { hubStartAvailability, hubStartReason } from "./hub-start-availability";
-import { PairLinkModal } from "@/components/pair-link-modal";
+import { PairLinkModal } from "@/hosts/add-host/internal/pair-link-modal";
 import { useHubStartStatus } from "./hub-start-status";
 import { suggestedDeviceLabel } from "./device-label";
 import { z } from "zod";
@@ -46,7 +46,7 @@ import {
 import { pairHub } from "./hub-transport";
 import { useHubHostDiscovery, type DetectedHub } from "./hub-host-discovery";
 import { SavedHubList, DetectedHubList, HubStartHosts, matchesSavedHub } from "./hub-list";
-import { buildSettingsAddHostRoute } from "@/utils/host-routes";
+import { useAddHost } from "@/hosts/add-host";
 import { isTailscaleOrigin, saveVerifiedHubRoutes, startHubOnHost } from "./hub-routes";
 import { HubRoutesCard } from "./hub-routes-card";
 import { HubPairDevicePanel } from "./hub-pair-device";
@@ -138,10 +138,7 @@ export function HubConnectionSettings({
   usePublicHubTarget(router, setBusy, setError);
   const retryDiscovery = useCallback(() => setDiscoveryAttempt((value) => value + 1), []);
   const { checks, detected, state: discovery } = useHubHostDiscovery(hosts, discoveryAttempt);
-  const connectHost = useCallback(
-    () => router.push(buildSettingsAddHostRoute(Date.now())),
-    [router],
-  );
+  const connectHost = useAddHost();
   const available = detected.filter(
     (hub) => !registry.profiles.some((profile) => matchesSavedHub(hub, profile)),
   );
@@ -249,7 +246,7 @@ export function HubConnectionSettings({
     setIntent("connect");
     router.setParams({ hubIntent: "connect" });
   }, [router]);
-  const scan = useCallback(() => router.push("/pair-scan"), [router]);
+  const scan = useAddHost({ method: "scan" });
   const changeLink = useCallback((value: string) => {
     setLink(value);
     setError(null);

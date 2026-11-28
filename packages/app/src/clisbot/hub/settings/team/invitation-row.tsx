@@ -58,7 +58,7 @@ export function InvitationRow({
       </View>
       <View style={styles.actions}>
         {/* The same request either way: a re-invite restarts the 48-hour lifetime. */}
-        <Button size="xs" variant="outline" disabled={pending} onPress={reinvite}>
+        <Button size="sm" variant="outline" disabled={pending} onPress={reinvite}>
           {expired ? t("hub.team.invitations.renew") : t("hub.team.invitations.resend")}
         </Button>
         <RowActionsMenu

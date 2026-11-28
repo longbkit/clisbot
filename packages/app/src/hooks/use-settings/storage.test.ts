@@ -3,6 +3,7 @@ import { QueryClient } from "@tanstack/react-query";
 import {
   APP_SETTINGS_KEY,
   APP_SETTINGS_QUERY_KEY,
+  CHAT_DISPLAYS,
   DEFAULT_APP_SETTINGS,
   DEFAULT_CLIENT_SETTINGS,
   DEFAULT_CODE_FONT_SIZE,
@@ -20,6 +21,7 @@ import {
   type SettingsDeps,
 } from "./storage";
 import { createFakeDesktopBridge, createInMemoryKeyValueStorage } from "./fakes";
+import { SETTINGS_MIGRATIONS_KEY } from "./keys";
 import {
   DEFAULT_SIDEBAR_ROW_ITEMS,
   SIDEBAR_ROW_ITEMS,
@@ -185,6 +187,8 @@ describe("loadAppSettingsFromStorage", () => {
 
     expect(result).toEqual(DEFAULT_CLIENT_SETTINGS);
     expect(DEFAULT_CLIENT_SETTINGS.language).toBe("system");
+    // Clisbot keeps latest-call grouping as its default display.
+    expect(DEFAULT_CLIENT_SETTINGS.chatDisplay).toBe("summary-with-latest-call");
     expect(JSON.parse(deps.storage.entries.get(APP_SETTINGS_KEY) ?? "null")).toEqual(
       DEFAULT_CLIENT_SETTINGS,
     );
@@ -253,6 +257,39 @@ describe("loadAppSettingsFromStorage", () => {
     const result = await loadAppSettingsFromStorage(deps);
 
     expect(result.chatOutlineEnabled).toBe(false);
+  });
+
+  it("uses Enter to send by default", async () => {
+    const deps = makeDeps();
+
+    const result = await loadAppSettingsFromStorage(deps);
+
+    expect(result.sendShortcut).toBe("enter");
+    expect(DEFAULT_CLIENT_SETTINGS.sendShortcut).toBe("enter");
+  });
+
+  it("loads the modifier Enter send preference", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({ sendShortcut: "mod-enter" }),
+      }),
+    });
+
+    const result = await loadAppSettingsFromStorage(deps);
+
+    expect(result.sendShortcut).toBe("mod-enter");
+  });
+
+  it("falls back to Enter when the stored send shortcut is invalid", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({ sendShortcut: "yes" }),
+      }),
+    });
+
+    const result = await loadAppSettingsFromStorage(deps);
+
+    expect(result.sendShortcut).toBe("enter");
   });
 
   it("defaults sidebar navigation items to an empty preference list", async () => {
@@ -350,6 +387,8 @@ describe("loadAppSettingsFromStorage", () => {
       displayAs: "used",
       pins: null,
       serverId: null,
+      cardOrder: [],
+      cardVisibility: {},
     });
 
     const deps = makeDeps({
@@ -374,6 +413,8 @@ describe("loadAppSettingsFromStorage", () => {
         { sourceId: "claude", windowId: "five-hour" },
       ],
       serverId: "server",
+      cardOrder: [],
+      cardVisibility: {},
     });
   });
 
@@ -389,6 +430,8 @@ describe("loadAppSettingsFromStorage", () => {
       displayAs: "remaining",
       pins: [],
       serverId: "server",
+      cardOrder: [],
+      cardVisibility: {},
     });
   });
 
@@ -409,6 +452,8 @@ describe("loadAppSettingsFromStorage", () => {
       displayAs: "used",
       pins: [{ sourceId: "claude", windowId: "weekly" }],
       serverId: null,
+      cardOrder: [],
+      cardVisibility: {},
     });
   });
 
@@ -508,6 +553,8 @@ describe("loadAppSettingsFromStorage", () => {
       ...DEFAULT_CLIENT_SETTINGS,
       theme: "dark",
       contentFontSize: DEFAULT_UI_BASE_FONT_SIZE,
+      // Clisbot: a blob without any display preference reads as the latest-call default.
+      chatDisplay: "summary-with-latest-call",
     });
     expect(JSON.parse(deps.storage.entries.get(APP_SETTINGS_KEY) ?? "null")).toEqual({
       manageBuiltInDaemon: false,
@@ -646,6 +693,8 @@ describe("loadSettingsFromStorage", () => {
       ...DEFAULT_APP_SETTINGS,
       theme: "light",
       contentFontSize: DEFAULT_UI_BASE_FONT_SIZE,
+      // Clisbot: a blob without any display preference reads as the latest-call default.
+      chatDisplay: "summary-with-latest-call",
     });
   });
 
@@ -690,6 +739,8 @@ describe("loadSettingsFromStorage", () => {
       ...DEFAULT_APP_SETTINGS,
       theme: "light",
       contentFontSize: DEFAULT_UI_BASE_FONT_SIZE,
+      // Clisbot: a blob without any display preference reads as the latest-call default.
+      chatDisplay: "summary-with-latest-call",
       manageBuiltInDaemon: false,
       releaseChannel: "beta",
     });
@@ -711,6 +762,8 @@ describe("loadSettingsFromStorage", () => {
       ...DEFAULT_APP_SETTINGS,
       theme: "light",
       contentFontSize: DEFAULT_UI_BASE_FONT_SIZE,
+      // Clisbot: a blob without any display preference reads as the latest-call default.
+      chatDisplay: "summary-with-latest-call",
     });
   });
 });
@@ -786,7 +839,7 @@ describe("saveAppSettings", () => {
       ...DEFAULT_CLIENT_SETTINGS,
       theme: "light",
       contentFontSize: DEFAULT_UI_BASE_FONT_SIZE,
-      toolCallDetailLevel: "overview",
+      chatDisplay: "collapseToolCalls",
     });
   });
 
@@ -841,31 +894,20 @@ describe("appearance settings", () => {
     expect(result.contentFontSize).toBe(DEFAULT_UI_BASE_FONT_SIZE);
     expect(result.codeFontSize).toBe(DEFAULT_CODE_FONT_SIZE);
     expect(result.syntaxTheme).toBe("one");
-    expect(result.toolCallDetailLevel).toBe("summary-with-latest-call");
+    expect(result.chatDisplay).toBe("summary-with-latest-call");
   });
 
-  it("upgrades the legacy compact tool call preference to the new default", async () => {
+  it("keeps a stored chat display over the tool call detail level it replaced", async () => {
     const deps = makeDeps({
       storage: createInMemoryKeyValueStorage({
-        [APP_SETTINGS_KEY]: JSON.stringify({ compactToolCalls: true }),
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          chatDisplay: "collapseTurns",
+          toolCallDetailLevel: "detailed",
+        }),
       }),
     });
 
-    expect((await loadAppSettingsFromStorage(deps)).toolCallDetailLevel).toBe(
-      "summary-with-latest-call",
-    );
-  });
-
-  it("clears settings with an unrecognized tool call detail level", async () => {
-    const deps = makeDeps({
-      storage: createInMemoryKeyValueStorage({
-        [APP_SETTINGS_KEY]: JSON.stringify({ toolCallDetailLevel: "unknown" }),
-      }),
-    });
-
-    expect((await loadAppSettingsFromStorage(deps)).toolCallDetailLevel).toBe(
-      "summary-with-latest-call",
-    );
+    expect((await loadAppSettingsFromStorage(deps)).chatDisplay).toBe("collapseTurns");
   });
 
   it("migrates a switched-off checks row item to the hidden checks display", async () => {
@@ -1115,53 +1157,136 @@ describe("parseClampedFontSize", () => {
   });
 });
 
-describe("content max width", () => {
-  it("follows the current default until the user picks a width", async () => {
+describe("content width", () => {
+  it("uses the default width when no preference is saved", async () => {
     const deps = makeDeps();
     const queryClient = new QueryClient();
 
     await saveAppSettings({ queryClient, updates: { codeFontSize: 14 }, deps });
 
-    const stored = JSON.parse(deps.storage.entries.get(APP_SETTINGS_KEY) ?? "null");
-    expect(stored.contentMaxWidth).toBeNull();
-    expect(resolveContentMaxWidth(await loadAppSettingsFromStorage(deps))).toBe(
-      DEFAULT_CONTENT_MAX_WIDTH,
-    );
+    const settings = await loadAppSettingsFromStorage(deps);
+    expect(settings.contentWidth).toBe("default");
+    expect(resolveContentMaxWidth(settings)).toBe(DEFAULT_CONTENT_MAX_WIDTH);
   });
 
-  it("keeps a picked width and returns to the default when reset", async () => {
+  it.each([
+    ["wide", 1200],
+    ["full", undefined],
+    ["default", DEFAULT_CONTENT_MAX_WIDTH],
+  ] as const)("persists the %s preset and resolves its width", async (contentWidth, expected) => {
     const deps = makeDeps();
     const queryClient = new QueryClient();
+    await saveAppSettings({ queryClient, updates: { contentWidth }, deps });
 
-    await saveAppSettings({ queryClient, updates: { contentMaxWidth: 1600 }, deps });
-    expect(resolveContentMaxWidth(await loadAppSettingsFromStorage(deps))).toBe(1600);
-
-    await saveAppSettings({ queryClient, updates: { contentMaxWidth: null }, deps });
-    expect(JSON.parse(deps.storage.entries.get(APP_SETTINGS_KEY) ?? "null").contentMaxWidth).toBe(
-      null,
-    );
-    expect(resolveContentMaxWidth(await loadAppSettingsFromStorage(deps))).toBe(
-      DEFAULT_CONTENT_MAX_WIDTH,
-    );
+    const settings = await loadAppSettingsFromStorage(deps);
+    expect(settings.contentWidth).toBe(contentWidth);
+    expect(resolveContentMaxWidth(settings)).toBe(expected);
   });
 
-  it("clamps stored widths and drops malformed ones to the default", async () => {
-    const load = (contentMaxWidth: unknown) =>
-      loadAppSettingsFromStorage(
-        makeDeps({
-          storage: createInMemoryKeyValueStorage({
-            [APP_SETTINGS_KEY]: JSON.stringify({ contentMaxWidth }),
-          }),
-        }),
-      );
+  it("preserves a legacy custom width until a preset is picked", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({ contentMaxWidth: 1600 }),
+      }),
+    });
+    const queryClient = new QueryClient();
+    const settings = await loadAppSettingsFromStorage(deps);
+    expect(settings.contentWidth).toBe(1600);
+    expect(resolveContentMaxWidth(settings)).toBe(1600);
 
-    expect((await load(100_000)).contentMaxWidth).toBe(4000);
-    expect((await load(10)).contentMaxWidth).toBe(600);
-    expect((await load("wide")).contentMaxWidth).toBeNull();
+    await saveAppSettings({ queryClient, updates: { codeFontSize: 14 }, deps });
+    expect((await loadAppSettingsFromStorage(deps)).contentWidth).toBe(1600);
+
+    await saveAppSettings({ queryClient, updates: { contentWidth: "default" }, deps });
+    expect((await loadAppSettingsFromStorage(deps)).contentWidth).toBe("default");
+  });
+
+  it.each([
+    [100_000, 4000],
+    [10, 600],
+    [null, "default"],
+    ["wide", "default"],
+  ])("normalizes legacy width %s on load", async (contentMaxWidth, expected) => {
+    const settings = await loadAppSettingsFromStorage(
+      makeDeps({
+        storage: createInMemoryKeyValueStorage({
+          [APP_SETTINGS_KEY]: JSON.stringify({ contentMaxWidth }),
+        }),
+      }),
+    );
+    expect(settings.contentWidth).toBe(expected);
   });
 });
 
-describe("latest-call settings across loads", () => {
+const ALL_SETTINGS_MIGRATIONS = {
+  [SETTINGS_MIGRATIONS_KEY]: JSON.stringify({
+    applied: ["steer-default", "mobile-content-16", "summary-with-latest-call-default"],
+  }),
+};
+
+/** Storage as a Clisbot install that already ran every one-time migration left it. */
+function migratedInstall(blob: Record<string, unknown>) {
+  return makeDeps({
+    storage: createInMemoryKeyValueStorage({
+      ...ALL_SETTINGS_MIGRATIONS,
+      [APP_SETTINGS_KEY]: JSON.stringify(blob),
+    }),
+  });
+}
+
+describe("chat display migration from Clisbot's tool call detail level", () => {
+  it.each([
+    [{ toolCallDetailLevel: "summary-with-latest-call" }, "summary-with-latest-call"],
+    [{ toolCallDetailLevel: "overview" }, "collapseToolCalls"],
+    [{ toolCallDetailLevel: "concise" }, "collapseToolCalls"],
+    [{ toolCallDetailLevel: "detailed" }, "full"],
+    [{ compactToolCalls: true }, "collapseToolCalls"],
+    [{ compactToolCalls: false }, "full"],
+    [{ toolCallDetailLevel: "invalid" }, "summary-with-latest-call"],
+    [{}, "summary-with-latest-call"],
+  ] as const)("reads %j as the %s chat display", async (legacy, display) => {
+    const deps = migratedInstall({ ...legacy, theme: "dark" });
+    const settings = await loadAppSettingsFromStorage(deps);
+    expect(settings.chatDisplay).toBe(display);
+    expect(settings).not.toHaveProperty("toolCallDetailLevel");
+    expect(settings).not.toHaveProperty("chatDisplayIsLegacy");
+  });
+
+  it.each(CHAT_DISPLAYS)("preserves a stored upstream %s chat display", async (display) => {
+    for (const legacy of [{}, { toolCallDetailLevel: "detailed" }]) {
+      const withMarker = migratedInstall({ ...legacy, chatDisplay: display });
+      expect((await loadAppSettingsFromStorage(withMarker)).chatDisplay).toBe(display);
+      // Even an install that never ran the latest-call reset keeps an explicit upstream choice.
+      const withoutMarker = makeDeps({
+        storage: createInMemoryKeyValueStorage({
+          [APP_SETTINGS_KEY]: JSON.stringify({ ...legacy, chatDisplay: display }),
+        }),
+      });
+      expect((await loadAppSettingsFromStorage(withoutMarker)).chatDisplay).toBe(display);
+    }
+  });
+
+  it("still resets a legacy-derived display once on an install that never ran the reset", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({ toolCallDetailLevel: "detailed" }),
+      }),
+    });
+    expect((await loadAppSettingsFromStorage(deps)).chatDisplay).toBe("summary-with-latest-call");
+  });
+
+  it("persists a migrated choice as chatDisplay and never stores the load marker", async () => {
+    const deps = migratedInstall({ toolCallDetailLevel: "overview", futureSetting: 1 });
+    const queryClient = new QueryClient();
+    await saveAppSettings({ queryClient, deps, updates: { theme: "light" } });
+    const stored = JSON.parse(deps.storage.entries.get(APP_SETTINGS_KEY) ?? "null");
+    expect(stored).toMatchObject({ chatDisplay: "collapseToolCalls", futureSetting: 1 });
+    expect(stored).not.toHaveProperty("chatDisplayIsLegacy");
+    expect((await loadAppSettingsFromStorage(deps)).chatDisplay).toBe("collapseToolCalls");
+  });
+});
+
+describe("chat display across loads", () => {
   it.each([
     {},
     { toolCallDetailLevel: "overview" },
@@ -1183,13 +1308,11 @@ describe("latest-call settings across loads", () => {
         }),
       }),
     });
-    expect((await loadAppSettingsFromStorage(deps)).toolCallDetailLevel).toBe(
-      "summary-with-latest-call",
-    );
+    expect((await loadAppSettingsFromStorage(deps)).chatDisplay).toBe("summary-with-latest-call");
     const queryClient = new QueryClient();
-    for (const selection of ["overview", "detailed", "summary-with-latest-call"] as const) {
-      await saveAppSettings({ queryClient, deps, updates: { toolCallDetailLevel: selection } });
-      expect((await loadAppSettingsFromStorage(deps)).toolCallDetailLevel).toBe(selection);
+    for (const selection of CHAT_DISPLAYS) {
+      await saveAppSettings({ queryClient, deps, updates: { chatDisplay: selection } });
+      expect((await loadAppSettingsFromStorage(deps)).chatDisplay).toBe(selection);
       expect(JSON.parse(deps.storage.entries.get(APP_SETTINGS_KEY) ?? "null")).toMatchObject({
         theme: "dark",
         futureSetting: { enabled: true },
@@ -1198,8 +1321,8 @@ describe("latest-call settings across loads", () => {
       });
     }
   });
-  it("uses the new default on a fresh install", async () => {
-    expect((await loadAppSettingsFromStorage(makeDeps())).toolCallDetailLevel).toBe(
+  it("uses the latest-call default on a fresh install", async () => {
+    expect((await loadAppSettingsFromStorage(makeDeps())).chatDisplay).toBe(
       "summary-with-latest-call",
     );
   });

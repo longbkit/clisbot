@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z, type ZodType } from "zod";
+import { ProviderLaunchSchema } from "./provider.js";
 import type { JsonValue } from "@clisbot/protocol/agent-types";
 
 export interface UsageWindow {
@@ -15,6 +16,8 @@ export interface UsageWindow {
   usedPct?: number | null;
   remainingPct?: number | null;
   resetsAt?: string | null;
+  /** Full length of the quota window when known. */
+  durationSeconds?: number;
   runsOutAt?: string | null;
   shortfallPct?: number | null;
   tone?: "default" | "ok" | "warning" | "danger";
@@ -47,6 +50,8 @@ export type UsageReport =
   | {
       status: "available";
       planLabel?: string;
+      /** When the provider measured the quota, if the report returns a previous reading. */
+      observedAt?: string;
       windows: UsageWindow[];
       balances?: UsageBalance[];
       details?: UsageDetail[];
@@ -62,17 +67,20 @@ export interface UsageAccount {
   harness?: string;
   /** Exact provider owning this login; used by Host access filtering, never a display label. */
   providerId?: string;
+  /** Provider ID associated with this login, used as a hint for default visibility. */
+  provider?: string;
   /** Store locator, opaque to the daemon. */
   input: JsonValue;
 }
 
 export const UsageScopeSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("global") }),
+  z.object({ kind: z.literal("global"), launch: ProviderLaunchSchema.optional() }),
   z.object({
     kind: z.literal("session"),
     provider: z.string(),
     model: z.string().optional(),
     env: z.record(z.string(), z.string()),
+    launch: ProviderLaunchSchema.optional(),
   }),
 ]);
 export type UsageScope = z.infer<typeof UsageScopeSchema>;
@@ -81,6 +89,10 @@ export interface UsageSourceRegistration {
   id: string;
   label: string;
   icon?: string;
+  /** Provider whose resolved launch is needed for discovery. */
+  provider?: string;
+  /** Provider IDs associated with this source, used as a hint for default visibility. */
+  providers?: readonly string[];
   input: ZodType;
   /** Accounts for this scope only. The same key in any scope identifies the same account. */
   discover(scope: UsageScope): Promise<UsageAccount[]>;
@@ -94,6 +106,7 @@ export function windowFromUsedPct(input: {
   shortLabel?: string;
   summary?: boolean;
   utilizationPct: number | null | undefined;
+  durationSeconds?: number;
   resetsAt?: string | null;
   tone?: UsageWindow["tone"];
 }): UsageWindow {
@@ -105,6 +118,7 @@ export function windowFromUsedPct(input: {
     remainingPct: usedPct === null ? null : Math.max(0, 100 - usedPct),
     resetsAt: input.resetsAt ?? null,
   };
+  if (input.durationSeconds !== undefined) window.durationSeconds = input.durationSeconds;
   if (input.shortLabel !== undefined) window.shortLabel = input.shortLabel;
   if (input.summary) window.summary = true;
   if (input.tone) window.tone = input.tone;
@@ -127,11 +141,10 @@ export function windowFromReportedDuration(input: {
   summary?: boolean;
   tone?: UsageWindow["tone"];
 }): UsageWindow {
-  const duration = input.durationSeconds;
-  const name =
-    duration !== null && Number.isFinite(duration) && duration > 0
-      ? durationWindowName(duration)
-      : input.unknown;
+  const reported = input.durationSeconds;
+  const duration =
+    reported !== null && Number.isFinite(reported) && reported > 0 ? reported : undefined;
+  const name = duration === undefined ? input.unknown : durationWindowName(duration);
   const scope = input.scope;
   return windowFromUsedPct({
     id: scope ? `${scope.id}:${name.id}` : name.id,
@@ -140,6 +153,7 @@ export function windowFromReportedDuration(input: {
       ? `${scope.label}${name.shortLabel ? ` ${name.shortLabel}` : ""}`
       : name.shortLabel,
     utilizationPct: input.utilizationPct,
+    durationSeconds: duration,
     resetsAt: input.resetsAt,
     summary: input.summary,
     tone: input.tone,

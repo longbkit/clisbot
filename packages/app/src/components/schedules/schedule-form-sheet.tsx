@@ -19,9 +19,8 @@ import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-moda
 import { ComboboxItem } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { CombinedModelSelector } from "@/components/combined-model-selector";
-import { useIsCompactFormFactor } from "@/constants/layout";
 import { HostPickerOption } from "@/components/hosts/host-picker";
-import { createControlGeometry, type FieldControlSize } from "@/components/ui/control-geometry";
+import { createControlGeometry, type ControlSize } from "@/components/ui/control-geometry";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { Switch } from "@/components/ui/switch";
 import { useProviderIcon } from "@/components/provider-icons";
@@ -90,8 +89,8 @@ export interface ScheduleFormSheetProps {
 type IsolationChoice = "local" | "worktree" | "existing";
 
 const ISOLATION_LABELS: Record<IsolationChoice, string> = {
-  local: "Local",
-  worktree: "Worktree",
+  local: "Project directory",
+  worktree: "New worktree",
   existing: "Existing workspace",
 };
 
@@ -329,7 +328,7 @@ function OpenScheduleFormSheet({
   schedule,
   presetAgentId,
 }: ScheduleFormSheetProps & { onDismiss: () => void }): ReactElement {
-  const controlSize: FieldControlSize = useIsCompactFormFactor() ? "md" : "sm";
+  const controlSize: ControlSize = "md";
   const { projects } = useProjects();
   const hostProfiles = useHosts();
   const hosts = useStoreWithEqualityFn(
@@ -576,7 +575,7 @@ interface ScheduleFormFieldsProps {
   state: ScheduleFormState;
   providerSnapshot: ReturnType<typeof useScheduleFormProviderSnapshot>;
   agentTargetLabel: string | null;
-  controlSize: FieldControlSize;
+  controlSize: ControlSize;
   cadenceError: string | null;
   mutationServerId: string;
   mentions: ScheduleMentions;
@@ -700,7 +699,7 @@ function HeartbeatCreateFields({
 }: {
   model: ScheduleFormModel;
   state: ScheduleFormState;
-  controlSize: FieldControlSize;
+  controlSize: ControlSize;
   cadenceError: string | null;
   mentions: ScheduleMentions;
 }): ReactElement {
@@ -808,7 +807,7 @@ interface ScheduleTargetFieldsProps {
   state: ScheduleFormState;
   providerSnapshot: ReturnType<typeof useScheduleFormProviderSnapshot>;
   agentTargetLabel: string | null;
-  controlSize: FieldControlSize;
+  controlSize: ControlSize;
   mutationServerId: string;
 }
 
@@ -1083,14 +1082,14 @@ function ScheduleIsolationField({
 }: {
   model: ScheduleFormModel;
   state: ScheduleFormState;
-  size: FieldControlSize;
+  size: ControlSize;
 }): ReactElement {
   const options = useMemo<SelectFieldOption<IsolationChoice>[]>(
     () => [
       {
         id: "local",
         value: "local",
-        label: "Local",
+        label: "Project directory",
         testID: "schedule-isolation-local",
       },
       ...(state.canUseWorktreeIsolation
@@ -1098,7 +1097,7 @@ function ScheduleIsolationField({
             {
               id: "worktree",
               value: "worktree" as const,
-              label: "Worktree",
+              label: "New worktree",
               testID: "schedule-isolation-worktree",
             },
           ]
@@ -1171,7 +1170,7 @@ function ScheduleAgentTargetField({
   size,
 }: {
   label: string | null;
-  size: FieldControlSize;
+  size: ControlSize;
 }): ReactElement {
   const fieldStyle = useMemo(
     () => [styles.readonlyField, size === "sm" ? styles.readonlyFieldSm : styles.readonlyFieldMd],

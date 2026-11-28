@@ -36,7 +36,7 @@ export function MemberChatCell({
           </Text>
           {link.linked || !canLink ? null : (
             <Button
-              size="xs"
+              size="sm"
               variant="ghost"
               disabled={pending}
               onPress={onLink}

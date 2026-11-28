@@ -1,5 +1,5 @@
 import { useCallback, useState, type ReactNode } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { Activity, CircleHelp, Gift, Keyboard } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -20,14 +20,13 @@ import { MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { DensityIcon } from "@/components/ui/density-icon";
 import { SidebarFooterIconHighlight } from "./sidebar-footer-icon-highlight";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useHasFinePointer } from "@/hooks/use-fine-pointer";
+import { usePointerCapabilities } from "@/hooks/pointer-capabilities";
+import { SidebarFooterMenuTrigger } from "./sidebar-footer-menu-trigger";
 import { useAppDiagnosticStore } from "@/diagnostics/store";
-import { useKeyboardShortcutsAvailable } from "@/keyboard/availability";
+import { useHardwareKeyboardPresent } from "@/keyboard";
 import { useHostRuntimeIsConnected, useHosts } from "@/runtime/host-runtime";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { useSessionStore } from "@/stores/session-store";
-import { density } from "@/styles/density";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 import type { HostProfile } from "@/types/host-connection";
 import { formatVersionWithPrefix } from "@/desktop/updates/desktop-updates";
@@ -90,14 +89,80 @@ export interface SidebarHelpMenuTrigger {
   align?: "start" | "end";
 }
 
+/** The Help menu's trigger, and the menu it opens. */
 export function SidebarHelpMenu({ trigger }: { trigger?: SidebarHelpMenuTrigger } = {}) {
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
-  const finePointer = useHasFinePointer();
-  const shortcutsAvailable = useKeyboardShortcutsAvailable();
+  const { finePointer } = usePointerCapabilities();
+  const [open, setOpen] = useState(false);
+  const label = t("sidebar.help.trigger");
+
+  let triggerNode: ReactNode;
+  if (trigger) {
+    triggerNode = (
+      <DropdownMenuTrigger
+        style={trigger.style}
+        testID="sidebar-help"
+        accessibilityRole="button"
+        accessibilityLabel={label}
+      >
+        {trigger.render}
+      </DropdownMenuTrigger>
+    );
+  } else if (isCompact || !finePointer) {
+    // Clisbot: a touch screen gets the full touch target and no hover tooltip.
+    triggerNode = (
+      <DropdownMenuTrigger
+        style={styles.touchTrigger}
+        testID="sidebar-help"
+        accessibilityRole="button"
+        accessibilityLabel={label}
+      >
+        {({ hovered, pressed, open: menuOpen }) => (
+          <>
+            <SidebarFooterIconHighlight visible={pressed || menuOpen} />
+            <DensityIcon
+              icon={CircleHelp}
+              size="md"
+              color={hovered ? "foreground" : "foregroundMuted"}
+            />
+          </>
+        )}
+      </DropdownMenuTrigger>
+    );
+  } else {
+    triggerNode = (
+      <SidebarFooterMenuTrigger
+        icon={CircleHelp}
+        label={label}
+        menuOpen={open}
+        testID="sidebar-help"
+      />
+    );
+  }
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      {triggerNode}
+      <DropdownMenuContent
+        side={trigger?.side ?? "top"}
+        align={trigger?.align ?? "end"}
+        offset={8}
+        width={280}
+        testID="sidebar-help-menu"
+      >
+        <SidebarHelpMenuItems />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** The Help menu's rows, shared by the Help menu and the footer's overflow page for it. */
+export function SidebarHelpMenuItems() {
+  const { t } = useTranslation();
+  const shortcutsAvailable = useHardwareKeyboardPresent();
   const openAppDiagnostic = useAppDiagnosticStore((state) => state.open);
   const setShortcutsDialogOpen = useKeyboardShortcutsStore((state) => state.setShortcutsDialogOpen);
-  const [open, setOpen] = useState(false);
   const version = formatVersionWithPrefix(resolveAppVersion());
   const hosts = useHosts();
 
@@ -114,125 +179,70 @@ export function SidebarHelpMenu({ trigger }: { trigger?: SidebarHelpMenuTrigger 
   }, []);
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      {trigger ? (
-        <DropdownMenuTrigger
-          style={trigger.style}
-          testID="sidebar-help"
-          accessibilityRole="button"
-          accessibilityLabel={t("sidebar.help.trigger")}
+    <>
+      <DropdownMenuLabel>{t("sidebar.help.sectionHelp")}</DropdownMenuLabel>
+      {shortcutsAvailable ? (
+        <DropdownMenuItem
+          testID="sidebar-help-shortcuts"
+          leading={shortcutsLeadingIcon}
+          onSelect={openKeyboardShortcuts}
         >
-          {trigger.render}
-        </DropdownMenuTrigger>
-      ) : (
-        <Tooltip delayDuration={300} enabledOnDesktop={!open}>
-          <TooltipTrigger asChild>
-            <View>
-              <DropdownMenuTrigger
-                style={[styles.trigger, isCompact || !finePointer ? styles.touchTrigger : null]}
-                testID="sidebar-help"
-                accessibilityRole="button"
-                accessibilityLabel={t("sidebar.help.trigger")}
-              >
-                {({ hovered, pressed, open: menuOpen }) => (
-                  <>
-                    <SidebarFooterIconHighlight visible={pressed || menuOpen} />
-                    <DensityIcon
-                      icon={CircleHelp}
-                      size="md"
-                      color={hovered ? "foreground" : "foregroundMuted"}
-                    />
-                  </>
-                )}
-              </DropdownMenuTrigger>
-            </View>
-          </TooltipTrigger>
-          <TooltipContent side="top" align="center" offset={8}>
-            <Text style={styles.tooltipText}>{t("sidebar.help.trigger")}</Text>
-          </TooltipContent>
-        </Tooltip>
-      )}
-      <DropdownMenuContent
-        side={trigger?.side ?? "top"}
-        align={trigger?.align ?? "end"}
-        offset={8}
-        width={280}
-        testID="sidebar-help-menu"
+          {t("sidebar.help.shortcuts")}
+        </DropdownMenuItem>
+      ) : null}
+      <DropdownMenuItem
+        testID="sidebar-help-changelog"
+        leading={changelogLeadingIcon}
+        onSelect={openChangelog}
       >
-        <DropdownMenuLabel>{t("sidebar.help.sectionHelp")}</DropdownMenuLabel>
-        {shortcutsAvailable ? (
-          <DropdownMenuItem
-            testID="sidebar-help-shortcuts"
-            leading={shortcutsLeadingIcon}
-            onSelect={openKeyboardShortcuts}
-          >
-            {t("sidebar.help.shortcuts")}
-          </DropdownMenuItem>
-        ) : null}
-        <DropdownMenuItem
-          testID="sidebar-help-changelog"
-          leading={changelogLeadingIcon}
-          onSelect={openChangelog}
+        {t("sidebar.help.whatsNew")}
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        testID="sidebar-help-diagnostics"
+        leading={diagnosticLeadingIcon}
+        onSelect={openAppDiagnostic}
+      >
+        {t("sidebar.help.diagnostics")}
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel>{t("sidebar.help.reportIssue")}</DropdownMenuLabel>
+      <DropdownMenuItem
+        testID="sidebar-help-discord"
+        leading={discordLeadingIcon}
+        onSelect={openDiscord}
+      >
+        {t("sidebar.help.discord")}
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        testID="sidebar-help-github"
+        leading={githubLeadingIcon}
+        onSelect={openGitHubIssue}
+      >
+        {t("sidebar.help.github")}
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <View style={styles.versionList}>
+        <DropdownMenuHint
+          style={styles.versionHint}
+          trailing={version}
+          testID="sidebar-help-version"
         >
-          {t("sidebar.help.whatsNew")}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          testID="sidebar-help-diagnostics"
-          leading={diagnosticLeadingIcon}
-          onSelect={openAppDiagnostic}
-        >
-          {t("sidebar.help.diagnostics")}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>{t("sidebar.help.reportIssue")}</DropdownMenuLabel>
-        <DropdownMenuItem
-          testID="sidebar-help-discord"
-          leading={discordLeadingIcon}
-          onSelect={openDiscord}
-        >
-          {t("sidebar.help.discord")}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          testID="sidebar-help-github"
-          leading={githubLeadingIcon}
-          onSelect={openGitHubIssue}
-        >
-          {t("sidebar.help.github")}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <View style={styles.versionList}>
-          <DropdownMenuHint
-            style={styles.versionHint}
-            trailing={version}
-            testID="sidebar-help-version"
-          >
-            {t("sidebar.help.appName")}
-          </DropdownMenuHint>
-          {hosts.map((host) => (
-            <HostVersionHint key={host.serverId} host={host} />
-          ))}
-        </View>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {t("sidebar.help.appName")}
+        </DropdownMenuHint>
+        {hosts.map((host) => (
+          <HostVersionHint key={host.serverId} host={host} />
+        ))}
+      </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  trigger: {
-    width: density.iconButton,
-    height: density.iconButton,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: theme.spacing[1],
-    paddingHorizontal: theme.spacing[1],
-  },
-  tooltipText: {
-    fontSize: theme.fontSize.base,
-    color: theme.colors.popoverForeground,
-  },
   touchTrigger: {
     width: MIN_TOUCH_TARGET_SIZE,
     height: MIN_TOUCH_TARGET_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
   },
   versionList: {
     gap: theme.spacing[1],

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
-import { buildSettingsAddHostRoute } from "@/utils/host-routes";
+import { useAddHost } from "@/hosts/add-host";
 import { useHubStartStatus } from "./hub-start-status";
 
 export function HubStartHelp({
@@ -81,10 +81,11 @@ function HubStartHelpSheet({
     close();
     router.push(`/settings/hosts/${host.serverId}/host`);
   }, [close, router, host.serverId]);
+  const addHost = useAddHost();
   const pair = useCallback(() => {
     close();
-    router.push(buildSettingsAddHostRoute(Date.now()));
-  }, [close, router]);
+    addHost();
+  }, [close, addHost]);
   const check = useCallback(() => {
     retry();
     close();

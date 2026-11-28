@@ -405,37 +405,11 @@ test("v2 native tool bridge preserves caller identity", async () => {
 }, 120_000);
 
 test.each([
-  {
-    major: 1,
-    package: "opencode-ai@1.14.46",
-    windowsPackage: "opencode-windows",
-    expectedTimeline: [],
-    expectedInitialTimeline: undefined,
-    expectedNotices: undefined,
-  },
-  {
-    major: 2,
-    package: "@opencode/cli@2.0.10",
-    windowsPackage: "@opencode/cli-windows",
-    expectedTimeline: [
-      { type: "notification", level: "info", message: "This chat uses OpenCode v2." },
-    ],
-    expectedInitialTimeline: [
-      expect.objectContaining({
-        item: { type: "notification", level: "info", message: "This chat uses OpenCode v2." },
-      }),
-    ],
-    expectedNotices: [expect.objectContaining({ major: 2 })],
-  },
+  { major: 1, package: "opencode-ai@1.14.46", windowsPackage: "opencode-windows" },
+  { major: 2, package: "@opencode/cli@2.0.10", windowsPackage: "@opencode/cli-windows" },
 ])(
   "versioned runtime v$major discovers models and preserves a native session handle",
-  async ({
-    package: cliPackage,
-    windowsPackage,
-    expectedTimeline,
-    expectedInitialTimeline,
-    expectedNotices,
-  }) => {
+  async ({ package: cliPackage, windowsPackage }) => {
     const root = await mkdtemp(path.join(os.tmpdir(), "clisbot-opencode-versioned-"));
     const client = new OpenCodeRuntimeClient(createTestLogger(), {
       command: {
@@ -462,9 +436,25 @@ test.each([
     let original: Awaited<ReturnType<typeof client.createSession>> | undefined;
     let resumed: Awaited<ReturnType<typeof client.resumeSession>> | undefined;
     try {
+      // Windows invokes the platform binary directly. Installing its wrapper also runs an
+      // unused postinstall binary probe, which has no timeout and can hold the fixture open.
+      const installPackage =
+        process.platform === "win32"
+          ? `${windowsPackage}-${process.arch}@${cliPackage.slice(cliPackage.lastIndexOf("@") + 1)}`
+          : cliPackage;
+      // npm abandons a stalled registry download only after its 5 minute default, past this
+      // test's budget, and the killed install keeps the fixture locked. Retry stalls sooner.
       await execCommand(
         "npm",
-        ["install", "--prefix", root, "--no-audit", "--no-fund", cliPackage],
+        [
+          "install",
+          "--prefix",
+          root,
+          "--no-audit",
+          "--no-fund",
+          "--fetch-timeout=30000",
+          installPackage,
+        ],
         {
           cwd: root,
           timeout: 180_000,
@@ -479,15 +469,14 @@ test.each([
         { persistSession: false },
       );
       const handle = await original.describePersistence();
-      expect(original.initialTimeline).toEqual(expectedInitialTimeline);
-      expect(handle.metadata?.openCodeRuntimeNotices).toEqual(expectedNotices);
+      expect(original.initialTimeline).toBeUndefined();
       resumed = await client.resumeSession(handle, { cwd: root });
       expect((await resumed.describePersistence()).nativeHandle).toBe(handle.nativeHandle);
       expect(
         (await drainPersistedTimeline(resumed)).map((event) =>
           event.type === "timeline" ? event.item : event,
         ),
-      ).toEqual(expectedTimeline);
+      ).toEqual([]);
     } finally {
       await resumed?.close();
       await original?.close();

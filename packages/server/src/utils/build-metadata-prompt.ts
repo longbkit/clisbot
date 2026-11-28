@@ -1,8 +1,5 @@
-import { readClisbotConfigJson } from "./clisbot-config-file.js";
-import {
-  ClisbotConfigSchema,
-  type ClisbotMetadataGeneration,
-} from "@clisbot/protocol/clisbot-config-schema";
+import { readClisbotConfig } from "./clisbot-config-file.js";
+import { type ClisbotMetadataGeneration } from "@clisbot/protocol/clisbot-config-schema";
 
 export type MetadataConfigKey = "title" | "branchName" | "commitMessage" | "pullRequest";
 
@@ -52,8 +49,8 @@ async function readProjectMetadataOverrides(
   }
   try {
     const repoRoot = await options.workspaceGitService.resolveRepoRoot(options.cwd);
-    const json = readClisbotConfigJson(repoRoot);
-    return ClisbotConfigSchema.parse(json).metadataGeneration;
+    const result = await readClisbotConfig(repoRoot);
+    return result.ok ? result.config?.metadataGeneration : undefined;
   } catch {
     return undefined;
   }

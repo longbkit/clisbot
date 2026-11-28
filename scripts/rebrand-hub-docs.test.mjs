@@ -147,3 +147,17 @@ test("ports the v0.17.4 hosted-default precedence and reference links in English
     }
   }
 });
+
+test("comparison mode keeps an old base's hosted text instead of stopping", () => {
+  const previous = process.env.CLISBOT_REBRAND_COMPARISON_BASE;
+  process.env.CLISBOT_REBRAND_COMPARISON_BASE = "1";
+  try {
+    assert.equal(
+      rebrandHubDocs("public-docs/new.md", "Sign in at https://hub.paseo.sh"),
+      "Sign in at https://hub.clisbot.com",
+    );
+  } finally {
+    if (previous === undefined) delete process.env.CLISBOT_REBRAND_COMPARISON_BASE;
+    else process.env.CLISBOT_REBRAND_COMPARISON_BASE = previous;
+  }
+});

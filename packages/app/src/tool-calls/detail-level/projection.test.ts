@@ -110,11 +110,7 @@ describe("tool call detail-level projection", () => {
       preparedHistory: prepared,
     });
     expect(single.head).toEqual([firstCall]);
-    expect(single.groupsByHostId.get(firstCall.id)?.run).toMatchObject({
-      calls: [firstCall],
-      latest: firstCall,
-      isSealed: false,
-    });
+    expect(single.groupsByHostId.size).toBe(0);
 
     const grouped = project({
       level: "overview",
@@ -142,18 +138,11 @@ describe("tool call detail-level projection", () => {
     expect(result.groupsByHostId.get("1")?.isLoading).toBe(true);
   });
 
-  it("builds a loading aggregate for a one-call run", () => {
+  it("leaves a running lone call visible without an aggregate", () => {
     const call = toolCall("1", { type: "shell", command: "one" }, { status: "running" });
     const result = project({ level: "overview", head: [call], isTurnActive: true });
-    const group = result.groupsByHostId.get(call.id);
-    if (!group) {
-      throw new Error("Expected an overview group");
-    }
-
-    expect(group).toMatchObject({
-      isLoading: true,
-      summary: { commandCount: 1 },
-    });
+    expect(result.head).toEqual([call]);
+    expect(result.groupsByHostId.size).toBe(0);
   });
 
   it("keeps an active overview group on its latest call until a visible boundary arrives", () => {
@@ -255,12 +244,13 @@ describe("tool call detail-level projection", () => {
       run: expect.any(Object),
       isLoading: false,
       summary: {
+        thoughtCount: 0,
         editedFileCount: 1,
         commandCount: 1,
         readFileCount: 2,
         searchCount: 0,
         otherToolCount: 0,
-        clisbotCallCount: 0,
+        clisbotActions: {},
       },
     });
   });
@@ -332,7 +322,7 @@ describe("tool call detail-level projection", () => {
     const result = project({ level: "overview", head: calls });
 
     expect(result.groupsByHostId.get("1")).toMatchObject({
-      summary: { otherToolCount: 2, clisbotCallCount: 2 },
+      summary: { otherToolCount: 2, clisbotActions: { "Listed agents": 1, "List worktrees": 1 } },
     });
   });
 
@@ -350,7 +340,11 @@ describe("tool call detail-level projection", () => {
     const result = project({ level: "overview", head: calls });
 
     expect(result.groupsByHostId.get("1")).toMatchObject({
-      summary: { searchCount: 3, otherToolCount: 0, clisbotCallCount: 3 },
+      summary: {
+        searchCount: 3,
+        otherToolCount: 0,
+        clisbotActions: { "Listed providers": 1, "List worktrees": 2 },
+      },
     });
   });
 
@@ -480,8 +474,161 @@ describe("tool call detail-level projection", () => {
     const result = project({ level: "overview", head: [singleCall, plan, speak] });
 
     expect(result.head).toEqual([singleCall, plan, speak]);
-    expect(result.groupsByHostId.get(singleCall.id)?.run.calls).toEqual([singleCall]);
-    expect(result.groupsByHostId.size).toBe(1);
+    expect(result.groupsByHostId.size).toBe(0);
+  });
+});
+
+it("keeps a heartbeat trigger visible outside grouped work", () => {
+  const trigger = toolCall(
+    "1",
+    { type: "plain_text", text: "Check progress" },
+    { name: "heartbeat" },
+  );
+  const work = toolCall("2", { type: "shell", command: "pwd" });
+  const result = project({ level: "overview", tail: [trigger, work] });
+  expect(result.tail.map((item) => item.id)).toEqual(["1", "2"]);
+  expect(result.groupsByHostId.has("1")).toBe(false);
+});
+
+it("does not merge tools from different canonical turns", () => {
+  const first = toolCall("1", { type: "shell", command: "pwd" });
+  first.turnId = "first";
+  const second = toolCall("2", { type: "shell", command: "ls" });
+  second.turnId = "second";
+  const result = project({ level: "overview", tail: [first, second] });
+  expect(result.tail.map((item) => item.id)).toEqual(["1", "2"]);
+});
+
+it.each([false, true])(
+  "handles streaming reasoning across retained history (Expand thinking %s)",
+  (autoExpandReasoning) => {
+    const call = { ...toolCall("1", { type: "shell", command: "echo ok" }), turnId: "run" };
+    const thought: StreamItem = {
+      kind: "thought",
+      id: "reasoning",
+      text: "Checking",
+      status: "loading",
+      timestamp: new Date(),
+      turnId: "run",
+    };
+    const tail = [call];
+    const result = project({
+      level: "overview",
+      tail,
+      head: [thought],
+      isTurnActive: true,
+      preparedHistory: prepareToolCallHistory("overview", tail, autoExpandReasoning),
+    });
+    expect(result.head).toEqual(autoExpandReasoning ? [thought] : []);
+    expect(result.groupsByHostId.get(call.id)?.run.calls).toEqual(
+      autoExpandReasoning ? undefined : [call, thought],
+    );
+    const group = result.groupsByHostId.get(call.id);
+    expect(group?.mode === "overview" ? group.summary : undefined).toEqual(
+      autoExpandReasoning
+        ? undefined
+        : expect.objectContaining({
+            commandCount: 1,
+            otherToolCount: 0,
+            thoughtCount: 1,
+          }),
+    );
+  },
+);
+
+it("turns a retained lone call into a group without replacing its row key", () => {
+  const first = toolCall("1", { type: "shell", command: "one" });
+  const second = toolCall("2", { type: "shell", command: "two" });
+  const tail = [assistant("before"), first];
+  const preparedHistory = prepareToolCallHistory("overview", tail);
+  const single = project({ level: "overview", tail, preparedHistory, isTurnActive: true });
+  const grouped = project({
+    level: "overview",
+    tail,
+    head: [second],
+    preparedHistory,
+    isTurnActive: true,
+  });
+  expect(single.groupsByHostId.size).toBe(0);
+  expect(single.tail).toBe(tail);
+  expect(grouped.tail).toBe(single.tail);
+  expect(grouped.head).toEqual([]);
+  expect(grouped.groupsByHostId.get(first.id)?.run.calls).toEqual([first, second]);
+  expect(grouped.historyGroupUpdatesByHostId.get(first.id)).toBe(
+    grouped.groupsByHostId.get(first.id),
+  );
+});
+
+it("shows one thought as itself until another groupable item arrives", () => {
+  const thought: StreamItem = {
+    kind: "thought",
+    id: "thought",
+    text: "Checking",
+    status: "ready",
+    timestamp: new Date(0),
+  };
+  const single = project({ level: "overview", tail: [thought] });
+  expect(single.tail).toEqual([thought]);
+  expect(single.groupsByHostId.size).toBe(0);
+  const grouped = project({
+    level: "overview",
+    tail: [thought, toolCall("1", { type: "shell", command: "one" })],
+  });
+  expect(grouped.tail.map((item) => item.id)).toEqual([thought.id]);
+  expect(grouped.groupsByHostId.get(thought.id)?.run.calls).toHaveLength(2);
+});
+
+describe("a lone tool call", () => {
+  const call = toolCall("1", { type: "shell", command: "npm test" });
+  const reply = assistant("done");
+
+  interface Rows {
+    tail?: StreamItem[];
+    head?: StreamItem[];
+    isTurnActive?: boolean;
+  }
+  const retained: Rows = { tail: [call, reply] };
+  const streaming: Rows = { head: [call], isTurnActive: true };
+
+  it.each([
+    ["retained", retained],
+    ["streaming", streaming],
+  ])("is a one-item latest-call badge in latest-call mode (%s)", (_, rows) => {
+    const result = project({ level: "summary-with-latest-call", ...rows });
+    const group = result.groupsByHostId.get(call.id);
+    expect(group).toMatchObject({
+      mode: "summary-with-latest-call",
+      run: { calls: [call], latest: call },
+      latestToolCall: call,
+      toolCallCount: 1,
+    });
+    // The badge reuses the call's row key, so nothing else in the timeline moves.
+    expect([...result.tail, ...result.head].map((item) => item.id)).toEqual(
+      [...(rows.tail ?? []), ...(rows.head ?? [])].map((item) => item.id),
+    );
+  });
+
+  it.each(["detailed", "overview"] as const)(
+    "keeps its own row in %s mode, as upstream designed",
+    (level) => {
+      for (const rows of [retained, streaming]) {
+        const result = project({ level, ...rows });
+        expect(result.groupsByHostId.size).toBe(0);
+        expect([...result.tail, ...result.head]).toContain(call);
+      }
+    },
+  );
+
+  it("stays a reasoning row when it is reasoning, even in latest-call mode", () => {
+    const thought = {
+      kind: "thought",
+      status: "ready",
+      id: "reasoning",
+      text: "thinking",
+      timestamp: new Date(),
+    } satisfies StreamItem;
+    const result = project({ level: "summary-with-latest-call", tail: [thought, reply] });
+    expect(result.groupsByHostId.size).toBe(0);
   });
 });
 
@@ -498,6 +645,8 @@ describe("summary with latest call", () => {
     expect(single.groupsByHostId.get("1")).toMatchObject({
       mode: level,
       run: { calls: [first], latest: first },
+      latestToolCall: first,
+      toolCallCount: 1,
       isLoading: false,
       failedCount: 0,
     });
@@ -505,7 +654,10 @@ describe("summary with latest call", () => {
     expect(live.tail.map((item) => item.id)).toEqual(["1"]);
     expect(live.head).toEqual([]);
     expect(live.historyGroupUpdatesByHostId.get("1")).toMatchObject({
+      mode: level,
       run: { calls: [first, running], latest: running, isSealed: false },
+      latestToolCall: running,
+      toolCallCount: 2,
       isLoading: true,
       failedCount: 0,
     });
@@ -548,7 +700,10 @@ describe("summary with latest call", () => {
     const latest = project({ level, tail });
     expect(latest.tail).toEqual(overview.tail);
     expect(latest.head).toEqual(overview.head);
-    expect(latest.groupsByHostId.size).toBe(overview.groupsByHostId.size);
+    // Same rows; latest-call additionally badges the lone call that overview leaves as a row.
+    expect(overview.groupsByHostId.has(later.id)).toBe(false);
+    expect(latest.groupsByHostId.get(later.id)?.run.calls).toEqual([later]);
+    expect(latest.groupsByHostId.size).toBe(overview.groupsByHostId.size + 1);
     expect(latest.tail).toEqual([
       expect.objectContaining({ id: first.id }),
       text,
@@ -556,9 +711,39 @@ describe("summary with latest call", () => {
       prompt,
       later,
     ]);
-    for (const id of [first.id, later.id]) {
-      expect(latest.groupsByHostId.get(id)?.run).toEqual(overview.groupsByHostId.get(id)?.run);
-    }
+    expect(latest.groupsByHostId.get(first.id)?.run).toEqual(
+      overview.groupsByHostId.get(first.id)?.run,
+    );
+  });
+  it("previews the latest tool call, not reasoning folded after it", () => {
+    const call = toolCall("1", { type: "shell", command: "npm test" });
+    const thought = {
+      kind: "thought",
+      status: "loading",
+      id: "reasoning",
+      text: "thinking",
+      timestamp: new Date(),
+    } satisfies StreamItem;
+    const group = project({
+      level,
+      tail: [call],
+      head: [thought],
+      isTurnActive: true,
+    }).historyGroupUpdatesByHostId.get(call.id);
+    expect(group).toMatchObject({
+      mode: level,
+      run: { latest: thought },
+      latestToolCall: call,
+      toolCallCount: 1,
+      isLoading: true,
+    });
+    const ready = { ...thought, status: "ready" } as const;
+    const reasoningOnly = project({ level, tail: [ready, { ...ready, id: "reasoning-2" }] });
+    expect(reasoningOnly.groupsByHostId.get(thought.id)).toMatchObject({
+      latestToolCall: null,
+      toolCallCount: 0,
+      isLoading: false,
+    });
   });
   it("reports errors and loading independently when parallel calls finish out of order", () => {
     const running = toolCall("1", { type: "shell", command: "slow" }, { status: "running" });

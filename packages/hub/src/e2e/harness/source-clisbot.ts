@@ -1,13 +1,13 @@
 import { spawn, execFile, type ChildProcess } from "node:child_process";
-import { createConnection, createServer as createNetServer } from "node:net";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { createServer as createNetServer } from "node:net";
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { WebSocket } from "ws";
 import { z } from "zod";
-import { runCommand } from "./command.js";
+import { describeProcesses, runCommand } from "./command.js";
 
 const exec = promisify(execFile);
 const TIMELINE_READER = fileURLToPath(new URL("./timeline-reader.mjs", import.meta.url));
@@ -22,13 +22,16 @@ const activeRelationshipSchema = z.object({
   transport: z.object({ webSocketUrl: z.string().url() }),
 });
 interface SourceClisbotOptions {
+  packagesRoot?: string;
   root?: string;
+  realAgent?: boolean;
   clisbotHome?: string;
   daemonHost?: string;
   config?: (paths: SourceClisbotPaths) => unknown;
 }
 
 export interface SourceClisbotPaths {
+  realAgent: boolean;
   packagesRoot: string;
   clisbotHome: string;
   daemonHost: string;
@@ -66,11 +69,18 @@ export class SourceClisbot {
     const ownsRoot = options.root === undefined;
     const root = options.root ?? (await mkdtemp(join(tmpdir(), "clisbot-source-e2e-")));
     try {
-      const packagesRoot = await packageClisbotArtifacts(resolveClisbotWorktree(), root);
+      const packagesRoot =
+        options.packagesRoot ?? (await packageClisbotArtifacts(resolveClisbotWorktree(), root));
       const clisbotHome = options.clisbotHome ?? join(root, "clisbot-home");
       const daemonHost = options.daemonHost ?? `127.0.0.1:${await availablePort()}`;
       await mkdir(clisbotHome, { recursive: true });
-      const paths = { packagesRoot, clisbotHome, daemonHost };
+      const realAgent = options.realAgent === true;
+      if (!realAgent) {
+        const bin = join(clisbotHome, "test-user", "bin");
+        await mkdir(bin, { recursive: true, mode: 0o700 });
+        await symlink(process.execPath, join(bin, "node"));
+      }
+      const paths = { packagesRoot, clisbotHome, daemonHost, realAgent };
       await writeFile(
         join(clisbotHome, "config.json"),
         JSON.stringify(options.config?.(paths) ?? defaultConfig(daemonHost), null, 2),
@@ -104,15 +114,19 @@ export class SourceClisbot {
   }
 
   async run(args: string[]): Promise<Record<string, unknown>> {
-    return this.runFrom(args, this.paths.packagesRoot);
+    return this.runFrom(args, this.root);
   }
 
-  async runFrom(args: string[], cwd: string): Promise<Record<string, unknown>> {
+  async runFrom(
+    args: string[],
+    cwd: string,
+    env: NodeJS.ProcessEnv = {},
+  ): Promise<Record<string, unknown>> {
     const result = await runCommand(
       join(this.paths.packagesRoot, "node_modules/.bin/clisbot"),
       args,
       cwd,
-      sourceEnvironment(this.paths.clisbotHome),
+      { ...sourceEnvironment(this.paths), ...env },
     );
     return parseCliResult(result.stdout);
   }
@@ -121,8 +135,8 @@ export class SourceClisbot {
     const result = await runCommand(
       process.execPath,
       [TIMELINE_READER, this.paths.packagesRoot, this.paths.daemonHost, agentId],
-      this.paths.packagesRoot,
-      sourceEnvironment(this.paths.clisbotHome),
+      this.root,
+      sourceEnvironment(this.paths),
     );
     const value: unknown = JSON.parse(result.stdout);
     return z.array(z.unknown()).parse(value);
@@ -249,9 +263,9 @@ export class SourceClisbot {
         ),
       ],
       {
-        cwd: this.paths.packagesRoot,
+        cwd: this.root,
         env: {
-          ...sourceEnvironment(this.paths.clisbotHome),
+          ...sourceEnvironment(this.paths),
           CLISBOT_LISTEN: this.paths.daemonHost,
         },
         stdio: ["ignore", "pipe", "pipe"],
@@ -262,7 +276,16 @@ export class SourceClisbot {
     daemon.stdout?.on("data", record);
     daemon.stderr?.on("data", record);
     this.daemon = daemon;
-    await observe(async () => canConnect(this.paths.daemonHost), "source daemon readiness", daemon);
+    // The listener opens before the daemon accepts its first authenticated RPC.
+    await observe(
+      () =>
+        this.status().then(
+          () => true,
+          () => false,
+        ),
+      "source daemon readiness",
+      daemon,
+    );
   }
 
   private async stopDaemon(): Promise<void> {
@@ -283,14 +306,22 @@ export async function packageClisbotArtifacts(clisbotRoot: string, root: string)
   const packages = join(root, "clisbot-packages");
   const tarballs = join(root, "clisbot-tarballs");
   await Promise.all([mkdir(packages), mkdir(tarballs)]);
-  for (const workspace of ["protocol", "relay", "highlight", "client", "server", "cli"]) {
-    await runCommand(
-      "npm",
-      ["pack", "--ignore-scripts", "--pack-destination", tarballs],
-      join(clisbotRoot, "packages", workspace),
-      {},
-    );
-  }
+  // Resolve the release graph from the checkout being tested, including transitive Hub packages.
+  const releaseScript = pathToFileURL(join(clisbotRoot, "scripts/npm-release.mjs")).href;
+  const { releasePackages } = await import(releaseScript);
+  const workspaces = z.array(z.object({ workspace: z.string() })).parse(releasePackages());
+  await runCommand(
+    "npm",
+    [
+      "pack",
+      "--silent",
+      "--ignore-scripts",
+      "--pack-destination",
+      tarballs,
+      ...workspaces.flatMap(({ workspace }) => ["--workspace", workspace]),
+    ],
+    clisbotRoot,
+  );
   await writeFile(
     join(packages, "package.json"),
     JSON.stringify({ private: true, type: "module" }),
@@ -298,13 +329,24 @@ export async function packageClisbotArtifacts(clisbotRoot: string, root: string)
   const tarballsToInstall = (await readdir(tarballs))
     .filter((file) => file.endsWith(".tgz"))
     .map((file) => join(tarballs, file));
-  await runCommand("npm", ["install", "--ignore-scripts", ...tarballsToInstall], packages, {});
+  await runCommand("npm", ["install", "--ignore-scripts", ...tarballsToInstall], packages);
   return packages;
 }
 
-export function sourceEnvironment(clisbotHome: string): NodeJS.ProcessEnv {
+export function sourceEnvironment({
+  clisbotHome,
+  realAgent,
+}: Pick<SourceClisbotPaths, "clisbotHome" | "realAgent">): NodeJS.ProcessEnv {
+  const home = join(clisbotHome, "test-user");
   return {
-    ...process.env,
+    ...(realAgent
+      ? process.env
+      : {
+          HOME: home,
+          PATH: [join(home, "bin"), "/usr/bin", "/bin"].join(":"),
+          LANG: "en_US.UTF-8",
+          TMPDIR: process.env["TMPDIR"],
+        }),
     CLISBOT_AGENT_ID: undefined,
     CLISBOT_WORKSPACE_ID: undefined,
     CLISBOT_HOME: clisbotHome,
@@ -348,19 +390,6 @@ async function observe(
     await delay(100);
   }
   throw new Error(`Timed out waiting for ${description}`);
-}
-
-async function canConnect(host: string): Promise<boolean> {
-  const [hostname, portText] = host.split(":");
-  const port = Number(portText);
-  return new Promise<boolean>((resolveConnection) => {
-    const socket = createConnection({ host: hostname, port });
-    socket.once("connect", () => {
-      socket.destroy();
-      resolveConnection(true);
-    });
-    socket.once("error", () => resolveConnection(false));
-  });
 }
 
 async function availablePort(): Promise<number> {
@@ -462,17 +491,6 @@ async function processFamily(rootPid: number | undefined): Promise<number[]> {
   };
   visit(rootPid);
   return family;
-}
-
-async function describeProcesses(pids: readonly number[]): Promise<string[]> {
-  if (pids.length === 0) return [];
-  const { stdout } = await exec("ps", [
-    "-o",
-    "pid=,ppid=,state=,etime=,command=",
-    "-p",
-    pids.join(","),
-  ]);
-  return stdout.trim().split("\n").filter(Boolean);
 }
 
 function isProcessAlive(pid: number): boolean {

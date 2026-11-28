@@ -46,7 +46,8 @@ interface TestClisbotDaemonOptions {
   staticDir?: string;
   cleanup?: boolean;
   openai?: ClisbotOpenAIConfig;
-  speech?: ClisbotSpeechConfig;
+  // localModelsDir defaults to the local provider's modelsDir, then to a dir under clisbotHome.
+  speech?: Omit<ClisbotSpeechConfig, "localModelsDir"> & { localModelsDir?: string };
   voiceLlmProvider?: ClisbotDaemonConfig["voiceLlmProvider"];
   voiceLlmProviderExplicit?: boolean;
   voiceLlmModel?: string | null;
@@ -58,8 +59,12 @@ interface TestClisbotDaemonOptions {
   trustedProxies?: ClisbotDaemonConfig["trustedProxies"];
   agentProfiles?: AgentProfile[];
   autoArchiveAfterMerge?: boolean;
+  resumeOnStartup?: boolean;
+  resumePrompt?: string;
   pluginsEnabled?: ClisbotDaemonConfig["pluginsEnabled"];
+  pluginRegistryUrl?: ClisbotDaemonConfig["pluginRegistryUrl"];
   builtinPlugins?: BuiltinPluginLoader;
+  lazyTerminalWorker?: boolean;
   plugins?: ClisbotDaemonConfig["plugins"];
 }
 
@@ -123,6 +128,7 @@ export async function createTestClisbotDaemon(
     const logger = options.logger ?? pino({ level: "silent" });
     const daemon = await (options.createDaemon ?? createClisbotDaemon)(config, logger, {
       builtinPlugins: options.builtinPlugins ?? new BuiltinPluginLoader(undefined, []),
+      lazyTerminalWorker: options.lazyTerminalWorker ?? true,
       serverFeatureOverrides: {
         daemonStatusRpc: options.daemonStatusRpcCapability,
         relayConfig: options.relayConfigCapability,
@@ -232,7 +238,15 @@ async function prepareTestDaemonConfig(
     webUi: options.webUi,
     trustedProxies: options.trustedProxies,
     openai: options.openai,
-    speech: options.speech,
+    speech: options.speech
+      ? {
+          ...options.speech,
+          localModelsDir:
+            options.speech.localModelsDir ??
+            options.speech.local?.modelsDir ??
+            path.join(clisbotHome, "models", "local-speech"),
+        }
+      : undefined,
     voiceLlmProvider: options.voiceLlmProvider ?? null,
     voiceLlmProviderExplicit: options.voiceLlmProviderExplicit ?? false,
     voiceLlmModel: options.voiceLlmModel ?? null,
@@ -240,8 +254,11 @@ async function prepareTestDaemonConfig(
     downloadTokenTtlMs: options.downloadTokenTtlMs,
     agentProfiles: options.agentProfiles,
     autoArchiveAfterMerge: options.autoArchiveAfterMerge,
+    resumeOnStartup: options.resumeOnStartup,
+    resumePrompt: options.resumePrompt,
     pluginsEnabled: options.pluginsEnabled,
     plugins: options.plugins,
+    pluginRegistryUrl: options.pluginRegistryUrl,
   };
   return { config, clisbotHomeRoot, clisbotHome, staticDir, createdDirs };
 }

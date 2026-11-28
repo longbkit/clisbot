@@ -12,7 +12,7 @@ A daemon runs agents on one machine, for you. Clisbot Hub is the layer above you
 
 - **Channels.** Connect [eight integrations](/docs/hub/channels): Slack, Telegram, Discord, Google Chat, Feishu/Lark, Zalo Official Bot, Zalo Personal and WhatsApp. Setup and capabilities vary by channel.
 - **Managed access.** Grant [Members and Teams access](/docs/hub/managed-access) to Hosts or Projects, with allowed Agent configurations.
-- **Automations.** Start agents from activity in GitHub, Slack, and Discord.
+- **Automations.** Start agents from activity in GitHub, Linear, Slack, and Discord.
 - **Activity.** A record of everything that arrived, what it matched, and what ran.
 
 Use your personal channels to continue work away from your desk, or share selected Projects with a team. Your daemons run the agents; Hub routes requests and access. [Bots and Group chats](/docs/bots-and-chats) also work without Hub.

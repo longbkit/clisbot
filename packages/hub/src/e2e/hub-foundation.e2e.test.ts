@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import { afterEach, beforeEach, describe, it } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, beforeAll, afterEach, beforeEach, describe, it } from "vitest";
+import { packageClisbotArtifacts, resolveClisbotWorktree } from "./harness/source-clisbot.js";
 import { HubE2E } from "./harness/index.js";
 import { currentProjectConfigurationFiles } from "../test-utils/current-project-configuration.js";
 
@@ -7,9 +11,18 @@ const describeHubE2E = process.env["RUN_HUB_E2E"] === "1" ? describe : describe.
 
 describeHubE2E("Clisbot Hub cross-repository contract", () => {
   let hub: HubE2E;
+  let installation: string | undefined;
+  let packagesRoot: string;
+  beforeAll(async () => {
+    installation = await mkdtemp(join(tmpdir(), "hub-foundation-install-"));
+    packagesRoot = await packageClisbotArtifacts(resolveClisbotWorktree(), installation);
+  }, 120_000);
+  afterAll(async () => {
+    if (installation) await rm(installation, { recursive: true, force: true });
+  }, 120_000);
 
   beforeEach(async () => {
-    hub = await HubE2E.start();
+    hub = await HubE2E.start({ packagesRoot });
   }, 120_000);
 
   afterEach(async () => {
@@ -31,7 +44,7 @@ describeHubE2E("Clisbot Hub cross-repository contract", () => {
   }, 120_000);
 
   it("validates and installs the exact authored bundle through the source-built CLI", async () => {
-    await hub.connect();
+    const enrollment = await hub.connect();
     await hub.daemonIsConnected();
 
     const evidence = await hub.deployCurrentProjectBundleWithSourceCli();
@@ -58,16 +71,8 @@ describeHubE2E("Clisbot Hub cross-repository contract", () => {
     });
     assert.deepEqual(evidence.authoredFiles, expectedFiles);
     assert.deepEqual(configuration.environments, [
-      {
-        name: "hub",
-        cwd: "/workspace/hub",
-        daemonId: configuration.environments[0]?.daemonId,
-      },
-      {
-        name: "clisbot",
-        cwd: "/workspace/clisbot",
-        daemonId: configuration.environments[1]?.daemonId,
-      },
+      { name: "clisbot", cwd: "/workspace/clisbot", daemonId: enrollment.daemonId },
+      { name: "hub", cwd: "/workspace/hub", daemonId: enrollment.daemonId },
     ]);
     assert.equal(configuration.slackWorkerEnvironment, "${{ values.selected_environment }}");
     assert.equal(configuration.slackAgentSelector, "${{ values.selected_agent }}");
@@ -97,6 +102,9 @@ describeHubE2E("Clisbot Hub cross-repository contract", () => {
     const completed = await hub.completedRun(run.executionId);
     const capabilityRun = await hub.runCapabilityTrigger("capability-delivery");
     const capability = await hub.completedCapabilityRun(capabilityRun.executionId);
+    // Normal enrollment grants status reads and steering. Exercise the original denials
+    // after the operator explicitly narrows this disposable Host relationship.
+    assert.equal(await hub.restrictHubToWorkspaceReads(), "workspace.read");
     const denial = await hub.requestForbiddenOperation();
     const steerDenial = await hub.requestForbiddenSteer(unrelatedAgent);
 

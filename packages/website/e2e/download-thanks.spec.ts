@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 const APPLE_SILICON_DMG =
   /\/longbkit\/clisbot\/releases\/download\/v[^/]+\/Clisbot-[^/]+-arm64\.dmg$/;

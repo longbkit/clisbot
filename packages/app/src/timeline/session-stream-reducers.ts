@@ -1,9 +1,10 @@
-import type { AgentTimelineItem } from "@clisbot/protocol/agent-types";
+import type { AgentMetric, AgentTimelineItem } from "@clisbot/protocol/agent-types";
 import type { AgentStreamEventPayload } from "@clisbot/protocol/messages";
 import { selectAgentTimelineState, useSessionStore } from "@/stores/session-store";
 import type { AssistantMessageItem, StreamItem, TodoEntry, TimelinePosition } from "@/types/stream";
 import type { TurnLivenessTransition } from "@/timeline/turn-liveness";
 import { sessionStorageReadable } from "@/clisbot/session-storage/capability";
+import { stampTimelineTurnMetrics } from "@/timeline/turn-metrics";
 import {
   applyStreamEvent,
   flushHeadToTail,
@@ -136,6 +137,7 @@ interface TimelineResponseEntry {
   turnId?: string;
   item: AgentTimelineItem;
   timestamp: string;
+  turnMetrics?: AgentMetric[];
 }
 
 export interface ProcessTimelineResponseInput {
@@ -350,7 +352,10 @@ function classifySessionTimelineSeq({
   seq: number;
 }): SessionTimelineSeqDecision {
   if (!cursor) {
-    return "init";
+    // A synced chat without coverage was empty when it last caught up. Only an epoch's
+    // first row can start coverage; a later row means rows before it were missed, for
+    // example while offline, and a cursor started there would hide them from catch-up.
+    return seq === 1 ? "init" : "gap";
   }
   if (cursor.epoch !== epoch) {
     return "drop_epoch";
@@ -1453,7 +1458,8 @@ export function processTimelineResponse(
   // ------------------------------------------------------------------
   // Convert entries to timeline units
   // ------------------------------------------------------------------
-  const timelineUnits = selectEntriesOwnedByTimelinePage(payload).map((entry) => ({
+  const pageEntries = selectEntriesOwnedByTimelinePage(payload);
+  const timelineUnits = pageEntries.map((entry) => ({
     seq: entry.seqStart,
     seqEnd: entry.seqEnd,
     deferredPayload: entry.deferredPayload,
@@ -1564,7 +1570,9 @@ export function processTimelineResponse(
     });
   }
 
-  const { nextTail, nextHead } = positionSourceRangeLanes(timelineResult, timelineUnits, payload);
+  const lanes = positionSourceRangeLanes(timelineResult, timelineUnits, payload);
+  const nextTail = stampTimelineTurnMetrics(lanes.nextTail, payload.epoch, pageEntries);
+  const nextHead = stampTimelineTurnMetrics(lanes.nextHead, payload.epoch, pageEntries);
   const nextCursor = timelineResult.cursor;
   const cursorChanged = timelineResult.cursorChanged;
   sideEffects.push(...timelineResult.sideEffects);
@@ -1742,14 +1750,14 @@ function processTimelineSequencingGate(input: {
     return {
       ...base,
       shouldApplyStreamEvent: false,
-      sideEffects: currentCursor
-        ? [
-            {
-              type: "catch_up",
-              cursor: { epoch: currentCursor.epoch, endSeq: currentCursor.endSeq },
-            },
-          ]
-        : [],
+      sideEffects: [
+        {
+          type: "catch_up",
+          cursor: currentCursor
+            ? { epoch: currentCursor.epoch, endSeq: currentCursor.endSeq }
+            : { epoch, endSeq: 0 },
+        },
+      ],
     };
   }
   if (decision === "drop_epoch" && seq === 1) {
@@ -1845,19 +1853,17 @@ export function processAgentStreamEvent(
         unmatchedUserMessageInsert: "head",
       });
     } else {
-      const overlay = applyStreamEvent({
-        tail: currentHead,
-        head: [],
-        event,
-        timestamp,
+      // Before history arrives, the overlay is one ordered stream. Reducing it
+      // directly keeps consecutive reasoning chunks in the same row.
+      const overlay = reduceStreamUpdate(currentHead, event, timestamp, {
         source: "live",
         timelineCursor,
       });
       streamResult = {
         tail: currentTail,
-        head: [...overlay.tail, ...overlay.head],
+        head: overlay,
         changedTail: false,
-        changedHead: overlay.changedTail || overlay.changedHead,
+        changedHead: overlay !== currentHead,
       };
     }
   } else {

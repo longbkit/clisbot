@@ -39,7 +39,8 @@ it("preserves Needs you and unread meaning and the existing collapsed status pre
   const agents = [
     agent("active", { status: "running" }),
     agent("approval", { pendingPermissionCount: 1 }),
-    agent("error", { status: "error" }),
+    // Upstream #8831: only an unread error (attention "error") shows as failed; the host sets it.
+    agent("error", { status: "error", requiresAttention: true, attentionReason: "error" }),
     agent("reply", { requiresAttention: true, attentionReason: "finished" }),
   ];
   expect(summarizeInboxActivity(agents, ready)).toMatchObject({

@@ -15,8 +15,23 @@ vi.mock("@tanstack/react-query", () => ({
   keepPreviousData: (data: unknown) => data,
   useQuery: () => ({ data: [], isLoading: false }),
 }));
-vi.mock("./use-agent-commands-query", () => ({
-  useAgentCommandsQuery: () => ({ commands: [], isLoading: false, isError: false }),
+// The provider list names provider commands; these tests list none.
+vi.mock("@/hooks/use-providers-snapshot", () => ({
+  useProvidersSnapshot: () => ({ entries: undefined }),
+}));
+// Upstream moved the commands query to `@/agent-commands`. Each test sets what the provider
+// reports: its commands, or a load still running or failed.
+const providerCommands = vi.hoisted(() => ({
+  commands: [] as { name: string; description: string; argumentHint: string }[],
+  isLoading: false,
+  isError: false,
+}));
+vi.mock("@/agent-commands/use-query", () => ({
+  useAgentCommandsQuery: () => ({
+    ...providerCommands,
+    error: providerCommands.isError ? new Error("commands unavailable") : null,
+    retry: () => undefined,
+  }),
 }));
 vi.mock("@/stores/session-store", () => ({
   useSessionStore: (select: (state: unknown) => unknown) =>
@@ -26,7 +41,12 @@ vi.mock("@/runtime/host-runtime", () => ({
   useHostRuntimeClient: () => null,
   useHostRuntimeIsConnected: () => true,
 }));
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  providerCommands.commands = [];
+  providerCommands.isLoading = false;
+  providerCommands.isError = false;
+});
 test("unchanged mention text uses the newly selected source resolver", () => {
   const setUserInput = vi.fn();
   const { result, rerender } = renderHook(
@@ -41,7 +61,13 @@ test("unchanged mention text uses the newly selected source resolver", () => {
       }),
     { initialProps: { root: "/alpha" } },
   );
-  const option = { id: "file", label: "app.ts", type: "file", entryPath: "src/app.ts" };
+  const option = {
+    id: "file",
+    label: "app.ts",
+    icon: "file" as const,
+    type: "file",
+    entryPath: "src/app.ts",
+  };
   result.current.onSelectOption(option);
   expect(setUserInput).toHaveBeenLastCalledWith('"/alpha/src/app.ts"');
   rerender({ root: "/beta" });
@@ -54,6 +80,7 @@ function renderSlash(input: {
   text: string;
   commands: readonly ClientSlashCommand[];
   onCommand?: (command: ClientSlashCommand) => boolean | void;
+  providerCommandsAvailable?: boolean;
 }) {
   const setUserInput = vi.fn();
   const onClientSlashCommand = vi.fn(input.onCommand ?? (() => true));
@@ -65,6 +92,9 @@ function renderSlash(input: {
       serverId: "host",
       agentId: "agent",
       clientSlashCommands: input.commands,
+      // The Chat composer passes this with its own command set (composer/index.tsx).
+      listClientCommandsOnBareSlash: input.commands === CONVERSATION_SLASH_COMMANDS,
+      providerCommandsAvailable: input.providerCommandsAvailable,
       canExecuteClientSlashCommand: true,
       onClientSlashCommand,
     }),
@@ -88,10 +118,84 @@ function renderSlash(input: {
   return { hook, press, setUserInput, onClientSlashCommand };
 }
 
-test("a Chat offers its own /new and never the agent tab's /clear or /exit", () => {
+const labels = (hook: ReturnType<typeof renderSlash>["hook"]) =>
+  hook.result.current.options.map((option) => option.label);
+
+test("a Chat's bare / lists its own /new, and never the agent tab's /clear or /exit", () => {
   const { hook } = renderSlash({ text: "/", commands: CONVERSATION_SLASH_COMMANDS });
   expect(hook.result.current.isVisible).toBe(true);
-  expect(hook.result.current.options.map((option) => option.label)).toEqual(["/new"]);
+  expect(labels(hook)).toEqual(["/new"]);
+  // Shown, not chosen: nothing is selected until the user moves to a row.
+  expect(hook.result.current.selectedIndex).toBe(-1);
+});
+
+test("a Chat's bare / lists /new after the provider's commands", () => {
+  providerCommands.commands = [{ name: "review", description: "Review", argumentHint: "" }];
+  const { hook } = renderSlash({ text: "/", commands: CONVERSATION_SLASH_COMMANDS });
+  expect(labels(hook)).toEqual(expect.arrayContaining(["/new", "/review"]));
+  expect(hook.result.current.selectedIndex).toBe(-1);
+});
+
+test("Enter or Tab on a Chat's bare / with nothing selected runs, resets and inserts nothing", () => {
+  for (const key of ["Enter", "Tab"]) {
+    const { press, onClientSlashCommand, setUserInput } = renderSlash({
+      text: "/",
+      commands: CONVERSATION_SLASH_COMMANDS,
+    });
+    press(key);
+    expect(onClientSlashCommand).not.toHaveBeenCalled();
+    expect(setUserInput).not.toHaveBeenCalled();
+    cleanup();
+  }
+});
+
+test("on a Chat's bare /, a row the user moved to runs once on Enter", () => {
+  const { press, onClientSlashCommand } = renderSlash({
+    text: "/",
+    commands: CONVERSATION_SLASH_COMMANDS,
+  });
+  press("ArrowDown");
+  press("Enter");
+  expect(onClientSlashCommand).toHaveBeenCalledTimes(1);
+  expect(onClientSlashCommand.mock.calls[0]?.[0]).toMatchObject({ kind: "fresh-chat-session" });
+});
+
+test.each(["loading", "error"] as const)(
+  "while the provider's commands are %s, no hidden row can be invoked",
+  (state) => {
+    providerCommands.isLoading = state === "loading";
+    providerCommands.isError = state === "error";
+    for (const text of ["/", "/new"]) {
+      for (const commands of [CONVERSATION_SLASH_COMMANDS, CLIENT_SLASH_COMMANDS]) {
+        const { hook, press, onClientSlashCommand, setUserInput } = renderSlash({
+          text,
+          commands,
+        });
+        expect(hook.result.current.options).toEqual([]);
+        press("Enter");
+        press("Tab");
+        expect(onClientSlashCommand).not.toHaveBeenCalled();
+        expect(setUserInput).not.toHaveBeenCalled();
+        cleanup();
+      }
+    }
+  },
+);
+
+test("an agent tab keeps upstream's search-first list: bare / offers no app command to Enter", () => {
+  const bare = renderSlash({ text: "/", commands: CLIENT_SLASH_COMMANDS });
+  expect(labels(bare.hook)).toEqual([]);
+  bare.press("Enter");
+  expect(bare.onClientSlashCommand).not.toHaveBeenCalled();
+  expect(bare.setUserInput).not.toHaveBeenCalled();
+  cleanup();
+  // With provider commands, the preselected row is the provider's, never /clear or /exit.
+  providerCommands.commands = [{ name: "review", description: "Review", argumentHint: "" }];
+  const withProvider = renderSlash({ text: "/", commands: CLIENT_SLASH_COMMANDS });
+  const selected = withProvider.hook.result.current.selectedIndex;
+  expect(withProvider.hook.result.current.options[selected]?.label).toBe("/review");
+  withProvider.press("Enter");
+  expect(withProvider.onClientSlashCommand).not.toHaveBeenCalled();
 });
 
 test("Enter on an exact /new in a Chat runs the fresh-session command once", () => {
@@ -150,7 +254,7 @@ test("Shift+Tab is left to focus navigation", () => {
 
 test("arrows move the selection and never pick", () => {
   const { press, onClientSlashCommand, setUserInput } = renderSlash({
-    text: "/",
+    text: "/e",
     commands: CLIENT_SLASH_COMMANDS,
   });
   expect(press("ArrowDown").handled).toBe(true);
@@ -182,4 +286,28 @@ test("a command its composer does not run is inserted instead of swallowing Ente
   press("Enter");
   expect(onClientSlashCommand).toHaveBeenCalledTimes(1);
   expect(setUserInput).toHaveBeenCalledWith("/new ");
+});
+
+// A Chat has no session before its first message; its draft key names no provider command list,
+// and that query never settles. The Chat's own commands must not wait behind it.
+test("a Chat with no session yet lists /new on a bare / while provider commands cannot load", () => {
+  providerCommands.isLoading = true;
+  const slash = renderSlash({
+    text: "/",
+    commands: CONVERSATION_SLASH_COMMANDS,
+    providerCommandsAvailable: false,
+  });
+  expect(slash.hook.result.current.status).toBeNull();
+  expect(slash.hook.result.current.options.map((option) => option.label)).toEqual(["/new"]);
+  expect(slash.hook.result.current.selectedIndex).toBe(-1);
+  slash.press("Enter");
+  expect(slash.onClientSlashCommand).not.toHaveBeenCalled();
+});
+
+test("an agent tab whose provider commands are loading offers nothing to pick", () => {
+  providerCommands.isLoading = true;
+  const slash = renderSlash({ text: "/", commands: CLIENT_SLASH_COMMANDS });
+  expect(slash.hook.result.current.options).toEqual([]);
+  slash.press("Enter");
+  expect(slash.onClientSlashCommand).not.toHaveBeenCalled();
 });

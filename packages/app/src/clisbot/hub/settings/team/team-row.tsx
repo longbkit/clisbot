@@ -39,7 +39,7 @@ export function TeamRow({
         )}
       </View>
       <Button
-        size="xs"
+        size="sm"
         variant="ghost"
         onPress={view}
         accessibilityLabel={t("hub.team.teams.viewLabel", { name: team.name })}

@@ -27,6 +27,7 @@ Rules that apply to both steps:
 - No code changes bundled into the changelog commit or the release commit. Code shims live in their own commit, reviewed on their own merits.
 - A sanity-check finding is information, not a directive. The agent surfaces it; the user decides.
 - Invoking a release skill is intent to start the flow, not blanket authorization to publish.
+- An approval the user already gave covers what it names, such as an explicit PR selection or authorization to release autonomously. Do not ask for it again.
 - If the user asks for a release preview, show the prospective changelog/release contents and answer questions, but do not commit, tag, publish, or run release commands until they explicitly authorize the release.
 
 ## Release credentials
@@ -286,23 +287,26 @@ Drafts do not appear in GitHub's releases feed. Updater clients continue to see 
 
 The `rollout_hours` input on `desktop-release.yml` is **only read on `workflow_dispatch`** — tag-push runs always default to 36. To get any other rollout duration on a fresh release, use the post-publish flip below.
 
-### Instant-admit release (rollout_hours=0 from publish)
+### Instant-admit release (rollout_hours=0)
 
-For a fresh release that should admit everyone immediately (low-risk change, doc-only, hotfix, or just a release you want out fast), cut the release normally and queue the rollout flip immediately after:
+Tag-push runs from `npm run release:patch` or `npm run release:minor` always stamp 36 hours. To admit everyone immediately (hotfix, doc-only change, a release you want out fast), cut the release normally, wait for it to publish, then flip the manifests:
 
 ```bash
-# 1. Cut and publish (default 36h ramp from tag push).
+# 1. Cut and publish (36h ramp from tag push).
 npm run release:patch
 
-# 2. Immediately queue the flip — runs as soon as finalize-rollout completes.
+# 2. Wait for Desktop Release to publish the GitHub Release.
+gh run watch <desktop-release-run-id> --exit-status
+
+# 3. Flip the published manifests to instant admit.
 gh workflow run desktop-rollout.yml \
   -f tag=v0.1.64 \
   -f rollout_hours=0
 ```
 
-**Why this is gap-free:** `desktop-release.yml`'s `finalize-rollout` job and `desktop-rollout.yml` share the concurrency group `desktop-rollout-<tag>`. Dispatching `desktop-rollout.yml` while the tag-push pipeline is still running queues it safely behind `finalize-rollout`. The first public manifests already carry `rolloutHours=36`, then `desktop-rollout.yml` flips them to `rolloutHours=0` shortly afterward. The renderer polls every 30 minutes, so active stable users pick up the new manifest on their next check.
+Dispatch only after `finalize-rollout` has published the release. Until then the release is a draft, and a draft has no tag: `desktop-rollout.yml` looks the release up by tag and fails with `release not found`. The concurrency group `desktop-rollout-<tag>` that the two workflows share orders them only once both are queued; it does not hold an early dispatch until the draft is published.
 
-Run the dispatch right after `release:patch` or `release:minor` returns. Don't wait for the tag-push CI to finish.
+The first public manifests carry `rolloutHours=36` for the minutes between publish and the flip. The renderer polls every 30 minutes, so active stable users pick up the new manifest on their next check.
 
 ### Adjusting an already-published release
 
@@ -368,8 +372,8 @@ macOS 13 maps to Darwin 22. The two values use different version domains; do not
 
 iOS and Android store builds are not in `.github/workflows`. They are triggered by the EAS GitHub app the moment the `v*` tag is pushed:
 
-- **Android (Play Store)** — EAS builds with profile `production` and auto-submits to the Play Store via `eas submit` (EAS-managed credentials, no Fastlane).
-- **iOS (TestFlight + App Store)** — EAS builds with profile `production`, uploads once through a `testflight` job, distributes the build to the `Clisbot Beta` external group with Beta App Review submission, and a Fastlane lane submits that same build for App Store review.
+- **Android (Play Store)** — EAS builds with profile `production` and auto-submits to the Play Store via `eas submit` (EAS-managed credentials). A Fastlane lane then replaces the store screenshots.
+- **iOS (TestFlight + App Store)** — EAS builds with profile `production`, uploads once through a `testflight` job, distributes the build to the `Clisbot Beta` external group with Beta App Review submission, and a Fastlane lane uploads the store screenshots and submits that same build for App Store review.
 - **Android APK (GitHub Release asset)** — separate, via `.github/workflows/android-apk-release.yml`. This is the only Android-related workflow that lives in this repo.
 
 EAS uses the local app version source. `packages/app/app.config.js` derives the native version from the package version. Android `versionCode` is `major * 1_000_000 + minor * 1_000 + patch`. iOS reserves 1,000 build slots per app version: beta `N` uses slot `N`, and stable uses slot `999`. For example, `0.2.6-beta.2` appears in App Store Connect as version `0.2.6` build `2006002`; stable uses build `2006999`. Rebuilding the same tag produces the same native build number; if a store has already accepted a binary and you need a different binary, cut the next beta or patch instead of relying on EAS remote auto-increment.
@@ -379,6 +383,17 @@ Stable tags run `Release Mobile`; beta tags run `Release iOS Beta`. Both distrib
 Stable iOS releases use one binary for two Apple review paths: Beta App Review for external TestFlight distribution and App Store review. [Apple says](https://developer.apple.com/help/app-store-connect/test-a-beta-version/invite-external-testers) the first submitted build requires a full TestFlight review; later builds for the same version might not. Do not assume a stable patch skips review.
 
 There is no mobile-release workflow under `.github/workflows`. The EAS GitHub app reads the workflows under `packages/app/.eas/workflows` and handles tag triggering directly.
+
+### Store screenshots
+
+Each stable release publishes the screenshots committed under `assets/store-screenshots/output/` (see [its README](../assets/store-screenshots/README.md) for how they are made). To change the store screenshots, re-render and commit them before you tag.
+
+- **App Store:** `submit_review` uploads `output/apple/` and `output/apple-ipad/` to the version it submits, replacing that version's `en-US` screenshots. Apple ties screenshots to an app version, so a version that is already live keeps the ones it shipped with. `Resubmit iOS for App Store review` uploads them again.
+  - When `submit_review` fails with `appStoreVersions … is not in valid state`, the reason is in the API error's `meta.associatedErrors`, which fastlane does not print. Read it with a `POST /v1/reviewSubmissionItems` against the version. A required age-rating question that Apple added, such as `socialMedia`, fails this way; answer it under App Information > Age Rating in App Store Connect, then resubmit.
+- **Google Play:** `upload_android_screenshots` runs `fastlane android upload_screenshots` after `submit_android`. It replaces only the `en-US` phone and 10-inch tablet screenshots, never the listing text or changelogs, and skips images whose checksum already matches. The lane stages only `en-US`: supply uploads every locale folder in one edit, and Play rejects F-Droid locales such as `ja`, which fails the whole edit. `Upload Google Play screenshots` reruns the step for the current release without a rebuild.
+- **F-Droid:** reads the same files as Google Play. `fastlane/metadata/android/en-US/images/phoneScreenshots/` and `tenInchScreenshots/` hold symlinks to the Google renders. `render.mjs` rewrites them on every render, so added or renamed panels reach Google Play and F-Droid as well.
+
+Fastlane cannot use the Play key Expo stores for `eas submit`. The Play lane reads its own copy of the same service-account key from the `GOOGLE_PLAY_JSON_KEY` file secret in the EAS `production` environment, and that service account needs the Play Console permission **Manage store presence**.
 
 ### Watching mobile builds from the terminal
 
@@ -422,6 +437,7 @@ For the `Release Mobile` EAS workflow, these jobs must pass:
 - `submit_ios_for_review` — iOS build submitted for App Store review via Fastlane
 - `build_android` — Android store binary built
 - `submit_android` — Android binary submitted to the Play Store
+- `upload_android_screenshots` — Google Play screenshots replaced from the repo
 
 Do not treat `build_ios: SUCCESS` or `distribute_ios: SUCCESS` as a completed iOS release. `submit_ios_for_review: FAILURE` means the iOS release is blocked even if the build is visible in TestFlight.
 
@@ -480,7 +496,7 @@ The GitHub Release body is populated automatically by the `Release Notes Sync` w
 - Release metadata and GitHub stars are optional for rendering the website. If no ready Clisbot desktop release exists or the GitHub lookup fails, the homepage links to `/download`, which shows links to the setup guide and GitHub releases instead of constructing download URLs for missing assets.
 - The website download page defaults to GitHub's latest published **stable** release.
 - A published beta prerelease is offered behind the Stable/Beta switch on `/download` (`?channel=beta`), never as the default. The switch only appears while the newest prerelease leads stable on its core version, so promoting `X.Y.Z-beta.N` to `X.Y.Z` retires the beta channel from the page until the next beta line opens.
-- Homebrew, the Play Store, the App Store, and `app.clisbot.com` have no beta. The Beta view drops those rows, and the whole Web section, rather than showing an inert "stable only" placeholder. When a surface gains a beta path — say a public TestFlight link — add its row back in `packages/website/src/routes/download.tsx`.
+- Homebrew, the Play Store, the App Store, and `app.clisbot.com` have no beta. The Beta view drops those rows, and the whole Web section, rather than showing an inert "stable only" placeholder. When a surface gains a beta path — say a public TestFlight link — add its row back in `packages/website/src/routes/{-$locale}/download.tsx`.
 - The default download target only moves when you publish the final stable release tag like `v0.1.41`.
 - The public `/changelog` page renders `CHANGELOG.md` as-is, so the in-flight `-beta.N` entry shows there once it lands on `main` — that's intended, it's where beta users check what's coming. Only the **default download target** stays pinned to the latest stable; the download links read GitHub's releases API, not the changelog, so a `-beta.N` heading on top never affects them.
 - The download page's "What's new" link deep-links the **minor group** anchor (`/changelog#release-0.3`), not the exact entry: the beta entry is renamed on each beta and on promotion, so the minor group remains the durable target. A version with no entry in the bundled changelog — a tag whose changelog commit hasn't redeployed the site yet — links the plain `/changelog` instead of a dead anchor.
@@ -543,7 +559,7 @@ git tag -f android-v0.1.28 HEAD && git push origin android-v0.1.28 --force
 git tag -f v0.1.29-beta.2 HEAD && git push origin v0.1.29-beta.2 --force
 ```
 
-This ensures the checkout ref matches the actual code on `main` with the fix included.
+This ensures the checkout ref matches the code you want built, with the fix included.
 
 - `vX.Y.Z` or `vX.Y.Z-beta.N` rebuilds the full tagged release
 - `desktop-vX.Y.Z` rebuilds desktop for all desktop platforms only
@@ -587,13 +603,14 @@ Release notes depend on the changelog heading format. The heading **must** be st
 
 No prefix (`v`), no extra text. `Release Notes Sync` matches the `## X.Y.Z` (or `## X.Y.Z-beta.N`) line for the pushed tag to extract the version. A malformed heading breaks the release-notes sync for that tag.
 
-`CHANGELOG.md` on `main` is also what the app's **What's new** sheet fetches and renders, so the file is a shipped product surface, not just a release input. `##` starts a release and `###` starts a section; the app reads section titles from the document, so renaming or adding one needs no app change. Everything under a section is rendered as Markdown: prose, lists, links, inline code, fenced code, block quotes, tables, and images. Raw HTML does not render — the shared Markdown parser runs with `html: false`, so a `<video>`, `<iframe>` or `<embed>` tag reaches the reader as visible markup. Keep media out of the changelog, or link to it. A GitHub callout renders as a block quote with its `[!NOTE]` marker still in the text. A release entry is what a user reads on a phone the moment they are offered the update — write it for them.
+`CHANGELOG.md` on `main` is also what the app's **What's new** sheet fetches and renders, so the file is a shipped product surface, not just a release input. `##` starts a release and `###` starts a section; the app reads section titles from the document, so renaming or adding one needs no app change. Content between the release heading and the first `###` is the release's [highlights](#changelog-highlights). The What's new sheet, the website changelog and the GitHub release body show the highlights and keep the sections collapsed behind one control: Show all changes in the app and on the website, and an All changes `<details>` block that `Release Notes Sync` writes into the release body, so the file itself never needs HTML. A release with nothing before its first `###` shows its sections. Older entries that open with summary paragraphs are treated as highlights. The app, the website and the release scripts each parse the file with their own code, and installed apps keep the parser they shipped with, so those two heading rules are fixed: new kinds of content go inside the highlights or a section as Markdown, never behind a new heading level or marker. `scripts/test-support/changelog-structure.json` holds the cases all three parsers are tested against; change a structure rule there first. Everything under a section is rendered as Markdown: prose, lists, links, inline code, fenced code, block quotes, tables, and images. Raw HTML does not render — the shared Markdown parser runs with `html: false`, so a `<video>`, `<iframe>` or `<embed>` tag reaches the reader as visible markup. Keep media out of the changelog, or link to it. A GitHub callout renders as a block quote with its `[!NOTE]` marker still in the text. A release entry is what a user reads on a phone the moment they are offered the update — write it for them.
 
 ## Changelog policy
 
 - `CHANGELOG.md` holds stable releases and at most one entry for the current beta series.
 - The first beta of a version inserts a top entry like `## 0.1.60-beta.1 - YYYY-MM-DD`.
 - Each subsequent beta rewrites that entry in place: the heading becomes the new beta number and date, and the body describes the full change from the previous stable release to this beta. Never add a second beta entry.
+- The entry announces changes and leaves setup steps, click paths, migration notes, configuration keys, hedges and edge cases to product docs. The headline change is the first highlight. [Changelog conciseness](#changelog-conciseness) and [Changelog ordering](#changelog-ordering) hold the rules.
 - The entry is a list of changes, not of PRs. When a later beta reverts, reworks, or follows up on something an earlier beta added, rewrite the bullet to the current behavior or delete it. A stable user never saw the earlier beta behavior, so fixes to it are not "Fixed" bullets.
 - Anything that already shipped to stable through a patch release on an older line stays out of the beta entry.
 - Stable promotion renames the entry to `## 0.1.60 - YYYY-MM-DD` after a final review.
@@ -606,7 +623,7 @@ Older prerelease bodies on GitHub keep the notes they were synced with; `Release
 
 - The release agent writes the Chinese entry in the changelog commit, after the English entry is approved. Every beta that rewrites the English entry rewrites the Chinese one too, and promotion renames both. `packages/website/e2e/i18n.spec.ts` fails CI on the release commit when any entry has no current translation.
 - A translated entry uses the English heading unchanged: `## X.Y.Z - YYYY-MM-DD`. The website uses it only while the version and date both match the English entry. Otherwise it shows that release whole in English under a notice. Delete Chinese entries whose English entry was renamed.
-- Keep the English sections, bullets and links one to one. Section titles: Added 新增, Improved 改进, Changed 变更, Fixed 修复, Security 安全, Breaking 破坏性变更, Plugins 插件, Notes 说明. Wording follows [website-i18n.md](website-i18n.md#chinese-style).
+- Keep the English highlights, sections, bullets and links one to one. Section titles: Added 新增, Improved 改进, Changed 变更, Fixed 修复, Security 安全, Breaking 破坏性变更, Plugins 插件, Notes 说明. Wording follows [website-i18n.md](website-i18n.md#chinese-style).
 
 ## Changelog ownership
 
@@ -649,15 +666,84 @@ claims a general improvement, rewrite it with the concrete change.
 
 ## Changelog conciseness
 
-Every bullet must be scannable at a glance. The changelog is not release documentation — it's a list.
+An entry announces what changed. Product docs own setup, navigation, migration and edge cases, and the PR link leads to the rest. These rules apply to highlights and section bullets.
 
-- **One sentence per bullet, max.** If a bullet contains two sentences, the second one is doing work that belongs in product docs, not the changelog. Cut it.
+- **No instructions.** Cut setup steps, click paths, configuration keys, flags and migration notes. "Open a provider's settings from Settings, setup, or the model picker" is a click path. "Existing goose settings and sessions carry over to the bundled plugin" is a migration note.
+- **One warning for a breaking requirement.** When the update stops something working until the user acts, state the requirement in one short sentence after the announcement, and link the product doc that has the steps: "Requires [Antigravity CLI 1.5.0 or later](https://clisbot.com/docs/supported-providers/antigravity)." Nothing else earns a second sentence.
+- **No hedges or exception clauses.** Cut "when needed", "for eligible models", "on hosts where…", "except…", "with a hint shown when…" and "across common install shapes". Keep the condition that triggers a fixed failure, as in `Fixed <failure> when <condition>`.
+- **The shorter bullet is still true.** When a change reaches only some providers, platforms or file types, name what it covers in the sentence's own words: "update supported CLIs" where one provider has no update command, "Markdown previews and source views" where HTML previews on iOS are left out, "by default" where an explicit interrupt still replaces the turn. Do not widen the claim to remove a clause.
+- **State the outcome and stop.** Say what the user gets. Leave out queues, snapshots, caches, timeouts, LAN/WAN topology, TLS handshakes and IPC.
+
+Each row is from the first draft of 0.17.1:
+
+| Avoid                                                                                                                                                                                                                                                     | Write                                                                                             |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Open a provider's settings from Settings, setup, or the model picker to update supported CLIs and watch their output                                                                                                                                      | Update supported CLIs from the app                                                                |
+| Use Antigravity CLI 1.5.0 or later on the daemon host, and include `acp` if you override its command                                                                                                                                                      | Requires Antigravity CLI 1.5.0 or later                                                           |
+| Reports and notifications from other agents arrive in order when the current turn ends instead of interrupting it. An interrupt or your own prompt carries earlier queued messages in the same turn, and Stop holds queued messages until the next prompt | By default, messages from other agents wait for the current turn to end                           |
+| Changed worktree teardown to keep the worktree when the command exceeds one minute or the `worktree.teardownTimeoutMs` limit in `clisbot.json`                                                                                                            | Changed worktree teardown to keep the worktree when the command times out                         |
+| Fixed file views losing their scroll position when switching Preview and Source, except HTML previews on iOS                                                                                                                                              | Fixed Markdown previews and source views losing their scroll position when switching between them |
+
+Section bullets also follow these limits:
+
+- **One sentence per bullet, max.** A second sentence is documentation. Cut it.
 - **No trailing periods.** Bullets are list items, not prose. Drop the period at the end of every bullet, including the period inside any bolded lead-in. `**Configurable terminal scrollback**` not `**Configurable terminal scrollback.**`.
 - **One line per bullet.** If a bullet wraps to three lines in a narrow column, it's too long.
 - **Split bullets that pack multiple distinct changes.** If a bullet uses "and", "plus", a comma list, or an em-dash to chain several independent improvements, break them into separate bullets — even when they share a theme or author. One bullet = one user-facing change.
-- **Trim qualifying clauses.** Drop "with a hint shown when…", "matching the CLI's behaviour", "across common install shapes". If the detail doesn't change whether a user cares, cut it.
-- **Stop after identifying the change.** Do not explain LAN/WAN topology, TLS handshakes, IPC, or other architecture in a changelog bullet. Put necessary background in product docs.
 - **Attribution follows the split.** When you split a dense bullet, move each PR/author to the bullet it belongs to. Never duplicate the same PR across multiple bullets.
+
+## Changelog highlights
+
+Every release entry leads with highlights: the changes a user would name first when asked what is
+new. They are a list above the first `###` section, ranked as
+[Changelog ordering](#changelog-ordering) describes. The sections below are the full record; a
+reader who stops after the highlights should have missed nothing they would ask about.
+
+```markdown
+## 0.16.0 - 2026-11-20
+
+- **Undo workspace archive:** Restore an archived workspace with Undo or Cmd/Ctrl+Z. ([#8904](https://github.com/longbkit/clisbot/pull/8904))
+
+### Added
+```
+
+- **The lead-in names what is new in four words at most.** Bold it, colon inside the bold. A reader
+  who sees only the bold words should know what this release added or changed. A category lead-in
+  such as `**Polish:**` gathers several related changes.
+- **The lead-in is not a place or something Clisbot already had.** A device, screen or area names
+  where the change landed. A feature name that was true of the last release hides the news: Clisbot
+  already had keyboard shortcuts, so the lead-in says they now work on mobile.
+- **One short sentence says the plain thing.** Write what a user would tell a friend: Clisbot now
+  shows the background tasks an agent is running. Leave out the conditions and mechanics that make
+  it true. A second sentence is only for a
+  [breaking requirement](#changelog-conciseness).
+- **Describe the new behavior, not the old one.** Say what is faster or better now, and do not
+  dwell on how slow or broken it was before. A number is welcome as a short aside after the new
+  behavior is stated: seconds, a percentage, a multiple.
+- **Do not list what a sentence already covers.** After "the same shortcuts as desktop", naming
+  five of them adds nothing. Keep a list only when it sets the scope, such as the providers a
+  feature works with.
+- **Sentences end with periods, and the attribution follows the last one.**
+  [Changelog wording](#changelog-wording) and [Changelog conciseness](#changelog-conciseness)
+  apply.
+- **A highlight replaces the section bullets it covers.** A PR appears once in an entry, so its
+  attribution moves to the highlight.
+- **A highlight is something a user would name.** Everything else stays a section bullet. A patch
+  release still has one: the change it ships for.
+- **Fixes are routine and stay in `### Fixed`.** Do not add a summary of fixes. A fix, or a group
+  of related fixes, becomes a highlight only when it passes the same test as a feature, and then
+  it is written as what works now: `**Fewer reconnects on return:**`.
+
+| Avoid                                                                                      | Write                                                                               |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `**iPad and touch screens:**`                                                              | `**Touch-sized tablet controls:**`                                                  |
+| `**Hardware keyboard shortcuts:**`                                                         | `**Keyboard shortcuts on mobile:**`                                                 |
+| When an agent ends its turn while shells it started are still running, a pill lists them   | Clisbot now shows the background tasks an agent is running                          |
+| A diff no longer waits 4 to 40 seconds behind worktree scans                               | Opening Changes shows the file tree right away, and diffs load about 6 times sooner |
+| The same shortcuts as desktop: command center, file picker, new workspace, workspace jumps | The same shortcuts as desktop, including your custom bindings                       |
+
+Before showing a draft, read only the bold lead-ins top to bottom. Each one must answer "what is
+new?" without its description, and each must outrank the one below it.
 
 ## Changelog attribution
 
@@ -686,11 +772,39 @@ Rules:
 
   This returns every distinct GitHub login that authored or co-authored a commit in the PR. Use those logins for attribution. Fall back to `gh pr view N --json author` only if the commits command returns nothing (which should not happen for merged PRs).
 
-  When listing PR numbers, `git log --format='%H %s' v<previous>..<release-source-sha> | grep -E '\(#[0-9]+\)$'` pulls the PR number out of squash commit subjects.
+  When listing PR numbers, `git log --cherry-pick --right-only --no-merges --format='%H %s' v<previous>...<release-source-sha> | grep -E '\(#[0-9]+\)$'` pulls the PR number out of squash commit subjects and skips commits the previous stable already shipped as cherry-picks.
 
 ## Changelog ordering
 
-Entries within each section (Added, Improved, Fixed) are ordered by user impact:
+Rank highlights by how much of a user's day the change touches: how many users get it, and how
+often they meet it. Put every highlight in one of four groups, then order each group by the same
+question.
+
+1. **New capabilities.** Something a user could not see or do in the last release:
+   `Background tasks`, `Plugin sidebar views`.
+2. **Everyday things that got better.** Speed, steadiness and polish in what users already do
+   every session: `Faster diff loading`, `Polish`.
+3. **Changes for part of the audience.** They need a particular device, provider or setup:
+   `Keyboard shortcuts on mobile`, `Touch-sized tablet controls`.
+4. **Small conveniences and highlighted fixes.** A user is glad to find them and would not update
+   for them: `Undo workspace archive`, `Fewer reconnects on return`. Fixes are routine, so one
+   that earned a highlight still follows everything new or improved.
+
+- **The headline change goes first, whatever its group.** It is the change the release is announced
+  with. 0.17.1 leads with `Antigravity approvals and history`, which needs one provider. The groups
+  rank everything after it.
+- **Reach decides before kind.** A new capability that needs a hardware keyboard is in group 3.
+- **Rank the whole list in one pass.** The order you collected the pull requests in, the alphabet
+  and the order of the sections below are not rankings.
+- **Show the groups with the draft.** List each highlight under its group when you ask for
+  approval, so the maintainer corrects the test and not one position.
+- **A maintainer's note that a change is big moves that change up.** It does not rank the changes
+  it names against each other, and it does not lower the ones it leaves out.
+- **A correction to one highlight is a correction to the test.** Work out which group or question
+  you got wrong, rank every highlight again, and then edit the file. Moving only the named item
+  leaves the same mistake in the others.
+
+Bullets within each section (Added, Changed, Fixed) follow this order:
 
 1. **User-facing features and changes first** — things users will notice, want to try, or that change their workflow.
 2. **Quality-of-life improvements** — polish, performance, smoother interactions.

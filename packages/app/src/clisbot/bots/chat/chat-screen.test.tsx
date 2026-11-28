@@ -58,7 +58,10 @@ vi.mock("@/agent-stream/view", () => ({
 vi.mock("@/runtime/host-runtime", () => ({ useHostRuntimeClient: () => null }));
 vi.mock("react-native", () => ({
   StyleSheet: { create: (styles: unknown) => styles },
-  Platform: { OS: "web" },
+  Platform: {
+    OS: "web",
+    select: (values: Record<string, unknown>) => values.web ?? values.default,
+  },
   ScrollView: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   View: ({ children, testID }: { children?: ReactNode; testID?: string }) => (
     <div data-testid={testID}>{children}</div>
@@ -82,6 +85,8 @@ vi.mock("react-native", () => ({
     </ol>
   ),
 }));
+// Upstream v0.17 tool-call sheets render their header through the adaptive modal sheet.
+vi.mock("@/components/adaptive-modal-sheet", () => ({ SheetHeaderView: () => null }));
 vi.mock("@/components/file-drop/file-drop-zone", () => ({
   FileDropZone: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));

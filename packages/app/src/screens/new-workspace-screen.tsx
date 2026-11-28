@@ -27,14 +27,12 @@ import { useHomeStartHosts, useHomeStartProject } from "@/clisbot/home/use-home-
 import { rememberStart } from "@/clisbot/home/use-remembered-start";
 import { rememberedProjectOf } from "@/clisbot/home/remembered-start";
 import { useAvailableHosts } from "@/clisbot/hub/host-inventory";
-import type {
-  CreateAgentRequestOptions,
-  CreateWorkspaceRequestOptions,
-} from "@clisbot/client/internal/daemon-client";
+import { useAddHost } from "@/hosts/add-host";
+import type { CreateWorkspaceRequestOptions } from "@clisbot/client/internal/daemon-client";
 import type { AgentSnapshotPayload, CreationSnapshot } from "@clisbot/protocol/messages";
 import { encodeImages } from "@/utils/encode-images";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -59,8 +57,11 @@ import { MenuHeader } from "@/components/headers/menu-header";
 import { HomeHeader } from "@/clisbot/home/home-header";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useToast } from "@/contexts/toast-context";
+import { draftCreationKey } from "@/composer/draft/creation-key";
 import { useAgentInputDraft } from "@/composer/draft/input-draft";
 import { useForgeSearchQuery } from "@/git/use-forge-search-query";
+import { getForgePresentation } from "@/git/forge";
+import { useCheckoutPrStatusQuery } from "@/git/use-pr-status-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
 import { ensureCheckoutStatus } from "@/git/checkout-status-cache";
 import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-launchable-terminal-profiles";
@@ -93,7 +94,6 @@ import type { KeyboardActionId } from "@/keyboard/keyboard-action-dispatcher";
 import { useFormPreferences } from "@/hooks/use-form-preferences";
 import type { CreateAgentInitialValues } from "@/hooks/use-agent-form-state";
 import { toErrorMessage } from "@/utils/error-messages";
-import { buildSettingsAddHostRoute } from "@/utils/host-routes";
 import {
   getHostProjectId,
   getWorktreeSupportForHostProject,
@@ -110,7 +110,7 @@ import type { MessagePayload } from "@/composer/types";
 import type { UserComposerAttachment } from "@/attachments/types";
 import type { AgentAttachment, ForgeSearchItem } from "@clisbot/protocol/messages";
 import type { DaemonClient } from "@clisbot/client/internal/daemon-client";
-import type { AgentProvider } from "@clisbot/protocol/agent-types";
+import type { AgentProvider, JsonValue } from "@clisbot/protocol/agent-types";
 import type { WorkspaceDraftTabSetup, WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { isEmptyWorkspaceSubmission, runCreateEmptyWorkspace } from "./new-workspace-empty";
 import {
@@ -121,7 +121,7 @@ import {
   buildPickerOptionData,
   defaultBasePickerItem,
   pickerItemLabel,
-  pickerItemToCheckoutRequest,
+  startsNewBranch,
   type BranchPickerDetail,
   type PickerCheckoutRequest,
   type PickerItem,
@@ -129,16 +129,33 @@ import {
 } from "./new-workspace-picker-item";
 import {
   clearPickerPrAttachmentForTargetChange,
-  initialPickerSelectionState,
-  reducePickerSelection,
   syncPickerPrAttachment,
 } from "./new-workspace-picker-state";
+import {
+  PluginNewWorkspaceItems,
+  type NewWorkspaceItemsScreen,
+} from "@/plugins/new-workspace-items";
+import {
+  BranchInWorktreeError,
+  createNewWorkspaceSetup,
+  refActionOf,
+  useNewWorkspaceSetupState,
+  type NewWorkspaceSetup,
+  type SetupInputs,
+} from "./new-workspace/setup-model";
+import type { IsolationChoice } from "./new-workspace/form";
+import { shortenPath } from "@/utils/shorten-path";
 import {
   resolveNewWorkspaceAutomaticServerId,
   resolveNewWorkspaceInitialServerId,
 } from "./new-workspace-initial-context";
 import { buildNewWorkspaceProjectIconTargets } from "./new-workspace/project-icon-targets";
 import { useNewWorkspaceProjectPicker } from "./new-workspace/project-picker";
+import {
+  useExistingWorktrees,
+  useProjectWorktrees,
+  type ExistingWorktree,
+} from "./new-workspace/existing-worktrees";
 import { useNewWorkspaceForm } from "./new-workspace/form";
 import { ImportSessionButton } from "./new-workspace/import-session-button";
 import { useImportSession } from "@/hooks/use-import-session";
@@ -147,7 +164,10 @@ import {
   type ListTerminalsPayload,
   upsertCreatedTerminalPayload,
 } from "./workspace/terminals/state";
-import { captureWorkspaceDraftCleanup } from "./new-workspace/background-handoff";
+import {
+  captureWorkspaceDraftCleanup,
+  handOffDraftMetadata,
+} from "./new-workspace/background-handoff";
 import { useNewWorkspaceScreenPresence, startScreenPath } from "./new-workspace/screen-presence";
 
 function useIsNewWorkspaceDraftHandoffActive(input: {
@@ -212,12 +232,23 @@ function noopChangeAttachments() {}
 function noopClearDraft() {}
 
 // Stable reference so the keyboard-action handler doesn't re-register each render.
-const PROJECT_PICK_ACTIONS: readonly KeyboardActionId[] = ["workspace.project.pick"];
+const PROJECT_PICK_ACTIONS: readonly KeyboardActionId[] = [
+  "workspace.project.pick",
+  "workspace.new",
+];
 
 interface WorkspaceIsolationState {
   isolation: "local" | "worktree";
+  /** Clisbot: a start template applies its isolation without remembering it (`persist: false`). */
   setIsolation: (value: "local" | "worktree", persist?: boolean) => void;
+  /** What the workspace is created as. An existing worktree is a local workspace at its path. */
   effectiveIsolation: "local" | "worktree";
+  /** The Isolation field's choice. */
+  choice: IsolationChoice;
+  /** The worktree an Existing worktree workspace is created in. */
+  existingWorktreePath: string | null;
+  /** Where the workspace works: the existing worktree, else the project directory. */
+  workingDirectory: string | null;
   canCreateWorktree: boolean;
   showRefPicker: boolean;
 }
@@ -225,34 +256,60 @@ interface WorkspaceIsolationState {
 // Preserve the user's worktree choice while route metadata is provisional. Once
 // the authoritative placement arrives, unsupported projects fall back to local.
 function useWorkspaceIsolation(input: {
+  setup: NewWorkspaceSetup;
+  setIsolation: WorkspaceIsolationState["setIsolation"];
   supportsMultiplicity: boolean;
-  worktreeSupport: "supported" | "unsupported" | "unknown";
+  canCreateWorktree: boolean;
+  existingWorktrees: readonly ExistingWorktree[];
+  projectDirectory: string | null;
 }): WorkspaceIsolationState {
-  const { supportsMultiplicity, worktreeSupport } = input;
+  const { setup, supportsMultiplicity, canCreateWorktree, existingWorktrees } = input;
   // The last isolation choice is remembered alongside the other New Workspace
   // form preferences (provider, model, mode). A manual in-screen pick overrides
   // the remembered default until the screen remounts.
-  const { preferences, updatePreferences } = useFormPreferences();
-  const [manualIsolation, setManualIsolation] = useState<"local" | "worktree" | null>(null);
+  const { preferences } = useFormPreferences();
+  const { manualIsolation, existingWorktreePath: chosenPath } = useNewWorkspaceSetupState(setup);
   const isolation = manualIsolation ?? preferences.isolation ?? "local";
-  const canCreateWorktree = supportsMultiplicity && worktreeSupport !== "unsupported";
-  const isWorktree = isolation === "worktree" && canCreateWorktree;
-
-  const setIsolation = useCallback(
-    (value: "local" | "worktree", persist = true) => {
-      setManualIsolation(value);
-      if (persist) void updatePreferences({ isolation: value });
-    },
-    [updatePreferences],
-  );
+  // A worktree that left the list (removed since it was chosen) is no choice.
+  const existingWorktreePath =
+    canCreateWorktree && existingWorktrees.some((worktree) => worktree.path === chosenPath)
+      ? chosenPath
+      : null;
+  const isWorktree = isolation === "worktree" && canCreateWorktree && !existingWorktreePath;
+  const worktreeChoice = isWorktree ? "worktree" : "local";
 
   return {
     isolation,
-    setIsolation,
+    setIsolation: input.setIsolation,
     effectiveIsolation: isWorktree ? "worktree" : "local",
+    choice: existingWorktreePath ? "existing" : worktreeChoice,
+    existingWorktreePath,
+    workingDirectory: existingWorktreePath ?? input.projectDirectory,
     canCreateWorktree,
     showRefPicker: !supportsMultiplicity || isWorktree,
   };
+}
+
+/** Create's checkout request, with the model's refusal said in the user's language. */
+function checkoutRequestOrExplain(
+  resolve: () => PickerCheckoutRequest | undefined,
+  t: TFunction,
+): PickerCheckoutRequest | undefined {
+  try {
+    return resolve();
+  } catch (error) {
+    if (!(error instanceof BranchInWorktreeError)) throw error;
+    const branch = error.branchName;
+    throw new Error(
+      error.worktree.containsCwd
+        ? t("newWorkspace.errors.branchInProjectDirectory", { branch })
+        : t("newWorkspace.errors.branchInWorktree", {
+            branch,
+            path: shortenPath(error.worktree.path),
+          }),
+      { cause: error },
+    );
+  }
 }
 
 function normalizeBranchDetails(
@@ -274,7 +331,6 @@ interface SubmitDraftInput {
   clearConsumedDraft: () => void;
   agentCreation?: {
     result: Promise<AgentSnapshotPayload>;
-    retry: (input: CreateAgentRequestOptions) => Promise<AgentSnapshotPayload>;
   };
   serverId: string;
   draftKey: string;
@@ -303,7 +359,7 @@ interface WorkspaceDraftSubmissionConfig {
   modeId: string | null;
   model: string | null;
   thinkingOptionId: string | null;
-  featureValues: Record<string, unknown> | undefined;
+  providerOptions: Record<string, unknown> | undefined;
   target: WorkspaceTabTarget;
 }
 
@@ -314,12 +370,17 @@ interface WorkspaceCreationResult {
 
 async function createMultiplicityWorkspace(input: {
   idempotencyKey: string;
+  launchTarget: LaunchTarget;
   worktreeSlug: string;
   client: NonNullable<ReturnType<typeof useHostRuntimeClient>>;
   isolation: "local" | "worktree";
   project: HostProjectListItem;
   sourceDirectory: string;
   checkoutRequest: PickerCheckoutRequest | undefined;
+  /** Names the new branch of a worktree cut from a branch. */
+  branchName: string | null;
+  /** Stored on the created workspace. */
+  metadata: Readonly<Record<string, JsonValue>>;
   withInitialAgent: boolean;
   agent?: CreateWorkspaceRequestOptions["agent"];
   onEvent?: (snapshot: CreationSnapshot) => void;
@@ -339,10 +400,8 @@ async function createMultiplicityWorkspace(input: {
     prompt: input.prompt,
     attachments: input.attachments,
   });
-  const payload = await input.client.createWorkspace({
-    idempotencyKey: input.idempotencyKey,
+  const request: Omit<CreateWorkspaceRequestOptions, "idempotencyKey" | "onEvent"> = {
     agent: input.agent,
-    onEvent: input.onEvent,
     source: isWorktree
       ? {
           kind: "worktree",
@@ -350,6 +409,9 @@ async function createMultiplicityWorkspace(input: {
           projectId,
           worktreeSlug: input.worktreeSlug,
           ...input.checkoutRequest,
+          ...(input.branchName && startsNewBranch(input.checkoutRequest)
+            ? { branchName: input.branchName }
+            : {}),
         }
       : {
           kind: "directory",
@@ -357,6 +419,15 @@ async function createMultiplicityWorkspace(input: {
           projectId,
         },
     ...(firstAgentContext ? { firstAgentContext } : {}),
+    ...(Object.keys(input.metadata).length > 0 ? { metadata: { ...input.metadata } } : {}),
+  };
+  const payload = await input.client.createWorkspace({
+    ...request,
+    idempotencyKey: draftCreationKey(input.idempotencyKey, {
+      request,
+      launchTarget: input.launchTarget,
+    }),
+    onEvent: input.onEvent,
   });
   if (payload.error || !payload.workspace) {
     throw new Error(payload.error ?? input.createFailedMessage);
@@ -406,7 +477,7 @@ function buildWorkspaceDraftSetupFromComposer(input: {
     modeId: input.composerState.effectiveModeId || null,
     model: input.composerState.effectiveModelId || null,
     thinkingOptionId: input.composerState.effectiveThinkingOptionId || null,
-    featureValues: input.composerState.featureValues ?? {},
+    providerOptions: input.composerState.providerOptions ?? {},
   };
 }
 
@@ -478,7 +549,7 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
   });
   const images = await encodeImages(wirePayload.images);
   let navigated = false;
-  let outcome: SubmitOutcome = "background";
+  const delivery: { outcome: SubmitOutcome } = { outcome: "background" };
   const initialAgent: NonNullable<CreateWorkspaceRequestOptions["agent"]> = {
     config: {
       provider,
@@ -486,20 +557,21 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
       modeId: composerState.effectiveModeId || undefined,
       model: composerState.effectiveModelId || undefined,
       thinkingOptionId: composerState.effectiveThinkingOptionId || undefined,
-      featureValues: composerState.featureValues,
+      providerOptions: composerState.providerOptions,
     },
+    ...(Object.keys(composerState.metadata).length > 0 ? { metadata: composerState.metadata } : {}),
     initialPrompt: text,
     clientMessageId: `${input.draftId}:initial-message`,
     images: images?.length ? images : undefined,
     attachments: wirePayload.attachments?.length ? wirePayload.attachments : undefined,
   };
-  const execute = async (requestedAgent = initialAgent): Promise<AgentSnapshotPayload> => {
+  const execute = async (): Promise<AgentSnapshotPayload> => {
     const { agent } = await ensureWorkspace({
       cwd,
       prompt: text,
       attachments: workspaceNamingAttachments,
       withInitialAgent: true,
-      agent: requestedAgent,
+      agent: initialAgent,
       onEvent: (snapshot) => {
         if (!snapshot.workspace || navigated) return;
         navigated = true;
@@ -514,7 +586,7 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
           provider,
           composerState,
         });
-        outcome = submitWorkspaceDraft({
+        delivery.outcome = submitWorkspaceDraft({
           clearConsumedDraft,
           draftKey: input.draftKey,
           draftContextScopeKey: input.draftContextScopeKey,
@@ -538,21 +610,17 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
     if (!agent) throw new Error("Workspace creation returned no agent");
     return agent;
   };
-  const agentCreation = {
-    result: Promise.resolve().then(() => execute()),
-    retry: (request: CreateAgentRequestOptions) =>
-      execute({
-        ...initialAgent,
-        config: { ...request.config!, cwd },
-        initialPrompt: request.initialPrompt ?? "",
-        clientMessageId: initialAgent.clientMessageId,
-        images: request.images,
-        attachments: request.attachments,
-      }),
-  };
-  await agentCreation.result;
-  if (outcome === "background") clearConsumedDraft();
-  return outcome;
+  // A retry after a failed agent start belongs to the ready workspace's draft, not to this creation.
+  const agentCreation = { result: Promise.resolve().then(() => execute()) };
+  try {
+    await agentCreation.result;
+  } catch (error) {
+    // Once handed off to the workspace draft tab, that tab owns surfacing agent startup errors.
+    if (delivery.outcome === "navigated") return delivery.outcome;
+    throw error;
+  }
+  if (delivery.outcome === "background") clearConsumedDraft();
+  return delivery.outcome;
 }
 
 function buildComposerConfig(input: {
@@ -566,7 +634,8 @@ function buildComposerConfig(input: {
   return {
     initialServerId: serverId || null,
     initialValues: buildComposerInitialValues({ initialSetup }),
-    initialFeatureValues: initialSetup?.featureValues,
+    initialProviderOptions: initialSetup?.providerOptions,
+    context: "new-workspace" as const,
     isVisible: true,
     lockedWorkingDir: workingDir,
   };
@@ -599,7 +668,7 @@ function resolveWorkspaceDraftSubmissionConfig(input: {
       modeId: initialSetup.modeId,
       model: initialSetup.model,
       thinkingOptionId: initialSetup.thinkingOptionId,
-      featureValues: initialSetup.featureValues,
+      providerOptions: initialSetup.providerOptions,
       target: { kind: "draft", draftId, setup: initialSetup },
     };
   }
@@ -609,7 +678,7 @@ function resolveWorkspaceDraftSubmissionConfig(input: {
     modeId: composerState.effectiveModeId || null,
     model: composerState.effectiveModelId || null,
     thinkingOptionId: composerState.effectiveThinkingOptionId || null,
-    featureValues: composerState.featureValues,
+    providerOptions: composerState.providerOptions,
     target: { kind: "draft", draftId },
   };
 }
@@ -667,10 +736,11 @@ function submitWorkspaceDraft(input: SubmitDraftInput): SubmitOutcome {
     ...(submission.modeId ? { modeId: submission.modeId } : {}),
     ...(submission.model ? { model: submission.model } : {}),
     ...(submission.thinkingOptionId ? { thinkingOptionId: submission.thinkingOptionId } : {}),
-    ...(submission.featureValues ? { featureValues: submission.featureValues } : {}),
+    ...(submission.providerOptions ? { providerOptions: submission.providerOptions } : {}),
     allowEmptyText: true,
     agentCreation: input.agentCreation,
   });
+  handOffDraftMetadata({ serverId, draftId, metadata: composerState.metadata });
   clearDraft("sent");
   navigateToWorkspace({
     serverId,
@@ -957,6 +1027,8 @@ export function NewWorkspaceScreen({
   const hostPickerAnchorRef = useRef<View | null>(null);
   const isDraftHandoffActive = useIsNewWorkspaceDraftHandoffActive({ draftId, selectedServerId });
   const isStillOnCreateScreen = useNewWorkspaceScreenPresence(startScreenPath(home));
+  const isScreenFocused = focused;
+  const projectPickHandlerId = useId();
 
   // Launch target: what the composer submits to (chat agent, or a terminal
   // profile). Mirrors useWorkspaceIsolation's pattern below: the derived
@@ -1084,22 +1156,58 @@ export function NewWorkspaceScreen({
     }),
   });
   const composerState = chatDraft.composerState;
-  const [pickerSelection, dispatchPickerSelection] = useReducer(
-    reducePickerSelection,
-    initialPickerSelectionState,
+  const supportsWorktreeList = useHostFeature(selectedServerId, "checkoutWorktreeList");
+  const projectWorktrees = useProjectWorktrees({
+    client,
+    serverId: selectedServerId,
+    cwd: selectedSourceDirectory,
+    enabled: supportsWorktreeList && isConnected,
+  });
+  const {
+    setup,
+    setIsolation: setSetupIsolation,
+    pluginProject,
+    canCreateWorktree,
+    isPending,
+  } = usePluginSetup({
+    serverId: selectedServerId,
+    project: selectedProject,
+    // Clisbot: only a project start can create a worktree; Bot and Quick chat starts cannot.
+    worktreesAllowed: startKind === "project",
+    worktrees: projectWorktrees,
+    supportsMultiplicity: supportsWorkspaceMultiplicity,
+    pendingAction,
+    isDraftHandoffActive,
+    updatePreferences: updateFormPreferences,
+    setAttachments: chatDraft.setAttachments,
+  });
+  const dispatchPickerSelection = setup.dispatchPicker;
+  const setupState = useNewWorkspaceSetupState(setup);
+  const selectedItem = setupState.pickerSelection.selectedItem;
+  const supportsRefActions = useHostFeature(selectedServerId, "worktreeRefActions");
+  const { refActions } = setupState;
+  const refActionFor = useMemo(
+    () => ({
+      branch: refActionOf({ refActions, supportsRefActions, kind: "branch" }),
+      "github-pr": refActionOf({ refActions, supportsRefActions, kind: "github-pr" }),
+    }),
+    [refActions, supportsRefActions],
   );
-  const selectedItem = pickerSelection.selectedItem;
+  const existingWorktrees = useExistingWorktrees(projectWorktrees);
 
   const handleForgeChangeRequestDetected = useCallback(() => {
     dispatchPickerSelection({ type: "pr-detected" });
-  }, []);
+  }, [dispatchPickerSelection]);
 
-  const handleForgeChangeRequestAutoAttach = useCallback((item: ForgeSearchItem) => {
-    dispatchPickerSelection({
-      type: "pr-added",
-      item: { kind: "github-pr", item },
-    });
-  }, []);
+  const handleForgeChangeRequestAutoAttach = useCallback(
+    (item: ForgeSearchItem) => {
+      dispatchPickerSelection({
+        type: "pr-added",
+        item: { kind: "github-pr", item },
+      });
+    },
+    [dispatchPickerSelection],
+  );
 
   const withConnectedClient = useCallback(() => {
     const connectedClient = getHostRuntimeStore().getClient(selectedServerId);
@@ -1118,13 +1226,25 @@ export function NewWorkspaceScreen({
     cwd: selectedSourceDirectory ?? "",
   });
 
-  const worktreeSupport = startWorktreeSupport(selectedProject, selectedServerId);
-  const isPending = isNewWorkspacePending({ pendingAction, isDraftHandoffActive });
-  const { effectiveIsolation, setIsolation, canCreateWorktree, showRefPicker } =
-    useWorkspaceIsolation({
-      supportsMultiplicity: supportsWorkspaceMultiplicity,
-      worktreeSupport: startKind === "project" ? worktreeSupport : "unsupported",
-    });
+  const {
+    effectiveIsolation,
+    setIsolation,
+    showRefPicker,
+    choice,
+    existingWorktreePath,
+    workingDirectory,
+  } = useWorkspaceIsolation({
+    setup,
+    setIsolation: setSetupIsolation,
+    supportsMultiplicity: supportsWorkspaceMultiplicity,
+    canCreateWorktree,
+    existingWorktrees,
+    projectDirectory: selectedSourceDirectory,
+  });
+  // Clisbot start templates read the project's worktree support to decide their isolation.
+  const worktreeSupport = selectedProject
+    ? getWorktreeSupportForHostProject({ project: selectedProject, serverId: selectedServerId })
+    : "unsupported";
 
   const branchSuggestionsQuery = useQuery({
     queryKey: [
@@ -1146,6 +1266,13 @@ export function NewWorkspaceScreen({
     },
     enabled: pickerQueryEnabled,
     staleTime: 15_000,
+  });
+
+  const changeRequestContext = useChangeRequestContext({
+    serverId: selectedServerId,
+    cwd: selectedSourceDirectory,
+    pickerOpen: pickerQueryEnabled,
+    selectedItem,
   });
 
   const githubPrSearchQuery = useForgeSearchQuery({
@@ -1189,16 +1316,15 @@ export function NewWorkspaceScreen({
   const selectPickerItem = useCallback(
     (item: PickerItem) => {
       setTemplateBaseRequired(false);
-      const nextAttachments = syncPickerPrAttachment({
-        attachments: chatDraft.attachments,
-        item,
-      });
-
-      dispatchPickerSelection({ type: "picker-selected", item });
-      chatDraft.setAttachments(nextAttachments);
+      setup.chooseRef(item);
       setPickerOpen(false);
     },
-    [chatDraft],
+    [setup],
+  );
+
+  const pluginScreen = useMemo<NewWorkspaceItemsScreen>(
+    () => ({ project: pluginProject, isolation: effectiveIsolation, baseItem, locked: isPending }),
+    [baseItem, effectiveIsolation, isPending, pluginProject],
   );
 
   const handleSelectOption = useCallback(
@@ -1221,7 +1347,7 @@ export function NewWorkspaceScreen({
       chatDraft.setAttachments(nextAttachments);
       dispatchPickerSelection({ type: "target-changed" });
     },
-    [chatDraft],
+    [chatDraft, dispatchPickerSelection],
   );
 
   const handleSelectProjectOption = useCallback(
@@ -1272,9 +1398,7 @@ export function NewWorkspaceScreen({
     openAddProjectPicker(selectedServerId);
   }, [openAddProjectPicker, selectedServerId]);
 
-  const handleAddHost = useCallback(() => {
-    router.push(buildSettingsAddHostRoute(Date.now()));
-  }, []);
+  const handleAddHost = useAddHost();
 
   const openPicker = useCallback(() => {
     setPickerOpen(true);
@@ -1284,19 +1408,18 @@ export function NewWorkspaceScreen({
     setProjectPickerOpen(true);
   }, []);
 
-  // Cmd/Ctrl+P opens the project picker with its search focused so the user can
-  // switch projects from the keyboard. Registered only while this screen is
-  // mounted, so the shortcut doesn't swallow the browser's native print
-  // elsewhere; gated on having projects to pick.
+  // On this screen, both project-pick and new-workspace open the chooser.
+  // Take precedence over global new-workspace navigation to preserve the draft.
   const handleProjectPick = useCallback(() => {
     openProjectPicker();
     return true;
   }, [openProjectPicker]);
   useKeyboardActionHandler({
-    handlerId: "new-workspace-project-pick",
+    handlerId: `new-workspace-project-pick:${projectPickHandlerId}`,
     actions: PROJECT_PICK_ACTIONS,
-    enabled: focused && projectPickerOptions.length > 0,
-    priority: 0,
+    enabled: isScreenFocused,
+    isActive: isStillOnCreateScreen,
+    priority: 10,
     handle: handleProjectPick,
   });
 
@@ -1338,7 +1461,7 @@ export function NewWorkspaceScreen({
       if (!selectedProject) {
         throw new Error("Choose a project");
       }
-      if (!selectedSourceDirectory) {
+      if (!selectedSourceDirectory || !workingDirectory) {
         throw new Error("Choose a host for this project");
       }
       const connectedClient = withConnectedClient();
@@ -1356,18 +1479,25 @@ export function NewWorkspaceScreen({
           })
         : null;
       const checkoutRequest = checkoutStatusForCreate
-        ? pickerItemToCheckoutRequest(
-            selectedItem ?? defaultBasePickerItem(checkoutStatusForCreate),
+        ? checkoutRequestOrExplain(
+            () =>
+              setup.checkoutRequestFor(
+                selectedItem ?? defaultBasePickerItem(checkoutStatusForCreate),
+              ),
+            t,
           )
         : undefined;
       const normalizedWorkspace = await createMultiplicityWorkspace({
         idempotencyKey: creationIdentity.draftId,
+        launchTarget,
         worktreeSlug: creationIdentity.worktreeSlug,
         client: connectedClient,
         isolation: createsWorktree ? "worktree" : "local",
         project: selectedProject,
-        sourceDirectory: selectedSourceDirectory,
+        sourceDirectory: workingDirectory,
         checkoutRequest,
+        branchName: setup.getSnapshot().branch,
+        metadata: setup.getSnapshot().metadata,
         withInitialAgent: input.withInitialAgent,
         prompt: input.prompt,
         attachments: input.attachments,
@@ -1386,15 +1516,18 @@ export function NewWorkspaceScreen({
       startKind,
       templateBaseRequired,
       effectiveIsolation,
+      launchTarget,
       mergeWorkspaces,
       queryClient,
       selectedItem,
       selectedProject,
       selectedServerId,
       selectedSourceDirectory,
+      setup,
       supportsWorkspaceMultiplicity,
       t,
       withConnectedClient,
+      workingDirectory,
     ],
   );
 
@@ -1519,7 +1652,9 @@ export function NewWorkspaceScreen({
         const message = toErrorMessage(error);
         setPendingAction(null);
         setErrorMessage(message);
-        toast.error(message);
+        if (!isStillOnCreateScreen()) {
+          toast.error(message);
+        }
       }
     },
     [
@@ -1556,7 +1691,7 @@ export function NewWorkspaceScreen({
       setPendingAction("terminal");
 
       await runCreateTerminalWorkspace({
-        cwd: selectedSourceDirectory ?? "",
+        cwd: workingDirectory ?? "",
         prompt: terminalPromptText,
         profile: selectedTerminalProfile,
         profileName: selectedTerminalProfile?.name,
@@ -1613,7 +1748,9 @@ export function NewWorkspaceScreen({
       const message = toErrorMessage(error);
       setPendingAction(null);
       setErrorMessage(message);
-      toast.error(message);
+      if (!isStillOnCreateScreen()) {
+        toast.error(message);
+      }
     }
   }, [
     ensureWorkspace,
@@ -1621,7 +1758,6 @@ export function NewWorkspaceScreen({
     launchTarget,
     queryClient,
     selectedServerId,
-    selectedSourceDirectory,
     selectedTerminalProfile,
     t,
     terminalPromptText,
@@ -1629,6 +1765,7 @@ export function NewWorkspaceScreen({
     leaveFullscreen,
     updateFormPreferences,
     withConnectedClient,
+    workingDirectory,
   ]);
 
   const agentControlsWithDisabled = useMemo(
@@ -1747,6 +1884,7 @@ export function NewWorkspaceScreen({
       handleSelectProjectOption(id);
     },
     [
+      dispatchPickerSelection,
       prepareQuickChat,
       acceptCurrent,
       botQuery.data,
@@ -1951,6 +2089,9 @@ export function NewWorkspaceScreen({
     home: HOME_V2_ENABLED,
     isCompact,
     isPending,
+    pluginItems: (
+      <PluginNewWorkspaceItems serverId={selectedServerId} screen={pluginScreen} setup={setup} />
+    ),
     project: {
       anchorRef: projectPickerAnchorRef,
       open: openProjectPicker,
@@ -1986,9 +2127,12 @@ export function NewWorkspaceScreen({
       open: openIsolationPicker,
       openState: isolationPickerOpen,
       onOpenChange: handleIsolationPickerOpenChange,
-      effectiveIsolation,
+      choice,
       canCreateWorktree,
       onSelect: selectIsolation,
+      existingWorktrees,
+      existingWorktreePath,
+      onChooseExistingWorktree: setup.chooseExistingWorktree,
     },
     base: {
       anchorRef: pickerAnchorRef,
@@ -2005,6 +2149,11 @@ export function NewWorkspaceScreen({
       setSearchQuery: setPickerSearchQuery,
       emptyText: pickerEmptyText,
       showRefPicker,
+      worktrees: projectWorktrees,
+      actionFor: refActionFor,
+      onActionChange: setup.chooseRefAction,
+      canChooseAction: supportsRefActions,
+      changeRequestContext,
     },
     launch: {
       serverId: selectedServerId,
@@ -2045,7 +2194,7 @@ export function NewWorkspaceScreen({
           textReplacement={terminalTextReplacement}
           attachments={NO_TERMINAL_ATTACHMENTS}
           onChangeAttachments={noopChangeAttachments}
-          cwd={selectedSourceDirectory ?? ""}
+          cwd={workingDirectory ?? ""}
           clearDraft={noopClearDraft}
           autoFocus={terminalTakesPrompt}
           autoFocusKey={launchFocusKey}
@@ -2074,7 +2223,7 @@ export function NewWorkspaceScreen({
           onChangeAttachments={chatDraft.setAttachments}
           onForgeChangeRequestDetected={handleForgeChangeRequestDetected}
           onForgeChangeRequestAutoAttach={handleForgeChangeRequestAutoAttach}
-          cwd={selectedSourceDirectory ?? ""}
+          cwd={workingDirectory ?? ""}
           clearDraft={handleClearDraft}
           autoFocus={!home}
           autoFocusKey={launchFocusKey}
@@ -2097,7 +2246,7 @@ export function NewWorkspaceScreen({
       terminalTextSource,
       setTerminalPromptText,
       terminalTextReplacement,
-      selectedSourceDirectory,
+      workingDirectory,
       launchFocusKey,
       handleSubmitNewWorkspace,
       chatDraft,
@@ -2246,6 +2395,83 @@ function startTitle(home: boolean, t: TFunction): string {
   return home ? "Where would you like to start?" : t("newWorkspace.title");
 }
 
+/**
+ * The setup model, built with what the screen has this render so a plugin item's mount effect can
+ * already run commands, and kept current on every commit.
+ */
+function usePluginSetup(input: {
+  serverId: string;
+  project: Parameters<typeof getHostProjectId>[0] | null;
+  worktrees: SetupInputs["worktrees"];
+  worktreesAllowed: boolean;
+  supportsMultiplicity: boolean;
+  pendingAction: Parameters<typeof isNewWorkspacePending>[0]["pendingAction"];
+  isDraftHandoffActive: boolean;
+  updatePreferences: ReturnType<typeof useFormPreferences>["updatePreferences"];
+  setAttachments: ReturnType<typeof useAgentInputDraft>["setAttachments"];
+}) {
+  const {
+    serverId,
+    project,
+    worktrees,
+    worktreesAllowed,
+    supportsMultiplicity,
+    pendingAction,
+    isDraftHandoffActive,
+    updatePreferences,
+    setAttachments,
+  } = input;
+  const worktreeSupport = project
+    ? getWorktreeSupportForHostProject({ project, serverId })
+    : "unsupported";
+  const canCreateWorktree =
+    worktreesAllowed && supportsMultiplicity && worktreeSupport !== "unsupported";
+  const locked = isNewWorkspacePending({ pendingAction, isDraftHandoffActive });
+  const supportsMetadata = useHostFeature(serverId, "entityMetadata");
+  const projectId = project ? getHostProjectId(project, serverId) : null;
+  const projectName = project?.projectName ?? null;
+  const pluginProject = useMemo(
+    () => (projectId && projectName ? { id: projectId, name: projectName } : null),
+    [projectId, projectName],
+  );
+  const supportsRefActions = useHostFeature(serverId, "worktreeRefActions");
+  const inputs: SetupInputs = {
+    serverId,
+    locked,
+    project: pluginProject,
+    canCreateWorktree,
+    supportsMetadata,
+    supportsRefActions,
+    worktrees,
+  };
+  // Both are stable for the life of the screen: preferences write through the query client, and
+  // the draft is keyed per mount. A command and a pick run the same effects.
+  // Clisbot: a start template sets isolation without making it the next screen's default.
+  const persistIsolationRef = useRef(true);
+  const [setup] = useState(() =>
+    createNewWorkspaceSetup(inputs, {
+      persistIsolation: (isolation) => {
+        if (persistIsolationRef.current) void updatePreferences({ isolation });
+      },
+      syncBaseAttachment: (item) =>
+        setAttachments((attachments) => syncPickerPrAttachment({ attachments, item })),
+    }),
+  );
+  useLayoutEffect(() => setup.syncInputs(inputs));
+  const setIsolation = useCallback(
+    (isolation: "local" | "worktree", persist = true) => {
+      persistIsolationRef.current = persist;
+      try {
+        setup.chooseIsolation(isolation);
+      } finally {
+        persistIsolationRef.current = true;
+      }
+    },
+    [setup],
+  );
+  return { setup, setIsolation, pluginProject, canCreateWorktree, isPending: locked };
+}
+
 /** Terminal and chat launches edit in separate sessions; the screen follows the mounted one. */
 function useNewWorkspaceComposerEditing() {
   const terminal = useComposerEditingSession("terminal");
@@ -2343,13 +2569,22 @@ const styles = StyleSheet.create((theme) => ({
     fontWeight: theme.fontWeight.normal,
     color: theme.colors.foreground,
   },
-  errorText: {
-    fontSize: theme.fontSize.base,
-    color: theme.colors.destructive,
-    lineHeight: 20,
-  },
 }));
 
-function startWorktreeSupport(project: HostProjectListItem | null, serverId: string) {
-  return project ? getWorktreeSupportForHostProject({ project, serverId }) : "unsupported";
+/**
+ * The project's forge names its change requests: pull requests, or merge requests on GitLab.
+ * The forge is looked up once the ref picker opens or a change request is chosen.
+ */
+function useChangeRequestContext(input: {
+  serverId: string;
+  cwd: string | null;
+  pickerOpen: boolean;
+  selectedItem: PickerItem | null;
+}): "mr" | undefined {
+  const { forge } = useCheckoutPrStatusQuery({
+    serverId: input.serverId,
+    cwd: input.cwd ?? "",
+    enabled: input.pickerOpen || input.selectedItem?.kind === "github-pr",
+  });
+  return getForgePresentation(forge).changeRequestContext;
 }

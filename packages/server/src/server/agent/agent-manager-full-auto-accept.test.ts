@@ -360,6 +360,8 @@ describe("Full auto-accept", () => {
       logger,
       agentManager: manager,
       agentStorage: storage,
+      // No restart recovery is running here; the child is already live.
+      waitForResume: async () => {},
       messages: () =>
         ({
           waitForDispatch: () => new Promise(() => undefined),

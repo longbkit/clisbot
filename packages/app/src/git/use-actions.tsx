@@ -12,10 +12,14 @@ import { type CheckoutStatusPayload, useCheckoutStatusQuery } from "@/git/use-st
 import { type CheckoutPrStatusPayload, useCheckoutPrStatusQuery } from "@/git/use-pr-status-query";
 import {
   buildGitActions,
+  isCurrentBranchBase,
+  canMergeIntoLocalBase,
   narrowPullRequestState,
+  readUpstreamState,
   type BuildGitActionsInput,
   type GitAction,
   type GitActions,
+  type GitUpstreamState,
 } from "@/git/policy";
 import { deriveMergeCapability } from "@/git/merge-capability";
 import type { CheckoutPrMergeMethod } from "@clisbot/protocol/messages";
@@ -116,7 +120,7 @@ interface DeriveGitActionsStateArgs {
   hasUncommittedChanges: boolean;
   postShipArchiveSuggested: boolean;
   isStatusLoading: boolean;
-  baseRefLabel: string;
+  baseRef: string | undefined;
 }
 
 interface DerivedGitActionsState {
@@ -127,8 +131,11 @@ interface DerivedGitActionsState {
   behindOfOrigin: number | null;
   hasPullRequest: boolean;
   hasRemote: boolean;
+  hasFirstPushRemote: boolean;
+  upstream: GitUpstreamState;
   isClisbotOwnedWorktree: boolean;
   isOnBaseBranch: boolean;
+  canMergeLocally: boolean;
   shouldPromoteArchive: boolean;
 }
 
@@ -167,7 +174,7 @@ function deriveGitActionsState(args: DeriveGitActionsStateArgs): DerivedGitActio
     hasUncommittedChanges,
     postShipArchiveSuggested,
     isStatusLoading,
-    baseRefLabel,
+    baseRef,
   } = args;
   const actionsDisabled = !isGit || Boolean(status?.error) || isStatusLoading;
   const isClisbotOwnedWorktree = gitStatus?.isClisbotOwnedWorktree ?? false;
@@ -177,8 +184,11 @@ function deriveGitActionsState(args: DeriveGitActionsStateArgs): DerivedGitActio
     ...extractGitCommitCounts(gitStatus),
     hasPullRequest: Boolean(prStatus?.url),
     hasRemote: gitStatus?.hasRemote ?? false,
+    hasFirstPushRemote: (gitStatus?.firstPushRemote ?? null) !== null,
+    upstream: gitStatus ? readUpstreamState(gitStatus) : "unknown",
     isClisbotOwnedWorktree,
-    isOnBaseBranch: gitStatus?.currentBranch === baseRefLabel,
+    isOnBaseBranch: isCurrentBranchBase(gitStatus?.currentBranch, baseRef),
+    canMergeLocally: canMergeIntoLocalBase(gitStatus?.currentBranch, baseRef),
     shouldPromoteArchive: computeShouldPromoteArchive({
       hasUncommittedChanges,
       postShipArchiveSuggested,
@@ -205,6 +215,8 @@ interface UseGitActionsResult {
   gitActions: GitActions;
   branchLabel: string;
   isGit: boolean;
+  /** Archives this workspace, Git or not. Null while it cannot be archived. */
+  archiveWorkspace: (() => void) | null;
 }
 
 interface UseWorkspaceScreenArchiveControllerInput {
@@ -262,6 +274,13 @@ function canArchiveWorkspace(
   );
 }
 
+function availableArchive(
+  controller: { canArchive: boolean; isArchiving: boolean },
+  archive: () => void,
+): (() => void) | null {
+  return controller.canArchive && !controller.isArchiving ? archive : null;
+}
+
 function useWorkspaceScreenArchiveController({
   serverId,
   activeWorkspaceSelection,
@@ -287,21 +306,13 @@ function useWorkspaceScreenArchiveController({
     serverId,
     workspaceId: workspaceDescriptor?.id ?? "",
     workspaceKind: workspaceDescriptor?.workspaceKind ?? "directory",
+    workspaceDirectory: workspaceDescriptor?.workspaceDirectory ?? "",
     name: workspaceDescriptor?.name ?? branchLabel,
-    isDirty: archiveRisk.isDirty,
-    aheadOfOrigin: archiveRisk.aheadOfOrigin,
     diffStat: workspaceDescriptor?.diffStat ?? null,
     warningLabels: getWorktreeArchiveWarningLabels(t),
     onSetHiding: setIsHidingWorkspace,
-    onArchiveStarted: () => {
-      if (!activeWorkspaceSelection) {
-        return;
-      }
-      redirectIfArchivingActiveWorkspace({
-        serverId,
-        workspaceId: activeWorkspaceSelection.workspaceId,
-        activeWorkspaceSelection,
-      });
+    onArchiveStarted: (archived) => {
+      redirectIfArchivingActiveWorkspace({ ...archived, activeWorkspaceSelection });
     },
   });
 
@@ -653,7 +664,7 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     hasUncommittedChanges,
     postShipArchiveSuggested,
     isStatusLoading,
-    baseRefLabel,
+    baseRef,
   });
   const {
     actionsDisabled,
@@ -663,8 +674,11 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     behindOfOrigin,
     hasPullRequest,
     hasRemote,
+    hasFirstPushRemote,
+    upstream,
     isClisbotOwnedWorktree,
     isOnBaseBranch,
+    canMergeLocally,
     shouldPromoteArchive,
   } = derived;
 
@@ -693,8 +707,11 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
       pullRequestMergeable: prStatus?.mergeable ?? "UNKNOWN",
       mergeCapability: deriveMergeCapability(prStatus?.forgeSpecific, prStatus?.github),
       hasRemote,
+      hasFirstPushRemote,
+      upstream,
       isClisbotOwnedWorktree,
       isOnBaseBranch,
+      canMergeLocally,
       hasUncommittedChanges,
       baseRefAvailable: Boolean(baseRef),
       baseRefLabel,
@@ -800,6 +817,8 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
   }, [
     isGit,
     hasRemote,
+    hasFirstPushRemote,
+    upstream,
     hasPullRequest,
     prStatus?.url,
     prStatus?.state,
@@ -812,6 +831,7 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     behindBaseCount,
     isClisbotOwnedWorktree,
     isOnBaseBranch,
+    canMergeLocally,
     githubFeaturesEnabled,
     forge,
     githubAutoMergeActionsEnabled,
@@ -865,7 +885,12 @@ export function useGitActions({ serverId, cwd, icons }: UseGitActionsInput): Use
     [gitActionsInput, baseRefLabel, hasPullRequest, forge, t],
   );
 
-  return { gitActions, branchLabel, isGit };
+  return {
+    gitActions,
+    branchLabel,
+    isGit,
+    archiveWorkspace: availableArchive(archiveController, handleArchiveWorkspace),
+  };
 }
 
 function translateGitActions(

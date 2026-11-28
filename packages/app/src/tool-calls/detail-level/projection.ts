@@ -1,5 +1,4 @@
 import type { StreamItem } from "@/types/stream";
-import type { ToolCallDetailLevel } from "@/hooks/use-settings/storage";
 import {
   groupLiveToolCalls,
   prepareGroupedHistory,
@@ -9,11 +8,15 @@ import {
 import { buildOverviewGroup, type OverviewToolCallGroup } from "./overview/model";
 import { buildLatestCallGroup, type LatestCallToolCallGroup } from "./latest-call/model";
 
-export type { ToolCallDetailLevel } from "@/hooks/use-settings/storage";
+import type { ToolCallDetailLevel } from "@/hooks/use-settings/storage";
+
+export type { ToolCallDetailLevel };
+export { toolCallDetailLevelForChatDisplay } from "@/hooks/use-settings/storage";
 export type ToolCallDetailGroup = OverviewToolCallGroup | LatestCallToolCallGroup;
 
 export interface PreparedToolCallHistory {
   mode: Exclude<ToolCallDetailLevel, "detailed">;
+  autoExpandReasoning: boolean;
   grouped: GroupedHistory<ToolCallDetailGroup>;
 }
 
@@ -42,15 +45,20 @@ function visibleToolCallItems(items: StreamItem[]): StreamItem[] {
 export function prepareToolCallHistory(
   level: ToolCallDetailLevel,
   tail: StreamItem[],
+  autoExpandReasoning = false,
 ): PreparedToolCallHistory | null {
   if (level === "detailed") {
     return null;
   }
   return {
     mode: level,
+    autoExpandReasoning,
     grouped: prepareGroupedHistory<ToolCallDetailGroup>({
       tail: visibleToolCallItems(tail),
       buildGroup: level === "overview" ? buildOverviewGroup : buildLatestCallGroup,
+      autoExpandReasoning,
+      // Clisbot: latest-call keeps its one-item badge for a lone call; other levels are upstream's.
+      groupLoneToolCalls: level === "summary-with-latest-call",
     }),
   };
 }
@@ -75,8 +83,10 @@ export function projectToolCallDetailLevel(input: {
   }
   return groupLiveToolCalls({
     history: input.preparedHistory.grouped,
+    autoExpandReasoning: input.preparedHistory.autoExpandReasoning,
     head: visibleToolCallItems(input.head),
     isTurnActive: input.isTurnActive,
     buildGroup: input.level === "overview" ? buildOverviewGroup : buildLatestCallGroup,
+    groupLoneToolCalls: input.level === "summary-with-latest-call",
   });
 }

@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useIsFocused } from "expo-router/react-navigation";
 import { RetainedPanelActivity } from "@/components/retained-panel";
+import { ensurePanelsRegistered } from "@/panels/register-panels";
 import { useIsCompactFormFactor, supportsDesktopPaneSplits } from "@/constants/layout";
 import { useConversationLayout } from "./use-conversation-layout";
 import { useConversationProject } from "./use-conversation-project";
@@ -44,6 +45,9 @@ export function ConversationWorkspace({
   headingActions,
   children,
 }: ConversationWorkspaceProps) {
+  // A Chat is the second route that renders panel-registry readers (tab rows, panel hosts, sheet
+  // tabs), so like the workspace screen it registers the panels before any of them renders.
+  ensurePanelsRegistered();
   const focused = useIsFocused();
   const compact = useIsCompactFormFactor();
   const singlePanel = compact || !supportsDesktopPaneSplits();

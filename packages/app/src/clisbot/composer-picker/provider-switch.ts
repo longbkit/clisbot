@@ -12,7 +12,11 @@ import { useForkAgent } from "@/hooks/use-fork-agent";
 import { useHostFeature } from "@/runtime/host-features";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { toErrorMessage } from "@/utils/error-messages";
-import { isProviderAutoAcceptOn, resolveAgentModes, resolveComposerModeId } from "./mode-options";
+import {
+  isAgentProviderAutoAcceptOn,
+  resolveAgentModes,
+  resolveComposerModeId,
+} from "./mode-options";
 import {
   permissionScopeOf,
   resolvePermissionCarry,
@@ -70,7 +74,8 @@ export function buildSwitchReview(input: {
     | "model"
     | "currentModeId"
     | "fullAutoAccept"
-    | "features"
+    | "options"
+    | "controls"
     | "availableModes"
     | "runtimeInfo"
   >;
@@ -82,8 +87,7 @@ export function buildSwitchReview(input: {
 }): ProviderSwitchReviewInput {
   const { agent, entries, provider } = input;
   const sourceEntry = entries?.find((entry) => entry.provider === agent.provider);
-  const providerAutoAccept =
-    input.fullAutoAcceptSupported && isProviderAutoAcceptOn(agent.features);
+  const providerAutoAccept = input.fullAutoAcceptSupported && isAgentProviderAutoAcceptOn(agent);
   const sourceModeId = resolveComposerModeId(
     agent.currentModeId ?? agent.runtimeInfo?.modeId ?? null,
     input.fullAutoAcceptSupported && agent.fullAutoAccept === true,
@@ -312,7 +316,8 @@ export function useLiveProviderChoices(input: {
       switchProvider
         ? withSwitchProviders(
             ownProviders,
-            buildSelectableProviderSelectorProviders(entries),
+            // Its own provider is filtered out below; only available ones are switch targets.
+            buildSelectableProviderSelectorProviders(entries, { selectedProvider: null }),
             ownProviderId,
             t("composer.providerSwitch.newSessionTag"),
           )

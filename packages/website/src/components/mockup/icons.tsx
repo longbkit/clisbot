@@ -1,22 +1,11 @@
 // Exact SVG paths from packages/app/src/components/icons/
 
-/** The Clisbot workspace and chat mark — public/logo.svg, drawn as a small sidebar avatar mark. */
+import { OpenCodeIcon as OpenCodeBrandIcon, PiIcon as PiBrandIcon } from "../agent-icons";
+import { ClisbotMark as CanonicalClisbotMark } from "../clisbot-brand";
+
+/** The Clisbot Flow mark, drawn as a small sidebar avatar or tool-call mark. */
 export function ClisbotMark({ size = 13, className }: { size?: number; className?: string }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 700 700"
-      fill="currentColor"
-      aria-hidden="true"
-      className={className}
-    >
-      <path
-        fillRule="evenodd"
-        d="M159.6 140H442.4C470.4 140 490 161 490 189V288.4C490 291.2 488.6 292.6 485.8 292.6H383.6C344.4 292.6 320.6 316.4 320.6 352.8V386.4C320.6 417.2 306.6 432.6 277.2 432.6H161C124.6 432.6 98 406 98 371V203C98 166.6 124.6 140 159.6 140ZM172.2 186.2C160.602 186.2 151.2 195.602 151.2 207.2C151.2 218.798 160.602 228.2 172.2 228.2H393.4C404.998 228.2 414.4 218.798 414.4 207.2C414.4 195.602 404.998 186.2 393.4 186.2H172.2Z M396.2 320.6H548.8C579.6 320.6 602 344.4 602 375.2V452.2C602 484.4 582.4 508.2 551.6 508.2V544.6C551.6 554.4 546 558.6 537.6 551.6L488.6 511H379.4C344.4 511 319.2 495.6 313.6 471.8C312.9 467.6 315 466.2 319.2 464.8C337.4 459.2 348.6 446.6 348.6 425.6V376.6C348.6 345.8 365.4 320.6 396.2 320.6Z"
-      />
-    </svg>
-  );
+  return <CanonicalClisbotMark width={size} height={size} className={className} />;
 }
 
 /** GitHub mark for the toolbar and PR panel. */
@@ -112,6 +101,68 @@ export function SourceControlIcon({ size = 14, className }: { size?: number; cla
       <line x1={9} y1={9.5} x2={15} y2={9.5} />
       <line x1={12} y1={6.5} x2={12} y2={12.5} />
       <line x1={9} y1={16} x2={15} y2={16} />
+    </svg>
+  );
+}
+
+export function OpenCodeIcon({ size = 13, className }: { size?: number; className?: string }) {
+  return <OpenCodeBrandIcon width={size} height={size} className={className} />;
+}
+
+export function PiIcon({ size = 13, className }: { size?: number; className?: string }) {
+  return <PiBrandIcon width={size} height={size} className={className} />;
+}
+
+const TAILSCALE_DOTS = [3, 12, 21].flatMap((cy, row) =>
+  [3, 12, 21].map((cx, column) => ({
+    cx,
+    cy,
+    // The mark is a T: the middle row and the dot under its center are solid.
+    solid: row === 1 || (row === 2 && column === 1),
+  })),
+);
+
+/** The Tailscale mark: a three by three dot grid with a solid T. */
+export function TailscaleMark({ size = 12, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      {TAILSCALE_DOTS.map((dot) => (
+        <circle
+          key={`${dot.cx}:${dot.cy}`}
+          cx={dot.cx}
+          cy={dot.cy}
+          r={3}
+          opacity={dot.solid ? 1 : 0.3}
+        />
+      ))}
+    </svg>
+  );
+}
+
+/** A mouse pointer. Its tip is the top left corner of the glyph. */
+export function PointerArrow({ size = 24, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      className={`drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] ${className ?? ""}`}
+    >
+      <path
+        d="M1 1v14.6l3.9-3.7 2.7 6.1 2.7-1.2-2.7-6h5.5z"
+        fill="#0b0b0b"
+        stroke="#fff"
+        strokeWidth={1.2}
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

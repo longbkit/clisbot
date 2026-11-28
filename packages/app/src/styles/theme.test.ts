@@ -53,12 +53,10 @@ describe("Pure black theme", () => {
     expect(darkPureBlackTheme.colors.accentBright).toBe("#7ccba0");
   });
 
-  it("derives sidebar interaction surfaces from the surface scale", () => {
+  it("steps its sidebar hover and selection off the black sidebar", () => {
     expect(darkPureBlackTheme.colors.surfaceSidebar).toBe("#000000");
-    expect(darkPureBlackTheme.colors.surfaceSidebarHover).toBe(darkPureBlackTheme.colors.surface1);
-    expect(darkPureBlackTheme.colors.surfaceSidebarSelected).toBe(
-      darkPureBlackTheme.colors.surface2,
-    );
+    expect(darkPureBlackTheme.colors.surfaceSidebarHover).toBe("#111111");
+    expect(darkPureBlackTheme.colors.surfaceSidebarSelected).toBe("#1d1d1d");
   });
 
   it("keeps ANSI black output readable on its zero-luminance terminal background", () => {
@@ -67,7 +65,19 @@ describe("Pure black theme", () => {
   });
 });
 
+// Hover and selected are derived from the sidebar color. The values the default themes had when
+// they were picked by eye are the reference: derivation lands within a few RGB units of them.
 describe("Sidebar interaction surfaces", () => {
+  function expectWithin(actual: string, expected: string, units: number) {
+    const channels = (hex: string) =>
+      [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16));
+    const expectedChannels = channels(expected);
+    channels(actual).forEach((channel, index) => {
+      expect(Math.abs(channel - expectedChannels[index])).toBeLessThanOrEqual(units);
+    });
+  }
+
+  // Clisbot's Light theme sets its own hover and selected values instead of the derived ones.
   it("keeps Light selection distinct from the sidebar surface", () => {
     expect(lightTheme.colors.surfaceSidebarHover).not.toBe(lightTheme.colors.surfaceSidebar);
     // The selected row is a white card on the gray sidebar, distinct from the gray hover.
@@ -78,9 +88,9 @@ describe("Sidebar interaction surfaces", () => {
     );
   });
 
-  it("derives Dark hover and selection from the first two raised surfaces", () => {
-    expect(darkTheme.colors.surfaceSidebarHover).toBe(darkTheme.colors.surface1);
-    expect(darkTheme.colors.surfaceSidebarSelected).toBe(darkTheme.colors.surface2);
+  it("keeps Dark hover and selection where they were", () => {
+    expectWithin(darkTheme.colors.surfaceSidebarHover, "#1e2120", 2);
+    expectWithin(darkTheme.colors.surfaceSidebarSelected, "#272a29", 2);
   });
 });
 
@@ -98,7 +108,6 @@ describe("Built-in light theme", () => {
       primary: "#18181b",
       primaryForeground: "#fafafa",
       destructiveForeground: "#ffffff",
-      successForeground: "#ffffff",
       terminal: {
         black: "#1a1a1e",
         brightBlack: "#3f3f46",

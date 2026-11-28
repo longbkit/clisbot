@@ -196,7 +196,7 @@ Every externally sourced GitHub Workflow needs a non-empty `from_users` allowlis
 
 Use `label` with `github.issue_label_added` or `github.pull_request_label_added` when the added label itself matters. Use `labels` when the item must currently have every listed label. Both compare labels case-insensitively. For example, `labels: [bug, backend]` requires both labels; it does not mean either one.
 
-The [configuration reference](/docs/hub/configuration/hub-yml#github-events-and-filters) lists every GitHub event and filter.
+The [configuration reference](/docs/hub/configuration/reference) lists every GitHub event and filter.
 
 ## Legacy event compatibility
 

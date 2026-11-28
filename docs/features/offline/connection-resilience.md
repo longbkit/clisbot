@@ -34,9 +34,11 @@ tail cache and Settings → Storage, is [offline cache](offline-cache.md).
   time on idle fell from ~570 to ~90 ms per 10 s.
 - A reconnect sweep runs when there is reason to think Hosts can connect again: the window
   `online` event (web and Electron, `runtime/network-reachability.web.ts`), the app returning to
-  the foreground, and a Host that had failed connecting again. Online Hosts verify their socket
-  and self-retrying clients reconnect at once; every other Host drops its backoff and tries now,
-  100 ms after the previous one, still through the connect limit. Without a sweep the backoff
+  the foreground, and a Host that had failed connecting again. On a network or foreground sweep,
+  online Hosts verify their socket and self-retrying clients reconnect at once. A sweep started
+  by a failed Host reconnecting leaves online Hosts alone, so a recovering gateway never disturbs
+  healthy connections. Every other Host drops its backoff and tries now, 100 ms after the previous
+  one, still through the connect limit. Without a sweep the backoff
   holds, so a hundred unreachable sandboxes do not retry together.
 - Native has no network-change signal (NetInfo needs a native rebuild). A failed Host connecting
   again stands in for it: when a VPN comes back, the first Host whose backoff falls due sweeps the

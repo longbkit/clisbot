@@ -40,7 +40,7 @@ filters:
   from_users: [U01234567]
 ```
 
-Use `from_users` on external triggers. Pin GitHub to `repo`, Slack to `workspace` and `channels`, and Discord to `guild` and `channels`. Allowlists reduce exposure but do not make a permitted account or its text trustworthy.
+Use `from_users` on external triggers. Pin GitHub to `repo`, Slack to `workspace` and `channels`, Discord to `guild` and `channels`, and Linear to `project`. Allowlists reduce exposure but do not make a permitted account or its text trustworthy.
 
 A [Channel](/docs/hub/channels) Route is the same kind of boundary from the other direction: anyone who can post in a conversation the Route matches can send text to the agent behind it. Scope Routes to named conversations before you point one at a working directory.
 
@@ -205,4 +205,4 @@ Provider policy does not replace OS filesystem or network isolation. Test the ex
 - Reply and GitHub authority appears only on the step that uses it.
 - Prompts distinguish instructions, `${{ clisbot.prompt }}`, and explicit `${{ clisbot.context }}`.
 
-Review [Workflows](/docs/hub/workflows), the [configuration reference](/docs/hub/configuration/hub-yml), and the relevant provider trigger page together.
+Review the [Trigger YAML reference](/docs/hub/configuration/reference), including [Workflow documents](/docs/hub/configuration/reference#workflow-documents), and the relevant provider trigger page together.

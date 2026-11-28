@@ -350,8 +350,7 @@ class ClientSecureChannel implements SecureChannel {
 
   private fail(code: number, reason: string): void {
     if (this.state === "closed") return;
-    this.state = "closed";
-    this.handshake = null;
+    this.notifyClosed();
     try {
       this.transport.close(code, reason);
     } catch {
@@ -370,13 +369,12 @@ class ClientSecureChannel implements SecureChannel {
   }
 
   close(code = 1000, reason = "Normal closure"): void {
+    this.notifyClosed();
     if (this.inner) {
       this.inner.close(code, reason);
     } else {
       this.transport.close(code, reason);
     }
-    this.state = "closed";
-    this.handshake = null;
   }
 
   isOpen(): boolean {

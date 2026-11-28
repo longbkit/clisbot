@@ -1,8 +1,8 @@
 ---
 title: Self-hosting Hub
-description: Run Hub locally with its embedded database, or deploy it with PostgreSQL.
+description: Run Hub locally with its embedded database, or deploy it with PostgreSQL, Docker Compose, or Fly.
 nav: Self-hosting
-order: 74
+order: 77
 category: Hub
 ---
 
@@ -33,13 +33,13 @@ Follow the [quickstart](/docs/hub/quickstart) to create your assistant and conne
 
 Without `DATABASE_URL`, Hub stores an embedded PGlite database and its generated authentication secret under `$XDG_DATA_HOME/clisbot-hub`. If `XDG_DATA_HOME` is not set to an absolute path, Hub uses `~/.local/share/clisbot-hub`. Both survive restarts.
 
-Set a different location explicitly with:
+Set a custom directory with `CLISBOT_HUB_DATA_DIR`:
 
 ```sh
 CLISBOT_HUB_DATA_DIR=/path/to/clisbot-hub-data npx @clisbot/hub
 ```
 
-Embedded mode supports one Hub process per data directory. It is intended for a personal or single-process Hub. Back up the whole data directory before upgrading or moving it.
+Embedded mode supports one Hub process per data directory and fits a personal or single-process Hub. Back up the whole data directory before upgrading or moving it.
 
 ## Public addresses
 
@@ -54,9 +54,13 @@ the shared UI and proxy when launching a fresh daemon, and uses its selected
 port for browser login links. If that daemon is already running without the
 proxy configured, onboarding explains which settings need a deliberate restart.
 
-GitHub event triggers use webhooks and need a public HTTPS address. Repository access can still work without the webhook. Slack's optional Webhooks transport also needs public HTTPS; Socket Mode does not.
+A public HTTPS address is required for:
 
-When Hub is available at a stable public origin, set it before starting:
+- GitHub event webhooks (GitHub repository access still works without webhooks)
+- Linear OAuth callbacks and webhooks
+- Slack Webhooks transport (Socket Mode does not need HTTPS)
+
+Set your public HTTPS origin before starting Hub:
 
 ```sh
 CLISBOT_HUB_APP_URL=https://hub.example.com npx @clisbot/hub
@@ -83,7 +87,7 @@ DATABASE_URL=postgres://clisbot:password@localhost:5432/clisbot_hub \
   npx @clisbot/hub
 ```
 
-Use PostgreSQL for a durable server deployment, more than one Hub process, or an existing database backup and operations setup. Migrations run automatically at startup. Hub does not start listening when a migration fails.
+Use PostgreSQL for a durable server deployment, multiple Hub processes, or standard database backups. Migrations run automatically at startup, and Hub refuses to listen if a migration fails.
 
 Hub holds up to 30 connections to PostgreSQL. Set `CLISBOT_HUB_DATABASE_POOL_SIZE` to change that; keep every Hub process's pool, added together, under the server's `max_connections`.
 
@@ -91,7 +95,7 @@ The database also stores Hub's generated authentication secret. Set `CLISBOT_HUB
 
 ## App configuration
 
-The operator configures GitHub, Slack, and Discord under **Apps**. Hub verifies the credentials before saving them in its database and starts the same provider runtime used by environment-configured deployments.
+The instance operator configures GitHub, Linear, Slack, and Discord under **Apps**. Hub verifies credentials before saving them in its database and starts the same provider runtime used by environment-configured deployments.
 
 Environment variables remain available for deployments that manage secrets outside Hub. A complete environment configuration takes precedence over a saved application and appears as **Managed by environment** in the app's Hub settings.
 
@@ -103,6 +107,11 @@ GITHUB_APP_CLIENT_ID=
 GITHUB_APP_CLIENT_SECRET=
 GITHUB_APP_PRIVATE_KEY=          # or GITHUB_APP_PRIVATE_KEY_PATH
 GITHUB_WEBHOOK_SECRET=
+
+# Linear
+LINEAR_CLIENT_ID=
+LINEAR_CLIENT_SECRET=
+LINEAR_WEBHOOK_SECRET=
 
 # Slack Socket Mode
 SLACK_TRANSPORT=socket
@@ -122,11 +131,16 @@ DISCORD_CLIENT_SECRET=
 DISCORD_BOT_TOKEN=
 ```
 
-See [GitHub](/docs/hub/self-hosting/github-app), [Slack](/docs/hub/self-hosting/slack-app), and [Discord](/docs/hub/self-hosting/discord-app) for provider behavior and connection steps.
+Read the setup guide for each provider:
+
+- [GitHub app](/docs/hub/self-hosting/github-app)
+- [Linear app](/docs/hub/self-hosting/linear-app)
+- [Slack app](/docs/hub/self-hosting/slack-app)
+- [Discord app](/docs/hub/self-hosting/discord-app)
 
 ## Bootstrap from environment
 
-Browser setup is the default for a fresh database. An unattended deployment can create the first operator from environment variables instead:
+Browser setup is the default for a fresh database. For an unattended deployment, create the first operator from environment variables instead:
 
 ```dotenv
 CLISBOT_BOOTSTRAP_ORGANIZATION=My organization
@@ -168,7 +182,7 @@ hub.example.com {
 }
 ```
 
-Point `hub.example.com` at the host and open ports 80 and 443. Caddy [obtains and renews the certificate](https://caddyserver.com/docs/automatic-https).
+Point `hub.example.com` at the host and open ports `80` and `443`. Caddy [obtains and renews the certificate](https://caddyserver.com/docs/automatic-https).
 
 Set these environment values on the Clisbot container:
 
@@ -207,7 +221,7 @@ The Fly address serves the backend. Serve the Clisbot app at
 Complete account setup in the app, or set the
 [bootstrap environment](#bootstrap-from-environment) before deploying.
 
-Keep one machine running. Hub holds Slack Socket Mode and Discord gateway connections and dispatches events to daemons, so a stopped machine misses events.
+Keep one machine running continuously. Hub holds Slack Socket Mode and Discord gateway connections and dispatches events to daemons, so a stopped machine misses events.
 
 ## Upgrades
 

@@ -1,4 +1,14 @@
 import {
+  DiffStreamRouter,
+  DiffSubscriptionError,
+  type DiffCompare,
+  type DiffState,
+} from "./diff/index.js";
+import {
+  ChunkedTransport,
+  ChunkedTransportProtocolError,
+} from "@clisbot/protocol/chunked-transport";
+import {
   HOST_ROUTE_OPCODE,
   encodeHostRouteFrame,
   decodeHostRouteFrame,
@@ -6,6 +16,7 @@ import {
 } from "@clisbot/protocol/binary-frames/index";
 import { messageTooLargeError } from "./daemon-client-transport-utils.js";
 import type { HostAdd, HostUpdate, HostDirectory } from "@clisbot/protocol/hosts";
+import type { PluginListingDetail, PluginListingIndex } from "@clisbot/protocol/plugin-registry";
 import { legacyUsageIcon } from "./legacy-usage-icons.js";
 import { subscribeTimeline, type TimelineMessage } from "./timeline-subscription/index.js";
 import { normalizeChatSenders } from "./normalize-chat-senders.js";
@@ -19,7 +30,9 @@ import {
 import { CreationClient } from "./creation/index.js";
 import { deviceHelloAuth, acceptDeviceCredential } from "./device-access.js";
 import type { CreationSnapshot } from "@clisbot/protocol/messages";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 import type { z } from "zod";
+import type { LocalSpeechModel } from "@clisbot/protocol/speech/rpc-schemas";
 import { CLIENT_CAPS, type ClientCapability } from "@clisbot/protocol/client-capabilities";
 import {
   isAccessRevocation,
@@ -42,7 +55,7 @@ import {
   ShutdownRequestedStatusPayloadSchema,
   DaemonUpdateResponseSchema,
   SessionInboundMessageSchema,
-  type ActiveTurnBehavior,
+  type AgentActiveTurnBehavior,
   type ServerInfoStatusPayload,
 } from "@clisbot/protocol/messages";
 import { validateWSOutboundMessage } from "@clisbot/protocol/validation/ws-outbound";
@@ -63,6 +76,7 @@ import type {
   GitSetupOptions,
   CheckoutStatusResponse,
   CheckoutCommit,
+  CheckoutWorktree,
   ParsedDiffFile,
   CheckoutCommitResponse,
   CheckoutMergeResponse,
@@ -105,6 +119,7 @@ import type {
   WorkspaceSetupStatusResponseMessage,
   ListCommandsResponse,
   ListProviderFeaturesResponseMessage,
+  ProviderControlsListResponseMessage,
   ListProviderModelsResponseMessage,
   ListProviderModesResponseMessage,
   ListAvailableProvidersResponse,
@@ -112,6 +127,8 @@ import type {
   RefreshProvidersSnapshotResponseMessage,
   ProviderDiagnosticResponseMessage,
   ProviderUsageListResponseMessage,
+  ProviderInstallationInspectResponseMessage,
+  ProviderInstallationCheckUpdatesResponseMessage,
   UsageReportEntry,
   DaemonGetStatusResponse,
   DaemonGetPairingOfferResponse,
@@ -146,6 +163,7 @@ import type {
   AgentSkillsSaveResult,
 } from "@clisbot/protocol/messages";
 import type {
+  AgentOptionControl,
   AgentPermissionRequest,
   AgentPermissionResponse,
   AgentPersistenceHandle,
@@ -167,6 +185,11 @@ import {
   FileTransferOpcode,
   TerminalStreamOpcode,
   type FileTransferFrame,
+  assertPluginWireValue,
+  decodePluginFrame,
+  encodePluginInputFrame,
+  isPluginFrameOpcode,
+  PluginFrameOpcode,
 } from "@clisbot/protocol/binary-frames/index";
 import {
   createRelayE2eeTransportFactory,
@@ -187,6 +210,10 @@ import {
   normalizeProviderSnapshotUpdateMessage,
   normalizeProvidersSnapshotPayload,
 } from "./compat/normalize-provider-models.js";
+import {
+  LegacyProviderOptions,
+  usesLegacyProviderOptions,
+} from "./compat/legacy-provider-options.js";
 import { TerminalStreamRouter, type TerminalStreamEvent } from "./terminal-stream-router.js";
 import type {
   BrowserAutomationExecuteRequest,
@@ -432,6 +459,17 @@ export type DaemonEventHandler = (event: DaemonEvent) => void;
 export type BrowserAutomationExecuteRequestMessage = BrowserAutomationExecuteRequest;
 export type BrowserAutomationExecuteResponseMessage = BrowserAutomationExecuteResponse;
 
+export interface PluginClientBundle {
+  id: string;
+  clientBundleHash: string;
+  clientBundle: string;
+}
+
+/** Host-scoped storage. load must return only bundles whose contents have been verified. */
+export interface PluginClientBundleStore {
+  load(): Promise<PluginClientBundle[]>;
+  replace(bundles: PluginClientBundle[]): Promise<void>;
+}
 /** Endpoint security negotiated on a relay connection. See docs/relay-endpoint-security.md. */
 export type RelaySecurityMode = "legacy" | "protected";
 
@@ -444,6 +482,8 @@ export interface DaemonClientConfig {
   sessionPermissions?: import("@clisbot/protocol/messages").DaemonPermission[];
   url: string;
   clientId: string;
+  /** Create one cache for the confirmed daemon identity, retained for this client lifetime. */
+  createPluginClientBundleStore?: (serverId: string) => PluginClientBundleStore;
   clientType?: "mobile" | "browser" | "cli" | "mcp" | "hub";
   appVersion?: string;
   runtimeGeneration?: number | null;
@@ -504,13 +544,23 @@ export interface DaemonClientTrace {
   endSection(): void;
 }
 
+/** A queued agent message carries the applied behavior and what happens next. */
+export interface AgentMessageReceipt {
+  deliveryStatus?: "queued";
+  activeTurnBehavior?: AgentActiveTurnBehavior;
+  guidance?: string;
+}
+
 export interface SendMessageOptions {
   sourceAgentId?: string;
   sourceAgentServerId?: string;
   sessionMode?: string;
   messageId?: string;
-  /** What happens when the agent is mid-turn. The daemon interrupts the turn when omitted. */
-  activeTurnBehavior?: ActiveTurnBehavior;
+  /**
+   * Agent sources default to queue: wait for the running turn to end. Human sources default to
+   * interrupt and cannot queue.
+   */
+  activeTurnBehavior?: AgentActiveTurnBehavior;
   expectedTurnId?: string;
   images?: Array<{ data: string; mimeType: string }>;
   attachments?: SendAgentMessageRequest["attachments"];
@@ -545,16 +595,21 @@ export interface CreateAgentRequestOptions extends AgentConfigOverrides {
   git?: GitSetupOptions;
   worktree?: CreateAgentRequestMessage["worktree"];
   autoArchive?: CreateAgentRequestMessage["autoArchive"];
+  /** Creates a background agent. A workspace this request creates inherits it. */
   background?: CreateAgentRequestMessage["background"];
   /** @deprecated Use createWorkspace({ source, agent, idempotencyKey }); rejected by createAgent. */
   worktreeName?: string;
   requestId?: string;
   labels?: Record<string, string>;
+  /** Plugin-owned data stored on the agent. Needs a host with `entityMetadata`. */
+  metadata?: CreateAgentRequestMessage["metadata"];
 }
 
 export interface CreateWorkspaceRequestOptions {
   source: WorkspaceCreateRequest["source"];
   title?: string;
+  /** Plugin-owned data stored on the workspace. Needs a host with `entityMetadata`. */
+  metadata?: WorkspaceCreateRequest["metadata"];
   /** Workspace discovery visibility; contents retain normal durability. */
   background?: boolean;
   callerAgentId?: string;
@@ -645,6 +700,7 @@ export interface FileUploadInput {
 export type FileUploadResult = FileUploadResponse["payload"];
 type FileDownloadTokenPayload = FileDownloadTokenResponse["payload"];
 type ListProviderFeaturesPayload = ListProviderFeaturesResponseMessage["payload"];
+export type ListProviderControlsPayload = ProviderControlsListResponseMessage["payload"];
 type ListProviderModelsPayload = ListProviderModelsResponseMessage["payload"];
 type ListProviderModesPayload = ListProviderModesResponseMessage["payload"];
 type ListAvailableProvidersPayload = ListAvailableProvidersResponse["payload"];
@@ -652,6 +708,13 @@ type GetProvidersSnapshotPayload = GetProvidersSnapshotResponseMessage["payload"
 type RefreshProvidersSnapshotPayload = RefreshProvidersSnapshotResponseMessage["payload"];
 type ProviderDiagnosticPayload = ProviderDiagnosticResponseMessage["payload"];
 type ProviderUsageListPayload = ProviderUsageListResponseMessage["payload"];
+type ProviderInstallationInspectPayload = ProviderInstallationInspectResponseMessage["payload"];
+type ProviderInstallationCheckUpdatesPayload =
+  ProviderInstallationCheckUpdatesResponseMessage["payload"];
+type ProviderInstallationUpdatePayload = Extract<
+  SessionOutboundMessage,
+  { type: "provider.installation.update.response" }
+>["payload"];
 interface UsageListReportsPayload {
   requestId: string;
   reports: UsageReportEntry[];
@@ -671,7 +734,7 @@ type WriteProjectConfigPayload = Extract<
 type ListCommandsPayload = ListCommandsResponse["payload"];
 type ListCommandsDraftConfig = Pick<
   AgentSessionConfig,
-  "provider" | "cwd" | "modeId" | "model" | "thinkingOptionId" | "featureValues"
+  "provider" | "cwd" | "modeId" | "model" | "thinkingOptionId" | "featureValues" | "providerOptions"
 >;
 export interface WriteProjectConfigInput {
   repoRoot: string;
@@ -754,6 +817,8 @@ export interface FetchAgentOptions {
 }
 type LegacyFetchAgentOptions = Omit<FetchAgentOptions, "agentId">;
 export interface FetchAgentTimelineOptions {
+  /** Prefer whole-turn pages when supported; older hosts retain item-based paging. */
+  wholeTurns?: boolean;
   direction?: FetchAgentTimelineDirection;
   cursor?: FetchAgentTimelineCursor;
   limit?: number;
@@ -851,6 +916,9 @@ type ShutdownRequestedStatusPayload = z.infer<typeof ShutdownRequestedStatusPayl
 export interface ShutdownServerOptions {
   requestId?: string;
   timeout?: number;
+  // Leave terminals running for the next daemon. Only daemons advertising
+  // `features.terminalsSurviveRestart` honor it; check before sending.
+  keepTerminals?: boolean;
 }
 export interface DaemonStatusOptions {
   requestId?: string;
@@ -936,6 +1004,14 @@ export type WorkspaceLabelDeleteInspectPayload = Extract<
   SessionOutboundMessage,
   { type: "workspace.label.delete.inspect.response" }
 >["payload"];
+export type ProjectSuggestionsPayload = Extract<
+  SessionOutboundMessage,
+  { type: "project.suggestions.response" }
+>["payload"];
+export type ProjectSuggestionsOptions = Omit<
+  Extract<SessionInboundMessage, { type: "project.suggestions.request" }>,
+  "type" | "requestId"
+> & { requestId?: string };
 export type ProjectListPayload = Extract<
   SessionOutboundMessage,
   { type: "project.list.response" }
@@ -1060,6 +1136,7 @@ interface WaitHandle<T> {
 interface WaitOptions {
   skipQueue?: boolean;
   requestId?: string;
+  requestType?: SessionInboundMessage["type"];
 }
 
 interface CorrelatedResponseIdentity {
@@ -1105,6 +1182,15 @@ type CorrelatedResponsePayloads = {
 };
 type CorrelatedResponsePayload<TType extends CorrelatedResponseType> =
   CorrelatedResponsePayloads[TType];
+export type AgentBackgroundWorkListPayload =
+  CorrelatedResponsePayload<"agent.background_work.list.response">;
+export type AgentBackgroundWorkItem = AgentBackgroundWorkListPayload["items"][number];
+
+type PluginCatalogResponseEntry =
+  CorrelatedResponsePayload<"plugin.catalog.get.response">["plugins"][number];
+export type PluginCatalogEntry = Omit<PluginCatalogResponseEntry, "clientBundle"> & {
+  clientBundle: string;
+};
 
 export class DaemonConnectionError extends Error {
   readonly serverId?: string;
@@ -1186,6 +1272,12 @@ const DEFAULT_CONNECT_TIMEOUT_MS = 15_000;
 const DEFAULT_LIVENESS_TIMEOUT_MS = 5000;
 const LIVENESS_HEARTBEAT_INTERVAL_MS = 10_000;
 const LIVENESS_HEARTBEAT_TIMEOUT_MS = 15_000;
+// Window of each check after the app returns to the foreground. A socket that silently died
+// while the app was suspended stays OPEN and accepts sends, so only inbound frames prove it.
+const FOREGROUND_LIVENESS_TIMEOUT_MS = 5_000;
+// A foreground window whose timer fires this much later than scheduled (wall clock) spanned
+// another suspension or a blocked JS thread, so its silence is no evidence either way.
+const SUSPENDED_WINDOW_SLACK_MS = 2_000;
 const LIVENESS_FAILURE_RECONNECT_THRESHOLD = 2;
 
 /** Default timeout for waiting for connection before sending queued messages */
@@ -1336,7 +1428,7 @@ function toReasonCode(reason: string | null | undefined): string | null {
 }
 
 interface PendingSend {
-  send: () => void;
+  send: () => void | Promise<void>;
   /** The session message this send carries, so an aborted request can drop it from the queue. */
   message?: SessionInboundMessage;
   resolve: () => void;
@@ -1350,15 +1442,60 @@ interface PingProbe {
   reject: (error: Error) => void;
   timeoutHandle: ReturnType<typeof setTimeout>;
   startedAt: number;
-  // Whether a timeout on this ping should be recorded as a liveness failure. Only the
-  // heartbeat sets this; a latency measurement never drives teardown, even when a
-  // heartbeat tick shares (dedupes onto) an in-flight measurement ping.
-  drivesLivenessFailure: boolean;
+  // Wall clock, which keeps running while the OS has JS suspended; perfNow may not.
+  startedAtWallMs: number;
+  receivedActivity: boolean;
+  role: PingProbeRole;
 }
+
+// A latency measurement waits for the next pong, not for a particular probe: the liveness
+// cycle may replace the probe the measurement joined, and a pong that answers an expired window
+// still proves the socket. It settles on a pong, a connection failure, or its own deadline.
+interface PongWaiter {
+  startedAt: number;
+  resolve: (rttMs: number) => void;
+  reject: (error: Error) => void;
+}
+
+// Who started the probe. A "latency" probe never drives teardown, even when a heartbeat
+// tick shares (dedupes onto) it. A "heartbeat" probe runs the regular cadence. A
+// "foreground" probe belongs to the verification cycle that ensureConnected({ verify })
+// runs after the app resumes: short window, immediate second check, reconnect at once.
+type PingProbeRole = "latency" | "heartbeat" | "foreground";
 
 // COMPAT(providerUsageList): added in v0.1.98, remove after 2027-03-26.
 export function supportsUsageReports(features: ServerInfoStatusPayload["features"]): boolean {
   return features?.usageSources === true || features?.providerUsageList === true;
+}
+
+export class TerminalKeepUnsupportedError extends Error {
+  readonly code = "TERMINALS_KEEP_UNSUPPORTED";
+  // Own fields reach the CLI's JSON error output, which desktop reads.
+  readonly version: string | null;
+
+  constructor(target: string, version: string | null) {
+    super(
+      `The daemon at ${target}${version ? ` (v${version})` : ""} closes terminals when it stops. Update it first, or run \`clisbot daemon stop\` to stop it and close them.`,
+    );
+    this.name = "TerminalKeepUnsupportedError";
+    this.version = version;
+  }
+}
+
+/**
+ * Gate for an explicit "keep terminals" stop. Older daemons drop `keepTerminals` and close the
+ * terminals anyway, so read the capability on the connection that will carry the shutdown and
+ * refuse before sending it.
+ */
+// COMPAT(terminalsSurviveRestart): added in v0.12.0, remove gate after 2027-04-21.
+export function requireTerminalKeepCapability(
+  client: Pick<DaemonClient, "getLastServerInfoMessage">,
+  target: string,
+): void {
+  const serverInfo = client.getLastServerInfoMessage();
+  if (serverInfo?.features?.terminalsSurviveRestart !== true) {
+    throw new TerminalKeepUnsupportedError(target, serverInfo?.version ?? null);
+  }
 }
 
 function buildFetchAgentsRequest(
@@ -1394,12 +1531,16 @@ export class DaemonClient {
       ),
     release: async (subscriptionId) => {
       if (!this.isConnected) return;
+      const transport = this.transport;
       try {
         await this.sendCorrelatedSessionRequest({
           message: { type: "subscription.release.request", subscriptionId },
           responseType: "subscription.release.response",
         });
       } catch (error) {
+        // close() rejects in-flight requests after dropping the transport. That failure says
+        // nothing about a live connection, and rethrowing it would abort close() midway.
+        if (this.transport !== transport) return;
         this.disposeTransport(1001, "Subscription release failed");
         this.scheduleReconnect({ reason: "Subscription release failed" });
         throw error;
@@ -1408,6 +1549,9 @@ export class DaemonClient {
     failed: (error) => this.logger.error({ err: error }, "Subscription failed"),
   });
   private transport: DaemonTransport | null = null;
+  private chunkedTransport: ChunkedTransport | null = null;
+  /** The transport a session probe is verifying, so concurrent requests share one probe. */
+  private connectionVerification: DaemonTransport | null = null;
   private helloAuth: HelloAuth;
   private transportCleanup: Array<() => void> = [];
   private rawMessageListeners: Set<(message: SessionOutboundMessage) => void> = new Set();
@@ -1435,10 +1579,33 @@ export class DaemonClient {
   private connectionFailure: Error | undefined;
   private authFailureReasonValue: DaemonAuthFailureReason | null = null;
   private connectionState: ConnectionState = { status: "idle" };
+  private readonly diffStreams = new DiffStreamRouter({
+    modern: (compare) =>
+      this.observe(
+        "diff.subscribe.response",
+        { type: "diff.subscribe.request", ...compare },
+        {
+          validateSnapshot: (payload) => {
+            if (payload.error) throw new DiffSubscriptionError(payload.error);
+          },
+        },
+      ),
+    legacy: (cwd, compare) => this.observeCheckoutDiff(cwd, compare),
+    failed: (error) => this.logger.error({ err: error }, "Diff observer failed"),
+  });
   private readonly terminalStreams = new TerminalStreamRouter();
   private pendingBinaryFileReads = new Map<string, PendingBinaryFileRead>();
   private activeBinaryFileTransfers = new Map<string, BinaryFileTransferState>();
   private completedBinaryFileReads = new Map<string, FileReadResult>();
+  /** The last catalog's client bundles by plugin id, so later catalogs can leave them out. */
+  private pluginClientBundles = new Map<
+    string,
+    { clientBundleHash: string; clientBundle: string }
+  >();
+  private pluginClientBundleStore: PluginClientBundleStore | undefined;
+  private pluginClientBundlesLoaded: Promise<void> | undefined;
+  private pluginClientBundlesWrite: PluginClientBundle[] | undefined;
+  private pluginClientBundlesWriting = false;
   private logger: Logger;
   private pendingSendQueue: PendingSend[] = [];
   /**
@@ -1456,7 +1623,7 @@ export class DaemonClient {
   private runtimeMetricsInterval: ReturnType<typeof setInterval> | null = null;
   private runtimeMetrics: DaemonClientRuntimeMetrics | null = null;
   private pingProbe: PingProbe | null = null;
-  private connectionVerification: DaemonTransport | null = null;
+  private readonly pongWaiters = new Set<PongWaiter>();
   private livenessHeartbeatTimer: ReturnType<typeof setTimeout> | null = null;
   private lastLivenessRttMs: number | null = null;
   private consecutiveLivenessFailures = 0;
@@ -1605,6 +1772,18 @@ export class DaemonClient {
       });
       this.traceConnectionAttempt += 1;
       this.transport = transport;
+      this.chunkedTransport = new ChunkedTransport({
+        get supportsDrain() {
+          return transport.supportsDrain;
+        },
+        get frameBytes() {
+          return transport.maxFrameBytes ?? 32 * 1024 * 1024;
+        },
+        send: (frame) => transport.send(frame),
+        onFailure: () => transport.close(4003, "Transport send failed"),
+        deliver: (frame) => this.handleTransportMessage(frame),
+        onActivity: () => this.recordTransportActivity(),
+      });
       this.lastServerInfoMessage = null;
       this.authFailureReasonValue = null;
 
@@ -1719,7 +1898,16 @@ export class DaemonClient {
           });
         }),
         transport.onMessage((data) => {
-          if (this.transport === transport) this.handleTransportMessage(data);
+          if (this.transport !== transport) return;
+          const bytes = asUint8Array(data);
+          try {
+            if (typeof data === "string" || bytes)
+              this.chunkedTransport!.receive(typeof data === "string" ? data : bytes!);
+            else this.handleTransportMessage(data);
+          } catch (error) {
+            if (!(error instanceof ChunkedTransportProtocolError)) throw error;
+            transport.close(4003, "Invalid chunked transport");
+          }
         }),
       ];
     } catch (error) {
@@ -1786,10 +1974,12 @@ export class DaemonClient {
     this.disposeTransport(1000, "Client closed");
     this.providerSnapshotUpdates.clear();
     this.clearWaiters(new Error("Daemon client closed"));
+    await this.diffStreams.close();
     await this.owned.close();
     this.creations.close();
     this.rejectPendingSendQueue(new Error("Daemon client closed"));
     this.rejectPingProbe(new Error("Daemon client closed"));
+    this.rejectPongWaiters(new Error("Daemon client closed"));
     this.terminalStreams.clearSlots();
     this.lastServerInfoMessage = null;
     if (this.runtimeMetricsInterval) {
@@ -1808,7 +1998,7 @@ export class DaemonClient {
       this.shouldReconnect = true;
     }
     if (this.connectionState.status === "connected") {
-      if (options?.verify) this.verifyConnection();
+      if (options?.verify) this.verifyConnectionOnForeground();
       return;
     }
     if (this.connectionState.status === "connecting") return;
@@ -1842,6 +2032,11 @@ export class DaemonClient {
       .finally(() => {
         if (this.connectionVerification === transport) this.connectionVerification = null;
       });
+  }
+
+  private recordTransportActivity(): void {
+    this.consecutiveLivenessFailures = 0;
+    if (this.pingProbe) this.pingProbe.receivedActivity = true;
   }
 
   requireConnectedHosts(): void {
@@ -1917,22 +2112,38 @@ export class DaemonClient {
       });
     }
   }
-  async openHostLink(channelId: string): Promise<string> {
+  openHostLink(channelId: string): Promise<string>;
+  openHostLink(
+    channelId: string,
+    options: { flowControl: true },
+  ): Promise<{ routeId: string; flowControl: boolean }>;
+  async openHostLink(
+    channelId: string,
+    options?: { flowControl: true },
+  ): Promise<string | { routeId: string; flowControl: boolean }> {
     this.requireConnectedHosts();
     if (this.getLastServerInfoMessage()?.features?.hostMultiplexing !== true)
       throw Object.assign(new Error("Update the destination daemon"), {
         code: "unsupported_capability",
       });
-    return (
-      await this.sendCorrelatedSessionRequest({
-        message: { type: "hosts.link.open.request", channelId },
-        responseType: "hosts.link.open.response",
-      })
-    ).routeId;
+    const response = await this.sendCorrelatedSessionRequest({
+      message: {
+        type: "hosts.link.open.request",
+        channelId,
+        ...(options?.flowControl ? { flowControl: true } : {}),
+      },
+      responseType: "hosts.link.open.response",
+    });
+    return options?.flowControl
+      ? { routeId: response.routeId, flowControl: response.flowControl === true }
+      : response.routeId;
   }
-  sendHostFrame(routeId: string, data: string | Uint8Array): void {
+  acknowledgeHostLink(routeId: string, sequence: number): Promise<void> {
+    return this.sendSessionMessageStrict({ type: "hosts.link.ack.request", routeId, sequence });
+  }
+  sendHostFrame(routeId: string, data: string | Uint8Array): Promise<void> {
     if (typeof data === "string") {
-      this.sendSessionMessageStrict({
+      return this.sendSessionMessageStrict({
         type: "hosts.route.frame.request",
         routeId,
         data,
@@ -1940,7 +2151,7 @@ export class DaemonClient {
       });
     } else {
       if (!this.isConnected || !this.transport) throw this.unavailableError();
-      this.sendTransportFrame(encodeHostRouteFrame(routeId, data));
+      return this.sendTransportFrame(encodeHostRouteFrame(routeId, data));
     }
   }
   private readonly hostFrameListeners = new Set<(frame: HostRouteFrame) => void>();
@@ -1997,6 +2208,11 @@ export class DaemonClient {
   // ============================================================================
   // Message Subscription
   // ============================================================================
+
+  /** Drain capability inherited by transports routed through this connection. */
+  get supportsDrain(): boolean {
+    return this.transport?.supportsDrain !== false;
+  }
 
   subscribe(handler: DaemonEventHandler): () => void {
     this.eventListeners.add(handler);
@@ -2116,7 +2332,7 @@ export class DaemonClient {
     messageType: string,
     message: unknown,
     submitted?: () => void,
-  ): void {
+  ): Promise<void> {
     const isOpen =
       this.config.trace?.isEnabled() === true &&
       this.beginTraceSection("clisbot.ws.message.outbound", {
@@ -2125,14 +2341,15 @@ export class DaemonClient {
         ...describeRequestIdentity(message),
       });
     try {
-      this.sendTransportFrame(JSON.stringify(message), submitted);
+      return this.sendTransportFrame(JSON.stringify(message), submitted);
     } finally {
       this.endTraceSection(isOpen);
     }
   }
 
-  private sendSessionPayload(payload: SessionInboundMessage): void {
-    this.sendJsonMessage("session", payload.type, { type: "session", message: payload }, () => {
+  private sendSessionPayload(payload: SessionInboundMessage): Promise<void> {
+    const wire = this.legacyProviderOptions()?.prepare(payload) ?? payload;
+    return this.sendJsonMessage("session", payload.type, { type: "session", message: wire }, () => {
       if (!("requestId" in payload) || typeof payload.requestId !== "string") return;
       for (const waiter of this.waiters) {
         if (waiter.requestId === payload.requestId) waiter.submitted = true;
@@ -2143,7 +2360,7 @@ export class DaemonClient {
   private sendTransportFrame(
     frame: string | Uint8Array | ArrayBuffer,
     submitted?: () => void,
-  ): void {
+  ): Promise<void> {
     if (!this.transport) {
       throw this.unavailableError();
     }
@@ -2156,7 +2373,8 @@ export class DaemonClient {
     });
     try {
       submitted?.();
-      this.transport.send(frame);
+      const payload = typeof frame === "string" ? frame : asUint8Array(frame)!;
+      return this.chunkedTransport!.send(payload);
     } finally {
       this.endTraceSection(isOpen);
     }
@@ -2185,10 +2403,10 @@ export class DaemonClient {
     }
   }
 
-  private sendBinaryFrame(frame: Uint8Array): void {
+  private sendBinaryFrame(frame: Uint8Array): Promise<void> {
     if (!this.transport || this.connectionState.status !== "connected") {
       if (this.config.suppressSendErrors) {
-        return;
+        return Promise.resolve();
       }
       throw new Error(`Transport not connected (status: ${this.connectionState.status})`);
     }
@@ -2197,10 +2415,10 @@ export class DaemonClient {
         envelopeType: "binary",
         messageType: "binary",
       });
-      this.sendTransportFrame(frame);
+      return this.sendTransportFrame(frame);
     } catch (error) {
       if (this.config.suppressSendErrors) {
-        return;
+        return Promise.resolve();
       }
       throw error instanceof Error ? error : new Error(String(error));
     }
@@ -2218,7 +2436,7 @@ export class DaemonClient {
       if (payload.type === "fetch_agent_timeline_request") {
         this.traceTimeline("send", payload.agentId, payload.requestId);
       }
-      this.sendSessionPayload(payload);
+      return this.sendSessionPayload(payload);
     }, message);
   }
 
@@ -2227,13 +2445,15 @@ export class DaemonClient {
     return this.sendWhenConnected(() => undefined);
   }
 
-  private sendWhenConnected(send: () => void, message?: SessionInboundMessage): Promise<void> {
+  private sendWhenConnected(
+    send: () => void | Promise<void>,
+    message?: SessionInboundMessage,
+  ): Promise<void> {
     const status = this.connectionState.status;
 
     // If connected, send immediately
     if (this.transport && status === "connected") {
-      send();
-      return Promise.resolve();
+      return Promise.resolve(send());
     }
 
     // If connecting, queue the message to be sent once connected
@@ -2272,8 +2492,7 @@ export class DaemonClient {
       clearTimeout(pending.timeoutHandle);
       try {
         if (this.transport && this.connectionState.status === "connected") {
-          pending.send();
-          pending.resolve();
+          void Promise.resolve(pending.send()).then(pending.resolve, pending.reject);
         } else {
           pending.reject(new DaemonConnectionError("Connection lost before message could be sent"));
         }
@@ -2303,6 +2522,8 @@ export class DaemonClient {
     signal?: AbortSignal;
     select: (msg: SessionOutboundMessage) => T | null;
     options?: { skipQueue?: boolean };
+    /** Sends the request in another form, such as a binary frame; defaults to `message`. */
+    transmit?: () => Promise<void>;
   }): Promise<T> {
     if (params.signal?.aborted) throw new Error("Request canceled");
     const wire = this.owned.prepareRequest(params.message);
@@ -2328,7 +2549,7 @@ export class DaemonClient {
         return { kind: "ok", value };
       },
       timeout,
-      { ...params.options, requestId: params.requestId },
+      { ...params.options, requestId: params.requestId, requestType: params.message.type },
     );
 
     const abort = () => {
@@ -2342,25 +2563,23 @@ export class DaemonClient {
       }
     };
     params.signal?.addEventListener("abort", abort, { once: true });
+    // The response deadline still applies while the transport waits for drain.
     void promise.catch(() => undefined);
     try {
-      await this.sendSessionMessageOrThrow(wire.message);
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      cancel(err);
-      void promise.catch(() => undefined);
-      params.signal?.removeEventListener("abort", abort);
-      throw err;
-    }
-
-    try {
-      const result = await promise;
+      const sent = params.transmit
+        ? params.transmit()
+        : this.sendSessionMessageOrThrow(wire.message);
+      const result = await Promise.race([promise, sent.then(() => promise)]);
       if (result.kind === "error") {
         if (result.error.code === "access_denied")
           this.config.onResourceAccessDenied?.(result.error);
         throw result.error;
       }
       return result.value;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      cancel(err);
+      throw err;
     } finally {
       params.signal?.removeEventListener("abort", abort);
       await wire.finish();
@@ -2378,6 +2597,7 @@ export class DaemonClient {
     responseType: TResponseType;
     options?: { skipQueue?: boolean };
     selectPayload?: (payload: CorrelatedResponsePayload<TResponseType>) => TResult | null;
+    transmit?: () => Promise<void>;
   }): Promise<TResult> {
     return this.sendRequest({
       requestId: params.requestId,
@@ -2385,6 +2605,7 @@ export class DaemonClient {
       timeout: params.timeout,
       signal: params.signal,
       options: params.options,
+      ...(params.transmit ? { transmit: params.transmit } : {}),
       select: (msg) => {
         const correlated = msg as CorrelatedResponseMessage;
         if (correlated.type !== params.responseType) {
@@ -2455,13 +2676,13 @@ export class DaemonClient {
     });
   }
 
-  private sendSessionMessageStrict(message: SessionInboundMessage): void {
+  private sendSessionMessageStrict(message: SessionInboundMessage): Promise<void> {
     if (!this.transport || this.connectionState.status !== "connected") {
       throw this.unavailableError();
     }
     const payload = SessionInboundMessageSchema.parse(message);
     try {
-      this.sendSessionPayload(payload);
+      return this.sendSessionPayload(payload);
     } catch (error) {
       throw error instanceof Error ? error : new Error(String(error));
     }
@@ -3051,34 +3272,41 @@ export class DaemonClient {
 
   measureLatency(params?: { timeoutMs?: number }): Promise<number> {
     const timeoutMs = Math.max(1, params?.timeoutMs ?? DEFAULT_LIVENESS_TIMEOUT_MS);
-    return this.sendPingAwaitRtt({ timeoutMs, drivesLivenessFailure: false }).catch((error) => {
-      throw toTimeoutError(error, "Latency measurement", timeoutMs);
-    });
-  }
-
-  private async livenessPing(params?: { timeoutMs?: number }): Promise<number> {
-    const timeoutMs = Math.max(1, params?.timeoutMs ?? DEFAULT_LIVENESS_TIMEOUT_MS);
-    try {
-      const rttMs = await this.sendPingAwaitRtt({ timeoutMs, drivesLivenessFailure: true });
-      this.lastLivenessRttMs = rttMs;
-      return rttMs;
-    } catch (error) {
-      throw toTimeoutError(error, "Liveness check", timeoutMs);
-    }
-  }
-
-  private sendPingAwaitRtt(params: {
-    timeoutMs: number;
-    drivesLivenessFailure: boolean;
-  }): Promise<number> {
     if (this.connectionState.status !== "connected" || !this.transport) {
       return Promise.reject(
         new Error(`Transport not connected (status: ${this.connectionState.status})`),
       );
     }
+    const waiter: PongWaiter = { startedAt: perfNow(), resolve: () => {}, reject: () => {} };
+    const pong = new Promise<number>((resolve, reject) => {
+      waiter.resolve = resolve;
+      waiter.reject = reject;
+    });
+    let deadline: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      deadline = setTimeout(() => reject(new PingTimeoutError(timeoutMs)), timeoutMs);
+    });
+    this.pongWaiters.add(waiter);
+    // The probe only puts a ping on the wire; its own outcome is the heartbeat's concern. A
+    // measurement that joins an in-flight ping reports that ping's round trip, so the clock
+    // starts at the send, not at the join.
+    const probe = this.ensurePingProbe({ timeoutMs, role: "latency" });
+    void probe.promise.catch(() => {});
+    waiter.startedAt = probe.startedAt;
+    return Promise.race([pong, timeout])
+      .catch((error) => {
+        throw toTimeoutError(error, "Latency measurement", timeoutMs);
+      })
+      .finally(() => {
+        clearTimeout(deadline);
+        this.pongWaiters.delete(waiter);
+      });
+  }
 
+  // One ping is outstanding at a time; a caller that finds one shares it.
+  private ensurePingProbe(params: { timeoutMs: number; role: PingProbeRole }): PingProbe {
     if (this.pingProbe) {
-      return this.pingProbe.promise;
+      return this.pingProbe;
     }
 
     const startedAt = perfNow();
@@ -3089,38 +3317,53 @@ export class DaemonClient {
       resolveProbe = resolve;
       rejectProbe = reject;
     });
+    const expire = () => {
+      if (this.pingProbe !== probe) return;
+      this.pingProbe = null;
+      const error = new PingTimeoutError(timeoutMs);
+      probe.reject(error);
+      if (
+        probe.role === "foreground" &&
+        Date.now() - probe.startedAtWallMs > timeoutMs + SUSPENDED_WINDOW_SLACK_MS
+      ) {
+        // The app was suspended again inside this window. Discard it, any frame it saw and
+        // the misses before it; the heartbeat tick that owns this probe starts the cycle over.
+        probe.receivedActivity = false;
+        this.consecutiveLivenessFailures = 0;
+        return;
+      }
+      // Keep the deadline fixed so subsequent pings renew the daemon socket lease
+      // during a long download. Progress proves life even when its pong is queued.
+      if (probe.role !== "latency" && !probe.receivedActivity) {
+        this.recordLivenessFailure(toTimeoutError(error, "Liveness check", timeoutMs), probe.role);
+      }
+    };
     const probe: PingProbe = {
       promise,
       resolve: (value) => resolveProbe?.(value),
       reject: (error) => rejectProbe?.(error),
-      timeoutHandle: setTimeout(() => {
-        if (this.pingProbe !== probe) {
-          return;
-        }
-        this.pingProbe = null;
-        const error = new PingTimeoutError(timeoutMs);
-        probe.reject(error);
-        if (probe.drivesLivenessFailure) {
-          this.recordLivenessFailure(toTimeoutError(error, "Liveness check", timeoutMs));
-        }
-      }, timeoutMs),
+      timeoutHandle: setTimeout(expire, timeoutMs),
+      receivedActivity: false,
       startedAt,
-      drivesLivenessFailure: params.drivesLivenessFailure,
+      startedAtWallMs: Date.now(),
+      role: params.role,
     };
     this.pingProbe = probe;
 
-    try {
-      this.sendJsonMessage("ping", "ping", { type: "ping" });
-    } catch (error) {
-      this.clearPingProbe();
+    const rejectSend = (error: unknown) => {
+      if (this.pingProbe !== probe) return;
       const sendError = error instanceof Error ? error : new Error(String(error));
-      if (probe.drivesLivenessFailure) {
-        this.recordLivenessFailure(sendError);
-      }
-      return Promise.reject(sendError);
+      this.rejectPingProbe(sendError);
+      this.rejectPongWaiters(sendError);
+      if (probe.role !== "latency") this.recordLivenessFailure(sendError, probe.role);
+    };
+    try {
+      void this.sendJsonMessage("ping", "ping", { type: "ping" }).catch(rejectSend);
+    } catch (error) {
+      rejectSend(error);
     }
 
-    return promise;
+    return probe;
   }
 
   private startLivenessHeartbeat(): void {
@@ -3143,12 +3386,60 @@ export class DaemonClient {
     }
     this.livenessHeartbeatTimer = setTimeout(() => {
       this.livenessHeartbeatTimer = null;
-      this.livenessPing({ timeoutMs: LIVENESS_HEARTBEAT_TIMEOUT_MS })
-        .catch(() => {})
-        .finally(() => {
-          this.scheduleNextLivenessHeartbeat();
-        });
+      this.tickLivenessHeartbeat();
     }, LIVENESS_HEARTBEAT_INTERVAL_MS);
+  }
+
+  /**
+   * The app came back to the foreground. Start a fresh verification cycle: two
+   * FOREGROUND_LIVENESS_TIMEOUT_MS windows back to back, then teardown and an immediate
+   * reconnect. Misses recorded before the app was suspended do not count, and a heartbeat
+   * probe that straddled the suspension measured the suspension, not the socket, so it is
+   * dropped without a miss. Latency measurements wait for the next pong, so replacing the
+   * probe they joined does not fail them.
+   */
+  private verifyConnectionOnForeground(): void {
+    // A cycle already running keeps its deadline and its window count.
+    if (this.pingProbe?.role === "foreground") return;
+    if (this.pingProbe?.role === "heartbeat") {
+      this.rejectPingProbe(new Error("Heartbeat superseded by foreground check"));
+    }
+    // A shared latency probe keeps its deadline, but only frames that arrive from now on count
+    // for this check; a latency probe never reads this flag for itself.
+    if (this.pingProbe) this.pingProbe.receivedActivity = false;
+    this.consecutiveLivenessFailures = 0;
+    this.tickLivenessHeartbeat("foreground");
+  }
+
+  private tickLivenessHeartbeat(check: "heartbeat" | "foreground" = "heartbeat"): void {
+    this.stopLivenessHeartbeat();
+    const transport = this.transport;
+    if (this.connectionState.status !== "connected" || !transport) return;
+    const probe = this.ensurePingProbe({
+      timeoutMs:
+        check === "foreground" ? FOREGROUND_LIVENESS_TIMEOUT_MS : LIVENESS_HEARTBEAT_TIMEOUT_MS,
+      role: check,
+    });
+    void probe.promise
+      .then(
+        (rttMs) => {
+          this.lastLivenessRttMs = rttMs;
+          return true;
+        },
+        () => probe.receivedActivity,
+      )
+      .then((alive) => {
+        // A replaced transport, or a probe that superseded this one, owns the next step.
+        if (this.transport !== transport || this.pingProbe) return;
+        if (!alive && check === "foreground") {
+          // Zero inbound frames in a foreground window: check again now. The second silent
+          // window reaches the threshold inside recordLivenessFailure.
+          this.tickLivenessHeartbeat("foreground");
+          return;
+        }
+        this.scheduleNextLivenessHeartbeat();
+        return;
+      });
   }
 
   // ============================================================================
@@ -3158,7 +3449,12 @@ export class DaemonClient {
   private observe<T extends CorrelatedResponseType>(
     responseType: T,
     message: { type: SessionInboundMessage["type"] } & Record<string, unknown>,
-    options?: { requestId?: string; timeout?: number; signal?: AbortSignal },
+    options?: {
+      requestId?: string;
+      timeout?: number;
+      signal?: AbortSignal;
+      validateSnapshot?: (payload: CorrelatedResponsePayload<T>) => void;
+    },
   ): OwnedSubscription<CorrelatedResponsePayload<T>> {
     let resetSource = false;
     return this.owned.observeRequest<CorrelatedResponsePayload<T>>(
@@ -3167,6 +3463,7 @@ export class DaemonClient {
         resetSource = false;
         if (query.type === "workspace.setup.subscribe.request")
           this.requireWorkspaceSetupObservation();
+        if (query.type === "plugin.rpc.subscribe.request") this.requirePluginSubscriptions();
         const requestId = this.createRequestId(options?.requestId);
         const request = SessionInboundMessageSchema.parse({ ...query, requestId });
         try {
@@ -3183,12 +3480,16 @@ export class DaemonClient {
                   requestType: message.type,
                   error: payload.error,
                 });
+              options?.validateSnapshot?.(payload);
               accept(payload);
               return payload;
             },
           });
         } catch (error) {
-          resetSource = !(error instanceof DaemonRpcError) && this.isConnected;
+          resetSource =
+            !(error instanceof DaemonRpcError) &&
+            !(error instanceof DiffSubscriptionError) &&
+            this.isConnected;
           throw error;
         }
       },
@@ -3389,6 +3690,28 @@ export class DaemonClient {
     });
   }
 
+  /** Finds one workspace by id across pages, background ones included when the host has them. */
+  async findWorkspace(
+    workspaceId: string,
+    options?: { requestId?: string },
+  ): Promise<FetchWorkspacesEntry | null> {
+    const filter = this.supportsBackgroundWorkspaces() ? { includeBackground: true } : {};
+    let cursor: string | undefined;
+    let requestId = options?.requestId;
+    do {
+      const result = await this.fetchWorkspaces({
+        requestId,
+        filter,
+        page: { limit: 200, ...(cursor ? { cursor } : {}) },
+      });
+      const match = result.entries.find((entry) => entry.id === workspaceId);
+      if (match) return match;
+      cursor = result.pageInfo.nextCursor ?? undefined;
+      requestId = undefined;
+    } while (cursor);
+    return null;
+  }
+
   listWorkspaceLabels(
     options: {
       sync?: { generation: string; afterSeq: number };
@@ -3494,6 +3817,19 @@ export class DaemonClient {
     });
   }
 
+  /** Repositories the user ran agent sessions in recently, grouped by main checkout. */
+  listProjectSuggestions(options?: ProjectSuggestionsOptions): Promise<ProjectSuggestionsPayload> {
+    return this.sendNamespacedCorrelatedSessionRequest<"project.suggestions.response">({
+      requestId: options?.requestId,
+      message: {
+        type: "project.suggestions.request",
+        ...(options?.providers ? { providers: options.providers } : {}),
+        ...(options?.since ? { since: options.since } : {}),
+        ...(options?.limit ? { limit: options.limit } : {}),
+      },
+    });
+  }
+
   async openProject(cwd: string, requestId?: string): Promise<OpenProjectPayload> {
     return this.sendCorrelatedSessionRequest({
       requestId,
@@ -3502,6 +3838,9 @@ export class DaemonClient {
         cwd,
       },
       responseType: "open_project_response",
+      // Opening a path whose checkout is currently archiving waits on the daemon checkout gate;
+      // wait for the terminal response or transport disconnect instead of timing out while queued.
+      timeout: 0,
     });
   }
 
@@ -3633,6 +3972,9 @@ export class DaemonClient {
         workspaceId,
       },
       responseType: "archive_workspace_response",
+      // Archive may wait for a queued checkout operation and then run teardown/manager removal,
+      // each bounded on the daemon; wait for the terminal response or transport disconnect.
+      timeout: 0,
     });
   }
 
@@ -3767,6 +4109,13 @@ export class DaemonClient {
     legacyWorkspace: (input) => this.createLegacyWorkspace(input, input.requestId),
   });
 
+  // Entity metadata is gated once at the transport boundary.
+  private requireEntityMetadata(): void {
+    if (this.lastServerInfoMessage?.features?.entityMetadata !== true) {
+      throw new Error("Update the host to use metadata.");
+    }
+  }
+
   // Background workspaces are gated once at the transport boundary.
   private requireBackgroundWorkspaces(): void {
     if (this.lastServerInfoMessage?.features?.backgroundWorkspaces !== true) {
@@ -3778,19 +4127,61 @@ export class DaemonClient {
     return this.lastServerInfoMessage?.features?.backgroundWorkspaces === true;
   }
 
+  // Background on a request that creates its workspace predates background agents: older hosts
+  // apply it to the new workspace. Placing a background agent in an existing workspace, or
+  // under a caller, needs a host that knows background agents.
+  private requireBackgroundCreation(options: CreateAgentRequestOptions): void {
+    if (options.workspaceId === undefined && options.callerAgentId === undefined) {
+      this.requireBackgroundWorkspaces();
+    } else if (this.lastServerInfoMessage?.features?.backgroundAgents !== true) {
+      throw new Error("Update the host to use background agents.");
+    }
+  }
+
   async createAgent(options: CreateAgentRequestOptions): Promise<AgentSnapshotPayload> {
     if (options.git !== undefined || options.worktreeName !== undefined) {
       throw new Error(
         "Legacy git/worktreeName agent placement was removed. Use createWorkspace({ source, agent, idempotencyKey }) or create a workspace first and pass workspaceId.",
       );
     }
-    if (options.background !== undefined) this.requireBackgroundWorkspaces();
+    if (options.background !== undefined) this.requireBackgroundCreation(options);
+    if (options.metadata !== undefined) this.requireEntityMetadata();
+    const config = resolveAgentConfig(options);
     const result = await this.creations.createAgent({
       ...options,
-      config: resolveAgentConfig(options),
+      config: this.carriesLegacyOptions(config)
+        ? await this.routeLegacyCreateConfig(config)
+        : config,
     });
     if (result.error || !result.agent) throw new Error(result.error ?? "Agent creation failed");
     return result.agent;
+  }
+
+  /**
+   * A legacy daemon reads control options as `featureValues`, and which options are controls
+   * depends on the config (Claude's differ by model), so a create that carries options first lists
+   * the controls for its own config. Callers never prime anything.
+   */
+  private carriesLegacyOptions(config: AgentSessionConfig): boolean {
+    return (
+      this.legacyProviderOptions() !== null && Object.keys(config.providerOptions ?? {}).length > 0
+    );
+  }
+
+  private async routeLegacyCreateConfig(config: AgentSessionConfig): Promise<AgentSessionConfig> {
+    const payload = await this.listProviderFeatures({
+      provider: config.provider,
+      cwd: config.cwd || "~",
+      ...(config.modeId ? { modeId: config.modeId } : {}),
+      ...(config.model ? { model: config.model } : {}),
+      ...(config.thinkingOptionId ? { thinkingOptionId: config.thinkingOptionId } : {}),
+      featureValues: config.providerOptions,
+    });
+    if (payload.error) throw new Error(payload.error);
+    return this.legacyOptions.routeCreateConfig(
+      config,
+      new Set((payload.features ?? []).map((feature) => feature.id)),
+    );
   }
 
   private async createLegacyAgent(
@@ -3991,6 +4382,42 @@ export class DaemonClient {
     return { removedWorkspaceIds: payload.removedWorkspaceIds };
   }
 
+  /** Top-level keys replace; `null` removes the key. Resolves to the agent's metadata afterwards. */
+  async setAgentMetadata(
+    agentId: string,
+    patch: Record<string, JsonValue>,
+    requestId?: string,
+  ): Promise<Record<string, JsonValue>> {
+    this.requireEntityMetadata();
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"agent.metadata.update.response">({
+        requestId,
+        message: { type: "agent.metadata.update.request", agentId, patch },
+      });
+    if (!payload.accepted || !payload.metadata) {
+      throw new Error(payload.error ?? "setAgentMetadata rejected");
+    }
+    return payload.metadata;
+  }
+
+  /** Top-level keys replace; `null` removes the key. Resolves to the workspace's metadata afterwards. */
+  async setWorkspaceMetadata(
+    workspaceId: string,
+    patch: Record<string, JsonValue>,
+    requestId?: string,
+  ): Promise<Record<string, JsonValue>> {
+    this.requireEntityMetadata();
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"workspace.metadata.update.response">({
+        requestId,
+        message: { type: "workspace.metadata.update.request", workspaceId, patch },
+      });
+    if (!payload.accepted || !payload.metadata) {
+      throw new Error(payload.error ?? "setWorkspaceMetadata rejected");
+    }
+    return payload.metadata;
+  }
+
   async setWorkspaceTitle(
     workspaceId: string,
     title: string | null,
@@ -4031,6 +4458,22 @@ export class DaemonClient {
     return { pinnedAt: payload.pinnedAt };
   }
 
+  async setWorkspaceBaseBranch(options: {
+    workspaceId: string;
+    baseRef: string;
+    requestId?: string;
+  }): Promise<{ baseRef: string | null }> {
+    const { requestId, workspaceId, baseRef } = options;
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"workspace.base_branch.set.response">({
+        requestId,
+        message: { type: "workspace.base_branch.set.request", workspaceId, baseRef },
+      });
+    if (!payload.accepted)
+      throw new Error(payload.error ?? "Changing the workspace base branch failed");
+    return { baseRef: payload.baseRef };
+  }
+
   async inspectWorkspaceRecovery(
     workspaceId: string,
     requestId?: string,
@@ -4054,10 +4497,30 @@ export class DaemonClient {
           type: "workspace.recovery.restore.request",
           workspaceId,
         },
-        timeout: 150_000,
+        // Restore may wait behind an active archive/removal before running a bounded restore stage;
+        // wait for the terminal response or transport disconnect instead of timing out mid-workflow.
+        timeout: 0,
       });
     if (!payload.accepted) {
       throw new Error(payload.error ?? "Workspace recovery was rejected by the host");
+    }
+  }
+
+  /** Rejects when the host could not put the workspace back; an old host has no such RPC. */
+  async undoWorkspaceArchive(workspaceId: string, requestId?: string): Promise<void> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"workspace.archive.undo.response">({
+        requestId,
+        message: {
+          type: "workspace.archive.undo.request",
+          workspaceId,
+        },
+        // Undo may wait for an in-flight archive to settle and then recreate the worktree;
+        // wait for the terminal response or transport disconnect.
+        timeout: 0,
+      });
+    if (!payload.accepted) {
+      throw new Error(payload.error ?? "The host could not undo the workspace archive");
     }
   }
 
@@ -4162,12 +4625,18 @@ export class DaemonClient {
     agentId: string,
     options: FetchAgentTimelineOptions = {},
   ): Promise<FetchAgentTimelinePayload> {
+    // COMPAT(wholeTurnTimeline): added after v0.13.2 (#8010); remove after 2027-04-27 once the daemon floor supports whole-turn pages.
+    // Reading history predates this capability and must keep working on older hosts.
+    const supportsWholeTurns = this.lastServerInfoMessage?.features?.wholeTurnTimeline === true;
     const resolvedRequestId = this.createRequestId(options.requestId);
     this.traceTimeline("invoke", agentId, resolvedRequestId);
     // COMPAT(agentSessionStorageRead): options from a cached view must not opt an old host in.
     const storageReadable = this.lastServerInfoMessage?.features?.agentSessionStorageRead === true;
     const message = SessionInboundMessageSchema.parse({
       type: "fetch_agent_timeline_request",
+      ...(supportsWholeTurns && options.wholeTurns !== undefined
+        ? { wholeTurns: options.wholeTurns }
+        : {}),
       agentId,
       requestId: resolvedRequestId,
       ...(options.direction ? { direction: options.direction } : {}),
@@ -4353,6 +4822,58 @@ export class DaemonClient {
     return payload;
   }
 
+  async listAgentBackgroundWork(
+    agentId: string,
+    options: { requestId?: string; timeout?: number } = {},
+  ): Promise<AgentBackgroundWorkItem[]> {
+    this.assertAgentBackgroundWorkSupported();
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"agent.background_work.list.response">({
+        requestId: options.requestId,
+        timeout: options.timeout,
+        message: { type: "agent.background_work.list.request", agentId },
+      });
+    if (payload.error) throw new Error(payload.error);
+    return payload.items;
+  }
+
+  async stopAgentBackgroundWork(
+    agentId: string,
+    item: AgentBackgroundWorkItem,
+    options: { requestId?: string; timeout?: number } = {},
+  ): Promise<void> {
+    // COMPAT(agentBackgroundWorkStop): added after v0.15.0, remove after 2027-05-03.
+    if (this.lastServerInfoMessage?.features?.agentBackgroundWorkStop !== true)
+      throw new Error("Update the host to stop background work.");
+    if (!item.canStop || !item.stopToken) throw new Error("Background work cannot be stopped.");
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"agent.background_work.stop.response">({
+        requestId: options.requestId,
+        timeout: options.timeout ?? 30000,
+        message: {
+          type: "agent.background_work.stop.request",
+          agentId,
+          itemId: item.id,
+          stopToken: item.stopToken,
+        },
+      });
+    if (payload.error) throw new Error(payload.error);
+  }
+
+  observeAgentBackgroundWork(
+    options: { signal?: AbortSignal } = {},
+  ): OwnedSubscription<CorrelatedResponsePayload<"session.events.set_subscription.response">> {
+    this.assertAgentBackgroundWorkSupported();
+    return this.observeEvents(["agent.background_work.update"], options);
+  }
+
+  private assertAgentBackgroundWorkSupported(): void {
+    // COMPAT(agentBackgroundWork): added after v0.11.0-beta.5, remove gate after 2027-04-06.
+    if (this.lastServerInfoMessage?.features?.agentBackgroundWork !== true) {
+      throw new Error("Update the host to see an agent's background work.");
+    }
+  }
+
   async fetchProviderSubagentTimeline(
     parentAgentId: string,
     subagentId: string,
@@ -4397,11 +4918,23 @@ export class DaemonClient {
 
   observeTimeline(
     agentIds: string[],
-    options?: { signal?: AbortSignal },
+    options?: {
+      signal?: AbortSignal;
+      /** The caller's position per chat; the response answers whether each is at the head. */
+      cursors?: Record<string, { epoch: string; seq: number }>;
+    },
   ): OwnedSubscription<CorrelatedResponsePayload<"agent.timeline.set_subscription.response">> {
     return this.observe(
       "agent.timeline.set_subscription.response",
-      { type: "agent.timeline.set_subscription.request", agentIds },
+      {
+        type: "agent.timeline.set_subscription.request",
+        agentIds,
+        // COMPAT(timelineFreshnessCheck): added after v0.15.3, remove after 2027-05-09.
+        ...(options?.cursors &&
+        this.lastServerInfoMessage?.features?.timelineFreshnessCheck === true
+          ? { cursors: options.cursors }
+          : {}),
+      },
       options,
     );
   }
@@ -4470,7 +5003,7 @@ export class DaemonClient {
     agentId: string,
     text: string,
     options: SendMessageOptions = {},
-  ): Promise<{ deliveryStatus?: "queued" }> {
+  ): Promise<AgentMessageReceipt> {
     this.assertSendMessageCapabilities(options);
     if (
       options.sourceAgentServerId &&
@@ -4478,6 +5011,7 @@ export class DaemonClient {
     ) {
       throw new Error("Update the Clisbot host to send messages with a qualified agent address.");
     }
+    const activeTurnBehavior = this.activeTurnBehaviorForHost(options);
     const requestId = this.createRequestId();
     const messageId = options.messageId ?? crypto.randomUUID();
     const message = SessionInboundMessageSchema.parse({
@@ -4489,7 +5023,7 @@ export class DaemonClient {
       sourceAgentServerId: options.sourceAgentServerId,
       sessionMode: options.sessionMode,
       ...(messageId ? { messageId } : {}),
-      activeTurnBehavior: options.activeTurnBehavior,
+      activeTurnBehavior,
       images: options.images,
       attachments: options.attachments,
       expectedTurnId: options.expectedTurnId,
@@ -4511,14 +5045,39 @@ export class DaemonClient {
     if (!payload.accepted) {
       throw new Error(payload.error ?? "sendAgentMessage rejected");
     }
-    return payload.deliveryStatus ? { deliveryStatus: payload.deliveryStatus } : {};
+    return {
+      ...(payload.deliveryStatus ? { deliveryStatus: payload.deliveryStatus } : {}),
+      ...(payload.activeTurnBehavior ? { activeTurnBehavior: payload.activeTurnBehavior } : {}),
+      ...(payload.guidance ? { guidance: payload.guidance } : {}),
+    };
+  }
+
+  /** The behavior to put on the wire for this host. */
+  private activeTurnBehaviorForHost(
+    options: SendMessageOptions,
+  ): AgentActiveTurnBehavior | undefined {
+    const requested = options.activeTurnBehavior;
+    if (!options.sourceAgentId) {
+      if (requested === "queue")
+        throw new Error('activeTurnBehavior "queue" needs an agent sender (sourceAgentId).');
+      return requested;
+    }
+    if (this.lastServerInfoMessage?.features?.agentActiveTurnBehaviors === true) return requested;
+    // COMPAT(agentActiveTurnBehaviors): added in v0.17.2, remove after 2027-05-22 once daemon
+    // floor >= v0.17.2. Older hosts reject queue and read an agent's steer as queue, so queue
+    // goes out as the host's own agent default and a real steer needs an update.
+    if (requested === "steer")
+      throw new Error(
+        "Update the Clisbot host to steer a running turn from an agent. Leave the behavior out to queue the message, or use interrupt.",
+      );
+    return requested === "interrupt" ? "interrupt" : undefined;
   }
 
   async sendMessage(
     agentId: string,
     text: string,
     options?: SendMessageOptions,
-  ): Promise<{ deliveryStatus?: "queued" }> {
+  ): Promise<AgentMessageReceipt> {
     return this.sendAgentMessage(agentId, text, options);
   }
 
@@ -4664,6 +5223,41 @@ export class DaemonClient {
     }
   }
 
+  /**
+   * Changes the agent's own provider options: top-level keys replace, `null` removes the key.
+   * A daemon without `providerOptionControls` takes each key as a feature write.
+   */
+  async setAgentOptions(
+    agentId: string,
+    patch: Record<string, unknown>,
+  ): Promise<AgentProviderNotice | null> {
+    const legacy = this.legacyProviderOptions();
+    if (legacy) {
+      // COMPAT(providerOptionControls): added in v0.15.0, remove after 2027-05-01.
+      const pending = this.legacyResetControls(agentId, patch);
+      const controls = pending ? await pending : [];
+      for (const [featureId, value] of legacy.featureWrites(patch, controls)) {
+        await this.setAgentFeature(agentId, featureId, value);
+      }
+      return null;
+    }
+    return this.applyAgentConfig(agentId, { options: patch });
+  }
+
+  /**
+   * COMPAT(providerOptionControls): added in v0.15.0, remove after 2027-05-01.
+   * A reset (`null`) on a daemon without `providerOptionControls` is written as the value its
+   * control resets to, which takes the agent's controls. Without a reset nothing is fetched, so
+   * the write is not delayed.
+   */
+  private legacyResetControls(
+    agentId: string,
+    patch: Record<string, unknown>,
+  ): Promise<AgentOptionControl[]> | null {
+    if (!Object.values(patch).includes(null)) return null;
+    return this.fetchAgent(agentId).then((result) => result?.agent.controls ?? []);
+  }
+
   async setAgentThinkingOption(
     agentId: string,
     thinkingOptionId: string | null,
@@ -4706,11 +5300,18 @@ export class DaemonClient {
     agentId: string,
     config: AgentConfigApply,
   ): Promise<AgentProviderNotice | null> {
+    let wireConfig = config;
+    const legacy = this.legacyProviderOptions();
+    if (legacy && config.options) {
+      // COMPAT(providerOptionControls): added in v0.15.0, remove after 2027-05-01.
+      const pending = this.legacyResetControls(agentId, config.options);
+      wireConfig = legacy.featureValuesConfig(config, pending ? await pending : []);
+    }
     const requestId = this.createRequestId();
     const message = SessionInboundMessageSchema.parse({
       type: "agent.config.apply.request",
       agentId,
-      config,
+      config: wireConfig,
       requestId,
     });
     const payload = await this.sendRequest({
@@ -4736,13 +5337,14 @@ export class DaemonClient {
   async restartServer(
     reason?: string,
     requestId?: string,
-    options?: { timeout?: number },
+    options?: { timeout?: number; killTerminals?: boolean },
   ): Promise<RestartRequestedStatusPayload> {
     const resolvedRequestId = this.createRequestId(requestId);
     const message = SessionInboundMessageSchema.parse({
       type: "restart_server_request",
       ...(reason && reason.trim().length > 0 ? { reason } : {}),
       requestId: resolvedRequestId,
+      ...(options?.killTerminals ? { killTerminals: true } : {}),
     });
     return this.sendRequest({
       requestId: resolvedRequestId,
@@ -4770,6 +5372,7 @@ export class DaemonClient {
     const message = SessionInboundMessageSchema.parse({
       type: "shutdown_server_request",
       requestId: resolvedRequestId,
+      ...(options?.keepTerminals ? { keepTerminals: true } : {}),
     });
     return this.sendRequest({
       requestId: resolvedRequestId,
@@ -4852,7 +5455,7 @@ export class DaemonClient {
   }
 
   async sendVoiceAudioChunk(audio: string, format: string, isLast = false): Promise<void> {
-    this.sendSessionMessage({ type: "voice_audio_chunk", audio, format, isLast });
+    return this.sendSessionMessageStrict({ type: "voice_audio_chunk", audio, format, isLast });
   }
 
   async startDictationStream(dictationId: string, format: string): Promise<void> {
@@ -4893,8 +5496,13 @@ export class DaemonClient {
 
     const cleanupError = new Error("Cancelled dictation start waiter");
     try {
-      this.sendSessionMessageStrict({ type: "dictation_stream_start", dictationId, format });
-      await Promise.race([ackPromise, errorPromise]);
+      const sent = this.sendSessionMessageStrict({
+        type: "dictation_stream_start",
+        dictationId,
+        format,
+      });
+      const response = Promise.race([ackPromise, errorPromise]);
+      await Promise.race([response, sent.then(() => response)]);
     } finally {
       ack.cancel(cleanupError);
       streamError.cancel(cleanupError);
@@ -5029,12 +5637,17 @@ export class DaemonClient {
 
     const cleanupError = new Error("Cancelled dictation finish waiter");
     try {
-      this.sendSessionMessageStrict({ type: "dictation_stream_finish", dictationId, finalSeq });
-      const firstOutcome = await Promise.race([
+      const sent = this.sendSessionMessageStrict({
+        type: "dictation_stream_finish",
+        dictationId,
+        finalSeq,
+      });
+      const response = Promise.race([
         finalOutcomePromise,
         errorOutcomePromise,
         finishAcceptedOutcomePromise,
       ]);
+      const firstOutcome = await Promise.race([response, sent.then(() => response)]);
 
       if (firstOutcome.kind === "final") {
         return firstOutcome.payload;
@@ -5162,6 +5775,26 @@ export class DaemonClient {
     });
   }
 
+  observeDiff(compare: DiffCompare): OwnedSubscription<DiffState> {
+    return this.diffStreams.observe(compare);
+  }
+
+  async readDiff(compare: DiffCompare): Promise<DiffState> {
+    const observation = this.observeDiff(compare);
+    try {
+      return await new Promise<DiffState>((resolve) => {
+        observation.subscribe({
+          snapshot: (state) => {
+            if (state.phase !== "loading") resolve(state);
+          },
+          update: () => {},
+        });
+      });
+    } finally {
+      await observation.release();
+    }
+  }
+
   observeCheckoutDiff(
     cwd: string,
     compare: { mode: "uncommitted" | "base" | "all"; baseRef?: string; ignoreWhitespace?: boolean },
@@ -5280,6 +5913,23 @@ export class DaemonClient {
       throw new Error(payload.error.message);
     }
     return { baseRef: payload.baseRef, commits: payload.commits };
+  }
+
+  /** Every git worktree of the repository `cwd` is in, whoever created it. */
+  async listCheckoutWorktrees(cwd: string, requestId?: string): Promise<CheckoutWorktree[]> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"checkout.worktrees.list.response">({
+        requestId,
+        message: {
+          type: "checkout.worktrees.list.request",
+          cwd,
+        },
+        timeout: 60000,
+      });
+    if (payload.error) {
+      throw new Error(payload.error.message);
+    }
+    return payload.worktrees;
   }
 
   async getCommitFileDiff(
@@ -5561,6 +6211,9 @@ export class DaemonClient {
         ...(input.scope !== undefined ? { scope: input.scope } : {}),
       },
       responseType: "clisbot_worktree_archive_response",
+      // Archive may wait for a queued checkout operation and then run teardown/manager removal,
+      // each bounded on the daemon; wait for the terminal response or transport disconnect.
+      timeout: 0,
     });
   }
 
@@ -5584,6 +6237,10 @@ export class DaemonClient {
         ...(input.githubPrNumber !== undefined ? { githubPrNumber: input.githubPrNumber } : {}),
       },
       responseType: "create_clisbot_worktree_response",
+      // Every daemon stage (before hooks, shared 120s manager budget, Git, after hooks) enforces
+      // its own deadline, and transport heartbeats/close reject if the host drops, so wait for the
+      // terminal worktree response instead of aborting prematurely mid-workflow.
+      timeout: 0,
     });
   }
 
@@ -5595,12 +6252,16 @@ export class DaemonClient {
     if (input.background !== undefined || input.callerAgentId) this.requireBackgroundWorkspaces();
     if (input.agent?.background !== undefined)
       throw new Error("Configure background on the workspace, not its initial agent.");
+    if (input.metadata !== undefined || input.agent?.metadata !== undefined)
+      this.requireEntityMetadata();
+    let agentConfig = input.agent ? resolveAgentConfig(input.agent) : undefined;
+    if (agentConfig && this.carriesLegacyOptions(agentConfig)) {
+      agentConfig = await this.routeLegacyCreateConfig(agentConfig);
+    }
     const result = await this.creations.createWorkspace({
       ...input,
       requestId: resolvedRequestId,
-      ...(input.agent
-        ? { agent: { ...input.agent, config: resolveAgentConfig(input.agent) } }
-        : {}),
+      ...(input.agent && agentConfig ? { agent: { ...input.agent, config: agentConfig } } : {}),
     });
     return {
       ...result,
@@ -5652,7 +6313,7 @@ export class DaemonClient {
   }
 
   async getBranchSuggestions(
-    options: { cwd: string; query?: string; limit?: number },
+    options: { cwd: string; query?: string; limit?: number; refMode?: "exact" },
     requestId?: string,
   ): Promise<BranchSuggestionsPayload> {
     return this.sendCorrelatedSessionRequest({
@@ -5662,6 +6323,7 @@ export class DaemonClient {
         cwd: options.cwd,
         query: options.query,
         limit: options.limit,
+        refMode: options.refMode,
       },
       responseType: "branch_suggestions_response",
     });
@@ -5956,8 +6618,10 @@ export class DaemonClient {
         return undefined;
       },
     );
+    const sendFrame = (frame: Uint8Array) =>
+      Promise.race([this.sendBinaryFrame(frame), responsePromise]);
     try {
-      this.sendBinaryFrame(
+      await sendFrame(
         encodeFileTransferFrame({
           opcode: FileTransferOpcode.FileBegin,
           requestId: resolvedRequestId,
@@ -5971,6 +6635,7 @@ export class DaemonClient {
         }),
       );
 
+      if (settled) return await responsePromise;
       const chunkSize = input.chunkSize ?? 128 * 1024;
       for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
         // Native WebSocket.send encodes binary synchronously. Let rendering and
@@ -5980,7 +6645,7 @@ export class DaemonClient {
         if (this.transport !== uploadTransport || this.connectionState.status !== "connected") {
           throw new DaemonConnectionError("Connection changed during file upload");
         }
-        this.sendBinaryFrame(
+        await sendFrame(
           encodeFileTransferFrame({
             opcode: FileTransferOpcode.FileChunk,
             requestId: resolvedRequestId,
@@ -5989,7 +6654,7 @@ export class DaemonClient {
         );
       }
 
-      this.sendBinaryFrame(
+      await sendFrame(
         encodeFileTransferFrame({
           opcode: FileTransferOpcode.FileEnd,
           requestId: resolvedRequestId,
@@ -6090,6 +6755,36 @@ export class DaemonClient {
     });
   }
 
+  /**
+   * The controls a draft agent would show and the options it would run with: `config.json`
+   * defaults merged with the draft's own `providerOptions`, resolved by the daemon.
+   */
+  async listProviderControls(
+    draftConfig: ListCommandsDraftConfig,
+    options?: { requestId?: string },
+  ): Promise<ListProviderControlsPayload> {
+    const legacy = this.legacyProviderOptions();
+    if (legacy) {
+      const { providerOptions, ...rest } = draftConfig;
+      const payload = await this.listProviderFeatures(
+        {
+          ...rest,
+          // A legacy daemon reads the options it exposes as features, whatever the others are.
+          ...(providerOptions ? { featureValues: providerOptions } : {}),
+        },
+        options,
+      );
+      return legacy.controlsResponse(payload);
+    }
+    return this.sendCorrelatedSessionRequest({
+      requestId: options?.requestId,
+      message: { type: "provider.controls.list.request", draftConfig },
+      responseType: "provider.controls.list.response",
+      timeout: 90000,
+    });
+  }
+
+  /** @deprecated Use `listProviderControls`. */
   async listProviderFeatures(
     draftConfig: ListCommandsDraftConfig,
     options?: { requestId?: string },
@@ -6326,6 +7021,34 @@ export class DaemonClient {
     });
   }
 
+  async listLocalSpeechModels(requestId?: string): Promise<LocalSpeechModel[]> {
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "speech.local_models.list.request" },
+      responseType: "speech.local_models.list.response",
+    });
+    if (payload.error) throw new Error(payload.error);
+    return payload.models;
+  }
+
+  async downloadLocalSpeechModel(modelId: string, requestId?: string): Promise<void> {
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "speech.local_models.download.request", modelId },
+      responseType: "speech.local_models.download.response",
+    });
+    if (payload.error) throw new Error(payload.error);
+  }
+
+  async deleteLocalSpeechModel(modelId: string, requestId?: string): Promise<void> {
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "speech.local_models.delete.request", modelId },
+      responseType: "speech.local_models.delete.response",
+    });
+    if (payload.error) throw new Error(payload.error);
+  }
+
   sendBrowserAutomationExecuteResponse(response: BrowserAutomationExecuteResponse): void {
     this.sendSessionMessageStrict(response);
   }
@@ -6384,6 +7107,70 @@ export class DaemonClient {
       responseType: "provider_diagnostic_response",
       timeout: 180000,
     });
+  }
+
+  /** Install and update links plus installed state. Requires `features.providerInstallation`. */
+  async inspectProviderInstallation(
+    provider: AgentProvider,
+    options?: { refresh?: boolean; requestId?: string },
+  ): Promise<ProviderInstallationInspectPayload> {
+    return this.sendNamespacedCorrelatedSessionRequest<"provider.installation.inspect.response">({
+      requestId: options?.requestId,
+      message: {
+        type: "provider.installation.inspect.request",
+        provider,
+        ...(options?.refresh ? { refresh: true } : {}),
+      },
+      timeout: 60_000,
+    });
+  }
+
+  /** Whether the provider reports a newer version. Requires `features.providerInstallation`. */
+  async checkProviderUpdates(
+    provider: AgentProvider,
+    options?: { refresh?: boolean; requestId?: string },
+  ): Promise<ProviderInstallationCheckUpdatesPayload> {
+    return this.sendNamespacedCorrelatedSessionRequest<"provider.installation.check_updates.response">(
+      {
+        requestId: options?.requestId,
+        message: {
+          type: "provider.installation.check_updates.request",
+          provider,
+          ...(options?.refresh ? { refresh: true } : {}),
+        },
+        timeout: 60_000,
+      },
+    );
+  }
+
+  /** Starts the provider's update, or joins the running one. Follow it with `observeProviderUpdates`. */
+  async updateProvider(
+    provider: AgentProvider,
+    options?: { requestId?: string },
+  ): Promise<ProviderInstallationUpdatePayload> {
+    return this.sendNamespacedCorrelatedSessionRequest<"provider.installation.update.response">({
+      requestId: options?.requestId,
+      message: { type: "provider.installation.update.request", provider },
+      timeout: 60_000,
+    });
+  }
+
+  /**
+   * The provider's latest update, then `provider.installation.update.progress` as updates start,
+   * report output and settle, and `provider.installation.update.cleared` when a refresh drops a
+   * failed update. Survives reconnects: each new snapshot replaces the previous one.
+   */
+  observeProviderUpdates(
+    provider: AgentProvider,
+    options?: { signal?: AbortSignal },
+  ): OwnedSubscription<
+    CorrelatedResponsePayload<"provider.installation.update.subscribe.response">
+  > {
+    return this.observe(
+      "provider.installation.update.subscribe.response",
+      { type: "provider.installation.update.subscribe.request", provider },
+      options,
+    );
   }
 
   async listProviderUsage(options?: { requestId?: string }): Promise<ProviderUsageListPayload> {
@@ -6568,14 +7355,82 @@ export class DaemonClient {
     return payload;
   }
 
-  async getPluginCatalog() {
+  async getPluginCatalog(): Promise<PluginCatalogEntry[]> {
+    if (this.config.createPluginClientBundleStore && !this.pluginClientBundleStore) {
+      const serverInfo = this.getLastServerInfoMessage();
+      if (!serverInfo) throw new Error("Plugin catalog requires a connected host");
+      this.pluginClientBundleStore = this.config.createPluginClientBundleStore(serverInfo.serverId);
+    }
+    const store = this.pluginClientBundleStore;
+    if (store) {
+      this.pluginClientBundlesLoaded ??= store.load().then(
+        (bundles) => {
+          for (const { id, ...bundle } of bundles) this.pluginClientBundles.set(id, bundle);
+          return undefined;
+        },
+        (error) => this.logger.warn({ err: error }, "Failed to load plugin client bundles"),
+      );
+      await this.pluginClientBundlesLoaded;
+    }
     const requestId = this.createRequestId();
+    const cached = this.pluginClientBundles;
+    const cachedClientBundles = [...cached].map(([id, { clientBundleHash }]) => ({
+      id,
+      clientBundleHash,
+    }));
     const payload = await this.sendCorrelatedSessionRequest({
       requestId,
-      message: { type: "plugin.catalog.get.request", requestId },
+      message: {
+        type: "plugin.catalog.get.request",
+        requestId,
+        ...(cachedClientBundles.length > 0 ? { cachedClientBundles } : {}),
+      },
       responseType: "plugin.catalog.get.response",
     });
-    return payload.plugins;
+    const retained = new Map<string, { clientBundleHash: string; clientBundle: string }>();
+    const plugins = payload.plugins.map(({ clientBundle: sent, ...plugin }): PluginCatalogEntry => {
+      const previous = cached.get(plugin.id);
+      const clientBundle =
+        sent ??
+        (previous?.clientBundleHash === plugin.clientBundleHash
+          ? previous?.clientBundle
+          : undefined);
+      if (clientBundle === undefined) {
+        throw new Error(`Plugin catalog left out the client bundle for ${plugin.id}`);
+      }
+      // COMPAT(pluginCatalogBundleHash): introduced by PR #6732 (unreleased); remove after
+      // 2027-04-27 once the daemon floor includes bundle hashes. Older bundles are not retained.
+      if (plugin.clientBundleHash !== undefined) {
+        retained.set(plugin.id, { clientBundleHash: plugin.clientBundleHash, clientBundle });
+      }
+      return Object.assign(plugin, { clientBundle });
+    });
+    this.pluginClientBundles = retained;
+    if (store) {
+      this.pluginClientBundlesWrite = [...retained].map(([id, bundle]) =>
+        Object.assign({ id }, bundle),
+      );
+      void this.persistPluginClientBundles(store);
+    }
+    return plugins;
+  }
+
+  private async persistPluginClientBundles(store: PluginClientBundleStore): Promise<void> {
+    if (this.pluginClientBundlesWriting) return;
+    this.pluginClientBundlesWriting = true;
+    try {
+      while (this.pluginClientBundlesWrite) {
+        const bundles = this.pluginClientBundlesWrite;
+        this.pluginClientBundlesWrite = undefined;
+        try {
+          await store.replace(bundles);
+        } catch (error) {
+          this.logger.warn({ err: error }, "Failed to persist plugin client bundles");
+        }
+      }
+    } finally {
+      this.pluginClientBundlesWriting = false;
+    }
   }
 
   async listPlugins(): Promise<PluginListItem[]> {
@@ -6702,6 +7557,38 @@ export class DaemonClient {
     return payload.plugins;
   }
 
+  private requirePluginRegistry(): void {
+    // COMPAT(pluginRegistry): added in v0.16.0; remove after 2027-05-15 once daemon floor proxies the registry.
+    if (this.getLastServerInfoMessage()?.features?.pluginRegistry !== true)
+      throw new Error("Update the host to browse plugins.");
+  }
+
+  /** The host's default plugin registry directory. */
+  async listPluginRegistry(): Promise<PluginListingIndex> {
+    this.requirePluginRegistry();
+    const requestId = this.createRequestId();
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "plugin.registry.list.request", requestId },
+      responseType: "plugin.registry.list.response",
+      timeout: 60_000,
+    });
+    return payload.index;
+  }
+
+  /** One registry listing with its overview. */
+  async getRegistryPlugin(id: string): Promise<PluginListingDetail> {
+    this.requirePluginRegistry();
+    const requestId = this.createRequestId();
+    const payload = await this.sendCorrelatedSessionRequest({
+      requestId,
+      message: { type: "plugin.registry.get.request", requestId, id },
+      responseType: "plugin.registry.get.response",
+      timeout: 60_000,
+    });
+    return payload.plugin;
+  }
+
   private requirePluginUpdates(): void {
     // COMPAT(pluginSourceUpdates): added in v0.8.0; remove after 2027-03-16 once daemon floor supports reviewed updates.
     if (this.getLastServerInfoMessage()?.features?.pluginSourceUpdates !== true)
@@ -6795,20 +7682,57 @@ export class DaemonClient {
     return payload.plugin;
   }
 
+  /**
+   * A `Uint8Array` input or output crosses the wire as a binary frame. Any other value is JSON and
+   * must not contain a `Uint8Array`.
+   */
   async invokePluginRpc(pluginId: string, method: string, input: unknown): Promise<unknown> {
+    assertPluginWireValue(input, "input");
     const requestId = this.createRequestId();
-    const payload = await this.sendCorrelatedSessionRequest({
-      requestId,
-      message: {
-        type: "plugin.rpc.invoke.request",
+    if (!(input instanceof Uint8Array)) {
+      const payload = await this.sendCorrelatedSessionRequest({
         requestId,
-        pluginId,
-        method,
-        input,
-      },
+        message: {
+          type: "plugin.rpc.invoke.request",
+          requestId,
+          pluginId,
+          method,
+          input,
+        },
+        responseType: "plugin.rpc.invoke.response",
+      });
+      return payload.output;
+    }
+    this.requirePluginSubscriptions();
+    const frame = encodePluginInputFrame({ requestId, pluginId, method, payload: input });
+    const payload = await this.sendCorrelatedRequest({
+      requestId,
+      message: { type: "plugin.rpc.invoke.request", requestId, pluginId, method, input: null },
       responseType: "plugin.rpc.invoke.response",
+      options: { skipQueue: true },
+      transmit: () => this.sendBinaryFrame(frame),
     });
     return payload.output;
+  }
+
+  /** One subscription to a plugin subscription handler; events arrive as updates and binary. */
+  observePluginRpc(
+    pluginId: string,
+    method: string,
+    input: unknown,
+    options?: { signal?: AbortSignal },
+  ): OwnedSubscription<CorrelatedResponsePayload<"plugin.rpc.subscribe.response">> {
+    assertPluginWireValue(input, "input");
+    return this.observe(
+      "plugin.rpc.subscribe.response",
+      { type: "plugin.rpc.subscribe.request", pluginId, method, input },
+      options,
+    );
+  }
+
+  private requirePluginSubscriptions(): void {
+    if (this.lastServerInfoMessage?.features?.pluginSubscriptions !== true)
+      throw new Error("Update the host to use plugin subscriptions and binary plugin RPC");
   }
 
   async respondToPermissionAndWait(
@@ -6983,10 +7907,16 @@ export class DaemonClient {
   // ============================================================================
 
   observeTerminals(input: {
-    cwd: string;
+    cwd?: string;
     workspaceId?: string;
     signal?: AbortSignal;
   }): OwnedSubscription<CorrelatedResponsePayload<"terminals_changed">> {
+    // COMPAT(terminalCollection): added in v0.16, remove after 2027-06.
+    if (
+      input.cwd === undefined &&
+      this.getLastServerInfoMessage()?.features?.terminalCollection !== true
+    )
+      throw new Error("Update the host to list terminals across workspaces.");
     const { signal, ...query } = input;
     return this.observe(
       "terminals_changed",
@@ -7075,7 +8005,8 @@ export class DaemonClient {
   }
 
   /**
-   * Snapshot/restore and output arrive in receive. Subscribe to the returned handle
+   * Defaults to a full ANSI replay. Replay begin/data/end and live output arrive in receive.
+   * Subscribe to the returned handle
    * for terminal_stream_exit: payload.error means observation failure, not PTY exit.
    * Either outcome detaches this slot and releases the handle automatically.
    */
@@ -7094,7 +8025,7 @@ export class DaemonClient {
       {
         type: "subscribe_terminal_request",
         terminalId,
-        ...(options?.restore ? { restore: options.restore } : {}),
+        restore: options?.restore ?? { mode: "full-snapshot" },
       },
       options,
     );
@@ -7361,6 +8292,14 @@ export class DaemonClient {
     return requestId ?? crypto.randomUUID();
   }
 
+  private readonly legacyOptions = new LegacyProviderOptions();
+
+  /** The translation for a daemon without `providerOptionControls`; null for a current one. */
+  private legacyProviderOptions(): LegacyProviderOptions | null {
+    const info = this.lastServerInfoMessage;
+    return info && usesLegacyProviderOptions(info) ? this.legacyOptions : null;
+  }
+
   getLastServerInfoMessage(): ServerInfoStatusPayload | null {
     return this.lastServerInfoMessage;
   }
@@ -7446,7 +8385,10 @@ export class DaemonClient {
   }
 
   private disposeTransport(code = 1001, reason = "Reconnecting"): void {
+    this.chunkedTransport?.close();
+    this.chunkedTransport = null;
     this.owned.disconnected();
+    this.diffStreams.disconnected();
     this.providerSnapshotUpdates.clear();
     this.stopLivenessHeartbeat();
     this.cleanupTransport();
@@ -7579,6 +8521,7 @@ export class DaemonClient {
         messageType: "pong",
       });
       this.resolvePingProbe();
+      this.resolvePongWaiters();
       this.recordInboundMessage("pong", bytes, perfNow() - startMs);
       return;
     }
@@ -7622,6 +8565,23 @@ export class DaemonClient {
     this.config.onInboundMessage?.(type, bytes, handlerMs);
   }
 
+  private handlePluginFrame(rawBytes: Uint8Array): void {
+    const frame = decodePluginFrame(rawBytes);
+    this.consecutiveLivenessFailures = 0;
+    this.runtimeMetrics?.recordBinaryFrame("plugin", rawBytes.byteLength, 0);
+    if (frame?.opcode === PluginFrameOpcode.Event) {
+      this.owned.receiveBinary(frame.subscriptionId, frame.payload);
+      return;
+    }
+    if (frame?.opcode === PluginFrameOpcode.Output) {
+      // The binary form of plugin.rpc.invoke.response.
+      this.resolveWaiters({
+        type: "plugin.rpc.invoke.response",
+        payload: { requestId: frame.requestId, output: frame.payload },
+      });
+    }
+  }
+
   private tryHandleBinaryFrame(rawBytes: Uint8Array): boolean {
     const hostFrame = decodeHostRouteFrame(rawBytes);
     if (rawBytes[0] === HOST_ROUTE_OPCODE && !hostFrame) {
@@ -7631,6 +8591,14 @@ export class DaemonClient {
     }
     if (hostFrame) {
       for (const handler of this.hostFrameListeners) handler(hostFrame);
+      return true;
+    }
+    if (rawBytes[0] >= 0x40 && rawBytes[0] <= 0x4f) {
+      this.diffStreams.receive(rawBytes);
+      return true;
+    }
+    if (isPluginFrameOpcode(rawBytes[0])) {
+      this.handlePluginFrame(rawBytes);
       return true;
     }
     const fileFrame = decodeFileTransferFrame(rawBytes);
@@ -7816,6 +8784,8 @@ export class DaemonClient {
     reason?: string;
     event?: string;
     reasonCode?: string;
+    // Attempt now instead of after the backoff delay. Failures of that attempt back off as usual.
+    immediate?: boolean;
   }): void {
     // A late credential result from the interrupted attempt must not replace or
     // reject a connection started by this retry.
@@ -7832,6 +8802,7 @@ export class DaemonClient {
     }
 
     this.owned.disconnected();
+    this.diffStreams.disconnected();
     this.providerSnapshotUpdates.clear();
 
     // Clear all pending waiters and queued sends since the connection was lost
@@ -7848,6 +8819,7 @@ export class DaemonClient {
     this.clearWaiters(connectionError, true);
     this.rejectPendingSendQueue(connectionError);
     this.rejectPingProbe(connectionError);
+    this.rejectPongWaiters(connectionError);
     this.terminalStreams.clearSlots();
     this.lastServerInfoMessage = null;
 
@@ -7867,6 +8839,10 @@ export class DaemonClient {
       return;
     }
 
+    if (input?.immediate) {
+      void this.attemptConnect();
+      return;
+    }
     this.armReconnectTimer();
   }
 
@@ -7938,15 +8914,6 @@ export class DaemonClient {
     probe.resolve(perfNow() - probe.startedAt);
   }
 
-  private clearPingProbe(): void {
-    const probe = this.pingProbe;
-    if (!probe) {
-      return;
-    }
-    this.pingProbe = null;
-    clearTimeout(probe.timeoutHandle);
-  }
-
   private rejectPingProbe(error: Error): void {
     const probe = this.pingProbe;
     if (!probe) {
@@ -7957,7 +8924,18 @@ export class DaemonClient {
     probe.reject(error);
   }
 
-  private recordLivenessFailure(error: Error): void {
+  private resolvePongWaiters(): void {
+    const now = perfNow();
+    for (const waiter of this.pongWaiters) waiter.resolve(now - waiter.startedAt);
+    this.pongWaiters.clear();
+  }
+
+  private rejectPongWaiters(error: Error): void {
+    for (const waiter of this.pongWaiters) waiter.reject(error);
+    this.pongWaiters.clear();
+  }
+
+  private recordLivenessFailure(error: Error, role: PingProbeRole): void {
     this.consecutiveLivenessFailures += 1;
     if (this.consecutiveLivenessFailures < LIVENESS_FAILURE_RECONNECT_THRESHOLD) {
       return;
@@ -7969,11 +8947,14 @@ export class DaemonClient {
       reason: error.message,
       event: "LIVENESS_TIMEOUT",
       reasonCode: "liveness_timeout",
+      // The foreground cycle already waited two windows; the user is looking at the app.
+      immediate: role === "foreground",
     });
   }
 
   private handleSessionMessage(msg: SessionOutboundMessage): void {
     msg = this.owned.normalize(msg);
+    msg = this.legacyProviderOptions()?.normalize(msg) ?? msg;
     const credential =
       msg.type === "status"
         ? parseServerInfoStatusPayload(msg.payload)?.deviceCredential
@@ -8013,6 +8994,10 @@ export class DaemonClient {
     if (consumerMessage.type === "status") {
       const serverInfo = parseServerInfoStatusPayload(consumerMessage.payload);
       if (serverInfo) {
+        if (this.chunkedTransport)
+          this.chunkedTransport.enabled =
+            serverInfo.features?.binaryChunkingV1 === true &&
+            this.config.capabilities?.[CLIENT_CAPS.binaryChunkingV1] !== false;
         this.lastServerInfoMessage = serverInfo;
         this.destinationServerId = serverInfo.serverId;
         this.connectionFailure = undefined;
@@ -8021,6 +9006,7 @@ export class DaemonClient {
           this.reconnectAttempt = 0;
           this.updateConnectionState({ status: "connected" }, { event: "HELLO_SERVER_INFO" });
           this.startLivenessHeartbeat();
+          this.diffStreams.connected(serverInfo.features?.diffSubscription === true);
           this.owned.restore(serverInfo, {
             ...DEFAULT_CLIENT_CAPABILITIES,
             ...this.config.capabilities,
@@ -8187,7 +9173,9 @@ export class DaemonClient {
   ): WaitHandle<T> {
     // Capture stack trace at call site, not inside setTimeout
     const timeoutError = new DaemonConnectionError(
-      `Timeout waiting for message (${timeout}ms)`,
+      options?.requestType
+        ? `No response to ${options.requestType} after ${timeout}ms`
+        : `Timeout waiting for message (${timeout}ms)`,
       "DAEMON_REQUEST_TIMEOUT",
     );
 
@@ -8281,6 +9269,7 @@ function resolveAgentConfig(options: CreateAgentRequestOptions): AgentSessionCon
     worktreeName: _worktreeName,
     requestId: _requestId,
     labels: _labels,
+    metadata: _metadata,
     ...overrides
   } = options;
 
@@ -8310,3 +9299,4 @@ function directE2eeProtocols(
 ): string[] | undefined {
   return !relay && encrypted ? ["clisbot.e2ee.v1"] : protocols;
 }
+export type { DiffCompare, DiffState, DiffEntry, ResolvedShas } from "./diff/index.js";

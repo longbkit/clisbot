@@ -2,7 +2,7 @@
 title: Plugin reference
 description: Local plugin files, client and server runtimes, platform limits, contributions, RPCs, lifecycle, hosts, and CLI commands.
 nav: Reference
-order: 48
+order: 50
 category: Plugins
 ---
 
@@ -73,16 +73,16 @@ The required root manifest is `clisbot-plugin.json`:
 }
 ```
 
-| Field          | Required | Behavior                                                                                                                                       |
-| -------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`           | Yes      | Default installation ID.                                                                                                                       |
-| `name`         | No       | Non-empty display name for the registry and website; independent of the installation ID.                                                       |
-| `icon`         | No       | Relative path to a PNG inside the plugin package.                                                                                              |
-| `media`        | No       | Array of image or video paths inside the package, or HTTPS URLs. An empty array is valid.                                                      |
-| `description`  | No       | Non-empty summary shown below the plugin ID in **Settings → Plugins**.                                                                         |
-| `translations` | No       | Listing text in other languages, read by the registry and ignored by Clisbot. See [other languages](/docs/plugins/publishing#other-languages). |
-| `requirements` | No       | Supported Clisbot versions, described below.                                                                                                   |
-| `build`        | No       | Preparation commands, described in the CLI reference.                                                                                          |
+| Field          | Required | Behavior                                                                                                                                              |
+| -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`           | Yes      | Default installation ID.                                                                                                                              |
+| `name`         | No       | Non-empty display name for the registry, the website, your row in **Settings → Plugins**, and your settings header. Without it, Clisbot shows the ID. |
+| `icon`         | No       | Relative path to a PNG inside the plugin package.                                                                                                     |
+| `media`        | No       | Array of image or video paths inside the package, or HTTPS URLs. An empty array is valid.                                                             |
+| `description`  | No       | Non-empty summary shown below the plugin name in **Settings → Plugins**.                                                                              |
+| `translations` | No       | Listing text in other languages, read by the registry and ignored by Clisbot. See [other languages](/docs/plugins/publishing#other-languages).        |
+| `requirements` | No       | Supported Clisbot versions, described below.                                                                                                          |
+| `build`        | No       | Preparation commands, described in the CLI reference.                                                                                                 |
 
 Paths are relative to `clisbot-plugin.json`, use forward slashes, and cannot contain `..`
 segments. Registry listings for visual plugins require an interface image even though `media` is
@@ -409,7 +409,7 @@ process, credential, and other machine-local work under `server/`. A plugin with
 ### Providers
 
 Follow [Build a provider plugin](/docs/plugins/providers) for direct and ACP implementations,
-session lifecycle, composer settings, timeline renderers, testing, and distribution.
+session lifecycle, option controls, timeline renderers, testing, and distribution.
 
 Call `server.registerProvider()` with a `ProviderRegistration` from
 `@clisbot/plugin/server/provider`. Its connection accepts inputs with `send()` and emits complete state
@@ -419,11 +419,15 @@ configuration, persistence, permissions, and failures are events.
 Use the single `session.prompt` input for messages, structured commands, steering, and command side
 effects. Repeat `clientMessageId` on the live user timeline item and publish exactly one matching
 `session.prompt_result`. Publish provider-created children as sessions with `parentSessionId`.
+Report measurements as `metrics` on a completed `session.turn` and through `session.metrics`. See
+[Report metrics](/docs/plugins/providers#report-metrics).
 
-Provider settings are toggle/select descriptors that Clisbot renders in the composer. Keep
-provider-private options under `ProviderSessionConfig.providerOptions` on `session.open`.
-This record includes configured defaults and per-agent overrides; validate and apply it in your
-provider. See [Provider options](/docs/sdk/provider-options) for configuration and merge semantics.
+Provider options are one record, `ProviderSessionConfig.providerOptions` on `session.open`. It
+includes configured defaults and per-agent overrides; validate and apply it in your provider. Report
+`controls` in `session.config` for the top-level keys that get a toggle or select in the composer,
+with the values the session runs under `providerOptions`. A running-session change arrives as
+`session.configure` with `changes.providerOptions`. See [Provider options](/docs/sdk/provider-options)
+for configuration and merge semantics.
 Host tools arrive as MCP servers in the complete
 session config.
 
@@ -431,18 +435,142 @@ Clisbot refreshes an agent by closing its current provider session and opening i
 configuration and persistence. Providers re-read external state during `session.open`.
 
 Use `runAcpProvider()` from `@clisbot/plugin/server/acp` to adapt a command-backed ACP. Add transformer
-hooks only for a vendor's discovery, configuration, notification, or tool-call differences.
+hooks for vendor behavior. See [Adapt an ACP agent](/docs/plugins/providers#adapt-an-acp-agent).
+
+In `discover` and `configure`, call `context.request(method, params)` to send an ACP extension
+request. The promise returns a JSON value or rejects with the agent's JSON-RPC error.
+
+In `toolCall`, use `context.mcpServerNames` to recognize servers that Clisbot supplied when it opened
+the ACP session. Include an empty-list fallback for older SDK versions or servers configured
+directly in the agent. `toolCall.content` holds the call's ACP `content` blocks, and
+`context.previous` is the call as Clisbot last presented it, after every transformer. Both are absent
+on older SDK versions, and `previous` is absent on a call's first update. See
+[Adapt an ACP agent](/docs/plugins/providers#adapt-an-acp-agent) for the standard tool cards.
+
+Use `config(state, context)` to return the configuration snapshot that Clisbot displays.
+Clisbot calls this synchronous hook for initial, notification, and committed configuration snapshots.
+Use `configure` to send changes to the agent.
+
+Publish `session.commands` to advertise slash commands and skills. Each entry carries `name`,
+`description`, and optional `argumentHint` and `kind`. The composer suggests both kinds at the
+start of a prompt. Use `kind: "skill"` if the agent accepts the skill inline as part of a normal
+message. The default kind is `"command"`.
+
+In the ACP shim, use `command(entry, context)` to return a rewritten entry for each advertised
+slash command. For example, a plugin with a vendor skill registry can set the kind with
+`return { ...entry, kind: skills.has(entry.name) ? "skill" : "command" }`.
 
 `ProviderRegistration.icon` is a file path relative to the plugin directory, such as `icon.svg`.
 It must resolve inside that directory to a regular file that follows the
 [SVG icon rules](#svg-rules). Clisbot reads and validates the file when the plugin starts; the string
 is never inline SVG or a URL.
 
+#### Provider installation
+
+**Requires Clisbot 0.17.** Older versions ignore `installation`.
+`ProviderRegistration.installation` fills the **Installation** section of the provider's settings.
+Every member is optional. Clisbot hides the section when you declare neither `inspect` nor
+`installUrl`. [Report installation and updates](/docs/plugins/providers#report-installation-and-updates)
+has a complete example. Import the types from `@clisbot/plugin/server/provider`.
+
+```ts
+interface ProviderInstallation {
+  installUrl?: string;
+  updateUrl?: string;
+  inspect?(context: ProviderInstallationContext): Promise<ProviderInspection>;
+  checkForUpdates?(context: ProviderUpdateCheckContext): Promise<ProviderUpdateCheck>;
+  update?(context: ProviderUpdateContext): Promise<ProviderUpdateResult>;
+}
+```
+
+| Member            | Called                                                       | Deadline | Answer kept                                        |
+| ----------------- | ------------------------------------------------------------ | -------- | -------------------------------------------------- |
+| `inspect`         | When the provider list or a provider's page shows            | 20 s     | 30 s                                               |
+| `checkForUpdates` | After `inspect` answers `installed`, or without `inspect`    | 25 s     | 1 hour for `current` or `available`, else 30 s     |
+| `update`          | When the user selects **Update**, one at a time per provider | None     | Clisbot reads both answers again after `succeeded` |
+
+**Refresh** in the provider's settings skips the kept answers and clears a failed update. Clisbot
+never calls these members before a session or on a schedule. A deadline or a throw becomes an error that shows the message.
+
+`installUrl` and `updateUrl` are `http` or `https` pages that Clisbot opens in the browser. The
+plugin fails to start when either is another kind of URL.
+
+The context:
+
+| Field              | Type                                      | Meaning                                                                                                                         |
+| ------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `launch`           | `ProviderInstallationLaunch \| undefined` | The launch a session would use, with `resolved`. Absent when the registration declares no `command`.                            |
+| `signal`           | `AbortSignal`                             | Aborts when Clisbot stops waiting or the daemon stops.                                                                          |
+| `installedVersion` | `string \| undefined`                     | `checkForUpdates` only. The `version` `inspect` reported, as written. Absent when it reported none or you declare no `inspect`. |
+| `report`           | `(event: ProviderUpdateReport) => void`   | `update` only. Shows `{ type: "stdout" \| "stderr" \| "message", text }` to the user in order.                                  |
+
+`ProviderInstallationLaunch` is `{ command, args, env, resolved }`. With `resolved: true`, `command`
+is the executable's path. With `resolved: false`, Clisbot did not find the executable and `command`
+is the configured name.
+
+Answers:
+
+| Type                   | Values                                                                                                                                  |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `ProviderInspection`   | `{ status: "installed", version?: string }` or `{ status: "not_installed" }`                                                            |
+| `ProviderUpdateCheck`  | `{ status: "current" }`, `{ status: "available", versions?: string[], message?: string }`, or `{ status: "unknown", message?: string }` |
+| `ProviderUpdateResult` | `{ status: "succeeded", message?: string }` or `{ status: "failed", message: string }`                                                  |
+
+Clisbot shows `version`, `versions` and `message` as written and does not parse or sort them. It
+reuses a `current` or `available` answer for up to an hour while `inspect` reports the same
+`version`. It keeps the last 65,536 characters of `report` output. An answer that does not match these
+shapes is an error. **Update** appears once `inspect` reports the CLI installed and you declare
+`update`, whatever `checkForUpdates` answers and whether you declare it; without `update`, Clisbot
+offers `updateUrl` on the same terms.
+
+#### Provider troubleshooting
+
+**Requires Clisbot 0.18.** Older versions ignore `docsUrl` and show only the `diagnostic` text.
+The provider's settings have a **Troubleshooting** section with a **Diagnostic report** and
+**Docs**. Users copy the report into a bug report, so put the facts
+that explain a wrong result into it.
+
+`ProviderRegistration.docsUrl` is the `http` or `https` page that **Docs** opens. Point it at the
+page that says how to set up the provider and how to fix its common problems. The plugin fails to
+start when it is another kind of URL. Clisbot hides **Docs** when you declare none.
+
+The report is your provider's `label` and one `Label: value` row per line. Clisbot writes these rows:
+
+| Row                                                            | Shown                                                                    |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `Command source`, `Configured command`                         | When you declare `command`                                               |
+| `Daemon PATH`, `Daemon shell`, `PATH matches`, `Resolved path` | When you declare `command`                                               |
+| `Version`                                                      | When Clisbot found the executable and you declare `installation.inspect` |
+| `Models`, `Status`                                             | Always                                                                   |
+
+`status(request)` adds your rows after them. `request.launch` is the launch a session would use.
+
+```ts
+async status({ launch }) {
+  if (!launch) return { available: false, diagnostic: "example-agent has no command" };
+  const profile = launch.env.EXAMPLE_PROFILE ?? "default";
+  return { available: true, diagnostic: `Profile: ${profile}\nSign-in: ${signInSource(launch.env)}` };
+}
+```
+
+| Answer                             | Result                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| `{ available: true, diagnostic? }` | Each line of `diagnostic` is one row. Write each line as `Label: value`.       |
+| `{ available: false, diagnostic }` | The provider is unavailable. The report shows `diagnostic` in the `Error` row. |
+
+Clisbot calls `status` each time it checks whether the provider is available, not only for the
+report. The report does not wrap lines, so write short rows.
+
 ### Usage sources
 
 **Requires Clisbot 0.11.** Register a source from your server entry with
 `server.registerUsageSource()`. Import its contract and helpers from
 `@clisbot/plugin/server/usage`.
+
+A source that needs its plugin's provider command may set `provider` to that provider's ID.
+The daemon supplies the resolved launch in `scope.launch` for global discovery and for that
+provider's sessions. The launch includes the trusted process environment; keep it daemon-side and
+use an opaque store locator as the input. It is absent when the provider is unavailable.
 
 A source implements two calls:
 
@@ -455,13 +583,20 @@ interface UsageAccount {
 }
 
 type UsageScope =
-  | { kind: "global" }
-  | { kind: "session"; provider: string; model?: string; env: Record<string, string> };
+  | { kind: "global"; launch?: ProviderLaunch }
+  | {
+      kind: "session";
+      provider: string;
+      model?: string;
+      env: Record<string, string>;
+      launch?: ProviderLaunch;
+    };
 
 interface UsageSourceRegistration {
   id: string;
   label: string;
   icon?: string;
+  provider?: string;
   input: ZodType;
   discover(scope: UsageScope): Promise<UsageAccount[]>;
   fetch(input: unknown): Promise<UsageReport>;
@@ -537,7 +672,11 @@ For numeric durations, use `windowFromReportedDuration()` from
 `@clisbot/plugin/server/usage` (Clisbot 0.11+). Pass the reported seconds or `null`, a neutral
 `unknown` identity and name, and an optional stable quota `scope`. The helper derives the ID,
 label, and short label together; it accepts no duration-label override. For named API periods,
-use `windowFromUsedPct()` with names justified by that field.
+use `windowFromUsedPct()` with names justified by that field. Set `durationSeconds` when
+the period has a known fixed length. Usage Details uses it with the reset time and the
+latest reading to estimate whether the quota will last until reset. If the source returns
+a previous reading, include its measurement time as an ISO timestamp in the report’s
+`observedAt` field.
 
 A window ID identifies a quota scope and period, never its response position, utilization, or
 reset instant. Scope model-specific quotas by the provider's stable feature ID, falling back to
@@ -549,10 +688,10 @@ window IDs across all accounts, so users must select the corrected window again.
 effective selection for cards, the sidebar, and toggles. The first edit snapshots those defaults;
 an explicit empty selection stays empty.
 
-Re-read the selected store in `fetch()` so the CLI's token rotations take effect. Never redeem
-refresh tokens or write credential stores: refreshing elsewhere can invalidate the CLI's copy,
-and rewriting parsed files can discard fields you do not model. If the store disappeared after
-discovery, throw; the card shows the error until the next discovery removes it.
+Re-read the selected store in `fetch()` so the CLI's token rotations take effect. If you discover
+a specific account, pass its identity in the input and verify it before returning usage.
+Throw if the store disappears or the login changes accounts. The next discovery updates the card.
+Only the CLI should redeem its refresh tokens or write its credential stores.
 
 Use `unavailable(problem)` to explain why an existing login cannot supply quota. It requires a
 problem; there is no zero-argument form. `expiresAt` is an ISO timestamp. A rejected login carries
@@ -602,15 +741,124 @@ hash. Codex prefers Codex CLI, OpenCode, Pi, then OMP and groups by the ChatGPT 
 metadata or JWT claims. Pi and OMP logins remain discoverable when expired. OMP requires
 `node:sqlite`.
 
-`usage.list_reports` discovers accounts when called without IDs. With IDs, it refreshes known
-accounts without rediscovering identity. If a store switches accounts, the existing card shows the
-new login's quota until the next discovery. Reports are cached for five minutes; `forceRefresh`
-bypasses that cache. Entries carry `id`, `account.label`, and `fetchedAt`. Failed accounts also carry optional
+`usage.list_reports` discovers accounts for the requested agent. A host-wide request discovers
+the defaults and revisits the agents whose usage Clisbot has already queried. A request with report
+IDs fetches known reports using their existing discovery inputs. Reports are cached for five minutes.
+Set `forceRefresh` to bypass that cache. Entries carry `id`, `account.label`, and `fetchedAt`.
+Failed accounts also carry optional
 `loginErrors` entries with `harness` and each login's failed `report`. Clients gate the feature
 on `server_info.features.usageSources`. The older `provider.usage.list` RPC maps the same reports
 for 0.10 clients and renders problems into its `error` string.
 
 The source icon is a file path with the same rules as a provider icon.
+
+## Worktree managers {#worktree-managers}
+
+**Requires Clisbot 0.17.** Register a worktree manager from `index.server.ts` with
+`server.registerWorktreeManager()` when an external tool such as Worktrunk should own creating,
+removing, and restoring Git worktrees instead of Clisbot running `git worktree add` and
+`git worktree remove` directly.
+
+```ts
+import { execCommand, type PluginServerContext } from "@clisbot/plugin/server";
+
+export default function contribute(server: PluginServerContext) {
+  return server.registerWorktreeManager({
+    async create(request, { signal }) {
+      if (request.kind !== "branch-off") return;
+      const { stdout } = await execCommand(
+        "wt",
+        [
+          "-C",
+          request.repoRoot,
+          "switch",
+          "--create",
+          request.branch,
+          "--base",
+          request.startPoint ?? request.baseRef,
+          "--no-cd",
+          request.untrusted ? "--no-hooks" : "--yes",
+          "--format=json",
+        ],
+        { signal },
+      );
+      const { path } = JSON.parse(stdout) as { path: string };
+      return { type: "created", path };
+    },
+    async remove({ repoRoot, path, force, untrusted }, { signal }) {
+      const skipHooks = untrusted || repoRoot === null;
+      await execCommand(
+        "wt",
+        [
+          "-C",
+          repoRoot ?? path,
+          "remove",
+          "--foreground",
+          "--no-delete-branch",
+          skipHooks ? "--no-hooks" : "--yes",
+          ...(force ? ["--force"] : []),
+          path,
+        ],
+        { signal },
+      );
+      return { type: "removed" };
+    },
+    async restore({ repoRoot, path, target, untrusted }, { signal }) {
+      if (target.type !== "branch") return;
+      const { stdout } = await execCommand(
+        "wt",
+        [
+          "-C",
+          repoRoot,
+          "switch",
+          target.branch,
+          "--path",
+          path,
+          "--no-cd",
+          untrusted ? "--no-hooks" : "--yes",
+          "--format=json",
+        ],
+        { signal },
+      );
+      const { path: restoredPath } = JSON.parse(stdout) as { path: string };
+      return { type: "restored", path: restoredPath };
+    },
+  });
+}
+```
+
+- **Create** runs after all `worktree.create.before` hooks and before `worktree.create.after`.
+  All managers share 120 seconds for each create request. Return `{ type: "created", path }` to
+  claim creation. If you return `undefined`, Clisbot tries the next manager or uses built-in Git.
+  For branch-off, Clisbot resolves `baseRef` and refreshes a remote-tracking starting ref before
+  calling the manager. If the fetch fails, Clisbot uses the cached ref. When `request.untrusted` is `true` (for
+  example, a fork change request), skip repository-defined hooks. Clisbot verifies that `path` is a
+  safe, newly created Git worktree of the same repository on a named branch, then records the
+  checked-out `HEAD` branch (managers may normalize or uniquely name the branch, and should create a
+  new branch for `branch-off`), writes comparison-base metadata, and seeds `clisbot.json`. Clisbot uses the
+  returned path to roll back a failed adoption or later creation step. If the callback throws or
+  its signal aborts before it returns, the manager is responsible for cleaning up any worktree it
+  created. First-agent branch auto-rename is skipped for manager-created worktrees.
+- **Remove** is optional and runs on workspace archive and creation rollback, after Clisbot runs
+  `clisbot.json` teardown and saves `refs/clisbot/kept-commits/<sha>` for restore. Return
+  `{ type: "removed" }` after removing the directory, or `undefined` to fall back to Git. When
+  `untrusted` is `true` (for example, a fork change request) or `repoRoot` is `null`, skip
+  repository-defined hooks and run against `repoRoot` when available. Clisbot routes removal to the
+  plugin that created the worktree and falls back to Git when that plugin is disabled or uninstalled.
+  Clisbot keeps the directory if it contains another linked Git worktree. Standalone clones and
+  submodules follow normal removal. During archive, an active workspace nested inside the directory
+  also keeps it on disk. If the callback throws or times out after 120 seconds, Clisbot skips Git
+  fallback. During archive, Clisbot logs the callback failure and still archives the workspace.
+  Any files the callback left stay on disk.
+- **Restore** is optional and runs when unarchiving a workspace whose worktree directory was deleted.
+  It receives the recorded `path` that the recreated worktree must occupy, `target` (`branch`,
+  `commit`, or `from-base`), and `untrusted`. Return `{ type: "restored", path }` or `undefined` to
+  fall back to Git. Clisbot verifies the checkout matches the requested branch, detached commit, or
+  new branch at the requested base commit. The same cleanup rules apply as for create. When
+  `restore` falls back to Git, Clisbot clears the workspace's manager ownership
+  so subsequent archives also use Git.
+
+See the complete [worktrunk example](https://github.com/longbkit/clisbot/tree/main/plugin-examples/worktrunk).
 
 ## Entry point and cleanup
 
@@ -628,340 +876,18 @@ export default function contribute(client: PluginClientContext) {
 }
 ```
 
-Cleanup can be async. Release timers, watchers, sockets, and other resources created by the plugin. Clisbot also removes registrations, unmounts surfaces, rejects pending RPCs, closes the plugin's daemon session, and stops its subprocess on reload, disable, removal, disconnect, or daemon shutdown.
+Cleanup can be async. Release timers, watchers, sockets, and other resources created by the plugin. Reload, disable, and removal dispose the affected installation. Stopping a server plugin also closes its daemon session and stops its subprocess. Client installations follow [Hosts and lifecycle](#hosts-and-lifecycle), including retention during a temporary disconnect.
 
 ## Lifecycle hooks
 
-In `index.server.ts`:
+Register async handlers with `server.addHook(name, handler)`. See [Hooks](/docs/plugins/hooks) for names, payloads, ordering, errors, and complete examples.
 
-```ts
-import type { PluginServerContext } from "@clisbot/plugin/server";
+## Sidebar views
 
-export default function contribute(server: PluginServerContext) {
-  server.on("agent.turn_ended", (event) => {
-    console.log(event.agent.id, event.outcome);
-  });
-
-  return () => {};
-}
-```
-
-| Register                        | Callback receives                    | Return                                                       |
-| ------------------------------- | ------------------------------------ | ------------------------------------------------------------ |
-| `server.on(name, callback)`     | `(event, { clisbot, signal })`       | `void` or `Promise<void>`                                    |
-| `server.before(name, callback)` | `({ request }, { clisbot, signal })` | Modified request, or `undefined` to keep it; async supported |
-
-Hooks run on the daemon while the plugin is enabled, even with no app connected.
-
-### Change configuration and inject an MCP server
-
-Add this callback inside `contribute(server)`. Replace the placeholder URL with your MCP endpoint.
-
-```ts
-server.before("agent.create", ({ request }) => {
-  if (request.config.provider !== "codex") {
-    return request;
-  }
-
-  return {
-    ...request,
-    config: {
-      ...request.config,
-      providerOptions: {
-        ...request.config.providerOptions,
-        sandbox_mode: "workspace-write",
-        approval_policy: "on-request",
-      },
-      mcpServers: {
-        ...request.config.mcpServers,
-        company: {
-          type: "http",
-          url: "https://tools.example.com/mcp",
-        },
-      },
-    },
-  };
-});
-```
-
-| Input                                       | Result                        |
-| ------------------------------------------- | ----------------------------- |
-| `providerOptions.sandbox_mode: "read-only"` | `"workspace-write"`           |
-| `providerOptions.web_search: "disabled"`    | Preserved by the spread       |
-| Existing `mcpServers.search`                | Preserved by the spread       |
-| Existing `mcpServers.company`               | Replaced with the entry above |
-
-The selected provider validates `providerOptions` and must support the configured MCP servers.
-Explicit Codex sandbox and approval options override its mode presets.
-
-### Inject environment variables on every session opening
-
-```ts
-server.before("agent.session_open", ({ request }) => {
-  return {
-    ...request,
-    env: {
-      ...request.env,
-      COMPANY_ENV: "development",
-    },
-  };
-});
-```
-
-This runs on create, resume, refresh, and import. To inject only on creation, set `env` in an
-`agent.create` callback instead.
-
-### Choose workspace isolation
-
-```ts
-server.before("workspace.create", ({ request }) => {
-  if (request.source.kind !== "directory") {
-    return request;
-  }
-
-  return {
-    ...request,
-    source: {
-      kind: "worktree",
-      cwd: request.source.path,
-      action: "branch-off",
-    },
-  };
-});
-```
-
-**Result:** an explicit directory creation request becomes a worktree request. Existing workspaces
-and directory lookup/import operations are unaffected.
-
-### Send a follow-up when a turn ends
-
-Copy [server/inspect.ts](https://github.com/longbkit/clisbot/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts)
-into your plugin. The helper imports types from `@clisbot/protocol/agent-types`; add
-`@clisbot/protocol` at the same version as your plugin SDK to your development dependencies
-and install them before loading the plugin. `latestOutputText` joins text chunks after the latest user message.
-
-```ts
-import type { PluginServerContext } from "@clisbot/plugin/server";
-import { latestOutputText } from "./server/inspect";
-
-export default function contribute(server: PluginServerContext) {
-  server.on("agent.turn_ended", async (event, context) => {
-    if (event.outcome.kind === "canceled") {
-      return;
-    }
-
-    const agent = context.clisbot.agents.ref(event.agent.id);
-    const page = await agent.timeline.refetch({ direction: "tail", limit: 20 });
-    const text = latestOutputText(page.entries.map(({ item }) => item));
-    if (/out of credits/i.test(text)) {
-      await agent.send("Try again.");
-    }
-  });
-
-  return () => {};
-}
-```
-
-```text
-Turn ends: "out of credits"
-  → plugin sends "Try again."
-  → a new turn starts
-```
-
-The handler fetches only the last 20 timeline items. Output before that page is not inspected.
-Use `cursor` and `direction` to page further when your plugin needs more history.
-
-This sends a new message with the existing SDK. Persistent matches keep sending follow-ups;
-add limits or delays in your plugin when needed. Attachments and tool effects are not replayed.
-
-### Answer a permission request
-
-Using `shellCommand` from the same [helper file](https://github.com/longbkit/clisbot/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts):
-
-```ts
-import type { PluginServerContext } from "@clisbot/plugin/server";
-import { shellCommand } from "./server/inspect";
-
-export default function contribute(server: PluginServerContext) {
-  server.on("agent.permission_requested", async (event, context) => {
-    const command = shellCommand(event.request);
-    if (command === null) {
-      return;
-    }
-
-    const agent = context.clisbot.agents.ref(event.agent.id);
-    if (/\brm\s+-rf\b/.test(command)) {
-      await agent.respondToPermission({
-        requestId: event.request.id,
-        response: { behavior: "deny", message: "Recursive deletion is blocked." },
-      });
-      return;
-    }
-
-    if (command.trim() === "git status") {
-      await agent.respondToPermission({
-        requestId: event.request.id,
-        response: { behavior: "allow" },
-      });
-    }
-  });
-
-  return () => {};
-}
-```
-
-| Request                  | Result                    |
-| ------------------------ | ------------------------- |
-| `rm -rf build`           | Declined                  |
-| `git status`             | Approved                  |
-| Other command or request | Left pending for the user |
-| Already-resolved request | SDK response fails        |
-
-The regex is an example policy, not a shell parser. Permission requests can also be questions,
-plans, and mode changes; requesting permission does not end the turn.
-
-### Events
-
-| Name                         | Event fields                                            | Trigger                                            |
-| ---------------------------- | ------------------------------------------------------- | -------------------------------------------------- |
-| `agent.created`              | `agent`                                                 | Ordinary creation finishes; excludes import/resume |
-| `agent.closed`               | `agent`                                                 | A live agent runtime closes                        |
-| `agent.turn_started`         | `agent`, `turnId`                                       | Live turn starts                                   |
-| `agent.turn_ended`           | `agent`, `turnId`, `outcome`, deprecated `timeline: []` | Live turn completes, fails, or is canceled         |
-| `agent.permission_requested` | `agent`, `request`                                      | Permission or question becomes pending             |
-| `agent.permission_resolved`  | `agent`, `requestId`, `resolution`                      | Pending request is answered or cleared             |
-| `agent.archived`             | `agent`, `archivedAt`                                   | Archive state is saved                             |
-| `workspace.created`          | `workspace`                                             | Record created; directory available                |
-| `workspace.archived`         | `workspace`                                             | Archive state is saved                             |
-
-Agent events exclude the daemon's private disposable helpers. Public background workspaces and
-their ordinary agents run the same lifecycle hooks as other workspaces. Archive events can precede
-runtime/worktree cleanup; observe lifecycle completion separately when cleanup matters.
-
-`agent.turn_ended.timeline` is deprecated and always empty. Fetch history on demand with
-`context.clisbot.agents.ref(event.agent.id).timeline.refetch({ direction: "tail", limit: 20 })`.
-The hook payload size does not grow with conversation history.
-
-**Shared payload shapes** (`@clisbot/plugin/server`):
-
-```ts
-interface PluginHookAgent {
-  id: string;
-  workspaceId: string | null;
-  parentAgentId: string | null;
-  provider: string;
-  cwd: string;
-  title: string | null;
-}
-
-interface PluginHookWorkspace {
-  id: string;
-  projectId: string;
-  cwd: string;
-  name: string | null;
-  archivedAt: string | null;
-}
-
-type PluginTurnOutcome =
-  | { kind: "completed" }
-  | { kind: "failed"; error: { message: string; code?: string } }
-  | { kind: "canceled"; reason: string };
-```
-
-| Field        | Shape / meaning                                                                                       |
-| ------------ | ----------------------------------------------------------------------------------------------------- |
-| `turnId`     | Provider-reported `string` or `null`; can repeat after a session reopens                              |
-| `timeline`   | `readonly AgentTimelineItem[]`; complete snapshot including earlier conversation; text may span items |
-| `request`    | SDK `AgentPermissionRequest`; `kind` is `tool`, `plan`, `question`, `mode`, or `other`                |
-| `resolution` | SDK `AgentPermissionResponse`                                                                         |
-| `archivedAt` | Timestamp string                                                                                      |
-
-### Before hooks
-
-| Name                 | Request fields                                                          | Editable                                |
-| -------------------- | ----------------------------------------------------------------------- | --------------------------------------- |
-| `agent.create`       | `config`, optional `env`                                                | Public agent config except `cwd`; `env` |
-| `agent.session_open` | `agentId`, `workspaceId`, `provider`, `cwd`, `reason`, `purpose`, `env` | Only `env`                              |
-| `workspace.create`   | `source`, optional `title`, `firstAgentContext`                         | Entire explicit creation request        |
-
-**`agent.create.config`** uses `AgentSessionConfig`:
-
-| Fields                                        | Constraint                                                                 |
-| --------------------------------------------- | -------------------------------------------------------------------------- |
-| `provider`, `model`                           | Separate fields; changing provider may require changing model/mode/options |
-| `modeId`, `thinkingOptionId`, `featureValues` | Provider-specific selections                                               |
-| `title`, `systemPrompt`                       | Agent configuration                                                        |
-| `providerOptions`                             | Opaque provider-specific options                                           |
-| `mcpServers`, `toolPolicy`                    | MCP configuration and exact-tool preapprovals                              |
-| `cwd`                                         | Cannot change                                                              |
-
-**`agent.session_open` request example:**
-
-```json
-{
-  "agentId": "agent-123",
-  "workspaceId": "workspace-456",
-  "provider": "codex",
-  "cwd": "/projects/shop",
-  "reason": "resume",
-  "purpose": "interactive",
-  "env": { "COMPANY_ENV": "development" }
-}
-```
-
-| Field         | Values                                                                                                                  |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `workspaceId` | String or `null`                                                                                                        |
-| `reason`      | `create`, `resume`, `refresh`, `import`                                                                                 |
-| `purpose`     | `interactive`, `history`                                                                                                |
-| `env`         | Launch override map; excludes the daemon's inherited environment. Replace the map to add, replace, or remove overrides. |
-
-### Ordering and returned values
-
-```text
-Creation request
-  → agent.create hooks (plugin-ID order; registration order within each plugin)
-  → resolve defaults and validate provider configuration
-  → derive launch configuration with Clisbot runtime tools and daemon prompt
-  → agent.session_open hooks (same ordering; env only)
-  → set CLISBOT_AGENT_ID and CLISBOT_AGENT_CWD
-  → open provider session and save agent configuration
-```
-
-| Callback returns                                        | Next callback receives                              |
-| ------------------------------------------------------- | --------------------------------------------------- |
-| `{ ...request, env: { ...request.env, REGION: "eu" } }` | Prior request with `REGION` added/replaced          |
-| `{ ...request, env: { REGION: "eu" } }`                 | Prior request with the entire override map replaced |
-| `undefined`                                             | Unchanged request                                   |
-| Throws or returns invalid data                          | Operation fails; later callbacks do not run         |
-
-No automatic deep merge. Later callbacks can overwrite earlier values. Agent configuration is
-saved; environment overrides are not persisted with it.
-
-### Context and cleanup
-
-| Contract                           | Behavior                                                                                                  |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `context.clisbot`                  | Existing SDK connected to this daemon                                                                     |
-| `context.signal`                   | Aborted on invocation timeout or plugin stop; pass to external requests                                   |
-| Input data                         | Detached snapshot; change state through returned requests or SDK commands                                 |
-| Registration result                | Idempotent remover, e.g. `const remove = server.on(...); remove();`                                       |
-| Reload, disable, removal, shutdown | Remaining registrations removed                                                                           |
-| Unknown hook name                  | Registration fails                                                                                        |
-| Hook timeout                       | 30 seconds; aborts the signal. A before hook fails the pending operation; an event handler logs an error. |
-| Event-handler error                | Logged against plugin; original operation continues                                                       |
-| Event delivery                     | Live, best effort; no replay, persistence, or automatic retry                                             |
-| Event concurrency                  | Different events may overlap; callback completion order is not guaranteed                                 |
-
-### Complete examples
-
-| Plugin                                                                                                   | Includes                                                                     |
-| -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| [lifecycle-logger](https://github.com/longbkit/clisbot/tree/main/plugin-examples/lifecycle-logger)       | All eleven hooks; JSON logs with environment values redacted                 |
-| [lifecycle-actions](https://github.com/longbkit/clisbot/tree/main/plugin-examples/lifecycle-actions)     | Follow-ups, permissions, environment, provider switching, worktree selection |
-| [agent-configuration](https://github.com/longbkit/clisbot/tree/main/plugin-examples/agent-configuration) | MCP injection and Codex sandbox/approval options                             |
-
-Read logger output with `clisbot plugin logs lifecycle-logger` or the host's `daemon.log`.
+`addSidebarView({ id, title, description?, Component })` registers an optional replacement for the
+sidebar content region. It returns cleanup. The user selects one view in Settings > Sidebar;
+registration does not activate it. See [Build a sidebar view](sidebar-views.md) for the props,
+ref-based queries and actions, device state and theme tokens.
 
 ## Screens and sidebar items
 
@@ -1030,6 +956,16 @@ export default function contribute(client: PluginClientContext) {
 | `layout`     | `compact` and the `ios`, `android`, or `web` platform.                                                                                                                                                                                                                                                                            |
 | `params`     | The params the screen was opened with, as string keys and values. `{}` when none.                                                                                                                                                                                                                                                 |
 | `navigation` | Optional client navigation. `openAgent({ agentId, serverId? })` and `openWorkspace({ workspaceId, serverId? })` open targets on `serverId`, or on the selected host when omitted. `openBrowser({ url, workspaceId, serverId? })` is available only on Electron; see [links and browsers](#external-links-and-workspace-browsers). |
+
+If `navigation?.supportsFocusHost` is true, pass `focusHost: true` to `openAgent` or `openWorkspace`.
+Clisbot selects only the destination host in the workspace sidebar, clears the project and label
+filters, and keeps the grouping mode. Omit the option to preserve the existing filters.
+
+```ts
+if (navigation?.supportsFocusHost) {
+  navigation.openAgent({ agentId, serverId, focusHost: true });
+}
+```
 
 Clisbot owns the route, header, close action, host picker, error boundary, and query client. The plugin owns the screen body.
 
@@ -1173,6 +1109,60 @@ function hideAlerts() {
   removeAlerts = null;
 }
 ```
+
+### Workspace row badge items
+
+`addWorkspaceRowBadgeItem({ id, title, icon, Component })` adds an item to the line under each workspace
+title in the sidebar, after the row's own items (host, pull request, checks, services, labels).
+`title` and `icon` label the item's toggle in the sidebar's **Show** menu, in a separate plugin group
+below a separator. Items start visible.
+
+`Component` renders once per workspace row on the plugin's host and receives
+`PluginWorkspaceRowBadgeItemProps`: `theme`, `host`, `layout`, and `workspaceId`. Render
+`WorkspaceRowBadge` from `@clisbot/plugin/client/ui`, or `null` when there is nothing to say about
+the workspace:
+
+| Prop                 | Meaning                                                                        |
+| -------------------- | ------------------------------------------------------------------------------ |
+| `icon`               | Optional. Any [icon](#icons) form, drawn at the line's glyph size.             |
+| `label`              | Optional. A short word. A badge with neither `icon` nor `label` draws nothing. |
+| `tone`               | `"muted"` (default), `"success"`, `"warning"`, `"danger"`, or `"info"`.        |
+| `accessibilityLabel` | Defaults to `label`, then the item's `title`.                                  |
+
+The line adds no separator around your badges, and returning `null` leaves no gap. Render as many
+badges as you like. Every row
+renders the component, so share one query across rows instead of fetching per workspace: the
+plugin's React Query client is shared by all of its components on a host.
+
+```tsx
+import type { PluginWorkspaceRowBadgeItemProps } from "@clisbot/plugin/client";
+import { useRpc } from "@clisbot/plugin/client";
+import { WorkspaceRowBadge } from "@clisbot/plugin/client/ui";
+import { useQuery } from "@tanstack/react-query";
+
+function ReviewState({ workspaceId }: PluginWorkspaceRowBadgeItemProps) {
+  const list = useRpc(reviewStates);
+  const { data } = useQuery({
+    queryKey: ["review-states"],
+    queryFn: () => list({}),
+    refetchInterval: 5000,
+  });
+  const state = data?.[workspaceId];
+  if (!state) return null;
+  return <WorkspaceRowBadge icon="Eye" label={state.label} tone="warning" />;
+}
+
+client.addWorkspaceRowBadgeItem({
+  id: "review",
+  title: "Review",
+  icon: "Eye",
+  Component: ReviewState,
+});
+```
+
+Apps older than this API have no `addWorkspaceRowBadgeItem`; check for it before calling.
+
+See the [workspace row badges example](https://github.com/longbkit/clisbot/tree/main/plugin-examples/workspace-row-badges).
 
 ## Host UI
 
@@ -1545,9 +1535,12 @@ async function publishReview(agentId: string, { clisbot }: PluginHandlerContext)
 
 The daemon stamps `pluginId` from the calling plugin session and rejects this RPC from non-plugin
 sessions. The row appears live, survives timeline refetches, and keeps only the latest value for the
-same plugin and `id`. If its renderer is missing, Clisbot shows the existing unavailable row. Daemons
-reject `data` over the limit rather than truncating it. Daemons that support this operation
-advertise `server_info.features.pluginTimelineItems`.
+same plugin and `id`. If its renderer is missing, Clisbot shows the existing unavailable row.
+
+`kind` starts with a lowercase letter and contains lowercase letters, numbers, or hyphens, the same
+rule `addTimelineRenderer` applies. Daemons reject any other `kind`. Daemons reject `data` over the
+limit rather than truncating it. Daemons that support this operation advertise
+`server_info.features.pluginTimelineItems`.
 
 ## Theme and layout
 
@@ -1597,6 +1590,12 @@ export default function contribute(client: PluginClientContext) {
       accent: "#cba6f7",
       mutedForeground: "#a6adc8",
       ring: "#6c7086",
+      sidebar: "#181825",
+      sidebarHover: "#313244",
+      sidebarSelected: "#45475a",
+      surface3: "#45475a",
+      surface4: "#585b70",
+      foregroundExtraMuted: "#7f849c",
     },
   });
   return () => {};
@@ -1607,16 +1606,29 @@ Every color is a hex string; anything else fails to load. Clisbot expands the pa
 token set the built-in dark themes use, so a contributed theme covers panels, menus, diffs, status
 colors, and the terminal without listing them.
 
-| Color             | Becomes                                                           |
-| ----------------- | ----------------------------------------------------------------- |
-| `background`      | App, workspace, and terminal background                           |
-| `foreground`      | Primary text, terminal foreground and cursor                      |
-| `raised`          | Cards, popovers, and hovered rows                                 |
-| `control`         | Inputs, secondary fills, and the light-theme sidebar              |
-| `border`          | Borders and the highest raised-surface tint                       |
-| `accent`          | Buttons, selection, and focus. Optional; `foreground` if omitted. |
-| `mutedForeground` | Secondary text                                                    |
-| `ring`            | Focus rings, scrollbars, and terminal bright black                |
+| Color                  | Becomes                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------ |
+| `background`           | App, workspace, and terminal background                                        |
+| `foreground`           | Primary text, terminal foreground and cursor                                   |
+| `raised`               | Cards and popovers                                                             |
+| `control`              | Inputs, secondary fills, and the light-theme sidebar unless `sidebar` is set   |
+| `border`               | Borders                                                                        |
+| `accent`               | Buttons, selection, and focus. Optional; `foreground` if omitted.              |
+| `mutedForeground`      | Secondary text                                                                 |
+| `ring`                 | The keyboard focus outline on web, and terminal bright black                   |
+| `sidebar`              | Sidebar background. Optional; `background` in dark themes, `control` in light. |
+| `sidebarHover`         | Optional hovered sidebar row background.                                       |
+| `sidebarSelected`      | Optional selected sidebar row background.                                      |
+| `surface3`             | Optional neutral fill for message bubbles, secondary buttons, and chips.       |
+| `surface4`             | Optional stronger neutral fill for tracks and other states.                    |
+| `foregroundExtraMuted` | Optional tertiary text, including sidebar timestamps.                          |
+
+Each optional override is used exactly as given. Omitted state, fill, and tertiary colors are derived
+independently from the palette. When you override a color, choose it for readable contrast with the
+surfaces or text it accompanies.
+
+`sidebar` and the five overrides require Clisbot 0.16.0 or later. Older apps reject a theme with an unknown color, and the
+plugin's other contributions fail to load with it, so raise `requirements.clisbot` when you use any of them.
 
 `appearance` is `"light"` or `"dark"`. Clisbot uses it to select the matching surface, status,
 diff, syntax, terminal, and shadow derivation.
@@ -1631,8 +1643,11 @@ Themes need a host that supports them. A client released before `addTheme` canno
 ## Settings screens
 
 Register a component with `client.addSettingsScreen({ id, title, icon, Component })` in
-`index.client.tsx`. It appears under **Settings → Plugins → your plugin** on that host.
-`id` is unique within the installation; `icon` is any [icon](#icons) form. Registration returns an
+`index.client.tsx`. Your plugin's row in **Settings → Plugins** on that host then shows a settings
+button (cog) that opens your first screen. When you register several screens, the settings page shows
+one tab per screen, labeled with its `title` and `icon`, in registration order. With one screen there
+are no tabs. The page header shows your manifest `name`, or your plugin ID when you leave `name`
+out; it never includes a screen title. `id` is unique within the installation; `icon` is any [icon](#icons) form. Registration returns an
 idempotent remover, and plugin teardown removes remaining screens.
 
 Call `client.openSettings(id)` or a Command Center callback's `openSettings(id)` to open one
@@ -1713,13 +1728,13 @@ export default function contribute(server: PluginServerContext) {
 }
 ```
 
-| Definition field               | Contract                                                                                                                             |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `id`                           | Lowercase identifier matching `[a-z][a-z0-9_-]*`; unique within the installation.                                                    |
-| `scope`                        | Required `"host"`. All authorized clients of that host share the document. No per-user, device-local, or cross-host synchronization. |
-| `version`                      | Required positive integer describing the schema, independent of the write revision.                                                  |
-| `schema`                       | Zod schema for JSON values. Supply defaults so parsing `{}` produces a complete document.                                            |
-| `migrate(values, fromVersion)` | Optional synchronous or asynchronous conversion from an older stored version. Its output must pass the current schema.               |
+| Definition field               | Contract                                                                                                                                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                           | Lowercase identifier matching `[a-z][a-z0-9_-]*`; unique within the installation.                                                                                                               |
+| `scope`                        | Required `"host"` or `"device"`. Host documents are shared by authorized clients. Device documents stay on this device, keyed by installation and settings ID; use them for layout preferences. |
+| `version`                      | Required positive integer describing the schema, independent of the write revision.                                                                                                             |
+| `schema`                       | Zod schema for JSON values. Supply defaults so parsing `{}` produces a complete document.                                                                                                       |
+| `migrate(values, fromVersion)` | Optional synchronous or asynchronous conversion from an older stored version. Its output must pass the current schema.                                                                          |
 
 Call `useSettings(preferences)` in any contributed component. It returns a discriminated state:
 
@@ -1889,6 +1904,8 @@ Agent snapshot fields:
 | `workspaceId`       | `string`                                                       |
 | `provider`          | `string`                                                       |
 | `status`            | `"initializing" \| "idle" \| "running" \| "error" \| "closed"` |
+| `backgroundWork`    | `{ count: number }`                                            |
+| `background`        | `boolean`                                                      |
 | `createdAt`         | ISO timestamp                                                  |
 | `updatedAt`         | ISO timestamp                                                  |
 | `lastActivityAt`    | ISO timestamp                                                  |
@@ -1901,6 +1918,27 @@ Agent snapshot fields:
 | `attentionReason`   | `"finished" \| "error" \| "permission" \| null`                |
 | `parentAgentId`     | `string \| null`                                               |
 | `labels`            | `Record<string, string>`                                       |
+
+`backgroundWork.count` is the number of shells and monitors the agent left running after its turn,
+and `0` when none are live. An agent can be `idle` with `attentionReason: "finished"` while that
+work still runs, so combine the fields the way your plugin needs:
+
+```tsx
+const busy = useAgent(
+  agentId,
+  (agent) => agent.status === "running" || agent.backgroundWork.count > 0,
+);
+if (busy === null) return null; // The agent is unavailable.
+```
+
+To list or stop the work itself, use
+[`clisbot.agents.ref(id).backgroundWork`](/docs/sdk/reference#agent-handle).
+
+`background` is `true` for a [background agent](/docs/sdk/agents#run-a-helper-as-a-background-agent),
+a helper hidden from tabs, lists and attention. It is fixed when the agent is created. An agent in a
+background workspace reads `false` unless it was created as a background agent; read the
+workspace's own `background` for that. `backgroundWork` and `background` require Clisbot 0.16.0 or
+later.
 
 Clisbot owns tab focus, splitting, closing, persistence, query state, the API/RPC providers, and the render error boundary. A restored tab whose plugin, panel, context, workspace, or agent is unavailable stays open with an unavailable message instead of crashing the workspace.
 
@@ -2221,12 +2259,274 @@ header has no room for plugin buttons, so each one is a row of the workspace men
 icon and title; its menus and popovers open as pages of that sheet. Placement and overflow are host
 decisions.
 
+## Composer items
+
+`client.addComposerItem({ id, Component })` puts a component in the composer: the agent composer,
+the draft composer for a new agent, and the composer on the New workspace screen. `useComposer()`
+reads and changes what the composer configures, and `Toggle`, `Select` and `Action` from
+`@clisbot/plugin/client/ui` draw the controls.
+
+```tsx
+import { useComposer, type PluginClientContext } from "@clisbot/plugin/client";
+import { Action, Select, Toggle } from "@clisbot/plugin/client/ui";
+
+function ReviewFlag() {
+  const composer = useComposer();
+  return (
+    <Toggle
+      title="Needs review"
+      icon="Flag"
+      value={composer.agent.metadata["review.needsReview"] === true}
+      onValueChange={({ value }) =>
+        composer.setMetadata({ "review.needsReview": value ? true : null })
+      }
+    />
+  );
+}
+
+function Checklist() {
+  const composer = useComposer();
+  return (
+    <Action
+      title="Insert checklist"
+      icon="ListChecks"
+      onPress={() => composer.insertText("- [ ] Tests\n- [ ] Docs\n")}
+    />
+  );
+}
+
+export default function contribute(client: PluginClientContext) {
+  client.addComposerItem({ id: "review-flag", Component: ReviewFlag });
+  client.addComposerItem({ id: "checklist", Component: Checklist });
+  return () => {};
+}
+```
+
+`useComposer()` returns the composer the item sits in:
+
+| Field or command                                    | Meaning                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `context`                                           | `"agent"` for a running agent, `"draft"` for a new agent in a workspace, `"new-workspace"` for the New workspace screen.                                                                                                                                                                                  |
+| `prompt`, `setPrompt(text)`, `insertText(text)`     | The prompt. `insertText` replaces the selection or inserts at the cursor.                                                                                                                                                                                                                                 |
+| `focus(options?)`                                   | Puts the cursor in this composer, ready to type, and resolves when it is there. `selection: { start, end }` places the cursor or selects text, as offsets into `prompt` clamped to its length; omit it to keep the cursor where it is. See [focus a composer](#focus-a-composer).                         |
+| `attachments`, `addAttachment`, `removeAttachment`  | Items from [your own attachment sources](#add-a-composer-attachment-source). Attachments from other plugins and Clisbot's own are not listed.                                                                                                                                                             |
+| `agent.provider`, `model`, `mode`, `thinking`       | What the agent runs with, or what the draft will create.                                                                                                                                                                                                                                                  |
+| `agent.options`                                     | The provider options in effect, defaults included. In a draft: the options the agent will be created with, including your changes.                                                                                                                                                                        |
+| `agent.metadata`                                    | The agent's [metadata](/docs/plugins/hooks#metadata). In New workspace, the first agent's.                                                                                                                                                                                                                |
+| `setProvider`, `setModel`, `setMode`, `setThinking` | Return promises. `setProvider` resets the model like the provider picker. It rejects on `context: "agent"`, which keeps its provider, and for a provider the host does not offer. `setModel` and `setThinking` pass the value on as given; on a running agent the provider's refusal rejects the promise. |
+| `setOptions(patch)`, `setMetadata(patch)`           | Top-level keys replace; `null` removes the key. Metadata set in a draft is sent when the agent is created and cleared once the prompt is sent.                                                                                                                                                            |
+
+The same call does the same thing in every composer; a plugin does not choose a composer's
+implementation. `setMetadata` on a running agent needs a host that supports metadata. On an older
+host the promise rejects with "Update the host to use metadata."
+
+`Toggle` takes `value` and `onValueChange({ value })`. `Select` takes `value`, `options` (`{ value, label,
+description? }`) and `onValueChange({ value })`. `Action` takes `onPress(event)`. All three take `title`,
+`icon` (a [Lucide name, SVG or component](#icons)) and `disabled`. A callback may return a promise:
+the control stays disabled until it settles, and Clisbot shows a rejection to the user as an error
+toast, the way it does for its own controls. Clisbot owns where each control sits: inline in the
+toolbar when the composer has room, and a row in the composer's overflow sheet when it does not,
+which is always the case on a phone. A `Select` opens its list in place of the sheet row. A
+`Component` that renders something other than these controls draws it where its item is placed; in
+the overflow sheet that is the sheet.
+
+Each command acts on the composer's state when it runs, not on the render that created your
+callback, so `await composer.setProvider("codex")` followed by `await composer.setModel("gpt")`
+changes both. A command's promise resolves once the change has taken effect, and `composer.agent`
+shows it on the next render.
+
+While the New workspace screen creates the workspace and its agent, the composer is locked. Your
+controls render disabled, `setPrompt` and `insertText` throw, and the agent commands reject with
+"The composer is locked while the agent is being created." `composer.agent.options` and
+`composer.agent.metadata` are frozen copies; change them through `setOptions` and `setMetadata`.
+
+Clisbot measures what an item renders in the toolbar to decide what fits, so an item that renders
+nothing takes no room and adds no overflow button. On wide composers the item stays mounted while
+it is in the overflow, and the overflow sheet mounts a second instance while it is open, so keep
+effects safe to run twice. On a phone an item mounts only while the overflow sheet is open.
+
+The [composer controls example](https://github.com/longbkit/clisbot/tree/main/plugin-examples/composer-controls)
+registers a `Select`, two `Toggle`s (one writes a provider option) and an `Action`, plus an
+Explorer panel and a Command Center item that reach a composer by reference.
+
+### Focus a composer
+
+`insertText` and `setPrompt` do not move the cursor. Call `focus()` after them so the user can keep
+typing:
+
+```tsx
+composer.insertText("- [ ] Tests\n");
+await composer.focus();
+```
+
+`await composer.focus({ selection: { start: 0, end: composer.prompt.length } })` selects the prompt.
+
+You do not need to know where the user is. On a running agent's composer, Clisbot navigates to the
+agent's tab or workspace when it is not on screen, closes a phone's agent list or Explorer panel
+that covers it, and moves focus to the agent's pane, then focuses the input. When the input is
+already on screen and focused in its pane, `focus()` only puts the cursor there. Every composer also
+closes the sheets, menus, pickers and image previews it opened over itself first, such as the
+controls sheet that holds your items on a phone. A phone opens its keyboard.
+
+`focus()` rejects when the composer cannot take focus: the agent was archived, its composer did not
+come on screen within 15 seconds, or the input refused focus, as it does on a phone while dictation
+is running. When calls overlap, the latest one decides where the cursor goes and the earlier ones
+settle with it. A rejected promise returned from a button's `onPress` or a Command Center item's
+`onSelect` shows the user an error toast.
+
+Drafts and the New workspace composer are only reachable from an item inside them, so `focus()` does
+not navigate to them. It works while the composer is on screen, and rejects with "The composer is
+not on screen." when the user has already moved on. A locked composer accepts focus.
+
+### Reach a composer by reference
+
+A running agent has a composer whether or not its tab is open. `useComposers(selector)` in any plugin
+component, `composers(selector)` on every command context, and `client.composers(selector)` on the
+client context return the same `PluginComposer` that `useComposer()` gives an item, for an agent you
+name or for the focused one. Use `client.composers` in a callback that receives no context, such as a
+[pill's `onPress`](#composer-pills):
+
+```tsx
+import { useComposers, type PluginClientContext } from "@clisbot/plugin/client";
+
+function InsertChecklist() {
+  const [focused] = useComposers({ focused: true });
+  return (
+    <Pressable disabled={!focused} onPress={() => focused?.insertText("- [ ] Tests\n")}>
+      <Text>Insert checklist</Text>
+    </Pressable>
+  );
+}
+
+export default function contribute(client: PluginClientContext) {
+  client.addWorkspacePanel({
+    id: "tools",
+    title: "Tools",
+    icon: "ListChecks",
+    locations: ["explorer"],
+    Component: InsertChecklist,
+  });
+  client.addCommandCenterItem({
+    id: "mark-for-review",
+    title: "Mark for review",
+    icon: "Flag",
+    context: "agent",
+    async onSelect({ agent, composers }) {
+      for (const composer of composers({ agentId: agent.id })) {
+        await composer.setMetadata({ "review.needsReview": true });
+      }
+    },
+  });
+  return () => {};
+}
+```
+
+| Selector            | Result                                                                                                                                                                                                                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{ agentId }`       | The composer of that agent on this host. Empty for an agent that is unknown or archived.                                                                                                                                                                                                     |
+| `{ focused: true }` | The composer of the agent the Command Center hands to agent items: the focused agent tab of the workspace on screen. Empty when the screen is not a workspace, such as a plugin screen or New workspace, or when the focused tab is not an agent. It follows focus as the user changes tabs. |
+
+The result is always an array, empty or with one composer, so the same code reads either selector.
+`useComposers` re-renders when a composer changes. A composer from `composers()` is the state at the
+call; call `composers()` again for the next state.
+
+The commands are those of [`useComposer()`](#composer-items), with these differences for a composer
+you reach from outside:
+
+- `insertText` inserts at the cursor while the agent's composer is on screen. While it is not, for
+  example when the user is in another workspace, it appends to the agent's saved prompt, and the text
+  is in the input when the user returns. `setPrompt` replaces the saved prompt the same way.
+- A running agent's composer is never locked.
+- `setProvider` rejects, as it does inside the agent's own composer.
+- `setModel` and `setThinking` send the value to the provider unchecked. A value the provider refuses
+  rejects with the provider's message. `model` and `thinking` read what the model picker
+  shows at that moment: until the provider's catalog loads that is the id the agent reports or was
+  created with, which may be an alias, and once it loads the catalog's own id.
+- `focus()` reveals the composer first, as [described above](#focus-a-composer).
+- Drafts and the New workspace screen are not addressable by reference. Only an item inside one
+  reaches its composer, through `useComposer()`.
+
+## New workspace items
+
+`client.addNewWorkspaceItem({ id, Component })` puts a field on the New workspace screen, beside
+the project, host and branch pickers. `useNewWorkspace()` reads and changes what the screen will
+create, and `Combobox`, `Select`, `Toggle` and `Action` from `@clisbot/plugin/client/ui` draw the
+fields. On desktop an item is a badge in the setup row; on a phone it is a full-width field.
+
+```tsx
+import { useNewWorkspace, useRpc, type PluginClientContext } from "@clisbot/plugin/client";
+import { Combobox } from "@clisbot/plugin/client/ui";
+import { searchIssuesRpc } from "../shared/issues";
+
+function IssueField() {
+  const newWorkspace = useNewWorkspace();
+  const searchIssues = useRpc(searchIssuesRpc);
+  const issueId = newWorkspace.metadata["issues.id"];
+  return (
+    <Combobox
+      title="Issue"
+      icon="CircleDot"
+      value={typeof issueId === "string" ? { id: issueId, label: issueId } : null}
+      search={async ({ query }) => (await searchIssues({ query })).issues}
+      onSelect={async ({ item }) => {
+        await newWorkspace.setBranch(item.branch);
+        await newWorkspace.setMetadata({ "issues.id": item.id });
+      }}
+    />
+  );
+}
+
+export default function contribute(client: PluginClientContext) {
+  client.addNewWorkspaceItem({ id: "issue", Component: IssueField });
+  return () => {};
+}
+```
+
+`useNewWorkspace()` returns the setup the item sits in:
+
+| Field or command            | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `host`, `project`           | The user's choices, `{ id, label }` and `{ id, name } \| null`. Read-only: an item cannot switch host or project.                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `isolation`, `setIsolation` | `"local"` or `"worktree"`. **Existing worktree** reads `"local"`, since the workspace is a local one at the worktree's directory, and `setIsolation` leaves it. A project that cannot make worktrees reads `"local"`, and `setIsolation("worktree")` rejects.                                                                                                                                                                                                                                                                           |
+| `baseRef`, `setBaseRef`     | What a new worktree starts from: `{ type: "branch", name }`, `{ type: "change-request", number }`, or `null` until the default is known. A branch's `name` is the exact ref creation uses, such as `refs/remotes/origin/main`, so `setBaseRef(newWorkspace.baseRef)` changes nothing. `setBaseRef` takes any ref the Base picker offers, or a bare branch name, which Clisbot resolves as it does anywhere else. The new worktree branches off it, and the Branches list switches to Branch off. It rejects while no project is chosen. |
+| `branch`, `setBranch`       | The name of the branch a new worktree is created on. `null` lets Clisbot pick one. It is kept while isolation is local or the base is a change request, and it names the new branch of any worktree that cuts one, from the default base or a chosen branch. It does not apply to a worktree that checks out an existing branch or change request.                                                                                                                                                                                      |
+| `metadata`, `setMetadata`   | The created workspace's [metadata](/docs/plugins/hooks#metadata), not the first agent's. Top-level keys replace; `null` removes a key. Rejects on a host that does not support metadata with "Update the host to use metadata."                                                                                                                                                                                                                                                                                                         |
+
+Commands follow the [composer item](#composer-items) rules: each one acts on the screen's state
+when it runs, so `await newWorkspace.setBranch(name)` followed by `newWorkspace.setMetadata(patch)`
+changes both, and its promise resolves once the change has taken effect. A command works from your component's first effect, including a mount effect. Payloads are JSON values.
+Your items are mounted for one project on one host. When the user changes either, Clisbot remounts them and clears `branch` and `metadata`, so state and `Combobox` results for the previous project do not carry over; an item that sets up in a mount effect sets up again for the new project. A command called after its project or host has been left, such as the end of a lookup the user abandoned by switching, rejects with "The New workspace screen moved to another project or host; this item belongs to the previous one." and changes nothing; the items mounted for the new project are not affected.
+`host`, `project`, `baseRef` and `metadata` are frozen. While the screen creates the workspace it is locked: your fields render
+disabled and every command rejects with "The New workspace screen is locked while the workspace is
+being created." A callback that returns a promise keeps the control disabled until it settles, and a
+rejection reaches the user as an error toast.
+
+`Combobox` is a field with a searchable list whose results come from your code:
+
+| Prop       | Meaning                                                                                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value`    | `{ id, label, description? } \| null`, what the field shows. It need not be among the search results, so it can show a choice made earlier.                                           |
+| `search`   | `({ query }) => Promise<Item[]>`. Called with `""` when the list opens and again, debounced, as the user types. Each `Item` is `{ id, label, description? }` plus any fields you add. |
+| `onSelect` | `({ item }) => void \| Promise<void>`. `item` is the object `search` returned.                                                                                                        |
+
+Clisbot shows "Searching…" while a search runs, "Search failed" with the error message when it
+rejects, and an empty state for no results. It keeps the previous results while a newer search runs
+and ignores a search that a newer one replaced, so `search` needs no cancellation of its own.
+`Combobox` takes the same `title`, `icon` and `disabled` as the other controls, and draws as a row
+with a list in the composer's overflow sheet too.
+
+The [New workspace issues example](https://github.com/longbkit/clisbot/tree/main/plugin-examples/new-workspace-issues)
+searches a fixed issue list from a daemon handler and sets the branch and metadata from the choice.
+
 ## Composer pills
 
 `client.addComposerPill({ id, workspaceId, agentId, button })` uses the same [button descriptor](#button-descriptor)
 and returns the same registration. It targets one agent's composer track alongside Tasks and
 Subagents. Composer pills always show the icon and `label` (or `title` when `label` is omitted).
-They never show a chevron, including for menus and popovers.
+Menus and popovers add an upward chevron on every layout, because their surface opens above the
+pill; actions show none, so a pill that runs on tap reads differently from one that opens something.
+The track keeps its space above the composer whether or not it has pills, so adding and removing
+pills does not move the transcript.
 
 ```tsx
 const pill = client.addComposerPill({
@@ -2241,6 +2541,31 @@ const pill = client.addComposerPill({
       kind: "action",
       onPress() {
         client.openPanel("review", { workspaceId, agentId });
+      },
+    },
+  },
+});
+```
+
+A pill's `onPress` receives no arguments. Reach its agent's composer with
+[`client.composers`](#reach-a-composer-by-reference):
+
+```tsx
+const pill = client.addComposerPill({
+  id: "hello",
+  workspaceId,
+  agentId,
+  button: {
+    title: "Add HELLO to the composer",
+    icon: "Hand",
+    label: "Hello",
+    behavior: {
+      kind: "action",
+      async onPress() {
+        for (const composer of client.composers({ agentId })) {
+          composer.insertText("HELLO");
+          await composer.focus();
+        }
       },
     },
   },
@@ -2346,7 +2671,7 @@ Hiding preserves the registration, so showing it again restores its position. It
 an action already in progress.
 
 `remove()` is idempotent. Updates after removal do nothing. Clisbot removes outstanding buttons when
-the plugin installation or host connection is torn down. Return cleanup from the client entry for
+the plugin installation is disposed (see [Hosts and lifecycle](#hosts-and-lifecycle)). Return cleanup from the client entry for
 your subscriptions, timers, and other resources.
 
 ## Use the Clisbot SDK
@@ -2406,6 +2731,8 @@ function PullRequestAction({ theme }: PluginSurfaceProps) {
 ```
 
 The returned API covers projects, workspaces, agents, terminals, providers, and daemon config. See the [SDK API reference](/docs/sdk/reference) for its methods. Connection lifecycle methods are intentionally absent because Clisbot owns the connection.
+
+To run a helper the user shouldn't see, such as a classifier or summarizer, create it as a [background agent](/docs/sdk/agents#run-a-helper-as-a-background-agent) in an existing workspace.
 
 ### Discover hosts and target another host
 
@@ -2551,9 +2878,167 @@ export default function contribute(server: PluginServerContext) {
 }
 ```
 
-Inputs and outputs are validated on both sides. RPC names start with a lowercase letter and contain lowercase letters, numbers, dots, hyphens, or underscores. `useRpc()` returns a typed async function. Use TanStack Query for request state, caching, and mutations.
+Inputs are parsed once in the plugin process; outputs are parsed once on the client. Send schema inputs from the client and return output-schema inputs from the handler; schema transforms run at the receiving side. RPC names start with a lowercase letter and contain lowercase letters, numbers, dots, hyphens, or underscores. `useRpc()` returns a typed async function. Use TanStack Query for request state, caching, and mutations.
 
 Backend handlers receive the same `ClisbotApi` as `{ clisbot }`. Their connection belongs to the subprocess and closes when the plugin stops. It does not subscribe to timelines or catalog events until plugin code subscribes. Follow the [SDK event contract](/docs/sdk/events) for cleanup and timeline replacements. Backend code can use Node APIs and dependencies installed in the plugin directory.
+
+## Stream events from the daemon {#subscriptions}
+
+A subscription runs a daemon handler for as long as one client listens and sends that client typed
+events. Use it for watchers, tails, and live media; use plugin RPC for a single answer.
+
+Define the contract in `shared/`:
+
+```ts
+// shared/diff.ts
+import { defineSubscription } from "@clisbot/plugin";
+import { z } from "zod";
+
+export const diffWatch = defineSubscription({
+  name: "diff.watch",
+  input: z.object({ cwd: z.string(), from: z.string() }),
+  event: z.object({ type: z.literal("changes"), files: z.array(z.string()) }),
+});
+```
+
+Handle it in `index.server.ts`. The handler receives `push` and an abort `signal` next to `clisbot`:
+
+```ts
+server.handle(diffWatch, ({ cwd, from }, { push, signal }) => {
+  const watcher = watchChanges(cwd, from, (files) => void push({ type: "changes", files }));
+  signal.addEventListener("abort", () => watcher.close(), { once: true });
+});
+```
+
+Subscribe from a surface with `useSubscription(contract, input, onEvent)`:
+
+```tsx
+const [files, setFiles] = useState<string[]>([]);
+const subscription = useSubscription(diffWatch, { cwd, from: "HEAD" }, (event) => {
+  setFiles(event.files);
+});
+if (subscription.status === "error") return <Text>{subscription.error.message}</Text>;
+```
+
+Outside React, `client.subscribe` takes the same arguments plus options and returns a remover:
+
+```ts
+const stop = client.subscribe(diffWatch, { cwd, from: "HEAD" }, onChanges, { signal });
+await stop.ready; // the daemon accepted the subscription
+stop(); // or await stop.release()
+```
+
+RPCs and subscriptions share one name space; registering the same name for both fails the plugin
+load.
+
+### Handler lifetime
+
+| The handler...                                | Result                                                       |
+| --------------------------------------------- | ------------------------------------------------------------ |
+| Throws synchronously, or the input is invalid | The subscribe call fails with the error. No events are sent. |
+| Returns nothing                               | The subscription stays open until the client releases it.    |
+| Returns a promise that resolves               | The subscription closes.                                     |
+| Returns a promise that rejects                | The subscription closes with the error.                      |
+
+`signal` aborts when the client releases the subscription, unmounts the hook, changes its input,
+disconnects, or the plugin stops. Pushes after the abort are dropped. `push` validates the event
+against the contract and resolves once the event has left the plugin process; await it in a loop
+to pace a producer.
+
+Each subscriber runs its own handler. Clisbot does not share one handler between clients and does
+not replay missed events: after a reconnect or a plugin reload, mounted surfaces subscribe again and
+the handler starts from the beginning. Share an
+expensive watcher inside your plugin when several subscribers need it.
+
+`useSubscription` returns a union on `status`:
+
+| Status       | Meaning                                                                                        |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `connecting` | Sent; the daemon has not accepted it yet.                                                      |
+| `live`       | The handler is running. Events arrive through `onEvent`.                                       |
+| `closed`     | The handler finished.                                                                          |
+| `error`      | The subscribe failed, the handler failed, an event failed the contract, or the plugin stopped. |
+
+The hook subscribes again when `input` changes by shallow equality. `onEvent` is always the latest
+render's callback, so an inline function does not resubscribe. `client.subscribe` takes
+`{ signal, onClosed }`; `onClosed` receives `{ error? }`.
+
+### Bytes
+
+A top-level `Uint8Array` crosses the wire as binary, without JSON or base64. Everything else is
+JSON. The rule applies to subscription events, RPC outputs, and RPC inputs. A Node `Buffer` is a
+`Uint8Array`.
+
+```ts
+export const thumbnail = defineRpc({
+  name: "thumbnail.render",
+  input: z.object({ path: z.string(), width: z.number() }),
+  output: z.instanceof(Uint8Array),
+});
+
+// index.server.ts
+server.handle(thumbnail, ({ path, width }) => renderPng(path, width));
+
+// client
+const renderThumbnail = useRpc(thumbnail);
+const png = await renderThumbnail({ path, width }); // Uint8Array
+```
+
+Declare bytes with `z.instanceof(Uint8Array)`. An event can be bytes or JSON per push: declare a
+union and branch with `event instanceof Uint8Array`. A `Uint8Array` nested in an object fails
+validation on the sending side with an error that names the rule; send the bytes as their own
+event or RPC value and the metadata as a separate JSON event.
+
+One event or RPC value carries at most 100 MiB less 65 KiB of framing. Push large payloads in
+chunks of a few hundred KiB; each `push` waits for the previous one to leave the plugin process.
+Uploads from a phone have a lower limit: Android closes the connection when one send exceeds
+16 MiB, so split a larger upload into several RPCs.
+
+### Several streams on one subscription
+
+Put a header byte in front of each payload to multiplex streams. Keep the layout in `shared/`, so
+the handler and the surface call named functions:
+
+```ts
+// shared/media-frames.ts
+export const MediaOpcode = { Video: 0x01, Audio: 0x02 } as const;
+
+export function encodeMediaFrame(opcode: number, payload: Uint8Array): Uint8Array {
+  const bytes = new Uint8Array(1 + payload.byteLength);
+  bytes[0] = opcode;
+  bytes.set(payload, 1);
+  return bytes;
+}
+
+export function decodeMediaFrame(bytes: Uint8Array) {
+  return { opcode: bytes[0], payload: bytes.subarray(1) }; // a view, not a copy
+}
+
+export const mediaStream = defineSubscription({
+  name: "media.stream",
+  input: z.object({ source: z.string() }),
+  event: z.instanceof(Uint8Array),
+});
+```
+
+```ts
+useSubscription(mediaStream, { source }, (bytes) => {
+  const frame = decodeMediaFrame(bytes);
+  if (frame.opcode === MediaOpcode.Audio) audio.enqueue(frame.payload);
+  else video.draw(frame.payload);
+});
+```
+
+Events from one subscription arrive in push order, JSON and binary alike.
+`plugin-examples/media-stream` streams video and audio this way and uploads a frame back through
+an RPC with a `Uint8Array` input; `plugin-examples/diff-watch` watches a working tree.
+
+### Older hosts
+
+Subscriptions and binary RPC values need a host that advertises them. Against an older host,
+`useSubscription` reports `error` asking to update the host, `client.subscribe` rejects `ready`
+with the same message, and an RPC with a `Uint8Array` input or output fails. Raise your plugin's
+`requirements.clisbot` to the release that ships subscriptions.
 
 ## Debug backend output
 
@@ -2674,9 +3159,11 @@ Plugins are installed per daemon. When the same contribution exists on several c
 
 Attachment sources remain scoped to each composer's host.
 
-Workspace panels and Command Center items stay scoped to the active host and exact cached context.
-Reload replaces their registrations. Disable, removal, host disconnect, and evaluation failure
-remove Command Center items and clear the installation's query state. An already-restored panel tab
+A dropped connection keeps client plugin registrations, mounted surfaces, local state, and query caches. Reconnecting through the existing `DaemonClient` object keeps unchanged installations and refreshes their settings. Consume SDK observation snapshots to refresh other daemon state; setup does not run again for an unchanged installation. Daemon calls still depend on connectivity.
+
+Switching connections (for example, from direct to relay) currently replaces the `DaemonClient` object and reinstalls client plugins. Reload, changed bundles or requirements, disable, plugin removal, and host removal also dispose affected installations and clear their query state. A replacement that fails evaluation leaves its contributions unavailable.
+
+Workspace panels and Command Center items stay scoped to the active host and exact cached context. An already-restored panel tab
 remains as unavailable until its matching contribution returns or the user closes it. Panel render
 failures stay inside the plugin error boundary.
 

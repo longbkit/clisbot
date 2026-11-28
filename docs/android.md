@@ -97,6 +97,18 @@ Gradle auto-fetches the platform/build-tools it needs once licenses are accepted
 
 ## Local build + install
 
+The `react-native-svg@15.15.4` patch prevents header fades retaining their old painted size after
+rotation. Rebuild native Android after changing it; Metro reloads cannot update this code. Keep the
+resize hunks until upstream invalidates descendant geometry on canvas resize. Its instrumentation
+regression renders real gradient pixels across growing and shrinking layouts, including a nested
+group. From `packages/app/android`, run it on your selected emulator:
+
+```bash
+ANDROID_SERIAL=emulator-5562 ./gradlew :react-native-svg:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.horcrux.svg.SvgResizeTest \
+  --no-daemon --max-workers=2 -Dorg.gradle.parallel=false
+```
+
 The locked `expo-modules-core@57.0.23` needs the patch installed by `npm install`.
 It backports
 [Expo's Activity-result launcher fix](https://github.com/expo/expo/pull/49634): changing
@@ -134,7 +146,30 @@ The older `android`, `android:development`, and `ios` commands remain aliases fo
 `android:production` still builds and installs a release through Expo; use `build:apk` when you
 need an artifact. `android:clear` removes the generated Android project.
 
-Run `npm run test:android --workspace=@clisbot/app` to prebuild Android and run native module unit tests. The app CI job runs this command with the Android toolchain.
+Run `npm run test:android --workspace=@clisbot/app` explicitly with a local Android toolchain to prebuild Android and run native module unit tests. Ordinary CI does not prebuild Android or run these tests.
+
+With an emulator or device connected, run the hardware keyboard's window-dispatch regression tests
+from `packages/app/android`:
+
+```bash
+./gradlew :clisbot-hardware-keyboard:connectedDebugAndroidTest --no-daemon --max-workers=2 -Dorg.gradle.parallel=false
+```
+
+These check terminal arrow ownership, held-key repeats and modifiers, and ordinary text-field editing.
+
+Run the terminal module's tests the same way with `:clisbot-terminal:connectedDebugAndroidTest`. Besides
+row layout, they check that the terminal input asks the keyboard not to learn what is typed
+(`IME_FLAG_NO_PERSONALIZED_LEARNING`), so passwords typed at a prompt stay out of Gboard's
+suggestions in other apps. React Native's TextInput has no prop for that flag, and it replaces
+`imeOptions` when `returnKeyType` or `disableFullscreenUI` is set, so the terminal input sets neither.
+
+Run the display density regression tests the same way:
+
+```bash
+./gradlew :clisbot-display-metrics:connectedDebugAndroidTest --no-daemon --max-workers=2 -Dorg.gradle.parallel=false
+```
+
+These check that React Native sizes text at the window's density when the window is on another display, such as Samsung DeX.
 
 ### Diagnostic logs without ADB
 
@@ -185,10 +220,11 @@ CPU sample to it.
 
 ### Reanimated stale Fabric tags
 
-`COMPAT(reanimated-stale-tag)` patches Reanimated 4.5.1 on React Native 0.86 to skip a
-synchronous update when its Fabric view is already gone. It preserves updates for tags being
-preallocated and continues to report other failures. Remove the patch and its postinstall version
-guard after upstream safely handles removed Fabric tags, then verify repeated Android pane
+`COMPAT(reanimated-stale-tag)` keeps Reanimated on a reviewed version with a stale-tag patch. Since
+the upstream v0.17.4 sync that patch is upstream's backport of Reanimated PR 10435 (4.7.1) for 4.5.5,
+replacing Clisbot's own 4.5.1 guard: a synchronous update whose Fabric view is already gone is
+dropped quietly, updates for preallocated tags still go through, and other failures are logged.
+Remove the patch after the installed Reanimated includes the fix, then verify repeated Android pane
 unmounts, valid animations, and preallocation on a real device. A Reanimated version change must
 fail the install until this compatibility patch has been reviewed for that version.
 
@@ -217,14 +253,18 @@ REACT_NATIVE_PACKAGER_HOSTNAME=localhost \
 
 This is the Android counterpart of the iOS local-simulator flow in [development.md](development.md): on iOS the simulator shares the Mac's loopback so `localhost:<port>` works directly; on Android you need `10.0.2.2` or `adb reverse`.
 
-## Inverted timeline selection
+## Scroll view corrections
 
-Android focus and selection visibility requests must not reposition inverted timelines. The
-`modules/clisbot-scroll` package keeps React Native's scroll manager interface and returns zero for
-child-reveal scroll calculations when the view's transform matrix inverts the vertical axis. React
-Native's Android list uses `scale: -1`, which decomposes into a 180-degree rotation with positive
-`scaleY`; checking the scale property alone misses it. Dragging and explicit scroll
-commands still work; non-inverted scroll views keep Android's default behavior.
+`modules/clisbot-scroll` replaces React Native's vertical scroll view with `ClisbotScrollView`, which
+keeps React Native's scroll manager interface and corrects how the chat timeline holds its position.
+[agent-stream-disclosure.md](agent-stream-disclosure.md#scroll-view-corrections) lists the
+corrections and the React Native issues they work around. Its instrumentation tests run the scroll
+view in a real window, mounting through React Native's own mounting manager and injecting touches:
+
+```bash
+cd packages/app/android
+./gradlew :clisbot-scroll:connectedDebugAndroidTest --no-daemon --max-workers=2 -Dorg.gradle.parallel=false
+```
 
 Register this package before React Native's core package through its Expo config plugin. Normal
 Android builds use the prebuilt `react-android` library, so patching Java under `node_modules` does
@@ -270,13 +310,16 @@ fastlane/metadata/android/
 │   ├── images/
 │   │   ├── icon.png            (512x512)
 │   │   ├── featureGraphic.png  (1024x500)
-│   │   └── phoneScreenshots/   (1.png, 2.png, ...)
+│   │   ├── phoneScreenshots/   (1.png, 2.png, ... linked to the store renders)
+│   │   └── tenInchScreenshots/ (1.png, 2.png, ... linked to the store renders)
 │   └── changelogs/             (generated — see below)
 ├── ja/
 └── zh-CN/
 ```
 
 Locale directories generally match `packages/app/src/i18n/locales.ts`, but note that `en` becomes `en-US`.
+
+Google Play reads its screenshots from the same folders; see [Store screenshots](release.md#store-screenshots).
 
 F-Droid changelogs are generated from `CHANGELOG.md`. Run `npm run fdroid:changelogs`; `npm run fdroid:changelogs:check` verifies without writing. It is wired into the npm `version` lifecycle, so a release picks it up automatically and `git add -A` stages the result.
 

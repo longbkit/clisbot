@@ -25,7 +25,6 @@ import {
   type PanelIconProps,
   type PanelPresentation,
 } from "@/panels/panel-registry";
-import { ensurePanelsRegistered } from "@/panels/register-panels";
 import { getTerminalProfileIcon } from "@clisbot/protocol/terminal-profiles";
 import { getBuiltInLaunchOrder, type BuiltInLaunchItemId } from "./internal/catalog";
 
@@ -112,7 +111,6 @@ export function useWorkspaceTabLaunchCatalog(input: {
   );
   const plugins = useInstalledPlugins();
   const isCompact = useIsCompactFormFactor();
-  ensurePanelsRegistered();
 
   const launchSelection = useCallback(
     (selection: NewTabSelection) => (destination: WorkspaceTabLaunchDestination) => {

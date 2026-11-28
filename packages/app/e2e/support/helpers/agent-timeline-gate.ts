@@ -22,7 +22,6 @@ export interface OlderTimelinePagesGate {
   getRepeatedEntryCount(): number;
   getOwnedEntryCountContaining(text: string): number;
   releasePage(pageNumber: number): void;
-  waitForRequestCount(count: number): Promise<void>;
 }
 
 export interface DaemonHydrationGate {
@@ -345,11 +344,32 @@ export async function delayAgentOlderTimelineResponse(
   return delayAgentTimelineResponse(page, agentId, "before");
 }
 
+export interface OlderTimelinePagesOptions {
+  daemonPort?: number;
+  /**
+   * Hide whole-turn paging from the app so it reads this host with item pages, as it reads
+   * daemons released before whole-turn pages. An item page can end inside a turn or a tool run.
+   */
+  itemPagedHost?: boolean;
+}
+
+function withoutWholeTurnPages(message: WebSocketMessage): WebSocketMessage {
+  const sessionMessage = getSessionMessage(message);
+  const payload = sessionMessage ? getPayload(sessionMessage) : null;
+  if (sessionMessage?.type !== "status" || payload?.status !== "server_info") return message;
+  const envelope = parseWebSocketJson(message) as {
+    message: { payload: { features?: Record<string, unknown> } };
+  };
+  delete envelope.message.payload.features?.wholeTurnTimeline;
+  return JSON.stringify(envelope);
+}
+
 export async function holdAgentOlderTimelinePages(
   page: Page,
   agentId: string,
-  daemonPort?: number,
+  options: OlderTimelinePagesOptions = {},
 ): Promise<OlderTimelinePagesGate> {
+  const { daemonPort } = options;
   let requestCount = 0;
   let responseCount = 0;
   let deliveredHistoryStart = false;
@@ -358,15 +378,6 @@ export async function holdAgentOlderTimelinePages(
   const ownedEntries = new Map<string, string>();
   const releasedPages = new Set<number>();
   const delayedForwards = new Map<number, Array<() => void>>();
-  const requestWaiters = new Map<number, Array<() => void>>();
-
-  const resolveRequestWaiters = () => {
-    for (const [count, resolvers] of requestWaiters) {
-      if (requestCount < count) continue;
-      requestWaiters.delete(count);
-      for (const resolve of resolvers) resolve();
-    }
-  };
 
   const routePattern =
     daemonPort === undefined ? daemonWsRoutePattern() : wsRoutePatternForPort(String(daemonPort));
@@ -384,11 +395,11 @@ export async function holdAgentOlderTimelinePages(
         !String(sessionMessage.requestId).startsWith("clisbot-prefetch:")
       ) {
         requestCount += 1;
-        resolveRequestWaiters();
       }
       server.send(message);
     });
-    server.onMessage((message) => {
+    server.onMessage((received) => {
+      const message = options.itemPagedHost ? withoutWholeTurnPages(received) : received;
       const sessionMessage = getSessionMessage(message);
       const payload = sessionMessage ? getPayload(sessionMessage) : null;
       if (String(payload?.requestId).startsWith("clisbot-prefetch:")) {
@@ -440,14 +451,6 @@ export async function holdAgentOlderTimelinePages(
       releasedPages.add(pageNumber);
       for (const forward of delayedForwards.get(pageNumber) ?? []) forward();
       delayedForwards.delete(pageNumber);
-    },
-    waitForRequestCount(count) {
-      if (requestCount >= count) return Promise.resolve();
-      return new Promise<void>((resolve) => {
-        const resolvers = requestWaiters.get(count) ?? [];
-        resolvers.push(resolve);
-        requestWaiters.set(count, resolvers);
-      });
     },
   };
 }

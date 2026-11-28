@@ -62,7 +62,11 @@ import {
   type ExecutionAuthority,
 } from "../../execution-authority/index.js";
 import type { GitHubAuthorityRegistration } from "../../providers/registration.js";
-import { configurationBundleFixture } from "../../test-utils/configuration-bundle.js";
+import { InstalledTriggerSchema } from "../../public-api/contracts.js";
+import {
+  configurationBundleFixture,
+  workflowDocumentFixtures,
+} from "../../test-utils/configuration-bundle.js";
 import type { HubBundleFile } from "../../config/bundle.js";
 
 const HUB_ORGANIZATION_ID = "org_1";
@@ -1375,13 +1379,29 @@ export class HubHarness {
     ].join("\n");
   }
 
-  async deliverSlackMention(): Promise<Response> {
+  async installSlackMentionTrigger() {
+    const [yaml] = workflowDocumentFixtures(this.slackConfigurationYaml());
+    const response = await fetch(`${this.origin}/api/v1/triggers/install`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...machineHeaders("valid") },
+      body: JSON.stringify({ yaml }),
+    });
+    if (response.status !== 201)
+      throw new Error(`Slack trigger install failed: ${await response.text()}`);
+    return InstalledTriggerSchema.parse(await response.json());
+  }
+
+  async deliverSlackMention(installed: {
+    triggerId: string;
+    revisionId: string;
+  }): Promise<Response> {
     return fetch(`${this.origin}/test/trigger`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         organizationId: HUB_ORGANIZATION_ID,
-        workflowId: this.workflowId,
+        triggerId: installed.triggerId,
+        triggerRevisionId: installed.revisionId,
         connectionId: "00000000-0000-4000-8000-000000000002",
         resourceId: "T1",
         source: "slack.mention",

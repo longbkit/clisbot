@@ -35,7 +35,7 @@ export function createConnectorProjectDirectory(deps: {
     project: active,
     async projectForCwd(cwd) {
       const sameFolder = createPathEquivalenceMatcher(cwd);
-      const workspaces = await deps.workspaceRegistry.list();
+      const workspaces = await deps.workspaceRegistry.listAll();
       const match = workspaces.find(
         (workspace) => workspace.archivedAt === null && sameFolder(workspace.cwd),
       );

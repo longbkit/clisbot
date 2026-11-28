@@ -343,8 +343,8 @@ describe("generateBranchNameFromFirstAgentContext", () => {
     const repoRoot = createTempDir("clisbot-branch-config-");
     const worktreeRoot = createTempDir("clisbot-branch-worktree-");
     mkdirSync(path.join(worktreeRoot, ".git"));
-    writeClisbotWorktreeMetadata(worktreeRoot, { baseRefName: "main" });
-    writeClisbotWorktreeFirstAgentBranchAutoNameMetadata(worktreeRoot, {
+    await writeClisbotWorktreeMetadata(worktreeRoot, { baseRefName: "main" });
+    await writeClisbotWorktreeFirstAgentBranchAutoNameMetadata(worktreeRoot, {
       placeholderBranchName: "dazzling-yak",
     });
     writeConfig(repoRoot, {

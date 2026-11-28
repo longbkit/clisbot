@@ -1,6 +1,6 @@
-import { join } from "node:path";
+import { basename } from "node:path";
 
-import { getClisbotWorktreesRoot, isClisbotOwnedWorktreeCwd } from "../../utils/worktree.js";
+import { isClisbotOwnedWorktreeCwd } from "../../utils/worktree.js";
 import {
   archiveByScope,
   resolveWorkspaceIdAtPath,
@@ -208,10 +208,18 @@ async function resolveWorktreeSlugPath(
   repoRoot: string,
   worktreeSlug: string,
 ): Promise<string> {
-  const worktreesRoot = await getClisbotWorktreesRoot(
-    repoRoot,
-    dependencies.clisbotHome,
-    dependencies.clisbotWorktreesBaseRoot,
-  );
-  return join(worktreesRoot, worktreeSlug);
+  // Worktrees can live anywhere (legacy root or wherever
+  // a plugin placed them), so a slug resolves against the
+  // discovered worktree list for the repo, never a guessed path.
+  const worktrees = await dependencies.workspaceGitService.listWorktrees(repoRoot);
+  const match = worktrees.find((entry) => basename(entry.path) === worktreeSlug);
+  if (!match) {
+    const found = worktrees.map((entry) => basename(entry.path));
+    throw new Error(
+      found.length > 0
+        ? `Clisbot worktree not found for slug ${worktreeSlug}: found ${found.join(", ")}`
+        : `Clisbot worktree not found for slug ${worktreeSlug}`,
+    );
+  }
+  return match.path;
 }

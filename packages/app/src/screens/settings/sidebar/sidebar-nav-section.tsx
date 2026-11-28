@@ -1,3 +1,4 @@
+import { SidebarViewPicker } from "@/plugins/sidebar-view";
 import { useCallback, useMemo, type ComponentType, type ReactElement } from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -150,7 +151,6 @@ function SidebarNavRow({
       <View style={styles.rowActions}>
         <Button
           variant="ghost"
-          size="sm"
           leftIcon={moveUpIcon}
           onPress={handleMoveUp}
           disabled={!canMoveUp || locked}
@@ -159,7 +159,6 @@ function SidebarNavRow({
         />
         <Button
           variant="ghost"
-          size="sm"
           leftIcon={moveDownIcon}
           onPress={handleMoveDown}
           disabled={!canMoveDown || locked}
@@ -258,6 +257,7 @@ function SidebarBottomBarCard(): ReactElement {
 export function SidebarNavSection(): ReactElement {
   return (
     <>
+      <SidebarViewPicker />
       <SidebarItemsCard section="header" />
       <SidebarItemsCard section="footer" />
       <SidebarBottomBarCard />

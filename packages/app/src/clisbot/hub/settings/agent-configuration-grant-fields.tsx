@@ -256,7 +256,7 @@ function ConfigurationHeader({
   return (
     <View style={styles.configurationHeader}>
       <Button
-        size="xs"
+        size="sm"
         variant="ghost"
         leftIcon={expanded ? ChevronDown : ChevronRight}
         onPress={onToggle}
@@ -270,7 +270,7 @@ function ConfigurationHeader({
         {summary}
       </Text>
       {onRemove === null ? null : (
-        <Button size="xs" variant="ghost" disabled={disabled} onPress={onRemove}>
+        <Button size="sm" variant="ghost" disabled={disabled} onPress={onRemove}>
           {t("hub.access.agentConfiguration.remove")}
         </Button>
       )}

@@ -122,7 +122,7 @@ function LimitRow({
       <View style={styles.offSlot}>
         {defaultValue === undefined && !off ? null : (
           <Button
-            size="xs"
+            size="sm"
             variant="ghost"
             disabled={disabled}
             onPress={toggleOff}

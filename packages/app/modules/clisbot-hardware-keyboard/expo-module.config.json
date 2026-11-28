@@ -1,7 +1,9 @@
 {
-  "platforms": ["ios"],
+  "platforms": ["ios", "android"],
   "ios": {
-    "modules": ["ClisbotHardwareKeyboardModule"],
-    "reactDelegateHandlers": ["ClisbotHardwareKeyboardReactDelegateHandler"]
+    "modules": ["ClisbotHardwareKeyboardModule"]
+  },
+  "android": {
+    "modules": ["sh.clisbot.keyboard.ClisbotHardwareKeyboardModule"]
   }
 }

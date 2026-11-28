@@ -1,5 +1,6 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fork } from "node:child_process";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { PassThrough } from "node:stream";
 import path from "node:path";
@@ -10,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentStreamEvent } from "../agent/agent-sdk-types.js";
 import { PluginAgentClientRegistry } from "../agent/plugin-provider.js";
 import { PluginRuntime } from "./runtime.js";
+import { resolveDaemonVersion } from "../daemon-version.js";
 import type { PluginSessionSocket } from "./session-socket.js";
 
 const temporaryDirectories: string[] = [];
@@ -104,6 +106,12 @@ function createReloadChild(
       emit("message", message);
     },
   };
+}
+
+function sha256(text: string | undefined): string {
+  return createHash("sha256")
+    .update(text ?? "")
+    .digest("hex");
 }
 
 function createTestRuntime(
@@ -249,6 +257,59 @@ afterEach(async () => {
 });
 
 describe("PluginRuntime", () => {
+  it("reports a spent create budget without blaming a manager it did not call", async () => {
+    const first = await createPlugin(
+      "first-manager",
+      `import { existsSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
+export default function contribute(server) {
+  return server.registerWorktreeManager({
+    async create({ path: directory }, { signal }) {
+      writeFileSync(path.join(directory, "started"), "");
+      while (!existsSync(path.join(directory, "decline"))) {
+        signal.throwIfAborted();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+    },
+  });
+}`,
+    );
+    const second = await createPlugin(
+      "second-manager",
+      `export default function contribute(server) {
+  return server.registerWorktreeManager({
+    async create() { throw new Error("Second manager was called"); },
+  });
+}`,
+    );
+    const runtime = createTestRuntime();
+    try {
+      await runtime.startPlugin("first-manager", first);
+      await runtime.startPlugin("second-manager", second);
+      // Advance the deadline clock while real subprocess IPC and timers keep running.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const creation = runtime.createWorktree({
+        kind: "branch-off",
+        repoRoot: first,
+        sourceCheckout: first,
+        branch: "topic",
+        slug: "topic",
+        path: first,
+        baseRef: "main",
+        untrusted: false,
+      });
+      const failure = creation.catch((error: unknown) => error);
+      await expect.poll(() => readTextIfPresent(path.join(first, "started"))).toBe("");
+      vi.setSystemTime(Date.now() + 120_000);
+      await writeFile(path.join(first, "decline"), "");
+      expect(await failure).toMatchObject({ message: "Worktree creation manager budget expired" });
+    } finally {
+      vi.useRealTimers();
+      await runtime.stopAll();
+    }
+  });
+
   it.each([
     { specifier: "@clisbot/plugin", moduleDirectory: "shared" },
     { specifier: "@clisbot/plugin", moduleDirectory: "server" },
@@ -651,7 +712,8 @@ lines.on("line", (line) => {
         type: "timeline.item",
         item: expect.objectContaining({
           type: "assistant_message",
-          id: "assistant-1",
+          id: JSON.stringify(["agent_message_chunk", "assistant-1"]),
+          messageId: "assistant-1",
           text: "ACP says hi",
         }),
       }),
@@ -1061,12 +1123,10 @@ export default function contribute(plugin: unknown) {
   });
 
   it("rejects provider input while a connection is closing", async () => {
-    const releaseDirectory = await mkdtemp(path.join(tmpdir(), "clisbot-provider-close-"));
-    const releaseFile = path.join(releaseDirectory, "release");
     const directory = await createPlugin(
       "closing-provider",
-      `import { readFile, writeFile } from "node:fs/promises";
-import type { ProviderRegistration } from "@clisbot/plugin/server/provider";
+      `import type { ProviderRegistration } from "@clisbot/plugin/server/provider";
+const closeReleased = Promise.withResolvers<void>();
 const provider: ProviderRegistration = {
   id: "delayed",
   label: "Delayed",
@@ -1078,10 +1138,7 @@ const provider: ProviderRegistration = {
       onEvent() { return () => undefined; },
       async close() {
         console.log("provider close started");
-        while (true) {
-          try { await readFile(${JSON.stringify(releaseFile)}); break; }
-          catch { await new Promise((resolve) => setTimeout(resolve, 10)); }
-        }
+        await closeReleased.promise;
         console.log("provider close completed");
       },
     };
@@ -1089,7 +1146,11 @@ const provider: ProviderRegistration = {
 };
 export default function contribute(server: { registerProvider(provider: ProviderRegistration): void }) {
   server.registerProvider(provider);
-  return () => console.log("plugin cleanup started");
+  return () => {
+    console.log("plugin cleanup started");
+    // Let shutdown reach the pending close before releasing it.
+    setImmediate(closeReleased.resolve);
+  };
 }`,
     );
     const closedReports: unknown[] = [];
@@ -1112,20 +1173,14 @@ export default function contribute(server: { registerProvider(provider: Provider
       await expect(connection.send({ type: "catalog", requestId: "during-close" })).rejects.toThrow(
         "Provider connection is closing",
       );
-      const stopping = runtime.stopPluginById("closing-provider");
-      await expect
-        .poll(() => pluginMessages(runtime, "closing-provider"))
-        .toContain("plugin cleanup started");
-      await writeFile(releaseFile, "release");
-      await Promise.all([closing, stopping]);
+      await Promise.all([closing, runtime.stopPluginById("closing-provider")]);
       const messages = pluginMessages(runtime, "closing-provider");
+      expect(messages).toContain("plugin cleanup started");
       expect(messages).toContain("provider close completed");
       expect(messages).not.toContain("provider accepted input");
       expect(closedReports).toHaveLength(1);
     } finally {
-      await writeFile(releaseFile, "release");
       await runtime.stopAll();
-      await rm(releaseDirectory, { recursive: true, force: true });
     }
   });
 
@@ -1390,6 +1445,44 @@ export default function contribute(server: { registerProvider(provider: Provider
     }
   });
 
+  it("releases a subscription in the plugin when its subscribe times out", async () => {
+    vi.useFakeTimers();
+    try {
+      const directory = await createPlugin(
+        "slow-subscribe",
+        `export default function contribute(plugin: unknown) { void plugin; return () => undefined; }`,
+      );
+      const child = createReloadChild("slow-subscribe", []);
+      const sent: Array<{ type: string; subscriptionId?: string }> = [];
+      const originalSend = child.send.bind(child);
+      child.send = (message, callback) => {
+        sent.push(message);
+        if (message.type !== "initialize") return originalSend(message, callback);
+        callback?.(null);
+        queueMicrotask(() =>
+          child.emitMessage({ type: "ready", methods: [], subscriptions: ["feed"], providers: [] }),
+        );
+        return true;
+      };
+      const runtime = createTestRuntime({ spawnChild: () => child });
+      await runtime.startPlugin("slow-subscribe", directory);
+
+      const subscription = runtime.startSubscription("slow-subscribe", "feed", {});
+      const rejection = subscription.ready.catch((error: Error) => error);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await expect(rejection).resolves.toMatchObject({
+        message: expect.stringContaining("timed out"),
+      });
+      const subscribe = sent.find((message) => message.type === "subscribe");
+      expect(sent).toContainEqual({
+        type: "unsubscribe",
+        subscriptionId: subscribe?.subscriptionId,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("escalates a plugin that ignores graceful shutdown from TERM to KILL", async () => {
     vi.useFakeTimers();
     try {
@@ -1535,6 +1628,7 @@ export default function contribute(server: { registerProvider(provider: Provider
 
     expect(spawnChild).not.toHaveBeenCalled();
     expect(runtime.catalog()[0]?.clientBundle).toContain("addTheme");
+    expect(runtime.catalog()[0]?.clientBundleHash).toBe(sha256(runtime.catalog()[0]?.clientBundle));
     await runtime.stopAll();
   });
 
@@ -1697,6 +1791,7 @@ export function inspectHost(_input: z.input<typeof inspectRpc.input>) {
     const plugin = runtime.catalog()[0];
     expect(plugin?.clientBundle).toContain("Client-only surface");
     expect(plugin?.clientBundle).not.toContain("node:os");
+    expect(plugin?.clientBundleHash).toBe(sha256(plugin?.clientBundle));
     await expect(runtime.invoke("split-runtime", "inspect", {})).resolves.toMatchObject({
       platform: expect.any(String),
     });
@@ -1804,7 +1899,7 @@ export function inspect() { void Surface; return {}; }`,
     await runtime.stopAll();
   });
 
-  it("rejects a handler result that does not match its RPC output schema", async () => {
+  it("forwards a handler result for the client to validate against its RPC output schema", async () => {
     const directory = await createPlugin(
       "invalid-output",
       `import { z } from "zod";
@@ -1823,7 +1918,9 @@ export default function contribute(plugin: any) {
 
     await runtime.startPlugin("invalid-output", directory);
 
-    await expect(runtime.invoke("invalid-output", "broken", {})).rejects.toThrow();
+    await expect(runtime.invoke("invalid-output", "broken", {})).resolves.toEqual({
+      value: "wrong",
+    });
     await runtime.stopAll();
   });
 
@@ -1849,9 +1946,9 @@ export default function contribute(plugin: any) {
     const child = createReloadChild("blocked", events);
     const runtime = createTestRuntime({ spawnChild: () => child });
 
-    await expect(runtime.startPlugin("blocked", directory, () => false)).rejects.toThrow(
-      "Plugin start cancelled: blocked",
-    );
+    await expect(
+      runtime.startPlugin("blocked", directory, () => events.length === 0),
+    ).rejects.toThrow("Plugin start cancelled: blocked");
 
     expect(runtime.catalog()).toEqual([]);
     expect(events).toEqual(["start:blocked", "shutdown:blocked", "exit:blocked"]);
@@ -1881,6 +1978,38 @@ export default function contribute(plugin: any) {
     expect(runtime.catalog()).toEqual([]);
     expect(runtime.getLogs("crashing").map((entry) => entry.message)).toContain("before crash");
     await expect(runtime.invoke("crashing", "anything", {})).rejects.toThrow(
+      "Plugin is not available",
+    );
+  });
+
+  it("reports and removes a plugin it terminated for an invalid message", async () => {
+    const directory = await createPlugin(
+      "invalid-message",
+      `export default function contribute(plugin: unknown) {
+  void plugin;
+  setTimeout(() => process.send?.({ type: "not-a-plugin-message" }), 20);
+  return () => undefined;
+}`,
+    );
+    const sessions = createTrackedSessionHost();
+    const runtime = createTestRuntime({ sessionHost: sessions.host });
+    const exited = new Promise<string>((resolve) => {
+      runtime.subscribe((pluginId, error) => {
+        if (pluginId === "invalid-message" && error) resolve(error);
+      });
+    });
+    await runtime.startPlugin("invalid-message", directory);
+
+    // The runtime kills the process; it must then treat it like any other exited plugin.
+    await expect(exited).resolves.toBe("Plugin process exited: invalid-message");
+    expect(sessions.active.size).toBe(0);
+    expect(runtime.catalog()).toEqual([]);
+    expect(
+      pluginMessages(runtime, "invalid-message").some((message) =>
+        message.includes("sent an invalid message"),
+      ),
+    ).toBe(true);
+    await expect(runtime.invoke("invalid-message", "anything", {})).rejects.toThrow(
       "Plugin is not available",
     );
   });
@@ -2051,6 +2180,57 @@ export default function contribute(server) {
     await expect(runtime.startPlugin("missing-discovery", directory)).rejects.toThrow(
       "Invalid usage source: missing-discovery",
     );
+  } finally {
+    await runtime.stopAll();
+  }
+});
+
+const examplesDirectory = fileURLToPath(
+  new URL("../../../../../plugin-examples/", import.meta.url),
+);
+// The Markdown example owns npm preparation in the real app fixture:
+// packages/app/e2e/browser/plugin-file-panel-examples.spec.ts.
+const examples = (await readdir(examplesDirectory, { withFileTypes: true }))
+  .filter((entry) => entry.isDirectory() && entry.name !== "markdown-panel")
+  .map((entry) => entry.name);
+
+it.each(examples)("builds and loads the %s plugin example", async (example) => {
+  const settingsDirectory = await mkdtemp(path.join(tmpdir(), "clisbot-example-settings-"));
+  temporaryDirectories.push(settingsDirectory);
+  const runtime = createTestRuntime(
+    { settingsDirectory },
+    undefined,
+    example === "sidebar-views" ? "0.16.0" : resolveDaemonVersion(import.meta.url),
+  );
+  try {
+    await runtime.startPlugin(example, path.join(examplesDirectory, example));
+    expect(runtime.catalog()).toMatchObject([{ id: example }]);
+    expect(pluginMessages(runtime, example)).toContain("[clisbot] Plugin ready");
+  } finally {
+    await runtime.stopAll();
+  }
+});
+
+it("does not initialize a plugin cancelled during compilation", async () => {
+  const directory = await createPlugin("cancelled-build", "export default () => {};");
+  const marker = path.join(directory, "initialized.txt");
+  await writeFile(
+    path.join(directory, "index.server.ts"),
+    `
+import { writeFileSync } from "node:fs";
+export default function contribute() {
+  writeFileSync(${JSON.stringify(marker)}, "initialized");
+  return () => {};
+}`,
+  );
+  const runtime = createTestRuntime();
+  let allowed = true;
+  try {
+    const loading = runtime.startPlugin("cancelled-build", directory, () => allowed);
+    allowed = false;
+    await expect(loading).rejects.toThrow("Plugin start cancelled: cancelled-build");
+    expect(await readTextIfPresent(marker)).toBeNull();
+    expect(runtime.catalog()).toEqual([]);
   } finally {
     await runtime.stopAll();
   }

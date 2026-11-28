@@ -29,15 +29,15 @@ beforeAll(async () => {
 afterEach(() => cleanup());
 
 const OPTIONS: AutocompleteOption[] = [
-  { id: "review", label: "/review", description: "Review the current changes", kind: "command" },
+  { id: "review", label: "/review", description: "Review the current changes", icon: "command" },
   {
     id: "handoff",
     label: "/handoff",
-    detail: "[agent]",
+    argumentHint: "[agent]",
     description: "Prepare a handoff note",
-    kind: "command",
+    icon: "command",
   },
-  { id: "exit", label: "/exit", description: "Archive the current agent", kind: "command" },
+  { id: "exit", label: "/exit", description: "Archive the current agent", icon: "archive" },
 ];
 
 it("lists each command once, with no card repeating the highlighted row", () => {

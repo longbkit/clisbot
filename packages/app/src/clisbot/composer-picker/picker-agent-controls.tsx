@@ -5,13 +5,14 @@ import { formatThinkingOptionLabel } from "@/agent-controls/labels";
 import type { ProviderSelectorProvider } from "@/provider-selection/provider-selection";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { readMeasuredWidth } from "@/hooks/use-container-width";
-import { isNative } from "@/constants/platform";
+import { controlSizingForLayout } from "@/components/ui/control-sizing";
 import {
+  composerToolbarGeometry,
   resolveComposerControlDensity,
   resolveComposerControlPresentation,
-  resolveComposerToolbarGlyphSize,
   type ComposerControlDensity,
   type ComposerControlPresence,
+  type ComposerToolbarGeometry,
 } from "@/composer/agent-controls/layout";
 import { ComposerControlLayoutProvider } from "@/composer/agent-controls/layout-context";
 import type { ControlledAgentControlsProps } from "@/composer/agent-controls/index";
@@ -83,7 +84,12 @@ function pickDesktopModel({
 const EMPTY_FEATURE_PRESENCE: ComposerControlPresence["features"] = [];
 
 /** How much of the bar fits: the effort leaves the Model chip first, then the Mode label. */
-function useComposerControlDensity(input: { isCompact: boolean; hasMode: boolean }) {
+function useComposerControlDensity(input: {
+  isCompact: boolean;
+  hasMode: boolean;
+  geometry: ComposerToolbarGeometry;
+}) {
+  const { geometry } = input;
   const { fontScale } = useWindowDimensions();
   const initialDensity: ComposerControlDensity = input.isCompact ? "tight" : "full";
   const [density, setDensity] = useState<ComposerControlDensity>(initialDensity);
@@ -95,6 +101,8 @@ function useComposerControlDensity(input: { isCompact: boolean; hasMode: boolean
       hasThinking: false,
       hasMode: input.hasMode,
       features: EMPTY_FEATURE_PRESENCE,
+      // The picker renders no plugin items in its row.
+      pluginItemsWidth: 0,
       fontScale,
     }),
     [fontScale, input.hasMode],
@@ -105,12 +113,13 @@ function useComposerControlDensity(input: { isCompact: boolean; hasMode: boolean
         availableWidth,
         currentDensity: densityRef.current,
         controls,
+        geometry,
       });
       if (next === densityRef.current) return;
       densityRef.current = next;
       setDensity(next);
     },
-    [controls],
+    [controls, geometry],
   );
   const handleLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -155,17 +164,21 @@ export function PickerAgentControls({
 }: ControlledAgentControlsProps) {
   const isCompactFormFactor = useIsCompactFormFactor();
   const isCompact = isCompactLayout ?? isCompactFormFactor;
+  // As the upstream toolbar: control sizes follow the window layout, not a narrow pane.
+  const toolbarSizing = controlSizingForLayout(isCompactFormFactor);
+  const toolbarGeometry = useMemo(() => composerToolbarGeometry(toolbarSizing), [toolbarSizing]);
   const { density, handleLayout } = useComposerControlDensity({
     isCompact,
     hasMode: Boolean(modeControl),
+    geometry: toolbarGeometry,
   });
   const presentation = resolveComposerControlPresentation(density);
   const layoutContextValue = useMemo(
     () => ({
-      glyphSize: resolveComposerToolbarGlyphSize(isNative ? "native" : "web"),
+      glyphs: toolbarGeometry.glyphs,
       presentation,
     }),
-    [presentation],
+    [presentation, toolbarGeometry],
   );
   const formattedThinkingOptions = useMemo(
     () => toThinkingControlOptions(thinkingOptions),
@@ -222,7 +235,7 @@ export function PickerAgentControls({
           isCompact={isCompact}
           showEffort={!isCompact && density !== "tight"}
           showModeLabel={!isCompact && presentation.showModeLabel}
-          glyphSize={layoutContextValue.glyphSize}
+          glyphSize={layoutContextValue.glyphs.label.size}
           onOpen={onModelSelectorOpen}
           onClose={onDropdownClose}
         />

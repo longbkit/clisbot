@@ -183,7 +183,7 @@ function createHarness(
     get: async (id: string) => projects.find((candidate) => candidate.projectId === id) ?? null,
   } as ProjectRegistry;
   const workspaceRegistry = {
-    list: async () => workspaces,
+    listAll: async () => workspaces,
     get: async (id: string) => workspaces.find((candidate) => candidate.workspaceId === id) ?? null,
   } as WorkspaceRegistry;
   const agentManager = {
@@ -192,7 +192,7 @@ function createHarness(
     getPendingPermissions: () => [...pending.values()],
   } as unknown as AgentManager;
   const agentStorage = {
-    list: async () => [...records.values()],
+    listAll: async () => [...records.values()],
     get: async (id: string) => records.get(id) ?? null,
     listByProviderSession: async (provider: string, providerHandleId: string) =>
       [...records.values()].filter(
@@ -216,13 +216,13 @@ function createHarness(
     isUnattendedConfiguration: async (config: {
       modeId?: string;
       fullAutoAccept?: boolean;
-      featureValues?: Record<string, unknown>;
+      providerOptions?: Record<string, unknown>;
     }) =>
       config.modeId === "unattended" ||
       config.modeId === "full-access" ||
       config.modeId === "full-auto-accept" ||
       config.fullAutoAccept === true ||
-      config.featureValues?.auto_accept === true,
+      config.providerOptions?.auto_accept === true,
   };
 
   return new ManagedResourceAuthorizer(
@@ -333,6 +333,35 @@ describe("ManagedResourceAuthorizer", () => {
       await expect(withFast.allowsInbound(create({ [featureId]: value }))).resolves.toBe(true);
       await expect(withFast.allowsInbound(set(featureId, value))).resolves.toBe(true);
     }
+    // Since v0.17 the same values also arrive as provider options; neither spelling is a bypass.
+    const createWithOptions = (providerOptions: Record<string, unknown>) => {
+      const request = create({});
+      return {
+        ...request,
+        config: { ...request.config, featureValues: undefined, providerOptions },
+      };
+    };
+    const apply = (options: Record<string, unknown>) => ({
+      type: "agent.config.apply.request" as const,
+      requestId: "apply-tier",
+      agentId: "agent-a",
+      config: { options },
+    });
+    for (const [featureId, value] of [
+      ["service_tier", "priority"],
+      ["fast_mode", true],
+    ] as const) {
+      await expect(without.allowsInbound(createWithOptions({ [featureId]: value }))).resolves.toBe(
+        false,
+      );
+      await expect(without.allowsInbound(apply({ [featureId]: value }))).resolves.toBe(false);
+      await expect(withFast.allowsInbound(createWithOptions({ [featureId]: value }))).resolves.toBe(
+        true,
+      );
+      await expect(withFast.allowsInbound(apply({ [featureId]: value }))).resolves.toBe(true);
+    }
+    // Removing an option (null) never needs the grant.
+    await expect(without.allowsInbound(apply({ fast_mode: null }))).resolves.toBe(true);
     // Standard and slower tiers need no grant.
     for (const [featureId, value] of [
       ["service_tier", "default"],
@@ -467,6 +496,14 @@ describe("ManagedResourceAuthorizer", () => {
         requestId: "apply-auto-accept",
         agentId: "agent-a",
         config: { featureValues: { auto_accept: true } },
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      limited.allowsInbound({
+        type: "agent.config.apply.request",
+        requestId: "apply-auto-accept-options",
+        agentId: "agent-a",
+        config: { options: { auto_accept: true } },
       }),
     ).resolves.toBe(false);
 

@@ -152,6 +152,8 @@ export const OmpSessionStateSchema = z
     thinkingLevel: OmpThinkingLevelSchema.optional(),
     isStreaming: z.boolean(),
     isCompacting: z.boolean(),
+    hasPendingAsyncWork: z.boolean().optional(),
+    isSettled: z.boolean().optional(),
     autoCompactionEnabled: z.boolean().optional(),
     fastModeEnabled: z.boolean().optional(),
     fastModeActive: z.boolean().optional(),
@@ -178,6 +180,9 @@ export const OmpSessionStatsSchema = z
       .passthrough()
       .optional(),
     cost: z.number().optional(),
+    toolCalls: z.number().optional(),
+    // Copilot bills by request rather than by token.
+    premiumRequests: z.number().optional(),
     contextUsage: OmpContextUsageSchema.optional(),
   })
   .passthrough();
@@ -526,6 +531,14 @@ export const OmpRuntimeEventSchema = z.discriminatedUnion("type", [
   OmpRpcHostToolCancelRequestSchema,
   OmpRpcHostToolUpdateSchema,
   z.object({ type: z.literal("model_changed") }).passthrough(),
+  z
+    .object({
+      type: z.literal("thinking_level_changed"),
+      thinkingLevel: z.string().optional(),
+      // The user's selector ("auto") when it differs from the level OMP runs.
+      configured: z.string().optional(),
+    })
+    .passthrough(),
 ]);
 
 const OmpCommandBase = { id: z.string().optional() };

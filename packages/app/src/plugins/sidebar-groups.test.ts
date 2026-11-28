@@ -26,14 +26,21 @@ function installed(
     queryClient: new QueryClient(),
     clisbot: {} as InstalledPlugin["clisbot"],
     invoke: async () => undefined,
+    subscribe: () => {
+      throw new Error("Subscriptions are not used here");
+    },
     settingsScreens: [],
     surfaces: [{ id: "surface", title: "Surface", Component: () => null }],
+    sidebarViews: [],
     sidebarItems: {
       header: [{ id: contributionId, title: "Example", Component: () => null }],
       footer: [{ id: "status", title: "Status", Component: () => null }],
     },
     legacySidebarItems,
+    workspaceRowBadgeItems: [],
     filePanels: [],
+    composerItems: [],
+    newWorkspaceItems: [],
     workspacePanels: [],
     commandCenterItems: [],
     clientSlashCommands: [],

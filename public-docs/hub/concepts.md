@@ -11,7 +11,7 @@ category: Hub
 Hub connects the places where requests arrive to the machines where your agents run, and decides who may use them.
 
 ```text
-Slack / Telegram / … message      GitHub / Slack / Discord event
+Slack / Telegram / … message      GitHub / Linear / Slack / Discord event
             ↓                                   ↓
      Route and its Rules               Automation trigger
             └──────────────┬────────────────────┘
@@ -21,7 +21,7 @@ Slack / Telegram / … message      GitHub / Slack / Discord event
                    starts the agent
 ```
 
-## The pieces
+## Core concepts
 
 - An **organization** owns everything below: Members, Connections, Routes, Automations, and connected daemons.
 - A **Host** is your app's connection to a machine; its **daemon** runs agents. A **Project** is a selected root on that Host, containing Workspaces. Hub has no Project of its own.
@@ -44,13 +44,13 @@ You edit all of it in the app's Hub settings (**Channels**, **Automations**, **P
 
 ## From event to agent
 
-1. A provider sends an event to Hub. GitHub and Slack use webhooks; Discord uses its gateway connection; manual runs use the Hub API.
+1. A provider sends an event to Hub. GitHub, Linear and Slack use webhooks (Slack can also use Socket Mode); Discord uses its gateway connection; manual runs use the Hub API.
 2. Hub verifies the event and evaluates triggers and their filters, including sender allowlists where required.
 3. A matching trigger creates a workflow run from the active revision.
 4. Each step whose `if` condition holds starts on its daemon. The next step sees the completed step's output.
 5. Hub records replies, structured output, status, and completion.
 
-Configure this in [Workflows](/docs/hub/workflows).
+Configure this in [Automations](/docs/hub/automations).
 
 ## Saving a change
 
@@ -64,4 +64,4 @@ After Hub enrollment, an `external` Managed access daemon requires Hub tickets f
 
 Routes admit only the senders their Rules allow. Event inputs use [trigger filters](/docs/hub/triggers#filters). Anyone who can change Routes or Automations can choose which connections, daemons, and agent capabilities they use, so grant that carefully.
 
-These controls do not sandbox the agent or make input safe. See [Hub security](/docs/hub/security). A step holds GitHub authority only when it declares a [`github` block](/docs/hub/github).
+These controls do not sandbox the agent or make input safe. See [Hub security](/docs/hub/security). A step holds GitHub authority only when it declares a [`github` block](/docs/hub/github). Hub resolves that block's `connection` when it launches the run; if the connection is unavailable or GitHub rejects the token request, the launch fails.

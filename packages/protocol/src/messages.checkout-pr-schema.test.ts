@@ -823,13 +823,14 @@ test("branch paging accepts old requests and optional nonnegative offsets", () =
   expect(BranchSuggestionsRequestSchema.safeParse({ ...old, offset: -1 }).success).toBe(false);
 });
 
-test.each([undefined, false, true])(
-  "accepts optional Hoplite capability (%s)",
-  (hopliteProvider) => {
-    const features = hopliteProvider === undefined ? {} : { hopliteProvider };
-    expect(
-      ServerInfoStatusPayloadSchema.parse({ status: "server_info", serverId: "test", features })
-        .features,
-    ).toEqual(features);
-  },
-);
+test.each(
+  ["hopliteProvider", "fxProvider", "gooseProvider", "hermesProvider"].flatMap((name) =>
+    [undefined, false, true].map((value) => [name, value] as const),
+  ),
+)("accepts optional bundled provider capability (%s: %s)", (name, value) => {
+  const features = value === undefined ? {} : { [name]: value };
+  expect(
+    ServerInfoStatusPayloadSchema.parse({ status: "server_info", serverId: "test", features })
+      .features,
+  ).toEqual(features);
+});

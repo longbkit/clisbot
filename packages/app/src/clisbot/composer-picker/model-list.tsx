@@ -62,7 +62,7 @@ function ListMessage(props: { status: ModelListStatus; emptyText: string; onRetr
     <View style={styles.message}>
       <Text style={styles.muted}>{failed ? status.error : emptyText}</Text>
       {failed && props.onRetry ? (
-        <Button size="xs" variant="outline" onPress={props.onRetry}>
+        <Button size="sm" variant="outline" onPress={props.onRetry}>
           {t("modelSelector.retry")}
         </Button>
       ) : null}
@@ -211,7 +211,7 @@ export function ProfileList(props: {
         <Text style={styles.muted}>{props.emptyText}</Text>
         {onEditProfiles ? (
           <Button
-            size="xs"
+            size="sm"
             variant="outline"
             onPress={onEditProfiles}
             testID="composer-picker-profiles-create"

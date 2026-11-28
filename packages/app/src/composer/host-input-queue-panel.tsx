@@ -128,7 +128,7 @@ function QueueEditor({
       </Text>
       <View style={styles.actions}>
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
           disabled={stale || pending}
           style={styles.touchAction}
@@ -137,7 +137,7 @@ function QueueEditor({
           {t("composer.hostQueue.save")}
         </Button>
         <Button
-          size="xs"
+          size="sm"
           variant="ghost"
           disabled={stale || pending}
           style={styles.touchAction}
@@ -146,7 +146,7 @@ function QueueEditor({
           {t("composer.hostQueue.move")}
         </Button>
         <Button
-          size="xs"
+          size="sm"
           variant="ghost"
           disabled={pending}
           style={styles.touchAction}
@@ -156,7 +156,7 @@ function QueueEditor({
         </Button>
         {stale ? (
           <Button
-            size="xs"
+            size="sm"
             variant="default"
             disabled={pending}
             style={styles.touchAction}

@@ -806,6 +806,11 @@ async function openSmokeWorkspace({ appPath, env, page, daemonHome }) {
     ],
     label: "Create packaged smoke workspace",
   });
+  // The fresh daemon had no projects at launch, so first-run setup is open over the sidebar.
+  await page.evaluate(() =>
+    localStorage.setItem("@clisbot:onboarding", JSON.stringify({ completedAt: "1970-01-01" })),
+  );
+  await page.reload();
   // Navigation V2 (the default layout) lists workspaces under the rail's Workspace section; the
   // earlier layout lists them in the sidebar by title.
   const workSection = page.getByTestId("navigation-rail-work");

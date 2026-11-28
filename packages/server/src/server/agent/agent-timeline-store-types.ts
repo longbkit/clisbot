@@ -1,6 +1,6 @@
 import type { AgentPermissionResponseRecord } from "@clisbot/protocol/session-authorship";
 import type { ProjectedTimelineRow } from "./timeline-projection.js";
-import type { AgentTimelineItem } from "./agent-sdk-types.js";
+import type { AgentMetric, AgentTimelineItem } from "./agent-sdk-types.js";
 import type { ProjectedTimelinePageSelection } from "./timeline-projection.js";
 import type { TimelinePromptIndex } from "./timeline-prompt-index.js";
 
@@ -10,6 +10,8 @@ export interface AgentTimelineRow {
   item: AgentTimelineItem;
   readonly turnId?: string;
   readonly providerMessageId?: string;
+  /** Metrics of the turn this row carries the footer for. */
+  readonly turnMetrics?: AgentMetric[];
 }
 
 export interface AgentTimelineCursor {
@@ -22,6 +24,7 @@ export type AgentTimelineFetchDirection = "tail" | "before" | "after";
 export interface AgentTimelineFetchOptions {
   pagingMode?: "source_ranges";
   allowDeferredPayloads?: true;
+  wholeTurns?: boolean;
   direction?: AgentTimelineFetchDirection;
   cursor?: AgentTimelineCursor;
   /**

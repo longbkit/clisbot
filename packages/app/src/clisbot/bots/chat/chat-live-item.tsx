@@ -33,6 +33,7 @@ export function renderLiveItem(
       return (
         <ToolCall
           key={item.id}
+          itemId={item.id}
           cwd={bot.cwd}
           toolName="thinking"
           args={item.text}
@@ -45,6 +46,7 @@ export function renderLiveItem(
       return item.payload.source === "agent" ? (
         <ToolCall
           key={item.id}
+          itemId={item.id}
           cwd={bot.cwd}
           toolName={item.payload.data.name}
           error={item.payload.data.error}
@@ -57,6 +59,7 @@ export function renderLiveItem(
       ) : (
         <ToolCall
           key={item.id}
+          itemId={item.id}
           cwd={bot.cwd}
           toolName={item.payload.data.toolName}
           args={item.payload.data.arguments}

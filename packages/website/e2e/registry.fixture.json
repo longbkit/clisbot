@@ -295,7 +295,7 @@
       "description": "PromptKit - rewrite and transform prompts directly from the Clisbot composer.",
       "artifact": {
         "kind": "npm",
-        "package": "paseo-prompt-kit",
+        "package": "clisbot-prompt-kit",
         "version": "0.6.0",
         "resolved": "https://registry.npmjs.org/paseo-prompt-kit/-/paseo-prompt-kit-0.6.0.tgz",
         "integrity": "sha512-eiagOY1OokDx2iihfe3Vjh2dgKKP6IsBKbJYbfhM+TXw3aU7duV/rs/TUnBSeeWAk0cEsVg2Jd+EkeaPM8IJdA=="
@@ -594,7 +594,7 @@
       "description": "Defer messages to Clisbot coding agents until a chosen time or usage-window reset.",
       "artifact": {
         "kind": "npm",
-        "package": "paseo-defer",
+        "package": "clisbot-defer",
         "version": "2.1.9",
         "resolved": "https://registry.npmjs.org/paseo-defer/-/paseo-defer-2.1.9.tgz",
         "integrity": "sha512-xBBf4TUC8zkTh9WMzQRRDt0alRAYPRCmUdBnBI1ZEkatUFC4i9MxFHgaTY939xij99dASM/261IWqctcKsQppQ=="
@@ -625,7 +625,7 @@
       "description": "Workspace-native Graphite stack status and PR action radar for Clisbot. <p align=\"center\">   <picture>     <source media=\"(prefers-color-scheme: dark)\" srcset=\"https://raw.githubusercontent.com/xpufx/paseo/main/plugins/slash/docs/screenshots/slash-logo-for-dark-bg.png\">     <source media=\"(prefers-color-scheme: light)\" srcset",
       "artifact": {
         "kind": "npm",
-        "package": "paseo-graphite",
+        "package": "clisbot-graphite",
         "version": "0.2.4",
         "resolved": "https://registry.npmjs.org/paseo-graphite/-/paseo-graphite-0.2.4.tgz",
         "integrity": "sha512-aAFvh+118c5mmSQ3sTsDKO8Is7g1ZU8m2+0fisr8nFrgPMu0m2mokPJnM/LaIqQc3Zaaak1chB6M6k0dWOPeIA=="

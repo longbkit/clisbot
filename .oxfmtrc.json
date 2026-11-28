@@ -39,6 +39,7 @@
     "packages/channels/telegram/src/telegram-text-delivery.ts",
     "packages/channels/telegram/src/draft-stream.ts",
     "packages/channels/slack/src/**",
-    "packages/channels/telegram/src/**"
+    "packages/channels/telegram/src/**",
+    "packages/react-native-enriched-markdown/**"
   ]
 }

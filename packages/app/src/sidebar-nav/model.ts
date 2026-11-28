@@ -71,11 +71,8 @@ export function builtinSidebarNavShortcutAction(id: BuiltinSidebarItemId): strin
   return BUILTIN_SHORTCUT_ACTIONS[id];
 }
 
-/**
- * Builtins that start hidden until the user turns them on: the Usage summary is opt-in, and
- * Clisbot's bottom bar already carries Search.
- */
-const HIDDEN_BY_DEFAULT: ReadonlySet<BuiltinSidebarItemId> = new Set(["usage", "search"]);
+/** Builtins that start hidden until the user turns them on: Clisbot's bottom bar already carries Search. */
+const HIDDEN_BY_DEFAULT: ReadonlySet<BuiltinSidebarItemId> = new Set(["search"]);
 
 function builtinVisibleByDefault(id: BuiltinSidebarItemId): boolean {
   return !HIDDEN_BY_DEFAULT.has(id);

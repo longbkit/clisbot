@@ -12,6 +12,10 @@ const CLISBOT_BROWSER_PROFILE_PARTITION = "persist:clisbot-browser";
 
 type EventHandler = (payload: unknown) => void;
 
+function readArgValue(prefix: string): string | undefined {
+  return process.argv.find((argument) => argument.startsWith(prefix))?.slice(prefix.length);
+}
+
 function readWindowChromeMode(): DesktopWindowChromeMode {
   const prefix = "--clisbot-window-chrome-mode=";
   const value = process.argv.find((argument) => argument.startsWith(prefix))?.slice(prefix.length);
@@ -32,6 +36,8 @@ interface AttachedBrowserRegistration {
 contextBridge.exposeInMainWorld("clisbotDesktop", {
   platform: process.platform,
   windowChromeMode: readWindowChromeMode(),
+  browserHostLabel: readArgValue("--clisbot-browser-host-label="),
+  browserHostInstanceId: readArgValue("--clisbot-browser-host-instance-id="),
   invoke: (command: string, args?: Record<string, unknown>) =>
     ipcRenderer.invoke("clisbot:invoke", command, args),
   getPendingOpenProject: () =>
@@ -117,7 +123,8 @@ contextBridge.exposeInMainWorld("clisbotDesktop", {
     delete: (key: string) => ipcRenderer.invoke("clisbot:device-secret:delete", key),
   },
   editor: {
-    listTargets: () => ipcRenderer.invoke("clisbot:editor:listTargets"),
+    listTargets: (input?: { workspacePath?: string }) =>
+      ipcRenderer.invoke("clisbot:editor:listTargets", input),
     openTarget: (input: {
       editorId: string;
       workspacePath: string;

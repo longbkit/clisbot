@@ -44,7 +44,7 @@ export function DirectoryStatus({
         {message}
       </Text>
       {health.status === "unavailable" ? (
-        <Button variant="ghost" size="xs" onPress={details} style={styles.action}>
+        <Button variant="ghost" size="sm" onPress={details} style={styles.action}>
           {health.recovery === "retry" ? t("home.directory.retry") : t("home.directory.details")}
         </Button>
       ) : null}

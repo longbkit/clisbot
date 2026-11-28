@@ -10,7 +10,8 @@ import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { useImportSession } from "@/hooks/use-import-session";
 import { openHostOverview } from "@/navigation/settings-navigation";
 import { usePanelStore } from "@/stores/panel-store";
-import { buildSettingsAddHostRoute, buildSettingsRoute } from "@/utils/host-routes";
+import { buildSettingsRoute } from "@/utils/host-routes";
+import { useAddHost } from "@/hosts/add-host";
 
 /** The existing sidebar actions and preferences, shared by both compact tab pages. */
 export function MobileToolbar() {
@@ -26,10 +27,8 @@ export function MobileToolbar() {
     usePanelStore.getState().showMobileAgent();
     router.push(buildSettingsRoute());
   }, []);
-  const addHost = useCallback(() => {
-    usePanelStore.getState().showMobileAgent();
-    router.push(buildSettingsAddHostRoute(Date.now()));
-  }, []);
+  // Upstream's in-place add-host flow (as in left-sidebar) replaces the Settings route intent.
+  const addHost = useAddHost();
   const hostSettings = useCallback((serverId: string) => {
     usePanelStore.getState().showMobileAgent();
     openHostOverview(serverId);

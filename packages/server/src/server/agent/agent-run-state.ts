@@ -10,14 +10,18 @@ export interface ForegroundTurnWaiter {
   resolveSettled: () => void;
 }
 
+type ForegroundRunStart =
+  | { status: "pending" }
+  | { status: "started"; turnId: string }
+  | { status: "failed"; error: string; stale?: true; cause?: unknown };
+
 export interface PendingForegroundRun {
   token: string;
   kind: "foreground";
   stagedEvents: AgentStreamEvent[];
-  start:
-    | { status: "pending" }
-    | { status: "started"; turnId: string }
-    | { status: "failed"; error: string; cause?: unknown };
+  start: ForegroundRunStart;
+  turnStartedPromise: Promise<void>;
+  resolveTurnStarted: () => void;
   settled: boolean;
   settledPromise: Promise<void>;
   resolveSettled: () => void;
@@ -40,8 +44,19 @@ export interface ForegroundRunAgentState {
   finalizedForegroundTurnIds: Set<string>;
 }
 
+const REMEMBERED_TURN_LIMIT = 50;
+
+function rememberBounded(turnIds: Set<string>, turnId: string): void {
+  turnIds.add(turnId);
+  if (turnIds.size <= REMEMBERED_TURN_LIMIT) return;
+  const oldest = turnIds.values().next().value;
+  if (oldest) turnIds.delete(oldest);
+}
+
 export class AgentRunState {
   private readonly runs = new Map<string, TrackedAgentRun>();
+  // Turns the daemon finalized by force while the provider may still be running them.
+  private readonly forceCanceledTurnIds = new WeakMap<ForegroundRunAgentState, Set<string>>();
 
   createPendingRun(agentId: string): PendingForegroundRun {
     const pendingRun = createPendingForegroundRun();
@@ -52,6 +67,28 @@ export class AgentRunState {
   getPendingRun(agentId: string): PendingForegroundRun | null {
     const run = this.runs.get(agentId);
     return run?.kind === "foreground" ? run : null;
+  }
+
+  settleForegroundStart(
+    run: PendingForegroundRun,
+    start: Exclude<ForegroundRunStart, { status: "pending" }>,
+  ): void {
+    run.start = start;
+    if (start.status === "started") {
+      run.resolveTurnStarted();
+    }
+  }
+
+  /**
+   * Resolves once the agent's foreground run has a turn id or has ended. A failed start
+   * resolves only once its run is cleared, so callers never see a failed run still tracked.
+   */
+  async waitForForegroundStart(agentId: string): Promise<void> {
+    const run = this.getPendingRun(agentId);
+    if (run?.start.status !== "pending") {
+      return;
+    }
+    await Promise.race([run.turnStartedPromise, run.settledPromise]);
   }
 
   hasPendingRun(agentId: string): boolean {
@@ -199,19 +236,25 @@ export class AgentRunState {
   }
 
   rememberFinalizedTurn(agent: ForegroundRunAgentState, turnId: string): void {
-    agent.finalizedForegroundTurnIds.add(turnId);
-    if (agent.finalizedForegroundTurnIds.size <= 50) {
-      return;
-    }
-
-    const oldest = agent.finalizedForegroundTurnIds.values().next().value;
-    if (oldest) {
-      agent.finalizedForegroundTurnIds.delete(oldest);
-    }
+    rememberBounded(agent.finalizedForegroundTurnIds, turnId);
   }
 
   hasFinalizedTurn(agent: ForegroundRunAgentState, turnId: string): boolean {
     return agent.finalizedForegroundTurnIds.has(turnId);
+  }
+
+  /** A force-cancel ends the turn here without the provider's terminal, so it may still run. */
+  rememberForceCanceledTurn(agent: ForegroundRunAgentState, turnId: string): void {
+    let turnIds = this.forceCanceledTurnIds.get(agent);
+    if (!turnIds) {
+      turnIds = new Set();
+      this.forceCanceledTurnIds.set(agent, turnIds);
+    }
+    rememberBounded(turnIds, turnId);
+  }
+
+  wasForceCanceled(agent: ForegroundRunAgentState, turnId: string): boolean {
+    return this.forceCanceledTurnIds.get(agent)?.has(turnId) === true;
   }
 
   private clearRun(agentId: string, run: TrackedAgentRun): void {
@@ -297,10 +340,16 @@ export class ForegroundTurnStream {
 }
 
 function createPendingForegroundRun(): PendingForegroundRun {
+  let resolveTurnStarted!: () => void;
+  const turnStartedPromise = new Promise<void>((resolvePromise) => {
+    resolveTurnStarted = resolvePromise;
+  });
   return {
     ...createTrackedRunState(),
     kind: "foreground",
     start: { status: "pending" },
+    turnStartedPromise,
+    resolveTurnStarted,
     stagedEvents: [],
   };
 }
@@ -330,4 +379,63 @@ function settleTrackedRun(run: TrackedAgentRun): void {
 
   run.settled = true;
   run.resolveSettled();
+}
+
+/**
+ * Follows one sender's prompt to the foreground run that starts it. Each run created for the
+ * prompt, including a stale-session retry, is bound here, so `started` settles for this
+ * sender's prompt and never for another run the agent tracks.
+ */
+export class ForegroundPromptStart {
+  readonly started: Promise<void>;
+  private resolveStarted!: () => void;
+  private rejectStarted!: (error: Error) => void;
+  private run: PendingForegroundRun | null = null;
+  private done = false;
+
+  constructor(
+    private readonly agentId: string,
+    readonly admit?: () => boolean,
+  ) {
+    this.started = new Promise<void>((resolve, reject) => {
+      this.resolveStarted = resolve;
+      this.rejectStarted = reject;
+    });
+    // Steered and fire-and-forget dispatches never wait on the start.
+    this.started.catch(() => undefined);
+  }
+
+  /** A run was created for this prompt. */
+  bind(run: PendingForegroundRun): void {
+    this.run = run;
+    void Promise.race([run.turnStartedPromise, run.settledPromise]).then(() =>
+      this.settle(run, { ended: false }),
+    );
+  }
+
+  /** The prompt's dispatch is over; no further run will be created for it. */
+  end(): void {
+    this.settle(this.run, { ended: true });
+  }
+
+  private settle(run: PendingForegroundRun | null, { ended }: { ended: boolean }): void {
+    if (this.done || run !== this.run) return;
+    if (run?.start.status === "started") {
+      this.done = true;
+      this.resolveStarted();
+      return;
+    }
+    // A stale-session failure is retried with a new run; wait for it unless dispatch ended.
+    if (run?.start.status === "failed" && run.start.stale && !ended) return;
+    this.done = true;
+    this.rejectStarted(new Error(this.describeUnstarted(run)));
+  }
+
+  private describeUnstarted(run: PendingForegroundRun | null): string {
+    if (run?.start.status === "failed") return run.start.error;
+    if (run?.settled) {
+      return `Agent ${this.agentId} run was canceled before its turn started; its prompt was not delivered`;
+    }
+    return `Agent ${this.agentId} run finished before starting`;
+  }
 }

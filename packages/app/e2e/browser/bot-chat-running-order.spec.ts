@@ -94,6 +94,14 @@ test("DM: capture in-flight interleaving and settled positions on pinned accepte
     await expect(page.getByTestId("turn-working-indicator")).toBeVisible();
     const chats = await client.listChats();
     const agentId = chats.chats.find((chat) => chat.id === chatId)!.participants[0]!.agentId!;
+    // The optimistic bubble can render before the Host accepts the input.
+    await expect
+      .poll(async () => {
+        const transcript = await client.fetchChatTranscript({ chatId, limit: 0 });
+        return transcript.lines.find((line) => line.text.includes("F03 interleaved"))?.seq;
+      })
+      .toBe(32);
+    await expect(page.getByTestId("turn-working-indicator")).toBeVisible();
     const running = {
       positions: await positions(page),
       transcript: await client.fetchChatTranscript({ chatId, limit: 0 }),

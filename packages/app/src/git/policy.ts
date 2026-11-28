@@ -2,7 +2,11 @@ import type { ReactElement } from "react";
 
 import type { ActionStatus } from "@/components/ui/dropdown-menu";
 import { i18n } from "@/i18n/i18next";
-import type { CheckoutPrMergeMethod, PullRequestMergeable } from "@clisbot/protocol/messages";
+import type {
+  CheckoutPrMergeMethod,
+  CheckoutStatusResponse,
+  PullRequestMergeable,
+} from "@clisbot/protocol/messages";
 
 import type { MergeCapability } from "./merge-capability";
 
@@ -50,6 +54,48 @@ interface GitActionRuntimeState {
   handler: () => void;
 }
 
+export function isCurrentBranchBase(
+  currentBranch: string | null | undefined,
+  baseRef: string | null | undefined,
+): boolean {
+  if (!currentBranch || !baseRef) return false;
+  if (baseRef.startsWith("refs/heads/")) return baseRef === `refs/heads/${currentBranch}`;
+  if (baseRef.startsWith("refs/")) return false;
+  // Older hosts send a display name, which cannot distinguish a local ref from its remote.
+  return currentBranch === baseRef.replace(/^origin\//, "");
+}
+
+export function canMergeIntoLocalBase(
+  currentBranch: string | null | undefined,
+  baseRef: string | null | undefined,
+): boolean {
+  if (!currentBranch || !baseRef) return false;
+  if (baseRef.startsWith("refs/remotes/") && !baseRef.startsWith("refs/remotes/origin/")) {
+    return false;
+  }
+  const localTarget = baseRef.replace(/^(?:refs\/heads\/|refs\/remotes\/origin\/|origin\/)/, "");
+  return currentBranch !== localTarget;
+}
+
+type CheckoutStatusPayload = CheckoutStatusResponse["payload"];
+
+export type GitUpstreamState = NonNullable<CheckoutStatusPayload["upstreamState"]>;
+
+export function readUpstreamState(
+  status: Pick<CheckoutStatusPayload, "upstreamState" | "aheadOfOrigin" | "isClisbotOwnedWorktree">,
+): GitUpstreamState {
+  if (status.upstreamState !== undefined) {
+    return status.upstreamState;
+  }
+  // COMPAT(checkoutUpstreamState): added in v0.17.4, remove after 2027-05-23 once the daemon
+  // floor reports upstreamState. Older daemons send a null upstream for both a never-pushed and
+  // a deleted remote branch. Only a Clisbot worktree's null was trusted as never pushed.
+  if (status.aheadOfOrigin !== null) {
+    return "tracked";
+  }
+  return status.isClisbotOwnedWorktree ? "none" : "unknown";
+}
+
 export interface BuildGitActionsInput {
   isGit: boolean;
   githubFeaturesEnabled: boolean;
@@ -66,8 +112,12 @@ export interface BuildGitActionsInput {
   pullRequestMergeable: PullRequestMergeable;
   mergeCapability: MergeCapability | null;
   hasRemote: boolean;
+  /** The daemon confirmed where a first push publishes the branch. */
+  hasFirstPushRemote: boolean;
+  upstream: GitUpstreamState;
   isClisbotOwnedWorktree: boolean;
   isOnBaseBranch: boolean;
+  canMergeLocally: boolean;
   hasUncommittedChanges: boolean;
   baseRefAvailable: boolean;
   baseRefLabel: string;
@@ -349,7 +399,7 @@ function getPrimaryActionId(input: BuildGitActionsInput): GitActionId | null {
   if (input.shipDefault === "pr" && canUsePullRequestActionAsShipDefault(input)) {
     return "pr";
   }
-  if (!input.isOnBaseBranch && input.aheadCount > 0) {
+  if (!input.isOnBaseBranch && input.canMergeLocally && input.aheadCount > 0) {
     return "merge-branch";
   }
   if (!input.isOnBaseBranch && canMergeFromBase(input)) {
@@ -380,7 +430,7 @@ function getPullRequestActionIds(filter: {
 function getFeatureActionIds(input: BuildGitActionsInput): GitActionId[] {
   return [
     "merge-from-base",
-    "merge-branch",
+    ...(input.canMergeLocally ? (["merge-branch"] as const) : []),
     ...getPullRequestActionIds({ roles: ["status", "direct", "auto"], input }),
   ];
 }
@@ -530,12 +580,22 @@ function canPush(input: BuildGitActionsInput): boolean {
 }
 
 function hasPushableCommits(input: BuildGitActionsInput): boolean {
-  if ((input.aheadOfOrigin ?? 0) > 0) {
-    return true;
+  switch (input.upstream) {
+    case "tracked":
+      return (input.aheadOfOrigin ?? 0) > 0;
+    case "none":
+      // A first push, which sets the upstream. The commits to send are the ones ahead of the base.
+      // Clisbot worktrees always publish to origin. A regular checkout publishes only where the
+      // daemon confirmed Git would push the branch too, so a fork setup is not sent to origin.
+      return input.aheadCount > 0 && (input.isClisbotOwnedWorktree || input.hasFirstPushRemote);
+    case "gone":
+    case "unknown":
+      // The branch has an upstream that is deleted or unreadable, so nothing counts the commits
+      // left to send. Clisbot worktrees publish whenever the branch is ahead of its base, for
+      // example after a merged PR. Regular checkouts do not: Push would re-create a branch that
+      // was deleted.
+      return input.isClisbotOwnedWorktree && input.aheadCount > 0;
   }
-  // No-upstream Clisbot worktrees are first-pushable: the daemon push sets upstream with `git push -u`.
-  // Do not fold this into aheadOfOrigin; null also covers deleted/pruned upstream branches.
-  return input.isClisbotOwnedWorktree && input.aheadOfOrigin === null && input.aheadCount > 0;
 }
 
 function canMergeFromBase(input: BuildGitActionsInput): boolean {
@@ -640,10 +700,16 @@ function getPushUnavailableMessage(input: BuildGitActionsInput): string | undefi
   if ((input.behindOfOrigin ?? 0) > 0) {
     return i18n.t("workspace.git.actions.unavailable.pushBehind");
   }
-  if (!hasPushableCommits(input)) {
-    return i18n.t("workspace.git.actions.unavailable.pushNothing");
+  if (hasPushableCommits(input)) {
+    return undefined;
   }
-  return undefined;
+  if (input.upstream === "gone") {
+    return i18n.t("workspace.git.actions.unavailable.pushUpstreamGone");
+  }
+  if (input.upstream === "none" && input.aheadCount > 0) {
+    return i18n.t("workspace.git.actions.unavailable.pushNoRemote");
+  }
+  return i18n.t("workspace.git.actions.unavailable.pushNothing");
 }
 
 function getPullAndPushUnavailableMessage(input: BuildGitActionsInput): string | undefined {

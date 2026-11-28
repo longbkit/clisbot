@@ -52,7 +52,7 @@
 <!-- clisbot:intro:end -->
 
 - **自托管：** Agents 在你的机器上运行，使用完整的本地开发环境、工具、配置和技能。
-- **自由选择 Agent：** 提供 40 多种 Agent 选项：内置 Claude Code、Codex、Copilot、OpenCode、Pi、Antigravity 和 Muse Code 的集成，ACP 目录另有 39 个预设（包括 Grok）。为每个任务选择合适的模型。
+- **自由选择 Agent：** 提供 40 多种 Agent 选项：内置 Claude Code、Codex、Copilot、OpenCode、Pi、Antigravity 和 Muse Code 的集成，ACP 目录另有 40 个预设（包括 Grok）。为每个任务选择合适的模型。
 - **语音控制：** 在语音模式下口述任务或讨论问题。需要免手操作时很方便。
 - **跨设备：** 支持 iOS、Android、桌面端、Web 和 CLI。在桌前开始工作，用手机查看进度，也可以从终端脚本化操作。
 - **隐私设置：** 支持的应用生产构建默认启用可选的使用情况分析。你可以在“设置 → 通用 → 隐私”中关闭。参阅[分析范围和控制选项](docs/product-analytics.md)。

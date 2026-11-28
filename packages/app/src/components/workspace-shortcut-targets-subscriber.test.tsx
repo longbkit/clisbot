@@ -83,13 +83,16 @@ function setHostProfiles(hosts: HostProfile[]): void {
 
 // The model reads the Agent sessions setting (Clisbot), which goes through React Query, and
 // selected route facts, which come from the root layout's route source.
-function SidebarModelProvider({ children }: { children: React.ReactNode }) {
+function SidebarModelProvider({
+  children,
+  ...props
+}: React.ComponentProps<typeof BaseSidebarModelProvider>) {
   const [queryClient] = React.useState(() => new QueryClient());
   const [routes] = React.useState(() => createTestRouteSource("/").source);
   return (
     <RouteSourceProvider source={routes}>
       <QueryClientProvider client={queryClient}>
-        <BaseSidebarModelProvider>{children}</BaseSidebarModelProvider>
+        <BaseSidebarModelProvider {...props}>{children}</BaseSidebarModelProvider>
       </QueryClientProvider>
     </RouteSourceProvider>
   );
@@ -147,6 +150,20 @@ describe("WorkspaceShortcutTargetsSubscriber", () => {
       useSessionStore.getState().clearSession("host-a");
       useSessionStore.getState().clearSession("host-b");
     });
+  });
+
+  it("keeps keyboard navigation populated when the sidebar starts hidden", async () => {
+    await act(async () => {
+      root?.render(
+        <SidebarModelProvider active={false} keyboardNavigationActive>
+          <WorkspaceShortcutTargetsSubscriber enabled />
+        </SidebarModelProvider>,
+      );
+    });
+    expect(useKeyboardShortcutsStore.getState().sidebarShortcutWorkspaceTargets).toEqual([
+      { serverId: "srv", workspaceId: "ws-1" },
+      { serverId: "srv", workspaceId: "ws-2" },
+    ]);
   });
 
   it("publishes workspace shortcut targets without rendering the sidebar", async () => {

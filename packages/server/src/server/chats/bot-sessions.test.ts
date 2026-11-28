@@ -1,11 +1,13 @@
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { BOT_ID_LABEL, CHAT_ID_LABEL } from "@clisbot/protocol/bots/labels";
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import type { StoredAgentRecord } from "../agent/agent-storage.js";
 import type { CreateAgentCommandInput } from "../agent/create-agent/create.js";
+import { createAgentCommand } from "../agent/create-agent/create.js";
+import type { ManagedAgent } from "../agent/agent-manager.js";
 import { BotSessions, type BotSessionsDependencies } from "./bot-sessions.js";
 import type { ChatBot } from "./chat-record.js";
 import { ChatStore } from "./chat-store.js";
@@ -58,7 +60,7 @@ async function harness(
   const deps: BotSessionsDependencies = {
     agentStorage: {
       get: async (id) => agents.get(id) ?? null,
-      list: async () => Array.from(agents.values()),
+      listAll: async () => Array.from(agents.values()),
     },
     store,
     createAgent: async (input) => {
@@ -94,8 +96,9 @@ describe("BotSessions", () => {
       provider: "codex/chosen",
       mode: "safe",
       thinking: "high",
-      features: { web: false },
+      providerOptions: { web: false },
     });
+    expect(created[0]).not.toHaveProperty("features");
     expect(bot.launch.model).not.toBe("chosen");
   });
 
@@ -274,7 +277,7 @@ describe("BotSessions.fork", () => {
       },
     });
     const broken = new BotSessions({
-      agentStorage: { get: async () => null, list: async () => [] },
+      agentStorage: { get: async () => null, listAll: async () => [] },
       store: failing,
       createAgent: async () => ({ snapshot: { id: "agent-orphan" } }) as never,
       ensureLoaded: async () => undefined,
@@ -295,7 +298,7 @@ describe("BotSessions.fork", () => {
     const { store, chat } = await harness();
     await store.setParticipantAgent(chat.id, bot.id, "agent-old");
     const sessions = new BotSessions({
-      agentStorage: { get: async () => null, list: async () => [] },
+      agentStorage: { get: async () => null, listAll: async () => [] },
       store,
       createAgent: async () => {
         throw new Error("claude is not installed");
@@ -339,5 +342,99 @@ describe("BotSessions.fork", () => {
     const reopened = new ChatStore(store.rootDir, createTestLogger());
     await reopened.load();
     expect(reopened.forkCarry(chat.id, bot.id)).toBeNull();
+  });
+});
+
+// A Bot's launch record keeps `featureValues` (disk, wire, current Bot form); agent creation takes
+// `providerOptions`. These run the real create command so a dropped value shows up in the config
+// the agent manager receives, not only in what BotSessions hands over.
+describe("BotSessions launch options through the real create command", () => {
+  async function realCreate(root: string) {
+    const created: Array<{ providerOptions?: unknown }> = [];
+    const createAgent = vi.fn(async (config: { providerOptions?: unknown }) => {
+      created.push(config);
+      return {
+        id: `agent-real-${created.length}`,
+        provider: "codex",
+        cwd: "/bots/alpha",
+      } as ManagedAgent;
+    });
+    const agents = new Map<string, StoredAgentRecord>();
+    const command = (input: CreateAgentCommandInput) =>
+      createAgentCommand(
+        {
+          agentManager: {
+            createAgent,
+            getAgent: vi.fn((id: string) => ({ id, provider: "codex", runtimeInfo: null })),
+          } as unknown as Parameters<typeof createAgentCommand>[0]["agentManager"],
+          agentStorage: {} as Parameters<typeof createAgentCommand>[0]["agentStorage"],
+          logger: createTestLogger(),
+          providerSnapshotManager: {
+            resolveCreateConfig: vi.fn(async () => ({})),
+          } as unknown as Parameters<typeof createAgentCommand>[0]["providerSnapshotManager"],
+        },
+        input,
+      ).then((result) => {
+        const id = result.snapshot.id;
+        agents.set(id, agentRecord(id, { createdAt: new Date().toISOString() }));
+        return result;
+      });
+    const sessions = (store: ChatStore) =>
+      new BotSessions({
+        agentStorage: {
+          get: async (id) => agents.get(id) ?? null,
+          listAll: async () => Array.from(agents.values()),
+        },
+        store,
+        createAgent: command,
+        ensureLoaded: async () => {},
+      });
+    return { created, sessions, store: () => new ChatStore(root, createTestLogger()) };
+  }
+
+  test("a saved Bot's launch values reach the agent config", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "bot-sessions-real-"));
+    roots.push(root);
+    const { created, sessions, store } = await realCreate(root);
+    const savedBot: ChatBot = {
+      ...bot,
+      launch: {
+        ...bot.launch,
+        featureValues: { mockStreamingAssistantResponse: "F03_GROUP_PREFIX" },
+      },
+    };
+    const chats = store();
+    const chat = await chats.create({ id: "cht_1", title: "Saved", botIds: [savedBot.id] });
+    await sessions(chats).resolve(chat, savedBot);
+    expect(created[0]?.providerOptions).toEqual({
+      mockStreamingAssistantResponse: "F03_GROUP_PREFIX",
+    });
+  });
+
+  test("a chat launch saved by an earlier version survives a restart and /new", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "bot-sessions-real-"));
+    roots.push(root);
+    const { created, sessions, store } = await realCreate(root);
+    const first = store();
+    const chat = await first.create({ id: "cht_1", title: "Saved", botIds: [bot.id] });
+    // Write the launch straight into chat.json, as a 2.2.x daemon stored it.
+    const file = path.join(root, "cht_1", "chat.json");
+    const record = JSON.parse(await fs.readFile(file, "utf8")) as Record<string, unknown>;
+    record["launch"] = { ...bot.launch, featureValues: { web: false, auto_accept: true } };
+    await fs.writeFile(file, JSON.stringify(record));
+
+    // Restart: a fresh store reads the record from disk.
+    const reloaded = store();
+    await reloaded.load();
+    const stored = await reloaded.require(chat.id);
+    const service = sessions(reloaded);
+    await service.resolve(stored, bot);
+    expect(created[0]?.providerOptions).toEqual({ web: false, auto_accept: true });
+
+    // Reopen: /new forgets the session; the next delivery launches with the same options.
+    await reloaded.resetParticipantSession(chat.id, bot.id);
+    await service.resolve(await reloaded.require(chat.id), bot);
+    expect(created).toHaveLength(2);
+    expect(created[1]?.providerOptions).toEqual({ web: false, auto_accept: true });
   });
 });

@@ -24,7 +24,7 @@ export function BrowseServersSection({
   const add = useMemo(
     () => (
       <Button
-        size="xs"
+        size="sm"
         variant="ghost"
         leftIcon={Plus}
         onPress={onAdd}

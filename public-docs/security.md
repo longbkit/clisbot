@@ -143,11 +143,13 @@ Clisbot never stores or transmits provider API keys. Agents run in your user con
 
 Host onboarding uses `clisbot hub connect <origin>` with browser approval. It issues a single-use token bound to the Host identity and approved Hub permissions, expiring with the request after 10 minutes; no CLI administration credential is created. Hub CLI login and daemon enrollment are separate identities. `clisbot hub login [origin]` stores a durable organization-scoped human credential in a private file under `CLISBOT_HOME`, keyed by the normalized Hub origin. A stored credential is never sent to another origin. Use `login` only for deliberate CLI administration: it grants all five Public API scopes, including configuration installation, run dispatch and Host enrollment, with no automatic expiry. `logout` deletes only the local copy; revoke the credential on Hub to invalidate it. Protect `CLISBOT_HOME` as sensitive local state.
 
-Hub CLI credentials are bearer secrets. Remote Hub origins must use HTTPS; cleartext HTTP is accepted only for loopback development origins (`localhost`, `127.0.0.1`, and `[::1]`).
+A stored credential is never sent to another origin, so protect `CLISBOT_HOME` as sensitive local state. Hub CLI credentials are bearer secrets, and remote Hub origins must use HTTPS (cleartext HTTP is accepted only on `localhost`, `127.0.0.1`, and `[::1]`).
 
 `clisbot hub connect [origin]` never reads a stored CLI credential. An explicit API key can replace browser approval for unattended enrollment; limit it to `daemons:enroll`. The daemon exchanges the token and retains its own independently generated relationship credential. Logging out of the CLI does not silently remove daemon authority. Interactive logout completes any accepted same-origin daemon disconnection before deleting the login. In JSON and noninteractive use, `logout` never prompts or disconnects; pass `--disconnect-daemon` only when automation intends to remove both identities.
 
-`--api-key` and `CLISBOT_HUB_API_KEY` override stored login without being persisted. Prefer environment or secret-manager injection for automation, and avoid command-line flags when local process listings or shell history are visible to other users.
+Logging out of the CLI does not silently remove daemon authority. Interactive `logout` asks whether to disconnect a same-origin daemon before deleting the login, while JSON and non-interactive logouts require `--disconnect-daemon` to remove both identities.
+
+`--api-key` and `CLISBOT_HUB_API_KEY` override stored login without being persisted. Prefer environment variables or secret-manager injection for automation, and avoid command-line flags when local process listings or shell history are visible to other users.
 
 ## Recommendations
 
@@ -158,3 +160,4 @@ Hub CLI credentials are bearer secrets. Remote Hub origins must use HTTPS; clear
 - **Scope Docker mounts tightly**, agents can access mounted workspaces and provider credentials
 - **Keep your daemon updated**, security improvements are released regularly
 - **Keep Hub access narrow**, a Route's Rules decide who can reach an agent from a chat platform, and each Hub member reaches only the daemons and projects you grant, see [Hub security](/docs/hub/security)
+- **Protect Hub trigger files and organization access**, push access to `.clisbot/triggers/*.yml` controls what Hub can run on your daemons, see [How Hub works](/docs/hub/concepts)

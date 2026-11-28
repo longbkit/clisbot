@@ -1,8 +1,8 @@
 ---
 title: Hub activity
-description: Read what Hub did with an event, tell a filtered event from an unrouted one, and debug a trigger that did nothing.
+description: Inspect trigger runs, distinguish filtered events from unrouted ones, and debug a trigger that did not run.
 nav: Activity
-order: 72
+order: 75
 category: Hub
 ---
 
@@ -23,14 +23,14 @@ In the app, **Channels → Activity** lists messages evaluated against Routes. F
 | `trigger_filters_rejected`  | The source matched, but filters rejected the event.           |
 | `configuration_unavailable` | A relevant configuration or Connection could not be resolved. |
 
-## Nothing happened when I mentioned the bot
+## Nothing happened when an event arrived
 
-1. **Which path is configured?** For a Route, check its Rules: Where, Who and message conditions. For a direct event, check `from_users`, resource and content filters. GitHub uses logins; prefer stable Slack/Discord user IDs. See [Channels](/docs/hub/channels) or [Triggers](/docs/hub/triggers).
+1. **Which path is configured?** For a Route, check its Rules: Where, Who and message conditions. For a direct event, check `from_users`, resource and content filters. GitHub uses logins; prefer stable Linear, Slack and Discord user IDs. See [Channels](/docs/hub/channels) or [Triggers](/docs/hub/triggers).
 2. **Did Hub receive it?** Look in Channel activity, Automation Runs or Known unrouted events. If absent, check Connection status and the provider delivery log. GitHub exposes App → Advanced → Recent Deliveries; Slack's direct-event path uses Event Subscriptions.
 3. **Is the intended revision active?** A failed save or sync leaves the old revision serving. Check configuration and errors before recreating anything.
 4. **Is the Host connected?** Confirm the target and its Hub relationship has `hub.execute`. A provider event dispatch can fail with `daemon_not_connected`.
 5. **Did it stop early?** Compare the run with its step's `idle_timeout`, `max_runtime`, and Workflow deadline. Inspect author-access rejection separately from provider startup failure.
-6. **Did it run without replying?** Check both the input's reply settings and the responding step's output grant. The prompt must name `hub.reply` and `hub.finish_execution`. See [Workflow instructions](/docs/hub/workflows#tell-the-agent-which-tool-to-call).
+6. **Did it run without replying?** Check both the input's reply settings and the responding step's output grant. The prompt must name `hub.reply` and `hub.finish_execution`. See [Workflow instructions](/docs/hub/configuration/reference#tell-the-agent-which-tool-to-call).
 
 ## Sync failures
 

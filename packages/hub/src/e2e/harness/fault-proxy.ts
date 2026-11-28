@@ -12,6 +12,7 @@ interface Denial {
 export class HubFaultProxy {
   private readonly server: Server;
   private readonly sockets = new WebSocketServer({ noServer: true });
+  private readonly negotiatedSessionProtocol = new WeakSet<IncomingMessage>();
   private daemonSocket: WebSocket | undefined;
   private hubSocket: WebSocket | undefined;
   private loseCreateResponse = false;
@@ -35,6 +36,10 @@ export class HubFaultProxy {
   ) {
     this.server = createServer((request, response) => {
       void this.forwardHttp(request, response);
+    });
+    this.sockets.on("headers", (headers, request) => {
+      if (this.negotiatedSessionProtocol.has(request))
+        headers.push("x-clisbot-session-protocol: 1");
     });
     this.server.on("upgrade", (request, socket, head) => this.upgrade(request, socket, head));
   }
@@ -174,50 +179,51 @@ export class HubFaultProxy {
   }
 
   private upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
-    this.sockets.handleUpgrade(request, socket, head, (daemonSocket) => {
-      const generation = ++this.connectionGeneration;
-      this.events.push(
-        `${generation}: daemon accepted ${
-          request.url ?? "/"
-        } daemon=${String(request.headers["x-clisbot-daemon-id"])}`,
-      );
-      const target = new URL(request.url ?? "/", this.targetOrigin);
-      target.protocol = "ws:";
-      const hubSocket = new WebSocket(target.toString(), {
-        headers: forwardedHeaders(request),
-      });
-      this.daemonSocket = daemonSocket;
-      this.hubSocket = hubSocket;
-      const queued: RawData[] = [];
-      daemonSocket.on("message", (data) => {
-        if (this.observeDaemonMessage(data)) return;
-        if (hubSocket.readyState === WebSocket.OPEN) hubSocket.send(data);
-        else queued.push(data);
-      });
-      hubSocket.on("open", () => {
+    const target = new URL(request.url ?? "/", this.targetOrigin);
+    target.protocol = "ws:";
+    const hubSocket = new WebSocket(target, { headers: forwardedHeaders(request) });
+    socket.once("close", () => hubSocket.terminate());
+    hubSocket.on("error", () => socket.destroy());
+    hubSocket.once("unexpected-response", (_upstream, response) => {
+      const status = response.statusCode ?? 502;
+      socket.end(`HTTP/1.1 ${status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+      response.resume();
+    });
+    hubSocket.once("upgrade", (response) => {
+      if (response.headers["x-clisbot-session-protocol"] === "1") {
+        this.negotiatedSessionProtocol.add(request);
+      }
+    });
+    hubSocket.once("open", () => {
+      this.sockets.handleUpgrade(request, socket, head, (daemonSocket) => {
+        const generation = ++this.connectionGeneration;
+        this.events.push(
+          `${generation}: daemon accepted ${request.url ?? "/"} daemon=${String(request.headers["x-clisbot-daemon-id"])}`,
+        );
         this.events.push(`${generation}: hub opened`);
-        for (const data of queued) hubSocket.send(data);
-      });
-      hubSocket.on("message", (data) => {
-        const raw = readText(data);
-        this.observeHubMessage(raw);
-        if (daemonSocket.readyState === WebSocket.OPEN) daemonSocket.send(raw);
-      });
-      daemonSocket.on("close", (code, reason) => {
-        this.events.push(`${generation}: daemon closed ${code} ${reason.toString()}`);
-        hubSocket.terminate();
-      });
-      hubSocket.on("close", (code, reason) => {
-        this.events.push(`${generation}: hub closed ${code} ${reason.toString()}`);
-        daemonSocket.terminate();
-      });
-      daemonSocket.on("error", (error) => {
-        this.events.push(`${generation}: daemon error ${error.message}`);
-        hubSocket.terminate();
-      });
-      hubSocket.on("error", (error) => {
-        this.events.push(`${generation}: hub error ${error.message}`);
-        daemonSocket.terminate();
+        this.daemonSocket = daemonSocket;
+        this.hubSocket = hubSocket;
+        daemonSocket.on("message", (data) => {
+          if (this.observeDaemonMessage(data)) return;
+          if (hubSocket.readyState === WebSocket.OPEN) hubSocket.send(data);
+        });
+        hubSocket.on("message", (data) => {
+          const raw = readText(data);
+          this.observeHubMessage(raw);
+          if (daemonSocket.readyState === WebSocket.OPEN) daemonSocket.send(raw);
+        });
+        daemonSocket.on("close", (code, reason) => {
+          this.events.push(`${generation}: daemon closed ${code} ${reason.toString()}`);
+          hubSocket.terminate();
+        });
+        hubSocket.on("close", (code, reason) => {
+          this.events.push(`${generation}: hub closed ${code} ${reason.toString()}`);
+          daemonSocket.terminate();
+        });
+        daemonSocket.on("error", (error) => {
+          this.events.push(`${generation}: daemon error ${error.message}`);
+          hubSocket.terminate();
+        });
       });
     });
   }

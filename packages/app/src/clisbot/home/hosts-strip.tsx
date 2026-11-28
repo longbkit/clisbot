@@ -23,7 +23,7 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { useAppDiagnosticStore } from "@/diagnostics/store";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { openHostOverview } from "@/navigation/settings-navigation";
-import { buildSettingsAddHostRoute } from "@/utils/host-routes";
+import { useAddHost } from "@/hosts/add-host";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 import { hubSubtitle, type StripHost, type StripHub } from "./hosts-strip-model";
 import { useHostsStrip, useOpenHub } from "./hosts-strip-data";
@@ -194,10 +194,8 @@ function HubEntry({ hub }: { hub: StripHub }) {
 /** Add a computer or a Hub, or troubleshoot one that will not connect. */
 function ConnectMenu() {
   const router = useRouter();
-  const connectComputer = useCallback(
-    () => router.push(buildSettingsAddHostRoute(Date.now())),
-    [router],
-  );
+  // Upstream's in-place add-host flow replaces the old Settings `addHost` route intent.
+  const connectComputer = useAddHost();
   const addHub = useCallback(
     () =>
       router.push({

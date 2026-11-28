@@ -26,7 +26,7 @@ const OPTIONAL_AGENT_SESSION_METHOD_NAMES = [
   "listCommands",
   "setModel",
   "setThinkingOption",
-  "setFeature",
+  "applyOptions",
   "revertConversation",
   "revertFiles",
   "revertBoth",
@@ -153,8 +153,8 @@ class FakeSession implements AgentSession {
     this.recordedCalls.push("setThinkingOption");
   }
 
-  async setFeature() {
-    this.recordedCalls.push("setFeature");
+  async applyOptions() {
+    this.recordedCalls.push("applyOptions");
   }
 
   async revertConversation() {
@@ -194,7 +194,7 @@ describe("wrapSessionProvider", () => {
     await wrapped.listCommands?.();
     await wrapped.setModel?.("sonnet");
     await wrapped.setThinkingOption?.("high");
-    await wrapped.setFeature?.("feature-1", true);
+    await wrapped.applyOptions?.({ "feature-1": true });
     await wrapped.revertConversation?.({ messageId: "message-1" });
     await wrapped.revertFiles?.({ messageId: "message-1" });
     await wrapped.revertBoth?.({ messageId: "message-1" });
@@ -209,7 +209,7 @@ describe("wrapSessionProvider", () => {
       "listCommands",
       "setModel",
       "setThinkingOption",
-      "setFeature",
+      "applyOptions",
       "revertConversation",
       "revertFiles",
       "revertBoth",
@@ -225,6 +225,8 @@ describe("wrapSessionProvider", () => {
     expect(wrapped.id).toBe("session-2");
     expect(wrapped.capabilities).toEqual(session.capabilities);
     expect(wrapped.initialTimeline).toEqual(session.initialTimeline);
+    session.steerActiveTurn = undefined;
+    expect(wrapped.steerActiveTurn).toBeUndefined();
   });
 
   test("propagates steering failure without interrupting or replacing the turn", async () => {

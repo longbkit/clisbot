@@ -120,7 +120,7 @@ export function FoldedRouteFormSection({
   const trailing = useMemo(
     () => (
       <View style={styles.sectionTrailing}>
-        <Button size="xs" variant="ghost" onPress={toggle} accessibilityState={state}>
+        <Button size="sm" variant="ghost" onPress={toggle} accessibilityState={state}>
           {open ? t("hub.routes.common.hide") : t("hub.routes.common.show")}
         </Button>
       </View>
@@ -207,7 +207,7 @@ export function FoldedRouteFormSubgroup({
   const trailing = useMemo(
     () => (
       <Button
-        size="xs"
+        size="sm"
         variant="ghost"
         onPress={toggle}
         accessibilityState={state}

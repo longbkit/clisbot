@@ -1,5 +1,5 @@
 import { renderPromptAttachmentAsText } from "../prompt-attachments.js";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type {
   AgentPromptContentBlock,
@@ -9,6 +9,10 @@ import type {
 
 const agentIdSchema = z.string().min(1);
 const sourceSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("change-request-update"),
+    url: z.url({ protocol: /^https?$/ }),
+  }),
   z.object({
     kind: z.literal("agent-message"),
     agentId: agentIdSchema,
@@ -68,6 +72,9 @@ function unescapeXml(value: string): string | null {
 
 export function formatAgentMessage(message: AgentMessage): string {
   const { source } = message;
+  if (source?.kind === "change-request-update") {
+    return `<clisbot-system version="1" kind="change-request-update" source-url="${escapeXml(source.url)}" message-id="${escapeXml(message.id)}">\n${escapeXml(message.text)}\n</clisbot-system>`;
+  }
   const attributes = source
     ? `kind="${source.kind}" source-agent-id="${escapeXml(source.agentId)}"`
     : 'kind="user-message"';
@@ -101,6 +108,7 @@ export function parseAgentMessage(text: string): AgentMessage | null {
     serverId: attributes.get("source-server-id"),
     event: attributes.get("event"),
     title: attributes.get("source-agent-title"),
+    url: attributes.get("source-url"),
   });
   if (!source.success) return null;
   return { id, source: source.data, text: body };
@@ -141,11 +149,23 @@ export function prepareAgentMessage(
       return { prompt, messageId: id };
     }
   }
+  return envelopeMessage(prompt, source ?? null, id);
+}
+
+/**
+ * Wrap a prompt in its envelope unconditionally. A person's prompt (`source` null) needs one
+ * only when it is quoted or shares a provider prompt with agent messages.
+ */
+export function envelopeMessage(
+  prompt: AgentPromptInput,
+  source: AgentPromptSource | null,
+  id?: string,
+): { prompt: AgentPromptInput; messageId: string } {
   const messageId = id ?? randomUUID();
   const text = typeof prompt === "string" ? prompt : prompt.flatMap(renderMessageText).join("\n\n");
   // Render textual attachments before wrapping, so provider replay still contains one
   // complete envelope instead of an envelope followed by provider-rendered context.
-  const envelope = formatAgentMessage({ id: messageId, source: source ?? null, text });
+  const envelope = formatAgentMessage({ id: messageId, source, text });
   return {
     messageId,
     prompt:
@@ -174,13 +194,31 @@ function projectAgentMessage(item: AgentTimelineItem): AgentTimelineItem | null 
   if (item.type !== "user_message") return item;
   const message = parseAgentMessage(item.text);
   if (!message) {
-    // COMPAT(legacySystemEnvelope): added in v0.11.1; remove after 2027-04-08 once
-    // legacy notification history is retired. Schedules still use this envelope.
-    return isSystemInjectedEnvelope(item.text) ? null : item;
+    if (!isSystemInjectedEnvelope(item.text)) return item;
+    // Schedule bodies include the run ID, keeping identity stable across replay.
+    const text = item.text.slice("<clisbot-system>\n".length, -"\n</clisbot-system>".length);
+    return {
+      type: "tool_call",
+      callId: `clisbot-system:${createHash("sha256").update(item.text).digest("hex")}`,
+      name: "heartbeat",
+      status: "completed",
+      error: null,
+      detail: { type: "plain_text", text, icon: "sparkles" },
+    };
   }
   const { source } = message;
   if (!source) {
     return { ...item, text: message.text, clientMessageId: message.id };
+  }
+  if (source.kind === "change-request-update") {
+    return {
+      type: "tool_call",
+      callId: `clisbot-change-request:${message.id}`,
+      name: "change_request_update",
+      status: "completed",
+      error: null,
+      detail: { type: "plain_text", text: message.text },
+    };
   }
   return {
     type: "tool_call",

@@ -64,7 +64,7 @@ async function readProviderFeaturePreferences(page: Page, provider: string): Pro
       const raw = localStorage.getItem(preferencesKey);
       if (!raw) return null;
       const preferences = JSON.parse(raw) as FormPreferences;
-      return preferences.providerPreferences?.[providerId]?.featureValues ?? null;
+      return preferences.providerPreferences?.[providerId]?.options ?? null;
     },
     { preferencesKey: hostFormPreferencesKey(), providerId: provider },
   );
@@ -148,7 +148,7 @@ test.describe("Agent profiles repair modeless provider preferences", () => {
         provider: featureProviderId,
         model: featureModelId,
         modeId: "bypassPermissions",
-        featureValues: { fast_mode: true },
+        options: { fast_mode: true },
       },
     ]);
     const provider = await seedModelProvider({
@@ -184,7 +184,7 @@ test.describe("Agent profiles repair modeless provider preferences", () => {
       expect(createAgentRequest).toMatchObject({
         config: {
           provider: featureProviderId,
-          featureValues: { fast_mode: true },
+          providerOptions: { fast_mode: true },
         },
       });
     } finally {

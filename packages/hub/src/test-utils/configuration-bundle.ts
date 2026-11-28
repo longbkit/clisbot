@@ -1,3 +1,4 @@
+import { HubConfigSchema } from "../config/compiler.js";
 import { dump, load } from "js-yaml";
 import type { HubBundleFile } from "../config/bundle.js";
 
@@ -53,4 +54,12 @@ function rewriteFixtureIncludes(trigger: Record<string, unknown>): void {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** One organization-owned workflow document for each trigger in a test configuration. */
+export function workflowDocumentFixtures(yaml: string): string[] {
+  const { environments, triggers } = HubConfigSchema.parse(load(yaml));
+  return triggers.map(({ on, filters, ...workflow }) =>
+    dump({ ...workflow, environments, on: { [on]: filters ? { filters } : {} } }, { noRefs: true }),
+  );
 }

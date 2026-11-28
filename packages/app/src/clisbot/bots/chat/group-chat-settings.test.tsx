@@ -29,6 +29,10 @@ vi.mock("@/runtime/host-runtime", () => ({
 vi.mock("../data/runtime", () => ({ refreshBotsAndChats: vi.fn() }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
 vi.mock("react-native", () => ({
+  Platform: {
+    OS: "web",
+    select: (values: Record<string, unknown>) => values.web ?? values.default,
+  },
   View: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   Text: ({ children }: { children: ReactNode }) => <span>{children}</span>,
 }));

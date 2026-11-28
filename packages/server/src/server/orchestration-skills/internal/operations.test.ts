@@ -21,18 +21,31 @@ function only(...skills: string[]): SkillSelection {
   return { mode: "custom", skills };
 }
 
+interface TestSkillTargets extends SkillTargets {
+  agentsDir: string;
+  claudeDir: string;
+  antigravityDir: string;
+  installDirs: string[];
+}
+
 interface Sandbox {
   root: string;
-  targets: SkillTargets;
+  targets: TestSkillTargets;
 }
 
 async function makeSandbox(): Promise<Sandbox> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "clisbot-skills-"));
-  const targets: SkillTargets = {
+  const agentsDir = path.join(root, "home", ".agents", "skills");
+  const claudeDir = path.join(root, "home", ".claude", "skills");
+  const codexDir = path.join(root, "home", ".codex", "skills");
+  const antigravityDir = path.join(root, "home", ".gemini", "config", "skills");
+  const targets: TestSkillTargets = {
     sourceDir: path.join(root, "bundle"),
-    agentsDir: path.join(root, "home", ".agents", "skills"),
-    claudeDir: path.join(root, "home", ".claude", "skills"),
-    codexDir: path.join(root, "home", ".codex", "skills"),
+    installDirs: [agentsDir, claudeDir, antigravityDir],
+    agentsDir,
+    claudeDir,
+    codexDir,
+    antigravityDir,
   };
   await fs.mkdir(targets.sourceDir, { recursive: true });
   return { root, targets };
@@ -63,7 +76,7 @@ async function writeOnDiskSkill(
 }
 
 async function writeOnDiskSkillToAllTargets(
-  targets: SkillTargets,
+  targets: TestSkillTargets,
   name: string,
   files: Record<string, string>,
 ): Promise<void> {
@@ -71,6 +84,7 @@ async function writeOnDiskSkillToAllTargets(
     writeOnDiskSkill(targets.agentsDir, name, files),
     writeOnDiskSkill(targets.claudeDir, name, files),
     writeOnDiskSkill(targets.codexDir, name, files),
+    writeOnDiskSkill(targets.antigravityDir, name, files),
   ]);
 }
 
@@ -86,9 +100,9 @@ async function pathExists(p: string): Promise<boolean> {
     .catch(() => false);
 }
 
-async function installedIn(targets: SkillTargets, name: string): Promise<boolean[]> {
+async function installedIn(targets: TestSkillTargets, name: string): Promise<boolean[]> {
   return Promise.all(
-    [targets.agentsDir, targets.claudeDir, targets.codexDir].map((dir) =>
+    [targets.agentsDir, targets.claudeDir, targets.codexDir, targets.antigravityDir].map((dir) =>
       pathExists(path.join(dir, name)),
     ),
   );
@@ -198,6 +212,10 @@ describe("getSkillsStatus", () => {
       "SKILL.md": "clisbot-v1",
       "hooks/guard.sh": "user guard",
     });
+    await writeOnDiskSkill(sandbox.targets.antigravityDir, "clisbot", {
+      "SKILL.md": "clisbot-v1",
+      "notes/local.md": "user notes",
+    });
 
     const status = await getSkillsStatus(sandbox.targets, ALL_SKILLS);
 
@@ -214,6 +232,7 @@ describe("getSkillsStatus", () => {
     await writeOnDiskSkill(sandbox.targets.agentsDir, "clisbot", { "SKILL.md": "stale" });
     await writeOnDiskSkill(sandbox.targets.claudeDir, "clisbot", { "SKILL.md": "clisbot-v1" });
     await writeOnDiskSkill(sandbox.targets.codexDir, "clisbot", { "SKILL.md": "clisbot-v1" });
+    await writeOnDiskSkill(sandbox.targets.antigravityDir, "clisbot", { "SKILL.md": "clisbot-v1" });
     await writeOnDiskSkillToAllTargets(sandbox.targets, "clisbot-loop", { "SKILL.md": "loop-v1" });
 
     const status = await getSkillsStatus(sandbox.targets, ALL_SKILLS);
@@ -230,11 +249,44 @@ describe("getSkillsStatus", () => {
     await writeOnDiskSkill(sandbox.targets.claudeDir, "clisbot-loop", { "SKILL.md": "loop-v1" });
     await writeOnDiskSkill(sandbox.targets.codexDir, "clisbot", { "SKILL.md": "clisbot-v1" });
     await writeOnDiskSkill(sandbox.targets.codexDir, "clisbot-loop", { "SKILL.md": "loop-v1" });
+    await writeOnDiskSkill(sandbox.targets.antigravityDir, "clisbot", { "SKILL.md": "clisbot-v1" });
+    await writeOnDiskSkill(sandbox.targets.antigravityDir, "clisbot-loop", {
+      "SKILL.md": "loop-v1",
+    });
 
     const status = await getSkillsStatus(sandbox.targets, ALL_SKILLS);
 
     expect(status.state).toBe("drift");
     expect(status.ops).toEqual([{ kind: "update", name: "clisbot" }]);
+  });
+
+  it("returns drift when Antigravity is missing or stale", async () => {
+    await writeCurrentBundle(sandbox.targets.sourceDir);
+    await writeOnDiskSkill(sandbox.targets.agentsDir, "clisbot", { "SKILL.md": "clisbot-v1" });
+    await writeOnDiskSkill(sandbox.targets.agentsDir, "clisbot-loop", { "SKILL.md": "loop-v1" });
+    await writeOnDiskSkill(sandbox.targets.claudeDir, "clisbot", { "SKILL.md": "clisbot-v1" });
+    await writeOnDiskSkill(sandbox.targets.claudeDir, "clisbot-loop", { "SKILL.md": "loop-v1" });
+    await writeOnDiskSkill(sandbox.targets.antigravityDir, "clisbot", { "SKILL.md": "stale" });
+
+    const status = await getSkillsStatus(sandbox.targets, ALL_SKILLS);
+
+    expect(status.state).toBe("drift");
+    expect(status.ops).toEqual([
+      { kind: "update", name: "clisbot" },
+      { kind: "add", name: "clisbot-loop" },
+    ]);
+  });
+
+  it("returns not-installed when only user-personal skills exist in Antigravity", async () => {
+    await writeCurrentBundle(sandbox.targets.sourceDir);
+    await writeOnDiskSkill(sandbox.targets.antigravityDir, "my-agy-skill", {
+      "SKILL.md": "user-agy",
+    });
+
+    const status = await getSkillsStatus(sandbox.targets, ALL_SKILLS);
+
+    expect(status.state).toBe("not-installed");
+    expect(status.installed).toEqual([]);
   });
 
   it("returns drift with add ops for the bundled skills missing from disk", async () => {
@@ -264,6 +316,7 @@ describe("getSkillsStatus", () => {
     await writeOnDiskSkill(sandbox.targets.agentsDir, "clisbot", { "SKILL.md": "stale" });
     await writeOnDiskSkill(sandbox.targets.claudeDir, "clisbot", { "SKILL.md": "clisbot-v1" });
     await writeOnDiskSkill(sandbox.targets.codexDir, "clisbot", { "SKILL.md": "clisbot-v1" });
+    await writeOnDiskSkill(sandbox.targets.antigravityDir, "clisbot", { "SKILL.md": "clisbot-v1" });
     await writeOnDiskSkill(sandbox.targets.agentsDir, "clisbot-chat", { "SKILL.md": "chat-old" });
 
     const status = await getSkillsStatus(sandbox.targets, ALL_SKILLS);
@@ -301,9 +354,14 @@ describe("custom skill selection", () => {
       available: ["clisbot", "clisbot-advisor", "clisbot-loop"],
       installed: ["clisbot", "clisbot-loop"],
     });
-    expect(await installedIn(sandbox.targets, "clisbot")).toEqual([true, true, false]);
-    expect(await installedIn(sandbox.targets, "clisbot-loop")).toEqual([true, true, false]);
-    expect(await installedIn(sandbox.targets, "clisbot-advisor")).toEqual([false, false, false]);
+    expect(await installedIn(sandbox.targets, "clisbot")).toEqual([true, true, false, true]);
+    expect(await installedIn(sandbox.targets, "clisbot-loop")).toEqual([true, true, false, true]);
+    expect(await installedIn(sandbox.targets, "clisbot-advisor")).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 
   it("reports up-to-date while an unselected bundled skill is absent", async () => {
@@ -325,9 +383,19 @@ describe("custom skill selection", () => {
     const status = await installSkills(sandbox.targets, only("clisbot"));
 
     expect(status.state).toBe("up-to-date");
-    expect(await installedIn(sandbox.targets, "clisbot")).toEqual([true, true, false]);
-    expect(await installedIn(sandbox.targets, "clisbot-loop")).toEqual([false, false, false]);
-    expect(await installedIn(sandbox.targets, "clisbot-advisor")).toEqual([false, false, false]);
+    expect(await installedIn(sandbox.targets, "clisbot")).toEqual([true, true, false, true]);
+    expect(await installedIn(sandbox.targets, "clisbot-loop")).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect(await installedIn(sandbox.targets, "clisbot-advisor")).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 
   it("reports a delete op for a deselected skill before it is applied", async () => {
@@ -341,12 +409,21 @@ describe("custom skill selection", () => {
 
   it("leaves unrelated user skills untouched", async () => {
     await writeOnDiskSkill(sandbox.targets.agentsDir, "unslop", { "SKILL.md": "user-unslop" });
+    await writeOnDiskSkill(sandbox.targets.antigravityDir, "custom-agy", {
+      "SKILL.md": "user-agy",
+    });
 
     await installSkills(sandbox.targets, only("clisbot"));
 
     expect(
       await fs.readFile(path.join(sandbox.targets.agentsDir, "unslop", "SKILL.md"), "utf-8"),
     ).toBe("user-unslop");
+    expect(
+      await fs.readFile(
+        path.join(sandbox.targets.antigravityDir, "custom-agy", "SKILL.md"),
+        "utf-8",
+      ),
+    ).toBe("user-agy");
   });
 
   it("treats an empty custom selection as no managed skills installed", async () => {
@@ -360,8 +437,13 @@ describe("custom skill selection", () => {
       available: ["clisbot", "clisbot-advisor", "clisbot-loop"],
       installed: [],
     });
-    expect(await installedIn(sandbox.targets, "clisbot")).toEqual([false, false, false]);
-    expect(await installedIn(sandbox.targets, "clisbot-loop")).toEqual([false, false, false]);
+    expect(await installedIn(sandbox.targets, "clisbot")).toEqual([false, false, false, false]);
+    expect(await installedIn(sandbox.targets, "clisbot-loop")).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 
   it("ignores selected names that the bundle does not ship", async () => {
@@ -373,7 +455,7 @@ describe("custom skill selection", () => {
       available: ["clisbot", "clisbot-advisor", "clisbot-loop"],
       installed: ["clisbot"],
     });
-    expect(await installedIn(sandbox.targets, "not-a-skill")).toEqual([false, false, false]);
+    expect(await installedIn(sandbox.targets, "not-a-skill")).toEqual([false, false, false, false]);
   });
 
   it("still deletes legacy skill names that are not selectable", async () => {
@@ -384,6 +466,7 @@ describe("custom skill selection", () => {
     await installSkills(sandbox.targets, only("clisbot"));
 
     expect(await installedIn(sandbox.targets, "clisbot-orchestrator")).toEqual([
+      false,
       false,
       false,
       false,
@@ -402,9 +485,12 @@ describe("installSkills / updateSkills", () => {
     await fs.rm(sandbox.root, { recursive: true, force: true });
   });
 
-  it("installs into shared and Claude roots without duplicating Codex discovery", async () => {
+  it("installs into shared, Claude, and Antigravity roots without duplicating Codex discovery", async () => {
     await writeCurrentBundle(sandbox.targets.sourceDir);
     await writeOnDiskSkill(sandbox.targets.agentsDir, "unslop", { "SKILL.md": "user-unslop" });
+    await writeOnDiskSkill(sandbox.targets.antigravityDir, "custom-agy", {
+      "SKILL.md": "user-agy",
+    });
 
     const status = await installSkills(sandbox.targets, ALL_SKILLS);
 
@@ -415,15 +501,25 @@ describe("installSkills / updateSkills", () => {
       installed: ["clisbot", "clisbot-loop"],
     });
     for (const name of ["clisbot", "clisbot-loop"]) {
+      const expected = name === "clisbot" ? "clisbot-v1" : "loop-v1";
       expect(
         await fs.readFile(path.join(sandbox.targets.agentsDir, name, "SKILL.md"), "utf-8"),
-      ).toBe(name === "clisbot" ? "clisbot-v1" : "loop-v1");
+      ).toBe(expected);
       expect(await pathExists(path.join(sandbox.targets.codexDir, name, "SKILL.md"))).toBe(false);
       expect(await pathExists(path.join(sandbox.targets.claudeDir, name))).toBe(true);
+      expect(
+        await fs.readFile(path.join(sandbox.targets.antigravityDir, name, "SKILL.md"), "utf-8"),
+      ).toBe(expected);
     }
     expect(
       await fs.readFile(path.join(sandbox.targets.agentsDir, "unslop", "SKILL.md"), "utf-8"),
     ).toBe("user-unslop");
+    expect(
+      await fs.readFile(
+        path.join(sandbox.targets.antigravityDir, "custom-agy", "SKILL.md"),
+        "utf-8",
+      ),
+    ).toBe("user-agy");
   });
 
   it("retires unchanged managed Codex copies while preserving personal files", async () => {
@@ -475,14 +571,23 @@ describe("installSkills / updateSkills", () => {
   });
 
   it.each([
-    { alias: "codex", target: "agents" },
-    { alias: "codex", target: "claude" },
-    { alias: "claude", target: "codex" },
+    { alias: "codex", target: "agents", expected: [true, true, true, true] },
+    { alias: "codex", target: "claude", expected: [true, true, true, true] },
+    { alias: "claude", target: "codex", expected: [true, true, true, true] },
+    { alias: "codex", target: "antigravity", expected: [true, true, true, true] },
+    { alias: "antigravity", target: "codex", expected: [true, true, true, true] },
+    { alias: "antigravity", target: "agents", expected: [true, true, false, true] },
+    { alias: "antigravity", target: "claude", expected: [true, true, false, true] },
   ] as const)(
     "keeps installed skills when the $alias root links to the $target root",
-    async ({ alias, target }) => {
+    async ({ alias, target, expected }) => {
       await writeCurrentBundle(sandbox.targets.sourceDir);
-      const rootOf = { agents: "agentsDir", claude: "claudeDir", codex: "codexDir" } as const;
+      const rootOf = {
+        agents: "agentsDir",
+        claude: "claudeDir",
+        codex: "codexDir",
+        antigravity: "antigravityDir",
+      } as const;
       const aliasRoot = sandbox.targets[rootOf[alias]];
       const targetRoot = sandbox.targets[rootOf[target]];
       await fs.mkdir(targetRoot, { recursive: true });
@@ -494,11 +599,35 @@ describe("installSkills / updateSkills", () => {
 
       expect(installed.state).toBe("up-to-date");
       expect(updated.state).toBe("up-to-date");
+      expect((await fs.lstat(aliasRoot)).isSymbolicLink()).toBe(true);
       for (const name of ["clisbot", "clisbot-loop"]) {
-        expect(await installedIn(sandbox.targets, name)).toEqual([true, true, true]);
+        expect(await installedIn(sandbox.targets, name)).toEqual([...expected]);
       }
     },
   );
+
+  it("keeps an installed skill when its Antigravity directory links to the shared copy", async () => {
+    await writeCurrentBundle(sandbox.targets.sourceDir);
+    await fs.mkdir(path.join(sandbox.targets.agentsDir, "clisbot"), { recursive: true });
+    await fs.mkdir(sandbox.targets.antigravityDir, { recursive: true });
+    await fs.symlink(
+      path.join(sandbox.targets.agentsDir, "clisbot"),
+      path.join(sandbox.targets.antigravityDir, "clisbot"),
+      "dir",
+    );
+
+    const installed = await installSkills(sandbox.targets, ALL_SKILLS);
+    const updated = await autoUpdateInstalledSkills(sandbox.targets, ALL_SKILLS);
+
+    expect(installed.state).toBe("up-to-date");
+    expect(updated.state).toBe("up-to-date");
+    expect(
+      (await fs.lstat(path.join(sandbox.targets.antigravityDir, "clisbot"))).isSymbolicLink(),
+    ).toBe(true);
+    expect(
+      await fs.readFile(path.join(sandbox.targets.antigravityDir, "clisbot", "SKILL.md"), "utf8"),
+    ).toBe("clisbot-v1");
+  });
 
   it("keeps an installed skill when its Codex directory links to the shared copy", async () => {
     await writeCurrentBundle(sandbox.targets.sourceDir);
@@ -610,6 +739,15 @@ describe("installSkills / updateSkills", () => {
     expect(
       await fs.readFile(path.join(sandbox.targets.claudeDir, "clisbot-loop", "SKILL.md"), "utf-8"),
     ).toBe("loop-v1");
+    expect(
+      await fs.readFile(path.join(sandbox.targets.antigravityDir, "clisbot", "SKILL.md"), "utf-8"),
+    ).toBe("clisbot-v1");
+    expect(
+      await fs.readFile(
+        path.join(sandbox.targets.antigravityDir, "clisbot-loop", "SKILL.md"),
+        "utf-8",
+      ),
+    ).toBe("loop-v1");
   });
 
   it("auto-updates drifted installed skills", async () => {
@@ -632,6 +770,9 @@ describe("installSkills / updateSkills", () => {
         "utf-8",
       ),
     ).toBe("user guard");
+    expect(
+      await fs.readFile(path.join(sandbox.targets.antigravityDir, "clisbot", "SKILL.md"), "utf-8"),
+    ).toBe("clisbot-v1");
   });
 
   it("does not auto-install skills on a clean machine", async () => {
@@ -648,7 +789,7 @@ describe("installSkills / updateSkills", () => {
       available: ["clisbot", "clisbot-loop"],
       installed: [],
     });
-    expect(await installedIn(sandbox.targets, "clisbot")).toEqual([false, false, false]);
+    expect(await installedIn(sandbox.targets, "clisbot")).toEqual([false, false, false, false]);
   });
 
   it("is idempotent — running install twice keeps state at up-to-date", async () => {
@@ -673,24 +814,51 @@ describe("uninstallSkills", () => {
     await fs.rm(sandbox.root, { recursive: true, force: true });
   });
 
-  it("removes every Clisbot skill from all three targets and preserves user dirs", async () => {
+  it("removes every Clisbot skill from all targets and preserves user dirs and symlinks", async () => {
     await writeCurrentBundle(sandbox.targets.sourceDir);
     await installSkills(sandbox.targets, ALL_SKILLS);
     for (const name of ["unslop", "tdd", "devbox"]) {
       await writeOnDiskSkill(sandbox.targets.agentsDir, name, { "SKILL.md": `user-${name}` });
     }
+    await writeOnDiskSkill(sandbox.targets.antigravityDir, "user-agy-skill", {
+      "SKILL.md": "user-agy",
+    });
+    const linkedSource = path.join(sandbox.root, "external-user-skill");
+    await writeFiles(linkedSource, { "SKILL.md": "linked-user-skill" });
+    await fs.symlink(
+      linkedSource,
+      path.join(sandbox.targets.antigravityDir, "linked-user-skill"),
+      "dir",
+    );
 
     const status = await uninstallSkills(sandbox.targets, ALL_SKILLS);
 
     expect(status.state).toBe("not-installed");
     for (const name of ["clisbot", "clisbot-loop", ...LEGACY_SKILL_NAMES]) {
-      expect(await installedIn(sandbox.targets, name)).toEqual([false, false, false]);
+      expect(await installedIn(sandbox.targets, name)).toEqual([false, false, false, false]);
     }
     for (const name of ["unslop", "tdd", "devbox"]) {
       expect(
         await fs.readFile(path.join(sandbox.targets.agentsDir, name, "SKILL.md"), "utf-8"),
       ).toBe(`user-${name}`);
     }
+    expect(
+      await fs.readFile(
+        path.join(sandbox.targets.antigravityDir, "user-agy-skill", "SKILL.md"),
+        "utf-8",
+      ),
+    ).toBe("user-agy");
+    expect(
+      (
+        await fs.lstat(path.join(sandbox.targets.antigravityDir, "linked-user-skill"))
+      ).isSymbolicLink(),
+    ).toBe(true);
+    expect(
+      await fs.readFile(
+        path.join(sandbox.targets.antigravityDir, "linked-user-skill", "SKILL.md"),
+        "utf-8",
+      ),
+    ).toBe("linked-user-skill");
   });
 
   it("is a no-op when nothing is installed", async () => {
@@ -701,12 +869,13 @@ describe("uninstallSkills", () => {
     expect(status.state).toBe("not-installed");
   });
 
-  it("cleans up legacy skill names that linger in agents, claude, and codex", async () => {
+  it("cleans up legacy skill names that linger in agents, claude, codex, and antigravity", async () => {
     await writeCurrentBundle(sandbox.targets.sourceDir);
     for (const dir of [
       sandbox.targets.agentsDir,
       sandbox.targets.claudeDir,
       sandbox.targets.codexDir,
+      sandbox.targets.antigravityDir,
     ]) {
       await writeOnDiskSkill(dir, "clisbot-chat", { "SKILL.md": "chat-old" });
     }
@@ -714,6 +883,11 @@ describe("uninstallSkills", () => {
     const status = await uninstallSkills(sandbox.targets, ALL_SKILLS);
 
     expect(status.state).toBe("not-installed");
-    expect(await installedIn(sandbox.targets, "clisbot-chat")).toEqual([false, false, false]);
+    expect(await installedIn(sandbox.targets, "clisbot-chat")).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 });

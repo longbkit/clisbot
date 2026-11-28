@@ -211,7 +211,7 @@ function RuleHeader({
       <Text style={styles.ruleTitle}>{t("hub.routes.rules.rule", { number })}</Text>
       <View style={styles.actions}>
         <Button
-          size="xs"
+          size="sm"
           variant="ghost"
           onPress={toggleOpen}
           accessibilityState={state}

@@ -38,7 +38,7 @@ export function ConnectionSettingRow({
           <Text style={settingsStyles.rowHint}>{value}</Text>
         </View>
         <Button
-          size="xs"
+          size="sm"
           variant="ghost"
           onPress={toggle}
           accessibilityState={state}

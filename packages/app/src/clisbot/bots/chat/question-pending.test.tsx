@@ -4,13 +4,23 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { QuestionFormCard } from "@/components/question-form-card";
 import type { PendingPermission } from "@/types/shared";
-vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
-vi.mock("@/constants/platform", () => ({ isWeb: true }));
+vi.mock("react-i18next", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-i18next")>()),
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+vi.mock("@/constants/layout", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/constants/layout")>()),
+  useIsCompactFormFactor: () => true,
+}));
+vi.mock("@/constants/platform", () => ({ isWeb: true, isNative: false }));
 vi.mock("@/components/ui/loading-spinner", () => ({
   LoadingSpinner: () => <span data-testid="pending-spinner" />,
 }));
 vi.mock("@/components/ui/text-input", () => ({ EditingTextInput: () => null }));
+// Upstream v0.17 renders question and option text as markdown; plain text keeps this about delivery.
+vi.mock("@/components/markdown/renderer", () => ({
+  MarkdownRenderer: ({ text }: { text: string }) => <span>{text}</span>,
+}));
 vi.mock("lucide-react-native", async (importOriginal) => ({
   ...(await importOriginal<typeof import("lucide-react-native")>()),
   Check: () => <i />,

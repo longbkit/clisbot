@@ -73,10 +73,10 @@ my-plugin/
 | 字段           | 是否必填 | 行为                                                                                                         |
 | -------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
 | `id`           | 是       | 默认的安装 ID。                                                                                              |
-| `name`         | 否       | 注册表和网站使用的非空显示名称；与安装 ID 无关。                                                             |
+| `name`         | 否       | 注册表、网站、**设置 → 插件** 中的插件行以及插件设置页标题使用的非空显示名称。没有 `name` 时显示插件 ID。    |
 | `icon`         | 否       | 插件包内 PNG 文件的相对路径。                                                                                |
 | `media`        | 否       | 包内图片或视频路径的数组，或 HTTPS URL。空数组是有效的。                                                     |
-| `description`  | 否       | 在 **设置 → 插件** 中显示在插件 ID 下方的非空摘要。                                                          |
+| `description`  | 否       | 在 **设置 → 插件** 中显示在插件名称下方的非空摘要。                                                          |
 | `translations` | 否       | 其他语言的展示文本，由注册表读取，Clisbot 会忽略它。见[其他语言](/docs/plugins/publishing#other-languages)。 |
 | `requirements` | 否       | 支持的 Clisbot 版本，见下文。                                                                                |
 | `build`        | 否       | 准备命令，见 CLI 参考。                                                                                      |
@@ -353,19 +353,108 @@ Clisbot 为服务端代码提供 `@clisbot/plugin`、`@clisbot/plugin/server`、
 
 ### Provider {#providers}
 
-直接实现和 ACP 实现、会话生命周期、Composer 设置、时间线渲染器、测试和分发，见[构建 Provider 插件](/docs/plugins/providers)。
+直接实现和 ACP 实现、会话生命周期、选项控件、时间线渲染器、测试和分发，见[构建 Provider 插件](/docs/plugins/providers)。
 
 使用来自 `@clisbot/plugin/server/provider` 的 `ProviderRegistration` 调用 `server.registerProvider()`。它的连接通过 `send()` 接收输入，并通过 `onEvent()` 发出完整的状态快照。`send()` 只报告是否接受；提示词的处理结果、轮次、配置、持久化、权限和失败都是事件。
 
-消息、结构化命令、引导和命令副作用都使用同一个 `session.prompt` 输入。在实时的用户时间线条目上重复 `clientMessageId`，并恰好发布一个与之匹配的 `session.prompt_result`。把 Provider 创建的子会话发布为带有 `parentSessionId` 的会话。
+消息、结构化命令、引导和命令副作用都使用同一个 `session.prompt` 输入。在实时的用户时间线条目上重复 `clientMessageId`，并恰好发布一个与之匹配的 `session.prompt_result`。把 Provider 创建的子会话发布为带有 `parentSessionId` 的会话。通过已完成的 `session.turn` 上的 `metrics` 和 `session.metrics` 报告测量数据，见[报告指标](/docs/plugins/providers#report-metrics)。
 
-Provider 设置是 Clisbot 在 Composer 中渲染的开关/选择描述符。把 Provider 私有的选项保留在 `session.open` 的 `ProviderSessionConfig.providerOptions` 中。这个记录包含配置的默认值和针对单个 Agent 的覆盖值；请在你的 Provider 中校验并应用它。配置和合并语义见 [Provider 选项](/docs/sdk/provider-options)。宿主工具以 MCP 服务器的形式出现在完整的会话配置中。
+Provider 选项是一个记录，即 `session.open` 中的 `ProviderSessionConfig.providerOptions`。它包含配置的默认值和针对单个 Agent 的覆盖值；请在你的 Provider 中校验并应用它。在 `session.config` 中为需要在 Composer 里显示开关或选择器的顶层键报告 `controls`，并在 `providerOptions` 下报告会话正在使用的值。运行中会话的修改会以 `session.configure` 的形式到达，内容在 `changes.providerOptions` 中。配置和合并语义见 [Provider 选项](/docs/sdk/provider-options)。宿主工具以 MCP 服务器的形式出现在完整的会话配置中。
 
 Clisbot 刷新 Agent 的方式是关闭它当前的 Provider 会话，再用当前的配置和持久化值打开它。Provider 在 `session.open` 期间重新读取外部状态。
 
-使用 `@clisbot/plugin/server/acp` 中的 `runAcpProvider()` 适配一个基于命令的 ACP。只针对厂商在发现、配置、通知或工具调用方面的差异添加转换器钩子。
+使用 `@clisbot/plugin/server/acp` 中的 `runAcpProvider()` 适配一个基于命令的 ACP。使用转换器钩子处理厂商特有的行为。参见[适配 ACP Agent](/docs/plugins/providers#adapt-an-acp-agent)。
+
+在 `discover` 和 `configure` 中，调用 `context.request(method, params)` 发送 ACP 扩展请求。
+Promise 返回 JSON 值，或以 Agent 的 JSON-RPC 错误拒绝。
+
+在 `toolCall` 中，通过 `context.mcpServerNames` 识别 Clisbot 打开 ACP 会话时提供的服务器。
+兼容旧版 SDK 或处理直接在 agent 中配置的服务器时，可以回退到空列表。`toolCall.content` 包含调用的 ACP `content` 块，
+`context.previous` 是 Clisbot 上一次展示的调用（经过所有转换器之后）。旧版 SDK 中两者都不存在；调用的第一次更新没有 `previous`。
+标准工具卡片见[适配 ACP Agent](/zh-CN/docs/plugins/providers#adapt-an-acp-agent)。
+
+使用 `config(state, context)` 返回 Clisbot 显示的配置快照。
+Clisbot 在会话就绪、收到配置通知或提交配置更改时调用此同步钩子。
+使用 `configure` 向 Agent 发送更改。
 
 `ProviderRegistration.icon` 是相对于插件目录的文件路径，例如 `icon.svg`。它必须解析到该目录内一个遵循 [SVG 图标规则](#svg-rules)的普通文件。Clisbot 在插件启动时读取并校验该文件；这个字符串从不是内联 SVG 或 URL。
+
+#### Provider 安装 {#provider-installation}
+
+**需要 Clisbot 0.17**。较旧的版本会忽略 `installation`。`ProviderRegistration.installation` 填充 Provider 设置中的 **安装** 部分。每个成员都是可选的。`inspect` 和 `installUrl` 都没有声明时，Clisbot 会隐藏这个部分。完整示例见[报告安装与更新](/docs/plugins/providers#report-installation-and-updates)。类型从 `@clisbot/plugin/server/provider` 导入。
+
+```ts
+interface ProviderInstallation {
+  installUrl?: string;
+  updateUrl?: string;
+  inspect?(context: ProviderInstallationContext): Promise<ProviderInspection>;
+  checkForUpdates?(context: ProviderUpdateCheckContext): Promise<ProviderUpdateCheck>;
+  update?(context: ProviderUpdateContext): Promise<ProviderUpdateResult>;
+}
+```
+
+| 成员              | 调用时机                                          | 期限  | 结果保留时间                                    |
+| ----------------- | ------------------------------------------------- | ----- | ----------------------------------------------- |
+| `inspect`         | 打开 Provider 设置时                              | 20 秒 | 30 秒                                           |
+| `checkForUpdates` | `inspect` 回答 `installed` 之后，或没有 `inspect` | 25 秒 | `current` 或 `available` 为一小时，其他为 30 秒 |
+| `update`          | 用户选择 **更新** 时，每个 Provider 同一时间一个  | 无    | `succeeded` 之后 Clisbot 重新读取两个结果       |
+
+Provider 设置中的 **刷新** 会跳过保留的结果，并清除失败的更新。Clisbot 从不在会话开始前或按计划调用这些成员。超过期限或抛出异常会变成显示该消息的错误。
+
+`installUrl` 和 `updateUrl` 是 Clisbot 在浏览器中打开的 `http` 或 `https` 页面。其中任何一个是其他类型的 URL 时，插件无法启动。
+
+上下文：
+
+| 字段               | 类型                                      | 含义                                                                                                                      |
+| ------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `launch`           | `ProviderInstallationLaunch \| undefined` | 会话将使用的启动配置，带有 `resolved`。注册没有声明 `command` 时不存在。                                                  |
+| `signal`           | `AbortSignal`                             | 当 Clisbot 停止等待或 daemon 停止时中止。                                                                                 |
+| `installedVersion` | `string \| undefined`                     | 仅用于 `checkForUpdates`。`inspect` 报告的 `version`，按原样传入。`inspect` 没有报告版本或你没有声明 `inspect` 时不存在。 |
+| `report`           | `(event: ProviderUpdateReport) => void`   | 仅用于 `update`。按顺序向用户显示 `{ type: "stdout" \| "stderr" \| "message", text }`。                                   |
+
+`ProviderInstallationLaunch` 是 `{ command, args, env, resolved }`。`resolved: true` 时，`command` 是可执行文件的路径。`resolved: false` 时，Clisbot 没有找到可执行文件，`command` 是配置中写的名称。
+
+结果：
+
+| 类型                   | 取值                                                                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `ProviderInspection`   | `{ status: "installed", version?: string }` 或 `{ status: "not_installed" }`                                                           |
+| `ProviderUpdateCheck`  | `{ status: "current" }`、`{ status: "available", versions?: string[], message?: string }` 或 `{ status: "unknown", message?: string }` |
+| `ProviderUpdateResult` | `{ status: "succeeded", message?: string }` 或 `{ status: "failed", message: string }`                                                 |
+
+Clisbot 按原样显示 `version`、`versions` 和 `message`，不解析或排序它们。只要 `inspect` 报告的 `version` 不变，Clisbot 会在最长一小时内复用 `current` 或 `available` 的结果。它保留 `report` 输出的最后 65,536 个字符。不符合这些结构的结果是错误。只要 `inspect` 报告 CLI 已安装且你声明了 `update`，就会出现 **更新**，与 `checkForUpdates` 的回答以及是否声明它无关；没有 `update` 时，Clisbot 在同样条件下提供 `updateUrl`。
+
+#### Provider 故障排查 {#provider-troubleshooting}
+
+**需要 Clisbot 0.18**。较旧的版本会忽略 `docsUrl`，并且只显示 `diagnostic` 文本。Provider 设置中有一个 **故障排查** 部分，其中包含 **诊断报告** 和 **文档**。用户会把报告复制到问题反馈中，所以请把能解释错误结果的事实写进报告。
+
+`ProviderRegistration.docsUrl` 是 **文档** 打开的 `http` 或 `https` 页面。请让它指向说明如何设置该 Provider 以及如何解决常见问题的页面。它是其他类型的 URL 时，插件会启动失败。没有声明时，Clisbot 会隐藏 **文档**。
+
+报告由 Provider 的 `label` 和若干行组成，每行是一个 `Label: value`。Clisbot 会写入以下各行：
+
+| 行                                                             | 显示条件                                                    |
+| -------------------------------------------------------------- | ----------------------------------------------------------- |
+| `Command source`、`Configured command`                         | 声明了 `command`                                            |
+| `Daemon PATH`、`Daemon shell`、`PATH matches`、`Resolved path` | 声明了 `command`                                            |
+| `Version`                                                      | Clisbot 找到了可执行文件，且你声明了 `installation.inspect` |
+| `Models`、`Status`                                             | 始终显示                                                    |
+
+`status(request)` 会在这些行之后添加你的行。`request.launch` 是会话将使用的启动配置。
+
+```ts
+async status({ launch }) {
+  if (!launch) return { available: false, diagnostic: "example-agent has no command" };
+  const profile = launch.env.EXAMPLE_PROFILE ?? "default";
+  return { available: true, diagnostic: `Profile: ${profile}\nSign-in: ${signInSource(launch.env)}` };
+}
+```
+
+| 结果                               | 效果                                                             |
+| ---------------------------------- | ---------------------------------------------------------------- |
+| `{ available: true, diagnostic? }` | `diagnostic` 的每一行是报告中的一行。每行请写成 `Label: value`。 |
+| `{ available: false, diagnostic }` | Provider 不可用。报告在 `Error` 行中显示 `diagnostic`。          |
+
+Clisbot 每次检查 Provider 是否可用时都会调用 `status`，不只是在生成报告时。报告不会自动换行，所以每一行请写得简短。
 
 ### 用量来源 {#usage-sources}
 
@@ -490,6 +579,84 @@ export default function contribute(server: PluginServerContext) {
 
 来源图标是一个文件路径，规则与 Provider 图标相同。
 
+## worktree 管理器 {#worktree-managers}
+
+**需要 Clisbot 0.17**。在服务端入口 `index.server.ts` 中调用 `server.registerWorktreeManager()`，可将 Git worktree 的创建、移除和恢复委托给 Worktrunk 等外部工具，而无需由 Clisbot 直接运行 `git worktree add` 和 `git worktree remove`。
+
+```ts
+import { execCommand, type PluginServerContext } from "@clisbot/plugin/server";
+
+export default function contribute(server: PluginServerContext) {
+  return server.registerWorktreeManager({
+    async create(request, { signal }) {
+      if (request.kind !== "branch-off") return;
+      const { stdout } = await execCommand(
+        "wt",
+        [
+          "-C",
+          request.repoRoot,
+          "switch",
+          "--create",
+          request.branch,
+          "--base",
+          request.startPoint ?? request.baseRef,
+          "--no-cd",
+          request.untrusted ? "--no-hooks" : "--yes",
+          "--format=json",
+        ],
+        { signal },
+      );
+      const { path } = JSON.parse(stdout) as { path: string };
+      return { type: "created", path };
+    },
+    async remove({ repoRoot, path, force, untrusted }, { signal }) {
+      const skipHooks = untrusted || repoRoot === null;
+      await execCommand(
+        "wt",
+        [
+          "-C",
+          repoRoot ?? path,
+          "remove",
+          "--foreground",
+          "--no-delete-branch",
+          skipHooks ? "--no-hooks" : "--yes",
+          ...(force ? ["--force"] : []),
+          path,
+        ],
+        { signal },
+      );
+      return { type: "removed" };
+    },
+    async restore({ repoRoot, path, target, untrusted }, { signal }) {
+      if (target.type !== "branch") return;
+      const { stdout } = await execCommand(
+        "wt",
+        [
+          "-C",
+          repoRoot,
+          "switch",
+          target.branch,
+          "--path",
+          path,
+          "--no-cd",
+          untrusted ? "--no-hooks" : "--yes",
+          "--format=json",
+        ],
+        { signal },
+      );
+      const { path: restoredPath } = JSON.parse(stdout) as { path: string };
+      return { type: "restored", path: restoredPath };
+    },
+  });
+}
+```
+
+- **Create**：在所有 `worktree.create.before` 钩子之后、`worktree.create.after` 之前运行，超时为 120 秒。返回 `{ type: "created", path }` 表示接管创建，返回 `undefined` 表示放弃并交由下一个管理器或 Clisbot 内置 Git 检出处理。创建新分支时，Clisbot 会在调用管理器前解析 `baseRef`，并刷新用作起点的远程跟踪引用。如果获取失败，则使用本地缓存的引用。当 `request.untrusted` 为 `true`（例如来自 fork 变更请求）时，请跳过仓库内定义的钩子。Clisbot 会验证 `path` 是同一仓库下新建且安全的命名分支 Git worktree，并记录实际检出的 `HEAD` 分支（管理器可自行规范或生成唯一分支名，但在 `branch-off` 时应创建新分支），随后写入基准元数据并生成 `clisbot.json`。如果采纳或后续创建步骤失败，Clisbot 会根据返回的路径回滚。回调在返回前抛出错误或收到中止信号时，由管理器清理自己创建的 worktree。由管理器创建的 worktree 会跳过首个 Agent 的分支自动重命名。
+- **Remove**：可选。在工作区归档和创建回滚时运行，位于 Clisbot 执行 `clisbot.json` 清理并保存 `refs/clisbot/kept-commits/<sha>` 之后。删除目录后返回 `{ type: "removed" }`，或返回 `undefined` 回退到 Git。当 `untrusted` 为 `true`（例如来自 fork 变更请求）或 `repoRoot` 为 `null` 时，请跳过仓库内定义的钩子，并在可用时从 `repoRoot` 运行。Clisbot 会将移除路由到创建该 worktree 的插件；若该插件已停用或移除，则回退到内置 Git。
+- **Restore**：可选。在取消归档且 worktree 目录已被删除时运行，接收必须恢复到的原路径 `path`、目标 `target`（`branch`、`commit` 或 `from-base`）以及 `untrusted`。返回 `{ type: "restored", path }`，或返回 `undefined` 回退到 Git。Clisbot 会验证检出结果是否为指定的分支、分离 HEAD 的提交，或位于指定基准提交的新分支。清理规则与 Create 相同。当 `restore` 回退到 Git 时，Clisbot 会清除该工作区的管理器归属，后续归档也会使用 Git。
+
+完整插件见 [worktrunk 示例](https://github.com/longbkit/clisbot/tree/main/plugin-examples/worktrunk)。
+
 ## 入口与清理 {#entry-point-and-cleanup}
 
 每个存在的入口都默认导出一个贡献函数，并返回清理函数。客户端入口接收 `PluginClientContext`；服务端入口接收 `PluginServerContext`。客户端注册方法返回幂等的移除函数，但标题栏按钮和 Composer 标签除外，它们返回 `{ update, remove }` 句柄。入口的清理函数会在 Clisbot 移除剩余的注册之前运行。
@@ -504,326 +671,15 @@ export default function contribute(client: PluginClientContext) {
 }
 ```
 
-清理函数可以是异步的。请释放插件创建的计时器、监听器、套接字和其他资源。在重新加载、停用、移除、断开连接或 daemon 关闭时，Clisbot 还会移除注册、卸载界面、reject 待处理的 RPC、关闭插件的 daemon 会话并停止它的子进程。
+清理函数可以是异步的。请释放插件创建的计时器、监听器、套接字和其他资源。重新加载、停用和移除会销毁受影响的插件安装。停止服务端插件还会关闭它的 daemon 会话并停止其子进程。客户端安装遵循[主机与生命周期](#hosts-and-lifecycle)中的规则，包括在暂时断开连接时保留安装。
 
 ## 生命周期钩子 {#lifecycle-hooks}
 
-在 `index.server.ts` 中：
+使用 `server.addHook(name, handler)` 注册异步处理函数。请参阅[钩子](/docs/plugins/hooks)，了解命名、载荷、顺序、错误处理和完整示例。
 
-```ts
-import type { PluginServerContext } from "@clisbot/plugin/server";
+## 侧边栏视图 {#sidebar-views}
 
-export default function contribute(server: PluginServerContext) {
-  server.on("agent.turn_ended", (event) => {
-    console.log(event.agent.id, event.outcome);
-  });
-
-  return () => {};
-}
-```
-
-| 注册                            | 回调接收                             | 返回                                                |
-| ------------------------------- | ------------------------------------ | --------------------------------------------------- |
-| `server.on(name, callback)`     | `(event, { clisbot, signal })`       | `void` 或 `Promise<void>`                           |
-| `server.before(name, callback)` | `({ request }, { clisbot, signal })` | 修改后的请求，或返回 `undefined` 保持不变；支持异步 |
-
-只要插件处于启用状态，钩子就会在 daemon 上运行，即使没有应用连接。
-
-### 修改配置并注入 MCP 服务器 {#change-configuration-and-inject-an-mcp-server}
-
-在 `contribute(server)` 中添加这个回调。把占位 URL 替换为你的 MCP 端点。
-
-```ts
-server.before("agent.create", ({ request }) => {
-  if (request.config.provider !== "codex") {
-    return request;
-  }
-
-  return {
-    ...request,
-    config: {
-      ...request.config,
-      providerOptions: {
-        ...request.config.providerOptions,
-        sandbox_mode: "workspace-write",
-        approval_policy: "on-request",
-      },
-      mcpServers: {
-        ...request.config.mcpServers,
-        company: {
-          type: "http",
-          url: "https://tools.example.com/mcp",
-        },
-      },
-    },
-  };
-});
-```
-
-| 输入                                        | 结果                |
-| ------------------------------------------- | ------------------- |
-| `providerOptions.sandbox_mode: "read-only"` | `"workspace-write"` |
-| `providerOptions.web_search: "disabled"`    | 由展开运算保留      |
-| 已有的 `mcpServers.search`                  | 由展开运算保留      |
-| 已有的 `mcpServers.company`                 | 被替换为上面的条目  |
-
-所选的 Provider 会校验 `providerOptions`，并且必须支持配置的 MCP 服务器。显式的 Codex 沙盒和批准选项会覆盖它的模式预设。
-
-### 在每次打开会话时注入环境变量 {#inject-environment-variables-on-every-session-opening}
-
-```ts
-server.before("agent.session_open", ({ request }) => {
-  return {
-    ...request,
-    env: {
-      ...request.env,
-      COMPANY_ENV: "development",
-    },
-  };
-});
-```
-
-它会在创建、恢复、刷新和导入时运行。如果只想在创建时注入，请改为在 `agent.create` 回调中设置 `env`。
-
-### 选择工作区隔离方式 {#choose-workspace-isolation}
-
-```ts
-server.before("workspace.create", ({ request }) => {
-  if (request.source.kind !== "directory") {
-    return request;
-  }
-
-  return {
-    ...request,
-    source: {
-      kind: "worktree",
-      cwd: request.source.path,
-      action: "branch-off",
-    },
-  };
-});
-```
-
-**结果**：显式的目录创建请求会变成 worktree 请求。已有的工作区以及目录查找/导入操作不受影响。
-
-### 在轮次结束时发送后续消息 {#send-a-follow-up-when-a-turn-ends}
-
-把 [server/inspect.ts](https://github.com/longbkit/clisbot/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts) 复制到你的插件中。该辅助文件从 `@clisbot/protocol/agent-types` 导入类型；请把与插件 SDK 版本相同的 `@clisbot/protocol` 加入开发依赖，并在加载插件之前安装它们。`latestOutputText` 会拼接最近一条用户消息之后的文本片段。
-
-```ts
-import type { PluginServerContext } from "@clisbot/plugin/server";
-import { latestOutputText } from "./server/inspect";
-
-export default function contribute(server: PluginServerContext) {
-  server.on("agent.turn_ended", async (event, context) => {
-    if (event.outcome.kind === "canceled") {
-      return;
-    }
-
-    const agent = context.clisbot.agents.ref(event.agent.id);
-    const page = await agent.timeline.refetch({ direction: "tail", limit: 20 });
-    const text = latestOutputText(page.entries.map(({ item }) => item));
-    if (/out of credits/i.test(text)) {
-      await agent.send("Try again.");
-    }
-  });
-
-  return () => {};
-}
-```
-
-```text
-Turn ends: "out of credits"
-  → plugin sends "Try again."
-  → a new turn starts
-```
-
-该处理函数只获取最近 20 条时间线条目，不检查这一页之前的输出。插件需要更多历史时，请用 `cursor` 和 `direction` 继续翻页。
-
-这会用现有的 SDK 发送一条新消息。持续匹配会不断发送后续消息；需要时请在插件中添加次数限制或延迟。附件和工具的效果不会被重放。
-
-### 回应权限请求 {#answer-a-permission-request}
-
-使用同一个[辅助文件](https://github.com/longbkit/clisbot/blob/main/plugin-examples/lifecycle-actions/server/inspect.ts)中的 `shellCommand`：
-
-```ts
-import type { PluginServerContext } from "@clisbot/plugin/server";
-import { shellCommand } from "./server/inspect";
-
-export default function contribute(server: PluginServerContext) {
-  server.on("agent.permission_requested", async (event, context) => {
-    const command = shellCommand(event.request);
-    if (command === null) {
-      return;
-    }
-
-    const agent = context.clisbot.agents.ref(event.agent.id);
-    if (/\brm\s+-rf\b/.test(command)) {
-      await agent.respondToPermission({
-        requestId: event.request.id,
-        response: { behavior: "deny", message: "Recursive deletion is blocked." },
-      });
-      return;
-    }
-
-    if (command.trim() === "git status") {
-      await agent.respondToPermission({
-        requestId: event.request.id,
-        response: { behavior: "allow" },
-      });
-    }
-  });
-
-  return () => {};
-}
-```
-
-| 请求             | 结果                 |
-| ---------------- | -------------------- |
-| `rm -rf build`   | 拒绝                 |
-| `git status`     | 批准                 |
-| 其他命令或请求   | 保持待处理，留给用户 |
-| 已经处理过的请求 | SDK 响应失败         |
-
-这个正则表达式只是一个示例策略，而不是 shell 解析器。权限请求也可能是问题、计划和模式变更；请求权限不会结束当前轮次。
-
-### 事件 {#events}
-
-| 名称                         | 事件字段                                              | 触发时机                      |
-| ---------------------------- | ----------------------------------------------------- | ----------------------------- |
-| `agent.created`              | `agent`                                               | 普通创建完成；不包括导入/恢复 |
-| `agent.closed`               | `agent`                                               | 一个运行中的 Agent 运行时关闭 |
-| `agent.turn_started`         | `agent`, `turnId`                                     | 实时轮次开始                  |
-| `agent.turn_ended`           | `agent`, `turnId`, `outcome`, 已弃用的 `timeline: []` | 实时轮次完成、失败或被取消    |
-| `agent.permission_requested` | `agent`, `request`                                    | 权限请求或问题进入待处理状态  |
-| `agent.permission_resolved`  | `agent`, `requestId`, `resolution`                    | 待处理的请求得到回应或被清除  |
-| `agent.archived`             | `agent`, `archivedAt`                                 | 归档状态已保存                |
-| `workspace.created`          | `workspace`                                           | 记录已创建；目录可用          |
-| `workspace.archived`         | `workspace`                                           | 归档状态已保存                |
-
-Agent 事件不包括 daemon 私有的一次性辅助 Agent。公开的后台工作区及其普通 Agent 与其他工作区运行相同的生命周期钩子。归档事件可能早于运行时/worktree 清理；当清理很重要时，请单独观察生命周期何时完成。
-
-`agent.turn_ended.timeline` 已弃用，并且始终为空。需要历史时，请用 `context.clisbot.agents.ref(event.agent.id).timeline.refetch({ direction: "tail", limit: 20 })` 按需获取。钩子负载的大小不会随对话历史增长。
-
-**共享的负载结构**（`@clisbot/plugin/server`）：
-
-```ts
-interface PluginHookAgent {
-  id: string;
-  workspaceId: string | null;
-  parentAgentId: string | null;
-  provider: string;
-  cwd: string;
-  title: string | null;
-}
-
-interface PluginHookWorkspace {
-  id: string;
-  projectId: string;
-  cwd: string;
-  name: string | null;
-  archivedAt: string | null;
-}
-
-type PluginTurnOutcome =
-  | { kind: "completed" }
-  | { kind: "failed"; error: { message: string; code?: string } }
-  | { kind: "canceled"; reason: string };
-```
-
-| 字段         | 结构 / 含义                                                                              |
-| ------------ | ---------------------------------------------------------------------------------------- |
-| `turnId`     | Provider 报告的 `string` 或 `null`；会话重新打开后可能重复                               |
-| `timeline`   | `readonly AgentTimelineItem[]`；包含之前对话的完整快照；文本可能跨越多个条目             |
-| `request`    | SDK 的 `AgentPermissionRequest`；`kind` 为 `tool`、`plan`、`question`、`mode` 或 `other` |
-| `resolution` | SDK 的 `AgentPermissionResponse`                                                         |
-| `archivedAt` | 时间戳字符串                                                                             |
-
-### before 钩子 {#before-hooks}
-
-| 名称                 | 请求字段                                                                | 可编辑                              |
-| -------------------- | ----------------------------------------------------------------------- | ----------------------------------- |
-| `agent.create`       | `config`，可选的 `env`                                                  | 除 `cwd` 外的公开 Agent 配置；`env` |
-| `agent.session_open` | `agentId`, `workspaceId`, `provider`, `cwd`, `reason`, `purpose`, `env` | 仅 `env`                            |
-| `workspace.create`   | `source`，可选的 `title`，`firstAgentContext`                           | 整个显式创建请求                    |
-
-**`agent.create.config`** 使用 `AgentSessionConfig`：
-
-| 字段                                          | 约束                                                     |
-| --------------------------------------------- | -------------------------------------------------------- |
-| `provider`, `model`                           | 独立的字段；修改 Provider 可能需要同时修改模型/模式/选项 |
-| `modeId`, `thinkingOptionId`, `featureValues` | 特定于 Provider 的选择                                   |
-| `title`, `systemPrompt`                       | Agent 配置                                               |
-| `providerOptions`                             | 不透明的、特定于 Provider 的选项                         |
-| `mcpServers`, `toolPolicy`                    | MCP 配置和精确的工具预批准                               |
-| `cwd`                                         | 不能修改                                                 |
-
-**`agent.session_open` 请求示例：**
-
-```json
-{
-  "agentId": "agent-123",
-  "workspaceId": "workspace-456",
-  "provider": "codex",
-  "cwd": "/projects/shop",
-  "reason": "resume",
-  "purpose": "interactive",
-  "env": { "COMPANY_ENV": "development" }
-}
-```
-
-| 字段          | 取值                                                                                 |
-| ------------- | ------------------------------------------------------------------------------------ |
-| `workspaceId` | 字符串或 `null`                                                                      |
-| `reason`      | `create`、`resume`、`refresh`、`import`                                              |
-| `purpose`     | `interactive`、`history`                                                             |
-| `env`         | 启动覆盖映射；不包括 daemon 继承的环境变量。替换整个映射即可添加、替换或移除覆盖项。 |
-
-### 顺序与返回值 {#ordering-and-returned-values}
-
-```text
-Creation request
-  → agent.create hooks (plugin-ID order; registration order within each plugin)
-  → resolve defaults and validate provider configuration
-  → derive launch configuration with Clisbot runtime tools and daemon prompt
-  → agent.session_open hooks (same ordering; env only)
-  → set CLISBOT_AGENT_ID and CLISBOT_AGENT_CWD
-  → open provider session and save agent configuration
-```
-
-| 回调返回                                                | 下一个回调收到                    |
-| ------------------------------------------------------- | --------------------------------- |
-| `{ ...request, env: { ...request.env, REGION: "eu" } }` | 之前的请求，添加或替换了 `REGION` |
-| `{ ...request, env: { REGION: "eu" } }`                 | 之前的请求，整个覆盖映射被替换    |
-| `undefined`                                             | 未改变的请求                      |
-| 抛出错误或返回无效数据                                  | 操作失败；后面的回调不会运行      |
-
-没有自动的深度合并。后面的回调可以覆盖前面的值。Agent 配置会被保存；环境变量覆盖项不会随之持久化。
-
-### context 与清理 {#context-and-cleanup}
-
-| 契约                       | 行为                                                                                |
-| -------------------------- | ----------------------------------------------------------------------------------- |
-| `context.clisbot`          | 已连接到此 daemon 的现有 SDK                                                        |
-| `context.signal`           | 在调用超时或插件停止时中止；请把它传给外部请求                                      |
-| 输入数据                   | 分离的快照；通过返回的请求或 SDK 命令改变状态                                       |
-| 注册结果                   | 幂等的移除函数，例如 `const remove = server.on(...); remove();`                     |
-| 重新加载、停用、移除、关闭 | 移除剩余的注册                                                                      |
-| 未知的钩子名称             | 注册失败                                                                            |
-| 钩子超时                   | 30 秒；会中止 signal。before 钩子会让待处理的操作失败；事件处理函数会记录一条错误。 |
-| 事件处理函数出错           | 记录在插件名下；原操作继续进行                                                      |
-| 事件投递                   | 实时、尽力而为；没有重放、持久化或自动重试                                          |
-| 事件并发                   | 不同的事件可能重叠；不保证回调完成的顺序                                            |
-
-### 完整示例 {#complete-examples}
-
-| 插件                                                                                                     | 包含                                                   |
-| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| [lifecycle-logger](https://github.com/longbkit/clisbot/tree/main/plugin-examples/lifecycle-logger)       | 全部十一个钩子；隐去环境变量值的 JSON 日志             |
-| [lifecycle-actions](https://github.com/longbkit/clisbot/tree/main/plugin-examples/lifecycle-actions)     | 后续消息、权限、环境变量、切换 Provider、选择 worktree |
-| [agent-configuration](https://github.com/longbkit/clisbot/tree/main/plugin-examples/agent-configuration) | MCP 注入以及 Codex 沙盒/批准选项                       |
-
-用 `clisbot plugin logs lifecycle-logger` 或主机的 `daemon.log` 读取 logger 的输出。
+`addSidebarView({ id, title, description?, Component })` 注册可替换侧边栏内容区域的视图，并返回清理函数。用户在设置的侧边栏页面中选择视图；注册不会激活它。视图属性、基于引用的查询与操作、设备状态和主题令牌见[构建侧边栏视图](sidebar-views.md)。
 
 ## 界面和侧边栏项 {#screens-and-sidebar-items}
 
@@ -1016,6 +872,51 @@ function hideAlerts() {
 }
 ```
 
+### 工作区行徽章项 {#workspace-row-badge-items}
+
+`addWorkspaceRowBadgeItem({ id, title, icon, Component })` 在侧边栏每个工作区标题下方的那一行中添加一项，位于该行自带的各项（主机、拉取请求、检查、服务、标签）之后。`title` 和 `icon` 用于标注该项在侧边栏 **Show** 菜单中的开关，插件开关位于分隔线下方的独立分组中。各项默认可见。
+
+`Component` 为插件所在主机上的每个工作区行渲染一次，并接收 `PluginWorkspaceRowBadgeItemProps`：`theme`、`host`、`layout` 和 `workspaceId`。渲染 `@clisbot/plugin/client/ui` 中的 `WorkspaceRowBadge`；工作区没有需要说明的内容时返回 `null`：
+
+| 属性                 | 含义                                                                  |
+| -------------------- | --------------------------------------------------------------------- |
+| `icon`               | 可选。任意[图标](#icons)形式，以该行的图标尺寸绘制。                  |
+| `label`              | 可选。一个简短的词。既没有 `icon` 也没有 `label` 的徽章不绘制。       |
+| `tone`               | `"muted"`（默认）、`"success"`、`"warning"`、`"danger"` 或 `"info"`。 |
+| `accessibilityLabel` | 默认为 `label`，其次是该项的 `title`。                                |
+
+该行不会在你的徽章周围添加分隔符，返回 `null` 不会留下空隙。可以渲染任意数量的徽章。每一行都会渲染该组件，所以请在各行之间共享一次查询，而不是为每个工作区单独获取：插件的 React Query 客户端由它在某台主机上的所有组件共享。
+
+```tsx
+import type { PluginWorkspaceRowBadgeItemProps } from "@clisbot/plugin/client";
+import { useRpc } from "@clisbot/plugin/client";
+import { WorkspaceRowBadge } from "@clisbot/plugin/client/ui";
+import { useQuery } from "@tanstack/react-query";
+
+function ReviewState({ workspaceId }: PluginWorkspaceRowBadgeItemProps) {
+  const list = useRpc(reviewStates);
+  const { data } = useQuery({
+    queryKey: ["review-states"],
+    queryFn: () => list({}),
+    refetchInterval: 5000,
+  });
+  const state = data?.[workspaceId];
+  if (!state) return null;
+  return <WorkspaceRowBadge icon="Eye" label={state.label} tone="warning" />;
+}
+
+client.addWorkspaceRowBadgeItem({
+  id: "review",
+  title: "Review",
+  icon: "Eye",
+  Component: ReviewState,
+});
+```
+
+早于此 API 的应用没有 `addWorkspaceRowBadgeItem`；调用前请先检查它是否存在。
+
+参见[工作区行徽章示例](https://github.com/longbkit/clisbot/tree/main/plugin-examples/workspace-row-badges)。
+
 ## 宿主 UI {#host-ui}
 
 在客户端代码中从 `@clisbot/plugin/client/ui` 导入由 Clisbot 提供的 UI。下面的示例会打开一个受控的弹窗、渲染一个宿主图标，并用 toast 确认操作：
@@ -1069,7 +970,7 @@ export function IssueActions({ theme }: PluginSurfaceProps) {
 ```tsx
 import { Markdown } from "@clisbot/plugin/client/ui";
 
-<Markdown>{"## 审查\n\n检查**通过**。"}</Markdown>;
+<Markdown>{"## Review\n\nThe checks **passed**."}</Markdown>;
 ```
 
 `children` 是唯一的属性，必须为字符串。更新它会立即渲染新内容；空字符串不渲染任何内容。
@@ -1326,7 +1227,9 @@ async function publishReview(agentId: string, { clisbot }: PluginHandlerContext)
 | `version` | 正整数     | 是       | 选择渲染器契约的版本。                       |
 | `data`    | 兼容 JSON  | 是       | 渲染器负载，JSON 序列化后最多 64 KiB。       |
 
-daemon 会根据发起调用的插件会话写入 `pluginId`，并拒绝来自非插件会话的此 RPC。该行会实时出现，在时间线重新获取后依然保留，并且对于同一插件和 `id` 只保留最新的值。如果它的渲染器缺失，Clisbot 会显示现有的“不可用”行。daemon 会拒绝超过限制的 `data`，而不是截断它。支持此操作的 daemon 会声明 `server_info.features.pluginTimelineItems`。
+daemon 会根据发起调用的插件会话写入 `pluginId`，并拒绝来自非插件会话的此 RPC。该行会实时出现，在时间线重新获取后依然保留，并且对于同一插件和 `id` 只保留最新的值。如果它的渲染器缺失，Clisbot 会显示现有的“不可用”行。
+
+`kind` 以小写字母开头，只包含小写字母、数字或连字符，与 `addTimelineRenderer` 使用的规则相同。daemon 会拒绝其他任何 `kind`。daemon 会拒绝超过限制的 `data`，而不是截断它。支持此操作的 daemon 会声明 `server_info.features.pluginTimelineItems`。
 
 ## 主题与布局 {#theme-and-layout}
 
@@ -1375,6 +1278,12 @@ export default function contribute(client: PluginClientContext) {
       accent: "#cba6f7",
       mutedForeground: "#a6adc8",
       ring: "#6c7086",
+      sidebar: "#181825",
+      sidebarHover: "#313244",
+      sidebarSelected: "#45475a",
+      surface3: "#45475a",
+      surface4: "#585b70",
+      foregroundExtraMuted: "#7f849c",
     },
   });
   return () => {};
@@ -1383,16 +1292,26 @@ export default function contribute(client: PluginClientContext) {
 
 每种颜色都是十六进制字符串；其他格式会导致加载失败。Clisbot 会把调色板扩展为内置深色主题所使用的完整令牌集合，因此贡献的主题无需逐一列出，就能覆盖面板、菜单、diff、状态颜色和终端。
 
-| 颜色              | 用作                                              |
-| ----------------- | ------------------------------------------------- |
-| `background`      | 应用、工作区和终端的背景                          |
-| `foreground`      | 主要文字、终端前景色和光标                        |
-| `raised`          | 卡片、弹出框和悬停的行                            |
-| `control`         | 输入框、次要填充以及浅色主题的侧边栏              |
-| `border`          | 边框以及最高层凸起表面的色调                      |
-| `accent`          | 按钮、选中和焦点。可选；省略时使用 `foreground`。 |
-| `mutedForeground` | 次要文字                                          |
-| `ring`            | 焦点环、滚动条以及终端的亮黑色                    |
+| 颜色                   | 用作                                                            |
+| ---------------------- | --------------------------------------------------------------- |
+| `background`           | 应用、工作区和终端的背景                                        |
+| `foreground`           | 主要文字、终端前景色和光标                                      |
+| `raised`               | 卡片和弹出框                                                    |
+| `control`              | 输入框、次要填充，以及未设置 `sidebar` 时浅色主题的侧边栏       |
+| `border`               | 边框                                                            |
+| `accent`               | 按钮、选中和焦点。可选；省略时使用 `foreground`。               |
+| `mutedForeground`      | 次要文字                                                        |
+| `ring`                 | Web 上的键盘焦点轮廓，以及终端的亮黑色                          |
+| `sidebar`              | 侧边栏背景。可选；深色主题默认为 `background`，浅色为 `control` |
+| `sidebarHover`         | 可选的侧边栏行悬停背景                                          |
+| `sidebarSelected`      | 可选的侧边栏行选中背景                                          |
+| `surface3`             | 可选的消息气泡、次要按钮和芯片中性填充                          |
+| `surface4`             | 可选的轨道和其他状态的较强中性填充                              |
+| `foregroundExtraMuted` | 可选的三级文字颜色，包括侧边栏时间戳                            |
+
+可选覆盖颜色按原值使用。省略的状态、填充和三级文字颜色分别由调色板推导。覆盖颜色时，请确保它与对应的背景或文字有足够对比度。
+
+`sidebar` 和以上五个覆盖颜色需要 Clisbot 0.16.0 或更高版本。较旧的应用会拒绝包含未知颜色的主题，该插件的其他贡献也会随之加载失败，因此使用其中任何一个时请提高 `requirements.clisbot`。
 
 `appearance` 为 `"light"` 或 `"dark"`。Clisbot 用它选择对应的表面、状态、diff、语法高亮、终端和阴影的推导方式。
 
@@ -1402,7 +1321,7 @@ export default function contribute(client: PluginClientContext) {
 
 ## 设置界面 {#settings-screens}
 
-在 `index.client.tsx` 中用 `client.addSettingsScreen({ id, title, icon, Component })` 注册一个组件。它会出现在该主机的 **设置 → 插件 → 你的插件** 下。`id` 在同一次安装中唯一；`icon` 可以是任意一种[图标](#icons)形式。注册返回一个幂等的移除函数，插件销毁时会移除剩余的界面。
+在 `index.client.tsx` 中用 `client.addSettingsScreen({ id, title, icon, Component })` 注册一个组件。之后，该主机 **设置 → 插件** 中你的插件行会显示一个设置按钮（齿轮），点击后打开你的第一个界面。注册多个界面时，设置页面会按注册顺序为每个界面显示一个标签页，使用其 `title` 和 `icon`；只有一个界面时不显示标签页。页面标题显示 manifest 中的 `name`；没有 `name` 时显示插件 ID，且从不包含界面标题。`id` 在同一次安装中唯一；`icon` 可以是任意一种[图标](#icons)形式。注册返回一个幂等的移除函数，插件销毁时会移除剩余的界面。
 
 调用 `client.openSettings(id)` 或 Command Center 回调中的 `openSettings(id)` 可以打开你自己的某个界面。即使多台主机安装了同一个插件，每次安装也有各自的值和路由。
 
@@ -1472,13 +1391,13 @@ export default function contribute(server: PluginServerContext) {
 }
 ```
 
-| 定义字段                       | 契约                                                                                          |
-| ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `id`                           | 匹配 `[a-z][a-z0-9_-]*` 的小写标识符；在同一次安装中唯一。                                    |
-| `scope`                        | 必须为 `"host"`。该主机所有获得授权的客户端共享这份文档。没有按用户、设备本地或跨主机的同步。 |
-| `version`                      | 必填的正整数，描述 schema 的版本，与写入修订号无关。                                          |
-| `schema`                       | JSON 值的 Zod schema。请提供默认值，使解析 `{}` 能得到一份完整的文档。                        |
-| `migrate(values, fromVersion)` | 可选的同步或异步函数，从较旧的存储版本转换。它的输出必须通过当前的 schema。                   |
+| 定义字段                       | 契约                                                                                                                    |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `id`                           | 匹配 `[a-z][a-z0-9_-]*` 的小写标识符；在同一次安装中唯一。                                                              |
+| `scope`                        | 必填 `"host"` 或 `"device"`。主机文档由授权客户端共享。设备文档以插件安装和设置 ID 为键保存在当前设备上，用于布局偏好。 |
+| `version`                      | 必填的正整数，描述 schema 的版本，与写入修订号无关。                                                                    |
+| `schema`                       | JSON 值的 Zod schema。请提供默认值，使解析 `{}` 能得到一份完整的文档。                                                  |
+| `migrate(values, fromVersion)` | 可选的同步或异步函数，从较旧的存储版本转换。它的输出必须通过当前的 schema。                                             |
 
 在任何贡献的组件中调用 `useSettings(preferences)`。它返回一个可区分的状态：
 
@@ -1642,6 +1561,8 @@ Agent 快照字段：
 | `workspaceId`       | `string`                                                       |
 | `provider`          | `string`                                                       |
 | `status`            | `"initializing" \| "idle" \| "running" \| "error" \| "closed"` |
+| `backgroundWork`    | `{ count: number }`                                            |
+| `background`        | `boolean`                                                      |
 | `createdAt`         | ISO 时间戳                                                     |
 | `updatedAt`         | ISO 时间戳                                                     |
 | `lastActivityAt`    | ISO 时间戳                                                     |
@@ -1654,6 +1575,20 @@ Agent 快照字段：
 | `attentionReason`   | `"finished" \| "error" \| "permission" \| null`                |
 | `parentAgentId`     | `string \| null`                                               |
 | `labels`            | `Record<string, string>`                                       |
+
+`backgroundWork.count` 是 Agent 在回合结束后仍在运行的 shell 和监视器数量，没有时为 `0`。Agent 可能处于 `idle` 且 `attentionReason: "finished"`，同时这些工作仍在运行，因此请按插件的需要组合这些字段：
+
+```tsx
+const busy = useAgent(
+  agentId,
+  (agent) => agent.status === "running" || agent.backgroundWork.count > 0,
+);
+if (busy === null) return null; // Agent 不可用。
+```
+
+要列出或停止这些工作本身，使用 [`clisbot.agents.ref(id).backgroundWork`](/docs/sdk/reference#agent-handle)。
+
+[后台 Agent](/docs/sdk/agents#run-a-helper-as-a-background-agent) 的 `background` 为 `true`，它是不出现在标签页、列表和提醒中的辅助 Agent，在创建时确定。后台工作区中的 Agent 除非本身以后台 Agent 创建，否则 `background` 为 `false`；要判断工作区，读取工作区自己的 `background`。`backgroundWork` 和 `background` 需要 Clisbot 0.16.0 或更高版本。
 
 标签页的焦点、拆分、关闭、持久化、查询状态、API/RPC Provider 以及渲染错误边界都由 Clisbot 负责。如果恢复的标签页所对应的插件、面板、上下文、工作区或 Agent 不可用，该标签页会保持打开并显示“不可用”消息，而不会让工作区崩溃。
 
@@ -1915,6 +1850,201 @@ review.remove();
 贡献移入一个共享的溢出菜单。在手机和较窄的窗口中，标题栏没有空间放置插件按钮，因此每个按钮都会成为工作区
 菜单（`···`）中的一行，显示它的图标和标题；它的菜单和弹出框以该底部面板中的页面打开。位置和溢出由宿主决定。
 
+## Composer 项 {#composer-items}
+
+`client.addComposerItem({ id, Component })` 把一个组件放进 composer：Agent composer、为新 Agent 准备的草稿 composer，以及新建工作区界面上的 composer。`useComposer()` 读取并修改 composer 所配置的内容，`@clisbot/plugin/client/ui` 中的 `Toggle`、`Select` 和 `Action` 负责绘制控件。
+
+```tsx
+import { useComposer, type PluginClientContext } from "@clisbot/plugin/client";
+import { Action, Select, Toggle } from "@clisbot/plugin/client/ui";
+
+function ReviewFlag() {
+  const composer = useComposer();
+  return (
+    <Toggle
+      title="Needs review"
+      icon="Flag"
+      value={composer.agent.metadata["review.needsReview"] === true}
+      onValueChange={({ value }) =>
+        composer.setMetadata({ "review.needsReview": value ? true : null })
+      }
+    />
+  );
+}
+
+function Checklist() {
+  const composer = useComposer();
+  return (
+    <Action
+      title="Insert checklist"
+      icon="ListChecks"
+      onPress={() => composer.insertText("- [ ] Tests\n- [ ] Docs\n")}
+    />
+  );
+}
+
+export default function contribute(client: PluginClientContext) {
+  client.addComposerItem({ id: "review-flag", Component: ReviewFlag });
+  client.addComposerItem({ id: "checklist", Component: Checklist });
+  return () => {};
+}
+```
+
+`useComposer()` 返回该项所在的 composer：
+
+| 字段或命令                                          | 含义                                                                                                                                                                                                                                                         |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `context`                                           | `"agent"` 表示运行中的 Agent，`"draft"` 表示工作区中的新 Agent，`"new-workspace"` 表示新建工作区界面。                                                                                                                                                       |
+| `prompt`、`setPrompt(text)`、`insertText(text)`     | 提示词。`insertText` 会替换选区，或在光标处插入。                                                                                                                                                                                                            |
+| `focus(options?)`                                   | 把光标放进这个 composer，准备输入，光标就位后完成。`selection: { start, end }` 放置光标或选中文本，为 `prompt` 中的偏移量，并限制在其长度内；省略时光标保持原位。参见[聚焦 composer](#focus-a-composer)。                                                    |
+| `attachments`、`addAttachment`、`removeAttachment`  | 来自[你自己的附件来源](#add-a-composer-attachment-source)的项目。其他插件和 Clisbot 自身的附件不会列出。                                                                                                                                                     |
+| `agent.provider`、`model`、`mode`、`thinking`       | Agent 当前使用的配置，或草稿将要创建的配置。                                                                                                                                                                                                                 |
+| `agent.options`                                     | 当前生效的 Provider 选项，包含默认值。在草稿中：创建 Agent 时将使用的选项，包含你所做的修改。                                                                                                                                                                |
+| `agent.metadata`                                    | Agent 的[元数据](/docs/plugins/hooks#metadata)。在新建工作区中是第一个 Agent 的元数据。                                                                                                                                                                      |
+| `setProvider`、`setModel`、`setMode`、`setThinking` | 返回 Promise。`setProvider` 会像 Provider 选择器一样重置模型。在 `context: "agent"` 下（运行中的 Agent 保持其 Provider）以及主机不提供该 Provider 时会被拒绝。`setModel` 和 `setThinking` 原样传递该值；对运行中的 Agent，Provider 拒绝时 Promise 会被拒绝。 |
+| `setOptions(patch)`、`setMetadata(patch)`           | 顶层键替换，`null` 删除该键。草稿中设置的元数据在创建 Agent 时发送，发送提示词后清空。                                                                                                                                                                       |
+
+同一个调用在每个 composer 中行为一致，插件不需要选择 composer 的实现。在运行中的 Agent 上调用 `setMetadata` 需要支持元数据的主机；主机过旧时，Promise 会以 “Update the host to use metadata.” 拒绝。
+
+`Toggle` 接收 `value` 和 `onValueChange({ value })`。`Select` 接收 `value`、`options`（`{ value, label, description? }`）和 `onValueChange({ value })`。`Action` 接收 `onPress(event)`。三者都接收 `title`、`icon`（[Lucide 名称、SVG 或组件](#icons)）和 `disabled`。回调可以返回 Promise：在它完成之前控件保持禁用，被拒绝时 Clisbot 会像对待自身控件一样，以错误提示向用户显示。控件的位置由 Clisbot 决定：composer 空间足够时显示在工具栏中，不够时（手机上始终如此）成为 composer 溢出面板中的一行。`Select` 会就地打开列表，而不是替换面板中的行。`Component` 如果渲染这些控件以外的内容，会在其所在位置绘制；在溢出面板中，该位置就是面板。
+
+每个命令都按运行时 composer 的当前状态执行，而不是按创建回调的那次渲染，所以 `await composer.setProvider("codex")` 之后再 `await composer.setModel("gpt")` 会同时生效。命令的 Promise 在更改生效后完成，`composer.agent` 在下一次渲染时反映它。
+
+新建工作区界面在创建工作区及其 Agent 期间会锁定 composer。你的控件显示为禁用，`setPrompt` 和 `insertText` 会抛出错误，Agent 命令会以 "The composer is locked while the agent is being created." 拒绝。`composer.agent.options` 和 `composer.agent.metadata` 是冻结的副本；请通过 `setOptions` 和 `setMetadata` 修改它们。
+
+在 Clisbot 知道渲染结果之前，composer 项就已计入可容纳的数量。不渲染任何内容的项仍可能在窄 composer 上留下空的溢出面板，所以请始终渲染一个控件。
+
+[Composer 控件示例](https://github.com/longbkit/clisbot/tree/main/plugin-examples/composer-controls)注册了一个 `Select`、两个 `Toggle`（其中一个写入 Provider 选项）和一个 `Action`，还有一个资源管理器面板和一个 Command Center 条目，它们按引用访问 composer。
+
+### 聚焦 composer {#focus-a-composer}
+
+`insertText` 和 `setPrompt` 不会移动光标。在它们之后调用 `focus()`，用户就可以继续输入：
+
+```tsx
+composer.insertText("- [ ] Tests\n");
+await composer.focus();
+```
+
+`await composer.focus({ selection: { start: 0, end: composer.prompt.length } })` 会选中提示词。
+
+你不需要知道用户在哪里。对于运行中 Agent 的 composer，当它不在屏幕上时，Clisbot 会导航到该 Agent 的标签页或工作区，关闭手机上遮挡它的 Agent 列表或资源管理器面板，并把焦点移到该 Agent 的窗格，然后聚焦输入框。输入框已在屏幕上且其窗格已聚焦时，`focus()` 只放置光标。每个 composer 也会先关闭它在自身上方打开的面板、菜单、选择器和图片预览，例如手机上放置你的项的控件面板。手机会弹出键盘。
+
+composer 无法获得焦点时 `focus()` 会被拒绝：Agent 已归档、其 composer 未在 15 秒内出现在屏幕上，或输入框拒绝获得焦点（例如手机上正在听写时）。多次调用重叠时，由最后一次决定光标位置，之前的调用随其一起完成。按钮的 `onPress` 或命令中心项的 `onSelect` 返回被拒绝的 promise 时，会向用户显示错误提示。
+
+草稿和新建工作区 composer 只能从其中的项访问，所以 `focus()` 不会导航到它们。composer 在屏幕上时可用，用户已离开时会以 “The composer is not on screen.” 拒绝。锁定的 composer 接受聚焦。
+
+### 按引用访问 composer {#reach-a-composer-by-reference}
+
+运行中的 Agent 无论标签页是否打开，都有自己的 composer。任意插件组件中的 `useComposers(selector)`、每个命令上下文中的 `composers(selector)`，以及客户端上下文中的 `client.composers(selector)`，都会返回与 `useComposer()` 给 composer 项的相同的 `PluginComposer`，对象可以是你指定的 Agent，也可以是当前聚焦的 Agent。在不接收上下文的回调中（例如[胶囊的 `onPress`](#composer-pills)）使用 `client.composers`：
+
+```tsx
+import { useComposers, type PluginClientContext } from "@clisbot/plugin/client";
+
+function InsertChecklist() {
+  const [focused] = useComposers({ focused: true });
+  return (
+    <Pressable disabled={!focused} onPress={() => focused?.insertText("- [ ] Tests\n")}>
+      <Text>Insert checklist</Text>
+    </Pressable>
+  );
+}
+
+export default function contribute(client: PluginClientContext) {
+  client.addWorkspacePanel({
+    id: "tools",
+    title: "Tools",
+    icon: "ListChecks",
+    locations: ["explorer"],
+    Component: InsertChecklist,
+  });
+  client.addCommandCenterItem({
+    id: "mark-for-review",
+    title: "Mark for review",
+    icon: "Flag",
+    context: "agent",
+    async onSelect({ agent, composers }) {
+      for (const composer of composers({ agentId: agent.id })) {
+        await composer.setMetadata({ "review.needsReview": true });
+      }
+    },
+  });
+  return () => {};
+}
+```
+
+| 选择器              | 结果                                                                                                                                                                                                 |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{ agentId }`       | 此主机上该 Agent 的 composer。Agent 未知或已归档时为空。                                                                                                                                             |
+| `{ focused: true }` | Command Center 交给 Agent 项的那个 Agent 的 composer：屏幕上工作区中聚焦的 Agent 标签页。当前界面不是工作区（例如插件界面或新建工作区），或聚焦的标签页不是 Agent 时为空，并随用户切换标签页而变化。 |
+
+结果始终是数组，为空或只含一个 composer，所以同一段代码可以读取任一选择器。composer 变化时 `useComposers` 会重新渲染。`composers()` 返回的 composer 是调用时的状态，要获取下一个状态请再次调用 `composers()`。
+
+命令与 [`useComposer()`](#composer-items) 相同，从外部访问时有以下差异：
+
+- Agent 的 composer 在屏幕上时，`insertText` 在光标处插入。不在屏幕上时（例如用户在另一个工作区），它会追加到该 Agent 已保存的提示词，用户回来时文本就在输入框里。`setPrompt` 以同样的方式替换已保存的提示词。
+- 运行中 Agent 的 composer 从不锁定。
+- `setProvider` 会被拒绝，与在 Agent 自己的 composer 内一样。
+- `setModel` 和 `setThinking` 不加检查地把值发给 Provider。Provider 拒绝的值会以 Provider 的消息拒绝。`model` 和 `thinking` 读取的是模型选择器此刻显示的值：在 Provider 的模型目录加载完成之前，是 Agent 上报或创建时使用的 id（可能是别名），加载完成后是目录中的 id。
+- `focus()` 会先让 composer 显示出来，如[上文所述](#focus-a-composer)。
+- 草稿和新建工作区界面不能按引用访问，只有其中的项能通过 `useComposer()` 访问其 composer。
+
+## 新建工作区项 {#new-workspace-items}
+
+`client.addNewWorkspaceItem({ id, Component })` 在新建工作区界面上放置一个字段，位于项目、主机和分支选择器旁边。`useNewWorkspace()` 读取并修改界面将要创建的内容，`@clisbot/plugin/client/ui` 中的 `Combobox`、`Select`、`Toggle` 和 `Action` 负责绘制字段。桌面端的项是设置行中的徽章；手机上是整行宽度的字段。
+
+```tsx
+import { useNewWorkspace, useRpc, type PluginClientContext } from "@clisbot/plugin/client";
+import { Combobox } from "@clisbot/plugin/client/ui";
+import { searchIssuesRpc } from "../shared/issues";
+
+function IssueField() {
+  const newWorkspace = useNewWorkspace();
+  const searchIssues = useRpc(searchIssuesRpc);
+  const issueId = newWorkspace.metadata["issues.id"];
+  return (
+    <Combobox
+      title="Issue"
+      icon="CircleDot"
+      value={typeof issueId === "string" ? { id: issueId, label: issueId } : null}
+      search={async ({ query }) => (await searchIssues({ query })).issues}
+      onSelect={async ({ item }) => {
+        await newWorkspace.setBranch(item.branch);
+        await newWorkspace.setMetadata({ "issues.id": item.id });
+      }}
+    />
+  );
+}
+
+export default function contribute(client: PluginClientContext) {
+  client.addNewWorkspaceItem({ id: "issue", Component: IssueField });
+  return () => {};
+}
+```
+
+`useNewWorkspace()` 返回该项所在的设置：
+
+| 字段或命令                  | 含义                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `host`、`project`           | 用户的选择，分别是 `{ id, label }` 和 `{ id, name } \| null`。只读：项不能切换主机或项目。                                                                                                                                                                                                                                                                                                                                      |
+| `isolation`、`setIsolation` | `"local"` 或 `"worktree"`。**已有 worktree** 读取为 `"local"`，因为工作区是该 worktree 目录上的本地工作区；调用 `setIsolation` 会离开它。无法创建 worktree 的项目读取为 `"local"`，此时 `setIsolation("worktree")` 会被拒绝。                                                                                                                                                                                                   |
+| `baseRef`、`setBaseRef`     | 新 worktree 的起点：`{ type: "branch", name }`、`{ type: "change-request", number }`，默认值未知时为 `null`。分支的 `name` 是创建时实际使用的完整 ref，例如 `refs/remotes/origin/main`，所以 `setBaseRef(newWorkspace.baseRef)` 不会改变任何内容。`setBaseRef` 接受 Base 选择器提供的任何 ref，或一个裸分支名，Clisbot 会按其他地方一贯的方式解析。新 worktree 会从它新建分支，分支列表会切换到新建分支。未选择项目时会被拒绝。 |
+| `branch`、`setBranch`       | 新 worktree 所创建的分支名称。`null` 表示由 Clisbot 选择名称。隔离为本地或起点为变更请求时会保留该值，它为任何新建分支的 worktree 命名，起点可以是默认基线或所选分支；检出已有分支或变更请求的 worktree 不适用。                                                                                                                                                                                                                |
+| `metadata`、`setMetadata`   | 所创建工作区的[元数据](/docs/plugins/hooks#metadata)，而不是第一个 Agent 的元数据。顶层键替换，`null` 删除该键。主机不支持元数据时以 “Update the host to use metadata.” 拒绝。                                                                                                                                                                                                                                                  |
+
+命令遵循 [Composer 项](#composer-items)的规则：每个命令都按界面运行时的状态执行，所以 `await newWorkspace.setBranch(name)` 之后再调用 `newWorkspace.setMetadata(patch)` 会同时生效，命令的 Promise 在更改生效后完成。命令从组件的第一个 effect 起即可使用，包括挂载时的 effect。载荷是 JSON 值。你的项针对某一台主机上的某一个项目挂载。用户更改其中任何一个时，Clisbot 会重新挂载你的项并清除 `branch` 和 `metadata`，因此上一个项目的状态和 `Combobox` 结果不会保留；在挂载 effect 中做初始化的项会针对新项目再次初始化。在其项目或主机已被离开之后才调用的命令（例如用户切换项目时被放弃的查询最终返回）会以 "The New workspace screen moved to another project or host; this item belongs to the previous one." 拒绝，并且不做任何更改；为新项目挂载的项不受影响。`host`、`project`、`baseRef` 和 `metadata` 是冻结的。界面创建工作区期间会被锁定：你的字段显示为禁用，所有命令都会以 "The New workspace screen is locked while the workspace is being created." 拒绝。返回 Promise 的回调在完成之前会让控件保持禁用，被拒绝时会以错误提示向用户显示。
+
+`Combobox` 是带可搜索列表的字段，结果由你的代码提供：
+
+| 属性       | 含义                                                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value`    | `{ id, label, description? } \| null`，字段显示的内容。它不必出现在搜索结果中，因此可以显示之前所做的选择。                                       |
+| `search`   | `({ query }) => Promise<Item[]>`。列表打开时以 `""` 调用，之后随用户输入防抖调用。每个 `Item` 是 `{ id, label, description? }` 加上你添加的字段。 |
+| `onSelect` | `({ item }) => void \| Promise<void>`。`item` 就是 `search` 返回的对象。                                                                          |
+
+搜索进行时 Clisbot 显示 “Searching…”，搜索被拒绝时显示 “Search failed” 和错误信息，没有结果时显示空状态。新搜索进行期间会保留之前的结果，并忽略已被更新搜索取代的结果，所以 `search` 不需要自己处理取消。`Combobox` 接收与其他控件相同的 `title`、`icon` 和 `disabled`。
+
+[新建工作区 Issue 示例](https://github.com/longbkit/clisbot/tree/main/plugin-examples/new-workspace-issues)通过守护进程处理器搜索一个固定的 Issue 列表，并根据所选项设置分支和元数据。
+
 ## Composer 胶囊 {#composer-pills}
 
 `client.addComposerPill({ id, workspaceId, agentId, button })` 使用同样的[按钮描述符](#button-descriptor)，
@@ -1934,6 +2064,30 @@ const pill = client.addComposerPill({
       kind: "action",
       onPress() {
         client.openPanel("review", { workspaceId, agentId });
+      },
+    },
+  },
+});
+```
+
+胶囊的 `onPress` 不接收参数。通过 [`client.composers`](#reach-a-composer-by-reference) 访问其 Agent 的 composer：
+
+```tsx
+const pill = client.addComposerPill({
+  id: "hello",
+  workspaceId,
+  agentId,
+  button: {
+    title: "Add HELLO to the composer",
+    icon: "Hand",
+    label: "Hello",
+    behavior: {
+      kind: "action",
+      async onPress() {
+        for (const composer of client.composers({ agentId })) {
+          composer.insertText("HELLO");
+          await composer.focus();
+        }
       },
     },
   },
@@ -2033,7 +2187,7 @@ const behavior: PluginButtonBehavior = {
 隐藏或禁用按钮会关闭它的浮层。更新它的 behavior 也会关闭浮层。隐藏会保留注册，因此再次显示时会恢复它
 原来的位置。它不会取消已经在进行中的操作。
 
-`remove()` 是幂等的。移除之后的更新不起作用。当插件安装或主机连接被拆除时，Clisbot 会移除尚存的按钮。
+`remove()` 是幂等的。移除之后的更新不起作用。当插件安装被销毁时，Clisbot 会移除尚存的按钮（参见[主机与生命周期](#hosts-and-lifecycle)）。
 请从客户端入口返回清理函数，用来释放你的订阅、定时器和其他资源。
 
 ## 使用 Clisbot SDK {#use-the-clisbot-sdk}
@@ -2093,6 +2247,8 @@ function PullRequestAction({ theme }: PluginSurfaceProps) {
 ```
 
 返回的 API 涵盖项目、工作区、Agent、终端、Provider 和 daemon 配置。其方法请参阅 [SDK API 参考](/docs/sdk/reference)。这里刻意没有连接生命周期方法，因为连接由 Clisbot 负责。
+
+如果要运行用户不需要看到的辅助任务，例如分类或摘要，请在已有工作区中把它创建为[后台 Agent](/docs/sdk/agents#run-a-helper-as-a-background-agent)。
 
 ### 发现主机并指定另一台主机 {#discover-hosts-and-target-another-host}
 
@@ -2239,6 +2395,140 @@ export default function contribute(server: PluginServerContext) {
 
 后端处理函数以 `{ clisbot }` 的形式收到同样的 `ClisbotApi`。它们的连接属于子进程，并在插件停止时关闭。在插件代码订阅之前，它不会订阅时间线或目录事件。清理和时间线替换请遵循 [SDK 事件契约](/docs/sdk/events)。后端代码可以使用 Node API 以及安装在插件目录中的依赖。
 
+## 从 daemon 推送事件 {#subscriptions}
+
+订阅会在一个客户端监听期间运行 daemon 处理函数，并向该客户端发送带类型的事件。监听文件、追踪日志和实时媒体使用订阅；只需要一次应答时使用插件 RPC。
+
+在 `shared/` 中定义契约：
+
+```ts
+// shared/diff.ts
+import { defineSubscription } from "@clisbot/plugin";
+import { z } from "zod";
+
+export const diffWatch = defineSubscription({
+  name: "diff.watch",
+  input: z.object({ cwd: z.string(), from: z.string() }),
+  event: z.object({ type: z.literal("changes"), files: z.array(z.string()) }),
+});
+```
+
+在 `index.server.ts` 中处理它。处理函数除了 `clisbot`，还会收到 `push` 和一个中止 `signal`：
+
+```ts
+server.handle(diffWatch, ({ cwd, from }, { push, signal }) => {
+  const watcher = watchChanges(cwd, from, (files) => void push({ type: "changes", files }));
+  signal.addEventListener("abort", () => watcher.close(), { once: true });
+});
+```
+
+在界面中用 `useSubscription(contract, input, onEvent)` 订阅：
+
+```tsx
+const [files, setFiles] = useState<string[]>([]);
+const subscription = useSubscription(diffWatch, { cwd, from: "HEAD" }, (event) => {
+  setFiles(event.files);
+});
+if (subscription.status === "error") return <Text>{subscription.error.message}</Text>;
+```
+
+在 React 之外，`client.subscribe` 接受同样的参数和一个选项对象，并返回一个移除函数：
+
+```ts
+const stop = client.subscribe(diffWatch, { cwd, from: "HEAD" }, onChanges, { signal });
+await stop.ready; // the daemon accepted the subscription
+stop(); // or await stop.release()
+```
+
+RPC 和订阅共用一个名称空间；同一个名称同时注册为 RPC 和订阅会导致插件加载失败。
+
+### 处理函数的生命周期 {#handler-lifetime}
+
+| 处理函数……               | 结果                                         |
+| ------------------------ | -------------------------------------------- |
+| 同步抛出错误，或输入无效 | 订阅调用失败并返回该错误，不会发送任何事件。 |
+| 不返回任何值             | 订阅保持打开，直到客户端释放它。             |
+| 返回一个兑现的 Promise   | 订阅关闭。                                   |
+| 返回一个拒绝的 Promise   | 订阅关闭并带上该错误。                       |
+
+当客户端释放订阅、卸载 hook、更改输入、断开连接，或者插件停止时，`signal` 会中止。中止之后的推送会被丢弃。`push` 会按契约校验事件，并在事件离开插件进程后兑现；在循环中 await 它可以控制生产者的速度。
+
+每个订阅者运行各自的处理函数。Clisbot 不会在多个客户端之间共享同一个处理函数，也不会重放错过的事件：重新连接或重新加载插件之后，已挂载的界面会重新订阅，处理函数从头开始运行。多个订阅者需要同一个昂贵的监听器时，请在插件内部共享它。
+
+`useSubscription` 返回一个以 `status` 区分的联合类型：
+
+| 状态         | 含义                                                     |
+| ------------ | -------------------------------------------------------- |
+| `connecting` | 已发送，daemon 尚未接受。                                |
+| `live`       | 处理函数正在运行，事件通过 `onEvent` 送达。              |
+| `closed`     | 处理函数已结束。                                         |
+| `error`      | 订阅失败、处理函数失败、事件不符合契约，或者插件已停止。 |
+
+`input` 按浅比较发生变化时，hook 会重新订阅。`onEvent` 始终是最近一次渲染的回调，所以内联函数不会导致重新订阅。`client.subscribe` 接受 `{ signal, onClosed }`；`onClosed` 会收到 `{ error? }`。
+
+### 字节 {#bytes}
+
+顶层的 `Uint8Array` 以二进制形式传输，不经过 JSON 或 base64，其他值都是 JSON。这条规则适用于订阅事件、RPC 输出和 RPC 输入。Node 的 `Buffer` 也是 `Uint8Array`。
+
+```ts
+export const thumbnail = defineRpc({
+  name: "thumbnail.render",
+  input: z.object({ path: z.string(), width: z.number() }),
+  output: z.instanceof(Uint8Array),
+});
+
+// index.server.ts
+server.handle(thumbnail, ({ path, width }) => renderPng(path, width));
+
+// client
+const renderThumbnail = useRpc(thumbnail);
+const png = await renderThumbnail({ path, width }); // Uint8Array
+```
+
+用 `z.instanceof(Uint8Array)` 声明字节。事件可以在每次推送时选择字节或 JSON：声明一个联合类型，并用 `event instanceof Uint8Array` 分支。嵌套在对象中的 `Uint8Array` 会在发送端校验失败，错误信息会说明这条规则；把字节作为单独的事件或 RPC 值发送，元数据作为另一个 JSON 事件发送。
+
+一个事件或 RPC 值最多 100 MiB（减去 65 KiB 的帧头）。大载荷请按几百 KiB 分块推送；每次 `push` 都会等待上一次离开插件进程。手机上传的上限更低：一次发送超过 16 MiB 时 Android 会关闭连接，所以较大的上传请拆成多个 RPC。
+
+### 在一个订阅中传输多条流 {#several-streams-on-one-subscription}
+
+在每个载荷前加一个头字节即可复用多条流。把布局放在 `shared/` 中，让处理函数和界面调用有名字的函数：
+
+```ts
+// shared/media-frames.ts
+export const MediaOpcode = { Video: 0x01, Audio: 0x02 } as const;
+
+export function encodeMediaFrame(opcode: number, payload: Uint8Array): Uint8Array {
+  const bytes = new Uint8Array(1 + payload.byteLength);
+  bytes[0] = opcode;
+  bytes.set(payload, 1);
+  return bytes;
+}
+
+export function decodeMediaFrame(bytes: Uint8Array) {
+  return { opcode: bytes[0], payload: bytes.subarray(1) }; // a view, not a copy
+}
+
+export const mediaStream = defineSubscription({
+  name: "media.stream",
+  input: z.object({ source: z.string() }),
+  event: z.instanceof(Uint8Array),
+});
+```
+
+```ts
+useSubscription(mediaStream, { source }, (bytes) => {
+  const frame = decodeMediaFrame(bytes);
+  if (frame.opcode === MediaOpcode.Audio) audio.enqueue(frame.payload);
+  else video.draw(frame.payload);
+});
+```
+
+同一个订阅的事件按推送顺序到达，JSON 和二进制都一样。`plugin-examples/media-stream` 用这种方式传输视频和音频，并通过一个输入为 `Uint8Array` 的 RPC 把一帧上传回去；`plugin-examples/diff-watch` 监听工作树。
+
+### 旧版主机 {#older-hosts}
+
+订阅和二进制 RPC 值需要主机声明支持。连接旧版主机时，`useSubscription` 会报告 `error` 并提示更新主机，`client.subscribe` 的 `ready` 会以同样的信息拒绝，带有 `Uint8Array` 输入或输出的 RPC 会失败。请把插件的 `requirements.clisbot` 提高到包含订阅功能的版本。
+
 ## 调试后端输出 {#debug-backend-output}
 
 后端贡献可以用普通的 Node 日志写入 stdout 和 stderr：
@@ -2352,8 +2642,11 @@ Composer 菜单、搜索选择器、选中后的胶囊、草稿状态和提交�
 
 附件来源仍然限定在各个 Composer 所在的主机上。
 
-工作区面板和 Command Center 条目仍然限定在当前活动的主机和确切的缓存上下文中。重新加载会替换它们的
-注册。停用、移除、主机断开和求值失败会移除 Command Center 条目，并清除该安装的查询状态。已经恢复的面板
+连接中断时，客户端插件的注册、已挂载界面、本地状态和查询缓存会保留。通过原有的 `DaemonClient` 对象重新连接时，未变化的安装会保留，其设置会刷新。请使用 SDK 观察快照刷新其他 daemon 状态；未变化的安装不会再次运行初始化函数。调用 daemon 仍然依赖连接。
+
+切换连接（例如从直连切换到中继）目前会替换 `DaemonClient` 对象并重新安装客户端插件。重新加载、插件包或版本要求变化、停用、移除插件和移除主机也会销毁受影响的安装，并清除其查询状态。如果替换安装求值失败，它的贡献将不可用。
+
+工作区面板和 Command Center 条目仍然限定在当前活动的主机和确切的缓存上下文中。已经恢复的面板
 标签页会保持“不可用”状态，直到与之匹配的贡献重新出现或用户关闭它。面板的渲染失败会被限制在插件的错误
 边界内。
 

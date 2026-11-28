@@ -1481,7 +1481,7 @@ export function SingleAgentAutomationForm({
         {!inputsValid ? (
           <Alert variant="error" title={t("hub.automations.form.uniqueInputNames")} />
         ) : null}
-        <Button size="xs" variant="outline" disabled={pending || !inputsValid} onPress={addInput}>
+        <Button size="sm" variant="outline" disabled={pending || !inputsValid} onPress={addInput}>
           {t("hub.automations.form.addParameter")}
         </Button>
       </View>
@@ -1798,7 +1798,7 @@ function AutomationEventEditor({
     <View style={styles.choiceGroup}>
       <View style={styles.actions}>
         <Text style={settingsStyles.rowTitle}>{definition.label}</Text>
-        <Button size="xs" variant="ghost" onPress={removeEvent} disabled={pending}>
+        <Button size="sm" variant="ghost" onPress={removeEvent} disabled={pending}>
           {t("hub.automations.eventEditor.remove", { label: definition.label })}
         </Button>
       </View>
@@ -1906,7 +1906,7 @@ function LegacyAutomationEvent({
         <Text style={settingsStyles.rowTitle}>{eventLabel(event.name)}</Text>
         <Text style={settingsStyles.rowHint}>{t("hub.automations.eventEditor.legacyHint")}</Text>
       </View>
-      <Button size="xs" variant="ghost" disabled={pending} onPress={remove}>
+      <Button size="sm" variant="ghost" disabled={pending} onPress={remove}>
         {t("hub.automations.eventEditor.removeEvent")}
       </Button>
     </View>
@@ -2007,7 +2007,7 @@ function AutomationInputEditor({
         disabled={pending}
         accessibilityLabel={t("hub.automations.inputEditor.requireLabel", { number: index + 1 })}
       />
-      <Button size="xs" variant="ghost" disabled={pending} onPress={remove}>
+      <Button size="sm" variant="ghost" disabled={pending} onPress={remove}>
         {t("hub.automations.inputEditor.remove")}
       </Button>
     </View>

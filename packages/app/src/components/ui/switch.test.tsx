@@ -21,7 +21,8 @@ const { theme } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/constants/platform", () => ({ isWeb: true }));
+// Upstream v0.17 sizes the switch through @/constants/layout, which also reads isNative.
+vi.mock("@/constants/platform", () => ({ isWeb: true, isNative: false }));
 
 vi.mock("react-native-reanimated", () => ({
   default: {
@@ -95,6 +96,7 @@ vi.mock("react-native-unistyles", () => ({
     ) =>
     (props: Record<string, unknown>) =>
       React.createElement(Component, { ...props, ...mapping?.(theme) }),
+  useUnistyles: () => ({ theme, rt: { breakpoint: "md" } }),
 }));
 
 describe("Switch", () => {

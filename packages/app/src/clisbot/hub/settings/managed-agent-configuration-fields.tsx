@@ -76,9 +76,13 @@ export function ManagedAgentConfigurationFields({
   const { t } = useTranslation();
   const snapshot = useProvidersSnapshot(serverId, { cwd: cwd.trim() || null });
   const { profiles, isSupported: profilesSupported } = useAgentProfiles(serverId);
+  // Upstream keeps the current choice listed whatever its state, so the selector still names it.
   const providers = useMemo(
-    () => buildSelectableProviderSelectorProviders(snapshot.entries),
-    [snapshot.entries],
+    () =>
+      buildSelectableProviderSelectorProviders(snapshot.entries, {
+        selectedProvider: value.provider || null,
+      }),
+    [snapshot.entries, value.provider],
   );
   const selectedEntry = useMemo(
     () => snapshot.entries?.find((entry) => entry.provider === value.provider) ?? null,
@@ -110,14 +114,21 @@ export function ManagedAgentConfigurationFields({
         model: profile.model?.trim() ?? "",
         mode: profile.modeId?.trim() ?? "",
         thinkingOptionId: profile.thinkingOptionId?.trim() ?? "",
-        featureValues: { ...profile.featureValues },
+        // Upstream profiles store provider options as `options`; `featureValues` is their COMPAT name.
+        featureValues: { ...(profile.options ?? profile.featureValues) },
       });
     },
     [onChange, profiles],
   );
   const profilePicker = useMemo<AgentProfilePicker | null>(() => {
     if (!profilesSupported || profiles === null) return null;
-    const available = new Set(providers.map(({ id }) => id));
+    // Profiles only offer choosable providers: the selected-but-unavailable one the selector keeps
+    // for display is not a new choice.
+    const available = new Set(
+      (snapshot.entries ?? [])
+        .filter((entry) => entry.enabled && entry.status !== "unavailable")
+        .map((entry) => entry.provider),
+    );
     return {
       rows: profiles
         .filter((profile) => available.has(profile.provider))
@@ -134,7 +145,7 @@ export function ManagedAgentConfigurationFields({
         })),
       applyProfile,
     };
-  }, [applyProfile, profiles, profilesSupported, providers]);
+  }, [applyProfile, profiles, profilesSupported, snapshot.entries]);
 
   const selectModel = useCallback(
     (provider: AgentProvider, model: string) => {

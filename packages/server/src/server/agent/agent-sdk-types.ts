@@ -1,8 +1,9 @@
 import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import type {
-  AgentFeature,
-  AgentFeatureSelect,
-  AgentFeatureToggle,
+  AgentMetric,
+  AgentOptionControl,
+  AgentOptionSelectControl,
+  AgentOptionToggleControl,
   AgentProviderNotice,
   AgentTaskItem,
   JsonValue,
@@ -10,13 +11,20 @@ import type {
   ToolPolicy,
 } from "@clisbot/protocol/agent-types";
 import type { AgentMessage } from "@clisbot/protocol/agent-message";
-import type { AgentAttachment } from "@clisbot/protocol/messages";
+import type { AgentAttachment, ProviderInstallationInspection } from "@clisbot/protocol/messages";
+import type {
+  ProviderInspection,
+  ProviderUpdateCheck,
+  ProviderUpdateReport,
+  ProviderUpdateResult,
+} from "@clisbot/plugin/server/provider";
 import type { ClisbotToolCatalog } from "./tools/types.js";
 
 export type {
-  AgentFeature,
-  AgentFeatureSelect,
-  AgentFeatureToggle,
+  AgentMetric,
+  AgentOptionControl,
+  AgentOptionSelectControl,
+  AgentOptionToggleControl,
   AgentProviderNotice,
   AgentTaskItem,
 };
@@ -137,6 +145,8 @@ export interface ProviderSnapshotEntry {
   label?: string;
   description?: string;
   iconSvg?: string;
+  /** The page that helps users set up and troubleshoot this provider. */
+  docsUrl?: string;
   defaultModeId?: string | null;
 }
 
@@ -149,7 +159,7 @@ export interface AgentCreateConfigParent {
 export interface ResolveAgentCreateConfigInput {
   provider: AgentProvider;
   requestedMode: string | undefined;
-  featureValues: Record<string, unknown> | undefined;
+  providerOptions: ProviderOptions | undefined;
   parent: AgentCreateConfigParent | null;
   unattended: boolean;
   availableModes: AgentMode[] | undefined;
@@ -157,13 +167,13 @@ export interface ResolveAgentCreateConfigInput {
 
 export interface ResolveAgentCreateConfigResult {
   modeId: string | undefined;
-  featureValues: Record<string, unknown> | undefined;
+  providerOptions: ProviderOptions | undefined;
 }
 
 export interface AgentCreateConfigUnattendedInput {
   modeId: string | null;
   config: AgentSessionConfig;
-  features?: AgentFeature[];
+  controls?: AgentOptionControl[];
   availableModes: AgentMode[];
 }
 
@@ -219,7 +229,11 @@ export interface AgentSteerOptions extends AgentRunOptions {
   clearPendingPermissions?: boolean;
 }
 
-export type SteerResult = { status: "accepted" } | { status: "unavailable" };
+// providerMessageId names the steered message in the provider's own history, when the provider
+// mints one. Rewinding to the message needs it.
+export type SteerResult =
+  | { status: "accepted"; providerMessageId?: string }
+  | { status: "unavailable" };
 
 export interface SteerActiveTurnOptions extends AgentSteerOptions {
   expectedTurnId: string;
@@ -324,7 +338,10 @@ export type ToolCallDetail =
       subAgentType?: string;
       description?: string;
       childSessionId?: string;
-      log: string;
+      // COMPAT(subagent-log): added in v0.14.1, remove after 2027-04-30. Apps before v0.14.1
+      // require `log`; every producer sends it empty and carries the same tag. Optional here because
+      // protocol timeline items, where `log` is optional, flow into this type.
+      log?: string;
       actions?: Array<{
         index: number;
         toolName: string;
@@ -426,8 +443,17 @@ export type AgentTimelineItem =
 export type AgentStreamEvent =
   | { type: "thread_started"; sessionId: string; provider: AgentProvider }
   | { type: "turn_started"; provider: AgentProvider; turnId?: string }
-  | { type: "turn_completed"; provider: AgentProvider; usage?: AgentUsage; turnId?: string }
+  | {
+      type: "turn_completed";
+      provider: AgentProvider;
+      usage?: AgentUsage;
+      turnId?: string;
+      /** Shown on the completed turn's footer. */
+      metrics?: AgentMetric[];
+    }
   | { type: "usage_updated"; provider: AgentProvider; usage: AgentUsage; turnId?: string }
+  /** Full replacement of the metrics shown for the session. An empty list clears them. */
+  | { type: "session_metrics_updated"; provider: AgentProvider; metrics: AgentMetric[] }
   | {
       type: "mode_changed";
       provider: AgentProvider;
@@ -440,6 +466,14 @@ export type AgentStreamEvent =
       provider: AgentProvider;
       thinkingOptionId: string | null;
     }
+  /**
+   * The provider changed options on its own: after `createSession`/`resumeSession` or
+   * `applyOptions` it ended up different from what it was given, or later it changed a setting
+   * itself. The daemon stores the patch and forwards it; it does not undo it. `null` removes the
+   * agent's own value. Only for changes that happen on the provider's own initiative: the result
+   * of opening goes in `openOptionsPatch` and the result of `applyOptions` is its return value.
+   */
+  | { type: "options_changed"; provider: AgentProvider; patch: Record<string, unknown> }
   | {
       type: "turn_failed";
       provider: AgentProvider;
@@ -479,6 +513,12 @@ export type AgentStreamEvent =
       type: "provider_subagent";
       provider: AgentProvider;
       event: import("./provider-subagents/store.js").ProviderSubagentInputEvent;
+    }
+  | {
+      /** Full replacement of the agent's live background work (shells, monitors…). */
+      type: "background_work";
+      provider: AgentProvider;
+      items: import("./background-work/index.js").AgentBackgroundWorkInput[] | null;
     };
 
 export function getAgentStreamEventTurnId(event: AgentStreamEvent): string | undefined {
@@ -524,6 +564,14 @@ export type AgentPermissionResponse =
       message?: string;
       interrupt?: boolean;
     };
+
+/** A requested turn was canceled before the provider accepted it. */
+export class AgentTurnStartCanceledError extends Error {
+  constructor() {
+    super("Turn was canceled before starting");
+    this.name = "AgentTurnStartCanceledError";
+  }
+}
 
 export interface AgentRunResult {
   sessionId: string;
@@ -595,6 +643,8 @@ export interface ImportProviderSessionContext {
 export interface ImportedTimelineEntry {
   item: AgentTimelineItem;
   timestamp?: string;
+  /** Set on the last entry of a turn the provider reported stats for. */
+  turnMetrics?: AgentMetric[];
 }
 
 export interface ImportedProviderSession {
@@ -602,6 +652,7 @@ export interface ImportedProviderSession {
   config: AgentSessionConfig;
   persistence: AgentPersistenceHandle;
   timeline: ImportedTimelineEntry[];
+  sessionMetrics?: AgentMetric[];
   providerSubagentEvents?: Extract<AgentStreamEvent, { type: "provider_subagent" }>[];
 }
 
@@ -618,10 +669,11 @@ export interface AgentSessionConfig {
    * persisted into agent config so daemon setting changes apply cleanly.
    */
   daemonAppendSystemPrompt?: string;
+  /** Plugin instructions for this launch; never persisted. */
+  pluginAppendSystemPrompt?: string[];
   modeId?: string;
   model?: string;
   thinkingOptionId?: string;
-  featureValues?: Record<string, unknown>;
   title?: string | null;
   providerOptions?: ProviderOptions;
   /**
@@ -644,6 +696,11 @@ export interface AgentSessionConfig {
 }
 
 export interface AgentLaunchContext {
+  /** Launch-only instructions contributed by plugins. */
+  appendSystemPrompt?: string[];
+  /** Launch-only plugin MCP servers and their owners; never persisted. */
+  mcpServers?: Record<string, McpServerConfig>;
+  mcpServerOwners?: Record<string, string>;
   agentId?: string;
   env?: Record<string, string>;
   /**
@@ -691,6 +748,7 @@ export type AutomaticPermissionResponder = (
   response: AgentPermissionResponse,
 ) => Promise<AgentPermissionResult | void>;
 export interface AgentUsageSession {
+  launch?: import("@clisbot/plugin/server/provider").ProviderLaunch;
   provider: string;
   model?: string;
   env: Record<string, string>;
@@ -699,15 +757,25 @@ export interface AgentUsageSession {
 
 export interface AgentSession {
   setAutomaticPermissionResponder?(responder: AutomaticPermissionResponder): void;
+  /** Persist the session's current handle immediately after an interactive resume. */
+  readonly persistenceUpdatedOnResume?: boolean;
   usageSession?(): AgentUsageSession | null;
   readonly provider: AgentProvider;
   readonly id: string | null;
   readonly capabilities: AgentCapabilityFlags;
-  readonly features?: AgentFeature[];
+  /** Composer controls over top-level option keys. Values come from the agent's effective options. */
+  readonly controls?: AgentOptionControl[];
+  /**
+   * How the session ended up different from the options it was opened with, as a patch (`null`
+   * removes a key). Set by the time `createSession`/`resumeSession` resolves; the daemon stores it
+   * before the agent is published.
+   */
+  readonly openOptionsPatch?: Record<string, unknown>;
   /** New provider-owned rows to commit on registration. streamHistory must also
    * replay them at their original timestamps; restored sessions omit old rows. */
   readonly initialTimeline?: ImportedTimelineEntry[];
   run(prompt: AgentPromptInput, options?: AgentRunOptions): Promise<AgentRunResult>;
+  /** Returns an ID unique across the agent lifetime, including resumed sessions and daemon restarts. */
   startTurn(prompt: AgentPromptInput, options?: AgentRunOptions): Promise<{ turnId: string }>;
   steerActiveTurn?(prompt: AgentPromptInput, options: SteerActiveTurnOptions): Promise<SteerResult>;
   subscribe(callback: (event: AgentStreamEvent) => void): () => void;
@@ -721,6 +789,7 @@ export interface AgentSession {
     requestId: string,
     response: AgentPermissionResponse,
   ): Promise<AgentPermissionResult | void>;
+  /** Null until a new provider process could resume this session; see docs/providers.md. */
   describePersistence(): AgentPersistenceHandle | null;
   /**
    * Resolve once every foreground turn that predates this call can no longer run or become active.
@@ -728,6 +797,12 @@ export interface AgentSession {
    * still uncertain.
    */
   interrupt(): Promise<void>;
+  /** Stop one currently owned background item and wait for provider confirmation. */
+  stopBackgroundWork?(id: string): Promise<void>;
+  /** True only when releasing this runtime loses no background work or pending replies.
+   * An optional additional veto: missing methods use daemon baseline eligibility;
+   * implemented checks that reject or return false keep the runtime resident. */
+  canStopRuntime?(): Promise<boolean>;
   /** Release live runtime resources without archiving or deleting the durable native session. */
   close(): Promise<void>;
   /**
@@ -737,15 +812,30 @@ export interface AgentSession {
    */
   isIdleForRelease?(): boolean;
   listCommands?(): Promise<AgentSlashCommand[]>;
-  setModel?(modelId: string | null): Promise<void>;
+  /** A returned model is the effective selection committed by this mutation.
+   * Returning void means the requested selection was accepted. No status read is required. */
+  setModel?(modelId: string | null): Promise<void | { model: string | null }>;
   setThinkingOption?(thinkingOptionId: string | null): Promise<void | AgentProviderNotice>;
-  setFeature?(featureId: string, value: unknown): Promise<void>;
   /**
    * Hides these skills from the agent for the rest of the session, replacing the last list
    * (docs/features/connectors/README.md, "Per session"). Providers without per-session skill
    * control leave it out.
    */
   setSkillsOff?(skills: readonly string[]): Promise<void>;
+  /**
+   * Apply an options patch. `options` holds only the keys the patch touches, resolved against
+   * the `config.json` defaults; `null` means nothing is set for the key, so return it to the
+   * session's own default if that can be done. Leave every other setting alone. Throw to reject a
+   * value, or a key the running session cannot apply (one the provider reads only when it
+   * opens): the daemon stores the patch only when this resolves, so a stored option always
+   * describes what runs, and the call is all-or-nothing.
+   * Emit nothing from here. Return the options the session ended up with when they differ from
+   * the request (a patch, `null` removes a key), for example a value it kept because it could not
+   * be reverted; the daemon stores it together with the patch. When a throw leaves the session's
+   * state moved anyway, report the moved values once as `options_changed` after the call has
+   * ended, so the stored options still match what runs.
+   */
+  applyOptions?(options: ProviderOptions): Promise<Record<string, unknown> | void>;
   revertConversation?(input: { messageId: string }): Promise<void>;
   revertFiles?(input: { messageId: string }): Promise<void>;
   revertBoth?(input: { messageId: string }): Promise<void>;
@@ -784,6 +874,8 @@ export interface ProviderCatalog {
   models: AgentModelDefinition[];
   modes: AgentMode[];
   defaultModeId?: string | null;
+  /** Part of discovery failed, so the catalogue omits models the provider could not confirm. */
+  incomplete?: boolean;
 }
 
 export interface ResolveAgentDefaultModeInput {
@@ -792,14 +884,61 @@ export interface ResolveAgentDefaultModeInput {
   signal?: AbortSignal;
 }
 
+export interface AgentDraftControls {
+  controls: AgentOptionControl[];
+  options: ProviderOptions;
+}
+
+export interface AgentClientInstallationContext {
+  /** Aborted when Clisbot stops waiting for the result. */
+  signal: AbortSignal;
+}
+
+export interface AgentClientInstallation {
+  installUrl?: string;
+  updateUrl?: string;
+  inspect?(context: AgentClientInstallationContext): Promise<ProviderInspection>;
+  /** See `ProviderInstallation.checkForUpdates` in the plugin contract. */
+  checkForUpdates?(context: AgentClientUpdateCheckContext): Promise<ProviderUpdateCheck>;
+  /** Runs the provider's updater. See `ProviderInstallation.update` in the plugin contract. */
+  update?(context: AgentClientUpdateContext): Promise<ProviderUpdateResult>;
+}
+
+export interface AgentClientUpdateCheckContext extends AgentClientInstallationContext {
+  /** The version `inspect` reported, as written. Absent when it reported none or there is no `inspect`. */
+  installedVersion?: string;
+}
+
+export interface AgentClientUpdateContext extends AgentClientInstallationContext {
+  report(event: ProviderUpdateReport): void;
+}
+
+/** What the daemon gives a provider's diagnostic report. */
+export interface AgentClientDiagnosticContext {
+  /**
+   * The installation as the provider's Installation row shows it, under the same deadline and
+   * cache. Undefined when the provider does not report its installation.
+   */
+  inspectInstallation(): Promise<ProviderInstallationInspection | undefined>;
+}
+
 export interface AgentClient {
+  resolveUsageLaunch?(): Promise<
+    import("@clisbot/plugin/server/provider").ProviderLaunch | undefined
+  >;
   readonly provider: AgentProvider;
   readonly capabilities: AgentCapabilityFlags;
+  /**
+   * Create the agent with `config.providerOptions` (defaults already merged in). Emit nothing
+   * about options while creating. If the agent ended up different from the options, say so in the
+   * session's `openOptionsPatch`.
+   */
   createSession(
     config: AgentSessionConfig,
     launchContext?: AgentLaunchContext,
     options?: AgentCreateSessionOptions,
   ): Promise<AgentSession>;
+  /** Same contract as `createSession`: open with the options, report any difference in `openOptionsPatch`. */
   resumeSession(
     handle: AgentPersistenceHandle,
     overrides?: Partial<AgentSessionConfig>,
@@ -828,7 +967,14 @@ export interface AgentClient {
   resolveCreateConfig?(input: ResolveAgentCreateConfigInput): ResolveAgentCreateConfigResult;
   isCreateConfigUnattended?(input: AgentCreateConfigUnattendedInput): boolean;
   listCommands?(config: AgentSessionConfig): Promise<AgentSlashCommand[]>;
-  listFeatures?(config: AgentSessionConfig): Promise<AgentFeature[]>;
+  /**
+   * The controls of a draft, with the options a session opened from `config` would run with:
+   * `config.providerOptions` (defaults already merged in) plus what the provider resolves
+   * natively for the ones nobody set.
+   */
+  listControls?(config: AgentSessionConfig): Promise<AgentDraftControls>;
+  /** Effective options: provider defaults from `config.json` deep-merged with the agent's own. */
+  effectiveOptions?(own: ProviderOptions | undefined): ProviderOptions;
   listImportableSessions?(
     options?: ListImportableSessionsOptions,
   ): Promise<ImportableProviderSession[]>;
@@ -841,7 +987,13 @@ export interface AgentClient {
    * Returns true if available, false otherwise.
    */
   isAvailable(signal?: AbortSignal, options?: FetchCatalogOptions): Promise<boolean>;
-  getDiagnostic?(): Promise<{ diagnostic: string }>;
+  getDiagnostic?(context: AgentClientDiagnosticContext): Promise<{ diagnostic: string }>;
+  /**
+   * Installation links and the installed version. The same contract as plugin providers'
+   * `ProviderRegistration.installation`; built-ins resolve their own launch inside `inspect`.
+   * Never consulted by availability, discovery, or session creation.
+   */
+  readonly installation?: AgentClientInstallation;
   /**
    * Archive a durable native session (best-effort). Runtime release belongs to AgentSession.close().
    * Called when Clisbot archives an agent so the provider's own UI reflects the same state.

@@ -203,7 +203,7 @@ function ViaCell({ row, open }: { row: GrantRow; open: ((viaKey: string) => void
   return (
     <View style={styles.viaLink}>
       <Button
-        size="xs"
+        size="sm"
         variant="ghost"
         onPress={press}
         accessibilityLabel={t("hub.access.table.open", { via: row.via })}
@@ -254,7 +254,7 @@ function GrantRowActions({ row, actions }: { row: GrantRow; actions: GrantAction
   }
   return (
     <View style={[styles.actions, styles.actionButtons]}>
-      <Button size="xs" variant="ghost" disabled={actions.pending} onPress={edit}>
+      <Button size="sm" variant="ghost" disabled={actions.pending} onPress={edit}>
         {editLabel(row, t)}
       </Button>
       {menu.length === 0 ? null : (

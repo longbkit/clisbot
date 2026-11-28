@@ -2,7 +2,7 @@ import { z } from "zod";
 import { readValidatedJson } from "@/storage/validated-storage";
 import { APP_SETTINGS_KEY, SETTINGS_MIGRATIONS_KEY } from "./keys";
 import type { AppSettings, KeyValueStorage, PersistedAppSettings } from "./storage";
-import { DEFAULT_TOOL_CALL_DETAIL_LEVEL } from "./tool-call-detail-level";
+import { DEFAULT_CHAT_DISPLAY } from "./tool-call-detail-level";
 
 const AppliedMigrationsSchema = z.strictObject({ applied: z.array(z.string()) });
 
@@ -17,7 +17,12 @@ const STEER_DEFAULT_MIGRATION = "steer-default";
 /** Existing mobile installs materialized the old 15px content default in storage. */
 const MOBILE_CONTENT_16_MIGRATION = "mobile-content-16";
 
-// Stored defaults cannot be distinguished from explicit choices. Reset once; subsequent choices stick.
+/**
+ * Clisbot's `toolCallDetailLevel` stored defaults could not be told apart from explicit choices,
+ * so installs were reset to latest-call grouping once; subsequent choices stick. The id is kept
+ * from that setting so installs that already ran it are not reset again. It only ever touches a
+ * display read from the legacy setting: a stored upstream `chatDisplay` is an explicit choice.
+ */
 const LATEST_CALL_DEFAULT_MIGRATION = "summary-with-latest-call-default";
 
 /**
@@ -30,7 +35,11 @@ export async function migrateAppSettings(
   settings: AppSettings,
   storage: KeyValueStorage,
   stored?: PersistedAppSettings,
-  options: { native?: boolean } = {},
+  options: {
+    native?: boolean;
+    /** False when the stored blob spelled chatDisplay out, so it is a choice, not a legacy read. */
+    chatDisplayIsLegacy?: boolean;
+  } = {},
 ): Promise<AppSettings> {
   const migrationMarker = await readValidatedJson(
     storage,
@@ -56,9 +65,9 @@ export async function migrateAppSettings(
 
   if (!applied.has(LATEST_CALL_DEFAULT_MIGRATION)) {
     migrated =
-      migrated.toolCallDetailLevel === DEFAULT_TOOL_CALL_DETAIL_LEVEL
+      options.chatDisplayIsLegacy === false || migrated.chatDisplay === DEFAULT_CHAT_DISPLAY
         ? migrated
-        : { ...migrated, toolCallDetailLevel: DEFAULT_TOOL_CALL_DETAIL_LEVEL };
+        : { ...migrated, chatDisplay: DEFAULT_CHAT_DISPLAY };
     applied.add(LATEST_CALL_DEFAULT_MIGRATION);
     addedMigration = true;
   }

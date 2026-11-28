@@ -12,6 +12,10 @@ vi.mock("./display/use-row-detail", () => ({
 }));
 vi.mock("./display/section-display-menu", () => ({ SectionDisplayMenu: () => null }));
 vi.mock("react-native", () => ({
+  Platform: {
+    OS: "web",
+    select: (values: Record<string, unknown>) => values.web ?? values.default,
+  },
   View: ({ children, testID }: { children?: ReactNode; testID?: string }) => (
     <div data-testid={testID}>{children}</div>
   ),

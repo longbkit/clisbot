@@ -84,6 +84,7 @@ function workspace(id: string, title: string, minutesAgo: number): WorkspaceSumm
     currentBranch: `feat/${id}`,
     changeRequestNumber: null,
     statusEnteredAt: new Date(Date.UTC(2026, 9, 25, 12) - minutesAgo * 60_000),
+    background: false,
   };
 }
 

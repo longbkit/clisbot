@@ -1,5 +1,6 @@
 import { runAcpProvider } from "@clisbot/plugin/server/acp";
 import type { ProviderRegistration } from "@clisbot/plugin/server/provider";
+import { createHopliteInstallation } from "./installation.js";
 import { runPhaseTransformer } from "./run-phase.js";
 
 export function createHopliteProvider(): ProviderRegistration {
@@ -14,5 +15,7 @@ export function createHopliteProvider(): ProviderRegistration {
       acpOptions: { workspaceOnlyCatalog: true },
       transformers: [runPhaseTransformer],
     }),
+    docsUrl: "https://clisbot.com/docs/supported-providers/hoplite",
+    installation: createHopliteInstallation(),
   };
 }

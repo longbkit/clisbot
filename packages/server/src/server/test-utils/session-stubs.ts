@@ -41,6 +41,8 @@ export function asAgentManager(stub: {
   return createStub<SessionOptions["agentManager"]>({
     listProviderSubagentActivity: () => [],
     getRetiredInternalAgent: () => null,
+    effectiveOptionsFor: (_provider: string, own?: Record<string, unknown>) => own ?? {},
+    getAgentBackgroundWorkSummary: () => undefined,
     ...stub,
   });
 }
@@ -49,6 +51,19 @@ export function asAgentStorage(stub: {
   [K in keyof SessionOptions["agentStorage"]]?: unknown;
 }): SessionOptions["agentStorage"] {
   return createStub<SessionOptions["agentStorage"]>({
+    listAll: async () => [],
+    listActive: async function (options) {
+      return (await this.listAll()).filter(
+        (record) => options?.includeArchived || !record.archivedAt,
+      );
+    },
+    listByWorkspaces: async function (ids, options) {
+      const selected = new Set(ids);
+      return (await this.listActive(options)).filter((record) =>
+        selected.has(record.workspaceId ?? ""),
+      );
+    },
+    lastUserMessageAtByWorkspace: async () => new Map<string, string>(),
     listByProviderSession: async () => [],
     listByWorkspace: async () => [],
     ...stub,
@@ -230,14 +245,16 @@ export function createProviderSnapshotManagerStub(): {
   const listModes = vi.fn<ProviderSnapshotManager["listModes"]>(async () => []);
   const resolveCreateConfig = vi.fn<ProviderSnapshotManager["resolveCreateConfig"]>(async () => ({
     modeId: undefined,
-    featureValues: undefined,
+    providerOptions: undefined,
   }));
   // The manifest's no-prompt marks, Full auto-accept and a provider's own auto_accept, as the
-  // real manager judges them for built-in providers.
+  // real manager judges them for built-in providers. Since v0.17 requested values arrive as
+  // `providerOptions`; legacy `featureValues` are folded into them the same way.
   const isUnattendedConfiguration = vi.fn<ProviderSnapshotManager["isUnattendedConfiguration"]>(
     async (config) =>
       config.fullAutoAccept === true ||
       config.modeId === FULL_AUTO_ACCEPT_MODE_ID ||
+      config.providerOptions?.auto_accept === true ||
       config.featureValues?.auto_accept === true ||
       AGENT_PROVIDER_DEFINITIONS.some(
         (provider) =>
@@ -313,7 +330,7 @@ export function createProviderSnapshotManagerStub(): {
 
 export function createMessageReceiptsStub(): SessionOptions["messageReceipts"] {
   return {
-    send: (input) => input.send(),
+    send: (input) => input.send(async () => {}),
   };
 }
 

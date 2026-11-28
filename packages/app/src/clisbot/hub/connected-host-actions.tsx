@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View, type PressableStateCallbackType } from "react-native";
 import { AdaptiveModalSheet } from "@/components/adaptive-modal-sheet";
-import { AddHostModal } from "@/components/add-host-modal";
+import { AddHostModal } from "@/hosts/add-host/internal/add-host-modal";
 import { Button } from "@/components/ui/button";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";

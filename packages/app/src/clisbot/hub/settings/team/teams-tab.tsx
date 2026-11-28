@@ -67,7 +67,7 @@ export function TeamsTab({
   const newTeam = useMemo(
     () =>
       canManage ? (
-        <Button size="xs" variant="outline" disabled={actions.pending} onPress={openCreate}>
+        <Button size="sm" variant="outline" disabled={actions.pending} onPress={openCreate}>
           {t("hub.team.teams.newTeam")}
         </Button>
       ) : null,

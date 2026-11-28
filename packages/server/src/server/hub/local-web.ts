@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { runLocalCliJson } from "../local-cli.js";
@@ -22,15 +22,14 @@ export async function controlHostLocalWeb(home: string, action: "start" | "statu
 
 /** Installed daemon/Desktop/OS-service startup honors saved owner intent once. */
 export async function resumeHostLocalServices(home: string): Promise<void> {
-  const read = (name: string): Record<string, unknown> => {
+  const read = async (name: string): Promise<Record<string, unknown>> => {
     try {
-      return JSON.parse(readFileSync(path.join(home, name), "utf8"));
+      return JSON.parse(await readFile(path.join(home, name), "utf8"));
     } catch {
       return {};
     }
   };
-  const web = read("web-intent.json");
-  const hub = read("hub-local.json");
+  const [web, hub] = await Promise.all([read("web-intent.json"), read("hub-local.json")]);
   if (web["enabled"] !== true && (!hub["pid"] || hub["stoppedAt"])) return;
   await runLocalCliJson({
     home,

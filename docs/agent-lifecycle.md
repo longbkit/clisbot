@@ -26,6 +26,27 @@ Registration remains initializing if subscription or automatic responder install
 while its cleanup is held or rejected. Cleanup and an already executing external close share one
 close operation for that exact runtime; they do not await a close queued behind their own lifecycle lane.
 
+## Daemon restart recovery
+
+Restart recovery is off by default. Enable `agents.resumeOnStartup` in host config or
+Host settings → Agents to resume interrupted agents after graceful shutdown or a crash. The daemon
+reopens the saved provider conversation and settings, then sends `Resume working.`. Customize
+the prompt with `agents.resumePrompt` or the same settings page.
+Disabling recovery consumes pending intent; enabling it later does not revive old work.
+
+Only agents recorded as running qualify. Idle and initializing agents stay inactive. Archived
+agents or workspaces, private helpers and Hub-owned executions retain their own lifecycle.
+Explicit creation environment overrides are saved with the agent and reapplied when reopening.
+
+Startup chooses candidates before anything else reads or repairs persisted running state, then
+opens connections and resumes every candidate in the background. A provider that is slow to reopen
+holds back only its own agent; a failed reopen is logged. Graceful shutdown records intent before
+closing runtimes.
+
+This is best-effort continuation. A crash between saving intent and dispatching a prompt can lose
+or repeat a continuation. Provider resume owns conversation restoration; there is no recovery retry
+loop or exactly-once turn guarantee.
+
 ## Runtime residency
 
 An unarchived agent may be `closed` without being deleted or archived. Closing releases its provider
@@ -95,6 +116,63 @@ draining events with nothing awaited before the agent is removed. A prompt that 
 therefore either keeps it resident or waits for a close already past that check and then resumes
 it. Internal agents are never closed this way.
 
+Idle resumable runtimes are collected after one hour without activity, checked once a minute.
+Collection releases the process and preserves the agent record, conversation, relationships, and
+provider session. The next prompt resumes that session. Set `agents.idleRuntimeCleanup: false` in
+host config to disable automatic collection. The host setting applies immediately; config-file edits
+apply on reload. Disabling invalidates pending safety checks and close admission. A close already
+started finishes. Re-enabling keeps the existing idle timestamps.
+
+Foreground runs, permissions and responses, queued deliveries, lifecycle operations, and working
+managed or native descendants prevent collection. Outstanding local or remote finish subscriptions
+also protect their caller, including registration, recovery and notification dispatch acknowledgment.
+An idle managed child can still own background work.
+
+The daemon baseline always applies. An optional provider `canStopRuntime()` adds a veto: false,
+errors and timeouts retain ownership, while true cannot override daemon blockers. Without a provider
+check, the baseline decides collection after the same one-hour idle period. Once protected work
+finishes, a fresh idle hour starts. There is no deadline that overrides a veto.
+
+Both collectors run: the certified-idle close above (30 minutes by default, providers that
+certify) and this one-hour runtime cleanup. They share one protection set: a client viewing the
+timeline, a pending agent-to-agent delivery or finish subscription, and a pending steer each hold
+the agent for both, and each collector checks it again just before closing. Close ownership stays
+separate: an agent whose close is already in flight, from either collector or an explicit close,
+is skipped, and a collector whose agent was replaced or removed before its close starts declines
+instead of failing.
+
+The `idle-runtime-cleanup/` module owns the clocks, eligibility policy and sweep lifetime.
+AgentManager supplies captured runtime capabilities and owns atomic revalidation and shutdown.
+Finish subscriptions expose caller protection through their public capability; the collector never
+reads their watches or durable records.
+
+The collector rechecks daemon state after asynchronous probes and event draining, in the existing
+close/load lifecycle lane. A prompt admitted before closure prevents collection. A prompt arriving
+after closure starts waits for release and resumes the saved session.
+
+Provider checks follow the signals their runtimes expose:
+
+- Claude uses its process-local background roster and pending completion notifications. A fresh
+  process starts empty. CLI 2.1.292 or newer is known to support the roster; older binaries must
+  demonstrate support by emitting one. Unknown versions stay resident until then.
+- Codex queries background terminals for loaded threads, including native children, and protects
+  pending provider requests. App servers without the terminal-list RPC stay resident.
+- OpenCode checks active executions and descendants. V1 checks PTYs; v2 also checks shell and
+  inbox inventories. The shared server remains leased while a session vetoes collection.
+- Pi checks streaming, compaction, pending replies, and adapter-owned operations. Known native
+  subagent signals also protect their parent through the daemon's subagent store.
+- OMP additionally requires `get_state.isSettled: true` and `hasPendingAsyncWork: false`.
+  These protect jobs with unsuppressed completion delivery, pending deliveries, queued result
+  injection, and admitted or scheduled continuations that can re-wake the session. Older OMP
+  runtimes without either field stay resident. These signals are not an inventory of arbitrary
+  processes.
+- ACP checks adapter-owned foreground turns, permissions, buffered user messages, and running
+  ACP terminals, including quiet terminals. Exited or failed-to-spawn terminal records do not
+  prevent collection. This does not inspect processes launched internally by the provider.
+
+These checks do not discover arbitrary detached processes or work hidden by third-party
+extensions. A provider plugin adds its own veto through the [runtime safety contract](../public-docs/plugins/providers.md#permit-idle-runtime-cleanup).
+
 A provider runtime can still die on its own — crash, OOM kill, host suspend. Work the agent parked
 inside that process dies with it: Claude Code's background Bash shells, `Monitor` watches, and
 workflows all live in the CLI process, and the completion notification that would have woken the
@@ -136,6 +214,12 @@ the marker. Closing a tab sets that client's label to `false`. Any `true` client
 open. Detach clears the parent and every open-tab label. The surviving child therefore becomes a
 normal root agent immediately, and closing its still-open tab archives it.
 
+Agent-scoped workspace creation records the caller's workspace as `parentWorkspaceId`.
+This is informational ancestry for future workspace grouping. It does not change placement,
+visibility, status, or archive behavior. Archiving a parent workspace preserves its children's
+records and parentage. Unscoped creation and existing workspaces have no parent; ancestry is
+never inferred from directories, projects, or Git branches.
+
 Runtime ownership is resolved from explicit workspace ID and caller context, never from `cwd`. Workspace creation is a separate operation with `local | worktree` isolation; agent creation reuses that workspace unless a new workspace is explicitly requested.
 
 Setup belongs to the workspace, including combined workspace-plus-agent creation and the supported agent `worktree` request. Run setup through the workspace workflow before launching configured terminals or scripts. Setup output is read in the Setup panel from per-command snapshots; never produce setup chat timeline rows or concatenate command logs. Legacy agent `git`/`worktreeName` inputs and hidden MCP worktree placement are rejected with workspace-creation guidance. Existing wire schemas retain an empty combined-log string for parsing compatibility.
@@ -144,12 +228,29 @@ Users can also detach an existing subagent from the subagents track. Detach is d
 
 `notifyOnFinish` defaults to `true` for agent-scoped creation and prompt follow-ups because most delegated work needs to report back to the creating agent. Set it to `false` for explicit reporting or no completion callback.
 
-Agent-originated messages and automatic notifications share a recipient-daemon delivery module. A queued receipt acknowledges admission before provider dispatch, allowing a child to report and finish in the same two-second quiet window. Human prompts dispatch directly. Conflicting explicit interruption or session-mode choices retain separate ordered dispatches.
+Agent-originated messages and automatic notifications share a recipient-daemon delivery module. A queued receipt acknowledges admission before provider dispatch. The module keeps one ordered queue per recipient, and the recipient reads its prompts in the order the daemon admitted them. Nothing overtakes an older queued message. A prompt takes its place when the daemon admits it, even while the provider is still starting an earlier turn, and a message stays in the queue until the turn that carries it starts. The turn has started when the agent manager acknowledges the run start; a turn that fails after that point is not delivered again.
 
-The pending message window is in memory. Clean shutdown flushes it before closing agents; an abrupt
-crash can lose queued prompts. A durable send receipt remains pending until actual dispatch
+An agent sender picks `queue`, `steer`, or `interrupt` with `activeTurnBehavior`. `steer` and `interrupt` mean what they mean for a person. A person's send has no `queue`. Each kind of prompt is released this way:
+
+- **`queue`** (the agent default) waits. An idle recipient gets the queue after two quiet seconds; steady arrivals cannot hold that window open past ten seconds. While the recipient has a running or starting turn (including compaction), the queue waits and is delivered together when that turn ends on its own or fails. The daemon releases it when it observes the recipient settle; a two-second timer also retries. Finish notifications and change-request updates always queue.
+- **`steer`** waits for neither the quiet window nor the turn. It is dispatched at admission as one prompt that enters the running turn: the messages queued before it, then the steer. A provider that cannot steer, or that refuses this steer, gets the prompt as a replacing turn instead, the same as a person's steer.
+- **`interrupt`** is dispatched at admission the same way, as one prompt that replaces the running turn. An older queued message cannot start a turn after the newer `interrupt` that countermands it.
+- **A person's prompt** (app, CLI, top-level MCP) is dispatched directly with its existing steer or interrupt behavior and takes the queue along the same way: the messages admitted before it first, then the person's text, in one provider prompt. Messages admitted after it follow it. The person's text keeps its own transcript row. When the turn does not start, the messages return to the queue in their place. That covers a start the provider rejects and a start that is not acknowledged within 60 seconds; a provider that starts the turn after those 60 seconds receives the messages twice.
+- **Stop** (the stop button, Escape, `cancel_agent`, a Hub interrupt) starts nothing. Messages admitted before the Stop are held, not dropped, including an interrupt whose turn had not started yet. They go ahead of the recipient's next prompt, in that prompt's turn: a person's prompt, or an agent message or notification admitted after the Stop. A held steer or interrupt no longer enters the turn; it waits like a queued message. A queue step or dispatch decided before the Stop is void, and the queue is held again when the message that reopened it is withdrawn. A replacing prompt, a reload, and a rewind are not a Stop. Neither is `cancel_agent` on a recipient with no running or starting turn: it stops nothing, reports that it canceled no run, and a queued message keeps its quiet window.
+
+The queued receipt carries the applied behavior and guidance text for the sender. The text comes from two facts known at admission: whether the recipient has a running turn, and whether its provider can steer (`AgentManager.canSteer`, which is true when the session offers `steerActiveTurn`). It does not wait for the outcome. Guidance for a message queued behind a running turn tells the sender to send a short `steer` or `interrupt` follow-up instead of resending, because the follow-up carries the queued message ahead of it and a resend would be read twice. The MCP tool, the WebSocket `send_agent_message_response`, the CLI, and the connected-host path all relay this one text.
+
+Older CLIs and connected hosts send an explicit `steer` for every default agent send. The daemon reads an agent sender's `steer` as `queue` unless the client advertises the `agent_active_turn_behaviors` capability. A new client talking to a daemon without `server_info.features.agentActiveTurnBehaviors` sends no behavior for `queue` and refuses a `steer`.
+
+A command the provider accepts out of band is the one exception to admission order: it runs alone without ending the turn. A queued command runs ahead of older messages, and a `steer` or `interrupt` that runs this way takes no queued message along. A person's command leaves the queue where it is. A prompt is a command when it starts with a slash and a name that has no second slash, so `/compact` is one and `/tmp/build.log is stale` is plain text.
+
+One provider prompt has one session mode. A batch released by a steer, an interrupt, or a person's prompt uses the latest explicit choice in it, the person's own first. Queued messages with conflicting choices keep separate ordered dispatches.
+
+The pending message window is in memory. Clean shutdown flushes it, held messages included, before
+closing agents; an abrupt crash can lose queued prompts. A durable send receipt remains pending until actual dispatch
 acknowledgment, so a lost window never becomes a completed receipt. Completion waits cover queued
-admission within their original timeout and cancellation scope.
+admission within their original timeout and cancellation scope, and return at permission
+checkpoints and when a Stop holds the queue.
 
 Finish notification intent has a separate daemon-owned lifetime. The finish-subscriptions module
 persists caller, child, host, and ownership policy through an injectable store; its JSON adapter uses
@@ -160,8 +261,10 @@ caller, child, and host into one watch.
 
 Bootstrap restores these watches after repairing stale running records to `closed` and before opening
 ingress. Reading a closed child's result does not load its provider. A finish notification reports that
-the child's run has settled; the parent decides whether its task is complete. Recovery never resumes
-child work. Archived or deleted parents suppress delivery; parent-owned creation watches also stop
+the child's run has settled; the parent decides whether its task is complete. A child chosen for restart
+recovery is observed only after its resume was sent, so the parent never hears that it was closed
+in between. Archived or deleted parents suppress delivery;
+parent-owned creation watches also stop
 reporting after detachment.
 
 Intent remains stored until the parent's notification dispatch is acknowledged. Dispatch failure
@@ -201,23 +304,42 @@ Some providers can create their own child sessions inside one provider runtime. 
 
 The provider still owns the underlying runtime. Clisbot keeps an agent record so the child can be opened, tracked, archived, and cascaded with the parent, but prompts and history hydration route through the provider adapter for that native child handle.
 
-## Background workspaces
+## Background visibility
 
-`workspace.background` controls discovery only. Background workspaces contain ordinary durable
-agents and terminals: provider history, plugin hooks, parentage, archive, and restart recovery
-keep their normal behavior. Visibility is creation-only; selecting an existing workspace cannot
-change it. New workspaces default to false, inherit the caller workspace's value when an agent
-creates one without an override, and accept explicit true or false.
+An agent is effectively background when it or its workspace is background:
+`agent.background || workspace.background`. Background controls discovery only. Background agents
+and the agents in background workspaces are ordinary durable agents: provider history, plugin
+hooks, parentage, finish notifications to a caller, archive, and restart recovery keep their
+normal behavior. Both flags are fixed at creation.
 
-The daemon derives agent discovery from workspace ownership. Default workspace and agent lists,
-including History requests, exclude background work; `filter.includeBackground` includes it.
-Exact-ID operations bypass discovery filtering. The app replicates both kinds and filters only
-its sidebar with **Show background**, so direct navigation and restored tabs remain available.
+- **Agent.** `create_agent_request.background` marks the agent. Use it for helpers the user does
+  not watch, such as a plugin's classifier in the user's open workspace. A background agent never
+  raises attention, adds nothing to its workspace's status bucket or Last prompt time, and stays
+  out of tabs, the parent's subagent track and agent lists in the app. A tab opened by id still
+  works.
+- **Workspace.** `workspace.background` hides the workspace from the sidebar unless **Show
+  background** is on.
+- **Inheritance.** When `background` is omitted, an agent created by a caller agent takes the
+  caller's own `background`. A new workspace takes the caller's effective background. A request
+  that creates its workspace applies `background` to both the agent and the workspace. Explicit
+  true or false always wins.
+
+`AgentDirectory` (`packages/server/src/server/agent/directory.ts`) owns visibility for lists.
+Default workspace and agent lists, including History requests, exclude background work;
+`includeBackground` includes it. Exact-ID operations bypass discovery filtering. The app
+replicates inclusively and filters at each surface.
+
+Sources without the `background_agents` hello capability get workspace-only visibility on
+inclusive reads and subscriptions: agents in background workspaces, but no agent-level background
+agents. Older apps replicate inclusively and auto-open a tab for every root agent, so a classifier
+run would otherwise open a tab each turn. That visibility has its own directory sync generation.
 
 Sequenced directories keep complete canonical collections. A filtered read must never replace
 those collections with its subset. Inclusive and default observations have distinct cursor
 scopes, so changing scope requires a fresh snapshot rather than reusing an incomplete cache.
-Clients gate creation and inclusive discovery on `features.backgroundWorkspaces`.
+Clients gate background workspaces and inclusive discovery on `features.backgroundWorkspaces`.
+They gate a background agent placed in an existing workspace or under a caller on
+`features.backgroundAgents`.
 
 ### Private daemon helpers
 
@@ -250,12 +372,36 @@ Workspace archive is a separate lifecycle. Archiving or removing a worktree can 
 agent record without setting the agent's `archivedAt`, while its `workspaceId` still points at the
 archived workspace. History navigation must not infer workspace lifecycle from `agent.archivedAt`
 or mutate either lifecycle. The workspace route asks the daemon for authoritative recovery state;
-only the route's explicit Unarchive or Restore action changes the archived workspace.
+the route exposes explicit Unarchive and Restore actions.
+
+Workspace archive is undoable from the archived toast, or with Cmd/Ctrl+Z, while the toast is up.
+The daemon runs one archive lane per workspace, shared by every connection
+(`packages/server/src/server/workspace-archive-operations.ts`):
+
+| A request arrives while  | Result                                                    |
+| ------------------------ | --------------------------------------------------------- |
+| an archive runs: archive | joins the running archive                                 |
+| an archive runs: undo    | aborts the archive, waits for it to settle, then restores |
+| an undo runs: archive    | waits for the undo, then archives                         |
+| an undo runs: undo       | joins the running undo                                    |
+
+A request takes its place in the lane before its first `await`. Arrival order decides, so an undo
+sent right behind its archive still cancels it.
+
+An aborted archive stops at its next checkpoint and reports `canceled`; the undo unarchives only
+the agents that archive itself archived. Deleting the worktree directory is the point of no
+return: an undo after it recreates the worktree through workspace recovery. The client shows or
+hides the row by the latest local intent, so a late remove or upsert from a superseded request
+does not flip it back. Tabs and layout are purged only once the undo window closes with the
+archive committed.
 
 History navigation opens the selected agent without changing either archive state. Workspace
-**Restore** recovers only the workspace; the selected archived agent stays open with its callout.
-The agent's **Unarchive** runs the provider's native unarchive hook before interactive resume and
-history hydration. Other archived agents stay archived.
+**Unarchive**, **Restore**, Undo, and reopening the directory recover the agents closed by that
+workspace archive, including
+after a daemon restart or after the toast expires. Agents archived individually beforehand stay
+archived. A failed worktree recreation leaves the workspace and its agents archived for retry.
+Each recovered agent runs the provider's native unarchive hook before interactive resume and
+history hydration.
 
 Opening an agent is a navigation choice, independent of whether its details are cached. The
 layout retains that choice across reload while the panel fetches the agent from the daemon.
@@ -304,16 +450,26 @@ Workspace status is an aggregate activity signal computed **per `workspaceId`**.
 
 Running provider-native subagents contribute `running` to the workspace owned by their parent agent. Their completed, failed, and canceled states stay in the parent's subagents track.
 
-A finished workspace can be marked unread after it has been reviewed. The daemon restores
-`finished` attention on its newest eligible workspace-root agent without sending a new completion
-notification. Opening the workspace clears that attention through the normal focus flow.
+A finished or failed workspace can be marked unread after it has been reviewed. The daemon restores
+attention on its newest eligible workspace-root agent, `error` for an agent whose lifecycle is
+`error` and `finished` otherwise, without sending a new notification. Opening a workspace restores
+its selected tab; attention on another agent remains unread until that agent is focused or the
+workspace is explicitly marked read.
 
-Attention is set by the agent finishing or failing and cleared by the client's
-`workspace.clear_attention`, which fires when the user reads the chat. Loading an agent's runtime is
+Attention is set by the agent finishing or failing and acknowledged by deliberate focus or
+interaction with its chat, including repeat clicks in an already focused pane. A completion
+arriving while focused stays unread until the next interaction; leaving does not acknowledge it. Loading an agent's runtime is
 neither, so resuming carries the stored attention and the stored last-activity time through
 untouched. Forging either makes a background resume look like the user read a workspace and like the
 agent worked in it just now, which rewrites the sidebar timestamp permanently — persisted
 `updatedAt` is what workspace `statusEnteredAt` is re-derived from on the next daemon start.
+
+The `failed` bucket follows unread `error` attention, not lifecycle status. An agent stays `error`
+until its next turn starts, so reading the chat dismisses the red dot the same way it dismisses the
+green one. For the same reason every new failure raises `error` attention, including a failed reload
+that leaves the lifecycle at `error`, and replaces unread `finished` attention; otherwise the failed
+agent would show the green dot or none. Subagents track marks are the exception: they follow the
+child's lifecycle, because the track is where a failed child stays visible.
 
 ## The subagents track
 
@@ -329,7 +485,7 @@ parentAgentId === thisAgent.id  AND  !archivedAt
 
 - **Provider subagents** are child executions owned by Claude, Codex, or OpenCode. They are not inserted into `AgentManager` as managed agents. Providers emit a separate descriptor and timeline stream through `agent.provider_subagents.*`; the client keeps that state outside the normal agent store and merges only the presentation rows into the track. A descriptor's optional `parentSubagentId` identifies its direct provider-subagent parent; an absent value identifies a direct child of the managed agent.
 
-Clicking either kind opens a workspace tab. On compact layouts it opens in a [sheet](explorer-sidebar.md#sheets) over the subagents list instead; the sheet hides the composer and shows the agent's model and thinking as one line in its place (`PaneSubtitle`, the row provider subagents already use), and a Clisbot subagent's sheet offers **Open as tab** (the full-screen glyph in the header) to get the composer back. A Clisbot subagent tab is a normal interactive agent pane. A provider subagent tab is a read-only timeline pane with no composer, archive, detach, rewind, or fork actions. It shows its own direct children in a subagents track. Both panes use `AgentStreamView`, so message, reasoning, tool-call, and layout rendering stay identical.
+Clicking either kind opens a workspace tab. On compact layouts it opens in a [sheet](explorer-sidebar.md#sheets) instead, replacing the subagents list in place (Back returns to the list); the sheet hides the composer and shows the agent's model and thinking as one line in its place (`PaneSubtitle`, the row provider subagents already use), and a Clisbot subagent's sheet offers **Open as tab** (the full-screen glyph in the header) to get the composer back. A Clisbot subagent tab is a normal interactive agent pane. A provider subagent tab is a read-only timeline pane with no composer, archive, detach, rewind, or fork actions. It shows its own direct children in a subagents track. Every subagent pane links back to its parent (`packages/app/src/subagents/parent/`): a pill above the composer when there is one, a parent box in the composer's place when there is not. Both panes use `AgentStreamView`, so message, reasoning, tool-call, and layout rendering stay identical.
 
 Provider timelines use the same structural timeline item format but deliberately have a separate lifecycle and transport. A provider thread/session identifier is not a Clisbot agent identifier, and closing its tab is always layout-only.
 

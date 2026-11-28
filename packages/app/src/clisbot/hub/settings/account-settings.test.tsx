@@ -39,7 +39,9 @@ const inventory = vi.hoisted(() => ({
   retry: vi.fn(),
 }));
 vi.mock("../host-inventory", () => ({ useHostInventory: () => inventory }));
-vi.mock("@/components/add-host-modal", () => ({
+// Upstream v0.17 moved the add-host modal under @/hosts/add-host; owner setup opens its scan step.
+vi.mock("@/hosts/add-host", () => ({ useAddHost: () => vi.fn() }));
+vi.mock("@/hosts/add-host/internal/add-host-modal", () => ({
   AddHostModal: ({
     visible,
     onClose,

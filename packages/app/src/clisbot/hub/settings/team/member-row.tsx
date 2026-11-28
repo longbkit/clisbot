@@ -70,7 +70,7 @@ export function MemberRow({
     <View style={styles.cellLine}>
       <Text style={tableStyles.cellText}>{memberTeamNames(member, teams)}</Text>
       {canEditTeams && (teams.length > 0 || needsTeam(member, teams)) ? (
-        <Button size="xs" variant="ghost" disabled={pending} onPress={editTeams}>
+        <Button size="sm" variant="ghost" disabled={pending} onPress={editTeams}>
           {teams.length === 0 ? t("hub.team.actions.addToTeam") : t("hub.team.actions.editTeams")}
         </Button>
       ) : null}

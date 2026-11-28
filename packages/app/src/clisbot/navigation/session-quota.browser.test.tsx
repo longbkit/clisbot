@@ -47,8 +47,10 @@ vi.mock("@/hooks/use-app-visible", async () => {
       ),
   };
 });
+// Upstream v0.17 reads the usage setting from daemon config (useDaemonConfig -> useHostRuntimeClient).
 vi.mock("@/runtime/host-runtime", () => ({
   useHostRuntimeIsConnected: () => true,
+  useHostRuntimeClient: () => null,
   useHostRuntimeConnectionStatuses: () => new Map(),
   useHosts: () => [],
   getHostRuntimeStore: () => ({

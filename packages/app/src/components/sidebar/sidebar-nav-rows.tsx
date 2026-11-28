@@ -41,6 +41,12 @@ interface SidebarNavRowsProps extends SidebarNavRowProps {
 
 const TAB_DESTINATIONS: ReadonlySet<BuiltinSidebarNavId> = new Set(["history", "schedules"]);
 
+/** The top-level items the user keeps visible, in display order. */
+export function useVisibleSidebarNavItems() {
+  const { items } = useSidebarNavItems("header");
+  return useMemo(() => items.filter((item) => item.visible), [items]);
+}
+
 /**
  * Top-level sidebar navigation, ordered and filtered by the user's
  * `sidebarNavItems` preference. Renders nothing — not even the bordered group

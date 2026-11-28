@@ -216,7 +216,7 @@ export function ProviderApplicationSettings() {
   const headerActions = useMemo(
     () => (
       <View style={styles.headerActions}>
-        <Button size="xs" variant="ghost" disabled={applications.isFetching} onPress={refresh}>
+        <Button size="sm" variant="ghost" disabled={applications.isFetching} onPress={refresh}>
           {t("hub.settings.providerApplications.refresh")}
         </Button>
         <Button
@@ -737,7 +737,7 @@ function ProviderGuideCopyRow({
           {value}
         </Text>
       </View>
-      <Button size="xs" variant="outline" onPress={copyValue}>
+      <Button size="sm" variant="outline" onPress={copyValue}>
         {copied === copyKey
           ? t("hub.settings.providerApplications.copied")
           : t("hub.settings.providerApplications.copy")}
@@ -765,7 +765,7 @@ function ProviderGuideManifest({
     <View style={styles.manifest}>
       <View style={styles.copyRow}>
         <Text style={styles.copyLabel}>{t("hub.settings.providerApplications.manifest")}</Text>
-        <Button size="xs" variant="outline" onPress={copyManifest}>
+        <Button size="sm" variant="outline" onPress={copyManifest}>
           {copied === copyKey
             ? t("hub.settings.providerApplications.copied")
             : t("hub.settings.providerApplications.copy")}

@@ -21,6 +21,12 @@ const FORK_HISTORY_OMITTED = "[Earlier chat history omitted]\n";
 const FORK_MESSAGE_TRUNCATED = "\n[Message truncated]\n";
 /** Room below this is too small for a useful excerpt of the entry that crosses the budget. */
 const MIN_FORK_EXCERPT_BYTES = 2_000;
+/** The only kinds a fork copies; the checkpoint check and the paged reader use the same list. */
+export const FORK_CONTEXT_KINDS: readonly AgentTimelineItem["type"][] = [
+  "user_message",
+  "assistant_message",
+  "tool_call",
+];
 
 interface ActivityCuratorOptions {
   maxItems?: number;
@@ -86,7 +92,7 @@ function formatToolSummary(summary: string | undefined): string | null {
 function inputFromUnknownDetail(
   detail: Extract<AgentTimelineItem, { type: "tool_call" }>["detail"],
 ): unknown {
-  return detail.type === "unknown" ? detail.input : null;
+  return detail.type === "unknown" ? detail.input : undefined;
 }
 
 function projectForCuration(items: readonly AgentTimelineItem[]): AgentTimelineItem[] {
@@ -140,6 +146,17 @@ function appendAgentMessageEntries(entries: ActivityEntry[], message: AgentMessa
   if (body) entries.push(activityEntry(body));
 }
 
+// COMPAT(subagent-log): sessions stored before sub-agents became launch markers carry the
+// child's activity in `log`; current producers send it empty.
+function appendLegacySubAgentLogEntry(
+  entries: ActivityEntry[],
+  item: Extract<AgentTimelineItem, { type: "tool_call" }>,
+) {
+  if (item.detail.type === "sub_agent" && item.detail.log?.trim()) {
+    entries.push(activityEntry(item.detail.log.trim()));
+  }
+}
+
 function curateProjectedActivityEntries(
   items: readonly AgentTimelineItem[],
   options?: ActivityCuratorOptions,
@@ -172,9 +189,7 @@ function curateProjectedActivityEntries(
           break;
         }
         entries.push(formatToolCallEntry(item, options));
-        if (item.detail.type === "sub_agent" && item.detail.log.trim()) {
-          entries.push(activityEntry(item.detail.log.trim()));
-        }
+        appendLegacySubAgentLogEntry(entries, item);
         break;
       }
       case "todo":
@@ -256,7 +271,9 @@ function selectForkContextRows(input: {
   const boundaryMessageId = input.boundaryMessageId?.trim() || null;
   if (!boundaryCursor && !boundaryMessageId) {
     return {
-      items: projectedRows.map((entry) => entry.item),
+      items: projectedRows
+        .filter((entry) => FORK_CONTEXT_KINDS.includes(entry.item.type))
+        .map((entry) => entry.item),
       endSeq: input.rows.at(-1)?.seq ?? 0,
       boundaryCursor: null,
       boundaryMessageId: null,
@@ -282,19 +299,27 @@ function selectForkContextRows(input: {
     );
   }
   const boundarySeq = projectedRows[boundaryIndex].seqEnd;
-  if (projectedRows.some((row) => row.seqStart <= boundarySeq && row.seqEnd > boundarySeq)) {
+  // A copied row that spans the checkpoint was updated after it, and the projection keeps only
+  // its latest payload: its state at the checkpoint is unknown, and copying it would put later
+  // results into the fork. Plugin cards also stretch across later updates, but a fork never
+  // copies them.
+  if (
+    projectedRows.some(
+      (row) =>
+        FORK_CONTEXT_KINDS.includes(row.item.type) &&
+        row.seqStart <= boundarySeq &&
+        row.seqEnd > boundarySeq,
+    )
+  ) {
     throw new Error(
       "This checkpoint changed after it was created. Fork from a later completed response instead.",
     );
   }
-  const projected = projectedRows.filter((row) => row.seqEnd <= boundarySeq);
+  const items = projectedRows
+    .filter((row) => row.seqEnd <= boundarySeq && FORK_CONTEXT_KINDS.includes(row.item.type))
+    .map((row) => row.item);
 
-  return {
-    items: projected.map((entry) => entry.item),
-    endSeq: boundarySeq,
-    boundaryCursor,
-    boundaryMessageId,
-  };
+  return { items, endSeq: boundarySeq, boundaryCursor, boundaryMessageId };
 }
 
 function trimContextMetadata(value: string | null | undefined): string | null {
@@ -404,7 +429,7 @@ export function buildAgentForkContextAttachment(input: {
   const entries = curateProjectedActivityEntries(selected.items, {
     maxItems: 0,
     labelAssistantMessages: true,
-    includeKinds: ["user_message", "assistant_message", "tool_call"],
+    includeKinds: FORK_CONTEXT_KINDS,
     includeExternalToolInput: false,
   });
   const metadata = { agentTitle: input.agentTitle, cwd: input.cwd };

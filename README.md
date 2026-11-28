@@ -56,7 +56,7 @@
 - **Built-in orchestration:** Agents in Clisbot can create worktrees, launch other agents, and talk to them, across providers.
 - **Complete development workflow:** Edit files, review diffs, open pull requests, and run terminals, in split panes you arrange how you want.
 - **Self-hosted:** Agents run on your machine with your full dev environment. Use your tools, your configs, and your skills.
-- **Freedom to choose:** 40+ agent options: Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code are built in; explore 39 ACP catalog presets including Grok. Pick the model for each task.
+- **Freedom to choose:** 40+ agent options: Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code are built in; explore 40 ACP catalog presets including Grok. Pick the model for each task.
 - **Voice control:** Dictate tasks or talk through problems in voice mode. Hands-free when you need it.
 - **Cross-device:** iOS, Android, desktop, web, and CLI. Start work at your desk, check in from your phone, script it from the terminal.
 - **Privacy controls:** Supported production app builds enable optional usage analytics by default. You can turn it off in Settings → General → Privacy. See [analytics scope and controls](docs/product-analytics.md).
@@ -115,8 +115,12 @@ You need at least one agent CLI installed and configured with your credentials:
 - [GitHub Copilot](https://github.com/features/copilot/cli/)
 - [OpenCode](https://github.com/anomalyco/opencode)
 - [Pi](https://pi.dev)
-- [Antigravity](https://clisbot.com/docs/supported-providers#antigravity)
-- [Muse Code](https://clisbot.com/docs/muse-code)
+- [Antigravity](https://clisbot.com/docs/supported-providers/antigravity)
+- [Muse Code](https://clisbot.com/docs/supported-providers/muse-code)
+- [fx](https://clisbot.com/docs/supported-providers/fx)
+- [Hoplite](https://clisbot.com/docs/supported-providers/hoplite)
+
+Clisbot also runs Cursor, Gemini CLI, and many other agents. See [Supported providers](https://clisbot.com/docs/supported-providers) for the full list and setup steps.
 
 ### Desktop app (recommended)
 

@@ -102,6 +102,11 @@ export function rebrandHubDocs(path, input, siteHost = "clisbot.com") {
   }
   for (const [before, after] of fixes.get(path) ?? []) output = output.replace(before, after);
   if (/__UPSTREAM_HOSTED_HUB__|\/docs\/hub\/hosted(?:\.md)?(?:[\s)#/]|$)/.test(output)) {
+    // A normalized merge base (scripts/upstream-sync/normalized-base.sh) is a throwaway
+    // comparison copy of an older release that predates these rules; never published.
+    if (process.env.CLISBOT_REBRAND_COMPARISON_BASE === "1") {
+      return output.replaceAll("__UPSTREAM_HOSTED_HUB__", `https://hub.${siteHost}`);
+    }
     throw new Error(`Review upstream hosted Hub publication claims: ${path}`);
   }
   return output;

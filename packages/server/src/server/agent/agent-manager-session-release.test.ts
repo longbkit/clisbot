@@ -7,6 +7,7 @@ import type { ChildProcess } from "node:child_process";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { createTestLogger } from "../../test-utils/test-logger.js";
+import { createAgentMessageDeliveryStub } from "../test-utils/session-stubs.js";
 import { AgentManager } from "./agent-manager.js";
 import { AgentStorage } from "./agent-storage.js";
 import { ensureAgentLoaded } from "./agent-loading.js";
@@ -100,7 +101,9 @@ class ScriptedSession implements AgentSession {
   isIdleForRelease(): boolean {
     return !this.backgroundWork;
   }
+  closeCalls = 0;
   async close(): Promise<void> {
+    this.closeCalls += 1;
     this.closeStarted = true;
     await this.heldClose;
     this.closed = true;
@@ -202,6 +205,7 @@ function createFixture(
 
 async function sendPrompt(fixture: Fixture, agentId: string, prompt: string): Promise<void> {
   await sendPromptToAgent({
+    agentMessages: createAgentMessageDeliveryStub(),
     agentManager: fixture.manager,
     agentStorage: fixture.storage,
     agentId,
@@ -530,4 +534,88 @@ test("an ACP session is never closed as idle, because ACP cannot report backgrou
     await storage.flush();
     rmSync(workdir, { recursive: true, force: true });
   }
+});
+
+describe("both idle collectors share one set of protections", () => {
+  async function idleAgent(fixture: Fixture) {
+    const created = await fixture.manager.createAgent(
+      { provider: "codex", cwd: fixture.workdir },
+      undefined,
+      { workspaceId: undefined },
+    );
+    await sendPrompt(fixture, created.id, "hello");
+    return created;
+  }
+
+  function candidate(fixture: Fixture, agentId: string) {
+    const found = fixture.manager
+      .getRuntimeCleanupCandidates()
+      .find((entry) => entry.agentId === agentId);
+    if (!found) throw new Error("missing cleanup candidate");
+    return found;
+  }
+
+  test("neither collector closes a session a client is viewing", async () => {
+    const fixture = createFixture();
+    const created = await idleAgent(fixture);
+    fixture.manager.setAgentTimelineViewedProbe((agentId) => agentId === created.id);
+
+    const runtime = candidate(fixture, created.id);
+    expect(runtime.isEligible()).toBe(false);
+    expect(await runtime.closeIfEligible(() => true)).toBe(false);
+    fixture.clock.advance(IDLE_MS);
+    await fixture.manager.waitForAgentClose(created.id);
+
+    expect(fixture.manager.getAgent(created.id)).not.toBeNull();
+    expect(fixture.client.sessions[0]!.closeCalls).toBe(0);
+  });
+
+  test("neither collector closes a session that still owes a delivery", async () => {
+    const fixture = createFixture();
+    const created = await idleAgent(fixture);
+    let pending = true;
+    fixture.manager.setPendingAgentDeliveryProbe((agentId) => pending && agentId === created.id);
+
+    const runtime = candidate(fixture, created.id);
+    expect(runtime.isEligible()).toBe(false);
+    expect(await runtime.closeIfEligible(() => true)).toBe(false);
+    fixture.clock.advance(IDLE_MS);
+    await fixture.manager.waitForAgentClose(created.id);
+    expect(fixture.manager.getAgent(created.id)).not.toBeNull();
+
+    // Once the delivery settles, the runtime collector may close it.
+    pending = false;
+    expect(await candidate(fixture, created.id).closeIfEligible(() => true)).toBe(true);
+    expect(fixture.client.sessions[0]!.closeCalls).toBe(1);
+  });
+
+  test("a delivery admitted after a session was chosen blocks its close", async () => {
+    const fixture = createFixture();
+    const created = await idleAgent(fixture);
+    let pending = false;
+    fixture.manager.setPendingAgentDeliveryProbe((agentId) => pending && agentId === created.id);
+
+    const runtime = candidate(fixture, created.id);
+    expect(runtime.isEligible()).toBe(true);
+    pending = true;
+
+    expect(await runtime.closeIfEligible(() => true)).toBe(false);
+    expect(fixture.manager.getAgent(created.id)).not.toBeNull();
+    expect(fixture.client.sessions[0]!.closeCalls).toBe(0);
+  });
+
+  test("both collectors claiming the same idle session close it once", async () => {
+    const fixture = createFixture();
+    const created = await idleAgent(fixture);
+    const runtime = candidate(fixture, created.id);
+
+    fixture.clock.advance(IDLE_MS);
+    const runtimeClose = runtime.closeIfEligible(() => true);
+    await fixture.manager.waitForAgentClose(created.id);
+    await runtimeClose;
+
+    expect(fixture.manager.getAgent(created.id)).toBeNull();
+    expect(fixture.client.sessions).toHaveLength(1);
+    expect(fixture.client.sessions[0]!.closeCalls).toBe(1);
+  });
 });

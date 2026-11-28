@@ -38,7 +38,9 @@ function QueueImageThumb({
 }) {
   const { t } = useTranslation();
   const preview = useAttachmentPreviewUrl(source.type === "attachment" ? source.metadata : null);
-  const uri = source.type === "uri" ? source.uri : preview;
+  // A stored attachment shows once its preview URL resolves; loading and failed show no image.
+  const previewUri = preview.status === "ready" ? preview.url : null;
+  const uri = source.type === "uri" ? source.uri : previewUri;
   const open = useCallback(() => onOpen(source), [onOpen, source]);
   const image = useMemo(() => (uri ? { uri } : null), [uri]);
   return (

@@ -88,8 +88,11 @@ function ConfiguredAgent({
 }) {
   const modelPicker = useQuickStartPicker("model");
   const providers = useMemo(
-    () => buildSelectableProviderSelectorProviders(snapshot.entries),
-    [snapshot.entries],
+    () =>
+      buildSelectableProviderSelectorProviders(snapshot.entries, {
+        selectedProvider: config.provider || null,
+      }),
+    [snapshot.entries, config.provider],
   );
   const providerEntry = snapshot.entries?.find((e) => e.provider === config.provider);
   const modelEntry =

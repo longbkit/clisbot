@@ -13,7 +13,7 @@ import { DensityIcon } from "@/components/ui/density-icon";
 import { Shortcut } from "@/components/ui/shortcut";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { useHasFinePointer } from "@/hooks/use-fine-pointer";
+import { usePointerCapabilities } from "@/hooks/pointer-capabilities";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import { usePanelStore } from "@/stores/panel-store";
@@ -60,7 +60,7 @@ export function FooterIconButton({
   indicatorTestID?: string;
 }) {
   const compact = useIsCompactFormFactor();
-  const finePointer = useHasFinePointer();
+  const { finePointer } = usePointerCapabilities();
 
   return (
     <Tooltip delayDuration={300}>
@@ -111,7 +111,7 @@ export function FooterSearchField() {
   const shortcutKeys = useShortcutKeys("toggle-command-center");
   const setCommandCenterOpen = useKeyboardShortcutsStore((state) => state.setCommandCenterOpen);
   const compact = useIsCompactFormFactor();
-  const finePointer = useHasFinePointer();
+  const { finePointer } = usePointerCapabilities();
   const showMobileAgent = usePanelStore((state) => state.showMobileAgent);
   const openSearch = useCallback(() => {
     if (compact && !HOME_V2_ENABLED) showMobileAgent();

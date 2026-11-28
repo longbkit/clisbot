@@ -109,12 +109,12 @@ export function NavigationHomeFeed({
             <View style={styles.markAll}>
               {/* Held while the reader is on Home; applying is the reader's choice, not a banner. */}
               {pending > 0 ? (
-                <Button size="xs" variant="ghost" onPress={update} testID="home-activity-apply">
+                <Button size="sm" variant="ghost" onPress={update} testID="home-activity-apply">
                   {t("navigation.updates", { count: pending })}
                 </Button>
               ) : null}
               {unseen.length > 1 ? (
-                <Button size="xs" variant="ghost" onPress={markAll} testID="home-mark-all-seen">
+                <Button size="sm" variant="ghost" onPress={markAll} testID="home-mark-all-seen">
                   {t("navigation.actions.markAllSeen")}
                 </Button>
               ) : null}

@@ -52,13 +52,14 @@ Betas are the best way to get fixes and features early. If you hit a bug, report
 
 ### How to join the beta channel
 
-In the desktop app:
+| Platform       | How to get betas                                                                                                |
+| -------------- | --------------------------------------------------------------------------------------------------------------- |
+| iOS and iPadOS | No beta build yet: Clisbot has no TestFlight. Open the web app from the pairing link.                           |
+| Android        | Download the APK from a prerelease on the [GitHub releases page](https://github.com/longbkit/clisbot/releases). |
+| Desktop        | Open **Settings → About** and select **Beta** under **Release channel**.                                        |
+| CLI            | Run `npm install -g @clisbot/cli@beta`. Plain `npm install -g @clisbot/cli` stays on stable.                    |
 
-1. Open **Settings**
-2. Go to **About**
-3. Under **Release channel**, select **Beta**
-
-The app will check for beta updates from then on.
+The desktop app checks for beta updates from the moment you select **Beta**.
 
 ## App stores
 

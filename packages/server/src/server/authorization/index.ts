@@ -37,7 +37,7 @@ export class SessionAuthorization {
     this.resources = resources ?? null;
   }
 
-  allowsInbound(message: SessionInboundMessage): boolean {
+  allowsInbound(message: Pick<SessionInboundMessage, "type">): boolean {
     return (
       this.hasActiveLease() &&
       (this.allows(requiredPermissionForInbound(message.type)) ||

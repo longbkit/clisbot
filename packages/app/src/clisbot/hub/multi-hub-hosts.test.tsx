@@ -462,6 +462,7 @@ test("a pending Hub does not block startup through another Hub's ready Host", as
     workspaceSelectionStatus: "missing",
     isWorkspaceSelectionLoaded: true,
     hasGivenUpWaitingForHost: true,
+    isWaitingForSetup: false,
   });
   expect(result.kind).toBe("redirect");
   await act(() => selectHubProfile("company"));

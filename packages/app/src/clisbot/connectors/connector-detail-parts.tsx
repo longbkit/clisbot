@@ -117,7 +117,7 @@ function UsedByRow({
             .join(" · ")}
         </Text>
       </View>
-      <Button size="xs" variant="ghost" onPress={open}>
+      <Button size="sm" variant="ghost" onPress={open}>
         {t("connectors.screen.common.edit")}
       </Button>
     </View>

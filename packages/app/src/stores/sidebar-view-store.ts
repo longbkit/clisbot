@@ -111,6 +111,7 @@ interface SidebarViewStoreState {
   pinHostFilter: (serverId: string) => void;
   clearHostFilters: () => void;
   clearAllFilters: () => void;
+  focusHost: (serverId: string) => void;
   toggleProjectFilter: (viewKey: string) => void;
   clearProjectFilters: () => void;
   toggleLabelFilter: (name: string) => void;
@@ -292,6 +293,15 @@ export const useSidebarViewStore = create<SidebarViewStoreState>()(
       clearAllFilters: () =>
         set({
           hostFilters: [],
+          projectFilters: [],
+          labelFilter: emptyLabelFilter(),
+          userFilters: [],
+          channelFilters: [],
+        }),
+      // An explicit navigation target must not be hidden by another host's facets.
+      focusHost: (serverId) =>
+        set({
+          hostFilters: [serverId],
           projectFilters: [],
           labelFilter: emptyLabelFilter(),
           userFilters: [],

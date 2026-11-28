@@ -1,4 +1,5 @@
-import type { AgentMode } from "@clisbot/protocol/agent-types";
+import type { AgentMode, AgentOptionControl, ProviderOptions } from "@clisbot/protocol/agent-types";
+import { readToggleOption } from "@/agent-controls/option-controls";
 import { FULL_AUTO_ACCEPT_MODE_ID } from "@clisbot/protocol/full-auto-accept";
 import type { ComposerPickerResources } from "@/i18n/resources/composer-picker";
 
@@ -98,6 +99,22 @@ export function isProviderAutoAcceptOn(
       (feature) => feature.id === PROVIDER_AUTO_ACCEPT_FEATURE_ID && feature.value === true,
     ) ?? false
   );
+}
+
+/**
+ * A session's provider `auto_accept`, read from its options the way its toggle control reads it
+ * (the control's default when the option is unset); an option with no control must be `true`.
+ */
+export function isAgentProviderAutoAcceptOn(agent: {
+  options?: ProviderOptions;
+  controls?: readonly AgentOptionControl[];
+}): boolean {
+  const options = agent.options ?? {};
+  const control = agent.controls?.find(
+    (candidate) => candidate.key === PROVIDER_AUTO_ACCEPT_FEATURE_ID,
+  );
+  if (control?.type === "toggle") return readToggleOption(control, options);
+  return options[PROVIDER_AUTO_ACCEPT_FEATURE_ID] === true;
 }
 
 /** Picking any mode but Full auto-accept turns a hidden provider `auto_accept` off. */

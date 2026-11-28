@@ -26,6 +26,8 @@ type Judge = Pick<ProviderSnapshotManager, "isUnattendedConfiguration">;
 export interface UnattendedRequest {
   modeId?: string | null;
   featureValues?: Record<string, unknown>;
+  /** A stored or inherited session config (a schedule's target) names them `providerOptions`. */
+  providerOptions?: Record<string, unknown> | null;
 }
 
 export interface AgentLocation {
@@ -48,19 +50,29 @@ export interface AgentUnattendedGuard {
   ): Promise<void>;
 }
 
+function requestedOptions(request: UnattendedRequest): Record<string, unknown> {
+  return { ...request.providerOptions, ...request.featureValues };
+}
+
 function asksForSomething(request: UnattendedRequest): boolean {
   return (
     (request.modeId !== undefined && request.modeId !== null) ||
-    Object.keys(request.featureValues ?? {}).length > 0
+    Object.keys(requestedOptions(request)).length > 0
   );
 }
 
 function toConfig(target: AgentLocation, request: UnattendedRequest): AgentSessionConfig {
+  const options = requestedOptions(request);
   return {
     provider: target.provider,
     cwd: target.cwd,
     ...(request.modeId ? { modeId: request.modeId } : {}),
-    ...(request.featureValues ? { featureValues: request.featureValues } : {}),
+    // Since v0.17 providers read requested values as `providerOptions`; the tools still call
+    // them features, and a schedule's inherited config already names them `providerOptions`.
+    // Judge both where the provider and Managed Access look.
+    ...(Object.keys(options).length > 0
+      ? { providerOptions: options as AgentSessionConfig["providerOptions"] }
+      : {}),
   };
 }
 

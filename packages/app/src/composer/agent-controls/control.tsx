@@ -2,6 +2,7 @@ import { forwardRef, useMemo, type ComponentProps } from "react";
 import { Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
+import { toolbarContentSlot, toolbarSlot } from "@/components/ui/control-geometry";
 import { useComposerControlLayout } from "@/composer/agent-controls/layout-context";
 import { ComposerToolbarGlyph } from "@/composer/agent-controls/glyph";
 import type { AgentControlIcon } from "@/agent-controls/icons";
@@ -42,6 +43,17 @@ function resolveAgentControlHitSlop(
     return TOOLBAR_LABEL_HIT_SLOP;
   }
   return TOOLBAR_ICON_HIT_SLOP;
+}
+
+/** An explicit icon color wins; a sheet row stays muted; a toolbar glyph follows its tone. */
+function resolveAgentControlIconColor(
+  iconColor: string | undefined,
+  isSheet: boolean,
+  tone: ReturnType<typeof useComposerControlLayout>["glyphs"]["label"]["tone"],
+): string {
+  if (iconColor !== undefined) return iconColor;
+  if (isSheet) return styles.iconColor.color;
+  return tone === "foreground" ? styles.iconColorForeground.color : styles.iconColor.color;
 }
 
 function buildAgentControlTriggerStyle(input: {
@@ -90,12 +102,13 @@ export const AgentControlTrigger = forwardRef<View, AgentControlTriggerProps>(
     },
     ref,
   ) {
-    const { glyphSize } = useComposerControlLayout();
+    const { glyphs } = useComposerControlLayout();
+    const glyphRole = showToolbarLabel ? "label" : "icon";
+    const glyph = glyphs[glyphRole];
     const isSheet = surface === "sheet";
     const isSwitch = accessibilityRole === "switch";
     const isDisabled = disabled === true;
-    const resolvedGlyphSize = isSheet ? 16 : glyphSize;
-    const resolvedIconColor = iconColor ?? styles.iconColor.color;
+    const resolvedIconColor = resolveAgentControlIconColor(iconColor, isSheet, glyph.tone);
     const showValue = isSheet || showToolbarLabel;
     const resolvedHitSlop = resolveAgentControlHitSlop(hitSlop, surface, showToolbarLabel);
     const selectedForeground = selected ? { color: resolvedIconColor } : null;
@@ -131,14 +144,15 @@ export const AgentControlTrigger = forwardRef<View, AgentControlTriggerProps>(
         accessibilityLabel={accessibilityLabel}
         testID={testID}
         chevron={showCaret ? undefined : null}
+        block={isSheet}
       >
         {isSheet ? (
           <View style={styles.sheetGlyph}>
-            <Icon size={resolvedGlyphSize} color={resolvedIconColor} />
+            <Icon size={16} color={resolvedIconColor} />
           </View>
         ) : (
-          <ComposerToolbarGlyph size={resolvedGlyphSize}>
-            <Icon size={resolvedGlyphSize} color={resolvedIconColor} />
+          <ComposerToolbarGlyph role={glyphRole}>
+            <Icon size={glyph.size} strokeWidth={glyph.strokeWidth} color={resolvedIconColor} />
           </ComposerToolbarGlyph>
         )}
         {isSheet ? (
@@ -165,18 +179,17 @@ export const AgentControlTrigger = forwardRef<View, AgentControlTriggerProps>(
 
 const styles = StyleSheet.create((theme) => ({
   toolbarControl: {
-    height: 28,
     minWidth: 0,
     flexShrink: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
-    paddingHorizontal: theme.spacing[2],
-    borderRadius: theme.borderRadius["2xl"],
+    ...toolbarContentSlot(),
+    borderRadius: theme.borderRadius.full,
     backgroundColor: "transparent",
   },
   toolbarIconOnly: {
-    width: 28,
+    ...toolbarSlot(),
     flexShrink: 0,
     paddingHorizontal: 0,
     justifyContent: "center",
@@ -230,13 +243,16 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface2,
   },
   pressed: {
-    backgroundColor: theme.colors.surface0,
+    backgroundColor: theme.colors.surface2,
   },
   disabled: {
     opacity: 0.5,
   },
   iconColor: {
     color: theme.colors.foregroundMuted,
+  },
+  iconColorForeground: {
+    color: theme.colors.foreground,
   },
   selectedFallback: {
     backgroundColor: theme.colors.surface2,

@@ -26,7 +26,7 @@ export function ChannelRevisionHistory({
   const toggle = useCallback(() => setExpanded((current) => !current), []);
   const trailing = useMemo(
     () => (
-      <Button size="xs" variant="ghost" onPress={close}>
+      <Button size="sm" variant="ghost" onPress={close}>
         {t("hub.channels.connectionSettings.hide")}
       </Button>
     ),
@@ -50,7 +50,7 @@ export function ChannelRevisionHistory({
             <ChannelRevisionLine revision={active} active={active.id === activeRevisionId} />
           </View>
           {older.length === 0 ? null : (
-            <Button size="xs" variant="ghost" onPress={toggle}>
+            <Button size="sm" variant="ghost" onPress={toggle}>
               {expanded
                 ? t("hub.channels.revisions.hideEarlier")
                 : t("hub.channels.revisions.earlier", { count: older.length })}

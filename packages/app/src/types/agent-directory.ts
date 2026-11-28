@@ -7,6 +7,7 @@ export type AgentDirectoryEntry = Pick<
   | "serverId"
   | "title"
   | "status"
+  | "backgroundWork"
   | "turn"
   | "lastActivityAt"
   | "cwd"

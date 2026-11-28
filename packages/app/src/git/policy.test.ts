@@ -2,7 +2,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { CheckoutPrStatusSchema } from "@clisbot/protocol/messages";
 import { i18n } from "@/i18n/i18next";
 
-import { actionsWithoutPrimary, buildGitActions, type BuildGitActionsInput } from "./policy";
+import {
+  actionsWithoutPrimary,
+  buildGitActions,
+  isCurrentBranchBase,
+  canMergeIntoLocalBase,
+  readUpstreamState,
+  type BuildGitActionsInput,
+} from "./policy";
 import { deriveMergeCapability, type ForgeSpecificStatusFacts } from "./merge-capability";
 
 type GithubMergeFactsFixture = ForgeSpecificStatusFacts & {
@@ -70,8 +77,11 @@ function createInput(
     pullRequestMergeable: "UNKNOWN",
     mergeCapability: deriveMergeCapability(pullRequestGithub),
     hasRemote: false,
+    hasFirstPushRemote: rest.hasRemote ?? false,
+    upstream: "tracked",
     isClisbotOwnedWorktree: false,
     isOnBaseBranch: true,
+    canMergeLocally: true,
     hasUncommittedChanges: false,
     baseRefAvailable: true,
     baseRefLabel: "main",
@@ -162,6 +172,10 @@ function createInput(
   };
 }
 
+function pushActionOf(actions: ReturnType<typeof buildGitActions>) {
+  return actions.secondary.find((action) => action.id === "push");
+}
+
 describe("git-actions-policy", () => {
   afterEach(async () => {
     await i18n.changeLanguage("en");
@@ -206,6 +220,81 @@ describe("git-actions-policy", () => {
       "pull-and-push",
       "archive-workspace",
     ]);
+  });
+
+  it("distinguishes exact local and remote base refs and retains legacy names", () => {
+    expect(isCurrentBranchBase("release", "refs/heads/release")).toBe(true);
+    expect(isCurrentBranchBase("release", "refs/remotes/origin/release")).toBe(false);
+    expect(isCurrentBranchBase("release", "release")).toBe(true);
+    expect(isCurrentBranchBase("release", "origin/release")).toBe(true);
+    expect(isCurrentBranchBase(null, "refs/heads/release")).toBe(false);
+    expect(canMergeIntoLocalBase("release", "refs/heads/release")).toBe(false);
+    expect(canMergeIntoLocalBase("feature", "refs/remotes/origin/release")).toBe(true);
+    expect(canMergeIntoLocalBase("release", "refs/remotes/upstream/release")).toBe(false);
+  });
+
+  it("offers local merge when the selected local base starts with origin slash", () => {
+    const actions = buildGitActions(
+      createInput({
+        isClisbotOwnedWorktree: true,
+        isOnBaseBranch: isCurrentBranchBase("release", "refs/heads/origin/release"),
+        canMergeLocally: canMergeIntoLocalBase("release", "refs/heads/origin/release"),
+        baseRefLabel: "origin/release",
+        aheadCount: 1,
+        shipDefault: "merge",
+      }),
+    );
+    expect(actions.primary?.id).toBe("merge-branch");
+  });
+
+  it("offers update but not local merge for a non-origin remote base", () => {
+    const actions = buildGitActions(
+      createInput({
+        isClisbotOwnedWorktree: true,
+        isOnBaseBranch: false,
+        canMergeLocally: canMergeIntoLocalBase("feature", "refs/remotes/upstream/release"),
+        baseRefLabel: "upstream/release",
+        aheadCount: 1,
+        behindBaseCount: 1,
+        aheadOfOrigin: null,
+        behindOfOrigin: null,
+        shipDefault: "merge",
+      }),
+    );
+    expect(actions.primary?.id).toBe("merge-from-base");
+    expect(actionsWithoutPrimary(actions).map((action) => action.id)).not.toContain("merge-branch");
+  });
+
+  it("does not offer merging into the current local branch when the remote base shares its name", () => {
+    const actions = buildGitActions(
+      createInput({
+        isClisbotOwnedWorktree: true,
+        isOnBaseBranch: false,
+        canMergeLocally: canMergeIntoLocalBase("release", "refs/remotes/origin/release"),
+        baseRefLabel: "release",
+        aheadCount: 1,
+        behindBaseCount: 1,
+        aheadOfOrigin: null,
+        behindOfOrigin: null,
+        shipDefault: "merge",
+      }),
+    );
+    expect(actions.primary?.id).toBe("merge-from-base");
+    expect(actionsWithoutPrimary(actions).map((action) => action.id)).not.toContain("merge-branch");
+  });
+
+  it("offers update from the same-named remote base when it is ahead", () => {
+    const actions = buildGitActions(
+      createInput({
+        isClisbotOwnedWorktree: true,
+        isOnBaseBranch: isCurrentBranchBase("release", "refs/remotes/origin/release"),
+        baseRefLabel: "release",
+        behindBaseCount: 1,
+        aheadOfOrigin: null,
+        behindOfOrigin: null,
+      }),
+    );
+    expect(actions.primary?.id).toBe("merge-from-base");
   });
 
   it("drops a promoted merge action from the remaining menu actions", () => {
@@ -264,6 +353,7 @@ describe("git-actions-policy", () => {
     const actions = buildGitActions(
       createInput({
         hasRemote: true,
+        upstream: "none",
         isClisbotOwnedWorktree: true,
         isOnBaseBranch: false,
         aheadCount: 1,
@@ -276,6 +366,207 @@ describe("git-actions-policy", () => {
     expect(pushAction).toMatchObject({
       disabled: false,
       unavailableMessage: undefined,
+    });
+  });
+
+  it("re-publishes a Clisbot worktree branch whose remote copy was deleted", () => {
+    const actions = buildGitActions(
+      createInput({
+        hasRemote: true,
+        upstream: "gone",
+        isClisbotOwnedWorktree: true,
+        isOnBaseBranch: false,
+        aheadCount: 2,
+        aheadOfOrigin: null,
+        behindOfOrigin: null,
+        shipDefault: "pr",
+      }),
+    );
+    const pushAction = actions.secondary.find((action) => action.id === "push");
+
+    expect(actions.primary).toMatchObject({ id: "push", label: "Push" });
+    expect(pushAction).toMatchObject({ disabled: false, unavailableMessage: undefined });
+  });
+
+  describe("a never-pushed branch in a regular checkout", () => {
+    const neverPushed = {
+      hasRemote: true,
+      upstream: "none",
+      isOnBaseBranch: false,
+      aheadCount: 1,
+      aheadOfOrigin: null,
+      behindOfOrigin: null,
+    } as const;
+
+    it("offers Push first, ahead of Create PR", () => {
+      const actions = buildGitActions(createInput({ ...neverPushed, shipDefault: "pr" }));
+
+      expect(actions.primary).toMatchObject({ id: "push", label: "Push" });
+    });
+
+    it("offers Push first, ahead of Merge locally", () => {
+      const actions = buildGitActions(
+        createInput({ ...neverPushed, githubFeaturesEnabled: false, shipDefault: "merge" }),
+      );
+
+      expect(actions.primary).toMatchObject({ id: "push", label: "Push" });
+    });
+
+    it("does not offer Push when it has no commits of its own", () => {
+      const actions = buildGitActions(createInput({ ...neverPushed, aheadCount: 0 }));
+      const pushAction = pushActionOf(actions);
+
+      expect(actions.primary?.id).not.toBe("push");
+      expect(pushAction?.unavailableMessage).toBe(
+        "Push isn't available because there is nothing new to send",
+      );
+    });
+
+    it("does not offer Push when the repository has no origin", () => {
+      const actions = buildGitActions(createInput({ ...neverPushed, hasRemote: false }));
+      const pushAction = pushActionOf(actions);
+
+      expect(actions.primary?.id).not.toBe("push");
+      expect(pushAction?.unavailableMessage).toBe(
+        "Push isn't available here because this branch is not connected to a remote yet",
+      );
+    });
+
+    it("does not offer Push when Git pushes the branch to another remote", () => {
+      const actions = buildGitActions(createInput({ ...neverPushed, hasFirstPushRemote: false }));
+      const pushAction = pushActionOf(actions);
+
+      expect(actions.primary?.id).not.toBe("push");
+      expect(pushAction?.unavailableMessage).toBe(
+        "Push isn't available here because this branch is not connected to a remote yet",
+      );
+    });
+
+    it("keeps offering Push in a Clisbot worktree when Git pushes the branch to another remote", () => {
+      const actions = buildGitActions(
+        createInput({ ...neverPushed, hasFirstPushRemote: false, isClisbotOwnedWorktree: true }),
+      );
+
+      expect(actions.primary).toMatchObject({ id: "push", label: "Push" });
+    });
+  });
+
+  it("does not offer a first push when the branch's remote copy was deleted", () => {
+    const actions = buildGitActions(
+      createInput({
+        hasRemote: true,
+        upstream: "gone",
+        isOnBaseBranch: false,
+        aheadCount: 2,
+        aheadOfOrigin: null,
+        behindOfOrigin: null,
+        shipDefault: "pr",
+      }),
+    );
+    const pushAction = actions.secondary.find((action) => action.id === "push");
+
+    expect(actions.primary).toMatchObject({ id: "pr", label: "Create PR" });
+    expect(pushAction?.unavailableMessage).toBe(
+      "Push isn't available because the branch this one tracks no longer exists",
+    );
+  });
+
+  describe("a published branch whose upstream the daemon cannot read", () => {
+    const unreadableUpstream = {
+      hasRemote: true,
+      upstream: "unknown",
+      isOnBaseBranch: false,
+      aheadCount: 2,
+      aheadOfOrigin: null,
+      behindOfOrigin: null,
+      shipDefault: "pr",
+    } as const;
+
+    it("does not offer a first push in a regular checkout", () => {
+      const actions = buildGitActions(createInput(unreadableUpstream));
+
+      expect(actions.primary).toMatchObject({ id: "pr", label: "Create PR" });
+      expect(pushActionOf(actions)?.unavailableMessage).toEqual(expect.any(String));
+    });
+
+    it("keeps offering Push in a Clisbot worktree", () => {
+      const actions = buildGitActions(
+        createInput({ ...unreadableUpstream, isClisbotOwnedWorktree: true }),
+      );
+
+      expect(actions.primary).toMatchObject({ id: "push", label: "Push" });
+      expect(pushActionOf(actions)).toMatchObject({
+        disabled: false,
+        unavailableMessage: undefined,
+      });
+    });
+  });
+
+  describe("readUpstreamState", () => {
+    it("uses the upstream state the daemon reports", () => {
+      expect(
+        readUpstreamState({
+          upstreamState: "none",
+          aheadOfOrigin: null,
+          isClisbotOwnedWorktree: false,
+        }),
+      ).toBe("none");
+      expect(
+        readUpstreamState({
+          upstreamState: "gone",
+          aheadOfOrigin: null,
+          isClisbotOwnedWorktree: true,
+        }),
+      ).toBe("gone");
+    });
+
+    it("keeps the old guess for daemons that predate upstream states", () => {
+      expect(
+        readUpstreamState({
+          upstreamState: undefined,
+          aheadOfOrigin: 1,
+          isClisbotOwnedWorktree: false,
+        }),
+      ).toBe("tracked");
+      expect(
+        readUpstreamState({
+          upstreamState: undefined,
+          aheadOfOrigin: null,
+          isClisbotOwnedWorktree: true,
+        }),
+      ).toBe("none");
+      expect(
+        readUpstreamState({
+          upstreamState: undefined,
+          aheadOfOrigin: null,
+          isClisbotOwnedWorktree: false,
+        }),
+      ).toBe("unknown");
+    });
+
+    it("keeps an old daemon's never-pushed regular branch off Push", () => {
+      const actions = buildGitActions(
+        createInput({
+          hasRemote: true,
+          upstream: readUpstreamState({
+            upstreamState: undefined,
+            aheadOfOrigin: null,
+            isClisbotOwnedWorktree: false,
+          }),
+          isOnBaseBranch: false,
+          aheadCount: 1,
+          aheadOfOrigin: null,
+          behindOfOrigin: null,
+          githubFeaturesEnabled: false,
+          shipDefault: "merge",
+        }),
+      );
+      const pushAction = pushActionOf(actions);
+
+      expect(actions.primary).toMatchObject({ id: "merge-branch" });
+      expect(pushAction?.unavailableMessage).toBe(
+        "Push isn't available because there is nothing new to send",
+      );
     });
   });
 

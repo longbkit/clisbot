@@ -5,6 +5,7 @@ import type { AgentStorage } from "../agent/agent-storage.js";
 import type { Logger } from "pino";
 import { ensureAgentLoaded } from "../agent/agent-loading.js";
 import { sendPromptToAgent, waitForAgentRunStartWithTimeout } from "../agent/agent-prompt.js";
+import type { AgentMessageDelivery } from "../agent/agent-messages/index.js";
 import { buildAgentPrompt } from "../agent/prompt-attachments.js";
 import { attachSessionFiles } from "../file-upload/session-files.js";
 import { attachQueueFiles } from "./files.js";
@@ -12,6 +13,12 @@ import type { StoredQueueContent } from "./content.js";
 import { InputQueueRuntime, type QueueTarget } from "./runtime.js";
 
 interface AgentInputQueueOptions {
+  /**
+   * The daemon's agent-message delivery. Direct prompts go through it so messages already queued
+   * for the agent travel with them (upstream v0.17). Read lazily: it exists once the WebSocket
+   * server does.
+   */
+  agentMessages: () => Pick<AgentMessageDelivery, "sendDirect">;
   manager: AgentManager;
   storage: AgentStorage;
   logger: Logger;
@@ -46,7 +53,7 @@ export class AgentInputQueues {
     );
   }
   private async restore(): Promise<void> {
-    for (const record of await this.options.storage.list()) {
+    for (const record of await this.options.storage.listAll()) {
       try {
         await access(
           path.join(await this.options.storage.getSessionDirectory(record.id), "queue.json"),
@@ -110,13 +117,14 @@ export class AgentInputQueues {
     interrupt = false,
     steerTarget?: { agentId: string; turnId: string },
   ): Promise<void> {
-    const { manager, storage, logger } = this.options;
+    const { manager, storage, logger, agentMessages } = this.options;
     if (steerTarget && steerTarget.agentId !== owner.agentId)
       throw new Error("Steer target does not match this session");
     const files = await attachQueueFiles(owner.directory, id, content);
     if (!interrupt && !steerTarget && manager.hasInFlightRun(owner.agentId))
       throw new Error("A turn started before queue handoff; check outcome");
     const result = await sendPromptToAgent({
+      agentMessages: agentMessages(),
       agentManager: manager,
       agentStorage: storage,
       agentId: owner.agentId,
@@ -134,7 +142,7 @@ export class AgentInputQueues {
       logger,
     });
     if (result.disposition === "turn_started")
-      await waitForAgentRunStartWithTimeout(manager, owner.agentId);
+      await waitForAgentRunStartWithTimeout(manager, owner.agentId, result.started);
     await manager.waitForDurableSubmittedMessage(owner.agentId, id);
   }
   async stop(): Promise<void> {

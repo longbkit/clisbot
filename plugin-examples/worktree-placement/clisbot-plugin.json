@@ -1,0 +1,4 @@
+{
+  "id": "worktree-placement",
+  "requirements": { "clisbot": ">=0.14.0-beta.1" }
+}

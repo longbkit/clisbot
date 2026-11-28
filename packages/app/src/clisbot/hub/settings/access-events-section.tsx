@@ -104,7 +104,7 @@ function AccessEventRow({
         <Text style={settingsStyles.rowHint}>{new Date(event.createdAt).toLocaleString()}</Text>
       </View>
       {revocable === undefined ? null : (
-        <Button size="xs" variant="ghost" disabled={pending} onPress={revoke}>
+        <Button size="sm" variant="ghost" disabled={pending} onPress={revoke}>
           {t("hub.access.events.revoke")}
         </Button>
       )}

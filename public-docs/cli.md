@@ -44,6 +44,8 @@ Copy the full report ID from the list into `inspect` to see reset times, balance
 
 Queries use the host's five-minute cache when available. Add `--refresh` to bypass it. Use `--host` or `--home` to [select a daemon](#select-one-daemon). Hosts without usage-source support return an update message.
 
+For OpenRouter, set `OPENROUTER_API_KEY` in the daemon’s environment to show what the key spent today, this week, and this month in UTC. Set `OPENROUTER_MANAGEMENT_KEY` to show the remaining account credits. Each variable adds its own report to the host’s Usage panel and `clisbot usage`.
+
 ### Usage in scripts
 
 ```bash
@@ -99,7 +101,7 @@ clisbot provider diagnostic codex --json
 clisbot --host devbox:6868 provider diagnostic opencode
 ```
 
-The diagnostic includes the configured command, daemon `PATH` and shell, matching binaries, resolved path, version, model count, and provider status. Use the global `--host` option for a remote daemon. This is the same diagnostic shown under **Settings → your host → Providers → provider → Diagnostic**.
+The diagnostic includes the configured command, daemon `PATH` and shell, matching binaries, resolved path, version, model count, and provider status. Use the global `--host` option for a remote daemon. This is the same diagnostic shown under **Settings → your host → Providers → provider → Diagnostic report**.
 
 ## Running agents
 
@@ -211,6 +213,8 @@ clisbot workspace rename <workspace-id> --reset   # back to the branch or direct
 clisbot workspace archive <workspace-id>
 ```
 
+Inside an agent session, `CLISBOT_WORKSPACE_ID` holds the agent's own workspace ID, so an agent can run `clisbot workspace rename "$CLISBOT_WORKSPACE_ID" "Auth rework"` or `clisbot workspace archive "$CLISBOT_WORKSPACE_ID"` even when other workspaces share its directory.
+
 Add `--forge <name>` to PR checkout when Clisbot cannot infer the forge from the source checkout. See [Git worktrees](/docs/worktrees) for setup hooks and services.
 
 ## Terminals
@@ -289,10 +293,10 @@ behavior.
 
 ```bash
 clisbot ls                    # Non-archived agents in active workspaces
-clisbot ls -a                 # Also include archived agents
+clisbot ls -a                 # Also include archived and background agents, with a BACKGROUND column
 clisbot ls -g                 # Non-archived agents across all workspaces
 clisbot ls -a -g --json       # All agents, including archived, as JSON
-clisbot ls --background       # Also include agents in background workspaces
+clisbot ls --background       # Also include background agents and agents in background workspaces
 ```
 
 ## Streaming output
@@ -318,7 +322,12 @@ clisbot send <id> --no-wait "run this task"
 clisbot send <id> --behavior interrupt "stop and do this instead"
 ```
 
-Agent-originated sends (`CLISBOT_AGENT_ID` set) default to steering the running turn. Other sends default to interrupting it. Use `--behavior steer` or `--behavior interrupt` to override the default. Steering uses the same fallback as the client: if steering is unavailable, the running turn is interrupted and replaced.
+Leave `--behavior` out unless the message cannot wait. The defaults depend on who sends:
+
+- From an agent (`CLISBOT_AGENT_ID` set), the default is `queue`. The message waits until the recipient's running turn ends. `--behavior steer` adds the message to the running turn, and `--behavior interrupt` stops the turn and starts a new one with the message. A steer or interrupt also delivers the messages you queued before it, in order.
+- From a person, the default is `interrupt`. `--behavior steer` adds the message to the running turn instead.
+
+If the recipient's provider cannot steer, `steer` interrupts the running turn instead. With `--no-wait`, the output says what happened to an agent's message and how to deliver a queued message now.
 
 ## Viewing logs
 
@@ -463,7 +472,7 @@ Bot-only use needs no Hub. Channels start the personal backend automatically, pr
 
 `login` is an advanced administration command. It creates a durable credential with all five Public API scopes and no automatic expiry; it does not enroll a Host. Read [API authentication](/docs/hub/api#authentication) before using it. `logout` only deletes the local copy; server revocation is separate.
 
-Interactive logout checks the same-origin daemon relationship and asks whether to disconnect before deleting the login. Declining removes only the login. JSON and noninteractive logout never prompt or disconnect implicitly; `--disconnect-daemon` is the explicit automation path, and `--force` applies to that daemon disconnection. If a requested disconnection fails, the login is preserved.
+Every Hub command resolves its destination and credentials in order:
 
 For remote Hub administration, origin precedence is the command origin or `--hub`, then `CLISBOT_HUB_URL`, then the stored login origin. There is no hosted default: with none of these, the command stops and asks for a Hub URL. Credential precedence is `--api-key <secret>`, then `CLISBOT_HUB_API_KEY`, then a stored login for the exact resolved origin. A stored credential is never sent to a different origin. API keys passed through flags or the environment are not stored.
 

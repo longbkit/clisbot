@@ -2,7 +2,7 @@ import { useComposerPickerPlacement } from "@/composer/picker-placement";
 import { useCallback, useMemo, useRef, useState, type ReactElement } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 import { useShallow } from "zustand/shallow";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { type SheetHeader } from "@/components/adaptive-modal-sheet";
@@ -32,13 +32,14 @@ import { FULL_AUTO_ACCEPT_MODE_ID } from "@clisbot/protocol/full-auto-accept";
 import { useHostFeature } from "@/runtime/host-features";
 import {
   buildComposerModeOptions,
-  isProviderAutoAcceptOn,
+  isAgentProviderAutoAcceptOn,
   PROVIDER_AUTO_ACCEPT_FEATURE_ID,
   resolveAgentModes,
   resolveComposerModeId,
   shouldClearProviderAutoAccept,
 } from "@/clisbot/composer-picker/mode-options";
 import { COMPOSER_PICKER_ENABLED } from "@/clisbot/composer-picker/feature";
+import { DensityIcon } from "@/components/ui/density-icon";
 interface ModeComboboxOptionProps {
   option: ComboboxOption;
   selected: boolean;
@@ -46,7 +47,6 @@ interface ModeComboboxOptionProps {
   onPress: () => void;
   provider: string;
   providerDefinitions: AgentProviderDefinition[];
-  iconColor: string;
 }
 
 function ModeComboboxOption({
@@ -56,12 +56,12 @@ function ModeComboboxOption({
   onPress,
   provider,
   providerDefinitions,
-  iconColor,
 }: ModeComboboxOptionProps) {
   const IconComponent = getAgentModeOptionIcon(provider, option.id, providerDefinitions);
   const leadingSlot = useMemo(
-    () => (IconComponent ? <IconComponent size={16} color={iconColor} /> : null),
-    [IconComponent, iconColor],
+    () =>
+      IconComponent ? <DensityIcon icon={IconComponent} size="md" color="foreground" /> : null,
+    [IconComponent],
   );
   return (
     <ComboboxItem
@@ -98,7 +98,6 @@ export function AgentModeControl({
   onClose,
 }: AgentModeControlValue & { surface?: "toolbar" | "sheet"; onClose?: () => void }) {
   const pickerPlacement = useComposerPickerPlacement();
-  const { theme } = useUnistyles();
   const { presentation } = useComposerControlLayout();
   const { t } = useTranslation();
   const { isActiveComposer } = useComposerKeyboardScope();
@@ -115,7 +114,6 @@ export function AgentModeControl({
   }, [modeOptions, selectedModeId]);
 
   const Icon = getAgentModeIcon(provider, selectedMode?.id ?? "", providerDefinitions);
-  const iconColor = theme.colors.foregroundMuted;
   const selectedModeLabel = selectedMode ? formatAgentModeLabel(selectedMode) : "";
 
   const allOptions = useMemo<ComboboxOption[]>(
@@ -184,10 +182,9 @@ export function AgentModeControl({
         onPress={args.onPress}
         provider={provider}
         providerDefinitions={providerDefinitions}
-        iconColor={theme.colors.foreground}
       />
     ),
-    [provider, providerDefinitions, theme.colors.foreground],
+    [provider, providerDefinitions],
   );
 
   const sheetHeader = useMemo<SheetHeader>(
@@ -211,7 +208,6 @@ export function AgentModeControl({
           <AgentControlTrigger
             ref={anchorRef}
             icon={Icon}
-            iconColor={iconColor}
             surface={surface}
             label={t("agentControls.mode.title")}
             value={selectedModeLabel}
@@ -268,7 +264,7 @@ export function useLiveAgentModeControl(
         cwd: agent.cwd,
         currentModeId: agent.currentModeId,
         fullAutoAccept: agent.fullAutoAccept === true,
-        providerAutoAccept: isProviderAutoAcceptOn(agent.features),
+        providerAutoAccept: isAgentProviderAutoAcceptOn(agent),
       };
     }),
   );

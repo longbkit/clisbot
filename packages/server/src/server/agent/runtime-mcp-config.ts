@@ -1,6 +1,6 @@
 import type { AgentSessionConfig, McpServerConfig } from "./agent-sdk-types.js";
 
-const CLISBOT_MCP_SERVER_NAME = "clisbot";
+export const CLISBOT_MCP_SERVER_NAME = "clisbot";
 const CLISBOT_MCP_PATHNAME = "/mcp/agents";
 
 /** Connector entries are added per launch (connectors/connector-runtime.ts) and never stored. */

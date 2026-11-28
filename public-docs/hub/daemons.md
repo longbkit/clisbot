@@ -1,6 +1,6 @@
 ---
 title: Daemons in Hub
-description: Enroll a machine with Hub, reference it from configuration, and understand what Hub owns once it is connected.
+description: Enroll a Clisbot daemon with Hub, grant execution permission, and target it from triggers.
 nav: Daemons
 order: 64
 category: Hub
@@ -10,7 +10,7 @@ category: Hub
 
 A daemon is one of your machines running the Clisbot daemon. Enroll it once with your Hub organization, then Routes and Automations can run agents on it, and Members you grant can use it.
 
-## Connect
+## Connect a daemon
 
 Run this on the machine with the daemon already running:
 
@@ -35,7 +35,7 @@ clisbot hub connect https://hub.example.com
 
 `reset-identity` removes `server-id`, `daemon-keypair.json`, and `hub-relationship.json` from `CLISBOT_HOME`. It refuses while the daemon runs or while `CLISBOT_SERVER_ID` is set, since that variable would restore the same ID. Hub also accepts connection details from a daemon only for the identity it enrolled with.
 
-Hub derives the daemon's initial slug from its hostname. If that slug is already used in the organization, Hub adds a short daemon ID suffix. You can rename the daemon later in Hub.
+Hub derives the daemon's initial slug from its hostname using lowercase words joined by hyphens, such as `build-studio`. If that slug is already taken in the organization, Hub appends a short daemon ID suffix.
 
 Each daemon has two identifiers: an immutable generated ID and a friendly slug. Hub normalizes slugs with lowercase words joined by hyphens, so `Build Studio` becomes `build-studio`. The dashboard shows the slug. Configuration accepts either the slug or the immutable ID.
 
@@ -60,7 +60,7 @@ CLISBOT_HUB_URL=https://hub.example.com CLISBOT_HUB_API_KEY=clisbot_pk_... clisb
 
 Origin precedence is explicit `[origin]`, `CLISBOT_HUB_URL`, then active stored login; with none of these it stops and asks for a Hub URL. An explicit `--api-key <secret>` takes precedence over `CLISBOT_HUB_API_KEY`. Stored CLI credentials are not used for connection.
 
-Check and undo:
+Check status or disconnect a daemon:
 
 ```sh
 clisbot hub status
@@ -72,16 +72,14 @@ One daemon has one Hub relationship. Repeating `connect` for the same Hub reuses
 
 `clisbot hub logout` removes the active CLI login. The daemon's relationship is a separate identity and stays connected.
 
-In an interactive terminal, logout offers to disconnect a daemon enrolled with the same Hub. Accepting disconnects first and then deletes the login, so a failed disconnection keeps your credential. Declining removes only the login.
-
-Noninteractive and `--json` logout never disconnect implicitly:
+`clisbot hub logout` removes the stored CLI login. In an interactive terminal, it offers to disconnect a daemon connected to the same Hub first. In `--json` or non-interactive mode, `logout` never disconnects the daemon unless you pass `--disconnect-daemon`:
 
 ```sh
-clisbot hub logout --disconnect-daemon           # remove both identities
-clisbot hub logout --disconnect-daemon --force   # drop local authority when Hub is unreachable
+clisbot hub logout --disconnect-daemon
+clisbot hub logout --disconnect-daemon --force
 ```
 
-## Let Hub run agents on it
+## Grant execution permission
 
 `hub.execute` lets Hub start agents on the daemon. `clisbot hub connect` grants it by default. Revoke or grant it from the machine at any time:
 
@@ -93,47 +91,68 @@ clisbot hub permissions revoke hub.execute
 
 Without it, Hub keeps the daemon for identity and presence only. [Hub security](/docs/hub/security#choose-daemon-authority) covers what the permission allows once granted.
 
-## Reference it from configuration
+## Target a daemon from a trigger
+
+Reference the daemon slug and an existing working directory under `run.target`:
 
 ```yaml
-environments:
-  dev:
-    kind: daemon
+name: repo-triage
+on:
+  manual.run: {}
+run:
+  target:
     daemon: my-macbook
     cwd: /Users/you/code/your-repo
+  agent:
+    provider: codex
+    mode: full-access
+  prompt: Inspect the repository status and call hub.finish_execution.
 ```
 
-`daemon` accepts the friendly slug or immutable ID within the same organization. It resolves to the immutable daemon ID when the configuration activates, so a daemon that no longer exists fails activation instead of failing at dispatch.
+`daemon` accepts the friendly slug or immutable ID within the same organization. It resolves to the immutable daemon ID when the configuration is saved or activates, so a daemon that no longer exists fails then instead of failing at dispatch. `cwd` is an absolute path that already exists on that machine; Hub does not clone repositories for you.
 
-`cwd` is a path on that machine. Hub does not clone anything for you; the directory must already exist.
-
-To keep executions off your working tree, add a worktree:
+To isolate each run on its own git branch instead of editing your working tree, add a `worktree` block:
 
 ```yaml
-worktree:
-  mode: branch-off
-  newBranch: trigger-${{ clisbot.execution.id }}
-  base: origin/main
+name: isolate-fix
+on:
+  manual.run: {}
+run:
+  target:
+    daemon: build-server
+    cwd: /workspace/project
+    worktree:
+      mode: branch-off
+      newBranch: trigger-${{ clisbot.execution.id }}
+      base: origin/main
+  agent:
+    provider: codex
+    mode: full-access
+  prompt: Run tests and call hub.finish_execution.
 ```
 
-`${{ clisbot.execution.id }}` renders the execution's UUID, so every execution gets its own branch off `origin/main`.
+`${{ clisbot.execution.id }}` renders the execution UUID, giving each run a unique branch off `origin/main` that survives retries and recovery. See [Trigger YAML reference](/docs/hub/configuration/reference#target-and-worktree) and [Git worktrees](/docs/worktrees).
 
-[Environment fields](/docs/hub/configuration/hub-yml#environments) lists what `newBranch` accepts. See [Git worktrees](/docs/worktrees) for setup hooks and scripts.
+## Provider discovery
 
-## What Hub owns
+When you select a daemon and working directory in the Hub trigger editor, Hub asks that daemon for its configured providers, models, execution modes, and thinking options.
 
-For agents it dispatched, Hub owns creation, reconnect recovery, output observation, and completion. Agents you start yourself are untouched.
+Hub works with any provider configured on your Clisbot daemon, including Claude Code, Codex, OpenCode, Pi, and custom or plugin providers.
 
-If Hub loses the create response, or the daemon restarts mid-execution, Hub resends the same create intent with the same execution id. The daemon returns the existing agent rather than running the prompt again. An agent that closed or errored is recorded as interrupted; Hub never silently starts a second one.
+## Recovery and ownership
 
-## Status
+For agents it dispatches, Hub owns creation, reconnect recovery, output tracking, and completion. Agents you start locally are untouched.
 
-| Status            | Meaning                                        |
-| ----------------- | ---------------------------------------------- |
-| Approval required | The CLI is waiting for you to approve the code |
-| Connected         | Online and accepting dispatch                  |
-| Offline           | Enrolled but not currently connected           |
-| Revoked           | Access removed from Hub                        |
+If Hub loses the create response or the daemon restarts mid-run, Hub resends the same create intent with the same execution ID. The daemon returns the existing agent instead of running the prompt twice. If an agent closes or crashes, Hub marks the run interrupted and does not silently start a second agent.
+
+## Daemon status
+
+| Status            | Meaning                                  |
+| ----------------- | ---------------------------------------- |
+| Approval required | The CLI is waiting for browser approval. |
+| Connected         | Online and connected to Hub.             |
+| Offline           | Enrolled, but not currently connected.   |
+| Revoked           | Access was removed from Hub.             |
 
 An Automation event that arrives while a daemon is offline fails dispatch with `daemon_not_connected`. Its run shows in **Runs**; the trigger must fire again. This differs from the channel's [durable ingress queue](/docs/hub/activity). Current app/API [Automation saves](/docs/hub/automations) do not check live provider/model availability. The legacy configuration-bundle installer checks named agents against the daemon and can refuse activation while it is offline.
 

@@ -186,8 +186,8 @@ function refresh<T>(entry: CacheEntry, options: CacheOptions<T>): Promise<unknow
   return entry.refreshing;
 }
 
-export async function getBlockingColdCache<T>(options: CacheOptions<T>): Promise<T> {
-  const { context, key, policy, isValue } = options;
+async function loadEntry<T>(options: CacheOptions<T>): Promise<CacheEntry> {
+  const { context, key, isValue } = options;
   const entry = entryFor(context, key);
   if (!entry.loaded) {
     if (!entry.reading) {
@@ -205,16 +205,38 @@ export async function getBlockingColdCache<T>(options: CacheOptions<T>): Promise
     }
     await entry.reading;
   }
+  return entry;
+}
+
+/** Serve the cached value; start a background refresh when it is stale and not backing off. */
+function serveCached<T>(entry: CacheEntry, options: CacheOptions<T>, cached: CachedValue<T>): T {
+  const { context, policy } = options;
+  let freshMs = policy.freshMs;
+  if (cached.value === null && policy.negativeFreshMs !== undefined)
+    freshMs = policy.negativeFreshMs;
+  const stale = Date.now() - cached.fetchedAt >= freshMs;
+  if (stale && Date.now() >= entry.retryAt)
+    context.waitUntil(refresh(entry, options).catch(() => undefined));
+  return cached.value;
+}
+
+/** Return the cached value, warming the cache in the background when it is empty or stale. */
+export async function getNonBlockingColdCache<T>(options: CacheOptions<T>): Promise<T | null> {
+  const { context, isValue } = options;
+  if (!context.cache && !context.edgeCache) return null;
+  const entry = await loadEntry(options);
   const cached = entry.cached;
-  if (cached && isValue(cached.value)) {
-    let freshMs = policy.freshMs;
-    if (cached.value === null && policy.negativeFreshMs !== undefined)
-      freshMs = policy.negativeFreshMs;
-    const stale = Date.now() - cached.fetchedAt >= freshMs;
-    if (stale && Date.now() >= entry.retryAt)
-      context.waitUntil(refresh(entry, options).catch(() => undefined));
-    return cached.value;
-  }
+  if (cached && isValue(cached.value)) return serveCached(entry, options, cached as CachedValue<T>);
+  if (Date.now() >= entry.retryAt)
+    context.waitUntil(refresh(entry, options).catch(() => undefined));
+  return null;
+}
+
+export async function getBlockingColdCache<T>(options: CacheOptions<T>): Promise<T> {
+  const { key, isValue } = options;
+  const entry = await loadEntry(options);
+  const cached = entry.cached;
+  if (cached && isValue(cached.value)) return serveCached(entry, options, cached as CachedValue<T>);
   if (Date.now() < entry.retryAt) throw entry.error;
   const fresh = await refresh(entry, options);
   if (!isValue(fresh)) throw new Error(`Invalid website cache value: ${key}`);

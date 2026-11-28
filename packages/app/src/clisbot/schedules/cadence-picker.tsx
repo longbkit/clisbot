@@ -301,7 +301,7 @@ function QuickPick({
 }): ReactElement {
   const handlePress = useCallback(() => onPick(expression), [expression, onPick]);
   return (
-    <Button variant="outline" size="xs" onPress={handlePress} testID={testID}>
+    <Button variant="outline" size="sm" onPress={handlePress} testID={testID}>
       {label}
     </Button>
   );

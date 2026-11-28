@@ -17,6 +17,7 @@ import {
 import { createServiceProxySubsystem } from "../../../service-proxy.js";
 import { WorkspaceScriptRuntimeStore } from "../../../workspace-script-runtime-store.js";
 import { createTerminalManager } from "../../../../terminal/terminal-manager.js";
+import { createTestAgentMessages } from "../../../test-utils/agent-messages.js";
 
 test("bridge preserves tool failure messages and classifies invalid requests as client errors", async () => {
   const clisbotHome = await mkdtemp(path.join(tmpdir(), "clisbot-7045-"));
@@ -58,16 +59,19 @@ test("bridge preserves tool failure messages and classifies invalid requests as 
     getDaemonTcpHost: null,
     serviceProxyPublicBaseUrl: null,
     resolveScriptHealth: null,
+    getGlobalServicePorts: async () => undefined,
     logger,
     emit: () => {},
     publishStatusUpdate: () => {},
     spawnWorkspaceScript: unused,
     assertAutomationAllowed: unused,
   });
+  const agentMessages = createTestAgentMessages({ agentManager, agentStorage, logger });
   const catalog = createClisbotToolCatalog({
     workspaceScripts,
     agentManager,
     agentStorage,
+    agentMessages: () => agentMessages,
     scheduleService,
     providerSnapshotManager,
     logger,
@@ -95,7 +99,7 @@ test("bridge preserves tool failure messages and classifies invalid requests as 
     const { tools } = await manifest.json();
     expect(
       tools.find((tool: { name: string }) => tool.name === "create_agent").inputSchema.properties,
-    ).not.toHaveProperty("background");
+    ).toHaveProperty("background");
     expect(
       tools.find((tool: { name: string }) => tool.name === "update_schedule").inputSchema
         .properties,
@@ -198,6 +202,7 @@ test("bridge preserves tool failure messages and classifies invalid requests as 
       ]),
     });
   } finally {
+    await agentMessages.close();
     await bridge.close();
     await providerSnapshotManager.shutdown();
     await rm(clisbotHome, { recursive: true, force: true });

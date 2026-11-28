@@ -9,7 +9,7 @@ vi.mock("./cowork-return", () => ({ rememberCoworkOrigin: vi.fn() }));
 vi.mock("@/runtime/host-runtime", () => ({ useHostRuntimeSnapshot: () => null }));
 vi.mock("@/utils/navigate-to-agent", () => ({ navigateToAgent: navigate }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => true }));
-vi.mock("@/constants/platform", () => ({ isNative: false }));
+vi.mock("@/constants/platform", () => ({ isNative: false, isWeb: true }));
 vi.mock("@/components/ui/tooltip", () => ({
   Tooltip: ({ children }: { children: ReactNode }) => children,
   TooltipTrigger: ({ children }: { children: ReactNode }) => children,

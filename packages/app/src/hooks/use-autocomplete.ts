@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getAutocompleteFallbackIndex,
   getAutocompleteNextIndex,
@@ -30,7 +30,14 @@ interface UseAutocompleteInput<
     event: TKeyPressEvent,
     intent: AutocompleteSelectIntent,
   ) => void;
+  /** Runs after Escape closes the list; the text stays unless this changes it. */
+  onEscape?: () => void;
   optionsPosition?: AutocompleteOptionsPosition;
+  /**
+   * Clisbot: whether the best match starts selected (default true). False leaves the list with
+   * no selection until an arrow key picks a row, so Enter and Tab act on nothing.
+   */
+  preselect?: boolean;
 }
 
 interface UseAutocompleteResult<TKeyPressEvent extends AutocompleteKeyPressEvent> {
@@ -38,40 +45,6 @@ interface UseAutocompleteResult<TKeyPressEvent extends AutocompleteKeyPressEvent
   /** Escape closed the list for this query; typing another query opens it again. */
   dismissed: boolean;
   onKeyPress: (event: TKeyPressEvent) => boolean;
-}
-
-function useSelectedIndex(input: {
-  isVisible: boolean;
-  count: number;
-  query: string;
-  optionsPosition?: AutocompleteOptionsPosition;
-  onQueryChange: () => void;
-}) {
-  const [selectedIndex, setSelectedIndex] = useState(-1);
-  const previousQueryRef = useRef("");
-  const previousPositionRef = useRef(input.optionsPosition);
-  const { onQueryChange } = input;
-  useEffect(() => {
-    if (previousQueryRef.current !== input.query) onQueryChange();
-    if (!input.isVisible) {
-      previousQueryRef.current = input.query;
-      setSelectedIndex(-1);
-      return;
-    }
-    // A list that moved to the input's other side starts again on the match next to the input.
-    const queryChanged =
-      previousQueryRef.current !== input.query ||
-      previousPositionRef.current !== input.optionsPosition;
-    previousQueryRef.current = input.query;
-    previousPositionRef.current = input.optionsPosition;
-    setSelectedIndex((current) => {
-      if (input.count === 0) return -1;
-      const fallbackIndex = getAutocompleteFallbackIndex(input.count, input.optionsPosition);
-      if (queryChanged || current < 0 || current >= input.count) return fallbackIndex;
-      return current;
-    });
-  }, [input.isVisible, input.count, input.query, input.optionsPosition, onQueryChange]);
-  return [selectedIndex, setSelectedIndex] as const;
 }
 
 /**
@@ -84,15 +57,27 @@ export function useAutocomplete<
   TKeyPressEvent extends AutocompleteKeyPressEvent = AutocompleteKeyPressEvent,
 >(input: UseAutocompleteInput<TOption, TKeyPressEvent>): UseAutocompleteResult<TKeyPressEvent> {
   const [dismissed, setDismissed] = useState(false);
-  const undismiss = useCallback(() => setDismissed(false), []);
-  const [selectedIndex, setSelectedIndex] = useSelectedIndex({
-    isVisible: input.isVisible,
-    count: input.options.length,
+  // The user's choice, tied to the query (and the side of the input) it was made for. The shown
+  // index is resolved from it during render, so a list never paints its first frame without a
+  // selection: the popover only measures once a non-empty list has one. A list that moved to the
+  // input's other side starts again on the match next to the input.
+  const [choice, setChoice] = useState<SelectionChoice | null>(null);
+  const itemCount = input.isVisible ? input.options.length : 0;
+  const selectedIndex = resolveSelectedIndex({
+    choice,
     query: input.query,
+    itemCount,
     optionsPosition: input.optionsPosition,
-    onQueryChange: undismiss,
+    preselect: input.preselect ?? true,
   });
   const open = input.isVisible && !dismissed;
+
+  // A choice belongs to one search, and Escape closes the list only for the query it was
+  // pressed on. Until this clears them, the checks above ignore a stale choice.
+  useEffect(() => {
+    setChoice(null);
+    setDismissed(false);
+  }, [input.isVisible, input.query]);
 
   const onKeyPress = useCallback(
     (event: TKeyPressEvent) => {
@@ -100,33 +85,63 @@ export function useAutocomplete<
       if (event.key === "Escape") {
         event.preventDefault();
         setDismissed(true);
+        input.onEscape?.();
         return true;
       }
       const count = input.options.length;
       if (count === 0) return false;
       if (event.key === "ArrowUp" || event.key === "ArrowDown") {
         event.preventDefault();
-        const key = event.key;
-        setSelectedIndex((current) =>
-          getAutocompleteNextIndex({ currentIndex: current, itemCount: count, key }),
-        );
+        setChoice({
+          index: getAutocompleteNextIndex({
+            currentIndex: selectedIndex,
+            itemCount: count,
+            key: event.key,
+          }),
+          query: input.query,
+          optionsPosition: input.optionsPosition,
+        });
         return true;
       }
       // Shift+Tab is focus navigation, never a completion.
       if (event.key === "Tab" && event.shiftKey) return false;
       if (event.key !== "Tab" && event.key !== "Enter") return false;
       event.preventDefault();
-      const fallbackIndex = getAutocompleteFallbackIndex(count, input.optionsPosition);
-      const resolvedIndex =
-        selectedIndex >= 0 && selectedIndex < count ? selectedIndex : fallbackIndex;
-      const selectedOption = input.options[resolvedIndex];
+      const selectedOption = input.options[selectedIndex];
       if (selectedOption) {
         input.onSelectOption(selectedOption, event, event.key === "Tab" ? "accept" : "commit");
       }
       return true;
     },
-    [input, open, selectedIndex, setSelectedIndex],
+    [input, open, selectedIndex],
   );
 
   return { selectedIndex, dismissed, onKeyPress };
+}
+
+interface SelectionChoice {
+  index: number;
+  query: string;
+  optionsPosition: AutocompleteOptionsPosition | undefined;
+}
+
+function resolveSelectedIndex(input: {
+  choice: SelectionChoice | null;
+  query: string;
+  itemCount: number;
+  optionsPosition?: AutocompleteOptionsPosition;
+  preselect: boolean;
+}): number {
+  const { choice } = input;
+  if (
+    choice &&
+    choice.query === input.query &&
+    choice.optionsPosition === input.optionsPosition &&
+    choice.index >= 0 &&
+    choice.index < input.itemCount
+  ) {
+    return choice.index;
+  }
+  if (!input.preselect) return -1;
+  return getAutocompleteFallbackIndex(input.itemCount, input.optionsPosition);
 }

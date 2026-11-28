@@ -325,9 +325,12 @@ function sourceMethods(
       const { state } = session;
       if (session.closed || state.selectedServerId !== serverId) return;
       session.entries = providerSnapshot.entries;
+      const next = resolved(session, state);
       publish(session, {
-        ...resolved(session, state),
-        modelSelectorProviders: buildSelectableProviderSelectorProviders(session.entries),
+        ...next,
+        modelSelectorProviders: buildSelectableProviderSelectorProviders(session.entries, {
+          selectedProvider: next.selectedProvider,
+        }),
         providerResolutionByServerId: {
           ...state.providerResolutionByServerId,
           [serverId]: "complete",

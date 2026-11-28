@@ -22,7 +22,7 @@ function setup(version: string, includePatch = true) {
   mkdirSync(bin);
   writeFileSync(join(dependency, "package.json"), JSON.stringify({ version }));
   if (includePatch)
-    writeFileSync(join(directory, "patches/react-native-reanimated+4.5.1.patch"), "fixture");
+    writeFileSync(join(directory, "patches/react-native-reanimated+4.5.5.patch"), "fixture");
   const fake = join(bin, "patch-package");
   writeFileSync(
     fake,
@@ -40,26 +40,26 @@ function setup(version: string, includePatch = true) {
 }
 
 it("fails clearly without invoking patch-package when the installed version differs", () => {
-  const { dependency, log, run } = setup("4.5.2");
+  const { dependency, log, run } = setup("4.5.6");
   const result = run();
   expect(result.status).toBe(1);
-  expect(result.stderr).toContain("4.5.1");
-  expect(result.stderr).toContain("4.5.2");
+  expect(result.stderr).toContain("4.5.5");
+  expect(result.stderr).toContain("4.5.6");
   expect(existsSync(log)).toBe(false);
   expect(existsSync(join(dependency, "package.json"))).toBe(true);
 });
 
 it("fails clearly when the required patch is missing", () => {
-  const { dependency, log, run } = setup("4.5.1", false);
+  const { dependency, log, run } = setup("4.5.5", false);
   const result = run();
   expect(result.status).toBe(1);
-  expect(result.stderr).toContain("react-native-reanimated+4.5.1.patch");
+  expect(result.stderr).toContain("react-native-reanimated+4.5.5.patch");
   expect(existsSync(log)).toBe(false);
   expect(existsSync(join(dependency, "package.json"))).toBe(true);
 });
 
 it("applies the patch when its dependency version matches", () => {
-  const { log, run } = setup("4.5.1");
+  const { log, run } = setup("4.5.5");
   expect(run().status).toBe(0);
   expect(existsSync(log)).toBe(true);
 });

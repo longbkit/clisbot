@@ -37,6 +37,7 @@ it("restores the retained row at the same offset without fetching", async () => 
     current: {
       scrollToBottom: vi.fn(),
       prepareForViewportChange: vi.fn(),
+      holdRow: vi.fn(),
       scrollToMessage: scroll,
       getMessageOffset: () => -32,
     },
@@ -73,6 +74,7 @@ it("fetches an evicted canonical anchor once and waits for its row before scroll
     current: {
       scrollToBottom: vi.fn(),
       prepareForViewportChange: vi.fn(),
+      holdRow: vi.fn(),
       scrollToMessage: scroll,
       getMessageOffset: () => 12,
     },

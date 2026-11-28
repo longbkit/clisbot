@@ -8,11 +8,16 @@ import type { DatabaseRuntime } from "../../db/runtime/index.js";
 import { createPostgresQueryRuntime } from "../../db/test-utils/runtime.js";
 import { z } from "zod";
 import { isHubFinishExecutionToolName } from "../../hub/protocol.js";
-import { DispatchedManualRunSchema, ProblemSchema } from "../../public-api/contracts.js";
-import { runCommand } from "./command.js";
+import {
+  DispatchedManualRunSchema,
+  InstalledTriggerSchema,
+  ProblemSchema,
+} from "../../public-api/contracts.js";
+import { describeProcesses, runCommand } from "./command.js";
 import { HubFaultProxy } from "./fault-proxy.js";
-import { SourceClisbot } from "./source-clisbot.js";
-import { configurationBundleFixture } from "../../test-utils/configuration-bundle.js";
+import { loginFixtureOperator } from "./operator-login.js";
+import { SourceClisbot, sourceEnvironment } from "./source-clisbot.js";
+import { workflowDocumentFixtures } from "../../test-utils/configuration-bundle.js";
 import { currentProjectConfigurationFiles } from "../../test-utils/current-project-configuration.js";
 import { slackConnectionCredentialOwner } from "../../credentials/credential-owners.js";
 import { createTestCredentialCipher } from "../../credentials/test-utils.js";
@@ -109,6 +114,7 @@ interface ManagedChild {
 }
 
 interface HubE2EOptions {
+  packagesRoot?: string;
   realAgent?: boolean;
 }
 
@@ -151,6 +157,7 @@ export class HubE2E {
   private hub: ManagedChild | undefined;
   private completionRunner: ManagedChild | undefined;
   private daemonHost = "";
+  private readonly installedTriggers = new Map<string, z.infer<typeof InstalledTriggerSchema>>();
   private acpRecordFile = "";
   private outputFile = "";
   private machineKeyFile = "";
@@ -197,6 +204,11 @@ export class HubE2E {
         { cause: error },
       );
     }
+    await loginFixtureOperator(
+      this.requireProxy().origin,
+      this.requirePool(),
+      this.requireSource().paths,
+    );
     return { daemonId: requiredString(status, "daemonId") };
   }
 
@@ -251,8 +263,10 @@ export class HubE2E {
       MACHINE_KEY,
       "--json",
     ];
+    // The legacy project bundle command is exposed in the CLI onboarding-off mode.
+    const deployEnv = { CLISBOT_ONBOARDING_ENABLED: "0" };
     const dryRun = await source
-      .runFrom([...common, "--dry-run"], projectRoot)
+      .runFrom([...common, "--dry-run"], projectRoot, deployEnv)
       .catch(async (error) => {
         const diagnostic = await fetch(
           `${this.requireProxy().origin}/api/v1/configurations/validate`,
@@ -271,7 +285,7 @@ export class HubE2E {
         );
       });
     const revisionsAfterDryRun = await this.configurationRevisionCount();
-    const install = await source.runFrom(common, projectRoot);
+    const install = await source.runFrom(common, projectRoot, deployEnv);
     const revisionsAfterInstall = await this.configurationRevisionCount();
     const active = await this.requirePool().query<{
       source_evidence: unknown;
@@ -401,19 +415,7 @@ export class HubE2E {
       "          provider: hub-e2e",
       '        prompt: [{ text: "daemon-restart" }] ',
     ].join("\n");
-    const response = await fetch(`${this.requireProxy().origin}/api/v1/configurations/install`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${MACHINE_KEY}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ projectSlug: PROJECT_SLUG, files: configurationBundleFixture(yaml) }),
-    });
-    if (response.status !== 201) {
-      throw new Error(
-        `install production configuration returned HTTP ${response.status}: ${await response.text()}`,
-      );
-    }
+    await this.installWorkflowDocuments(yaml);
   }
 
   async installRealAgentConfiguration(provider: RealAgentProvider): Promise<void> {
@@ -445,15 +447,7 @@ export class HubE2E {
       ...realAgentOptionsYaml(provider),
       '        prompt: [{ text: "Call the finish_execution MCP tool exactly once. Do not use curl, shell, or direct HTTP." }] ',
     ].join("\n");
-    const response = await fetch(`${this.requireProxy().origin}/api/v1/configurations/install`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${MACHINE_KEY}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ projectSlug: PROJECT_SLUG, files: configurationBundleFixture(yaml) }),
-    });
-    assertStatus(response, 201, "install real-agent configuration");
+    await this.installWorkflowDocuments(yaml);
   }
 
   async installRealAgentRoutingConfiguration(provider: RealAgentProvider): Promise<void> {
@@ -521,15 +515,27 @@ export class HubE2E {
       ...realAgentOptionsYaml(provider),
       '        prompt: [{ text: "Call finish_execution exactly once. Do not use curl, shell, or direct HTTP." }] ',
     ].join("\n");
-    const response = await fetch(`${this.requireProxy().origin}/api/v1/configurations/install`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${MACHINE_KEY}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ projectSlug: PROJECT_SLUG, files: configurationBundleFixture(yaml) }),
-    });
-    assertStatus(response, 201, "install real-agent routing configuration");
+    await this.installWorkflowDocuments(yaml);
+  }
+
+  private async installWorkflowDocuments(yaml: string): Promise<void> {
+    for (const document of workflowDocumentFixtures(yaml)) {
+      const response = await fetch(`${this.requireProxy().origin}/api/v1/triggers/install`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${MACHINE_KEY}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ yaml: document }),
+      });
+      if (response.status !== 201) {
+        throw new Error(
+          `Install test trigger returned HTTP ${response.status}: ${await response.text()}`,
+        );
+      }
+      const installed = InstalledTriggerSchema.parse(await response.json());
+      this.installedTriggers.set(installed.name, installed);
+    }
   }
 
   async runManual(
@@ -681,8 +687,7 @@ export class HubE2E {
       if (!item.completedToolCall) {
         throw new Error(`real ${provider} step ${item.stepId} has no completed finish tool call`);
       }
-      const binary = realAgentProcessPattern(provider);
-      if (!item.processDescriptions.some((description) => binary.test(description))) {
+      if (!item.processDescriptions.some((description) => description.endsWith(` ${provider}`))) {
         throw new Error(
           `real ${provider} process evidence missing for step ${item.stepId}: ${JSON.stringify(item.processDescriptions)}`,
         );
@@ -773,8 +778,7 @@ export class HubE2E {
       );
     }
     const processDescriptions = run.processDescriptions ?? [];
-    const binary = realAgentProcessPattern(provider);
-    if (!processDescriptions.some((description) => binary.test(description))) {
+    if (!processDescriptions.some((description) => description.endsWith(` ${provider}`))) {
       throw new Error(
         `real ${provider} process evidence missing: ${JSON.stringify(processDescriptions)}`,
       );
@@ -790,12 +794,15 @@ export class HubE2E {
   }
 
   async runCapabilityTrigger(deliveryKey: string): Promise<ManualRun> {
+    const installed = this.installedTriggers.get("e2e-discord");
+    if (!installed) throw new Error("Install the capability trigger before dispatch");
     const response = await fetch(`${this.requireProxy().origin}/test/trigger`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         organizationId: "hub-e2e",
-        projectId: PROJECT_ID,
+        triggerId: installed.triggerId,
+        triggerRevisionId: installed.revisionId,
         source: "e2e.discord",
         deliveryId: deliveryKey,
         payload: {},
@@ -896,6 +903,27 @@ export class HubE2E {
       duplicateRejected: record["duplicateRejected"] === true,
       secretCompletionEnvPresent: record["secretCompletionEnvPresent"] === true,
     };
+  }
+
+  async restrictHubToWorkspaceReads(): Promise<string> {
+    const source = this.requireSource();
+    for (const permission of [
+      "workspace.manage",
+      "workspace.write",
+      "daemon.read",
+      "hub.execute",
+    ]) {
+      await source.run([
+        "hub",
+        "permissions",
+        "revoke",
+        permission,
+        "--host",
+        source.paths.daemonHost,
+        "--json",
+      ]);
+    }
+    return requiredString(await source.status(), "permissions");
   }
 
   requestForbiddenOperation() {
@@ -1232,6 +1260,7 @@ export class HubE2E {
     this.completionGate = join(this.root, "allow-acp-completion");
     this.completionJobs = join(this.root, "completion-jobs");
     await Promise.all([
+      mkdir(join(this.root, "clisbot-home", "test-user"), { recursive: true, mode: 0o700 }),
       mkdir(this.workspace),
       mkdir(this.completionJobs),
       writeFile(this.completionGate, "ready\n"),
@@ -1268,9 +1297,11 @@ export class HubE2E {
     );
     MACHINE_KEY = (await readFile(this.machineKeyFile, "utf8")).trim();
     this.source = await SourceClisbot.start({
+      ...(this.options.packagesRoot ? { packagesRoot: this.options.packagesRoot } : {}),
       root: this.root,
       clisbotHome: join(this.root, "clisbot-home"),
       daemonHost: this.daemonHost,
+      realAgent: this.options.realAgent === true,
       config: ({ packagesRoot, daemonHost }) => this.clisbotConfig(packagesRoot, daemonHost),
     });
   }
@@ -1288,6 +1319,8 @@ export class HubE2E {
         PORT: String(this.hubPort),
         HUB_E2E_MACHINE_KEY_FILE: this.machineKeyFile,
         CLISBOT_HUB_APP_URL: this.requireProxy().origin,
+        // This loopback Hub serves the test-only synthetic provider ingress at /test/trigger.
+        CLISBOT_HUB_WEB_UI_ENABLED: "true",
         CLISBOT_HUB_AUTH_SECRET: "hub-e2e-browser-auth-secret-at-least-32-characters",
         CLISBOT_REGISTRATION_MODE: "open",
         CLISBOT_ORGANIZATION_CREATION: "open",
@@ -1322,7 +1355,32 @@ export class HubE2E {
         ? {}
         : {
             agents: {
+              // An empty list auto-discovers real models for background metadata.
+              metadataGeneration: { providers: [{ provider: "hub-e2e" }] },
               providers: {
+                claude: {
+                  command: [
+                    process.execPath,
+                    join(HUB_ROOT, "src/e2e/harness/catalog-cli.mjs"),
+                    "claude",
+                  ],
+                },
+                // The authored bundle is a fixed test artifact. Its model is validated and
+                // installed here; real-provider journeys use the Host's discovered catalog.
+                codex: {
+                  command: [
+                    process.execPath,
+                    join(HUB_ROOT, "src/e2e/harness/catalog-cli.mjs"),
+                    "codex",
+                  ],
+                  additionalModels: [
+                    {
+                      id: "gpt-5.5",
+                      label: "Bundle fixture model",
+                      thinkingOptions: [{ id: "xhigh", label: "Extra high" }],
+                    },
+                  ],
+                },
                 "hub-e2e": {
                   extends: "acp",
                   label: "Hub E2E",
@@ -1364,7 +1422,7 @@ export class HubE2E {
         authorization: `Bearer ${MACHINE_KEY}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ projectSlug: PROJECT_SLUG, ...input }),
+      body: JSON.stringify(input),
     });
     if (response.status !== 200) {
       throw new Error(
@@ -1598,15 +1656,10 @@ function realAgentOptionsYaml(provider: RealAgentProvider): string[] {
   ];
 }
 
-function realAgentProcessPattern(provider: RealAgentProvider): RegExp {
-  if (provider === "codex") return /(?:^|\/)codex(?:\s|$)/u;
-  if (provider === "claude") return /(?:^|\/)claude(?:\s|$)/u;
-  return /(?:^|\/)opencode(?:\s|$)/u;
-}
 async function initializeGitWorkspace(workspace: string): Promise<void> {
-  await runCommand("git", ["init", "-q"], workspace, {});
+  await runCommand("git", ["init", "-q"], workspace);
   await writeFile(join(workspace, "README.md"), "phase five\n");
-  await runCommand("git", ["add", "README.md"], workspace, {});
+  await runCommand("git", ["add", "README.md"], workspace);
   await runCommand(
     "git",
     [
@@ -1619,7 +1672,6 @@ async function initializeGitWorkspace(workspace: string): Promise<void> {
       "fixture",
     ],
     workspace,
-    {},
   );
 }
 
@@ -1635,7 +1687,10 @@ async function startChild(input: {
   const output: string[] = [];
   const child = spawn(input.command, input.args, {
     cwd: input.cwd,
-    env: { ...process.env, ...input.env },
+    env: {
+      ...sourceEnvironment({ clisbotHome: join(input.root, "clisbot-home"), realAgent: false }),
+      ...input.env,
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
   const record = (chunk: Buffer) => {
@@ -1716,23 +1771,7 @@ async function processFamily(rootPid: number | undefined): Promise<number[]> {
 }
 
 async function processDiagnostics(rootPid: number): Promise<string> {
-  const family = new Set(await processFamily(rootPid));
-  const { stdout } = await exec("ps", ["-ax", "-o", "pid=,ppid=,state=,etime=,command="]);
-  return stdout
-    .split("\n")
-    .filter((line) => family.has(Number(line.trim().split(/\s+/u)[0])))
-    .join("\n");
-}
-
-async function describeProcesses(pids: readonly number[]): Promise<string[]> {
-  if (pids.length === 0) return [];
-  const selected = new Set(pids);
-  const { stdout } = await exec("ps", ["-ax", "-o", "pid=,ppid=,state=,etime=,command="]);
-  return stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => selected.has(Number(line.split(/\s+/u)[0])))
-    .map(redactProcessDescription);
+  return (await describeProcesses(await processFamily(rootPid))).join("\n");
 }
 
 function isProcessAlive(pid: number): boolean {
@@ -1742,13 +1781,6 @@ function isProcessAlive(pid: number): boolean {
   } catch {
     return false;
   }
-}
-
-function redactProcessDescription(description: string): string {
-  return description.replace(
-    /(--(?:api-key|credential|password|secret|token))(=|\s+)\S+/giu,
-    "$1$2<redacted>",
-  );
 }
 
 export async function availablePort(): Promise<number> {
@@ -1779,10 +1811,4 @@ function requiredString(value: Record<string, unknown>, key: string): string {
   const field = value[key];
   if (typeof field !== "string") throw new Error(`Expected ${key} in ${JSON.stringify(value)}`);
   return field;
-}
-
-function assertStatus(response: Response, expected: number, action: string): void {
-  if (response.status !== expected) {
-    throw new Error(`${action} returned HTTP ${response.status}`);
-  }
 }

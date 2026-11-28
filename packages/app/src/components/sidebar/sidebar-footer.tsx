@@ -1,12 +1,12 @@
 import { SPACING } from "@/styles/theme";
 import { buttonControlHeight, MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { useHasFinePointer } from "@/hooks/use-fine-pointer";
+import { usePointerCapabilities } from "@/hooks/pointer-capabilities";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { PluginSidebarItem } from "@/plugins/sidebar-items";
 import { useSidebarFooterItems } from "@/sidebar-nav/use-sidebar-footer-items";
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
-import { UsageSidebarItem, UsageSidebarRoot, useHasUsageSummary } from "@/usage";
+import { UsageSidebarItem, UsageSidebarRoot, useUsageSummary } from "@/usage";
 import { FolderPlus, Import, Settings } from "lucide-react-native";
 import { useRef } from "react";
 import { View } from "react-native";
@@ -81,7 +81,7 @@ function SidebarFooterActions({
   const newAgentKeys = useShortcutKeys("new-agent");
   const { items } = useSidebarFooterItems();
   const compact = useIsCompactFormFactor();
-  const finePointer = useHasFinePointer();
+  const { finePointer } = usePointerCapabilities();
   const touchTarget = compact || !finePointer;
   const actions = items.filter((item) => item.visible && item.group === "actions");
   // A phone keeps every footer action on one line: search shrinks to its icon instead of wrapping.
@@ -192,7 +192,9 @@ function SidebarFooterRows({
   stable?: boolean;
 }) {
   const { items } = useSidebarNavItems("footer");
-  const hasUsageSummary = useHasUsageSummary();
+  // Read once here and handed to the item, as upstream lifts the summary to its caller.
+  const usageSummary = useUsageSummary();
+  const hasUsageSummary = usageSummary.length > 0;
   const rowsRef = useRef<View | null>(null);
   const visibleItems = items.filter(
     (item) => item.visible && (item.kind === "plugin" || stable || hasUsageSummary),
@@ -212,7 +214,7 @@ function SidebarFooterRows({
                 onBeforeNavigate={onBeforeNavigate}
               />
             ) : (
-              <UsageSidebarItem key={item.key} reserveSpace={stable} />
+              <UsageSidebarItem key={item.key} sources={usageSummary} reserveSpace={stable} />
             )}
           </View>
         ))}

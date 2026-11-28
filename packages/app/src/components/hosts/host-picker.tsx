@@ -156,24 +156,34 @@ export function HostPickerOption({
       ? formatActiveConnectionLabel(activeConnection)
       : undefined;
   const leadingSlot = useMemo(() => <HostStatusDotSlot serverId={serverId} />, [serverId]);
+  const { theme } = useUnistyles();
   const managedAccess = isManagedAccessHost(useHosts().find((host) => host.serverId === serverId));
-  const handleSettingsPress = useCallback(
-    (event: GestureResponderEvent) => {
-      event.stopPropagation();
-      onOpenHostSettings?.(serverId);
-    },
-    [onOpenHostSettings, serverId],
+  const trailingSlot = useMemo(
+    () => (managedAccess ? <ManagedAccessGlyph serverId={serverId} /> : undefined),
+    [managedAccess, serverId],
   );
-  const trailingSlot = useMemo(() => {
-    const managedIcon = managedAccess ? <ManagedAccessGlyph serverId={serverId} /> : null;
-    if (!onOpenHostSettings) return managedIcon ?? undefined;
+  const handleSettingsPress = useCallback(() => {
+    onOpenHostSettings?.(serverId);
+  }, [onOpenHostSettings, serverId]);
+  const trailingAction = useMemo(() => {
+    if (!onOpenHostSettings) return undefined;
     return (
-      <View style={styles.trailing}>
-        {managedIcon}
-        <HostSettingsButton label={label} onPress={handleSettingsPress} />
-      </View>
+      <Pressable
+        onPress={handleSettingsPress}
+        style={styles.settingsAction}
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${label} settings`}
+      >
+        <Settings size={theme.iconSize.sm} color={theme.colors.foregroundMuted} />
+      </Pressable>
     );
-  }, [handleSettingsPress, label, managedAccess, onOpenHostSettings, serverId]);
+  }, [
+    handleSettingsPress,
+    label,
+    onOpenHostSettings,
+    theme.colors.foregroundMuted,
+    theme.iconSize.sm,
+  ]);
 
   return (
     <ComboboxItem
@@ -183,6 +193,7 @@ export function HostPickerOption({
       descriptionLayout="stacked"
       leadingSlot={leadingSlot}
       trailingSlot={trailingSlot}
+      trailingAction={trailingAction}
       selected={selected}
       active={active}
       onPress={onPress}
@@ -438,6 +449,12 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
+  },
+  settingsAction: {
+    flex: 1,
+    justifyContent: "center",
+    paddingLeft: theme.spacing[1],
+    paddingRight: theme.spacing[3],
   },
   statusDotSlot: {
     width: theme.iconSize.sm,

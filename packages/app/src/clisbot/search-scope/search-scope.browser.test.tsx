@@ -74,15 +74,25 @@ vi.mock("@/hooks/use-projects", () => ({
     return { projects: fleet.value!.projects };
   },
 }));
+// Upstream v0.17 Command Center modules also load the host chooser, Hub picker and settled-host
+// readers; the fleet stands in for each.
 vi.mock("@/clisbot/hub/host-inventory", () => ({
   useAvailableHosts: () => fleet.value!.hosts,
+  useHostInventory: () => ({
+    hosts: fleet.value!.hosts,
+    status: "ready",
+    error: null,
+    retry: () => {},
+  }),
 }));
 vi.mock("@/clisbot/hub/account-provider", () => ({
   useHubAccounts: () => stable.hubAccounts,
+  useHubAccount: () => stable.hubAccounts[0] ?? null,
 }));
 vi.mock("@/device-access/hub-profiles", () => ({
   useHubProfiles: () => ({ profiles: [] }),
   hubProfileOrigin: () => "",
+  selectHubProfile: () => {},
 }));
 vi.mock("@/hooks/use-is-local-daemon", () => ({ useLocalDaemonServerId: () => "local" }));
 // Not `importOriginal`: the runtime imports modules that import it back, which deadlocks the mocker.
@@ -108,11 +118,17 @@ vi.mock("@/runtime/host-runtime", async () => {
       useSyncExternalStore(runtimeStatus.subscribe, runtimeStatus.version);
       return new Map(ids.map((id) => [id, snapshot(id).connectionStatus]));
     },
+    // Upstream v0.17 Command Center rows read one Host's status at a time.
+    useHostRuntimeConnectionStatus: (serverId: string) => {
+      useSyncExternalStore(runtimeStatus.subscribe, runtimeStatus.version);
+      return snapshot(serverId).connectionStatus;
+    },
     getHostRuntimeStore: () => store,
     getHostRuntimeConnectionStatusSince: () => null,
     useHostRuntimeClient: () => null,
     useHostRuntimeSnapshot: () => null,
     useHostRuntimeIsConnected: () => true,
+    useHostRegistryLoaded: () => true,
   };
 });
 // The shared stub theme has no palette; the list's real theme does.
@@ -128,12 +144,20 @@ vi.mock("react-native-unistyles", async () => {
     UnistylesRuntime: { setTheme: () => undefined, themeName: "light" },
   };
 });
+// Upstream v0.17 also searches archived workspaces through Host history; this fleet has none.
+vi.mock("@/archived-workspaces", () => ({
+  useArchivedWorkspaceSearch: () => ({ workspaces: [], matchedByHost: true, pending: false }),
+}));
 vi.mock("@/projects/icons", () => ({ useProjectIcons: () => stable.icons }));
 vi.mock("@/agent-presentation", () => ({
   useAgentDescriptor: () => stable.descriptor,
   resolveAgentLabel: (title: string | null) => title,
 }));
-vi.mock("@/workspace-status", () => ({ useWorkspaceStatus: () => "done" }));
+// Upstream v0.17 plugin snapshots, loaded by the Command Center, derive the status directly.
+vi.mock("@/workspace-status", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/workspace-status")>()),
+  useWorkspaceStatus: () => "done",
+}));
 vi.mock("@/command-center/workspace-search", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/command-center/workspace-search")>();
   return {
@@ -155,26 +179,38 @@ let container: HTMLDivElement | null = null;
 const TOAST_API = { show: () => () => {}, copied: () => {}, error: () => {} };
 
 async function mountCommandCenter({ open = true } = {}) {
-  const [{ CommandCenter }, { CommandCenterProvider }, dispatcher, toast, store] =
-    await Promise.all([
-      import("@/command-center/command-center"),
-      import("@/command-center/provider"),
-      import("@/keyboard/keyboard-action-dispatcher-context"),
-      import("@/contexts/toast-api-context"),
-      import("@/stores/keyboard-shortcuts-store"),
-    ]);
+  const [
+    { CommandCenter },
+    { CommandCenterProvider },
+    dispatcher,
+    toast,
+    store,
+    routes,
+    testRoutes,
+  ] = await Promise.all([
+    import("@/command-center/command-center"),
+    import("@/command-center/provider"),
+    import("@/keyboard/keyboard-action-dispatcher-context"),
+    import("@/contexts/toast-api-context"),
+    import("@/stores/keyboard-shortcuts-store"),
+    import("@/navigation/route-source"),
+    import("@/test/route-source"),
+  ]);
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
   await act(async () => {
+    // Upstream v0.17 reads the route through a RouteSourceProvider (the app root supplies it).
     root!.render(
-      <dispatcher.KeyboardActionDispatcherProvider>
-        <toast.ToastApiProvider api={TOAST_API}>
-          <CommandCenterProvider>
-            <CommandCenter />
-          </CommandCenterProvider>
-        </toast.ToastApiProvider>
-      </dispatcher.KeyboardActionDispatcherProvider>,
+      <routes.RouteSourceProvider source={testRoutes.createTestRouteSource("/").source}>
+        <dispatcher.KeyboardActionDispatcherProvider>
+          <toast.ToastApiProvider api={TOAST_API}>
+            <CommandCenterProvider>
+              <CommandCenter />
+            </CommandCenterProvider>
+          </toast.ToastApiProvider>
+        </dispatcher.KeyboardActionDispatcherProvider>
+      </routes.RouteSourceProvider>,
     );
   });
   if (!open) return;

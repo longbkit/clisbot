@@ -7,11 +7,16 @@ import { ScriptRouteStore } from "./script-proxy.js";
 import {
   buildWorkspaceScriptPayloads,
   createScriptStatusEmitter,
+  readClisbotConfigForProjection,
 } from "./script-status-projection.js";
 import { WorkspaceScriptPayloadSchema } from "@clisbot/protocol/messages";
 import type { ScriptHealthState } from "./script-health-monitor.js";
 import { WorkspaceScriptRuntimeStore } from "./workspace-script-runtime-store.js";
 import { readClisbotConfig } from "../utils/worktree.js";
+import {
+  readClisbotConfigForEdit,
+  writeClisbotConfigForEdit,
+} from "../utils/clisbot-config-file.js";
 import type { ClisbotConfig } from "@clisbot/protocol/clisbot-config-schema";
 import { createTestLogger } from "../test-utils/test-logger.js";
 
@@ -53,7 +58,7 @@ function createWorkspaceRepo(options?: {
   };
 }
 
-function buildPayloads(input: {
+async function buildPayloads(input: {
   workspaceId: string;
   workspaceDirectory: string;
   clisbotConfig?: ClisbotConfig | null;
@@ -66,7 +71,9 @@ function buildPayloads(input: {
   resolveHealth?: (hostname: string) => ScriptHealthState | null;
 }) {
   const clisbotConfig =
-    input.clisbotConfig !== undefined ? input.clisbotConfig : loadConfig(input.workspaceDirectory);
+    input.clisbotConfig !== undefined
+      ? input.clisbotConfig
+      : await loadConfig(input.workspaceDirectory);
   const { routeStore, serviceProxy, ...rest } = input;
   return buildWorkspaceScriptPayloads({
     ...rest,
@@ -75,8 +82,8 @@ function buildPayloads(input: {
   });
 }
 
-function loadConfig(repoRoot: string): ClisbotConfig | null {
-  const result = readClisbotConfig(repoRoot);
+async function loadConfig(repoRoot: string): Promise<ClisbotConfig | null> {
+  const result = await readClisbotConfig(repoRoot);
   return result.ok ? result.config : null;
 }
 
@@ -96,7 +103,7 @@ describe("script-status-projection", () => {
     ).toBeNull();
   });
 
-  it("projects plain scripts and services differently", () => {
+  it("projects plain scripts and services differently", async () => {
     const workspaceId = "workspace-plain-and-service";
     const workspace = createWorkspaceRepo({
       clisbotConfig: {
@@ -119,7 +126,7 @@ describe("script-status-projection", () => {
 
     try {
       expect(
-        buildPayloads({
+        await buildPayloads({
           workspaceId,
           workspaceDirectory: workspace.repoDir,
           routeStore,
@@ -157,7 +164,7 @@ describe("script-status-projection", () => {
     }
   });
 
-  it("builds service hostnames from service-provided git metadata", () => {
+  it("builds service hostnames from service-provided git metadata", async () => {
     const workspaceId = "workspace-service-metadata";
     const workspace = createWorkspaceRepo({
       branchName: "local-branch-that-should-not-be-read",
@@ -171,7 +178,7 @@ describe("script-status-projection", () => {
     const runtimeStore = new WorkspaceScriptRuntimeStore();
 
     try {
-      const payloads = buildPayloads({
+      const payloads = await buildPayloads({
         workspaceId,
         workspaceDirectory: workspace.repoDir,
         serviceProxy: routeStore,
@@ -203,7 +210,7 @@ describe("script-status-projection", () => {
     }
   });
 
-  it("projects local and public service URLs while keeping proxyUrl public-first", () => {
+  it("projects local and public service URLs while keeping proxyUrl public-first", async () => {
     const workspaceId = "workspace-public-service";
     const workspace = createWorkspaceRepo({
       clisbotConfig: {
@@ -217,7 +224,7 @@ describe("script-status-projection", () => {
 
     try {
       expect(
-        buildPayloads({
+        await buildPayloads({
           workspaceId,
           workspaceDirectory: workspace.repoDir,
           routeStore,
@@ -246,7 +253,7 @@ describe("script-status-projection", () => {
     }
   });
 
-  it("overlays runtime, route, and health state for running services", () => {
+  it("overlays runtime, route, and health state for running services", async () => {
     const workspaceId = "workspace-running-service";
     const workspace = createWorkspaceRepo({
       branchName: "feature/card",
@@ -276,7 +283,7 @@ describe("script-status-projection", () => {
 
     try {
       expect(
-        buildPayloads({
+        await buildPayloads({
           workspaceId,
           workspaceDirectory: workspace.repoDir,
           routeStore,
@@ -304,7 +311,7 @@ describe("script-status-projection", () => {
     }
   });
 
-  it("maps internal pending health to null on the wire", () => {
+  it("maps internal pending health to null on the wire", async () => {
     const workspaceId = "workspace-pending-health";
     const workspace = createWorkspaceRepo({
       clisbotConfig: {
@@ -333,7 +340,7 @@ describe("script-status-projection", () => {
 
     try {
       expect(
-        buildPayloads({
+        await buildPayloads({
           workspaceId,
           workspaceDirectory: workspace.repoDir,
           routeStore,
@@ -361,7 +368,7 @@ describe("script-status-projection", () => {
     }
   });
 
-  it("includes orphaned running runtime entries even after config removal", () => {
+  it("includes orphaned running runtime entries even after config removal", async () => {
     const workspaceId = "workspace-orphaned-service";
     const workspace = createWorkspaceRepo();
     const routeStore = new ScriptRouteStore();
@@ -384,7 +391,7 @@ describe("script-status-projection", () => {
 
     try {
       expect(
-        buildPayloads({
+        await buildPayloads({
           workspaceId,
           workspaceDirectory: workspace.repoDir,
           routeStore,
@@ -411,7 +418,7 @@ describe("script-status-projection", () => {
     }
   });
 
-  it("projects orphaned plain scripts as scripts instead of services", () => {
+  it("projects orphaned plain scripts as scripts instead of services", async () => {
     const workspaceId = "workspace-orphaned-script";
     const workspace = createWorkspaceRepo();
     const routeStore = new ScriptRouteStore();
@@ -427,7 +434,7 @@ describe("script-status-projection", () => {
 
     try {
       expect(
-        buildPayloads({
+        await buildPayloads({
           workspaceId,
           workspaceDirectory: workspace.repoDir,
           routeStore,
@@ -452,7 +459,7 @@ describe("script-status-projection", () => {
     }
   });
 
-  it("readClisbotConfig fails with configPath and error when clisbot.json is malformed", () => {
+  it("readClisbotConfig fails with configPath and error when clisbot.json is malformed", async () => {
     const workspace = createWorkspaceRepo();
     const configPath = path.join(workspace.repoDir, "clisbot.json");
     writeFileSync(
@@ -461,7 +468,7 @@ describe("script-status-projection", () => {
     );
 
     try {
-      const result = readClisbotConfig(workspace.repoDir);
+      const result = await readClisbotConfig(workspace.repoDir);
       expect(result.ok).toBe(false);
       if (result.ok) throw new Error("unreachable");
       expect(result.configPath).toBe(configPath);
@@ -471,7 +478,85 @@ describe("script-status-projection", () => {
     }
   });
 
-  it("buildWorkspaceScriptPayloads given clisbotConfig=null still surfaces orphaned runtime scripts", () => {
+  it("keeps every workspace's scripts when a listing's clisbot.json checks do not finish in time", async () => {
+    // More workspaces than the daemon kept snapshots for before, each with a config it has read.
+    const tempDir = realpathSync(mkdtempSync(path.join(tmpdir(), "script-projection-many-")));
+    const workspaces = Array.from({ length: 300 }, (_, index) => {
+      const directory = path.join(tempDir, `workspace-${index}`);
+      mkdirSync(directory);
+      writeFileSync(
+        path.join(directory, "clisbot.json"),
+        JSON.stringify({ scripts: { api: { type: "service", command: "npm run dev" } } }),
+      );
+      return directory;
+    });
+    const logger = createTestLogger();
+    try {
+      await Promise.all(
+        workspaces.map((directory) => readClisbotConfigForProjection(directory, logger)),
+      );
+
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const listing = Promise.all(
+        workspaces.map((directory) => readClisbotConfigForProjection(directory, logger)),
+      );
+      // The filesystem has not answered any check when the 5 s budget runs out.
+      vi.advanceTimersByTime(5_000);
+      const configs = await listing;
+
+      expect(configs.filter((config) => config?.scripts?.api === undefined)).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the saved scripts when the first check after an in-app save is late", async () => {
+    const workspace = createWorkspaceRepo({
+      clisbotConfig: { scripts: { api: { type: "service", command: "npm run dev" } } },
+    });
+    const logger = createTestLogger();
+    try {
+      const current = await readClisbotConfigForEdit(workspace.repoDir);
+      if (!current.ok) throw new Error("expected a readable clisbot.json");
+      const saved = await writeClisbotConfigForEdit({
+        repoRoot: workspace.repoDir,
+        config: { scripts: { web: { type: "service", command: "npm run web" } } },
+        expectedRevision: current.revision,
+      });
+      expect(saved.ok).toBe(true);
+
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const listing = readClisbotConfigForProjection(workspace.repoDir, logger);
+      vi.advanceTimersByTime(5_000);
+
+      expect(Object.keys((await listing)?.scripts ?? {})).toEqual(["web"]);
+    } finally {
+      vi.useRealTimers();
+      workspace.cleanup();
+    }
+  });
+
+  it("shows an external clisbot.json edit on the next listing", async () => {
+    const workspace = createWorkspaceRepo({
+      clisbotConfig: { scripts: { api: { type: "service", command: "npm run dev" } } },
+    });
+    try {
+      await readClisbotConfigForProjection(workspace.repoDir, createTestLogger());
+      writeFileSync(
+        path.join(workspace.repoDir, "clisbot.json"),
+        JSON.stringify({ scripts: { web: { type: "service", command: "npm run web" } } }),
+      );
+
+      const config = await readClisbotConfigForProjection(workspace.repoDir, createTestLogger());
+
+      expect(Object.keys(config?.scripts ?? {})).toEqual(["web"]);
+    } finally {
+      workspace.cleanup();
+    }
+  });
+
+  it("buildWorkspaceScriptPayloads given clisbotConfig=null still surfaces orphaned runtime scripts", async () => {
     const workspaceId = "workspace-null-config";
     const workspace = createWorkspaceRepo();
     const routeStore = new ScriptRouteStore();
@@ -487,7 +572,7 @@ describe("script-status-projection", () => {
 
     try {
       expect(
-        buildPayloads({
+        await buildPayloads({
           workspaceId,
           workspaceDirectory: workspace.repoDir,
           clisbotConfig: null,
@@ -541,7 +626,12 @@ describe("script-status-projection", () => {
       exitCode: null,
     });
 
-    const session = { emit: vi.fn() };
+    const messages: unknown[] = [];
+    const session = {
+      emit: (message: unknown) => {
+        messages.push(message);
+      },
+    };
     const emitUpdate = createScriptStatusEmitter({
       sessions: () => [session],
       serviceProxy: routeStore,
@@ -553,7 +643,11 @@ describe("script-status-projection", () => {
     });
 
     try {
-      emitUpdate(workspaceId, [
+      const originalConfig = await readClisbotConfigForProjection(
+        workspace.repoDir,
+        createTestLogger(),
+      );
+      await emitUpdate(workspaceId, [
         {
           scriptName: "api",
           hostname: "api--repo.localhost",
@@ -561,9 +655,25 @@ describe("script-status-projection", () => {
           health: "healthy",
         },
       ]);
-      await Promise.resolve();
 
-      expect(session.emit).toHaveBeenCalledWith({
+      expect(await readClisbotConfigForProjection(workspace.repoDir, createTestLogger())).toBe(
+        originalConfig,
+      );
+      await emitUpdate(workspaceId, [
+        { scriptName: "api", hostname: "api--repo.localhost", port: 3001, health: "unhealthy" },
+      ]);
+      expect(messages.at(-1)).toMatchObject({
+        payload: {
+          scripts: [
+            { scriptName: "api", health: "unhealthy" },
+            { scriptName: "typecheck", health: null },
+          ],
+        },
+      });
+      expect(await readClisbotConfigForProjection(workspace.repoDir, createTestLogger())).toBe(
+        originalConfig,
+      );
+      expect(messages).toContainEqual({
         type: "script_status_update",
         payload: {
           workspaceId,

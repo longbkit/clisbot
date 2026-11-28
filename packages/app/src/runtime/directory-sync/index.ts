@@ -5,6 +5,7 @@ import type {
   FetchAgentsEntry,
   FetchAgentsOptions,
 } from "@clisbot/client/internal/daemon-client";
+import type { AgentSnapshotPayload } from "@clisbot/protocol/messages";
 import { fetchAgentTimelineOnce } from "@/timeline/fetch-agent-timeline-once";
 import {
   batchSessionStoreUpdates,
@@ -179,7 +180,7 @@ export class DirectorySync {
   private readonly fullDemandSources = new Set<object>();
   private readonly scriptStatusDemand = new Map<object, string>();
   private demandRefresh: Promise<void> | null = null;
-  private demandGeneration = 0;
+  private subscriptionGeneration = 0;
   private satisfiedDemandSource: DirectorySourceToken | null = null;
   private cursors: DirectoryCheckpoint = {};
   private readonly pageFetchLimiter: ConnectLimiter | null;
@@ -317,7 +318,7 @@ export class DirectorySync {
   private releaseSubscriptions(): void {
     // A same-connection consumer can return while canceled ready promises are settling.
     // Its demand must not be satisfied by the subscriptions being released here.
-    this.demandGeneration += 1;
+    this.subscriptionGeneration += 1;
     for (const subscription of [
       this.agentSubscription,
       this.workspaceSubscription,
@@ -373,7 +374,7 @@ export class DirectorySync {
   private applyLiveAgentDelta(source: DirectorySourceToken, delta: AgentDirectoryDelta): boolean {
     if (this.agentTransactions.record(source, delta)) return false;
     this.agents.applyDelta(delta);
-    this.noteLiveCursor("agents", delta);
+    if (this.extendsRefreshedBaseline(source)) this.noteLiveCursor("agents", delta);
     return true;
   }
 
@@ -383,12 +384,26 @@ export class DirectorySync {
   ): boolean {
     if (this.workspaceTransactions.record(source, delta)) return false;
     this.applyWorkspaceDelta(delta);
-    if (delta.kind !== "script_status")
+    if (delta.kind !== "script_status" && this.extendsRefreshedBaseline(source))
       this.noteLiveCursor(
         "projectId" in delta || "project" in delta ? "projects" : "workspaces",
         delta,
       );
     return true;
+  }
+
+  /**
+   * A live event's sequence covers everything before it only when a refresh completed on the
+   * subscriptions that delivered it. Before that (first sync still pending or failed) or after
+   * they lapse, the client may have missed earlier changes, so the event updates rows but leaves
+   * the cursor where the next refresh can still fetch what was missed.
+   */
+  private extendsRefreshedBaseline(source: DirectorySourceToken): boolean {
+    const refreshed = this.satisfiedDemandSource;
+    return (
+      refreshed?.clientGeneration === source.clientGeneration &&
+      refreshed.connectionEpoch === source.connectionEpoch
+    );
   }
 
   private observeDirectoryEvents(): void {
@@ -448,7 +463,7 @@ export class DirectorySync {
     this.observeDirectoryEvents();
     this.observeScriptStatusEvents();
     const source = this.connection.source;
-    const demandGeneration = this.demandGeneration;
+    const subscriptionGeneration = this.subscriptionGeneration;
     if (
       !force &&
       this.satisfiedDemandSource?.clientGeneration === source.clientGeneration &&
@@ -465,18 +480,19 @@ export class DirectorySync {
           ]).then(() => undefined);
     this.demandRefresh = refresh
       .then(() => {
-        if (this.demandGeneration === demandGeneration) this.satisfiedDemandSource = source;
+        if (this.subscriptionGeneration === subscriptionGeneration) {
+          this.satisfiedDemandSource = source;
+        }
         return undefined;
       })
       .finally(() => {
         this.demandRefresh = null;
         const current = this.connection.source;
-        if (
-          this.hasDemand() &&
-          (this.demandGeneration !== demandGeneration ||
-            current.clientGeneration !== source.clientGeneration ||
-            current.connectionEpoch !== source.connectionEpoch)
-        ) {
+        const sourceChanged =
+          current.clientGeneration !== source.clientGeneration ||
+          current.connectionEpoch !== source.connectionEpoch;
+        const subscriptionsReleased = this.subscriptionGeneration !== subscriptionGeneration;
+        if (this.hasDemand() && (sourceChanged || subscriptionsReleased)) {
           void this.requestDemandRefresh().catch(() => undefined);
         }
       });
@@ -602,6 +618,26 @@ export class DirectorySync {
     return page;
   }
 
+  /**
+   * Captures these chats' lifecycle before a subscribe. The returned function keeps the agent rows
+   * its answer carries, which is what a timeline fetch would have delivered for each of them.
+   */
+  captureSubscribedAgents(
+    agentIds: string[],
+  ): (agents: Record<string, AgentSnapshotPayload>) => void {
+    const tokens = new Map(agentIds.map((id) => [id, this.agents.captureTimeline(id)]));
+    return (agents) => {
+      let accepted = false;
+      for (const [agentId, agent] of Object.entries(agents)) {
+        const token = tokens.get(agentId);
+        if (token && this.agents.submitTimelineAgent(token, agent)) accepted = true;
+      }
+      if (!accepted) return;
+      this.revision += 1;
+      this.persistCheckpoint();
+    };
+  }
+
   async refreshAgents(
     input: RefreshAgentDirectoryInput = {},
   ): Promise<RefreshAgentDirectoryResult> {
@@ -668,25 +704,17 @@ export class DirectorySync {
     input: { subscribe?: boolean } | undefined,
     loadDirectoryCache: boolean,
   ): Promise<void> {
-    if (loadDirectoryCache) await this.loadCachedDirectory();
+    if (loadDirectoryCache) {
+      this.primeWorkspaceTransactionForCacheLoad();
+      await this.loadCachedDirectory();
+    }
     const onlineConnection = this.getOnlineConnection();
     if (!onlineConnection) return;
     const { client, source } = onlineConnection;
     this.liveUpdates.flush();
-    const transaction = this.workspaceTransactions.begin(source, () => {
-      const baseline = this.workspaces.snapshot();
-      return {
-        workspaces: new Map(baseline.workspaces),
-        projects: new Map(baseline.projects),
-        // Cache hydration can advance the live replica while these requests await responses.
-        // Every page must use the cursors belonging to the maps captured here.
-        requestCursors: { ...this.cursors },
-        syncCursors: {},
-        syncModes: {},
-        touchedWorkspaceIds: new Set(),
-        touchedProjectIds: new Set(),
-      };
-    });
+    const transaction = this.workspaceTransactions.begin(source, () =>
+      this.createWorkspaceRefreshSnapshot(),
+    );
     this.callbacks.markWorkspaceLoading();
     try {
       await this.waitForSessionMetadata(client, source);
@@ -926,6 +954,31 @@ export class DirectorySync {
       subscriptionId: null,
       syncRemovals: [],
     }));
+  }
+
+  // Updates that arrive before a refresh completes have no trusted baseline to advance from.
+  // Holding them keeps their cursor out of the cache until the refresh they are applied over.
+  private primeWorkspaceTransactionForCacheLoad(): void {
+    const connection = this.getOnlineConnection();
+    if (!connection) return;
+    this.workspaceTransactions.begin(connection.source, () =>
+      this.createWorkspaceRefreshSnapshot(),
+    );
+  }
+
+  private createWorkspaceRefreshSnapshot(): WorkspaceRefreshSnapshot {
+    const baseline = this.workspaces.snapshot();
+    return {
+      workspaces: new Map(baseline.workspaces),
+      projects: new Map(baseline.projects),
+      // Cache hydration can advance the live replica while these requests await responses.
+      // Every page must use the cursors belonging to the maps captured here.
+      requestCursors: { ...this.cursors },
+      syncCursors: {},
+      syncModes: {},
+      touchedWorkspaceIds: new Set(),
+      touchedProjectIds: new Set(),
+    };
   }
 
   private supportsDirectorySync(): boolean {

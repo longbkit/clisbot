@@ -250,16 +250,16 @@ function AccountRow({
       <View style={styles.accountActions}>
         <StatusBadge label={ACCOUNT_STATUS_LABELS[state]} variant={APP_STATE_VARIANTS[state]} />
         {state === "pending" ? (
-          <Button size="xs" variant="outline" onPress={check}>
+          <Button size="sm" variant="outline" onPress={check}>
             {t("connectors.screen.appDetail.checkStatus")}
           </Button>
         ) : null}
         {state === "attention" ? (
-          <Button size="xs" variant="outline" onPress={onRetry}>
+          <Button size="sm" variant="outline" onPress={onRetry}>
             {t("connectors.screen.common.signInAgain")}
           </Button>
         ) : null}
-        <Button size="xs" variant="ghost" onPress={disconnectPress}>
+        <Button size="sm" variant="ghost" onPress={disconnectPress}>
           {t("connectors.screen.appDetail.disconnect")}
         </Button>
       </View>

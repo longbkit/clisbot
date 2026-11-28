@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { createInMemoryKeyValueStorage } from "./fakes";
 import { APP_SETTINGS_KEY, SETTINGS_MIGRATIONS_KEY } from "./keys";
 import { migrateAppSettings } from "./migrations";
-import { DEFAULT_CLIENT_SETTINGS, type AppSettings, type SendBehavior } from "./storage";
+import {
+  CHAT_DISPLAYS,
+  DEFAULT_CLIENT_SETTINGS,
+  type AppSettings,
+  type SendBehavior,
+} from "./storage";
 
 function settingsWith(sendBehavior: SendBehavior): AppSettings {
   return { ...DEFAULT_CLIENT_SETTINGS, sendBehavior };
@@ -157,32 +162,43 @@ describe("migrateAppSettings", () => {
 });
 
 describe("latest-call default migration", () => {
-  it.each(["overview", "detailed", "summary-with-latest-call"] as const)(
-    "upgrades %s once, then preserves manual choices",
-    async (level) => {
+  it.each(["full", "collapseToolCalls", "summary-with-latest-call"] as const)(
+    "upgrades a legacy-derived %s once, then preserves manual choices",
+    async (display) => {
       const storage = createInMemoryKeyValueStorage();
-      const initial = { ...DEFAULT_CLIENT_SETTINGS, toolCallDetailLevel: level };
+      const initial = { ...DEFAULT_CLIENT_SETTINGS, chatDisplay: display };
       const upgraded = await migrateAppSettings(initial, storage);
-      expect(upgraded.toolCallDetailLevel).toBe("summary-with-latest-call");
+      expect(upgraded.chatDisplay).toBe("summary-with-latest-call");
       expect(appliedIds(storage)).toContain("summary-with-latest-call-default");
-      for (const selection of ["overview", "detailed"] as const) {
-        const selected = { ...upgraded, toolCallDetailLevel: selection };
-        expect((await migrateAppSettings(selected, storage)).toolCallDetailLevel).toBe(selection);
+      for (const selection of CHAT_DISPLAYS) {
+        const selected = { ...upgraded, chatDisplay: selection };
+        expect((await migrateAppSettings(selected, storage)).chatDisplay).toBe(selection);
       }
     },
   );
 
+  it.each(CHAT_DISPLAYS)("never resets a stored upstream chatDisplay %s", async (display) => {
+    const storage = createInMemoryKeyValueStorage();
+    const initial = { ...DEFAULT_CLIENT_SETTINGS, chatDisplay: display };
+    // The stored blob spelled chatDisplay out, so it is a choice rather than a legacy default.
+    const result = await migrateAppSettings(initial, storage, undefined, {
+      chatDisplayIsLegacy: false,
+    });
+    expect(result.chatDisplay).toBe(display);
+    expect(appliedIds(storage)).toContain("summary-with-latest-call-default");
+  });
+
   it("does not mark a failed preference write and retries after a failed marker write", async () => {
-    const initial = { ...DEFAULT_CLIENT_SETTINGS, toolCallDetailLevel: "overview" as const };
+    const initial = { ...DEFAULT_CLIENT_SETTINGS, chatDisplay: "collapseToolCalls" as const };
     const failedSettings = createFailingWriteStorage(APP_SETTINGS_KEY);
     await expect(migrateAppSettings(initial, failedSettings)).rejects.toThrow();
     expect(appliedIds(failedSettings)).toEqual([]);
     const failedMarker = createFailingWriteStorage(SETTINGS_MIGRATIONS_KEY);
     await expect(migrateAppSettings(initial, failedMarker)).rejects.toThrow();
     const landed = JSON.parse(failedMarker.entries.get(APP_SETTINGS_KEY) ?? "null");
-    expect(landed.toolCallDetailLevel).toBe("summary-with-latest-call");
+    expect(landed.chatDisplay).toBe("summary-with-latest-call");
     const recovered = createInMemoryKeyValueStorage(Object.fromEntries(failedMarker.entries));
-    expect((await migrateAppSettings(landed, recovered)).toolCallDetailLevel).toBe(
+    expect((await migrateAppSettings(landed, recovered)).chatDisplay).toBe(
       "summary-with-latest-call",
     );
     expect(appliedIds(recovered)).toContain("summary-with-latest-call-default");
@@ -199,9 +215,6 @@ it("writes the upgraded display preference before its migration marker", async (
       await memory.setItem(key, value);
     },
   };
-  await migrateAppSettings(
-    { ...DEFAULT_CLIENT_SETTINGS, toolCallDetailLevel: "detailed" },
-    storage,
-  );
+  await migrateAppSettings({ ...DEFAULT_CLIENT_SETTINGS, chatDisplay: "full" }, storage);
   expect(writes).toEqual([APP_SETTINGS_KEY, SETTINGS_MIGRATIONS_KEY]);
 });

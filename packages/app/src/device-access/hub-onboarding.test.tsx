@@ -64,6 +64,9 @@ const state = vi.hoisted(() => ({
     connection: null as Record<string, unknown> | null,
   },
 }));
+// The app-level add-host flow (upstream `@/hosts/add-host`) needs its provider; Hub onboarding only
+// opens it.
+vi.mock("@/hosts/add-host", () => ({ useAddHost: () => () => {} }));
 vi.mock("@/contexts/toast-api-context", () => ({
   useToast: () => ({ show: vi.fn(), error: vi.fn() }),
 }));
@@ -92,7 +95,7 @@ vi.mock("@/clisbot/hub/account-provider", () => ({
   ],
 }));
 vi.mock("@/utils/confirm-dialog", () => ({ confirmDialog: state.confirm }));
-vi.mock("@/desktop/host", () => ({ getDesktopHost: () => null }));
+vi.mock("@/desktop/host", () => ({ getDesktopHost: () => null, isElectronRuntime: () => false }));
 vi.mock("@/stores/session-store", () => ({
   useSessionStore: (selector: (value: unknown) => unknown) =>
     selector({

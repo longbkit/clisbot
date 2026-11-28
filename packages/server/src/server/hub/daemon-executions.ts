@@ -13,6 +13,7 @@ import type { McpServerConfig } from "../agent/agent-sdk-types.js";
 import type { AgentStorage, StoredAgentRecord } from "../agent/agent-storage.js";
 import type { BoundCreateAgentCommand } from "../agent/create-agent/create.js";
 import { sendPromptToAgent } from "../agent/agent-prompt.js";
+import type { AgentMessageDelivery } from "../agent/agent-messages/index.js";
 import type { Logger } from "pino";
 import type { CreateClisbotWorktreeWorkflowResult } from "../worktree-session.js";
 import { buildStoredAgentPayload } from "../agent/agent-projections.js";
@@ -30,7 +31,6 @@ export interface HubExecutionAgentCreateInput {
   model?: string;
   modeId?: string;
   thinkingOptionId?: string;
-  featureValues?: Record<string, unknown>;
   providerOptions?: ProviderOptions;
   toolPolicy?: ToolPolicy;
   env?: Record<string, string>;
@@ -59,6 +59,12 @@ export type OwnedAgentEvent =
     };
 
 interface DaemonExecutionsOptions {
+  /**
+   * The daemon's agent-message delivery. Direct prompts go through it so messages already queued
+   * for the agent travel with them (upstream v0.17). Read lazily: it exists once the WebSocket
+   * server does.
+   */
+  agentMessages: () => Pick<AgentMessageDelivery, "sendDirect">;
   hubOrigin?: string;
   daemonId: string;
   agentManager: AgentManager;
@@ -246,7 +252,6 @@ export class DaemonExecutions implements HubExecutionAgents {
         projectId: input.projectId,
         mode: input.modeId,
         thinking: input.thinkingOptionId,
-        features: input.featureValues,
         env: input.env,
         ...(input.mcpServers || input.providerOptions || input.toolPolicy
           ? {
@@ -332,7 +337,6 @@ export class DaemonExecutions implements HubExecutionAgents {
       modeId: input.modeId,
       model: input.model,
       thinkingOptionId: input.thinkingOptionId,
-      featureValues: input.featureValues,
       providerOptions: input.providerOptions,
       toolPolicy: input.toolPolicy,
       env: input.env,
@@ -371,6 +375,7 @@ export class DaemonExecutions implements HubExecutionAgents {
     }
     await this.agentStorage.applySnapshot(agent);
     await sendPromptToAgent({
+      agentMessages: this.options.agentMessages(),
       agentId: agent.id,
       prompt: input.prompt,
       agentManager: this.agentManager,
@@ -439,7 +444,11 @@ export class DaemonExecutions implements HubExecutionAgents {
       agent: live
         ? serializeAgentSnapshot(live)
         : {
-            ...buildStoredAgentPayload(record, this.agentManager.getRegisteredProviderIds()),
+            ...buildStoredAgentPayload(
+              record,
+              this.agentManager.getRegisteredProviderIds(),
+              (provider, own) => this.agentManager.effectiveOptionsFor(provider, own),
+            ),
             status: "closed",
           },
     };

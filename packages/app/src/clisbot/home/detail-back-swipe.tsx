@@ -134,10 +134,14 @@ function useBackSwipeGesture({ enabled, width, offset, onCommit }: BackSwipeGest
             return;
           }
           const intent = resolveMobilePanelGestureIntent({
+            // `.enabled(enabled)` already gates the handler; upstream's intent takes it too.
+            enabled,
             deltaX: touch.absoluteX - touchStart.value.x,
             deltaY: touch.absoluteY - touchStart.value.y,
             direction: 1,
             openGesturesBlocked: openGesturesBlocked.value,
+            // The detail back swipe has always started anywhere, as before the upstream edge rule.
+            openEdge: null,
           });
           const panelsAtRest = canBeginMobilePanelGesture(
             motionState.value,

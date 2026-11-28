@@ -45,14 +45,19 @@ export function parseClaudeWorkflowRun(contents: string): ClaudeWorkflowRun | nu
  * provider runtime was recreated, so replay terminalizes it as failed instead of resurrecting a
  * row that can never receive another update.
  */
-export function observeReplayWorkflows(input: {
+export async function observeReplayWorkflows(input: {
   workflows: readonly ClaudeWorkflowRun[];
-  parentEntries: Iterable<ClaudeWorkflowParentEntry>;
+  parentEntries: Iterable<ClaudeWorkflowParentEntry> | AsyncIterable<ClaudeWorkflowParentEntry>;
   /** Repeatable entries in chronological order, supplied by the transcript reader. */
-  entriesByRunId?: ReadonlyMap<string, Iterable<ClaudeReplayEntry>>;
-  convertEntry?: (entry: ClaudeReplayEntry) => AgentTimelineItem[];
-}): SubagentObservation[] {
-  const toolCallIdByRunId = readWorkflowLinks(input.parentEntries);
+  entriesByRunId?: ReadonlyMap<
+    string,
+    Iterable<ClaudeReplayEntry> | AsyncIterable<ClaudeReplayEntry>
+  >;
+  convertEntry?: (entry: ClaudeReplayEntry) => AgentTimelineItem[] | Promise<AgentTimelineItem[]>;
+}): Promise<SubagentObservation[]> {
+  if (input.workflows.length === 0) return [];
+  const runIds = new Set(input.workflows.map((workflow) => workflow.runId));
+  const toolCallIdByRunId = await readWorkflowLinks(input.parentEntries, runIds);
   const observations: SubagentObservation[] = [];
 
   for (const workflow of input.workflows) {
@@ -79,7 +84,7 @@ export function observeReplayWorkflows(input: {
       });
     }
 
-    for (const observation of observeWorkflowTimeline({
+    for (const observation of await observeWorkflowTimeline({
       id,
       result: workflow.result,
       entries: input.entriesByRunId?.get(workflow.runId) ?? [],
@@ -115,19 +120,19 @@ export function observeReplayWorkflows(input: {
   return observations;
 }
 
-function observeWorkflowTimeline(input: {
+async function observeWorkflowTimeline(input: {
   id: string;
   result: unknown;
-  entries: Iterable<ClaudeReplayEntry>;
-  convertEntry?: (entry: ClaudeReplayEntry) => AgentTimelineItem[];
+  entries: Iterable<ClaudeReplayEntry> | AsyncIterable<ClaudeReplayEntry>;
+  convertEntry?: (entry: ClaudeReplayEntry) => AgentTimelineItem[] | Promise<AgentTimelineItem[]>;
   finishedAt?: string;
-}): SubagentObservation[] {
+}): Promise<SubagentObservation[]> {
   const observations: SubagentObservation[] = [];
   const replayedAssistantText = new Set<string>();
 
-  for (const entry of input.entries) {
+  for await (const entry of input.entries) {
     const timestamp = normalizeProviderReplayTimestamp(entry.timestamp);
-    const items = input.convertEntry?.(entry) ?? [];
+    const items = (await input.convertEntry?.(entry)) ?? [];
     for (const item of items) {
       if (item.type === "assistant_message") replayedAssistantText.add(item.text.trim());
       observations.push({
@@ -150,34 +155,35 @@ function observeWorkflowTimeline(input: {
   return observations;
 }
 
-function readWorkflowLinks(entries: Iterable<ClaudeWorkflowParentEntry>): Map<string, string> {
+async function readWorkflowLinks(
+  entries: Iterable<ClaudeWorkflowParentEntry> | AsyncIterable<ClaudeWorkflowParentEntry>,
+  runIds: ReadonlySet<string>,
+): Promise<Map<string, string>> {
   const workflowToolCallIds = new Set<string>();
-  const toolCallIdByRunId = new Map<string, string>();
+  const results: { runId: string; toolCallId: string }[] = [];
 
-  for (const entry of entries) {
+  for await (const entry of entries) {
     const content = entry.message?.content;
     if (!Array.isArray(content)) continue;
     for (const value of content) {
       const block = toRecord(value);
-      if (block?.type !== "tool_use" || block.name !== "Workflow") continue;
-      const id = readString(block.id);
-      if (id) workflowToolCallIds.add(id);
-    }
-  }
-
-  for (const entry of entries) {
-    const content = entry.message?.content;
-    if (!Array.isArray(content)) continue;
-    for (const value of content) {
-      const block = toRecord(value);
+      if (block?.type === "tool_use" && block.name === "Workflow") {
+        const id = readString(block.id);
+        if (id) workflowToolCallIds.add(id);
+      }
       if (block?.type !== "tool_result") continue;
       const toolCallId = readString(block.tool_use_id);
-      if (!toolCallId || !workflowToolCallIds.has(toolCallId)) continue;
+      if (!toolCallId) continue;
       const runId = readRunId(block.content);
-      if (runId) toolCallIdByRunId.set(runId, toolCallId);
+      if (runId && runIds.has(runId)) results.push({ runId, toolCallId });
     }
   }
 
+  // Resolve IDs in result order after all calls are known, even if a result precedes its call.
+  const toolCallIdByRunId = new Map<string, string>();
+  for (const { runId, toolCallId } of results) {
+    if (workflowToolCallIds.has(toolCallId)) toolCallIdByRunId.set(runId, toolCallId);
+  }
   return toolCallIdByRunId;
 }
 

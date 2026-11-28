@@ -17,7 +17,9 @@ function assistantEvent(text: string) {
     epoch: "epoch-1",
     currentTail: [] as StreamItem[],
     currentHead: [] as StreamItem[],
-    currentCursor: undefined,
+    // The chat already covers rows 1..41. Since upstream #9723 a row past seq 1 on a chat
+    // without coverage is a gap (catch-up), not a live row.
+    currentCursor: { epoch: "epoch-1", startSeq: 1, endSeq: 41 },
     timestamp: new Date(0),
   };
 }
@@ -45,6 +47,7 @@ describe("live source positions", () => {
       ...assistantEvent(" world"),
       seq: 43,
       currentHead: first.head,
+      currentCursor: first.cursor ?? undefined,
       trackSourcePositions: true,
     });
     // A continued chunk extends the range it already owns instead of starting a new one.

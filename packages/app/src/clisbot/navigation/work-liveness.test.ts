@@ -45,7 +45,8 @@ const agents = new Map(
   [
     agent("running", { status: "running" }),
     agent("approval", { status: "running", pendingPermissions: [permission] }),
-    agent("failed", { status: "error" }),
+    // Upstream #8831: only an unread error (attention "error") shows as failed; the host sets it.
+    agent("failed", { status: "error", requiresAttention: true, attentionReason: "error" }),
     agent("idle"),
   ].map((entry) => [entry.id, entry]),
 );
@@ -151,7 +152,12 @@ describe("Workspace session index across agent updates", () => {
     const withOther = new Map(agents).set(other.id, other);
     const previous = indexWorkSessions(sourcesWith(withOther));
     const next = new Map(withOther);
-    next.set("idle", { ...agents.get("idle")!, status: "error" });
+    next.set("idle", {
+      ...agents.get("idle")!,
+      status: "error",
+      requiresAttention: true,
+      attentionReason: "error",
+    });
 
     const index = indexWorkSessions(sourcesWith(next), previous);
 

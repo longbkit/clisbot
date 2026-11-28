@@ -6,7 +6,7 @@ import {
   type ComponentProps,
   type ReactNode,
 } from "react";
-import { View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
+import { View, useWindowDimensions } from "react-native";
 import { useTranslation } from "react-i18next";
 import { SplitContainer } from "@/components/split-container";
 import {
@@ -66,16 +66,25 @@ export function DesktopConversationSurface({
   openExplorer,
 }: SurfaceProps & { openExplorer: () => void }) {
   const [hovered, setHovered] = useState<string | null>(null);
-  const [width, setWidth] = useState(0);
-  const measure = useCallback(
-    (event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width),
-    [],
-  );
   const splitActions = useDesktopActions(state.layoutKey, actions.bulkClose);
+  // A narrow split drops the tab rail for the compact header, so the heading switches tabs there
+  // as it does on the compact mobile surface.
+  const renderHeading = useCallback<ConversationHeadingRenderer>(
+    (heading) => (
+      <ConversationIdentitySwitcher
+        serverId={serverId}
+        state={state}
+        actions={actions}
+        heading={heading}
+      />
+    ),
+    [serverId, state, actions],
+  );
+  const renderCompactHeader = useCallback(() => header(renderHeading), [header, renderHeading]);
   if (!state.layout) return null;
   const { layoutKey, layout, tabs } = state;
   return (
-    <View style={desktopRow} onLayout={measure}>
+    <View style={desktopRow}>
       <View style={fill}>
         <SplitContainer
           {...clipboardActions}
@@ -87,6 +96,7 @@ export function DesktopConversationSurface({
           isWorkspaceFocused={focused}
           uiTabs={tabs}
           renderMainHeader={header}
+          renderCompactHeader={renderCompactHeader}
           hoveredCloseTabKey={hovered}
           setHoveredCloseTabKey={setHovered}
           closingTabIds={EMPTY_CLOSING}
@@ -100,7 +110,6 @@ export function DesktopConversationSurface({
       <ConversationExplorerDock
         {...{ serverId, focused, layoutKey, layout, tabs, actions, hovered, setHovered }}
         closeActions={splitActions}
-        containerWidth={width}
         openExplorer={openExplorer}
       />
     </View>

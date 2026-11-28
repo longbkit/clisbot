@@ -35,6 +35,35 @@ CLISBOT_MOBILE_E2E_METRO_PORT=62093 npm run test:e2e:mobile
 
 [native-terminal-basic.ios.ad](../packages/app/e2e/mobile/agent-device/native-terminal-basic.ios.ad) and [native-terminal-basic.android.ad](../packages/app/e2e/mobile/agent-device/native-terminal-basic.android.ad) are the smallest examples. Each opens a fresh terminal, types a command at zero delay, submits it, and asserts its distinct output. The app must be connected to a daemon with an active workspace.
 
+For Android background fold recovery, install the release APK on a foldable AVD, open a
+connected workspace, close the keyboard, and run:
+
+```bash
+ANDROID_SERIAL=emulator-5574 node packages/app/e2e/mobile/fold/android.mjs
+```
+
+The AVD must expose `CLOSED` and `OPENED` device states. The test backgrounds the app,
+changes posture, resumes immediately, and asserts compact/wide workspace controls without
+restarting the process. It writes snapshots and native failure state under
+`.dev/agent-device-artifacts/android-fold`. Set `CLISBOT_MOBILE_APP_ID=sh.clisbot` for a
+production package. This needs a native rebuild when the Unistyles patch changes; a Metro
+reload cannot update it.
+
+To check the first Android composer tap after pinch-to-zoom, install the rebuilt
+APK and connect it to a chat whose latest assistant message contains a visible
+Markdown image. For example, put `picture.png` in the agent workspace and have
+the assistant reply with `![Test image](picture.png)`. Set `CHAT_URL` to the
+chat's Clisbot deep link and run from the repository root:
+
+```bash
+agent-device test packages/app/e2e/mobile/composer-keyboard/lightbox-pinch.android.ad \
+  --platform android --serial emulator-5554 -e APP_ID=sh.clisbot -e "CHAT_URL=$CHAT_URL"
+```
+
+Use `APP_ID=sh.clisbot.debug` for a development build. If the image has different
+alt text, pass it with `-e IMAGE_LABEL="..."`. The test pinches the image, closes
+it, types in the composer, and checks that a single Attach tap opens Upload file.
+
 For Android keyboard continuity, run the current checkout in the app, open an idle terminal
 with an empty prompt, hide its keyboard, and run:
 
@@ -94,6 +123,12 @@ and its Claude provider available. Set `CLISBOT_COMPOSER_KEYBOARD_SERVER_ID`,
 `_AGENT_ID` (an idle mock chat), and `_WORKSPACE_ID` (its workspace); `_DEVICE`,
 `_SESSION`, and `_DRAFT_ID` are optional. Artifacts go to
 `.dev/agent-device-artifacts/composer-keyboard-ios`.
+With a Codex draft selected, set `_SCENARIO=growth` on a 402pt-wide iPhone to
+check live wrapping, shrinking, the 12pt anchor gap, and command insertion. Set
+`_SCENARIO=previews` on an SE-sized iPhone to check long and short descriptions
+under an eight-line draft, selection with the keyboard shown and hidden, and
+file mentions. These scenarios only need `_SERVER_ID` and `_WORKSPACE_ID`;
+`_UDID` selects an exact simulator and `_ARTIFACTS_DIR` overrides the output path.
 
 The Android sidebar scroll-retention flow requires a connected host with enough
 workspaces to overflow the compact sidebar. Pass `TOP_WORKSPACE` and
@@ -635,18 +670,9 @@ Regular `View` components can safely use Unistyles dynamic styles — the confli
 
 ## Native Chat Stream Layout
 
-The native agent stream uses an inverted `FlatList`, so chat layout has three coordinate systems:
-
-- chronological stream order
-- strategy-ordered array order
-- native inverted cell visual order
-
 Do not compute stream neighbors, history/live-head seams, turn footer ownership, assistant block spacing, or tool sequence endings inside React render loops. Those policies live in `packages/app/src/agent-stream/layout.ts` and are unit-tested without React Native rendering.
 
-Platform-specific stream edges belong on `StreamStrategy`:
-
-- forward web uses the last history item as the history/live-head boundary and renders content before a footer
-- native inverted uses the first history item as the history/live-head boundary and compensates for inverted cell child order
+Platform-specific stream edges belong on `StreamStrategy`. Web and native both render in chronological order, so both use the last history item as the history/live-head boundary and render content before a footer.
 
 If a chat footer looks duplicated or appears above the assistant message on mobile, start with `packages/app/src/agent-stream/layout.test.ts`. Do not add a React Native renderer test for this class of bug; make the pure layout invariant fail first.
 

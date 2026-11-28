@@ -13,7 +13,7 @@ vi.mock("@/components/adaptive-modal-sheet", () => ({
     adapter.sheets.push(props);
     if (!props.visible) return null;
     return (
-      <div role="dialog" aria-label={props.header.title}>
+      <div role="dialog" aria-label={props.header?.title}>
         <button type="button" onClick={props.onClose}>
           Close sheet
         </button>

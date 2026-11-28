@@ -263,7 +263,7 @@ function AutomationTargetFields({
         disabled={pending || automationCreatePending}
       />
       <Button
-        size="xs"
+        size="sm"
         variant="outline"
         disabled={pending || automationCreatePending || showAutomationCreator}
         onPress={showAutomationForm}

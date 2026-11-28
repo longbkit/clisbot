@@ -38,8 +38,8 @@ test("Project-bound Hub execution rejects traversal and symlink cwd before Agent
     list: async () => [project],
   } as Pick<ProjectRegistry, "get" | "list">;
   const workspaceRegistry = {
-    list: async () => [workspace],
-  } as Pick<WorkspaceRegistry, "list">;
+    listAll: async () => [workspace],
+  } as Pick<WorkspaceRegistry, "listAll">;
   const createAgent = vi.fn();
   const executions = new DaemonExecutions({
     daemonId: "daemon-a",

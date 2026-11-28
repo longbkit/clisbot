@@ -1,3 +1,5 @@
+import { workspaceLabelKey } from "@clisbot/protocol/workspace-labels";
+export type { TerminalReplayEvent, TerminalStreamEvent } from "./terminal-stream-router.js";
 import type { AgentAddress } from "@clisbot/protocol/addresses";
 import { parentAddressLabels } from "@clisbot/protocol/agent-labels";
 export type { AgentAddress } from "@clisbot/protocol/addresses";
@@ -7,7 +9,7 @@ export type { HostAdd, HostUpdate, HostSummary, HostDirectory } from "@clisbot/p
 import type { OwnedSubscription } from "./connection/index.js";
 export type { OwnedSubscription, SubscriptionObserver } from "./connection/index.js";
 import type { DaemonClientConfig } from "./daemon-client.js";
-import type { AgentPermissionResponse } from "@clisbot/protocol/agent-types";
+import type { AgentPermissionResponse, JsonValue } from "@clisbot/protocol/agent-types";
 import type {
   AgentSnapshotPayload,
   CreationSnapshot,
@@ -19,6 +21,8 @@ import type {
   ListCommandsResponse,
   ListProviderFeaturesRequestMessage,
   ListProviderFeaturesResponseMessage,
+  ProviderControlsListRequestMessage,
+  ProviderControlsListResponseMessage,
   ListProviderModelsResponseMessage,
   ProjectListRequestMessage,
   ProjectListResponseMessage,
@@ -53,6 +57,7 @@ export type {
 } from "./terminals/index.js";
 import type { PluginTimelineItem } from "@clisbot/protocol/agent-types";
 import type {
+  AgentBackgroundWorkItem,
   FetchAgentsEntry,
   FetchAgentsOptions,
   FetchAgentsPageInfo,
@@ -181,6 +186,8 @@ export interface ClisbotWorkspaceHandle {
   readonly directory: string | null;
   readonly name: string | null;
   readonly status: ClisbotWorkspace["status"] | null;
+  /** Data plugins stored on the workspace. Clisbot never reads a key. */
+  readonly metadata: NonNullable<ClisbotWorkspace["metadata"]> | null;
   readonly agents: {
     create(options: ClisbotWorkspaceAgentCreateOptions): Promise<ClisbotAgentHandle>;
   };
@@ -188,6 +195,14 @@ export interface ClisbotWorkspaceHandle {
   current(): ClisbotWorkspace | null;
   refresh(options?: { requestId?: string }): Promise<ClisbotWorkspace | null>;
   setTitle(title: string | null, requestId?: string): Promise<{ title: string | null }>;
+  /** Top-level keys replace; `null` removes the key. Needs a host with `entityMetadata`. */
+  setMetadata(patch: Record<string, JsonValue>): Promise<void>;
+  setPinned(pinned: boolean): Promise<{ pinnedAt: string | null }>;
+  setLabel(name: string, options: { assigned: boolean }): Promise<{ labels: string[] }>;
+  setBaseBranch(options: {
+    baseRef: string;
+    requestId?: string;
+  }): Promise<{ baseRef: string | null }>;
   archive(requestId?: string): Promise<ClisbotWorkspaceArchiveResult>;
   /**
    * Subscribes to already-emitted daemon workspace_update events for this id.
@@ -238,8 +253,12 @@ export interface ClisbotAgentConfig {
   provider: string;
   modeId?: ClisbotAgentSessionConfig["modeId"];
   thinkingOptionId?: ClisbotAgentSessionConfig["thinkingOptionId"];
+  /** @deprecated Put these in `options`; they are folded into it on send. */
   featureValues?: ClisbotProviderFeatureValues;
-  /** JSON-safe provider-native settings, validated by the selected provider. */
+  /**
+   * JSON-safe provider settings, validated by the selected provider. They include the settings the
+   * provider offers a composer control for, such as `service_tier` or `fast_mode`.
+   */
   options?: ClisbotAgentSessionConfig["providerOptions"];
   systemPrompt?: ClisbotAgentSessionConfig["systemPrompt"];
   toolPolicy?: ClisbotAgentSessionConfig["toolPolicy"];
@@ -263,10 +282,16 @@ export interface ClisbotAgentCreateOptions {
   git?: CreateAgentRequestMessage["git"];
   worktree?: CreateAgentRequestMessage["worktree"];
   autoArchive?: CreateAgentRequestMessage["autoArchive"];
-  /** Visibility intent for a NEW workspace. Existing targets reject this option. */
+  /**
+   * Creates a background agent: hidden from default lists, tabs, the parent's subagent track
+   * and notifications, and still addressable by id. A workspace this call creates is
+   * background too. With a parent and no value, the parent's own background applies.
+   */
   background?: CreateAgentRequestMessage["background"];
   requestId?: string;
   labels?: Record<string, string>;
+  /** Data plugins store on the agent: JSON values under keys such as `"linear.issue"`. */
+  metadata?: CreateAgentRequestMessage["metadata"];
 }
 
 export type ClisbotWorkspaceAgentCreateOptions = Omit<ClisbotAgentCreateOptions, "cwd">;
@@ -281,6 +306,11 @@ export interface ClisbotAgentTimelineRefetchOptions {
   cursor?: FetchAgentTimelineCursor;
   limit?: number;
   projection?: FetchAgentTimelineProjection;
+  /**
+   * Extends a `tail` or `before` page back to the start of the oldest turn it touches, so
+   * `{ direction: "tail", limit: 1, wholeTurns: true }` returns the latest turn.
+   */
+  wholeTurns?: boolean;
   requestId?: string;
 }
 
@@ -350,6 +380,39 @@ export interface ClisbotAgentTimelineHandle {
   subscribe(handler: (event: ClisbotAgentTimelineEvent) => void): ClisbotAgentTimelineSubscription;
 }
 
+export type ClisbotAgentBackgroundWorkItem = AgentBackgroundWorkItem;
+
+export interface ClisbotAgentBackgroundWorkHandle {
+  /** Stop one item and wait for provider confirmation. */
+  stop(
+    item: ClisbotAgentBackgroundWorkItem,
+    options?: { requestId?: string; timeout?: number },
+  ): Promise<void>;
+  /** Reads the agent's current background work once. */
+  list(options?: {
+    requestId?: string;
+    timeout?: number;
+  }): Promise<ClisbotAgentBackgroundWorkItem[]>;
+  /**
+   * Calls `listener` with the agent's current list once the subscription is established, again
+   * after each reconnect, then with the full list each time it changes. Returns the unsubscribe
+   * function.
+   *
+   * When reading the current list fails, `options.onError` receives the error and `listener` is
+   * not called; without `onError` the error is logged. The read is not retried: the next
+   * reconnect reads the list again.
+   */
+  subscribe(
+    listener: (items: ClisbotAgentBackgroundWorkItem[]) => void,
+    options?: ClisbotAgentBackgroundWorkSubscribeOptions,
+  ): () => void;
+}
+
+export interface ClisbotAgentBackgroundWorkSubscribeOptions {
+  /** Receives the error when reading the agent's current list fails. */
+  onError?: (error: unknown) => void;
+}
+
 export interface ClisbotAgentHandle {
   readonly id: string;
   readonly address: AgentAddress;
@@ -369,14 +432,35 @@ export interface ClisbotAgentHandle {
   readonly activeTurn: NonNullable<ClisbotAgent["activeTurn"]> | null;
   readonly lastUsage: NonNullable<ClisbotAgent["lastUsage"]> | null;
   readonly lastError: NonNullable<ClisbotAgent["lastError"]> | null;
+  /** @deprecated Use `controls` and `options`. */
   readonly features: NonNullable<ClisbotAgent["features"]> | null;
+  /** The provider options the agent runs with: `config.json` defaults merged with its own. */
+  readonly options: NonNullable<ClisbotAgent["options"]> | null;
+  /** How the provider wants its options drawn. Controls hold no value; read `options`. */
+  readonly controls: NonNullable<ClisbotAgent["controls"]> | null;
+  /** Data plugins stored on the agent. Clisbot never reads a key. */
+  readonly metadata: NonNullable<ClisbotAgent["metadata"]> | null;
   readonly runtimeInfo: NonNullable<ClisbotAgent["runtimeInfo"]> | null;
   readonly archivedAt: NonNullable<ClisbotAgent["archivedAt"]> | null;
   readonly timeline: ClisbotAgentTimelineHandle;
+  readonly backgroundWork: ClisbotAgentBackgroundWorkHandle;
   current(): ClisbotAgent | null;
   refresh(requestId?: string): Promise<ClisbotAgentRefetchResult | null>;
+  /**
+   * Reopens the provider session with current configuration, rerunning session-open hooks.
+   * Interrupts a running turn and returns the refreshed snapshot.
+   */
+  reload(options?: { requestId?: string }): Promise<ClisbotAgentRefetchResult | null>;
   send(text: string, options?: ClisbotAgentSendOptions): Promise<void>;
   respondToPermission(options: ClisbotAgentRespondToPermissionOptions): Promise<void>;
+  /**
+   * Changes the agent's own options: top-level keys replace, `null` removes the key so the
+   * `config.json` default (or the provider's own default) applies again. Resolves once the
+   * provider has applied the patch; a provider that cannot apply a key live rejects it.
+   */
+  setOptions(patch: Record<string, unknown>): Promise<void>;
+  /** Top-level keys replace; `null` removes the key. Needs a host with `entityMetadata`. */
+  setMetadata(patch: Record<string, JsonValue>): Promise<void>;
   /** Sends a prompt and resolves when that turn finishes or needs attention. */
   run(text: string, options?: ClisbotAgentRunOptions): Promise<ClisbotAgentRunResult>;
   /** Waits for the current turn, including one started with `prompt`. */
@@ -413,14 +497,21 @@ export interface ClisbotAgentActions {
 
 export type ClisbotProviderModelsResult = ListProviderModelsResponseMessage["payload"];
 export type ClisbotProviderModesResult = ListProviderModesResponseMessage["payload"];
-type ClisbotProviderFeaturesDraft = ListProviderFeaturesRequestMessage["draftConfig"];
-export interface ClisbotProviderFeaturesInput extends Omit<
-  ClisbotProviderFeaturesDraft,
+type ClisbotProviderControlsDraft = ProviderControlsListRequestMessage["draftConfig"];
+export interface ClisbotProviderControlsInput extends Omit<
+  ClisbotProviderControlsDraft,
   "provider" | "model"
 > {
   /** Provider and model in `provider/model` format. */
   provider: string;
 }
+export type ClisbotProviderControlsResult = ProviderControlsListResponseMessage["payload"];
+/** @deprecated Use `ClisbotProviderControlsInput`. */
+export type ClisbotProviderFeaturesInput = Omit<
+  ListProviderFeaturesRequestMessage["draftConfig"],
+  "provider" | "model"
+> & { provider: string };
+/** @deprecated Use `ClisbotProviderControlsResult`. */
 export type ClisbotProviderFeaturesResult = ListProviderFeaturesResponseMessage["payload"];
 export type ClisbotProviderAvailabilityResult = ListAvailableProvidersResponse["payload"];
 export type ClisbotProviderSnapshotResult = GetProvidersSnapshotResponseMessage["payload"];
@@ -459,6 +550,15 @@ export interface ClisbotProviderActions {
     provider: ClisbotAgentProvider,
     options?: ClisbotProviderListOptions,
   ): Promise<ClisbotProviderModesResult>;
+  /**
+   * The controls a draft agent would show and the options it would run with, resolved by the
+   * daemon from `config.json` defaults and the draft's own `providerOptions`.
+   */
+  listControls(
+    draftConfig: ClisbotProviderControlsInput,
+    options?: { requestId?: string },
+  ): Promise<ClisbotProviderControlsResult>;
+  /** @deprecated Use `listControls`. */
   listFeatures(
     draftConfig: ClisbotProviderFeaturesInput,
     options?: { requestId?: string },
@@ -543,7 +643,14 @@ function toDaemonAgentCreateOptions(
   serverId?: string,
 ): CreateAgentRequestOptions {
   const { config: agentConfig, cwd, parent, title, prompt, ...requestOptions } = options;
-  const { provider: providerModel, options: providerOptions, ...runtimeConfig } = agentConfig;
+  const {
+    provider: providerModel,
+    options: ownOptions,
+    featureValues,
+    ...runtimeConfig
+  } = agentConfig;
+  // COMPAT(featureValues): added in v0.15.0, remove after 2027-05-01. An explicit option wins.
+  const providerOptions = featureValues ? { ...featureValues, ...ownOptions } : ownOptions;
   const { provider, model } = parseProviderModel(providerModel);
   const relationship = parent ? encodeParent(parent, serverId) : {};
   return {
@@ -604,17 +711,20 @@ export function createClisbotApi(
     daemonClient,
     listenAgents,
     (agentId, handler) => own(() => daemonClient.subscribeAgentTimeline(agentId, handler)),
+    () => own(() => daemonClient.observeAgentBackgroundWork()),
   );
   const createAgent = async (
     options: ClisbotAgentCreateOptions,
     placement?: { workspaceId: string; cwd: string },
   ) => {
+    const serverId = daemonClient.getLastServerInfoMessage()?.serverId;
+    const foreignParent =
+      options.background === undefined ? foreignParentHandle(options.parent, serverId) : null;
+    const resolved = foreignParent
+      ? await inheritParentBackground(options, foreignParent)
+      : options;
     const agent = await daemonClient.createAgent(
-      toDaemonAgentCreateOptions(
-        options,
-        placement,
-        daemonClient.getLastServerInfoMessage()?.serverId,
-      ),
+      toDaemonAgentCreateOptions(resolved, placement, serverId),
     );
     return createAgentHandle(agent);
   };
@@ -778,6 +888,10 @@ export function createClisbotApi(
         const { provider, model } = parseProviderModel(providerModel);
         return daemonClient.listProviderFeatures({ ...draftConfig, provider, model }, options);
       },
+      listControls: ({ provider: providerModel, ...draftConfig }, options) => {
+        const { provider, model } = parseProviderModel(providerModel);
+        return daemonClient.listProviderControls({ ...draftConfig, provider, model }, options);
+      },
       listAvailable: (options) => daemonClient.listAvailableProviders(options),
       snapshot: (options) => daemonClient.getProvidersSnapshot(options),
       waitForReady: (options) =>
@@ -821,25 +935,7 @@ function createWorkspaceHandleFactory(
     let current = typeof workspace === "string" ? null : workspace;
 
     const refresh = async (options?: { requestId?: string }) => {
-      let cursor: string | undefined;
-      let requestId = options?.requestId;
-      // A ref addresses one workspace by id, so a background one resolves too.
-      const filter = daemonClient.supportsBackgroundWorkspaces() ? { includeBackground: true } : {};
-      do {
-        const result = await daemonClient.fetchWorkspaces({
-          requestId,
-          filter,
-          page: { limit: 200, ...(cursor ? { cursor } : {}) },
-        });
-        const match = result.entries.find((entry) => entry.id === id);
-        if (match) {
-          current = match;
-          return current;
-        }
-        cursor = result.pageInfo.nextCursor ?? undefined;
-        requestId = undefined;
-      } while (cursor);
-      current = null;
+      current = await daemonClient.findWorkspace(id, options);
       return current;
     };
 
@@ -856,6 +952,9 @@ function createWorkspaceHandleFactory(
       },
       get status() {
         return current?.status ?? null;
+      },
+      get metadata() {
+        return current?.metadata ?? null;
       },
       agents: {
         create: async (options) => {
@@ -876,6 +975,20 @@ function createWorkspaceHandleFactory(
       current: () => current,
       refresh,
       setTitle: (title, requestId) => daemonClient.setWorkspaceTitle(id, title, requestId),
+      setMetadata: async (patch) => {
+        const metadata = await daemonClient.setWorkspaceMetadata(id, patch);
+        if (current) current = { ...current, metadata };
+      },
+      setPinned: (pinned) => daemonClient.setWorkspacePinned(id, pinned),
+      setLabel: (name, options) =>
+        assignWorkspaceLabel({
+          client: daemonClient,
+          workspaceId: id,
+          name,
+          assigned: options.assigned,
+        }),
+      setBaseBranch: (options) =>
+        daemonClient.setWorkspaceBaseBranch({ ...options, workspaceId: id }),
       archive: async (requestId) => {
         const result = await daemonClient.archiveWorkspace(id, requestId);
         if (current) {
@@ -901,6 +1014,7 @@ function createAgentHandleFactory(
   daemonClient: DaemonClient,
   listen: (handler: ClisbotAgentUpdateHandler) => () => void,
   subscribeTimeline: DaemonClient["subscribeAgentTimeline"],
+  observeBackgroundWork: () => ReturnType<DaemonClient["observeAgentBackgroundWork"]>,
 ): AgentHandleFactory {
   return (agent) => {
     const id = typeof agent === "string" ? agent : agent.id;
@@ -947,6 +1061,48 @@ function createAgentHandleFactory(
             }
           }),
       },
+      backgroundWork: {
+        stop: (item, options) => daemonClient.stopAgentBackgroundWork(id, item, options),
+        list: (options) => daemonClient.listAgentBackgroundWork(id, options),
+        subscribe: (listener, options) => {
+          const observation = observeBackgroundWork();
+          // Bumped by every delivery so a list answered after a newer update is dropped.
+          let sequence = 0;
+          let released = false;
+          const reportError = (error: unknown) => {
+            if (released) return;
+            if (options?.onError) options.onError(error);
+            else console.error("Background work subscription failed", error);
+          };
+          observation.subscribe({
+            error: reportError,
+            snapshot: () => {
+              const listed = ++sequence;
+              void daemonClient
+                .listAgentBackgroundWork(id)
+                .then((items) => {
+                  if (!released && listed === sequence) listener(items);
+                  return undefined;
+                })
+                .catch(reportError);
+            },
+            update: (message) => {
+              if (message.type !== "agent.background_work.update") return;
+              if (message.payload.agentId !== id) return;
+              sequence++;
+              listener(message.payload.items);
+            },
+          });
+          return () => {
+            released = true;
+            void observation
+              .release()
+              .catch((error) =>
+                console.error("Background work subscription cleanup failed", error),
+              );
+          };
+        },
+      },
       get workspaceId() {
         return current?.workspaceId ?? null;
       },
@@ -977,6 +1133,15 @@ function createAgentHandleFactory(
       get features() {
         return current?.features ?? null;
       },
+      get options() {
+        return current?.options ?? null;
+      },
+      get controls() {
+        return current?.controls ?? null;
+      },
+      get metadata() {
+        return current?.metadata ?? null;
+      },
       get runtimeInfo() {
         return current?.runtimeInfo ?? null;
       },
@@ -989,8 +1154,21 @@ function createAgentHandleFactory(
         current = result?.agent ?? null;
         return result;
       },
+      reload: async (options) => {
+        await daemonClient.refreshAgent(id, options?.requestId);
+        const result = await daemonClient.fetchAgent({ agentId: id });
+        current = result?.agent ?? null;
+        return result;
+      },
       send: async (text, options) => {
         await daemonClient.sendAgentMessage(id, text, options);
+      },
+      setOptions: async (patch) => {
+        await daemonClient.setAgentOptions(id, patch);
+      },
+      setMetadata: async (patch) => {
+        const metadata = await daemonClient.setAgentMetadata(id, patch);
+        if (current) current = { ...current, metadata };
       },
       respondToPermission: async ({ requestId, response }) => {
         await daemonClient.respondToPermission(id, requestId, response);
@@ -1060,6 +1238,24 @@ async function openWorkspace(
 
 function resolveWorkspaceId(workspace: string | ClisbotWorkspaceHandle): string {
   return typeof workspace === "string" ? workspace : workspace.id;
+}
+
+function foreignParentHandle(
+  parent: ClisbotAgentCreateOptions["parent"],
+  serverId: string | undefined,
+): ClisbotAgentHandle | null {
+  if (!parent || typeof parent === "string" || !("address" in parent)) return null;
+  return parent.address.serverId === serverId ? null : parent;
+}
+
+// A host inherits background from a caller it can see. A parent on another host is invisible to
+// it, so a handle passes its own value on. A bare foreign address can't; pass background then.
+async function inheritParentBackground(
+  options: ClisbotAgentCreateOptions,
+  parent: ClisbotAgentHandle,
+): Promise<ClisbotAgentCreateOptions> {
+  const snapshot = parent.current() ?? (await parent.refresh())?.agent;
+  return snapshot?.background ? { ...options, background: true } : options;
 }
 
 function encodeParent(
@@ -1195,4 +1391,31 @@ function createGeneratedClientId(): string {
       ? globalThis.crypto.randomUUID()
       : Math.random().toString(36).slice(2);
   return `clisbot-sdk-${randomId}`;
+}
+
+export type { DiffCompare, DiffState, DiffEntry, ResolvedShas } from "./diff/index.js";
+
+interface WorkspaceLabelAssignment {
+  client: DaemonClient;
+  workspaceId: string;
+  name: string;
+  assigned: boolean;
+}
+async function assignWorkspaceLabel(
+  input: WorkspaceLabelAssignment,
+): Promise<{ labels: string[] }> {
+  input.client.ensureConnected();
+  // COMPAT(workspaceLabels): added in v0.5.0, remove gate after 2027-08-14.
+  if (input.client.getLastServerInfoMessage()?.features?.workspaceLabels !== true)
+    throw new Error("Update the host to assign workspace labels.");
+  const catalog = await input.client.listWorkspaceLabels();
+  const key = workspaceLabelKey(input.name);
+  const existing = catalog.labels.find((label) => workspaceLabelKey(label.name) === key);
+  const label = existing ?? { name: input.name, color: "violet" as const };
+  const result = await input.client.setWorkspaceLabel({
+    workspaceId: input.workspaceId,
+    label,
+    assigned: input.assigned,
+  });
+  return { labels: result.workspaceLabels };
 }

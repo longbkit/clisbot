@@ -91,7 +91,7 @@ it.each(["intent", "partial"])(
     expect(await crashAt(directory, phase)).toBe("SIGKILL");
     expect(await fs.readFile(path.join(directory, "session.json"), "utf8")).toContain("agent");
     const storage = new AgentStorage(root, pino({ level: "silent" }));
-    expect((await storage.list()).map((item) => item.id)).toEqual(["keeper"]);
+    expect((await storage.listAll()).map((item) => item.id)).toEqual(["keeper"]);
     await expect(fs.stat(directory)).rejects.toMatchObject({ code: "ENOENT" });
     await expect(fs.stat(`${directory}.json`)).rejects.toMatchObject({ code: "ENOENT" });
     expect(
@@ -136,15 +136,15 @@ it("releases completed deletion owners while fencing stale writes across cwd cha
       "permanently deleted",
     );
   }
-  expect(await storage.list()).toEqual([]);
+  expect(await storage.listAll()).toEqual([]);
   const reopened = new AgentStorage(root, pino({ level: "silent" }), { sessionLayout: true });
-  expect(await reopened.list()).toEqual([]);
+  expect(await reopened.listAll()).toEqual([]);
   await expect(reopened.upsert({ ...record("deleted-0"), cwd: "/work/third" })).rejects.toThrow(
     "permanently deleted",
   );
   expect(reopened.activeDeletionCount).toBe(0);
   await reopened.upsert(record("new-agent"));
-  expect((await reopened.list()).map((value) => value.id)).toEqual(["new-agent"]);
+  expect((await reopened.listAll()).map((value) => value.id)).toEqual(["new-agent"]);
 });
 
 it("reconstructs the permanent ID fence when restarting after the scoped intent alone", async () => {
@@ -157,6 +157,6 @@ it("reconstructs the permanent ID fence when restarting after the scoped intent 
     paths: [path.join(directory, "session.json")],
   });
   await expect(assertAgentNotDeleted(root, "agent")).resolves.toBeUndefined();
-  expect(await new AgentStorage(root, pino({ level: "silent" })).list()).toEqual([]);
+  expect(await new AgentStorage(root, pino({ level: "silent" })).listAll()).toEqual([]);
   await expect(assertAgentNotDeleted(root, "agent")).rejects.toThrow("permanently deleted");
 });

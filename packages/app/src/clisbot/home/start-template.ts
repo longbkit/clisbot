@@ -12,7 +12,8 @@ export function composerLaunch(composer: StartComposer): BotLaunchDefaults {
     model: composer.effectiveModelId || undefined,
     modeId: composer.selectedMode || undefined,
     thinkingOptionId: composer.effectiveThinkingOptionId || undefined,
-    featureValues: composer.featureValues,
+    // The Bot launch record keeps its `featureValues` field; upstream calls these provider options.
+    featureValues: composer.providerOptions,
   };
 }
 export function snapshotStart(
@@ -76,7 +77,7 @@ export function defaultStartLaunch(
     model: pref?.model,
     modeId: pref?.mode,
     thinkingOptionId: pref?.thinkingByModel?.[pref?.model ?? ""],
-    featureValues: pref?.featureValues,
+    featureValues: pref?.options,
   };
 }
 export function applyLaunch(composer: StartComposer, config: BotLaunchDefaults) {
@@ -85,6 +86,6 @@ export function applyLaunch(composer: StartComposer, config: BotLaunchDefaults) 
     modelId: config.model ?? "",
     modeId: config.modeId ?? "",
     thinkingOptionId: config.thinkingOptionId ?? "",
-    featureValues: config.featureValues ?? {},
+    options: config.featureValues ?? {},
   });
 }

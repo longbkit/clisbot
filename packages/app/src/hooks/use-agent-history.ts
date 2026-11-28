@@ -3,9 +3,15 @@ import type {
   FetchAgentHistoryOptions,
   FetchAgentHistoryPageInfo,
 } from "@clisbot/client/internal/daemon-client";
-import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/shallow";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import {
   getHostRuntimeStore,
@@ -36,6 +42,8 @@ export interface AgentHistoryResult {
   isSearchSupported: boolean;
   /** More sessions matched than the ranked page holds. Narrow the query. */
   isSearchTruncated: boolean;
+  /** The agents answer the previous query; the current one is loading (`keepPreviousResults`). */
+  isPreviousResults: boolean;
   /** Hosts that failed while others succeeded. The list still renders. */
   hostErrors: AgentHistoryHostError[];
   /** Hosts still answering after the page was shown; their sessions merge in when they do. */
@@ -377,6 +385,13 @@ export function useAgentHistory(options: {
   enabled?: boolean;
   search?: string;
   activityFilter?: FetchAgentHistoryOptions["activityFilter"];
+  /**
+   * Leave out hosts that predate search, instead of searching no host. For a surface that adds
+   * history matches to other results, where a missing host is not a claim of "no matches".
+   */
+  searchableHostsOnly?: boolean;
+  /** Keep the previous query's results until the next query's arrive. */
+  keepPreviousResults?: boolean;
 }): AgentHistoryResult {
   const { t } = useTranslation();
   const daemons = useHosts();
@@ -387,23 +402,31 @@ export function useAgentHistory(options: {
     return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
   }, [options.serverId]);
   const enabled = options.enabled ?? true;
+  const requestedServerIds = useMemo(
+    () => (serverId ? [serverId] : daemons.map((daemon) => daemon.serverId)),
+    [daemons, serverId],
+  );
+  const searchableServerIds = useSessionStore(
+    useShallow((state) =>
+      requestedServerIds.filter(
+        (id) => state.sessions[id]?.serverInfo?.features?.agentHistorySearch === true,
+      ),
+    ),
+  );
+  const serverIds = options.searchableHostsOnly ? searchableServerIds : requestedServerIds;
+  // Read the statuses as values: a version counter read only for reactivity is dropped by the
+  // React Compiler, which left a Host that came online after a cold start "unreachable" forever.
+  const connectionStatuses = useHostRuntimeConnectionStatuses(serverIds);
   // A host the user asked about splits two ways: one this fetch can reach, and
   // one whose sessions will be missing from the answer. Both come out of here,
   // because dropping the unreachable ones silently is what lets the list — and
   // worse, "No sessions match" — overstate what was actually searched.
-  const candidateServerIds = useMemo(
-    () => (serverId ? [serverId] : daemons.map((daemon) => daemon.serverId)),
-    [daemons, serverId],
-  );
-  // Read the statuses as values: a version counter read only for reactivity is dropped by the
-  // React Compiler, which left a Host that came online after a cold start "unreachable" forever.
-  const connectionStatuses = useHostRuntimeConnectionStatuses(candidateServerIds);
   const { targetHosts, unreachableHosts } = useMemo(() => {
     const serverLabelById = new Map(daemons.map((daemon) => [daemon.serverId, daemon.label]));
     const hosts: AgentHistoryHost[] = [];
     const unreachable: AgentHistoryHostError[] = [];
 
-    for (const targetServerId of candidateServerIds) {
+    for (const targetServerId of serverIds) {
       const client = runtime.getClient(targetServerId);
       const serverName = serverLabelById.get(targetServerId) ?? targetServerId;
       if (!client || connectionStatuses.get(targetServerId) !== "online") {
@@ -414,18 +437,18 @@ export function useAgentHistory(options: {
     }
 
     return { targetHosts: hosts, unreachableHosts: unreachable };
-  }, [daemons, runtime, connectionStatuses, candidateServerIds]);
+  }, [daemons, runtime, connectionStatuses, serverIds]);
   // One gate, checked before the field is offered: a fleet where any host
   // predates search has no search, rather than a list that silently omits that
   // host's sessions.
   const isSearchSupported = useSessionStore(
     useCallback(
       (state) =>
-        candidateServerIds.length > 0 &&
-        candidateServerIds.every(
+        serverIds.length > 0 &&
+        serverIds.every(
           (id) => state.sessions[id]?.serverInfo?.features?.agentHistorySearch === true,
         ),
-      [candidateServerIds],
+      [serverIds],
     ),
   );
   const search = useMemo(() => {
@@ -434,17 +457,18 @@ export function useAgentHistory(options: {
   }, [isSearchSupported, options.search]);
   const queryKey = useMemo(
     () => [
-      ...(serverId ? agentHistoryQueryKey(serverId) : allAgentHistoryQueryKey(candidateServerIds)),
+      ...(serverId ? agentHistoryQueryKey(serverId) : allAgentHistoryQueryKey(serverIds)),
       search,
       options.activityFilter,
     ],
-    [search, serverId, candidateServerIds, options.activityFilter],
+    [search, serverId, serverIds, options.activityFilter],
   );
   const serverLabelById = useMemo(
     () => new Map(daemons.map((daemon) => [daemon.serverId, daemon.label])),
     [daemons],
   );
 
+  const queryEnabled = Boolean(enabled && targetHosts.length > 0);
   const historyQuery = useInfiniteQuery<
     AgentHistoryBatchPage,
     Error,
@@ -453,8 +477,11 @@ export function useAgentHistory(options: {
     AgentHistoryCursorByServerId | null
   >({
     queryKey,
-    enabled: Boolean(enabled && targetHosts.length > 0),
+    enabled: queryEnabled,
     staleTime: 30_000,
+    // Previous results stand in only until the next query's arrive. With no host to search,
+    // nothing will arrive, so they would stand in, and read as still loading, indefinitely.
+    ...(options.keepPreviousResults && queryEnabled ? { placeholderData: keepPreviousData } : {}),
     initialPageParam: null,
     getNextPageParam: getNextAgentHistoryPageParam,
     queryFn: async ({ pageParam }) => {
@@ -495,6 +522,7 @@ export function useAgentHistory(options: {
     isFetching,
     isFetchingNextPage,
     isLoading,
+    isPlaceholderData,
     refetch,
   } = historyQuery;
 
@@ -569,6 +597,7 @@ export function useAgentHistory(options: {
     isLoadingMore: isFetchingNextPage,
     isSearchSupported,
     isSearchTruncated,
+    isPreviousResults: isPlaceholderData,
     hostErrors,
     lateHosts,
     refreshAll,

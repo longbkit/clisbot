@@ -44,6 +44,7 @@ export const ScheduleTargetSchema = z.discriminatedUnion("type", [
       workspaceId: z.string().trim().min(1).optional(),
       title: z.string().trim().min(1).nullable().optional(),
       providerOptions: z.record(z.string(), z.unknown()).optional(),
+      // COMPAT(featureValues): added in v0.15.0, remove after 2027-05-01. Folded into providerOptions.
       featureValues: z.record(z.string(), z.unknown()).optional(),
       systemPrompt: z.string().optional(),
       mcpServers: z.record(z.string(), z.unknown()).optional(),

@@ -90,6 +90,8 @@ packages/protocol/src/generated/validation/ws-outbound-schema-metadata.ts
 packages/protocol/codegen/generated/
 
 /artifacts
+# Website e2e cache written by packages/website/playwright.config.ts
+/.artifacts/
 packages/desktop/.cache/
 packages/desktop/src-tauri/resources/managed-runtime/
 app.json

@@ -18,6 +18,7 @@ import {
   expectComposerFullscreenControls,
   sendComposerWithButton,
   queueComposerWithButton,
+  fillComposerDraft,
   configureComposerQueueSend,
   activateRetainedComposerTab,
   switchComposerTabWithKeyboard,
@@ -40,7 +41,7 @@ import {
   closeMobileExplorer,
   expectMobileExplorerHidden,
   expectMobileExplorerVisible,
-  swipeOpenMobileAgentSidebar,
+  openMobileAgentSidebarWithKeyboard,
   swipeOpenMobileExplorer,
 } from "../support/helpers/sidebar";
 
@@ -458,6 +459,32 @@ test("fullscreen Send keeps the configured queue behavior while an agent runs", 
   }
 });
 
+test("editing a queued draft restores its original height with the focus hint visible", async ({
+  page,
+}) => {
+  await configureComposerQueueSend(page);
+  await resizeComposerViewport(page, "portrait");
+  const agent = await startRunningMockAgent(page, {
+    prefix: "composer-queued-draft-height-",
+    model: "one-minute-stream",
+    prompt: "Stay running while a draft is queued.",
+  });
+  try {
+    const draft = "Please review the latest changes.\nPlease review the latest changes.";
+    await fillComposerDraft(page, draft);
+    const originalHeight = await composerHeight(page);
+    await queueComposerWithButton(page);
+    await expect(composerLocator(page)).toHaveValue("");
+    await composerLocator(page).blur();
+    await expect(page.getByText(/ to focus$/)).toBeVisible();
+    await page.getByRole("button", { name: "Edit queued message", exact: true }).click();
+    await expect(composerLocator(page)).toHaveValue(draft);
+    await expectComposerHeight(page, originalHeight);
+  } finally {
+    await agent.cleanup();
+  }
+});
+
 test("image paste stays attached to the active editor across fullscreen entry and exit", async ({
   page,
 }) => {
@@ -557,7 +584,7 @@ test("a real compact overlay over a fullscreen editor leaves the exit action alo
     if (usesChatNavigation) {
       // Home V2 deliberately removes the left drawer, including while fullscreen.
       // Prove that swipe leaves the editor intact, then cover it with the real Explorer.
-      await swipeOpenMobileAgentSidebar(page);
+      await openMobileAgentSidebarWithKeyboard(page);
       await expectMobileAgentSidebarHidden(page);
       await expectComposerFullscreenControls(page);
       await expect(composerLocator(page)).toHaveValue(draft);
@@ -569,7 +596,8 @@ test("a real compact overlay over a fullscreen editor leaves the exit action alo
       await expectMobileExplorerHidden(page);
     } else {
       // Legacy still presents its left drawer over fullscreen, preserving that contract.
-      await swipeOpenMobileAgentSidebar(page);
+      // Fullscreen hides the header's menu button; the keyboard shortcut opens the list over it.
+      await openMobileAgentSidebarWithKeyboard(page);
       await expectMobileAgentSidebarVisible(page);
       await blurComposer(page);
       await page.keyboard.press("Escape");

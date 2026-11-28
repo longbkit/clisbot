@@ -1,17 +1,26 @@
 import { createContext, useCallback, useContext } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { HEADER_CONTROL_HEIGHT, MIN_TOUCH_TARGET_SIZE } from "@/components/ui/control-geometry";
+import {
+  bySizing,
+  controlSizingForLayout,
+  ICON_BUTTON_SIZES,
+  MIN_TOUCH_TARGET_SIZE,
+  TOUCH_ICON_SIZE,
+  type SizingValue,
+} from "@/components/ui/control-geometry";
+import type { LayoutValue } from "@/components/ui/control-sizing";
 import { ICON_SIZE } from "@/styles/theme";
 
 export { extraMutedIconColorMapping, mutedIconColorMapping } from "@/components/ui/icon-color";
 
 export type IconButtonChromeSize = "large" | "small";
 
-const SMALL_ICON_BUTTON_SIZE = 20;
-/** Width and height of a large icon button on compact layouts. */
-export const COMPACT_LARGE_ICON_BUTTON_SIZE = 32;
-const COMPACT_SMALL_ICON_BUTTON_SIZE = 32;
+// Touch-sized, every icon button is one target with one glyph size.
+const GLYPH_SIZES = {
+  large: { touch: TOUCH_ICON_SIZE.md, pointer: ICON_SIZE.md },
+  small: { touch: TOUCH_ICON_SIZE.md, pointer: ICON_SIZE.sm },
+} satisfies Record<IconButtonChromeSize, SizingValue>;
 
 export interface IconButtonChromeState {
   hovered?: boolean;
@@ -22,7 +31,7 @@ export interface IconButtonChromeState {
 
 function resolveIconButtonFrame(size: IconButtonChromeSize, compact: boolean) {
   if (size === "large") return styles.large;
-  return compact ? styles.smallCompact : styles.small;
+  return controlSizingForLayout(compact) === "touch" ? styles.smallTouch : styles.small;
 }
 
 interface IconButtonChromeOptions {
@@ -35,7 +44,17 @@ interface IconButtonChromeOptions {
   style?: StyleProp<ViewStyle>;
 }
 
-const IconButtonChromeContext = createContext<"default" | "compact-header">("default");
+/**
+ * `header-island`: upstream's round, large header actions. `compact-header` (Clisbot): large,
+ * square actions with a 48pt touch target in the compact header.
+ */
+type IconButtonChromeScope = "default" | "header-island" | "compact-header";
+
+const IconButtonChromeContext = createContext<IconButtonChromeScope>("default");
+
+function isLargeHeaderScope(scope: IconButtonChromeScope): boolean {
+  return scope === "header-island" || scope === "compact-header";
+}
 
 /** A container owns the chrome of its icon actions, including custom menu and badge triggers. */
 export const IconButtonChromeProvider = IconButtonChromeContext.Provider;
@@ -53,10 +72,10 @@ export function useIconButtonChromeStyle({
   return useCallback(
     (state: IconButtonChromeState) =>
       iconButtonChromeStyle({
-        size: scope === "compact-header" ? "large" : size,
+        size: isLargeHeaderScope(scope) ? "large" : size,
         compact,
         disabled,
-        round,
+        round: scope === "header-island" || round,
         style: [style, scope === "compact-header" && styles.compactHeaderTarget],
         state: { ...state, active: active || state.active },
       }),
@@ -92,57 +111,70 @@ export function iconButtonChromeFrameStyle(
 }
 
 export function iconButtonChromeGlyphSize(size: IconButtonChromeSize, compact = false): number {
-  if (size === "large") return ICON_SIZE.md;
-  return compact ? 18 : 14;
+  return GLYPH_SIZES[size][controlSizingForLayout(compact)];
+}
+
+/** The glyph for an icon button, sized by its container's chrome the way its frame is. */
+export function useIconButtonChromeGlyphSize(size: IconButtonChromeSize, compact = false): number {
+  const scope = useContext(IconButtonChromeContext);
+  return iconButtonChromeGlyphSize(isLargeHeaderScope(scope) ? "large" : size, compact);
+}
+
+/**
+ * The margin that pulls a button out by how far its frame reaches past its glyph. A row that hangs
+ * its edge buttons by it keeps their glyphs, not their frames, on the row's content rail.
+ */
+export function iconButtonChromeHang(size: IconButtonChromeSize): LayoutValue {
+  const frame = ICON_BUTTON_SIZES[size];
+  const glyph = GLYPH_SIZES[size];
+  return bySizing({
+    touch: (glyph.touch - frame.touch) / 2,
+    pointer: (glyph.pointer - frame.pointer) / 2,
+  });
 }
 
 export function smallIconButtonChromeFrameSize(compact = false): number {
-  return compact ? COMPACT_SMALL_ICON_BUTTON_SIZE : SMALL_ICON_BUTTON_SIZE;
+  return ICON_BUTTON_SIZES.small[controlSizingForLayout(compact)];
 }
+
+// Icon buttons sit in header and toolbar rows that clip overflow, so the keyboard focus ring
+// from public/index.html is drawn inside the frame instead of around it.
+const FOCUS_RING_INSET = -2;
 
 const styles = StyleSheet.create((theme) => ({
   large: {
-    width: {
-      xs: COMPACT_LARGE_ICON_BUTTON_SIZE,
-      md: HEADER_CONTROL_HEIGHT,
-    },
-    height: {
-      xs: COMPACT_LARGE_ICON_BUTTON_SIZE,
-      md: HEADER_CONTROL_HEIGHT,
-    },
+    width: bySizing(ICON_BUTTON_SIZES.large),
+    height: bySizing(ICON_BUTTON_SIZES.large),
     padding: 0,
     borderRadius: theme.borderRadius.md,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    outlineWidth: 0,
-    outlineColor: "transparent",
+    outlineOffset: FOCUS_RING_INSET,
   },
   compactHeaderTarget: {
     minWidth: MIN_TOUCH_TARGET_SIZE,
     minHeight: MIN_TOUCH_TARGET_SIZE,
   },
   small: {
-    width: SMALL_ICON_BUTTON_SIZE,
-    height: SMALL_ICON_BUTTON_SIZE,
+    width: ICON_BUTTON_SIZES.small.pointer,
+    height: ICON_BUTTON_SIZES.small.pointer,
     padding: 0,
     borderRadius: theme.borderRadius.md,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    outlineWidth: 0,
-    outlineColor: "transparent",
+    outlineOffset: FOCUS_RING_INSET,
   },
-  smallCompact: {
-    width: COMPACT_SMALL_ICON_BUTTON_SIZE,
-    height: COMPACT_SMALL_ICON_BUTTON_SIZE,
+  smallTouch: {
+    width: ICON_BUTTON_SIZES.small.touch,
+    height: ICON_BUTTON_SIZES.small.touch,
     padding: 0,
     borderRadius: theme.borderRadius.md,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-    outlineWidth: 0,
-    outlineColor: "transparent",
+    outlineOffset: FOCUS_RING_INSET,
   },
   round: {
     borderRadius: theme.borderRadius.full,

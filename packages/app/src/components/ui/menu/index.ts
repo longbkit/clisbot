@@ -12,11 +12,14 @@ export { MenuRoot, MenuTrigger, type MenuTriggerProps, type MenuTriggerState } f
 export {
   MenuSurface,
   useMenuSurface,
+  type MenuFillPageDefinition,
+  type MenuListPageDefinition,
   type MenuPageDefinition,
   type MenuSurfaceProps,
 } from "./menu-surface";
 export { MenuSubTrigger } from "./menu-sub";
 export {
+  MenuCheckboxItem,
   MenuHint,
   MenuItem,
   MenuItemAction,
@@ -25,6 +28,7 @@ export {
   MenuTextField,
   menuRowContentInset,
   type ActionStatus,
+  type MenuCheckboxItemProps,
   type MenuItemProps,
 } from "./menu-item";
 export { MENU_ITEM_HEIGHT } from "./menu-geometry";

@@ -5,7 +5,7 @@ import type { ManagedAccessMode } from "@clisbot/protocol/managed-access";
 import { Alert } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { PairLinkModal } from "@/components/pair-link-modal";
+import { PairLinkModal } from "@/hosts/add-host/internal/pair-link-modal";
 import { readDeviceCredential } from "@/device-access/credentials";
 import { readDesktopManagedLocalCredential } from "@/desktop/daemon/local-credential";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";

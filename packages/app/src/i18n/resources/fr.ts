@@ -21,6 +21,11 @@ export const fr: TranslationResources = {
     partial: "Activité partielle ; un Host est indisponible",
     loading: "Chargement de l’activité",
   },
+  pluginCombobox: {
+    searching: "Recherche…",
+    empty: "Aucun résultat",
+    failed: "Échec de la recherche : {{message}}",
+  },
   paneFind: {
     connectionFailure:
       "Impossible de rechercher dans cette conversation. Vérifiez la connexion à l’hôte et réessayez.",
@@ -88,6 +93,7 @@ export const fr: TranslationResources = {
       daemonClientUnavailable: "Client du daemon indisponible",
       daemonClientDisconnected: "Le client du daemon est déconnecté",
       noFileFound: "Aucun fichier trouvé pour {{token}}",
+      folderOutsideWorkspace: "{{path}} se trouve en dehors de cet espace de travail",
       unexpectedDictationError: "Une erreur inattendue s’est produite pendant la dictée.",
     },
     connectionStatus: {
@@ -105,14 +111,23 @@ export const fr: TranslationResources = {
       close: "Fermer le menu",
     },
     commandCenter: {
-      placeholder: "Rechercher des commandes, fichiers, espaces de travail et agents…",
+      placeholder: "Rechercher des espaces de travail, fichiers et actions…",
+      placeholderWithoutFiles: "Rechercher des espaces de travail et des actions…",
       filePlaceholder: "Rechercher des fichiers…",
+      workspacePlaceholder: "Rechercher des espaces de travail…",
+      actionPlaceholder: "Rechercher des actions…",
       searchingFiles: "Recherche de fichiers…",
       noMatches: "Aucun résultat",
       actions: "Actions",
       files: "Fichiers",
       workspaces: "Espaces de travail",
-      agents: "Agents",
+      recentWorkspaces: "Espaces de travail récents",
+      tabs: {
+        all: "Tout",
+        workspaces: "Espaces de travail",
+        files: "Fichiers",
+        actions: "Actions",
+      },
       newAgent: "Nouvel agent",
       open: "Ouvrir {{name}}",
       openInSidePane: "Ouvrir {{name}} dans le panneau latéral",
@@ -121,6 +136,7 @@ export const fr: TranslationResources = {
       home: "Accueil",
       groupByProject: "Grouper par projet",
       groupByStatus: "Grouper par statut",
+      copyBrowserHostName: "Copier le nom de l’hôte du navigateur",
       modelGroupLabel: "Modèle",
       modelSearchKeywords:
         "changer de modèle modifier le modèle définir le modèle sélectionner le modèle model",
@@ -158,6 +174,8 @@ export const fr: TranslationResources = {
       sendAndInterrupt: "Envoyer et interrompre",
       sendAndSteer: "Envoyer et réorienter",
       sendMessage: "Envoyer le message",
+      longPressToQueue: "Appui long pour mettre en file d’attente",
+      longPressToSendNow: "Appui long pour envoyer maintenant",
       queue: "Mettre en file d’attente",
       send: "Envoyer",
     },
@@ -319,7 +337,7 @@ export const fr: TranslationResources = {
     states: {
       notFound: "Agent introuvable",
       failedToLoad: "Impossible de charger l’agent",
-      reconnecting: "Reconnexion à l’hôte…",
+      reconnecting: "Reconnexion…",
       updating: "Mise à jour des messages…",
       timelineSyncFailed: "Impossible d’actualiser l’historique de l’agent.",
       timelineSyncRetrying: "Nouvelle tentative…",
@@ -402,6 +420,7 @@ export const fr: TranslationResources = {
       copyTurn: "Copier l’échange",
       copyMessage: "Copier le message",
       forkMenu: "Forker la conversation à partir d’ici",
+      turnStats: "Statistiques de l’échange",
       forkInNewTab: "Forker dans un nouvel onglet",
       forkInNewWorkspace: "Forker dans un nouvel espace de travail",
       forkUnavailable: "Mettez à jour l’hôte pour utiliser cette fonction.",
@@ -431,6 +450,11 @@ export const fr: TranslationResources = {
       details: "Détails",
     },
     dictation: {
+      insecureContext: "Ouvrez Clisbot via HTTPS ou sur localhost pour utiliser le microphone.",
+      unsupported: "La dictée est indisponible dans ce navigateur.",
+      noMicrophone: "Connectez un microphone, puis réessayez.",
+      permissionDenied: "Autorisez l’accès au microphone, puis réessayez.",
+      startFailed: "Impossible de lancer la dictée. Réessayez.",
       paused: "Microphone interrompu. En attente de reprise…",
       start: "Démarrer la dictée vocale",
       cancel: "Annuler la dictée",
@@ -446,6 +470,25 @@ export const fr: TranslationResources = {
       next: "Suivant",
       answerPlaceholder: "Saisissez votre réponse…",
       otherPlaceholder: "Autre…",
+    },
+    backgroundWork: {
+      heartbeat: "Battement périodique",
+      pillOne: "1 tâche en arrière-plan",
+      pillMany: "{{count}} tâches en arrière-plan",
+      notRunning: "N’est plus en cours",
+      dismiss: "Fermer",
+      stop: "Arrêter",
+      stopping: "Arrêt…",
+      stopError: "Impossible de confirmer l’arrêt.",
+      label: "Arrière-plan",
+      title: "Travail en arrière-plan",
+      waiting: "En attente des détails",
+      error: "Impossible de charger le travail en arrière-plan",
+      retry: "Réessayer",
+      running: "Travail en arrière-plan en cours",
+      shell: "Shell",
+      monitor: "Surveillance",
+      other: "Autre travail",
     },
     todo: {
       title: "Tâches",
@@ -522,8 +565,7 @@ export const fr: TranslationResources = {
         archivedTitle: "Espace de travail archivé",
         restoreDescription:
           "Restaurez {{workspaceName}} pour retrouver ses agents. Son worktree utilisera la branche {{branch}}.",
-        restoreWithoutBranchDescription:
-          "Restaurez {{workspaceName}} pour retrouver ses agents. Une nouvelle branche partira de la base enregistrée ou de la branche par défaut du dépôt.",
+        restoreWithoutBranchDescription: "Restaurez {{workspaceName}} pour retrouver ses agents.",
         unarchiveDescription: "{{workspaceName}} est archivé. Désarchivez-le pour le rouvrir.",
         restoreAction: "Restaurer",
         unarchiveAction: "Désarchiver",
@@ -688,6 +730,7 @@ export const fr: TranslationResources = {
     terminal: {
       hostDisconnected: "L’hôte n’est pas connecté",
       updateHost: "Mettez à jour l’hôte pour utiliser le rendu natif du terminal.",
+      restoreRequiresUpdate: "Mettez à jour l’hôte pour afficher les terminaux.",
       unableToSubscribe: "Impossible de s’abonner au terminal",
       fileUploaded: "Fichier envoyé",
       pasteFileFailed: "Impossible de coller le fichier : {{reason}}",
@@ -953,6 +996,7 @@ export const fr: TranslationResources = {
           pushBehind:
             "Push indisponible pour l’instant : des modifications plus récentes doivent d’abord être récupérées",
           pushNothing: "Push indisponible : il n’y a rien de nouveau à pousser",
+          pushUpstreamGone: "Push indisponible : la branche suivie par cette branche n’existe plus",
           pullAndPushNoRemote:
             "Pull et push indisponibles : cette branche n’est pas encore liée à un dépôt distant",
           pullAndPushDirty:
@@ -1022,6 +1066,9 @@ export const fr: TranslationResources = {
         },
       },
       diff: {
+        baseBranch: {
+          title: "Branche de base",
+        },
         openChangesTab: "Ouvrir l’onglet Modifications",
         openDiffTab: "Ouvrir l’onglet Diff",
         closeChangesTab: "Fermer l’onglet Modifications",
@@ -1246,6 +1293,8 @@ export const fr: TranslationResources = {
     title: "Nouveautés",
     installed: "Installée",
     showMore: "Afficher plus",
+    showAllChanges: "Afficher toutes les modifications",
+    hideAllChanges: "Masquer toutes les modifications",
     openWebsite: "Journal des modifications complet",
     error: {
       title: "Impossible de charger le journal des modifications",
@@ -1253,6 +1302,14 @@ export const fr: TranslationResources = {
     },
   },
   sidebar: {
+    view: {
+      failed: "Impossible de charger la vue de la barre latérale.",
+      useDefault: "Utiliser la vue par défaut",
+      readFailed: "Impossible de charger votre préférence de vue de la barre latérale.",
+      agentUnavailable: "Cet agent n’est plus disponible",
+      terminalUnavailable: "Ce terminal n’est plus disponible",
+      projectUnavailable: "Ce projet n’est plus disponible",
+    },
     statusGroupAccessibility: "Groupe {{label}}",
     statusBucket: {
       needsInput: "Attend une réponse",
@@ -1352,6 +1409,7 @@ export const fr: TranslationResources = {
       hostsFiltered: "Hôtes (filtre actif)",
       settings: "Paramètres",
       closeSidebar: "Fermer la barre latérale",
+      moreActions: "Plus d’actions",
     },
     footer: {
       usage: "Utilisation",
@@ -1457,6 +1515,9 @@ export const fr: TranslationResources = {
         hostDisconnected: "L’hôte n’est pas connecté",
         hideFailed: "Impossible de masquer l’espace de travail",
         archiveFailed: "Impossible d’archiver l’espace de travail",
+        archived: "Espace de travail archivé",
+        undoArchive: "Annuler",
+        undoArchiveFailed: "Impossible d’annuler l’archivage",
       },
     },
   },
@@ -1464,8 +1525,9 @@ export const fr: TranslationResources = {
     title: "Nouvel espace de travail",
     create: "Créer",
     isolation: {
-      local: "Local",
+      local: "Répertoire du projet",
       worktree: "Nouveau worktree",
+      existing: "Worktree existant",
       label: "Isolation",
     },
     fields: {
@@ -1480,12 +1542,17 @@ export const fr: TranslationResources = {
       createWorktreeFailed: "Impossible de créer le worktree",
       composerStateRequired: "L’état de la zone de saisie est requis",
       selectModel: "Sélectionnez un modèle",
+      branchInProjectDirectory:
+        "{{branch}} est extraite dans le répertoire du projet. Choisissez Répertoire du projet pour y travailler, ou créez une branche à partir d’elle.",
+      branchInWorktree:
+        "{{branch}} est extraite dans {{path}}. Choisissez ce worktree dans Worktree existant, ou créez une branche à partir d’elle.",
     },
     tooltips: {
       project: "Choisir le projet",
       host: "Choisir l’hôte",
       isolation: "Choisir le niveau d’isolation",
       startingRef: "Choisir le point de départ",
+      worktree: "Choisir le worktree où travailler",
       launch: "Choisir quoi lancer",
     },
     refPicker: {
@@ -1493,8 +1560,31 @@ export const fr: TranslationResources = {
       intoBase: "vers {{baseRef}}",
       searching: "Recherche…",
       noMatchingRefs: "Aucune référence correspondante.",
-      searchPlaceholder: "Rechercher des branches et des PR",
+      searchBranches: "Rechercher des branches",
+      searchPullRequests: "Rechercher des PR",
+      searchPullRequests_mr: "Rechercher des MR",
+      branches: "Branches",
+      pullRequests: "Pull requests",
+      pullRequests_mr: "Merge requests",
+      pullRequestsShort: "PR",
+      pullRequestsShort_mr: "MR",
+      branchOff: "Nouvelle branche",
+      checkout: "Extraire",
+      branchOffHint: "Crée une nouvelle branche à partir de celle-ci",
+      checkoutHint: "Travaille directement dessus",
+      base: "Base",
+      from: "depuis",
+      branch: "Branche",
+      pullRequest: "Pull request",
+      pullRequest_mr: "Merge request",
+      inProjectDirectory: "Dans le répertoire du projet",
+      inWorktree: "Dans un worktree",
       title: "Partir de",
+    },
+    worktreePicker: {
+      title: "Worktree",
+      searchPlaceholder: "Rechercher des worktrees",
+      empty: "Aucun worktree correspondant.",
     },
     launch: {
       title: "Que lancer ?",
@@ -1672,6 +1762,9 @@ export const fr: TranslationResources = {
       cli: {
         statusFailed: "Impossible de vérifier l’installation de la CLI.",
         installFailed: "Impossible d’installer la CLI Clisbot.",
+        uninstallFailed: "Impossible de désinstaller la CLI Clisbot.",
+        keptForeign:
+          "Une commande clisbot qui n’a pas été installée par Clisbot a été conservée. Supprimez-la vous-même pour la désinstaller.",
       },
     },
   },
@@ -1742,6 +1835,7 @@ export const fr: TranslationResources = {
     openPath: "Ouvrir le chemin",
   },
   branchSwitcher: {
+    failedToLoad: "Impossible de charger les branches. Rouvrez le sélecteur pour réessayer.",
     triggerTooltip: "Changer la branche de l’espace de travail",
     currentBranch: "Branche actuelle : {{branchName}}. Appuyez pour changer de branche.",
     placeholder: "Changer de branche…",
@@ -1766,7 +1860,11 @@ export const fr: TranslationResources = {
     loadingCommands: "Chargement des commandes…",
     noFiles: "Aucun fichier ou répertoire trouvé",
     noCommands: "Aucune commande trouvée",
-    failedToLoad: "Échec du chargement",
+    loadingProviderCommands: "Chargement des commandes {{provider}}…",
+    commandsFailed: "Impossible de charger les commandes",
+    providerCommandsFailed: "Impossible de charger les commandes {{provider}}",
+    filesFailed: "Impossible de rechercher les fichiers",
+    skillTag: "Skill",
     chooseProjectForCommands: "Choisissez un projet pour afficher les commandes",
     chooseModelForCommands: "Sélectionnez un modèle pour afficher les commandes",
   },
@@ -1794,6 +1892,61 @@ export const fr: TranslationResources = {
     },
   },
   onboarding: {
+    setup: {
+      title: "Clisbot",
+      stepCounter: "Étape {{current}} sur {{total}}",
+      skip: "Passer la configuration",
+      continue: "Continuer",
+      finish: "Terminer",
+      steps: {
+        appearance: {
+          label: "Apparence",
+          title: "Bienvenue dans Clisbot",
+          description: "Commençons par choisir une apparence",
+        },
+        providers: {
+          label: "Fournisseurs",
+          title: "Vos fournisseurs",
+          description: "Clisbot utilise les CLI d'agents déjà installées sur cet ordinateur",
+        },
+        projects: {
+          label: "Projets",
+          title: "Ajoutez vos projets",
+          description: "Où voulez-vous que vos agents travaillent",
+          addProject: "Ajouter un projet",
+          added: "Ajouté",
+          suggestions: {
+            loading: "Recherche des dossiers dans lesquels vous avez travaillé",
+            empty: "Aucun projet récent trouvé",
+            lastUsed: "Dernière utilisation {{time}}",
+            addSelected_one: "Ajouter {{count}} projet",
+            addSelected_other: "Ajouter {{count}} projets",
+            adding: "Ajout…",
+            addFailed: "Impossible d'ajouter ce dossier",
+          },
+        },
+        orchestration: {
+          label: "Orchestration",
+          title: "Laissez les agents utiliser Clisbot",
+          description:
+            "Laissez vos agents créer des espaces de travail et parler à d'autres agents",
+        },
+        phone: {
+          label: "Mobile",
+          title: "Emportez vos agents partout",
+          description:
+            "L'application mobile native complète vous permet de contrôler n'importe quel ordinateur Clisbot depuis votre téléphone",
+          appStore: "App Store",
+          googlePlay: "Google Play",
+          connectTitle: "Choisissez comment vous connecter",
+          connectDocs: "Docs",
+          openConnectDocs: "Ouvrir la documentation sur la connectivité",
+          recommended: "Recommandé",
+          relay: { title: "Relais", hint: "Chiffré de bout en bout, scannez un QR code" },
+          tailscale: { title: "Tailscale", hint: "Demande un peu de configuration" },
+        },
+      },
+    },
     title: "Bienvenue dans Clisbot",
     subtitle: "Connectez votre ordinateur pour commencer",
     actions: {
@@ -2062,6 +2215,8 @@ export const fr: TranslationResources = {
       notNow: "Pas maintenant",
       directConnectionHint:
         "Sans relais, connectez-vous directement via TCP, Tailscale ou un autre VPN. Aucun code QR n’est créé.",
+      tailscaleDocs: "Configurer Tailscale",
+      tailscaleDocsAccessibility: "Lire comment se connecter via Tailscale",
       updateRequired: "Mettez à jour l’hôte pour activer le relais depuis Clisbot Desktop.",
       unavailable: "Offre d’association indisponible.",
       hint: "Scannez ce code QR avec Clisbot sur votre téléphone, ou copiez le lien ci-dessous.",
@@ -2108,6 +2263,7 @@ export const fr: TranslationResources = {
     hostUnavailable: "L’hôte de téléchargement est indisponible.",
     cancelled: "Téléchargement annulé.",
     failed: "Impossible de télécharger le fichier.",
+    httpFailed: "Impossible de télécharger le fichier (HTTP {{status}}).",
     shareFile: "Partager le fichier",
     shareFileNamed: "Partager {{fileName}}",
   },
@@ -2115,6 +2271,12 @@ export const fr: TranslationResources = {
     backdrop: "Arrière-plan du menu",
   },
   subagents: {
+    parent: {
+      backToParent: "Retour au parent",
+      backTo: "Retour à {{label}}",
+      parentAgent: "Agent parent",
+      openParent: "Ouvrir le parent",
+    },
     title: "Sous-agents",
     pillLabelOne: "1 sous-agent",
     pillLabelMany: "{{count}} sous-agents",
@@ -2212,11 +2374,17 @@ export const fr: TranslationResources = {
   toolCallDetails: {
     error: "Erreur",
     empty: "Aucun détail supplémentaire disponible",
-    subAgentActivity: "Activité du sous-agent",
     input: "Entrée",
     output: "Sortie",
   },
+  turnSummary: {
+    details: "Voir les détails du tour",
+    sentBy: "Envoyé par {{name}}",
+    showMore: "Afficher plus",
+    showLess: "Afficher moins",
+  },
   toolCallGroup: {
+    thought: "Réfléchi",
     editedFiles: {
       one: "{{count}} fichier modifié",
       other: "{{count}} fichiers modifiés",
@@ -2285,7 +2453,13 @@ export const fr: TranslationResources = {
     },
   },
   providerUsage: {
+    checkUsage: "Vérifier l’utilisation",
+    checkUsageHint: "S’applique à {{host}} sur tous les appareils",
+    off: "L’utilisation est désactivée sur {{host}}.",
+    turnOn: "Activer",
+
     options: "Paramètres",
+    host: "Hôte",
     refreshFailed: "Impossible d’actualiser l’utilisation",
     noHosts: "Aucun hôte connecté",
     agentError: "Impossible de charger l’utilisation : {{reason}}",
@@ -2302,6 +2476,12 @@ export const fr: TranslationResources = {
     loginExpired: "Connexion expirée {{relativeTime}}. {{remedy}}",
     title: "Utilisation du forfait",
     refresh: "Actualiser",
+    reorderCard: "Réorganiser {{source}}",
+    sources: "Sources",
+    sourcesCount: "{{shown}} sur {{total}}",
+    providerInactive: "Fournisseur inactif",
+    allSourcesHidden: "Aucune source d'utilisation affichée",
+    chooseSources: "Choisir les sources",
     refreshAll: "Tout actualiser",
     refreshing: "Actualisation...",
     loading: "Chargement de l’utilisation...",
@@ -2332,6 +2512,7 @@ export const fr: TranslationResources = {
       days: "{{value}} j",
       hours: "{{value}} h",
       minutes: "{{value}} min",
+      pair: "{{first}} {{second}}",
     },
     timing: {
       lastUpdated: "Dernière mise à jour {{relativeTime}}",
@@ -2339,8 +2520,11 @@ export const fr: TranslationResources = {
       resetTimePassed: "Heure de réinitialisation dépassée",
       resettingNow: "réinitialisation en cours",
       resetsIn: "se réinitialise dans {{duration}}",
-      runsOutNow: "s’épuise maintenant",
-      runsOutIn: "s’épuise dans {{duration}}",
+      resetsAtWeekday: "{{weekday}} {{time}}",
+      resetsAtDate: "{{date}}, {{time}}",
+      limitReached: "Limite atteinte",
+      mayHaveRunOut: "Le quota est peut-être épuisé",
+      runsOutAt: "épuisement prévu {{time}}",
       justNow: "à l’instant",
       daysAgo: "il y a {{value}} j",
       hoursAgo: "il y a {{value}} h",
@@ -2418,6 +2602,7 @@ export const fr: TranslationResources = {
       connections: "Connexions",
       agents: "Agents",
       metadata: "Métadonnées",
+      voice: "Voix",
       workspaces: "Espaces de travail",
       providers: "Fournisseurs",
       usage: "Utilisation",
@@ -2440,9 +2625,78 @@ export const fr: TranslationResources = {
       docs: "Documentation",
       saveError: "Impossible de mettre à jour la génération de métadonnées",
     },
+    voice: {
+      offline: "Connectez-vous à cet hôte pour configurer la voix.",
+      updateHost: "Mettez à jour l'hôte pour configurer la voix.",
+      saveError: "Impossible de mettre à jour les réglages vocaux",
+      provider: "Fournisseur",
+      providers: {
+        local: "Local",
+        openai: "OpenAI",
+      },
+      voice: "Voix",
+      save: "Enregistrer",
+      retry: "Réessayer",
+      cancel: "Annuler",
+      model: "Modèle",
+      language: "Langue",
+      languagePlaceholder: "Détection automatique",
+      setBy: "Défini par {{name}}",
+      unknownProvider: "Mettez à jour l'app pour configurer {{provider}}",
+      sites: {
+        dictationStt: "Transcription",
+        voiceModeStt: "Écoute",
+        voiceModeTts: "Parole",
+      },
+      dictation: {
+        title: "Dictée",
+        enabled: "Dictée",
+        enabledHint: "Parlez dans la zone de message au lieu de taper",
+      },
+      voiceMode: {
+        title: "Mode vocal",
+        info: "Le mode vocal transcrit ce que vous dites et lit à voix haute les réponses de l'agent.",
+        enabled: "Mode vocal",
+        enabledHint: "Parlez à vos agents sans les mains",
+      },
+      openai: {
+        apiKey: "Clé d'API",
+        apiKeyHint: "Enregistrée sur l'hôte, jamais réaffichée.",
+        keyPlaceholder: "sk-...",
+        savedKeyPlaceholder: "Enregistrée",
+        missingKey: "Clé d'API manquante",
+        baseUrl: "URL de base",
+        baseUrlHint: "Pour les serveurs compatibles OpenAI. Laissez vide pour utiliser OpenAI.",
+      },
+      models: {
+        loading: "Chargement des modèles...",
+        loadError: "Impossible de charger les modèles locaux",
+        none: "Aucun modèle disponible",
+        downloaded: "Téléchargé",
+        inUse: "Utilisé",
+        recommended: "Recommandé",
+        download: "Télécharger",
+        downloadAction: "Télécharger {{label}}",
+        downloading: "Téléchargement...",
+        downloadingPercent: "Téléchargement {{percent}} %",
+        extracting: "Extraction...",
+        delete: "Supprimer",
+        deleteAction: "Supprimer {{label}}",
+        deleteTitle: "Supprimer {{label}} ?",
+        deleteMessage: "Cela libère {{size}}. Vous pourrez le retélécharger plus tard.",
+        languages: "Langues de {{label}}",
+        moreLanguages: "{{languages}} et {{count}} autres",
+      },
+    },
     general: {
       title: "Général",
       sending: "Envoi",
+      setup: {
+        label: "Configuration initiale",
+        description:
+          "Reprendre l'apparence, les fournisseurs, les projets et l'appairage du téléphone",
+        action: "Afficher la configuration",
+      },
       browserData: {
         title: "Données du navigateur",
         siteData: "Cookies et données des sites",
@@ -2465,10 +2719,25 @@ export const fr: TranslationResources = {
           queue:
             "Quand l’agent est en cours d’exécution, Entrée met en file d’attente. Cmd/Ctrl+Entrée envoie.",
         },
+        commandEnterDescriptions: {
+          interrupt:
+            "Lorsque l'agent est en cours d'exécution, {{modifier}}+Entrée interrompt. Entrée insère une nouvelle ligne.",
+          steer:
+            "Lorsque l'agent est en cours d'exécution, {{modifier}}+Entrée oriente le tour actif. Entrée insère une nouvelle ligne.",
+          queue:
+            "Lorsque l'agent est en cours d'exécution, {{modifier}}+Entrée met en file d'attente. Entrée insère une nouvelle ligne.",
+        },
         options: {
           interrupt: "Interrompre",
           steer: "Réorienter",
           queue: "File d’attente",
+        },
+      },
+      sendShortcut: {
+        label: "Raccourci d’envoi",
+        options: {
+          enter: "Enter",
+          "mod-enter": "{{modifier}}+Enter",
         },
       },
       serviceUrls: {
@@ -2487,13 +2756,16 @@ export const fr: TranslationResources = {
         label: "Toujours afficher le raisonnement",
         description: "Afficher par défaut le raisonnement de l’agent entièrement déplié",
       },
-      toolCallDetail: {
-        label: "Affichage des appels d’outils",
-        description: "Comment les appels d’outils apparaissent dans la chronologie",
+      chatDisplay: {
+        label: "Affichage du chat",
+        description: "La part du travail de l’agent affichée dans le chat",
         options: {
           "summary-with-latest-call": "Résumé avec le dernier appel",
           overview: "Résumé",
           detailed: "Détails complets",
+          full: "Complet",
+          collapseToolCalls: "Réduire les appels d’outils",
+          collapseTurns: "Réduire les tours",
         },
       },
       language: {
@@ -2594,6 +2866,13 @@ export const fr: TranslationResources = {
         bottomTitle: "Barre du bas",
         bottomDescription:
           "Choisissez les actions du bas et leur ordre. Nouveau, Ajouter un projet et Rechercher restent à gauche ; les hôtes et Importer une session, à droite. Aide et Paramètres sont toujours visibles à des positions fixes.",
+        view: {
+          title: "Vue de la barre latérale",
+          label: "Vue",
+          default: "Vue par défaut",
+          unavailable:
+            "La vue sélectionnée est indisponible ou désactivée. La vue par défaut est affichée.",
+        },
         header: {
           title: "En-tête",
           description:
@@ -2630,11 +2909,11 @@ export const fr: TranslationResources = {
       layout: {
         title: "Mise en page",
         contentWidth: "Largeur du contenu",
-        contentWidthHint:
-          "Largeur maximale de la discussion et des fichiers Markdown sur les grands écrans",
-        contentWidthAccessibility: "Largeur du contenu en pixels",
-        reset: "Réinitialiser",
-        resetAccessibility: "Réinitialiser la largeur du contenu",
+        contentWidthHint: "Largeur du chat, de la zone de saisie et des aperçus Markdown",
+        contentWidthDefault: "Par défaut",
+        contentWidthWide: "Large",
+        contentWidthFull: "Pleine largeur",
+        contentWidthCustom: "Largeur personnalisée · {{width}} px",
       },
       syntax: {
         title: "Syntaxe",
@@ -2705,6 +2984,8 @@ export const fr: TranslationResources = {
         toggleFocusMode: "Activer/désactiver le mode focus",
         cycleTheme: "Parcourir les thèmes",
         focusMessageInput: "Aller à la zone de saisie",
+        toggleModelPicker: "Ouvrir ou fermer le sélecteur de modèle",
+        cycleEffort: "Parcourir les niveaux d’effort",
         cycleAgentMode: "Parcourir les modes de l’agent",
         toggleVoiceMode: "Activer/désactiver le mode vocal",
         startStopDictation: "Démarrer/arrêter la dictée",
@@ -2728,11 +3009,7 @@ export const fr: TranslationResources = {
       commandLine: {
         title: "Ligne de commande",
         description: "Pilotez et scriptez vos agents depuis votre terminal",
-      },
-      actions: {
-        install: "Installer",
-        installing: "Installation…",
-        installed: "Installé",
+        accessibilityLabel: "Installer la CLI Clisbot",
       },
     },
     permissions: {
@@ -2814,13 +3091,12 @@ export const fr: TranslationResources = {
         ...en.settings.host.skills,
         sectionTitle: "Skills d’orchestration",
         title: "Skills d’orchestration",
-        description: "Apprenez à vos agents à orchestrer via la CLI",
+        description: "Apprenez à vos agents à utiliser les outils Clisbot",
         updateAvailable: "Mise à jour disponible",
         updateTitle: "Mettre à jour les skills Clisbot ?",
-        updateFallback: "Synchronisez les skills fournis sur cet hôte.",
         uninstallTitle: "Désinstaller les skills Clisbot ?",
         uninstallMessage:
-          "Supprime tous les skills d’orchestration Clisbot de ~/.agents, ~/.claude et ~/.codex sur cet hôte.",
+          "Supprime tous les skills d’orchestration Clisbot de ~/.agents, ~/.claude, ~/.codex et ~/.gemini/config sur cet hôte.",
         choose: "Choisir les skills",
         chooseAll: "Tous les skills",
         chooseAllHint:
@@ -2829,16 +3105,13 @@ export const fr: TranslationResources = {
         chooseEmpty: "Cet hôte ne fournit aucun skill.",
         removeTitle: "Supprimer les skills décochés ?",
         removeMessage:
-          "{{skills}} seront supprimés de ~/.agents, ~/.claude et ~/.codex sur cet hôte. Tout ce que vous avez ajouté dans ces dossiers de skills sera également supprimé.",
+          "{{skills}} seront supprimés de ~/.agents, ~/.claude, ~/.codex et ~/.gemini/config sur cet hôte. Tout ce que vous avez ajouté dans ces dossiers de skills sera également supprimé.",
         saveFailed: "Impossible d’enregistrer votre sélection de skills.",
         statusFailed: "Impossible de vérifier l’état des skills d’orchestration.",
         updateFailed: "Impossible de mettre à jour les skills d’orchestration.",
         uninstallFailed: "Impossible de désinstaller les skills d’orchestration.",
         saveSelectionFailed: "Impossible d’enregistrer la sélection des skills d’orchestration.",
         actions: {
-          install: "Installer",
-          installing: "Installation…",
-          installed: "Installé",
           update: "Mettre à jour",
           working: "En cours…",
           remove: "Supprimer",
@@ -2860,6 +3133,7 @@ export const fr: TranslationResources = {
           title: "Activer les outils Clisbot",
           hint: "Les agents pourront gérer les worktrees, les agents et les planifications",
           accessibilityLabel: "Injecter les outils Clisbot",
+          updateFailed: "Impossible de mettre à jour les outils Clisbot.",
         },
         systemPrompt: {
           title: "Prompt système",
@@ -2875,6 +3149,19 @@ export const fr: TranslationResources = {
       },
       agents: {
         unavailable: "Connectez-vous à cet hôte pour gérer les agents",
+        resumeOnStartup: {
+          title: "Reprendre les agents après un redémarrage",
+          info: "Rouvre les agents qui travaillaient lorsque l’hôte s’est arrêté et envoie le message de reprise. S’applique après un redémarrage normal ou un plantage.",
+          hint: "Continuer automatiquement le travail interrompu.",
+          prompt: "Message de reprise",
+          edit: "Modifier",
+          editAccessibilityLabel: "Modifier le message",
+        },
+        idleRuntimeCleanup: {
+          title: "Libérer les agents inactifs",
+          hint: "Libère de la mémoire après une heure d’inactivité.",
+          info: "Arrête le processus de l’agent tout en conservant sa conversation. Envoyez un message pour la reprendre.\n\nLe travail en cours, les notifications en attente et les vérifications de sécurité du fournisseur empêchent le nettoyage.",
+        },
       },
       workspaces: {
         unavailable: "Connectez-vous à cet hôte pour gérer les espaces de travail",
@@ -2969,6 +3256,10 @@ export const fr: TranslationResources = {
           requestFailedTitle: "Erreur",
           requestFailedMessage:
             "Impossible d’envoyer la demande de redémarrage. Clisbot se reconnecte automatiquement : réessayez quand l’hôte apparaît en ligne.",
+          closeTerminals: "Redémarrer et fermer les terminaux",
+          closeTerminalsHint: "Redémarre et ferme aussi tous les terminaux ouverts sur cet hôte.",
+          closeTerminalsConfirmMessage:
+            "Le daemon va redémarrer et fermer tous ses terminaux, ce qui arrêtera les programmes qui y tournent. L'app se reconnectera automatiquement.",
           dialogFailedMessage:
             "Impossible d’ouvrir la boîte de dialogue de confirmation du redémarrage.",
         },
@@ -3019,6 +3310,23 @@ export const fr: TranslationResources = {
     providers: {
       title: "Fournisseurs",
       addProvider: "Ajouter un fournisseur",
+      list: {
+        add: "Fournisseur",
+        updatingTo: "Mise à jour vers {{version}}…",
+      },
+      detail: {
+        backToProviders: "Retour aux fournisseurs",
+        notOnHost: "Ce fournisseur n'est pas sur cet hôte",
+        enabled: "Activé",
+        unavailableTitle: "{{name}} n'est pas disponible",
+        troubleshooting: "Dépannage",
+        status: "État du fournisseur",
+        checked: "Vérifié {{time}}",
+        diagnosticReport: "Rapport de diagnostic",
+        docs: "Documentation",
+        dangerZone: "Zone de danger",
+        removeHint: "Supprime ce fournisseur de config.json",
+      },
       providerDetails: "Détails du fournisseur {{name}}",
       enableProvider: "Activer {{name}}",
       unavailable: "Connectez-vous à cet hôte pour voir les fournisseurs",
@@ -3061,9 +3369,30 @@ export const fr: TranslationResources = {
         retrying: "Nouvelle tentative…",
         noSearchMatches: "Aucun modèle ne correspond à votre recherche",
         noneDetected: "Aucun modèle détecté",
-        discovered: "Détectés",
+        noCustom: "Aucun modèle personnalisé",
+        title: "Modèles",
         custom: "Modèles personnalisés",
         updated: "Mis à jour {{time}}",
+      },
+      installation: {
+        title: "Installation",
+        version: "Version",
+        installed: "Installé",
+        notInstalled: "Non installé",
+        install: "Installer",
+        checking: "Vérification...",
+        failed: "Impossible de vérifier l'installation",
+        updates: "Mises à jour",
+        upToDate: "À jour",
+        updateAvailable: "Mise à jour disponible",
+        updateInstructions: "Instructions de mise à jour",
+        update: "Mettre à jour",
+        updating: "Mise à jour...",
+        updated: "Mis à jour",
+        updateFailed: "Échec de la mise à jour",
+        outputTruncated: "La sortie précédente a été supprimée.",
+        updatesFailed: "Impossible de vérifier les mises à jour",
+        installInstructions: "Instructions d'installation",
       },
       diagnostic: {
         title: "Diagnostic",

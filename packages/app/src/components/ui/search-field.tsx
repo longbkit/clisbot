@@ -26,6 +26,8 @@ export interface SearchFieldProps {
   /** Falls back to `placeholder`, which already names the field. */
   accessibilityLabel?: string;
   clearAccessibilityLabel: string;
+  /** Fill the container, for a search that heads one list. Defaults to the filter rail's width. */
+  fullWidth?: boolean;
   testID?: string;
   clearTestID?: string;
   /** Focus the field as it mounts: a search a press opens takes the keyboard at once. */
@@ -51,6 +53,7 @@ export function SearchField({
   placeholder,
   accessibilityLabel,
   clearAccessibilityLabel,
+  fullWidth = false,
   testID,
   clearTestID,
   autoFocus,
@@ -72,6 +75,7 @@ export function SearchField({
         size === "xs" && styles.fieldXs,
         size === "sm" && styles.fieldSm,
         size === "md" && styles.fieldMd,
+        fullWidth && styles.fieldFullWidth,
         isFocused && styles.fieldFocused,
       ]}
     >
@@ -129,6 +133,9 @@ const styles = StyleSheet.create((theme) => {
     fieldXs: geometry.fieldControlXs,
     fieldSm: geometry.fieldControlSm,
     fieldMd: geometry.fieldControlMd,
+    fieldFullWidth: {
+      maxWidth: "100%",
+    },
     fieldFocused: {
       borderColor: theme.colors.borderAccent,
     },

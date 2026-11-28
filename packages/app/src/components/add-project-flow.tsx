@@ -8,6 +8,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/contexts/toast-api-context";
 import { canManageHostProjects, PROJECT_ACCESS_DENIED } from "@/add-project-flow/permissions";
+import { useOverlayRegistration, type KeyboardInputEvent } from "@/keyboard";
+import { useAddHost } from "@/hosts/add-host";
+import { Modal } from "@/components/ui/modal";
 import { usePanelStore } from "@/stores/panel-store";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { router } from "expo-router";
@@ -33,14 +36,7 @@ import {
   type ComponentType,
   type RefObject,
 } from "react";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  type PressableStateCallbackType,
-} from "react-native";
+import { Pressable, ScrollView, Text, View, type PressableStateCallbackType } from "react-native";
 import {
   EditingTextInput as TextInput,
   type EditingTextInputHandle,
@@ -85,19 +81,15 @@ import {
 } from "@/components/project-picker-options";
 import { Shortcut } from "@/components/ui/shortcut";
 import { useRevealActiveItem } from "@/components/ui/scroll-reveal";
-import { useKeyboardShortcutsAvailable } from "@/keyboard/availability";
+import { useHardwareKeyboardPresent } from "@/keyboard";
 import { getIsElectronRuntime } from "@/constants/layout";
-import { isNative, isWeb } from "@/constants/platform";
+import { isWeb } from "@/constants/platform";
 import { pickDirectory } from "@/desktop/pick-directory";
 import { useFetchQuery } from "@/data/query";
 import { getOpenProjectFailureReason, registerProjectDescriptor } from "@/hooks/open-project";
 import { useIsLocalDaemon, useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
 import { useCloneGithubProject, useOpenProject } from "@/hooks/use-open-project";
-import {
-  OverlayLayerProvider,
-  useGlobalWebOverlayLayer,
-  useWebOverlayRegistration,
-} from "@/lib/overlay-root";
+import { OverlayLayerProvider, useGlobalOverlayLayer } from "@/lib/overlay-root";
 import {
   useHosts,
   useHostRuntimeClient,
@@ -112,7 +104,7 @@ import {
 } from "@/stores/add-project-flow-store";
 import type { Theme } from "@/styles/theme";
 import { shortenPath } from "@/utils/shorten-path";
-import { buildNewWorkspaceRoute, buildSettingsAddHostRoute } from "@/utils/host-routes";
+import { buildNewWorkspaceRoute } from "@/utils/host-routes";
 
 interface AddProjectFlowProps {
   request: AddProjectFlowRequest;
@@ -325,7 +317,7 @@ function FlowRow({
 
 /** One keycap per key, spelled out: `↑` `↓` Navigate, `Enter` Open, `⌘ Enter` Add. */
 function FlowHint({ keys, action }: { keys: string[][]; action: string }) {
-  const shortcutsAvailable = useKeyboardShortcutsAvailable();
+  const shortcutsAvailable = useHardwareKeyboardPresent();
   if (!shortcutsAvailable) return null;
 
   return (
@@ -389,6 +381,7 @@ function setPageStatus(
 // The product flow is intentionally one cohesive page-stack state machine.
 // eslint-disable-next-line complexity
 export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
+  const addHost = useAddHost();
   const hosts = useHosts();
   const hostIds = useMemo(() => hosts.map((host) => host.serverId), [hosts]);
   const connectionStatuses = useHostRuntimeConnectionStatuses(hostIds);
@@ -557,13 +550,10 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
       setBrowsing(false);
       return;
     }
-    setState((current) => {
-      const previous = backAddProjectPage(current);
-      if (previous) return previous;
-      onClose();
-      return current;
-    });
-  }, [browsing, onClose]);
+    const previous = backAddProjectPage(state);
+    if (previous) setState(previous);
+    else onClose();
+  }, [browsing, onClose, state]);
 
   const openNewWorkspaceForProject = useCallback(
     (serverId: string, project: WorkspaceProjectDescriptorPayload) => {
@@ -717,9 +707,9 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
           icon: Plus,
           testID: "add-project-flow-add-host",
           select: () => {
+            // The native project Modal must release its window before the root sheet opens.
             onClose();
-            usePanelStore.getState().showMobileAgent();
-            router.push(buildSettingsAddHostRoute(Date.now()));
+            addHost();
           },
         });
       }
@@ -821,6 +811,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
     directoryPaths,
     githubQuery.data,
     host,
+    addHost,
     onClose,
     openAddedProject,
     openFolderInBrowser,
@@ -929,12 +920,12 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
     [activeIndex, addSearchedPath, browsing, handleBack, page.kind, rows, submitActive],
   );
 
-  const modalLayer = useGlobalWebOverlayLayer("modal", isWeb);
-  const handleWebOverlayKeyDown = useCallback(
-    (event: KeyboardEvent) => {
+  const modalLayer = useGlobalOverlayLayer("modal", true);
+  const handleOverlayKeyDown = useCallback(
+    (event: KeyboardInputEvent) => {
       const handled =
         browsing && event.key !== "Escape"
-          ? (browserKeyHandlerRef.current?.(event) ?? false)
+          ? (browserKeyHandlerRef.current?.(event as unknown as KeyboardEvent) ?? false)
           : handleKey(event.key, event.metaKey || event.ctrlKey);
       if (!handled) return false;
       event.preventDefault();
@@ -942,20 +933,15 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
     },
     [browsing, handleKey],
   );
-  const setWebOverlayScope = useWebOverlayRegistration({
-    active: isWeb,
+  const setOverlayScope = useOverlayRegistration({
+    // Clisbot: the folder browser also takes Backspace (up a level) while it is open.
+    keys: browsing
+      ? ["Escape", "Enter", "ArrowUp", "ArrowDown", "Backspace"]
+      : ["Escape", "Enter", "ArrowUp", "ArrowDown"],
+    active: true,
     layer: modalLayer,
-    onKeyDown: handleWebOverlayKeyDown,
+    onKeyDown: handleOverlayKeyDown,
   });
-
-  const handleNativeKeyPress = useCallback(
-    ({ nativeEvent: { key } }: { nativeEvent: { key: string } }) => {
-      if (key === "ArrowDown" || key === "ArrowUp" || key === "Escape") {
-        handleKey(key);
-      }
-    },
-    [handleKey],
-  );
 
   const handleInputChange = useCallback((value: string) => {
     setState((current) =>
@@ -1008,7 +994,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
       <View style={styles.overlay} testID="add-project-flow">
         <Pressable style={styles.backdrop} onPress={onClose} testID="add-project-flow-backdrop" />
         <View
-          ref={setWebOverlayScope}
+          ref={setOverlayScope}
           style={styles.panel}
           testID={`add-project-flow-page-${page.kind}`}
           accessibilityLabel={`Add project: ${page.kind}`}
@@ -1029,7 +1015,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
                 </View>
                 {searchesDirectories && host?.canBrowseDirectories ? (
                   <Button
-                    size="xs"
+                    size="sm"
                     variant="outline"
                     leftIcon={FolderOpen}
                     onPress={openBrowser}
@@ -1050,30 +1036,12 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
                   <ThemedX size={18} uniProps={foregroundMutedColorMapping} />
                 </HeaderToggleButton>
               </View>
-              {page.kind === "method" && isNative ? (
-                // Native hardware-keyboard events need a focused responder even without a visible field.
-                <TextInput
-                  ref={inputRef}
-                  onKeyPress={handleNativeKeyPress}
-                  onSubmitEditing={submitActive}
-                  showSoftInputOnFocus={false}
-                  caretHidden
-                  contextMenuHidden
-                  accessible={false}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no-hide-descendants"
-                  pointerEvents="none"
-                  style={styles.keyboardCapture}
-                  testID="add-project-flow-keyboard-capture"
-                />
-              ) : null}
               {page.kind !== "method" ? (
                 <View style={styles.inputRow}>
                   <ThemedTextInput
                     ref={inputRef}
                     initialValue={pageInput(page)}
                     onChangeText={handleInputChange}
-                    onKeyPress={isWeb ? undefined : handleNativeKeyPress}
                     onSubmitEditing={isWeb ? undefined : submitActive}
                     placeholder={pagePlaceholder(page)}
                     style={styles.input}
@@ -1193,9 +1161,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
     </Modal>
   );
 
-  return accessDenied
-    ? null
-    : createElement(OverlayLayerProvider, { layer: isWeb ? modalLayer : 0 }, modal);
+  return accessDenied ? null : createElement(OverlayLayerProvider, { layer: modalLayer }, modal);
 }
 
 const styles = StyleSheet.create((theme) => ({
@@ -1272,12 +1238,6 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[1],
     outlineStyle: "none",
   } as object,
-  keyboardCapture: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    opacity: 0,
-  },
   results: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
   resultsContent: { paddingVertical: theme.spacing[2] },
   row: {

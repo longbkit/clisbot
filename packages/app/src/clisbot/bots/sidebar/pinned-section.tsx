@@ -5,7 +5,7 @@ import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { PinnedRowProvider } from "@/components/ui/pin-mark";
 import { FLAT_ROW_FILL_INSET } from "@/components/sidebar/row-geometry";
 
@@ -50,11 +50,21 @@ export function FusionPinnedSection({
   const router = useRouter();
   // The open pin's route, or null: a push that opens no pin re-renders nothing here.
   const pathname = useRoutePath((path) => (rows.some((row) => row.route === path) ? path : null));
-  const limited = useLimitedSidebarGroup(rows);
+  const [expanded, setExpanded] = useState(false);
+  const toggleExpanded = useCallback(() => setExpanded((current) => !current), []);
+  // The group limits by position only: with no selection, no pin is lifted out of order as the
+  // open workspace, so the group identity fields are never compared.
+  const groupItems = useMemo(
+    () => rows.map((row) => ({ row, serverId: "", workspaceId: "" })),
+    [rows],
+  );
+  const limited = useLimitedSidebarGroup({ items: groupItems, selection: null, expanded });
   // Floated pins are part of one list; they are never folded behind Show more.
-  const visibleItems = float ? rows : limited.visibleItems;
+  const visibleItems = useMemo(
+    () => (float ? rows : limited.visibleItems.map((item) => item.row)),
+    [float, rows, limited.visibleItems],
+  );
   const canToggle = !float && limited.canToggle;
-  const { expanded, toggleExpanded } = limited;
   const [storedCollapsed, toggleCollapsed] = useSectionCollapsed("pinned");
   const collapsed = !float && storedCollapsed;
   const openChat = useCallback(

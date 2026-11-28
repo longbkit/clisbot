@@ -146,7 +146,7 @@ function HostBanners({
           {message}
         </Text>
         {errors.length > 0 ? (
-          <Button variant="ghost" size="xs" onPress={openDetails}>
+          <Button variant="ghost" size="sm" onPress={openDetails}>
             Details
           </Button>
         ) : null}

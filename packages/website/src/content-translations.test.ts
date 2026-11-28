@@ -33,10 +33,14 @@ const DIVERGENT_DOC_FALLBACK_PATHS = [
   "/docs/hub/daemons",
   "/docs/hub/triggers/github",
   "/docs/hub/configuration",
-  "/docs/hub/configuration/hub-yml",
   "/docs/hub/activity",
   "/docs/hub/faq",
   "/docs/hub/security",
+  // v0.17.4: these upstream translations teach getpaseo/hub-only fields (continuation, tools,
+  // schedules, webhooks) or a separate Hub dashboard that the bundled Clisbot Hub does not have.
+  "/docs/hub/triggers",
+  "/docs/hub/configuration/reference",
+  "/docs/hub/self-hosting",
 ] as const;
 
 // Reviewed Clisbot pages already present before the v0.13.0 sync (c2dc4ad9).

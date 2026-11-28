@@ -81,7 +81,7 @@ export function PairedDeviceList({
         {revokeAll.count > 0 ? (
           <Button
             variant="ghost"
-            size="xs"
+            size="sm"
             leftIcon={Trash2}
             disabled={busy}
             onPress={revokeAll.start}
@@ -89,11 +89,11 @@ export function PairedDeviceList({
             {revokeAll.label}
           </Button>
         ) : null}
-        <Button variant="ghost" size="xs" leftIcon={RefreshCw} disabled={busy} onPress={refresh}>
+        <Button variant="ghost" size="sm" leftIcon={RefreshCw} disabled={busy} onPress={refresh}>
           {t("hub.connection.devices.refresh")}
         </Button>
         {onPairDevice ? (
-          <Button variant="ghost" size="xs" leftIcon={QrCode} onPress={onPairDevice}>
+          <Button variant="ghost" size="sm" leftIcon={QrCode} onPress={onPairDevice}>
             {t("hub.connection.devices.pair")}
           </Button>
         ) : null}

@@ -32,12 +32,36 @@ const resolvePackageEntry = (packageName: string) => {
 export default defineConfig({
   plugins: [
     {
-      name: "compile-relative-time",
+      name: "reanimated-web-style-helpers",
+      transform(_source, id) {
+        // Reanimated writes animated styles to the DOM through react-native-web helpers it loads
+        // with `require` inside try/catch. Vite serves ESM, so the require throws, the helpers stay
+        // undefined, and the first animated style update after mount crashes the component.
+        if (
+          !id.split("?")[0].endsWith("/lib/module/ReanimatedModule/js-reanimated/webUtils.web.js")
+        ) {
+          return;
+        }
+        return {
+          code: [
+            'export { default as createReactDOMStyle } from "react-native-web/dist/exports/StyleSheet/compiler/createReactDOMStyle";',
+            'export { createTransformValue, createTextShadowValue } from "react-native-web/dist/exports/StyleSheet/preprocess";',
+          ].join("\n"),
+          map: null,
+        };
+      },
+    },
+    {
+      name: "compile-react-components",
       enforce: "pre",
       transform(source, id) {
         // These labels must react to time and language in the compiled app too: the compiler
         // memoizes a value derived in render, so a clock read the deps don't show goes stale.
-        if (!isCompiledRelativeTimeModule(id)) return;
+        // Also exercise overlay lifetime and timeline row revisions in the same form as Expo.
+        const overlayLayer = id.endsWith("/src/lib/overlay-root.ts");
+        const streamRow = id.endsWith("/src/agent-stream/stream-row.tsx");
+        if (!isCompiledRelativeTimeModule(id) && !overlayLayer && !streamRow) return;
+        if (id.includes(".test.")) return;
         const result = transformSync(source, {
           filename: id,
           babelrc: false,
@@ -87,6 +111,7 @@ export default defineConfig({
           environment: "node",
           include: [
             "src/**/*.{test,spec}.{ts,tsx}",
+            "modules/**/*.{test,spec}.{ts,tsx}",
             "native-release-version.test.ts",
             "app.config.test.ts",
             "vitest-environment.test.ts",
@@ -123,6 +148,13 @@ export default defineConfig({
                 "@react-native-masked-view/masked-view/js/MaskedView.web.js",
               ),
             },
+            // The app renders LegendList on native only, from the patched native build. Browser
+            // tests render that build too, instead of the package's separate web build. Unit tests
+            // load it outside Vite, where its react-native import would miss the web alias.
+            {
+              find: /^@legendapp\/list\/react-native$/,
+              replacement: path.resolve(rootNodeModules, "@legendapp/list/react-native.mjs"),
+            },
           ],
         },
         test: {
@@ -131,7 +163,10 @@ export default defineConfig({
           include: ["src/**/*.browser.{test,spec}.{ts,tsx}"],
           browser: {
             enabled: true,
-            provider: playwright(),
+            provider: playwright({
+              // Exercise real WebGL glyph rendering on GPU-less CI runners.
+              launchOptions: { args: ["--enable-unsafe-swiftshader"] },
+            }),
             headless: true,
             connectTimeout: 180_000,
             instances: [{ browser: "chromium" }],
@@ -196,14 +231,21 @@ export default defineConfig({
       "expo-router/react-navigation",
       "@testing-library/react",
       "@tanstack/react-query",
+      "@tanstack/react-virtual",
+      "@legendapp/list/react-native",
       "react-i18next",
       "i18next",
       "@marijn/find-cluster-break",
       "tiny-invariant",
+      "react/jsx-dev-runtime",
       "react-native-gesture-handler > hoist-non-react-statics",
       "react-native-gesture-handler > invariant",
+      // Loaded by the reanimated-web-style-helpers plugin, which the dependency scan does not see.
+      "react-native-web/dist/exports/StyleSheet/compiler/createReactDOMStyle",
+      "react-native-web/dist/exports/StyleSheet/preprocess",
     ],
     exclude: [
+      "react-native-enriched-markdown",
       "react-native-reanimated",
       "react-native-gesture-handler",
       "react-native-keyboard-controller",
@@ -294,10 +336,18 @@ export default defineConfig({
         find: /^react-native\/Libraries\/Renderer\/shims\/ReactNative$/,
         replacement: path.resolve(__dirname, "test-stubs/rn-renderer-shims-react-native.ts"),
       },
+      // The CJS entry requires the real react-native, whose Flow sources do not parse.
+      {
+        find: /^@floating-ui\/react-native$/,
+        replacement: path.resolve(
+          rootNodeModules,
+          "@floating-ui/react-native/dist/floating-ui.react-native.esm.js",
+        ),
+      },
       // Point at the shim (which re-exports the ESM web build plus inert
       // native-module seams) so Vite can transform its imports and apply the
       // react alias below (the CJS build uses require('react') which bypasses
-      // Vite alias resolution).
+      // Vite alias resolution). The stub re-exports it and adds what web lacks.
       {
         find: "react-native",
         replacement: path.resolve(__dirname, "test-stubs/react-native-web-plus.ts"),

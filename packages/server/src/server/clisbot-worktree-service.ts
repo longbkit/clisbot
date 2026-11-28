@@ -1,3 +1,6 @@
+import type { JsonValue } from "@clisbot/protocol/agent-types";
+import type { PluginLifecycle } from "./plugins/lifecycle/index.js";
+import type { PluginWorktreeManagerRuntime } from "./plugins/runtime.js";
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -33,6 +36,7 @@ export interface CreateClisbotWorktreeInput extends CreateWorktreeCoreInput {
   workspaceId?: string;
   projectId?: string;
   title?: string;
+  metadata?: Record<string, JsonValue>;
   background?: boolean;
   callerWorkspaceId?: string;
 }
@@ -59,6 +63,11 @@ export interface AttemptFirstAgentBranchAutoNameResult {
 }
 
 export interface CreateClisbotWorktreeDeps extends CreateWorktreeCoreDeps {
+  lifecycle?: Pick<PluginLifecycle, "wait" | "before">;
+  worktreeManagers?: Pick<
+    PluginWorktreeManagerRuntime,
+    "hasWorktreeManager" | "createWorktree" | "removeWorktree"
+  >;
   workspaceGitService: WorkspaceGitService;
   workspaceProvisioning: Pick<WorkspaceProvisioningService, "createWorkspaceForWorktree">;
 }
@@ -77,7 +86,16 @@ async function createClisbotWorktreeWithPriority(
   const workspaceCwdPlan = await planWorkspaceCwdForWorktree(input.cwd, deps.workspaceGitService);
   const createdWorktree = await createWorktreeCore(input, deps);
   try {
-    if (!input.branchName?.trim()) maybeMarkFirstAgentBranchAutoNameEligible({ createdWorktree });
+    if (createdWorktree.created) {
+      await deps.lifecycle?.wait("worktree.create.after", {
+        worktree: {
+          path: createdWorktree.worktree.worktreePath,
+          branch: createdWorktree.worktree.branchName,
+          sourceCheckout: workspaceCwdPlan.sourceCheckout,
+        },
+      });
+    }
+    await maybeMarkFirstAgentBranchAutoNameEligible({ createdWorktree, input });
     const workspaceCwd = mapWorkspaceRelativeCwdToWorktree({
       relativeWorkspaceCwd: workspaceCwdPlan.relativeWorkspaceCwd,
       targetWorktreePath: createdWorktree.worktree.worktreePath,
@@ -101,21 +119,13 @@ async function createClisbotWorktreeWithPriority(
       worktreeRoot: createdWorktree.worktree.worktreePath,
       branch: createdWorktree.worktree.branchName || null,
       baseBranch: createdWorktree.worktree.comparisonBaseRef,
+      worktreeManagerPluginId: createdWorktree.worktree.worktreeManagerPluginId ?? null,
       title: input.title?.trim() || resolveFirstAgentPromptTitle(input.firstAgentContext),
+      metadata: input.metadata,
       expectsInitialAgent: Boolean(input.firstAgentContext),
       background: input.background,
       callerWorkspaceId: input.callerWorkspaceId,
-      ...(createdWorktree.intent.kind === "checkout-change-request" &&
-      createdWorktree.intent.headRepository
-        ? {
-            untrustedSource: {
-              kind: "change_request" as const,
-              forge: createdWorktree.intent.forge,
-              number: createdWorktree.intent.changeRequestNumber,
-              headRepository: createdWorktree.intent.headRepository,
-            },
-          }
-        : {}),
+      untrustedSource: createdWorktree.untrustedSource,
     });
 
     deps.github.invalidate({ cwd: createdWorktree.worktree.worktreePath });
@@ -138,6 +148,10 @@ async function createClisbotWorktreeWithPriority(
         teardownCwds: [],
         clisbotHome: input.clisbotHome,
         worktreesBaseRoot: input.worktreesRoot,
+        worktreeManagers: deps.worktreeManagers,
+        worktreeManagerPluginId: createdWorktree.worktree.worktreeManagerPluginId ?? null,
+        removeReason: "rollback",
+        untrusted: Boolean(createdWorktree.untrustedSource),
       },
       error,
     );
@@ -155,7 +169,7 @@ async function isDirectory(targetPath: string): Promise<boolean> {
 async function planWorkspaceCwdForWorktree(
   inputCwd: string,
   workspaceGitService: Pick<WorkspaceGitService, "getCheckout">,
-): Promise<{ inputCwd: string; relativeWorkspaceCwd: string }> {
+): Promise<{ inputCwd: string; relativeWorkspaceCwd: string; sourceCheckout: string }> {
   const normalizedInputCwd = resolve(inputCwd);
   const sourceCheckout = await workspaceGitService.getCheckout(normalizedInputCwd);
   const sourceWorktreePath = sourceCheckout.worktreeRoot ?? normalizedInputCwd;
@@ -163,7 +177,7 @@ async function planWorkspaceCwdForWorktree(
   if (relativeWorkspaceCwd === null) {
     throw new Error(`Workspace cwd is outside its source worktree: ${normalizedInputCwd}`);
   }
-  return { inputCwd: normalizedInputCwd, relativeWorkspaceCwd };
+  return { inputCwd: normalizedInputCwd, relativeWorkspaceCwd, sourceCheckout: sourceWorktreePath };
 }
 
 export async function attemptFirstAgentBranchAutoName(options: {
@@ -182,9 +196,9 @@ export async function attemptFirstAgentBranchAutoName(options: {
     return { attempted: false, renamed: false, branchName: null };
   }
 
-  let metadata: ReturnType<typeof readClisbotWorktreeMetadata>;
+  let metadata: Awaited<ReturnType<typeof readClisbotWorktreeMetadata>>;
   try {
-    metadata = readClisbotWorktreeMetadata(options.cwd);
+    metadata = await readClisbotWorktreeMetadata(options.cwd);
   } catch {
     return { attempted: false, renamed: false, branchName: null };
   }
@@ -199,11 +213,11 @@ export async function attemptFirstAgentBranchAutoName(options: {
   const getCurrentBranchImpl = options.getCurrentBranch ?? getCurrentBranch;
   const placeholderBranchName = metadata.firstAgentBranchAutoName.placeholderBranchName;
   if ((await getCurrentBranchImpl(options.cwd)) !== placeholderBranchName) {
-    markClisbotWorktreeFirstAgentBranchAutoNameAttempted(options.cwd);
+    await markClisbotWorktreeFirstAgentBranchAutoNameAttempted(options.cwd);
     return { attempted: true, renamed: false, branchName: null };
   }
 
-  markClisbotWorktreeFirstAgentBranchAutoNameAttempted(options.cwd);
+  await markClisbotWorktreeFirstAgentBranchAutoNameAttempted(options.cwd);
 
   const branchName = await options.generateBranchNameFromContext({
     cwd: options.cwd,
@@ -264,15 +278,28 @@ async function findAvailableBranchName(options: {
   return null;
 }
 
-function maybeMarkFirstAgentBranchAutoNameEligible(options: {
+async function maybeMarkFirstAgentBranchAutoNameEligible(options: {
   createdWorktree: Awaited<ReturnType<typeof createWorktreeCore>>;
-}): void {
-  const { createdWorktree } = options;
+  input: Pick<CreateClisbotWorktreeInput, "branchName">;
+}): Promise<void> {
+  const { createdWorktree, input } = options;
   if (!createdWorktree.created || createdWorktree.intent.kind !== "branch-off") {
     return;
   }
+  // A worktree manager plugin owns branch and directory naming, so skip silent renames.
+  if (createdWorktree.worktree.worktreeManagerPluginId) {
+    return;
+  }
+  // A branch the caller named is their choice; only a placeholder slug is replaced.
+  // Clisbot: a blank or whitespace-only branch name (channel commands) counts as unnamed.
+  if (input.branchName?.trim()) {
+    return;
+  }
 
-  writeClisbotWorktreeFirstAgentBranchAutoNameMetadata(createdWorktree.worktree.worktreePath, {
-    placeholderBranchName: createdWorktree.worktree.branchName,
-  });
+  await writeClisbotWorktreeFirstAgentBranchAutoNameMetadata(
+    createdWorktree.worktree.worktreePath,
+    {
+      placeholderBranchName: createdWorktree.worktree.branchName,
+    },
+  );
 }

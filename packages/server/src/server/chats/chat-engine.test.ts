@@ -75,7 +75,7 @@ async function harness(
   const botSessions = new BotSessions({
     agentStorage: {
       get: async (id) => agents.get(id) ?? null,
-      list: async () => [...agents.values()],
+      listAll: async () => [...agents.values()],
     },
     store,
     createAgent: async (input) => {

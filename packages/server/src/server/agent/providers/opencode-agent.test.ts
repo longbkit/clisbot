@@ -780,6 +780,19 @@ describe("OpenCodeAgentClient adapter smoke tests", () => {
     }
   });
 
+  test("keeps turn identities distinct for the same persisted session", async () => {
+    const first = await createParentSession("ses_persisted");
+    const firstTurn = await first.parent.startTurn("first");
+    await first.parent.close();
+    const resumed = await createParentSession("ses_persisted");
+    try {
+      const nextTurn = await resumed.parent.startTurn("second");
+      expect(nextTurn.turnId).not.toBe(firstTurn.turnId);
+    } finally {
+      await resumed.parent.close();
+    }
+  });
+
   test.each([
     { saved: "default", variant: undefined },
     { saved: "high", variant: "high" },
@@ -2479,6 +2492,42 @@ describe("OpenCode adapter startTurn error handling", () => {
     await session.close();
   });
 
+  test("reports a question rejected by a human steer as resolved", async () => {
+    const { parent: session, openCode } = await createParentSession("ses_steer_question");
+    openCode.sessionPromptAsyncEvents = [];
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+    const { turnId } = await session.startTurn("first");
+    openCode.emitEvent({
+      type: "question.asked",
+      properties: {
+        id: "question-steer",
+        sessionID: "ses_steer_question",
+        questions: [{ question: "Which color?", header: "Color", options: [] }],
+      },
+    });
+    await vi.waitFor(() => expect(session.getPendingPermissions()).toHaveLength(1));
+
+    await expect(
+      session.steerActiveTurn?.("never mind", {
+        expectedTurnId: turnId,
+        clearPendingPermissions: true,
+      }),
+    ).resolves.toEqual({ status: "accepted" });
+
+    expect(openCode.calls.questionReject).toContainEqual(
+      expect.objectContaining({ requestID: "question-steer" }),
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "permission_resolved",
+        requestId: "question-steer",
+        resolution: expect.objectContaining({ behavior: "deny" }),
+      }),
+    );
+    await session.close();
+  });
+
   test("keeps multiple native steers correlated in admission order", async () => {
     const { parent: session, openCode } = await createParentSession("ses_native_steer_fifo");
     openCode.sessionPromptAsyncEvents = [];
@@ -4163,6 +4212,9 @@ describe("OpenCode adapter startTurn error handling", () => {
       return { data: true };
     };
 
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+
     try {
       const { turnId: firstTurnId } = await session.startTurn("first");
       const interrupt = session.interrupt();
@@ -5445,7 +5497,7 @@ describe("OpenCode provider subagent contract", () => {
     const parent = await client.createSession({
       provider: "opencode",
       cwd: "/workspace/repo",
-      featureValues: { auto_accept: true },
+      providerOptions: { auto_accept: true },
     });
     parent.subscribe(() => undefined);
 
@@ -7180,4 +7232,22 @@ describe("OpenCode session permission rules", () => {
       rmSync(cwd, { recursive: true, force: true });
     }
   });
+});
+
+test("OpenCode v1 runtime safety retains terminals and busy sessions on its shared server", async () => {
+  const { parent, openCode } = await createParentSession("runtime-safety");
+  try {
+    expect(await parent.canStopRuntime!()).toBe(true);
+    openCode.ptyListResponse = { data: [{ id: "shell", status: "running" }] };
+    expect(await parent.canStopRuntime!()).toBe(false);
+    openCode.ptyListResponse = { data: [] };
+    openCode.sessionStatusResponse = { data: { "other-native-session": { type: "busy" } } };
+    expect(await parent.canStopRuntime!()).toBe(false);
+    openCode.sessionStatusResponse = { data: {} };
+    expect(await parent.canStopRuntime!()).toBe(true);
+    openCode.ptyListResponse = { error: "Inventory unavailable" };
+    await expect(parent.canStopRuntime!()).rejects.toThrow("Unable to inspect OpenCode terminals");
+  } finally {
+    await parent.close();
+  }
 });

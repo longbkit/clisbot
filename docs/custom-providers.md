@@ -65,6 +65,7 @@ per-agent examples and provider-specific keys.
 ## Table of Contents
 
 - [Extending a built-in provider](#extending-a-built-in-provider)
+- [OpenCode with an existing v2 server](#opencode-with-an-existing-v2-server)
 - [Z.AI (Zhipu) coding plan](#zai-zhipu-coding-plan)
 - [Alibaba Cloud (Qwen) coding plan](#alibaba-cloud-qwen-coding-plan)
 - [Codex with a custom OpenAI-compatible endpoint](#codex-with-a-custom-openai-compatible-endpoint)
@@ -104,6 +105,35 @@ Required fields for custom providers:
 - `label` — display name in the UI
 
 See [Codex with a custom OpenAI-compatible endpoint](#codex-with-a-custom-openai-compatible-endpoint) below for the dedicated Codex example.
+
+---
+
+## OpenCode with an existing v2 server
+
+Clisbot first uses an explicitly configured server, then a healthy locally registered OpenCode v2 service, then starts its own helper. It never stops a reused service. To select a server explicitly, set its URL in the provider environment:
+
+```json
+{
+  "agents": {
+    "providers": {
+      "opencode": {
+        "env": {
+          "CLISBOT_OPENCODE_SERVER_URL": "http://127.0.0.1:4096",
+          "CLISBOT_OPENCODE_SERVER_PASSWORD": "<server password>"
+        }
+      }
+    }
+  }
+}
+```
+
+`CLISBOT_OPENCODE_SERVER_URL` must be an absolute `http` or `https` URL. Omit `CLISBOT_OPENCODE_SERVER_PASSWORD` when the server has no authentication; when set, Clisbot authenticates with HTTP Basic auth as `opencode`.
+
+A configured URL takes precedence even when unreachable; Clisbot reports the connection error. The local service registration supplies its own authentication. For a discovered local service, Clisbot installs its bridge package in OpenCode's watched global plugin directory without changing the existing configuration. Refresh reads the existing service's catalogs without starting another server.
+
+An explicitly configured server needs the bridge installed separately. Connect once and start a session: the setup error gives the local package directory. Copy that directory to the server's OpenCode global `plugins` directory, then retry. For a server on another machine, set `CLISBOT_OPENCODE_BRIDGE_PORT` in the Clisbot OpenCode provider environment before starting Clisbot, and set `CLISBOT_OPENCODE_BRIDGE_URL` to the URL the OpenCode server can use to reach that port. For example, an SSH reverse tunnel can expose the Clisbot loopback port on the OpenCode host. The bridge token is exchanged through the OpenCode connection and is not written into the plugin package.
+
+OpenCode's custom MCP registrations are shared by all sessions in a location. Clisbot rejects custom MCP servers and per-agent process environment overrides on a reused server rather than applying them to other sessions or ignoring them. Session identity is applied to each session's shell environment. A Clisbot-owned helper supports custom process and MCP settings; it is selected when there is no explicit URL or healthy registered service.
 
 ---
 
@@ -232,7 +262,7 @@ For pay-as-you-go, use `ANTHROPIC_API_KEY` with a standard Model Studio key (`sk
 
 Codex talks to OpenAI's Responses API by default. Custom providers that extend `"codex"` can point Codex at any OpenAI-compatible endpoint (OpenRouter, LiteLLM, vLLM, llama.cpp server, an internal gateway, etc.) by setting `OPENAI_BASE_URL` and `OPENAI_API_KEY` in the provider `env`.
 
-Clisbot passes those variables through to the Codex app-server process **and** maps them into Codex's thread config under `model_provider` / `model_providers`, because Codex reads provider routing from config rather than from `OPENAI_BASE_URL` alone.
+Clisbot passes those variables through to the Codex app-server process **and** maps them into Codex's thread config under `model_provider` / `model_providers`, because Codex reads provider routing from config rather than from `OPENAI_BASE_URL` alone. The generated Codex provider key is `clisbot:<provider-id>`, so a Clisbot provider such as `ollama` does not override a Codex built-in. Existing custom sessions created with a non-built-in provider key remain available in Import session. Native Codex conversations using a built-in key stay separate from a custom provider of the same name.
 
 ### Setup
 
@@ -260,9 +290,9 @@ Clisbot passes those variables through to the Codex app-server process **and** m
 Under the hood, for each custom Codex provider Clisbot injects this into Codex's config:
 
 ```toml
-model_provider = "my-codex"
+model_provider = "clisbot:my-codex"
 
-[model_providers.my-codex]
+[model_providers."clisbot:my-codex"]
 name = "My Codex"
 base_url = "https://custom-relay.example.com/v1"
 wire_api = "responses"
@@ -484,7 +514,7 @@ The [Agent Client Protocol (ACP)](https://agentclientprotocol.com) is an open st
 
 ACP agents communicate over JSON-RPC 2.0 on stdio. Clisbot spawns the agent process and talks to it through stdin/stdout.
 
-Clisbot also ships an in-app ACP provider catalog for common agents, including CodeWhale, Cursor, DeepAgents, DimCode, Gemini CLI, Hermes, Qwen Code, and Kimi Code. Most catalog entries create the same `extends: "acp"` provider config shown below. Hoplite activates its [bundled provider](plugins.md#built-in-plugins) instead.
+Clisbot also ships an in-app ACP provider catalog for common agents, including CodeWhale, Cursor, DeepAgents, DimCode, Gemini CLI, Hermes, Qwen Code, and Kimi Code. Most catalog entries create the same `extends: "acp"` provider config shown below. Goose, Hermes, and Hoplite activate their [bundled providers](plugins.md#built-in-plugins) instead. An existing `extends: "acp"` entry for goose or Hermes migrates to the bundled provider on load and keeps a custom command. Hermes agents saved with the old adapter resume with their mode translated (`plugins/hermes-provider/server/legacy-modes.ts`).
 
 ### Adding a generic ACP provider
 
@@ -649,32 +679,6 @@ ACP probes use short timeouts and browser-suppression environment variables so a
 
 Ref: [Gemini CLI ACP mode docs](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/acp-mode.md)
 
-### Example: Hermes (Nous Research)
-
-[Hermes](https://github.com/NousResearch/hermes-agent) is an open-source coding agent by Nous Research with persistent memory and multi-provider LLM support. It supports ACP via the `acp` subcommand.
-
-1. Install: `curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash`
-2. Install ACP support: `pip install -e '.[acp]'`
-3. Configure Hermes credentials in `~/.hermes/`
-4. Add to config.json:
-
-```json
-{
-  "agents": {
-    "providers": {
-      "hermes": {
-        "extends": "acp",
-        "label": "Hermes",
-        "description": "Nous Research self-improving AI agent",
-        "command": ["hermes", "acp"]
-      }
-    }
-  }
-}
-```
-
-Ref: [Hermes ACP docs](https://hermes-agent.nousresearch.com/docs/user-guide/features/acp)
-
 ### How ACP providers work in Clisbot
 
 When you launch an agent with an ACP provider:
@@ -799,6 +803,8 @@ The built-in `claude` provider appends concrete model IDs from `~/.claude/settin
 
 This lets users who already configured Claude Code for Bedrock, OpenRouter, ollama, Z.AI, or another Anthropic-compatible gateway select the exact model ID in Clisbot. Explicit model IDs are passed unchanged to Claude Code, even when the same string is a compatibility alias for a built-in model. When `agents.providers.claude.models` is set it **replaces** both the hardcoded first-party Claude list and any settings.json-discovered entries; use `agents.providers.claude.additionalModels` to keep the first-party list and append curated entries on top.
 
+Clisbot's effort selector does not inherit `effortLevel` from Claude's settings.json. Select an effort in Clisbot to choose a specific value.
+
 ### New Claude models without an app update
 
 A catalog refresh also lists any first-party model Claude Code advertises that Clisbot's manifest (`packages/server/src/server/agent/providers/claude/model-manifest.ts`) does not know yet, labeled from its id (`claude-fable-5-2` → "Fable 5.2") with Low/Medium/High/Max reasoning. When Claude Code does not advertise it, add it to `$CLISBOT_HOME/config.json` (`~/.clisbot/config.json` for the desktop app) and refresh the model list:
@@ -903,12 +909,6 @@ A config.json with multiple custom providers:
         "extends": "acp",
         "label": "Google Gemini",
         "command": ["gemini", "--acp"]
-      },
-
-      "hermes": {
-        "extends": "acp",
-        "label": "Hermes",
-        "command": ["hermes", "acp"]
       }
     }
   }

@@ -16,7 +16,7 @@ test("transforms absolute path data including single-axis commands", () => {
   assert.throws(() => transformPath("M1 1l2 2", 1, 0, 0), /Relative path command/);
 });
 
-test("regenerates upstream's brand folder from the Flow kit with no Paseo artwork", () => {
+test("regenerates upstream's brand folder from the Flow kit with no upstream artwork", () => {
   const files = brandAssetFiles();
   const flow = runtimePath();
   for (const [file, text] of files) {
@@ -31,7 +31,7 @@ test("regenerates upstream's brand folder from the Flow kit with no Paseo artwor
     assert.match(svg, /height="144" viewBox="0 0 \d+ 144"/);
     assert.equal([...svg.matchAll(/<path /g)].length, 2, slug);
   }
-  assert.match(files.get("assets/brand/build.mjs"), /scripts\/branding\/apply\.mjs/);
+  assert.match(files.get("assets/brand/build.mjs"), /scripts\/branding\/brand-assets\.mjs/);
   assert.deepEqual(brandAssetFiles(), files);
 });
 

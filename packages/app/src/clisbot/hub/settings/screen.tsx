@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useAddHost } from "@/hosts/add-host";
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
@@ -176,14 +177,13 @@ function HubAccountSettingsEntry({
   invitation: HubInvitation | undefined;
 }) {
   const { t } = useTranslation();
-  const router = useRouter();
   const registry = useHubProfiles();
   const profile = registry.profiles.find((value) => value.hubId === registry.activeId);
   const setupUnavailable = hub.error?.startsWith("Owner setup approval is unavailable") === true;
   const setupBlocked = profile?.setupStatus === "blocked";
   const state = hub.state;
   const [pending, setPending] = useState(false);
-  const scanOwnerSetup = useCallback(() => router.push("/pair-scan"), [router]);
+  const scanOwnerSetup = useAddHost({ method: "scan" });
   const retryAccount = useCallback(() => {
     setPending(true);
     void hub.refresh().finally(() => setPending(false));

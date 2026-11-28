@@ -16,6 +16,7 @@ export interface MentionMember {
 
 export interface MemberMentionOption {
   type: "chat_member";
+  icon: "member";
   id: string;
   label: string;
   description: string;
@@ -42,6 +43,7 @@ export function memberMentionOptions(
       ? [
           {
             type: "chat_member",
+            icon: "member",
             id: `member:${EVERYONE}`,
             label: `@${EVERYONE}`,
             description: i18n.t("bots.chat.mentions.everyone"),
@@ -55,6 +57,7 @@ export function memberMentionOptions(
       .filter((member) => matches(member.slug) || matches(member.displayName))
       .map((member) => ({
         type: "chat_member" as const,
+        icon: "member" as const,
         id: `member:${member.slug}`,
         label: member.displayName,
         description: `@${member.slug}`,

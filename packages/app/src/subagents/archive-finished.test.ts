@@ -438,3 +438,32 @@ describe("createArchiveFinishedSubagents", () => {
     expect(descriptors.get("running")).toBe(running);
   });
 });
+
+it("excludes live background work and rechecks it before each archive", async () => {
+  const first = deferred<void>();
+  const active = { ...clisbot("active"), backgroundWork: { count: 1 } };
+  const current = new Map([
+    ["first", managed("first")],
+    ["later", managed("later")],
+    ["active", managed("active", "idle", { backgroundWork: { count: 1 } })],
+  ]);
+  const calls: string[] = [];
+  const archive = createArchiveFinishedSubagents([clisbot("first"), clisbot("later"), active], {
+    parentAgentId: "parent",
+    getManagedSubagent: ({ agentId }) => current.get(agentId),
+    archiveManagedSubagent: ({ agentId }) => {
+      calls.push(agentId);
+      return first.promise;
+    },
+    dismissProviderSubagents: () => undefined,
+  });
+  expect(archive.getState().eligibleCount).toBe(2);
+  const operation = archive.archiveFinished();
+  current.set("later", managed("later", "idle", { backgroundWork: { count: 1 } }));
+  first.resolve();
+  expect(await operation).toMatchObject({
+    archivedClisbotIds: ["first"],
+    skippedClisbotIds: ["later"],
+  });
+  expect(calls).toEqual(["first"]);
+});

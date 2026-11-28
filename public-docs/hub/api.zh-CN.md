@@ -2,6 +2,7 @@
 title: Hub 公开 API
 description: 使用组织凭据安装触发器、管理旧版配置、发起运行和注册 daemon。
 nav: 公开 API
+translationOwner: clisbot
 ---
 
 # Hub 公开 API {#hub-public-api}
@@ -19,7 +20,7 @@ Hub 公开 API 让自动化可以操作一个组织中的触发器、项目和 d
 
 **Host 接入使用 `clisbot hub connect <origin>`，不需要 CLI 登录。** 只有明确需要 CLI API 管理并了解其权限时，才使用 `clisbot hub login [origin]`。在浏览器中批准后，Clisbot 会在 `CLISBOT_HOME` 下为这个确切的地址保存一个持久、可撤销的组织凭据。未显式指定地址时，CLI 依次使用 `CLISBOT_HUB_URL`、当前保存的登录；都未设置时会停止并要求提供 Hub URL。
 
-用于自动化时，请在 Hub 控制台的 **API keys** 下创建组织 API 密钥。两种凭据都是 bearer token：
+用于自动化时，请在 Hub 控制台的 **Configuration → API keys** 下创建组织 API 密钥。两种凭据都是 bearer token：
 
 ```http
 Authorization: Bearer clisbot_pk_...
@@ -40,9 +41,9 @@ API 密钥的作用域是组织。拥有该密钥的组织决定了它能访问�
 
 API 密钥不授予控制台访问权限。它们不能管理连接、项目或组织成员。
 
-CLI 凭据拥有当前 CLI 操作所需的权限范围，并且可以独立于 daemon 关系单独撤销。`clisbot hub logout` 会删除当前的本地 CLI 凭据；它不会撤销或断开 daemon 身份。
+CLI 凭据拥有上面列出的全部五个权限范围（`projects:read`、`configuration:validate`、`configuration:install`、`runs:dispatch`、`daemons:enroll`），并且不会自动过期。它们可以独立于 daemon 关系单独撤销。`clisbot hub logout` 会删除当前的本地 CLI 凭据；它不会在服务器上撤销该凭据，也不会断开 daemon 身份。请在 Hub → Configuration → API keys 中撤销 CLI 凭据。用于自动化时，建议使用只包含所需权限范围的密钥。
 
-API 失败时使用 RFC 9457 问题详情格式。缺失、无效或已撤销的凭据返回 `401`，类型为 `application/problem+json`：
+API 失败时使用 RFC 9457 问题详情格式（`application/problem+json`），并带有 `X-Request-ID` 响应头。缺失、无效或已撤销的凭据返回 `401` 和 `WWW-Authenticate: Bearer`：
 
 ```json
 {
@@ -59,17 +60,21 @@ API 失败时使用 RFC 9457 问题详情格式。缺失、无效或已撤销的
 
 ## 触发器校验和安装 {#trigger-validation-and-installation}
 
-`clisbot hub deploy --dry-run` 通过 `POST /api/v1/triggers/validate` 校验每个 `.clisbot/triggers/*.yml` 文件。`clisbot hub deploy` 先校验所有文件，再通过 `POST /api/v1/triggers/install` 逐个安装。
+对于旧版 CLI 界面（`CLISBOT_ONBOARDING_ENABLED=0`），`clisbot hub deploy --dry-run` 通过 `POST /api/v1/triggers/validate` 校验每个 `.clisbot/triggers/*.yml` 文件。`clisbot hub deploy` 先校验所有文件，再通过 `POST /api/v1/triggers/install` 逐个安装。
 
-两个端点都接受一份自包含的文档：
+两个端点都接受一份自包含的 Automation 文档：单 `run` 简写，或带有 `environments` 和 `steps` 的 Workflow。
+
+持有 `configuration:validate` 时，`GET /api/v1/triggers` 列出当前生效的定义；`GET /api/v1/configuration-resources` 列出目标和 Connection 资源，`GET /api/v1/setup-resources` 提供过滤条件所需的 Provider 原生标识。
+
+示例请求：
 
 ```json
 {
-  "yaml": "name: manual-task\nenabled: true\non:\n  manual.run: {}\nrun:\n  target: { daemon: my-macbook, cwd: /workspace }\n  agent: { provider: codex, model: gpt-5, mode: full-access }\n  prompt: Complete the task and call hub.finish_execution.\n  max_runtime: 1h\n  idle_timeout: 5m\n"
+  "yaml": "name: manual-task\nenabled: true\non:\n  manual.run: {}\nrun:\n  target: { daemon: my-macbook, cwd: /workspace }\n  agent: { provider: codex, mode: full-access }\n  prompt: Complete the task and call hub.finish_execution.\n  max_runtime: 1h\n  idle_timeout: 5m\n"
 }
 ```
 
-请使用你的组织中可用的 daemon slug 和 Agent 运行时。两个操作都会请指定的 daemon 检查 Agent，因此它必须已连接并持有 `hub.execute`；它无法运行的 Agent 会作为字段问题报告，而不是在第一次运行时失败。见[保存时会对照 daemon 检查 Agent](/docs/hub/triggers#saving-checks-the-agent-against-the-daemon)。校验需要 `configuration:validate`，并返回 `200` 和 `{ "name": "manual-task", "valid": true }`。
+请使用你的组织中可用的 daemon slug 和 Agent 运行时。两个操作都会编译 YAML 并解析组织资源。目标必须以 `hub.execute` 注册；请使用该 Host 提供的 Agent 控制项，并验证一次实际运行。仅保存并不能证明 Provider 可以启动。见[保存时会对照 daemon 检查 Agent](/docs/hub/triggers#saving-checks-the-agent-against-the-daemon)。校验需要 `configuration:validate`，并返回 `200` 和 `{ "name": "manual-task", "valid": true }`。
 
 安装需要 `configuration:install`。它按 YAML 中的 `name` 创建或更新组织的触发器，并返回 `201`：
 
@@ -83,11 +88,11 @@ API 失败时使用 RFC 9457 问题详情格式。缺失、无效或已撤销的
 }
 ```
 
-无效的 YAML 或未知的组织资源会返回 `422` 及字段问题。每次安装都是独立的请求；后面的失败不会撤销前面已成功的安装。见[从 CLI 部署](/docs/hub/configuration#deploy-from-the-cli)。
+无效的 YAML 或未知的组织资源会返回 `422` 及字段问题。每次安装都是独立的请求；后面的失败不会撤销前面已成功的安装。见[仓库文件包](/docs/hub/configuration#repository-bundles)。
 
 ## 项目列表 {#project-list}
 
-`GET /api/v1/projects` 返回 bearer 凭据所属组织中的活动项目。`clisbot hub projects` 以表格形式显示项目。使用 `--json` 时，它返回 `{ "origin": "...", "projects": [...] }`，因此即使结果为空，也会记录解析出的 Hub。
+`GET /api/v1/projects` 返回 bearer 凭据所属组织中的活动项目。`clisbot hub projects`（旧版 CLI 界面）以表格形式显示项目。使用 `--json` 时，它返回 `{ "origin": "...", "projects": [...] }`，因此即使结果为空，也会记录解析出的 Hub。
 
 ```json
 {
@@ -177,7 +182,7 @@ curl --fail-with-body -sS -X POST "$CLISBOT_HUB_URL/api/v1/configurations/instal
   --data @configuration-install.json
 ```
 
-`clisbot hub deploy -p <project>` 会用在本地发现的文件包调用这个旧版端点。在没有参数和环境变量凭据时，该命令使用与地址完全匹配的已保存登录。见[从 CLI 部署](/docs/hub/configuration#deploy-from-the-cli)。
+`clisbot hub deploy -p <project>`（需设置 `CLISBOT_ONBOARDING_ENABLED=0`）会用在本地发现的文件包调用这个旧版端点。在没有参数和环境变量凭据时，该命令使用与地址完全匹配的已保存登录。见[仓库文件包](/docs/hub/configuration#repository-bundles)。
 
 ## 发起手动运行 {#manual-run-dispatch}
 
@@ -233,7 +238,7 @@ curl --fail-with-body -sS -X POST "$CLISBOT_HUB_URL/api/v1/manual-runs" \
   }'
 ```
 
-输入类型、默认值、可选值、被拒绝的输入以及手动调用示例，见 [Hub workflow](/docs/hub/workflows)。
+输入类型、默认值和可选值见[触发器 YAML 参考](/docs/hub/configuration/reference#top-level-fields)。
 
 ## 注册 daemon {#daemon-enrollment}
 
@@ -254,7 +259,7 @@ POST /api/v1/daemons/enrollment-tokens
 
 令牌在 10 分钟后过期，并在 daemon 注册时被消耗。
 
-`clisbot hub connect [origin]` 会使用 `--api-key`、`CLISBOT_HUB_API_KEY` 或匹配的已保存登录执行此请求，然后把这个一次性令牌传给 daemon 的注册操作。daemon 会生成并保存它自己的关系凭据。
+`clisbot hub connect [origin]` 只有在显式提供 `--api-key` 或 `CLISBOT_HUB_API_KEY` 时才使用此端点。默认情况下，它会通过 `/api/v1/cli-authorizations` 发起浏览器批准，并附带 `enrollment` 对象（服务器 ID、公钥、主机名和权限）；轮询和浏览器决定使用 `purpose: "host_enrollment"`。轮询成功时返回 `status: "enrollment_authorized"` 和 `token`，绝不返回 `credential`。该令牌只能使用一次，绑定到已批准的身份和权限，并随 10 分钟的请求一起过期。空的启动请求体保留高级 CLI 登录契约。两种流程在注册时都只把注册令牌传给 daemon。daemon 会生成并保存它自己的关系凭据。
 
 ```bash
 curl --fail-with-body -sS -X POST \

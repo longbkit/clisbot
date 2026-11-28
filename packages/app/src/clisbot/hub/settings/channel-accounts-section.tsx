@@ -249,7 +249,7 @@ function ConnectionsPageActions({
     <View style={styles.headerActions}>
       {/* A Connection Admin cannot connect a bot: they add Routes on their own. */}
       {adminScoped ? null : (
-        <Button size="xs" variant="outline" disabled={pending} onPress={addConnection}>
+        <Button size="sm" variant="outline" disabled={pending} onPress={addConnection}>
           {t("hub.channels.accounts.addConnection")}
         </Button>
       )}

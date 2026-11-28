@@ -169,12 +169,30 @@ by \`scripts/branding/apply.mjs\` during each upstream sync; do not edit them by
 ## Regenerate
 
 \`\`\`sh
-node scripts/branding/apply.mjs --apply
+node assets/brand/build.mjs            # marks and lockups only
+node scripts/branding/apply.mjs --apply  # the whole kit
 \`\`\`
 `;
 
-const BUILD_STUB = `// Clisbot generates assets/brand from the Flow / Ocean 02 kit; see assets/brand/README.md.
-throw new Error("Run node scripts/branding/apply.mjs --apply to regenerate Clisbot brand assets.");
+const BUILD_STUB = `// Regenerates Clisbot's brand marks and lockups from the Flow / Ocean 02 kit.
+//
+//   node assets/brand/build.mjs
+//
+// Upstream's generator drew its own artwork here; Clisbot's canonical generator is
+// scripts/branding/brand-assets.mjs (also run by scripts/branding/apply.mjs). See README.md.
+
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { brandAssetFiles } from "../../scripts/branding/brand-assets.mjs";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+for (const [file, text] of brandAssetFiles()) {
+  if (!file.endsWith(".svg")) continue;
+  const target = path.join(repoRoot, file);
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, text);
+}
 `;
 
 /** Every generated file under assets/brand, keyed by repository path. */

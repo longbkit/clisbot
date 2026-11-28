@@ -24,7 +24,7 @@ export interface ResolvedBotSession {
 }
 
 export interface BotSessionsDependencies {
-  agentStorage: Pick<import("../agent/agent-storage.js").AgentStorage, "get" | "list">;
+  agentStorage: Pick<import("../agent/agent-storage.js").AgentStorage, "get" | "listAll">;
   store: Pick<
     ChatStore,
     "require" | "setParticipantAgent" | "resetParticipantSession" | "forkParticipantSession"
@@ -165,7 +165,7 @@ export class BotSessions {
     botId: string,
     resetAt: string | null,
   ): Promise<StoredAgentRecord | null> {
-    const matches = (await this.deps.agentStorage.list()).filter(
+    const matches = (await this.deps.agentStorage.listAll()).filter(
       (record) =>
         belongsTo(record, chatId, botId) &&
         !record.archivedAt &&
@@ -204,7 +204,10 @@ export class BotSessions {
           title: title ?? chat.title ?? bot.displayName,
           ...(launch.modeId ? { mode: launch.modeId } : {}),
           ...(launch.thinkingOptionId ? { thinking: launch.thinkingOptionId } : {}),
-          ...(launch.featureValues ? { features: launch.featureValues } : {}),
+          // The Bot launch record keeps its `featureValues` field on disk and on the wire; agent
+          // creation calls them provider options. Written as a plain property so a renamed
+          // create field fails typecheck instead of being dropped by a spread.
+          providerOptions: launch.featureValues,
           ...(systemPrompt ? { config: { systemPrompt } } : {}),
           cwd: bot.cwd,
           workspaceId: bot.workspaceId,
@@ -218,7 +221,7 @@ export class BotSessions {
 
   private async moveHeartbeats(chatId: string, botId: string, agentId: string): Promise<void> {
     if (!this.deps.moveHeartbeats) return;
-    const earlier = (await this.deps.agentStorage.list())
+    const earlier = (await this.deps.agentStorage.listAll())
       .filter((record) => record.id !== agentId && belongsTo(record, chatId, botId))
       .map((record) => record.id);
     if (earlier.length > 0) await this.deps.moveHeartbeats(earlier, agentId);

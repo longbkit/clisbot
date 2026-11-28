@@ -77,6 +77,7 @@ export async function discover(
         ...accountIdentity(auth, input),
         harness: harnessLabel(input),
         providerId: input.route.store,
+        provider: input.route.store,
         input,
       });
   }

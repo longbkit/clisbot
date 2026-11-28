@@ -3,11 +3,12 @@ import { Pressable, Text, View, type PressableStateCallbackType } from "react-na
 import type { StyleProp, TextStyle, ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
-  CONTROL_HEIGHTS,
   createControlGeometry,
   segmentedIconSize,
+  TOUCH_TARGET,
   type SegmentedControlSize,
 } from "@/components/ui/control-geometry";
+import { useContainedControlSize } from "@/components/ui/control-size";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Theme } from "@/styles/theme";
 
@@ -19,7 +20,7 @@ export interface SegmentedControlOption<T extends string> {
   icon?: SegmentedControlIconRenderer;
   disabled?: boolean;
   testID?: string;
-  /** Shown on hover (desktop only), for a label too short to say what the segment does. */
+  /** Shown below the segment while the pointer is over it (desktop only). */
   tooltip?: string;
 }
 
@@ -33,8 +34,9 @@ export type SegmentedControlVariant = "plain" | "track";
 
 interface SegmentedControlProps<T extends string> {
   options: SegmentedControlOption<T>[];
-  value: T;
+  value: T | null;
   onValueChange: (value: T) => void;
+  /** `xs` is Clisbot's tight tier; `sm`/`md` follow the shared control sizes. */
   size?: SegmentedControlSize;
   variant?: SegmentedControlVariant;
   hideLabels?: boolean;
@@ -106,7 +108,7 @@ export function SegmentedControl<T extends string>({
   options,
   value,
   onValueChange,
-  size = "md",
+  size: sizeProp,
   variant = "plain",
   hideLabels = false,
   trailing,
@@ -115,6 +117,8 @@ export function SegmentedControl<T extends string>({
   touch = false,
   testID,
 }: SegmentedControlProps<T>) {
+  const containedSize = useContainedControlSize();
+  const size: SegmentedControlSize = sizeProp ?? containedSize ?? "md";
   const containerSizeStyle = {
     xs: styles.containerXs,
     sm: styles.containerSm,
@@ -175,7 +179,7 @@ function SegmentItem<T extends string>({
   hideLabels: boolean;
   size: SegmentedControlSize;
   variant: SegmentedControlVariant;
-  currentValue: T;
+  currentValue: T | null;
   onValueChange: (value: T) => void;
   touch: boolean;
 }) {
@@ -234,8 +238,8 @@ function SegmentItem<T extends string>({
   return (
     <Tooltip delayDuration={300}>
       <TooltipTrigger asChild>{segment}</TooltipTrigger>
-      <TooltipContent side="bottom" align="center">
-        <Text>{option.tooltip}</Text>
+      <TooltipContent side="bottom" offset={8}>
+        <Text style={styles.tooltipText}>{option.tooltip}</Text>
       </TooltipContent>
     </Tooltip>
   );
@@ -280,7 +284,7 @@ const styles = StyleSheet.create((theme) => {
       ...geometry.segmentedSegmentMd,
     },
     segmentTouch: {
-      minHeight: CONTROL_HEIGHTS.field,
+      minHeight: TOUCH_TARGET,
     },
     segmentSelected: {
       backgroundColor: theme.colors.surface3,
@@ -327,6 +331,10 @@ const styles = StyleSheet.create((theme) => {
     },
     labelRaised: {
       fontWeight: theme.fontWeight.medium,
+    },
+    tooltipText: {
+      fontSize: theme.fontSize.base,
+      color: theme.colors.popoverForeground,
     },
   };
 });

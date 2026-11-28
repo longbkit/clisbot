@@ -4,11 +4,20 @@ import {
   dismissKeyboardOnOpen,
   type PhoneSessionMenu,
 } from "@/clisbot/session-menu/workspace-session-menu";
+import type { WorkspaceCompactHeaderActions } from "./adaptive-workspace-chrome";
 import React, { useCallback, useMemo } from "react";
 import { View } from "react-native";
 import { usePathname, useRouter, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Copy, Ellipsis, Globe, Import as ImportIcon, Search, Settings } from "lucide-react-native";
+import {
+  Archive,
+  Copy,
+  Ellipsis,
+  Globe,
+  Import as ImportIcon,
+  Search,
+  Settings,
+} from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { TerminalProfile } from "@clisbot/protocol/messages";
 import {
@@ -29,6 +38,7 @@ import {
 import { TerminalProfileIcon } from "@/components/terminal-profile-icon";
 import { useLaunchableTerminalProfiles } from "@/clisbot/terminal-profiles/use-launchable-terminal-profiles";
 import { getTerminalProfileIcon } from "@clisbot/protocol/terminal-profiles";
+import { useActiveWorkspaceArchive } from "@/hooks/use-active-workspace-archive";
 import {
   buildSettingsHostSectionRoute,
   parseHostWorkspaceRouteFromPathname,
@@ -46,6 +56,7 @@ import { useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 
 const ThemedEllipsis = withUnistyles(Ellipsis);
+const ThemedArchive = withUnistyles(Archive);
 const ThemedCopy = withUnistyles(Copy);
 const ThemedGlobe = withUnistyles(Globe);
 const ThemedImport = withUnistyles(ImportIcon);
@@ -57,6 +68,7 @@ const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMut
 const MENU_NEW_BROWSER_ICON = <ThemedGlobe size={16} uniProps={mutedColorMapping} />;
 const MENU_IMPORT_ICON = <ThemedImport size={16} uniProps={mutedColorMapping} />;
 const MENU_COPY_ICON = <ThemedCopy size={16} uniProps={mutedColorMapping} />;
+const MENU_ARCHIVE_ICON = <ThemedArchive size={16} uniProps={mutedColorMapping} />;
 const MENU_SETTINGS_ICON = <ThemedSettings size={16} uniProps={mutedColorMapping} />;
 const MENU_SEARCH_ICON = <ThemedSearch size={16} uniProps={mutedColorMapping} />;
 function WorkspaceHeaderMenuTriggerIcon() {
@@ -268,16 +280,49 @@ function WorkspaceFileSearchAction({
 }
 
 export interface WorkspaceHeaderMenuMobileProps extends WorkspaceHeaderWorkspaceActions {
+  pane?: WorkspaceCompactHeaderActions["pane"];
+  onExitFocusMode?: () => void;
   normalizedServerId: string;
   normalizedWorkspaceId: string;
   workspaceDirectory?: string | null;
   scripts: UseWorkspaceScriptsMenuPagesInput;
   showCreateBrowserTab: boolean;
   createTerminalDisabled: boolean;
-  onCreateTerminalWithProfile: (profile: TerminalProfile) => void;
-  onCreateBrowser: () => void;
+  onCreateTerminalWithProfile: (profile: TerminalProfile, paneId?: string) => void;
+  onCreateBrowser: (input?: { paneId?: string }) => void;
   /** Clisbot: the title opens this menu, and it ends with the session's tabs. */
   phoneSession?: PhoneSessionMenu;
+}
+
+/** Clisbot: on a phone the session title opens the menu; elsewhere the ⋯ button does. */
+function WorkspaceHeaderMenuMobileTrigger({
+  phoneSession,
+  label,
+  needsAttention,
+}: {
+  phoneSession?: PhoneSessionMenu;
+  label: string;
+  needsAttention: boolean;
+}) {
+  const triggerStyle = useIconButtonChromeStyle({ size: "large" });
+  if (phoneSession) {
+    return <PhoneSessionMenuTrigger menu={phoneSession} label={label} attention={needsAttention} />;
+  }
+  return (
+    <DropdownMenuTrigger
+      testID="workspace-header-menu-trigger"
+      style={triggerStyle}
+      hitSlop={COMPACT_HEADER_BUTTON_HIT_SLOP}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      {needsAttention ? (
+        <WorkspaceHeaderMenuAttentionTriggerIcon />
+      ) : (
+        <WorkspaceHeaderMenuTriggerIcon />
+      )}
+    </DropdownMenuTrigger>
+  );
 }
 
 /**
@@ -298,11 +343,21 @@ export function WorkspaceHeaderMenuMobile({
   onCreateTerminalWithProfile,
   onCreateBrowser,
   phoneSession,
+  pane,
+  onExitFocusMode,
   ...workspaceActions
 }: WorkspaceHeaderMenuMobileProps) {
+  const paneId = pane?.id;
+  const handleCreateBrowser = useCallback(
+    () => onCreateBrowser({ paneId }),
+    [onCreateBrowser, paneId],
+  );
+  const handleCreateTerminalWithProfile = useCallback(
+    (profile: TerminalProfile) => onCreateTerminalWithProfile(profile, paneId),
+    [onCreateTerminalWithProfile, paneId],
+  );
   const { t } = useTranslation();
   const router = useRouter();
-  const triggerStyle = useIconButtonChromeStyle({ size: "large" });
   const terminalAccess = useLaunchableTerminalProfiles(
     normalizedServerId,
     workspaceDirectory ?? null,
@@ -312,6 +367,10 @@ export function WorkspaceHeaderMenuMobile({
   const handleEditProfiles = useCallback(() => {
     router.push(buildSettingsHostSectionRoute(normalizedServerId, "terminals") as Href);
   }, [normalizedServerId, router]);
+  const { canArchive, archive } = useActiveWorkspaceArchive();
+  const handleArchiveWorkspace = useCallback(() => {
+    archive();
+  }, [archive]);
   const scriptsMenu = useWorkspaceScriptsMenuPages(scripts);
   const pluginMenu = usePluginWorkspaceMenu(normalizedServerId, normalizedWorkspaceId);
   const pages = useMemo(
@@ -326,7 +385,7 @@ export function WorkspaceHeaderMenuMobile({
           key={profile.id}
           profile={profile}
           disabled={createTerminalDisabled}
-          onCreateTerminalWithProfile={onCreateTerminalWithProfile}
+          onCreateTerminalWithProfile={handleCreateTerminalWithProfile}
         />
       ))}
       {terminalAccess.canManageProfiles ? (
@@ -369,27 +428,11 @@ export function WorkspaceHeaderMenuMobile({
       compactMode="sheet"
       onOpenChange={phoneSession ? dismissKeyboardOnOpen : undefined}
     >
-      {phoneSession ? (
-        <PhoneSessionMenuTrigger
-          menu={phoneSession}
-          label={triggerLabel}
-          attention={scriptsMenu.needsAttention}
-        />
-      ) : (
-        <DropdownMenuTrigger
-          testID="workspace-header-menu-trigger"
-          style={triggerStyle}
-          hitSlop={COMPACT_HEADER_BUTTON_HIT_SLOP}
-          accessibilityRole="button"
-          accessibilityLabel={triggerLabel}
-        >
-          {scriptsMenu.needsAttention ? (
-            <WorkspaceHeaderMenuAttentionTriggerIcon />
-          ) : (
-            <WorkspaceHeaderMenuTriggerIcon />
-          )}
-        </DropdownMenuTrigger>
-      )}
+      <WorkspaceHeaderMenuMobileTrigger
+        phoneSession={phoneSession}
+        label={triggerLabel}
+        needsAttention={scriptsMenu.needsAttention}
+      />
       <DropdownMenuContent
         align="start"
         width={220}
@@ -397,6 +440,30 @@ export function WorkspaceHeaderMenuMobile({
         pages={menuPages}
         sheetTitle={t("workspace.header.actions.workspaceActions")}
       >
+        {onExitFocusMode ? (
+          <DropdownMenuItem onSelect={onExitFocusMode}>
+            {t("workspace.tabs.actions.exitFocusMode")}
+          </DropdownMenuItem>
+        ) : null}
+        {pane?.splitRight ? (
+          <DropdownMenuItem onSelect={pane.splitRight}>
+            {t("workspace.tabs.actions.splitRight")}
+          </DropdownMenuItem>
+        ) : null}
+        {pane?.splitDown ? (
+          <DropdownMenuItem onSelect={pane.splitDown}>
+            {t("workspace.tabs.actions.splitDown")}
+          </DropdownMenuItem>
+        ) : null}
+        {pane?.toggleMaximized ? (
+          <DropdownMenuItem onSelect={pane.toggleMaximized}>
+            {t(
+              pane.maximized
+                ? "workspace.tabs.actions.restorePane"
+                : "workspace.tabs.actions.maximizePane",
+            )}
+          </DropdownMenuItem>
+        ) : null}
         {scriptsMenu.trigger}
         {pluginMenu.rows}
         {pluginMenu.rows.length > 0 ? <DropdownMenuSeparator /> : null}
@@ -411,7 +478,7 @@ export function WorkspaceHeaderMenuMobile({
           <DropdownMenuItem
             testID="workspace-header-new-browser"
             leading={MENU_NEW_BROWSER_ICON}
-            onSelect={onCreateBrowser}
+            onSelect={handleCreateBrowser}
           >
             {t("workspace.header.actions.newBrowser")}
           </DropdownMenuItem>
@@ -420,6 +487,15 @@ export function WorkspaceHeaderMenuMobile({
           {...workspaceActions}
           workspaceDirectory={workspaceDirectory}
         />
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          testID="workspace-header-archive-workspace"
+          leading={MENU_ARCHIVE_ICON}
+          disabled={!canArchive}
+          onSelect={handleArchiveWorkspace}
+        >
+          {t("sidebar.workspace.actions.archiveWorkspace")}
+        </DropdownMenuItem>
         {phoneSession ? (
           <>
             <DropdownMenuSeparator />

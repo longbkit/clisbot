@@ -2,7 +2,6 @@ import { useCallback } from "react";
 import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { useRouter } from "expo-router";
 import { ChevronDown, Server, X } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
@@ -13,7 +12,7 @@ import { PressHighlight } from "@/components/ui/press-highlight";
 import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import { CONTROL_HEIGHTS } from "@/components/ui/control-geometry";
 import { openHostOverview } from "@/navigation/settings-navigation";
-import { buildSettingsAddHostRoute } from "@/utils/host-routes";
+import { useAddHost } from "@/hosts/add-host";
 import { useHostFilter } from "./host-filter";
 
 /** What the Host filter shows in a label: All Hosts, the one Host, or how many. */
@@ -33,9 +32,8 @@ export function hostFilterLabel(
  */
 export function HostFilterChip() {
   const { t } = useTranslation();
-  const router = useRouter();
   const filter = useHostFilter();
-  const addHost = useCallback(() => router.push(buildSettingsAddHostRoute(Date.now())), [router]);
+  const addHost = useAddHost();
   const label = hostFilterLabel(filter, t);
   const counts = t("navigation.hostFilter.online", { online: filter.online, total: filter.total });
   const renderTrigger = useCallback(

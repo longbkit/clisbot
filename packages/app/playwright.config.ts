@@ -13,9 +13,6 @@ function videoMode(): "on" | "on-first-retry" | "retain-on-failure" {
 }
 
 export default defineConfig({
-  // Workspace packages ship compiled ESM. Loading them through both the fixture's
-  // CommonJS transform and the client's dynamic import corrupts named exports.
-  build: { external: ["**/packages/*/dist/**"] },
   testDir: "./e2e/browser",
   globalSetup: "./e2e/support/global-setup.ts",
   timeout: 60_000,
@@ -26,6 +23,12 @@ export default defineConfig({
   // spec on one worker avoids repeating its file-level setup across daemons.
   fullyParallel: false,
   workers: Number(process.env.E2E_WORKERS ?? (process.env.CI ? "2" : "1")),
+  // Workspace packages are already compiled. Tests import them at run time, so
+  // on a cold cache every worker transpiles the same files and writes them into
+  // Playwright's shared transform cache without locking. A worker that reads an
+  // entry mid-write loads an empty module and fails with "does not provide an
+  // export named".
+  build: { external: ["**/packages/*/dist/**"] },
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
   use: {

@@ -11,6 +11,7 @@ const input = {
   workspaceSelectionStatus: "exists" as const,
   isWorkspaceSelectionLoaded: true,
   hasGivenUpWaitingForHost: false,
+  isWaitingForSetup: false,
 };
 describe("Home startup policy", () => {
   it("cold starts at Home even with a valid remembered workspace", () =>

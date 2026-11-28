@@ -15,6 +15,7 @@ import type { SessionActor } from "@clisbot/protocol/session-authorship";
 import { ensureAgentLoaded } from "../agent/agent-loading.js";
 import type { AgentManager } from "../agent/agent-manager.js";
 import { sendPromptToAgent } from "../agent/agent-prompt.js";
+import type { AgentMessageDelivery } from "../agent/agent-messages/index.js";
 import type { AgentStorage } from "../agent/agent-storage.js";
 import type { AgentTimelineStore } from "../agent/agent-timeline-store-types.js";
 import type { BoundCreateAgentCommand } from "../agent/create-agent/create.js";
@@ -38,6 +39,12 @@ import {
 } from "./transcript-log.js";
 
 export interface ChatServiceOptions {
+  /**
+   * The daemon's agent-message delivery. Direct prompts go through it so messages already queued
+   * for the agent travel with them (upstream v0.17). Read lazily: it exists once the WebSocket
+   * server does.
+   */
+  agentMessages: () => Pick<AgentMessageDelivery, "sendDirect">;
   /** `$CLISBOT_HOME/chats`; created on the first chat, never at start. */
   rootDir: string;
   queueEnabled?: boolean;
@@ -260,6 +267,7 @@ function createEngine(
     sessionForks: createSessionForks({ agentManager, agentStorage, logger }),
     sendPrompt: (params) =>
       sendPromptToAgent({
+        agentMessages: options.agentMessages(),
         agentManager,
         agentStorage,
         agentId: params.agentId,

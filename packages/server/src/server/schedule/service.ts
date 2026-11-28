@@ -34,6 +34,7 @@ import {
   resolveScheduleRunModeId,
   withScheduleMode,
 } from "./schedule-mode.js";
+import { foldFeatureValues } from "../agent/option-controls.js";
 import type {
   CreateScheduleInput,
   ScheduleExecutionResult,
@@ -288,6 +289,7 @@ type ScheduleAgentManager = Pick<
   AgentRunController,
   | "getAgent"
   | "reloadAgentSession"
+  | "reloadStalePluginSession"
   | "tryRunOutOfBand"
   | "hasInFlightRun"
   | "replaceAgentRun"
@@ -296,7 +298,7 @@ type ScheduleAgentManager = Pick<
 > &
   Pick<
     AgentManager,
-    | "createAgent"
+    | "createAgentFromRecord"
     | "getRegisteredProviderIds"
     | "hydrateTimelineFromProvider"
     | "resumeAgentFromPersistence"
@@ -305,6 +307,8 @@ type ScheduleAgentManager = Pick<
     | "waitForAgentClose"
     | "appendTimelineItem"
     | "sessionStorageEnabled"
+    | "setDaemonBackgroundWork"
+    | "removeDaemonBackgroundWork"
   >;
 
 interface ScheduleWorkspaceCreateInput {
@@ -355,12 +359,18 @@ export class ScheduleService {
   ) => Promise<ScheduleExecutionResult>;
   private readonly runningScheduleIds = new Set<string>();
   private chats: ScheduleChats | null = null;
+  private readonly heartbeatStops = new Map<string, () => Promise<void>>();
+  private recovering = false;
   private tickTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(options: ScheduleServiceOptions) {
     this.logger = options.logger.child({ module: "schedule-service" });
-    this.store = new ScheduleStore(join(options.clisbotHome, "schedules"), this.logger);
     this.agentManager = options.agentManager;
+    this.store = new ScheduleStore(
+      join(options.clisbotHome, "schedules"),
+      this.logger,
+      (schedule, change) => this.syncHeartbeat(schedule, change),
+    );
     this.agentStorage = options.agentStorage;
     this.createAgent = options.createAgent;
     this.createDirectoryWorkspace = options.createDirectoryWorkspace;
@@ -378,10 +388,18 @@ export class ScheduleService {
   }
 
   async start(): Promise<void> {
-    await this.recoverInterruptedRuns();
-    await this.sweepOrphanedSchedules();
     if (this.tickTimer) {
       return;
+    }
+    this.recovering = true;
+    try {
+      await this.recoverInterruptedRuns();
+      await this.sweepOrphanedSchedules();
+    } finally {
+      this.recovering = false;
+    }
+    for (const schedule of await this.store.list()) {
+      this.syncHeartbeat(schedule, "write");
     }
     const timer = setInterval(() => {
       void this.tick().catch((error) => {
@@ -638,6 +656,14 @@ export class ScheduleService {
         schedule.status !== "completed",
     );
     for (const match of matches) {
+      // The heartbeat's background work is keyed by agent: drop the old agent's entry and its
+      // stop closure so the store write below re-registers it under the new agent.
+      this.heartbeatStops.delete(match.id);
+      this.agentManager.removeDaemonBackgroundWork({
+        agentId: fromAgentId,
+        namespace: "heartbeat",
+        id: match.id,
+      });
       await this.store.update(match.id, (schedule) =>
         schedule.target.type === "agent" && schedule.target.agentId === fromAgentId
           ? {
@@ -649,6 +675,49 @@ export class ScheduleService {
       );
     }
     return matches.length;
+  }
+
+  private syncHeartbeat(schedule: StoredSchedule, change: "write" | "delete"): void {
+    if (schedule.target.type !== "agent") {
+      return;
+    }
+    const { agentId } = schedule.target;
+    const { id, name, createdAt } = schedule;
+    if (change === "delete" || schedule.status !== "active") {
+      this.heartbeatStops.delete(id);
+      this.agentManager.removeDaemonBackgroundWork({ agentId, namespace: "heartbeat", id });
+      return;
+    }
+    if (this.recovering) {
+      return;
+    }
+    let stop = this.heartbeatStops.get(id);
+    if (!stop) {
+      const stopHeartbeat = () =>
+        this.store.delete(id, (current) => {
+          // A queued Stop can reach the store after a pause and resume replaced its row.
+          if (
+            current?.status !== "active" ||
+            current.target.type !== "agent" ||
+            current.target.agentId !== agentId ||
+            this.heartbeatStops.get(id) !== stopHeartbeat
+          ) {
+            throw new ScheduleStateConflictError("Background work is no longer available to stop");
+          }
+        });
+      this.heartbeatStops.set(id, stopHeartbeat);
+      stop = stopHeartbeat;
+    }
+    this.agentManager.setDaemonBackgroundWork({
+      agentId,
+      namespace: "heartbeat",
+      id,
+      kind: "heartbeat",
+      countsAsRunning: false,
+      description: name,
+      startedAt: createdAt,
+      stop,
+    });
   }
 
   async completeForAgent(agentId: string): Promise<number> {
@@ -743,7 +812,7 @@ export class ScheduleService {
   }
 
   private async completeScheduleIfDue(scheduleId: string, now: Date): Promise<void> {
-    const updated = await this.store.update(scheduleId, (schedule) => {
+    await this.store.update(scheduleId, (schedule) => {
       if (
         schedule.status !== "active" ||
         !schedule.nextRunAt ||
@@ -753,7 +822,6 @@ export class ScheduleService {
       }
       return completeSchedule(schedule, now);
     });
-    requireSchedule(updated, scheduleId);
   }
 
   private async recoverInterruptedRuns(): Promise<void> {
@@ -800,10 +868,14 @@ export class ScheduleService {
           error: "Daemon restarted before the scheduled run completed",
         };
         updated = { ...updated, runs };
-        if (shouldCompleteSchedule(updated, now)) {
-          updated = completeSchedule(updated, now);
-        }
         dirty = true;
+      }
+
+      if (
+        (updated.status === "active" || runningIndex !== -1) &&
+        shouldCompleteSchedule(updated, now)
+      ) {
+        return completeSchedule(updated, now);
       }
 
       if (
@@ -932,7 +1004,7 @@ export class ScheduleService {
     now: Date,
   ): Promise<{ schedule: StoredSchedule; runId: string } | null> {
     let claimed: { schedule: StoredSchedule; runId: string } | null = null;
-    const updatedSchedule = await this.store.update(scheduleId, (schedule) => {
+    await this.store.update(scheduleId, (schedule) => {
       if (
         schedule.status !== "active" ||
         !schedule.nextRunAt ||
@@ -975,7 +1047,6 @@ export class ScheduleService {
       claimed = { schedule: updated, runId };
       return updated;
     });
-    requireSchedule(updatedSchedule, scheduleId);
     return claimed;
   }
 
@@ -1001,7 +1072,8 @@ export class ScheduleService {
     targetGone: boolean;
     manual: boolean;
   }): Promise<void> {
-    const updatedSchedule = await this.store.update(params.scheduleId, (schedule) => {
+    // A Stop can delete the schedule while its already launched turn is still running.
+    await this.store.update(params.scheduleId, (schedule) => {
       const now = this.now();
       const completedRuns = schedule.runs.map((run) =>
         run.id === params.runId
@@ -1054,7 +1126,6 @@ export class ScheduleService {
 
       return updated;
     });
-    requireSchedule(updatedSchedule, params.scheduleId);
   }
 
   private async recordRunWorkspace(params: {
@@ -1182,7 +1253,6 @@ export class ScheduleService {
           },
           mode: runConfig.modeId,
           thinking: config.thinkingOptionId,
-          features: config.featureValues,
           promptFailure: "return-error",
           notifyOnFinish: false,
         }),
@@ -1342,8 +1412,8 @@ function buildScheduleAgentConfig(
     model: config.model,
     thinkingOptionId: config.thinkingOptionId,
     title: config.title,
-    providerOptions: config.providerOptions,
-    featureValues: config.featureValues,
+    // COMPAT(featureValues): added in v0.15.0, remove after 2027-05-01.
+    providerOptions: foldFeatureValues(config).providerOptions,
     systemPrompt: config.systemPrompt,
     mcpServers: config.mcpServers as AgentSessionConfig["mcpServers"],
   };

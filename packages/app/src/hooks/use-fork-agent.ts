@@ -33,7 +33,7 @@ export type ForkAgentSource = Pick<
   | "model"
   | "thinkingOptionId"
   | "runtimeInfo"
-  | "features"
+  | "options"
   | "projectPlacement"
 >;
 
@@ -104,16 +104,11 @@ function buildForkDraftSetup(
       modeId: launch.modeId,
       model: launch.model,
       thinkingOptionId: null,
-      featureValues: {},
+      providerOptions: {},
     };
   }
   if (!agent.provider) {
     return undefined;
-  }
-
-  const featureValues: Record<string, unknown> = {};
-  for (const feature of agent.features ?? []) {
-    featureValues[feature.id] = feature.value;
   }
 
   return {
@@ -122,7 +117,7 @@ function buildForkDraftSetup(
     modeId: agent.currentModeId ?? agent.runtimeInfo?.modeId ?? null,
     model: agent.model ?? agent.runtimeInfo?.model ?? null,
     thinkingOptionId: agent.thinkingOptionId ?? agent.runtimeInfo?.thinkingOptionId ?? null,
-    featureValues,
+    providerOptions: { ...agent.options },
   };
 }
 

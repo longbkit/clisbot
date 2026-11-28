@@ -443,7 +443,7 @@ function IdentityUnlinkButton({
     void unlink(identityId);
   }, [identityId, unlink]);
   return (
-    <Button size="xs" variant="ghost" disabled={pending} onPress={handlePress}>
+    <Button size="sm" variant="ghost" disabled={pending} onPress={handlePress}>
       {t("hub.channels.selfLink.unlink")}
     </Button>
   );

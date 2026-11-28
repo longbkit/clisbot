@@ -1,5 +1,6 @@
 // Walk the main web screens of a daemon serving the bundled web UI and save one
-// screenshot per screen, for the upstream-sync UI check. Fails on any page error.
+// screenshot per screen, for the upstream-sync UI check. Each screen waits for its own content;
+// a page error, a missing marker, a blank capture or a failed action exits non-zero.
 //
 // Usage (from the repo root, after `npm run build:daemon-web-ui` and starting a
 // daemon with CLISBOT_WEB_UI_ENABLED=true):
@@ -41,52 +42,101 @@ async function openPage({ width = 1440, height = 900, colorScheme = "light", wel
   return page;
 }
 
-async function visit(page, path, name, prepare) {
+/**
+ * One screen: open `path`, wait for `ready` (text that only this screen shows), run `prepare`,
+ * wait for `shows` (what the step should leave on screen), then screenshot. A step passes only
+ * when that content is visible and the capture is not blank; a missing marker, a blank page or
+ * a failed action fails the step and the tour exits non-zero.
+ */
+async function visit(page, path, name, { ready, prepare, shows } = {}) {
   try {
     await page.goto(base + path);
-    await page.waitForTimeout(4500);
+    if (ready) await expectVisible(page, ready);
     if (prepare) await prepare(page);
-    await page.waitForTimeout(1200);
-    await page.screenshot({ path: `${out}/${name}.png` });
-    console.log(`saved ${name}`);
+    if (shows) await expectVisible(page, shows);
+    await page.waitForTimeout(800);
+    const text = (await page.evaluate(() => document.body.innerText)).trim();
+    if (text.length < 40) throw new Error(`page shows almost no text (${text.length} chars)`);
+    const image = await page.screenshot({ path: `${out}/${name}.png` });
+    if (image.length < 15_000) throw new Error(`screenshot looks blank (${image.length} bytes)`);
+    console.log(`saved ${name} (${image.length} bytes)`);
   } catch (error) {
     stepErrors.push(`${name}: ${error.message.split("\n")[0]}`);
   }
 }
 
-const desktop = await openPage({});
-await visit(desktop, "/", "desktop-home");
-await visit(desktop, "/connectors", "connectors");
-await visit(desktop, "/automations", "automations-schedules");
-await visit(desktop, "/settings/general", "settings-general-language");
-await visit(desktop, "/settings/appearance", "settings-appearance");
-await visit(desktop, "/settings/sidebar", "settings-sidebar");
-await visit(desktop, "/", "create-bot", (page) =>
-  page
-    .getByRole("button", { name: /^Create (?:a )?bot$/ })
+/** `marker` is visible text, or a function of the page that resolves once the screen is right. */
+async function expectVisible(page, marker) {
+  if (typeof marker === "function") return marker(page);
+  await page
+    .getByText(marker, { exact: false })
     .first()
-    .click(),
-);
-await visit(desktop, "/", "add-connection", async (page) => {
-  await page.getByTestId("sidebar-hosts-trigger").click();
-  await page.getByTestId("sidebar-host-add").click();
+    .waitFor({ state: "visible", timeout: 30_000 });
+}
+
+const desktop = await openPage({});
+await visit(desktop, "/", "desktop-home", { ready: "Quick start" });
+await visit(desktop, "/connectors", "connectors", { ready: "All apps" });
+await visit(desktop, "/automations", "automations-schedules", { ready: "What is a Hub?" });
+await visit(desktop, "/settings/general", "settings-general-language", { ready: "App language" });
+await visit(desktop, "/settings/appearance", "settings-appearance", { ready: "Interface font" });
+await visit(desktop, "/settings/sidebar", "settings-sidebar", { ready: "Sidebar view" });
+// Bots are created from Chats → New chat → New bot (the Home "Create bot" button is gone).
+await visit(desktop, "/chat", "create-bot", {
+  ready: (page) => page.getByRole("button", { name: "New chat" }).first().waitFor(),
+  prepare: async (page) => {
+    await page.getByRole("button", { name: "New chat" }).first().click();
+    await page.getByRole("menuitem", { name: "New bot" }).click();
+  },
+  shows: "AI configuration",
 });
-await visit(desktop, "/settings/general", "home-vietnamese", async (page) => {
-  await page.getByText("Tiếng Việt", { exact: true }).first().click();
-  await page.goto(base + "/");
-  await page.waitForTimeout(4000);
+await visit(desktop, "/", "add-connection", {
+  ready: "Quick start",
+  prepare: async (page) => {
+    await page.getByTestId("sidebar-hosts-trigger").click();
+    await page.getByTestId("sidebar-host-add").click();
+  },
+  shows: (page) => page.getByRole("dialog").first().waitFor({ state: "visible" }),
 });
-await visit(desktop, "/settings/general", "language-reset", (page) =>
-  page.getByText("English", { exact: true }).first().click(),
-);
-await visit(await openPage({ welcome: true }), "/welcome", "welcome");
+await visit(desktop, "/settings/general", "home-vietnamese", {
+  ready: "App language",
+  prepare: async (page) => {
+    await page.getByText("Tiếng Việt", { exact: true }).first().click();
+    await page.goto(base + "/");
+  },
+  // Home in Vietnamese: no English "Quick start", and Vietnamese text on screen.
+  shows: (page) =>
+    page.waitForFunction(
+      () =>
+        !document.body.innerText.includes("Quick start") &&
+        /[ăâđêôơư]/iu.test(document.body.innerText),
+      undefined,
+      { timeout: 30_000 },
+    ),
+});
+await visit(desktop, "/settings/general", "language-reset", {
+  prepare: (page) => page.getByText("English", { exact: true }).first().click(),
+  shows: "App language",
+});
+const welcomeShown = (page) =>
+  page.waitForFunction(
+    () => location.pathname.startsWith("/welcome") && document.body.innerText.trim().length > 40,
+    undefined,
+    { timeout: 30_000 },
+  );
+await visit(await openPage({ welcome: true }), "/welcome", "welcome", { ready: welcomeShown });
 await visit(
   await openPage({ width: 390, height: 844, welcome: true }),
   "/welcome",
   "welcome-mobile",
+  {
+    ready: welcomeShown,
+  },
 );
-await visit(await openPage({ width: 390, height: 844 }), "/", "mobile-home");
-await visit(await openPage({ colorScheme: "dark" }), "/", "desktop-dark");
+await visit(await openPage({ width: 390, height: 844 }), "/", "mobile-home", {
+  ready: "Quick start",
+});
+await visit(await openPage({ colorScheme: "dark" }), "/", "desktop-dark", { ready: "Quick start" });
 
 await browser.close();
 console.log(`page errors: ${pageErrors.length}, steps that failed: ${stepErrors.length}`);

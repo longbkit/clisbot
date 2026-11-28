@@ -79,7 +79,7 @@ function ComposioLink({ id, url }: { id: ComposioLinkId; url: string }) {
     privacy: t("connectors.screen.composio.privacy"),
   };
   return (
-    <Button size="xs" variant="ghost" leftIcon={ExternalLink} onPress={open}>
+    <Button size="sm" variant="ghost" leftIcon={ExternalLink} onPress={open}>
       {labels[id]}
     </Button>
   );

@@ -8,12 +8,13 @@ import type {
 } from "../agent-timeline-store-types.js";
 import type { AgentTimelineItem, ToolCallDetail } from "../agent-sdk-types.js";
 import {
-  selectProjectedTimelinePage,
   projectTimelineRows,
   type ProjectedTimelinePageSelection,
   type TimelineProjectionEntry,
   type TimelineSeqRange,
 } from "../timeline-projection.js";
+import { continuesTimelineTurn, isTimelineTurnTrigger } from "@clisbot/protocol/timeline-turn";
+import { selectProjectedTimelinePage } from "./timeline-page.js";
 import { selectSourceRanges } from "./source-range-selection.js";
 import { ToolRowProjection, projectionRowBytes } from "./tool-row-projection.js";
 import { SESSION_STORAGE_LIMITS } from "./paged-journal.js";
@@ -518,6 +519,7 @@ export class ProjectedTimeline {
     cursorSeq: number | undefined,
     limit: number,
     budget: ProjectionBudget,
+    wholeTurns = false,
   ): Promise<PageRows> {
     if (state.maxSeq === 0) return { rows: [] };
     if (limit >= MAX_WINDOW_ROWS) return { rows: await this.readRows(state, budget) };
@@ -543,7 +545,11 @@ export class ProjectedTimeline {
       const covers =
         rows.length === 0 || (rows[0]!.seq <= state.minSeq && rows.at(-1)!.seq >= state.maxSeq);
       // One spare entry at each edge proves the returned page is not the truncated one.
-      if (covers || projectTimelineRows({ rows, mode: "projected" }).length > limit + 1)
+      if (
+        covers ||
+        (projectTimelineRows({ rows, mode: "projected" }).length > limit + 1 &&
+          !this.turnMayStartBeforeWindow(rows, state, direction, cursorSeq, limit, wholeTurns))
+      )
         return { rows };
     }
     budget.release();
@@ -574,6 +580,67 @@ export class ProjectedTimeline {
       direction,
     );
     return { rows: fallback.rows.filter((row) => withinRange(row.seq, range)), fallback: range };
+  }
+
+  /**
+   * A whole-turn page widened all the way to the window's first row cannot tell whether its turn
+   * began earlier, so the window must grow until the page starts inside it (or at minSeq).
+   */
+  private turnMayStartBeforeWindow(
+    rows: readonly AgentTimelineRow[],
+    state: SessionEventState,
+    direction: "tail" | "before" | "after",
+    cursorSeq: number | undefined,
+    limit: number,
+    wholeTurns: boolean,
+  ): boolean {
+    if (!wholeTurns || direction === "after" || rows.length === 0) return false;
+    if (rows[0]!.seq <= state.minSeq) return false;
+    const page = selectProjectedTimelinePage({
+      rows,
+      bounds: { minSeq: rows[0]!.seq, maxSeq: state.maxSeq },
+      direction,
+      cursorSeq,
+      limit,
+      wholeTurns: true,
+    });
+    return page.startSeq !== null && page.startSeq <= rows[0]!.seq;
+  }
+
+  /**
+   * A whole-turn `before` page also finishes the turn its last entry belongs to. Read forward
+   * from the window's end in bounded steps until the next turn starts, so the page end is proven
+   * rather than assumed to run to maxSeq. Returns the rows read and whether the turn's end was
+   * reached (false when the step limit stopped the read first).
+   */
+  private async turnTailRows(
+    rows: readonly AgentTimelineRow[],
+    state: SessionEventState,
+    budget: ProjectionBudget,
+  ): Promise<{ rows: AgentTimelineRow[]; complete: boolean }> {
+    const tail: AgentTimelineRow[] = [];
+    let previous = rows.at(-1);
+    if (!previous) return { rows: tail, complete: true };
+    let next = previous.seq + 1;
+    for (
+      let span = MERGE_STEP_ROWS;
+      next <= state.maxSeq;
+      span = Math.min(READ_PAGE_ROWS, span * 2)
+    ) {
+      if (tail.length >= MAX_WINDOW_ROWS) return { rows: tail, complete: false };
+      const end = Math.min(state.maxSeq, next + span - 1);
+      for (const row of await this.readRange(next, end, budget)) {
+        if (!continuesTimelineTurn(previous.turnId, row.turnId, isTimelineTurnTrigger(row.item))) {
+          // The next turn's first row bounds the page; the selector ends just before it.
+          tail.push(row);
+          return { rows: tail, complete: true };
+        }
+        tail.push(row);
+        previous = row;
+      }
+      next = end + 1;
+    }
+    return { rows: tail, complete: true };
   }
 
   /** Select only after every source range traversed by the page is present. Distant
@@ -643,6 +710,53 @@ export class ProjectedTimeline {
     return result;
   }
 
+  /** Selects a page of projected rows, extending a `before` page to whole turns when asked. */
+  private async rowPage(
+    state: SessionEventState,
+    control: ReturnType<typeof projectionControl>,
+    options: AgentTimelineFetchOptions,
+    budget: ProjectionBudget,
+  ): Promise<ProjectedTimelinePageSelection> {
+    const wholeTurns = options.wholeTurns === true && control.selectedDirection !== "after";
+    const read = await this.pageRows(
+      state,
+      control.selectedDirection,
+      options.cursor?.seq,
+      control.limit,
+      budget,
+      wholeTurns,
+    );
+    const { fallback } = read;
+    let rows = read.rows;
+    let maxSeq = state.maxSeq;
+    if (wholeTurns && control.selectedDirection === "before" && !fallback) {
+      const tail = await this.turnTailRows(rows, state, budget);
+      rows = [...rows, ...tail.rows];
+      // An unfinished read proves the page only up to what was read.
+      if (!tail.complete) maxSeq = rows.at(-1)?.seq ?? maxSeq;
+    } else if (wholeTurns && fallback) {
+      // A bounded fallback read nothing past its range; never claim the turn ends later.
+      maxSeq = Math.min(maxSeq, fallback.endSeq);
+    }
+    let page = selectProjectedTimelinePage({
+      rows,
+      ...(state.maxSeq > 0 ? { bounds: { minSeq: state.minSeq, maxSeq } } : {}),
+      direction: control.selectedDirection,
+      cursorSeq: options.cursor?.seq,
+      limit: control.limit,
+      wholeTurns,
+    });
+    if (maxSeq < state.maxSeq) page = { ...page, hasNewer: true };
+    // Rows outside a fallback range were never read, so they still exist beyond the page.
+    if (fallback)
+      page = {
+        ...page,
+        hasOlder: page.hasOlder || fallback.startSeq > state.minSeq,
+        hasNewer: page.hasNewer || fallback.endSeq < state.maxSeq,
+      };
+    return page;
+  }
+
   async fetch(options: AgentTimelineFetchOptions = {}): Promise<ProjectedTimelineFetchResult> {
     const state = await this.source.state();
     const control = projectionControl(state, options);
@@ -658,27 +772,7 @@ export class ProjectedTimeline {
           budget,
         );
       } else {
-        const { rows, fallback } = await this.pageRows(
-          state,
-          control.selectedDirection,
-          options.cursor?.seq,
-          control.limit,
-          budget,
-        );
-        page = selectProjectedTimelinePage({
-          rows,
-          ...(state.maxSeq > 0 ? { bounds: { minSeq: state.minSeq, maxSeq: state.maxSeq } } : {}),
-          direction: control.selectedDirection,
-          cursorSeq: options.cursor?.seq,
-          limit: control.limit,
-        });
-        // Rows outside a fallback range were never read, so they still exist beyond the page.
-        if (fallback)
-          page = {
-            ...page,
-            hasOlder: page.hasOlder || fallback.startSeq > state.minSeq,
-            hasNewer: page.hasNewer || fallback.endSeq < state.maxSeq,
-          };
+        page = await this.rowPage(state, control, options, budget);
       }
       const deferrable = options.allowDeferredPayloads === true;
       return {

@@ -369,7 +369,7 @@ test("replaces upstream sponsorship with placeholders and uses the Clisbot commu
   assert.match(readme, /alternative to Grok Bot, Muse, or Dots/);
   assert.match(readme, /\*\*Freedom to choose:\*\*/);
   assert.match(readme, /40\+ agent options/);
-  assert.match(readme, /39 ACP catalog presets including Grok/);
+  assert.match(readme, /40 ACP catalog presets including Grok/);
   assert.match(readme, /Pi, Antigravity, and Muse Code are built in/);
   assert.match(readme, /Sponsorship options for Clisbot are being set up/);
   assert.match(readme, /## Concept\n/);
@@ -411,7 +411,7 @@ test("keeps the README provider count aligned with the ACP catalog", () => {
     "utf8",
   );
   const ids = [...catalog.matchAll(/^    id: "([^"]+)",/gm)].map((match) => match[1]);
-  assert.equal(ids.length, 39);
+  assert.equal(ids.length, 40);
   const readme = readFileSync(join(dirname(script), "../README.md"), "utf8");
   assert.match(readme, new RegExp(`explore ${ids.length} ACP catalog presets`));
   assert.equal(new Set(ids).size, ids.length);
@@ -585,7 +585,7 @@ test("archives upstream hosted Hub docs in every locale without inventing a Clis
   );
 });
 
-test("archives only the fifteen reviewed divergent Chinese guides and preserves raw upstream bytes", () => {
+test("archives only the reviewed divergent Chinese guides and preserves raw upstream bytes", () => {
   const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-doc-fallbacks-"));
   git(root, "init", "-q");
   const paths = [
@@ -604,12 +604,17 @@ test("archives only the fifteen reviewed divergent Chinese guides and preserves 
     "public-docs/hub/activity.zh-CN.md",
     "public-docs/hub/faq.zh-CN.md",
     "public-docs/hub/security.zh-CN.md",
+    "public-docs/hub/api.zh-CN.md",
+    "public-docs/hub/triggers/index.zh-CN.md",
+    "public-docs/hub/configuration/reference.zh-CN.md",
+    "public-docs/hub/self-hosting/index.zh-CN.md",
   ];
   const raw =
     "---\ntitle: Paseo 原文\n---\n# Paseo\n\nUpstream contract uses https://hub.paseo.sh and port 6767.\n";
   for (const path of paths) put(root, path, raw);
   const untouched = [
-    "public-docs/hub/api.zh-CN.md",
+    "public-docs/hub/github.zh-CN.md",
+    "public-docs/hub/triggers/linear.zh-CN.md",
     "public-docs/hub/new-guide.zh-CN.md",
     "public-docs/hub/quickstart.fr.md",
     "public-docs/hub/quickstart.md",
@@ -627,6 +632,53 @@ test("archives only the fifteen reviewed divergent Chinese guides and preserves 
     assert.ok(archived.includes(`source \`${path}\``));
     // Removing the one provenance line recovers the exact original, not a renamed copy.
     assert.equal(archived.replace(/\n> Archived upstream Chinese documentation[^\n]*\n/, ""), raw);
+  }
+  for (const path of untouched) {
+    assert.match(readFileSync(join(root, path), "utf8"), /Reviewed content/);
+  }
+  // After integration this URL serves Clisbot's own translation alongside the archived original.
+  const localApi = "public-docs/hub/api.zh-CN.md";
+  const reviewed = "---\ntitle: Hub API\ntranslationOwner: clisbot\n---\nReviewed Clisbot API.\n";
+  put(root, localApi, reviewed);
+  git(root, "add", "-A");
+  assert.equal(
+    JSON.parse(execFileSync("node", [...args, "--check"], { encoding: "utf8" })).changedFiles,
+    0,
+  );
+  assert.equal(readFileSync(join(root, localApi), "utf8"), reviewed);
+});
+
+test("archives upstream Hub feature guides the bundled Hub lacks, in every locale", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-unsupported-hub-docs-"));
+  git(root, "init", "-q");
+  const paths = [
+    "public-docs/hub/tools.md",
+    "public-docs/hub/tools.zh-CN.md",
+    "public-docs/hub/triggers/webhooks.md",
+    "public-docs/hub/triggers/webhooks.zh-CN.md",
+    "public-docs/hub/triggers/schedules.md",
+    "public-docs/hub/triggers/schedules.fr.md",
+  ];
+  const raw =
+    "---\ntitle: Paseo Hub feature\n---\n# Paseo\n\nPOST to https://hub.paseo.sh/webhooks/wh_x on port 6767.\n";
+  for (const path of paths) put(root, path, raw);
+  const untouched = [
+    "public-docs/hub/triggers/linear.md",
+    "public-docs/hub/triggers/slack.zh-CN.md",
+    "public-docs/hub/tools-guide.md",
+  ];
+  for (const path of untouched) put(root, path, "---\ntitle: Guide\n---\nReviewed content.\n");
+  git(root, "add", "-A");
+  const args = [script, "--root", root];
+  execFileSync("node", [...args, "--apply"]);
+  for (const path of paths) {
+    assert.throws(() => readFileSync(join(root, path)), { code: "ENOENT" });
+    const target = path.replace("public-docs/", "docs/audits/upstream-public-docs/");
+    const archived = readFileSync(join(root, target), "utf8");
+    assert.match(archived, /does not implement/);
+    assert.match(archived, /Excluded from clisbot\.com\/docs/);
+    assert.ok(archived.includes(`source \`${path}\``));
+    assert.equal(archived.replace(/\n> Archived upstream documentation[^\n]*\n/, ""), raw);
   }
   for (const path of untouched) {
     assert.match(readFileSync(join(root, path), "utf8"), /Reviewed content/);
@@ -704,5 +756,26 @@ test("recognizes the October 13 upstream agentic development introduction", () =
   const result = JSON.parse(
     execFileSync("node", [script, "--root", root, "--check"], { encoding: "utf8" }),
   );
+  assert.equal(result.changedFiles, 0);
+});
+
+test("treats package copies of the root LICENSE as the root license", () => {
+  const root = mkdtempSync(join(tmpdir(), "clisbot-rebrand-license-copies-"));
+  git(root, "init", "-q");
+  const upstream =
+    "Copyright (c) 2025-present Mohamed Boudra\n\n* Third-party components incorporated into Paseo remain licensed.\nApache License, Version 2.0\n";
+  const own = "MIT License\n\nCopyright (c) Software Mansion\nPaseo uses this package.\n";
+  put(root, "LICENSE", upstream);
+  put(root, "packages/server/LICENSE", upstream);
+  put(root, "packages/vendored/LICENSE", own);
+  git(root, "add", "-A");
+  const args = [script, "--root", root];
+  execFileSync("node", [...args, "--apply"]);
+  const license = readFileSync(join(root, "LICENSE"), "utf8");
+  assert.equal(readFileSync(join(root, "packages/server/LICENSE"), "utf8"), license);
+  assert.equal(license.slice(-upstream.length), upstream);
+  // A package's own license is not a copy of the root one; its legal text stays verbatim.
+  assert.equal(readFileSync(join(root, "packages/vendored/LICENSE"), "utf8"), own);
+  const result = JSON.parse(execFileSync("node", [...args, "--check"], { encoding: "utf8" }));
   assert.equal(result.changedFiles, 0);
 });

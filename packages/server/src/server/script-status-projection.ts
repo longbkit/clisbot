@@ -5,7 +5,8 @@ import type {
   WorkspaceScriptPayload,
 } from "@clisbot/protocol/messages";
 import type { ClisbotConfig } from "@clisbot/protocol/clisbot-config-schema";
-import { getScriptConfigs, isServiceScript, readClisbotConfig } from "../utils/worktree.js";
+import { readClisbotConfigOrLastKnown } from "../utils/clisbot-config-file.js";
+import { getScriptConfigs, isServiceScript } from "../utils/worktree.js";
 import { deriveProjectSlug } from "./workspace-git-metadata.js";
 import type { ScriptHealthEntry, ScriptHealthState } from "./script-health-monitor.js";
 import type {
@@ -33,11 +34,11 @@ interface BuildWorkspaceScriptPayloadsOptions {
   resolveHealth?: (hostname: string) => ScriptHealthState | null;
 }
 
-export function readClisbotConfigForProjection(
+export async function readClisbotConfigForProjection(
   workspaceDirectory: string,
   logger: Logger,
-): ClisbotConfig | null {
-  const result = readClisbotConfig(workspaceDirectory);
+): Promise<ClisbotConfig | null> {
+  const result = await readClisbotConfigOrLastKnown(workspaceDirectory);
   if (result.ok) {
     return result.config;
   }
@@ -288,9 +289,9 @@ export function createScriptStatusEmitter({
   serviceProxyPublicBaseUrl?: string | null;
   resolveWorkspaceDirectory: (workspaceId: string) => string | null | Promise<string | null>;
   logger: Logger;
-}): (workspaceId: string, scripts: ScriptHealthEntry[]) => void {
-  return (workspaceId, scripts) => {
-    void (async () => {
+}): (workspaceId: string, scripts: ScriptHealthEntry[]) => Promise<void> {
+  return async (workspaceId, scripts) => {
+    try {
       const workspaceDirectory = await resolveWorkspaceDirectory(workspaceId);
       if (!workspaceDirectory) {
         return;
@@ -304,7 +305,7 @@ export function createScriptStatusEmitter({
       const projected = buildWorkspaceScriptPayloads({
         workspaceId,
         workspaceDirectory,
-        clisbotConfig: readClisbotConfigForProjection(workspaceDirectory, logger),
+        clisbotConfig: await readClisbotConfigForProjection(workspaceDirectory, logger),
         serviceProxy,
         runtimeStore,
         daemonPort: resolvedDaemonPort,
@@ -320,6 +321,8 @@ export function createScriptStatusEmitter({
       for (const session of sessions()) {
         session.emit(message);
       }
-    })();
+    } catch (error) {
+      logger.warn({ err: error, workspaceId }, "Failed to project workspace script status");
+    }
   };
 }

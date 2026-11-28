@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   DaemonClient,
   FetchAgentHistoryEntry,
@@ -21,18 +21,8 @@ vi.mock("@/runtime/host-runtime", () => ({
   }
 ).__DEV__ = false;
 
-type UseAgentHistoryModule = typeof import("./use-agent-history");
-
-let fetchAgentHistoryBatch: UseAgentHistoryModule["fetchAgentHistoryBatch"];
-let fetchAgentHistoryPage: UseAgentHistoryModule["fetchAgentHistoryPage"];
-let collectAgentHistoryHostErrors: UseAgentHistoryModule["collectAgentHistoryHostErrors"];
-
-beforeAll(async () => {
-  const module = await import("./use-agent-history");
-  fetchAgentHistoryBatch = module.fetchAgentHistoryBatch;
-  fetchAgentHistoryPage = module.fetchAgentHistoryPage;
-  collectAgentHistoryHostErrors = module.collectAgentHistoryHostErrors;
-});
+const { fetchAgentHistoryBatch, fetchAgentHistoryPage, collectAgentHistoryHostErrors } =
+  await import("./use-agent-history");
 
 type FetchAgentHistory = DaemonClient["fetchAgentHistory"];
 type FetchAgentHistoryResult = Awaited<ReturnType<FetchAgentHistory>>;

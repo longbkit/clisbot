@@ -82,10 +82,32 @@ export class ComposerEditingSession {
       this.queueAdmission = { editor: this.queueEdit, fingerprint, id: createId() };
     return this.queueAdmission.id;
   }
+  private editor: {
+    getText(): string;
+    replaceText(text: string, selection: ComposerSelection): void;
+    focus(): void;
+  } | null = null;
   private retained: ComposerRetainedEditor | null = null;
   private listeners = new Set<() => void>();
   constructor(private readonly onChange?: () => void) {}
   getFullscreen = () => this.fullscreen;
+  attachEditor(editor: NonNullable<ComposerEditingSession["editor"]>) {
+    this.editor = editor;
+    return () => {
+      if (this.editor === editor) this.editor = null;
+    };
+  }
+  focus() {
+    this.editor?.focus();
+  }
+  insertCommand(command: string) {
+    const editor = this.editor;
+    if (!editor) return;
+    const text = editor.getText();
+    const nextText = `${text}${text && !/\s$/.test(text) ? " " : ""}${command} `;
+    editor.replaceText(nextText, { start: nextText.length, end: nextText.length });
+    editor.focus();
+  }
   /** Called by the unmounting editor; the next mount of this session takes it. */
   retainEditor(retained: ComposerRetainedEditor) {
     this.retained = retained;

@@ -78,6 +78,9 @@ export function workspaceManagementTarget(
     case "workspace.recovery.restore.request":
     case "workspace.title.set.request":
     case "workspace.pin.set.request":
+    // Added by upstream v0.17.4; each names the workspace it changes.
+    case "workspace.metadata.update.request":
+    case "workspace.archive.undo.request":
       return existing({ workspaceId: message.workspaceId });
     case "clisbot_worktree_archive_request":
       return existing({

@@ -124,7 +124,7 @@ export function ProviderHeader(props: ProviderHeaderProps) {
       {error ? (
         <View style={styles.error} testID="composer-picker-provider-refresh-error">
           <Text style={styles.errorText}>{`${t("composer.picker.refreshFailed")}: ${error}`}</Text>
-          <Button size="xs" variant="outline" onPress={onRefresh}>
+          <Button size="sm" variant="outline" onPress={onRefresh}>
             {t("modelSelector.retry")}
           </Button>
         </View>

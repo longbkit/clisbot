@@ -1,7 +1,8 @@
 import type { TFunction } from "i18next";
 import { i18n } from "@/i18n/i18next";
+import { formatTimeOfDay, localCalendarDaysBetween } from "@/utils/time";
 import type { UsageDisplayAs } from "./preferences";
-import type { UsageBalanceUnit } from "./types";
+import type { UsageBalanceUnit, UsageReportEntry } from "./types";
 
 const providerUsageLabels = {
   session: { label: "Session", key: "providerUsage.labels.session" },
@@ -11,6 +12,11 @@ const providerUsageLabels = {
   credits: { label: "Credits", key: "providerUsage.labels.credits" },
   monthly_credits: { label: "Monthly credits", key: "providerUsage.labels.monthlyCredits" },
 } as const;
+
+/** The source, with the account when the report names one: "Claude (work)". */
+export function formatUsageAccountName(entry: UsageReportEntry): string {
+  return entry.account.label ? `${entry.sourceLabel} (${entry.account.label})` : entry.sourceLabel;
+}
 
 export function formatProviderUsageLabel(id: string, label: string, t: TFunction = i18n.t): string {
   const reviewPrefix = "Code review · ";
@@ -50,7 +56,17 @@ export function formatDisplayPct(
     : t("providerUsage.values.remaining", { amount: percentage });
 }
 
-type RelativeDuration = { unit: "now" } | { unit: "minutes" | "hours" | "days"; count: number };
+type DurationUnit = "minutes" | "hours" | "days";
+interface DurationPart {
+  unit: DurationUnit;
+  count: number;
+}
+/** Two units, floored, so a countdown keeps moving: "2d 23h", "4h 59m", "37m". */
+type RelativeDuration = { kind: "now" } | { kind: "remaining"; parts: DurationPart[] };
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
 
 function formatCount(value: number): string {
   return new Intl.NumberFormat(i18n.resolvedLanguage).format(value);
@@ -59,35 +75,35 @@ function formatCount(value: number): string {
 function relativeDuration(iso: string, now: number): RelativeDuration | null {
   const diffMs = new Date(iso).getTime() - now;
   if (!Number.isFinite(diffMs)) return null;
-  if (diffMs <= 0) return { unit: "now" };
-  const diffMinutes = Math.floor(diffMs / 60_000);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays > 0) return { unit: "days", count: diffDays };
-  if (diffHours > 0) return { unit: "hours", count: diffHours };
-  return { unit: "minutes", count: diffMinutes };
+  if (diffMs <= 0) return { kind: "now" };
+  const days = Math.floor(diffMs / DAY_MS);
+  const hours = Math.floor((diffMs % DAY_MS) / HOUR_MS);
+  const minutes = Math.floor((diffMs % HOUR_MS) / MINUTE_MS);
+  if (days === 1 && hours === 0) return remaining({ unit: "hours", count: 24 });
+  if (days > 0) return remaining({ unit: "days", count: days }, { unit: "hours", count: hours });
+  if (hours > 0)
+    return remaining({ unit: "hours", count: hours }, { unit: "minutes", count: minutes });
+  return remaining({ unit: "minutes", count: minutes });
 }
 
-function formatRelativeDuration(duration: RelativeDuration, t: TFunction): string | null {
-  switch (duration.unit) {
-    case "now":
-      return null;
-    case "days":
-      return t("providerUsage.duration.days", {
-        count: duration.count,
-        value: formatCount(duration.count),
-      });
-    case "hours":
-      return t("providerUsage.duration.hours", {
-        count: duration.count,
-        value: formatCount(duration.count),
-      });
-    case "minutes":
-      return t("providerUsage.duration.minutes", {
-        count: duration.count,
-        value: formatCount(duration.count),
-      });
-  }
+/** The major unit, plus the minor one unless it is zero. */
+function remaining(major: DurationPart, minor?: DurationPart): RelativeDuration {
+  return { kind: "remaining", parts: minor && minor.count > 0 ? [major, minor] : [major] };
+}
+
+function formatDurationPart(part: DurationPart, t: TFunction): string {
+  return t(`providerUsage.duration.${part.unit}`, {
+    count: part.count,
+    value: formatCount(part.count),
+  });
+}
+
+function formatRelativeDuration(
+  duration: Extract<RelativeDuration, { kind: "remaining" }>,
+  t: TFunction,
+): string {
+  const [first, second] = duration.parts.map((part) => formatDurationPart(part, t));
+  return second ? t("providerUsage.duration.pair", { first, second }) : first;
 }
 
 /** The time until a reset in its largest unit only ("2h", "3d", "30m"), or null once due. */
@@ -98,7 +114,9 @@ export function formatResetDuration(
 ): string | null {
   if (!iso) return null;
   const rel = relativeDuration(iso, now);
-  return rel ? formatRelativeDuration(rel, t) : null;
+  if (!rel || rel.kind === "now") return null;
+  // The countdown keeps two units; this label keeps only the largest.
+  return formatDurationPart(rel.parts[0], t);
 }
 
 export function formatResetLabel(
@@ -110,10 +128,35 @@ export function formatResetLabel(
   if (!iso) return null;
   const rel = relativeDuration(iso, now);
   if (!rel) return null;
-  if (rel.unit === "now" && retained) return t("providerUsage.timing.resetTimePassed");
-  if (rel.unit === "now") return t("providerUsage.timing.resettingNow");
-  const duration = formatRelativeDuration(rel, t);
-  return duration ? t("providerUsage.timing.resetsIn", { duration }) : null;
+  if (rel.kind === "now" && retained) return t("providerUsage.timing.resetTimePassed");
+  if (rel.kind === "now") return t("providerUsage.timing.resettingNow");
+  return t("providerUsage.timing.resetsIn", { duration: formatRelativeDuration(rel, t) });
+}
+
+/**
+ * A clock time today, a weekday for the next six calendar days, and a weekday plus date after that.
+ * Names follow the app language. The clock uses the device's 12/24h preference.
+ * Nothing for a time that has passed, where the countdown already says so.
+ */
+export function formatResetTime(
+  iso: string | null | undefined,
+  now = Date.now(),
+  t: TFunction = i18n.t,
+): string | null {
+  if (!iso) return null;
+  const at = new Date(iso);
+  const diffMs = at.getTime() - now;
+  if (!Number.isFinite(diffMs) || diffMs <= 0) return null;
+  const time = formatTimeOfDay(at);
+  const locale = i18n.resolvedLanguage;
+  const dayDiff = localCalendarDaysBetween(new Date(now), at);
+  if (dayDiff === 0) return time;
+  if (dayDiff <= 6) {
+    const weekday = at.toLocaleDateString(locale, { weekday: "short" });
+    return t("providerUsage.timing.resetsAtWeekday", { weekday, time });
+  }
+  const date = at.toLocaleDateString(locale, { weekday: "short", month: "short", day: "numeric" });
+  return t("providerUsage.timing.resetsAtDate", { date, time });
 }
 
 export function formatRunsOutLabel(
@@ -121,12 +164,8 @@ export function formatRunsOutLabel(
   now = Date.now(),
   t: TFunction = i18n.t,
 ): string | null {
-  if (!iso) return null;
-  const rel = relativeDuration(iso, now);
-  if (!rel) return null;
-  if (rel.unit === "now") return t("providerUsage.timing.runsOutNow");
-  const duration = formatRelativeDuration(rel, t);
-  return duration ? t("providerUsage.timing.runsOutIn", { duration }) : null;
+  const time = formatResetTime(iso, now, t);
+  return time ? t("providerUsage.timing.runsOutAt", { time }) : null;
 }
 
 export function formatAgo(

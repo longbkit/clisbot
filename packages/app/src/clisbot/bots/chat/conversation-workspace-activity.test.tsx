@@ -2,7 +2,12 @@
 import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({ focused: true }));
+const state = vi.hoisted(() => ({ focused: true, registered: false }));
+vi.mock("@/panels/register-panels", () => ({
+  ensurePanelsRegistered: () => {
+    state.registered = true;
+  },
+}));
 vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => state.focused }));
 vi.mock("react-native", () => ({
   View: "div",
@@ -29,7 +34,13 @@ vi.mock("./conversation-header", () => ({
 }));
 vi.mock("./conversation-surfaces", async () => {
   const { useRetainedPanelActive } = await import("@/components/retained-panel");
-  const Surface = () => <div data-testid="surface" data-active={useRetainedPanelActive()} />;
+  const Surface = () => (
+    <div
+      data-testid="surface"
+      data-active={useRetainedPanelActive()}
+      data-registered={String(state.registered)}
+    />
+  );
   return { MobileConversationSurface: Surface, DesktopConversationSurface: Surface };
 });
 import { ConversationWorkspace } from "./conversation-workspace";
@@ -54,4 +65,22 @@ it("deactivates the whole retained conversation on route blur without unmounting
   view.rerender(React.cloneElement(content));
   expect(screen.getByTestId("surface")).toBe(surface);
   expect(surface.getAttribute("data-active")).toBe("false");
+});
+
+it("registers the workspace panels before its tab rows and panel hosts render", () => {
+  state.focused = true;
+  state.registered = false;
+  render(
+    <ConversationWorkspace
+      serverId="host"
+      chatId="chat"
+      accessScope="owner"
+      title="Chat"
+      bots={[]}
+      group={false}
+    >
+      Messages
+    </ConversationWorkspace>,
+  );
+  expect(screen.getByTestId("surface").getAttribute("data-registered")).toBe("true");
 });

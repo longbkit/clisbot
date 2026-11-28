@@ -18,14 +18,17 @@ const adapters = vi.hoisted(() => ({
 vi.mock("@/clisbot/hub/host-inventory", () => ({ useHostInventory: () => adapters }));
 vi.mock("@/hooks/use-is-local-daemon", () => ({ useLocalDaemonServerId: () => null }));
 vi.mock("expo-router", () => ({ router: { push: adapters.push } }));
+// Upstream v0.17 opens Add Host through the add-host flow instead of router.push.
+vi.mock("@/hosts/add-host", () => ({ useAddHost: () => adapters.push }));
 vi.mock("@/components/hosts/host-picker", () => ({ HostStatusDotSlot: () => null }));
 vi.mock("@/components/ui/text-input", () => ({
   EditingTextInput: () => <input aria-label="Search hosts" />,
 }));
-vi.mock("@/lib/overlay-root", () => ({
+vi.mock("@/lib/overlay-root", async (importOriginal) => ({
+  // Upstream v0.17 tooltips read OVERLAY_Z, and the chooser registers one global overlay layer.
+  ...(await importOriginal<typeof import("@/lib/overlay-root")>()),
   OverlayLayerProvider: ({ children }: { children: React.ReactNode }) => children,
-  useGlobalWebOverlayLayer: () => 1,
-  useWebOverlayRegistration: () => undefined,
+  useGlobalOverlayLayer: () => 1,
 }));
 
 function host(serverId: string, label: string): HostProfile {

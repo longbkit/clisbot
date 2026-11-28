@@ -15,6 +15,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import type { Logger } from "pino";
+import type { JsonValue } from "@clisbot/protocol/agent-types";
 
 import { writeJsonFileAtomic } from "../atomic-file.js";
 import { writeDurableJson } from "./session-storage/durable-file.js";
@@ -23,18 +24,26 @@ import {
   listSessionRecordPaths,
   moveSessionRecord,
 } from "./session-storage/layout.js";
-import { AgentFeatureSchema, AgentStatusSchema } from "../messages.js";
+import {
+  AgentFeatureSchema,
+  AgentMetricSchema,
+  AgentOptionControlSchema,
+  AgentStatusSchema,
+} from "../messages.js";
 import { toStoredAgentRecord } from "./agent-projections.js";
 import type { ManagedAgent } from "./agent-manager.js";
 import type { AgentColdStorageConfig } from "./agent-cold-storage.js";
 import type { AgentSessionConfig } from "./agent-sdk-types.js";
 import { AgentOwnerSchema, daemonExecutionKey, type DaemonAgentOwner } from "./agent-owner.js";
+import { controlsFromFeatures } from "@clisbot/protocol/option-controls";
+import { foldFeatureValues } from "./option-controls.js";
 
 const SERIALIZABLE_CONFIG_SCHEMA = z
   .object({
     modeId: z.string().nullable().optional(),
     model: z.string().nullable().optional(),
     thinkingOptionId: z.string().nullable().optional(),
+    // COMPAT(featureValues): added in v0.15.0, remove after 2027-05-01. Read-only; folded on parse.
     featureValues: z.record(z.string(), z.unknown()).nullable().optional(),
     providerOptions: z.record(z.string(), z.unknown()).nullable().optional(),
     fullAutoAccept: z.boolean().optional(),
@@ -69,7 +78,7 @@ const PERSISTENCE_HANDLE_SCHEMA = z
   .nullable()
   .optional();
 
-const STORED_AGENT_SCHEMA = z.object({
+const RAW_STORED_AGENT_SCHEMA = z.object({
   ...SessionAuthorshipShape,
   authorshipWatermark: z.string().optional(),
   id: z.string(),
@@ -82,9 +91,12 @@ const STORED_AGENT_SCHEMA = z.object({
   lastUserMessageAt: z.string().nullable().optional(),
   title: z.string().nullable().optional(),
   labels: z.record(z.string(), z.string()).default({}),
+  metadata: z.record(z.string(), z.custom<JsonValue>()).default({}),
   lastStatus: AgentStatusSchema.default("closed"),
+  resumeOnStartup: z.boolean().optional(),
   lastModeId: z.string().nullable().optional(),
   config: SERIALIZABLE_CONFIG_SCHEMA,
+  launchEnv: z.record(z.string(), z.string()).optional(),
   runtimeInfo: z
     .object({
       provider: z.string(),
@@ -95,13 +107,17 @@ const STORED_AGENT_SCHEMA = z.object({
       extra: z.record(z.string(), z.unknown()).optional(),
     })
     .optional(),
+  controls: z.array(AgentOptionControlSchema).optional(),
+  // COMPAT(featureValues): added in v0.15.0, remove after 2027-05-01. Read-only; becomes controls.
   features: z.array(AgentFeatureSchema).optional(),
   persistence: PERSISTENCE_HANDLE_SCHEMA,
+  sessionMetrics: z.array(AgentMetricSchema).optional(),
   lastError: z.string().nullable().optional(),
   requiresAttention: z.boolean().optional(),
   attentionReason: z.enum(["finished", "error", "permission"]).nullable().optional(),
   attentionTimestamp: z.string().nullable().optional(),
   internal: z.boolean().optional(),
+  background: z.boolean().optional(),
   archivedAt: z.string().nullable().optional(),
   owner: AgentOwnerSchema.optional(),
 });
@@ -111,7 +127,6 @@ export type SerializableAgentConfig = Pick<
   | "modeId"
   | "model"
   | "thinkingOptionId"
-  | "featureValues"
   | "providerOptions"
   | "fullAutoAccept"
   | "toolPolicy"
@@ -119,7 +134,26 @@ export type SerializableAgentConfig = Pick<
   | "mcpServers"
 >;
 
-export type StoredAgentRecord = z.infer<typeof STORED_AGENT_SCHEMA>;
+type RawStoredAgentRecord = z.infer<typeof RAW_STORED_AGENT_SCHEMA>;
+type RawStoredAgentConfig = NonNullable<RawStoredAgentRecord["config"]>;
+
+/** Records carry `providerOptions` and `controls` only; legacy fields are folded when read. */
+export type StoredAgentRecord = Omit<RawStoredAgentRecord, "config" | "features"> & {
+  config?: Omit<RawStoredAgentConfig, "featureValues"> | null;
+};
+
+// COMPAT(featureValues): added in v0.15.0, remove after 2027-05-01.
+function foldLegacyRecordFields(record: RawStoredAgentRecord): StoredAgentRecord {
+  const { features, config, controls, ...rest } = record;
+  return {
+    ...rest,
+    ...(config ? { config: foldFeatureValues(config) } : { config }),
+    ...((controls ?? features) ? { controls: controls ?? controlsFromFeatures(features) } : {}),
+  };
+}
+
+const STORED_AGENT_SCHEMA = RAW_STORED_AGENT_SCHEMA.transform(foldLegacyRecordFields);
+
 export function parseStoredAgentRecord(value: unknown): StoredAgentRecord {
   return STORED_AGENT_SCHEMA.parse(value);
 }
@@ -132,9 +166,14 @@ export class AgentStorage {
   private deleting: Set<string> = new Set();
   private daemonAgentIdsByExecution: Map<string, string> = new Map();
   private daemonExecutionKeysByAgentId: Map<string, string> = new Map();
+  private readonly idsByWorkspace = new Map<string, Set<string>>();
+  private readonly workspaceById = new Map<string, string>();
+  private readonly activeIds = new Set<string>();
+  private readonly promptTimeByAgent = new Map<string, string>();
+  private readonly promptTimes = new Map<string, string>();
   private loaded = false;
   private baseDir: string;
-  private loadPromise: Promise<StoredAgentRecord[]> | null = null;
+  private loadPromise: Promise<void> | null = null;
   private logger: Logger;
 
   constructor(
@@ -158,9 +197,117 @@ export class AgentStorage {
     await this.load();
   }
 
-  async list(): Promise<StoredAgentRecord[]> {
+  async listAll(): Promise<StoredAgentRecord[]> {
     await this.load();
     return Array.from(this.cache.values());
+  }
+
+  async listActive(options?: { includeArchived?: boolean }): Promise<StoredAgentRecord[]> {
+    await this.load();
+    return Array.from(
+      options?.includeArchived ? this.cache.keys() : this.activeIds,
+      (id) => this.cache.get(id)!,
+    );
+  }
+
+  async listByWorkspaces(
+    workspaceIds: Iterable<string>,
+    options?: { includeArchived?: boolean },
+  ): Promise<StoredAgentRecord[]> {
+    await this.load();
+    const records: StoredAgentRecord[] = [];
+    for (const workspaceId of new Set(workspaceIds)) {
+      for (const id of this.idsByWorkspace.get(workspaceId) ?? []) {
+        const record = this.cache.get(id)!;
+        if (options?.includeArchived || !record.archivedAt) records.push(record);
+      }
+    }
+    return records;
+  }
+
+  async lastUserMessageAtByWorkspace(
+    workspaceIds?: Iterable<string>,
+    options?: { excludeAgentIds?: Iterable<string> },
+  ): Promise<ReadonlyMap<string, string>> {
+    await this.load();
+    const times = new Map<string, string>();
+    const excluded = new Set(options?.excludeAgentIds);
+    const affected = new Set(Array.from(excluded, (id) => this.workspaceById.get(id)));
+    for (const id of workspaceIds ?? this.promptTimes.keys()) {
+      let at = this.promptTimes.get(id);
+      if (affected.has(id)) {
+        at = undefined;
+        for (const agentId of this.idsByWorkspace.get(id) ?? []) {
+          const record = this.cache.get(agentId)!;
+          if (
+            !excluded.has(agentId) &&
+            !record.internal &&
+            !record.background &&
+            record.lastUserMessageAt &&
+            record.lastUserMessageAt > (at ?? "")
+          ) {
+            at = record.lastUserMessageAt;
+          }
+        }
+      }
+      if (at) times.set(id, at);
+    }
+    return times;
+  }
+
+  private indexWorkspace(record: StoredAgentRecord): void {
+    const previous = this.workspaceById.get(record.id);
+    if (previous) this.idsByWorkspace.get(previous)?.delete(record.id);
+    this.workspaceById.delete(record.id);
+    this.activeIds.delete(record.id);
+    if (!record.archivedAt) this.activeIds.add(record.id);
+    if (record.workspaceId) {
+      const ids = this.idsByWorkspace.get(record.workspaceId) ?? new Set<string>();
+      ids.add(record.id);
+      this.idsByWorkspace.set(record.workspaceId, ids);
+      this.workspaceById.set(record.id, record.workspaceId);
+    }
+    this.indexPromptTime(record, previous);
+  }
+
+  private indexPromptTime(record: StoredAgentRecord, previous: string | undefined): void {
+    const previousTime = this.promptTimeByAgent.get(record.id);
+    const nextTime =
+      !record.internal && !record.background ? (record.lastUserMessageAt ?? undefined) : undefined;
+    if (nextTime) this.promptTimeByAgent.set(record.id, nextTime);
+    else this.promptTimeByAgent.delete(record.id);
+    if (previous === record.workspaceId && previousTime === nextTime) return;
+    if (
+      previous &&
+      previousTime &&
+      this.promptTimes.get(previous) === previousTime &&
+      (previous !== record.workspaceId || !nextTime || nextTime < previousTime)
+    ) {
+      this.refreshPromptTime(previous);
+    }
+    if (
+      record.workspaceId &&
+      nextTime &&
+      nextTime > (this.promptTimes.get(record.workspaceId) ?? "")
+    ) {
+      this.promptTimes.set(record.workspaceId, nextTime);
+    }
+  }
+
+  private refreshPromptTime(workspaceId: string): void {
+    this.promptTimes.delete(workspaceId);
+    let latest = "";
+    for (const id of this.idsByWorkspace.get(workspaceId) ?? []) {
+      const record = this.cache.get(id)!;
+      if (
+        !record.internal &&
+        !record.background &&
+        record.lastUserMessageAt &&
+        record.lastUserMessageAt > latest
+      )
+        latest = record.lastUserMessageAt;
+    }
+    if (latest) this.promptTimes.set(workspaceId, latest);
   }
 
   async get(agentId: string): Promise<StoredAgentRecord | null> {
@@ -182,8 +329,7 @@ export class AgentStorage {
   }
 
   async listByWorkspace(workspaceId: string): Promise<StoredAgentRecord[]> {
-    await this.load();
-    return Array.from(this.cache.values()).filter((record) => record.workspaceId === workspaceId);
+    return this.listByWorkspaces([workspaceId], { includeArchived: true });
   }
 
   async findByDaemonExecution(owner: DaemonAgentOwner): Promise<StoredAgentRecord | null> {
@@ -248,7 +394,15 @@ export class AgentStorage {
 
     if (previousPath && previousPath !== nextPath) {
       try {
-        await fs.unlink(previousPath);
+        // Compare the entries after the atomic replacement. On a case-insensitive
+        // volume both spellings can now address the file we just wrote.
+        const [previous, next] = await Promise.all([
+          fs.lstat(previousPath, { bigint: true }),
+          fs.lstat(nextPath, { bigint: true }),
+        ]);
+        if (previous.dev !== next.dev || previous.ino !== next.ino) {
+          await fs.unlink(previousPath);
+        }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
@@ -301,6 +455,14 @@ export class AgentStorage {
       }),
     );
 
+    const workspaceId = this.workspaceById.get(agentId);
+    this.workspaceById.delete(agentId);
+    this.promptTimeByAgent.delete(agentId);
+    this.activeIds.delete(agentId);
+    if (workspaceId) {
+      this.idsByWorkspace.get(workspaceId)?.delete(agentId);
+      this.refreshPromptTime(workspaceId);
+    }
     this.cache.delete(agentId);
     this.removeOwnerIndex(agentId);
     this.pathById.delete(agentId);
@@ -387,6 +549,10 @@ export class AgentStorage {
         Object.assign(record, copySessionAuthorship(existing), {
           authorshipWatermark: existing.authorshipWatermark,
         });
+      // Background is fixed at creation; a runtime opened without it cannot clear it.
+      if (existing?.background) record.background = true;
+      record.resumeOnStartup =
+        existing?.resumeOnStartup && agent.lifecycle !== "idle" && agent.lifecycle !== "error";
       return record;
     });
   }
@@ -407,9 +573,9 @@ export class AgentStorage {
     await Promise.all(writes);
   }
 
-  private async load(): Promise<StoredAgentRecord[]> {
+  private async load(): Promise<void> {
     if (this.loaded) {
-      return Array.from(this.cache.values());
+      return;
     }
 
     if (!this.loadPromise) {
@@ -419,7 +585,7 @@ export class AgentStorage {
     return this.loadPromise;
   }
 
-  private async doLoad(): Promise<StoredAgentRecord[]> {
+  private async doLoad(): Promise<void> {
     this.cache.clear();
     this.pathById.clear();
     this.pathsById.clear();
@@ -428,9 +594,8 @@ export class AgentStorage {
 
     try {
       await replaySessionDeletionIntents(this.baseDir);
-      const records = await this.scanDisk();
+      await this.scanDisk();
       this.loaded = true;
-      return records;
     } catch (error) {
       this.logger.error({ err: error }, "Failed to load agents");
       this.loadPromise = null;
@@ -570,6 +735,7 @@ export class AgentStorage {
   }
 
   private indexOwner(record: StoredAgentRecord): void {
+    this.indexWorkspace(record);
     this.removeOwnerIndex(record.id);
     if (record.owner?.kind === "daemon") {
       const key = daemonExecutionKey(record.owner);

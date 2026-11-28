@@ -197,7 +197,7 @@ function ChannelRouteRow({
           <View style={styles.routeActions}>
             {warnings.length === 0 ? null : (
               <Button
-                size="xs"
+                size="sm"
                 variant="ghost"
                 onPressIn={keepPressInControl}
                 onPress={toggleWarnings}

@@ -1,10 +1,16 @@
+import { measureMainThreadWork } from "../test-utils/main-thread-work.js";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { loadConfig, resolveBundledWebUiDistDir, resolveConfigFromPersisted } from "./config.js";
+import {
+  loadConfig,
+  resolveBundledWebUiDistDir,
+  resolveConfigFromPersisted,
+  resolveReloadableConfig,
+} from "./config.js";
 import { loadPersistedConfig } from "./persisted-config.js";
 import { createPublishedConnectionOffer } from "./device-access/connection-offer.js";
 
@@ -62,6 +68,43 @@ describe("server config", () => {
     expect(overridden.appBaseUrl).toBe("https://override.example");
     expect(overridden.configReload?.overrideControlledPaths).toContain("app.baseUrl");
   });
+  test("resolves reloadable settings without resolving the startup password", async () => {
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-auth-reload-"));
+    roots.push(clisbotHome);
+    const env = { CLISBOT_PASSWORD: "synthetic-audit-password" };
+    const persisted = loadPersistedConfig(clisbotHome);
+    const startup = resolveConfigFromPersisted(clisbotHome, persisted, { env });
+    const { result: reloaded, blockingMs } = await measureMainThreadWork(
+      "config resolve main-thread work",
+      () =>
+        resolveReloadableConfig(
+          { ...persisted, daemon: { ...persisted.daemon, browserTools: { enabled: true } } },
+          { env },
+        ),
+    );
+    expect(reloaded).not.toHaveProperty("auth");
+    expect(reloaded.browserToolsEnabled).toBe(true);
+    expect(startup.auth?.password).toBeTypeOf("string");
+    expect(blockingMs).toBeLessThan(50);
+  });
+
+  test.each([undefined, false, true])(
+    "restart recovery requires explicit opt-in (%s)",
+    async (enabled) => {
+      const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-recovery-"));
+      roots.push(clisbotHome);
+      await writeFile(
+        path.join(clisbotHome, "config.json"),
+        JSON.stringify({
+          version: 1,
+          agents: { resumeOnStartup: enabled, resumePrompt: "Continue exactly.\n" },
+        }),
+      );
+      const config = loadConfig(clisbotHome, { env: {} });
+      expect(config.resumeOnStartup).toBe(enabled === true);
+      expect(config.resumePrompt).toBe("Continue exactly.\n");
+    },
+  );
 
   test("records when the daemon is managed by Clisbot Desktop", async () => {
     const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-desktop-managed-"));
@@ -80,6 +123,17 @@ describe("server config", () => {
       loadConfig(clisbotHome, { env: { CLISBOT_HUB_PROXY_URL: "http://127.0.0.1:6870" } })
         .hubHttpProxyUrl,
     ).toBe("http://127.0.0.1:6870");
+  });
+
+  test("idle runtime cleanup defaults on and supports a host-wide opt-out", async () => {
+    const clisbotHome = await mkdtemp(path.join(os.tmpdir(), "clisbot-config-idle-cleanup-"));
+    roots.push(clisbotHome);
+    expect(loadConfig(clisbotHome, { env: {} }).idleRuntimeCleanup).toBe(true);
+    await writeFile(
+      path.join(clisbotHome, "config.json"),
+      JSON.stringify({ agents: { idleRuntimeCleanup: false } }),
+    );
+    expect(loadConfig(clisbotHome, { env: {} }).idleRuntimeCleanup).toBe(false);
   });
 
   test("loads the provider catalog refresh timeout", async () => {
@@ -176,9 +230,13 @@ describe("server config", () => {
       name: "OpenAI speech providers",
       providers: { dictation: "openai", voiceStt: "openai", voiceTts: "openai" },
       expected: [
+        "features.dictation.stt.apiKey",
         "features.dictation.stt.confidenceThreshold",
         "features.dictation.stt.model",
+        "features.voiceMode.stt.apiKey",
+        "features.voiceMode.stt.confidenceThreshold",
         "features.voiceMode.stt.model",
+        "features.voiceMode.tts.apiKey",
         "features.voiceMode.tts.model",
         "features.voiceMode.tts.voice",
       ],
@@ -187,8 +245,9 @@ describe("server config", () => {
       name: "mixed local and OpenAI speech providers",
       providers: { dictation: "local", voiceStt: "openai", voiceTts: "local" },
       expected: [
-        "features.dictation.stt.confidenceThreshold",
         "features.dictation.stt.model",
+        "features.voiceMode.stt.apiKey",
+        "features.voiceMode.stt.confidenceThreshold",
         "features.voiceMode.stt.model",
         "features.voiceMode.tts.model",
       ],

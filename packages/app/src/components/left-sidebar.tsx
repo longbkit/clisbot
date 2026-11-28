@@ -13,7 +13,8 @@ import { SidebarViewBar } from "@/clisbot/workspace-sessions/view-bar";
 import { useBotsFeatureHosts } from "@/clisbot/bots/feature";
 import { BotsAndChatsSidebarSections } from "@/clisbot/bots/sidebar/sections";
 import { QuickChatsSection } from "@/clisbot/quick-chats/quick-chats-section";
-import { router } from "expo-router";
+import { SidebarViewSlot } from "@/plugins/sidebar-view";
+import { useAddHost } from "@/hosts/add-host";
 import { GitBranch, X } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
@@ -23,6 +24,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
 import { SidebarActiveFilters } from "@/components/sidebar/display-preferences/active-filters";
 import { SidebarDisplayPreferencesMenu } from "@/components/sidebar/display-preferences/menu";
+import { SidebarToastRegion } from "@/components/sidebar/sidebar-toast-region";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HEADER_INNER_HEIGHT, useIsCompactFormFactor } from "@/constants/layout";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
@@ -39,8 +41,9 @@ import { usePanelStore } from "@/stores/panel-store";
 import { useOwnsWindowChromeCorner, WindowChromeSafeArea } from "@/utils/desktop-window";
 import { useCloseAgentListGesture } from "@/mobile-panels/gestures";
 import { MobilePanelOverlay } from "@/mobile-panels/presentation";
-import { buildSettingsAddHostRoute, buildSettingsRoute } from "@/utils/host-routes";
-import { openHostOverview } from "@/navigation/settings-navigation";
+import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
+import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
+import { openSettingsFromSidebar } from "@/navigation/settings-navigation";
 import { SidebarAgentListSkeleton } from "./sidebar-agent-list-skeleton";
 import { SidebarCalloutSlot } from "./sidebar-callout-slot";
 import { SidebarMetadataNotice } from "./sidebar/empty-states";
@@ -99,19 +102,25 @@ interface MobileSidebarProps extends SidebarSharedProps {
 interface DesktopSidebarProps extends SidebarSharedProps {
   insetsTop: number;
   active: boolean;
+  overlay: boolean;
 }
 
 export const LeftSidebar = memo(function LeftSidebar({
   active,
-  presented,
+  presented = true,
+  desktopOverlay = false,
 }: {
   active: boolean;
-  presented: boolean;
+  /** Phone only: whether the retained panel is on screen (Clisbot). */
+  presented?: boolean;
+  /** Wide layouts: the sidebar slides over the workspace instead of docking beside it. */
+  desktopOverlay?: boolean;
 }) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const isCompactLayout = useIsCompactFormFactor();
+  const activeWorkspace = useActiveWorkspaceSelection();
   const showMobileAgent = usePanelStore((state) => state.showMobileAgent);
 
   const {
@@ -148,47 +157,27 @@ export const LeftSidebar = memo(function LeftSidebar({
   const openProjectPicker = useOpenAddProject();
   const { open: openImportSession, sheet: importSessionSheet } = useImportSession();
 
-  const handleOpenProjectMobile = useCallback(() => {
+  // Workspace destinations close the overlay; Settings retains it for the return journey.
+  const handleOpenProject = useCallback(() => {
     void openProjectPicker();
   }, [openProjectPicker]);
 
-  const handleOpenProjectDesktop = useCallback(() => {
-    void openProjectPicker();
-  }, [openProjectPicker]);
+  const handleSettings = useCallback(() => {
+    openSettingsFromSidebar({ workspace: activeWorkspace, isCompact: isCompactLayout });
+  }, [activeWorkspace, isCompactLayout]);
 
-  const handleSettingsMobile = useCallback(() => {
-    showMobileAgent();
-    router.push(buildSettingsRoute());
-  }, [showMobileAgent]);
+  const handleAddHost = useAddHost();
 
-  const handleSettingsDesktop = useCallback(() => {
-    router.push(buildSettingsRoute());
-  }, []);
-
-  const handleAddHostMobile = useCallback(() => {
-    showMobileAgent();
-    router.push(buildSettingsAddHostRoute(Date.now()));
-  }, [showMobileAgent]);
-
-  const handleAddHostDesktop = useCallback(() => {
-    router.push(buildSettingsAddHostRoute(Date.now()));
-  }, []);
-
-  const handleOpenHostSettingsMobile = useCallback(
+  const handleOpenHostSettings = useCallback(
     (serverId: string) => {
-      showMobileAgent();
-      openHostOverview(serverId);
+      openSettingsFromSidebar({
+        workspace: activeWorkspace,
+        isCompact: isCompactLayout,
+        route: buildSettingsHostSectionRoute(serverId, "host"),
+      });
     },
-    [showMobileAgent],
+    [activeWorkspace, isCompactLayout],
   );
-
-  const handleOpenHostSettingsDesktop = useCallback((serverId: string) => {
-    openHostOverview(serverId);
-  }, []);
-
-  const handleImportSessionMobile = useCallback(() => {
-    openImportSession();
-  }, [openImportSession]);
 
   const labels = useMemo(
     (): SidebarLabels => ({
@@ -223,42 +212,36 @@ export const LeftSidebar = memo(function LeftSidebar({
     labels,
   };
 
-  if (isCompactLayout) {
-    return (
-      <>
-        <RetainedPanelActivity active={active}>
+  const handlers = {
+    handleOpenProject,
+    handleImportSession: openImportSession,
+    handleSettings,
+    handleAddHost,
+    handleOpenHostSettings,
+  };
+
+  return (
+    <>
+      <RetainedPanelActivity active={active}>
+        {isCompactLayout ? (
           <MobileSidebar
             {...sharedProps}
+            {...handlers}
             active={active}
             presented={presented}
             insetsTop={insets.top}
             insetsBottom={insets.bottom}
             closeSidebar={showMobileAgent}
-            handleOpenProject={handleOpenProjectMobile}
-            handleImportSession={handleImportSessionMobile}
-            handleSettings={handleSettingsMobile}
-            handleAddHost={handleAddHostMobile}
-            handleOpenHostSettings={handleOpenHostSettingsMobile}
           />
-        </RetainedPanelActivity>
-        {importSessionSheet}
-      </>
-    );
-  }
-
-  return (
-    <>
-      <RetainedPanelActivity active={active}>
-        <DesktopSidebar
-          {...sharedProps}
-          insetsTop={insets.top}
-          active={active}
-          handleOpenProject={handleOpenProjectDesktop}
-          handleImportSession={openImportSession}
-          handleSettings={handleSettingsDesktop}
-          handleAddHost={handleAddHostDesktop}
-          handleOpenHostSettings={handleOpenHostSettingsDesktop}
-        />
+        ) : (
+          <DesktopSidebar
+            {...sharedProps}
+            {...handlers}
+            insetsTop={insets.top}
+            active={active}
+            overlay={desktopOverlay}
+          />
+        )}
       </RetainedPanelActivity>
       {importSessionSheet}
     </>
@@ -319,6 +302,11 @@ function MobileSidebar({
   );
 
   const handleWorkspacePress = handleConversationPress;
+  const insets = useSafeAreaInsets();
+  const mobileCloseButtonStyle = useMemo(
+    () => styles.mobileCloseButton(insets.right),
+    [insets.right],
+  );
 
   const mobileSidebarInsetStyle = useMemo(
     () => ({
@@ -357,7 +345,7 @@ function MobileSidebar({
                 style={styles.mobileCloseButtonRow}
               >
                 <Pressable
-                  style={styles.mobileCloseButton}
+                  style={mobileCloseButtonStyle}
                   onPress={closeSidebar}
                   testID="sidebar-close"
                   nativeID="sidebar-close"
@@ -379,32 +367,36 @@ function MobileSidebar({
             )}
 
             <SidebarMetadataNotice />
-            {isInitialLoad && !hasActiveHostFilter ? (
-              <SidebarAgentListSkeleton />
-            ) : (
-              <SidebarWorkspaceList
-                collapsedProjectKeys={collapsedProjectKeys}
-                onToggleProjectCollapsed={toggleProjectCollapsed}
-                shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
-                groupMode={groupMode}
-                workspaceGroups={workspaceGroups}
-                projectIconTargets={projectIconTargets}
-                pinnedGroups={pinnedGroups}
-                projects={projects}
-                hasProjectsBeforeFilter={hasProjectsBeforeFilter}
-                hasActiveProjectFilter={hasActiveProjectFilter}
-                workspaceEntriesByKey={workspaceEntriesByKey}
-                isRefreshing={isManualRefresh && isRevalidating}
-                onRefresh={handleRefresh}
-                onWorkspacePress={handleWorkspacePress}
-                onAddProject={handleOpenProject}
-                onImportSession={handleImportSession}
-                parentGestureRef={closeGestureRef}
-                dragGestureHostActive={active}
-                listLeadingComponent={botsAndChatsSections}
-                listHeaderComponent={workspacesSectionHeaderElement}
-              />
-            )}
+            <SidebarViewSlot dismiss={handleWorkspacePress}>
+              <SidebarToastRegion active={active}>
+                {isInitialLoad && !hasActiveHostFilter ? (
+                  <SidebarAgentListSkeleton />
+                ) : (
+                  <SidebarWorkspaceList
+                    collapsedProjectKeys={collapsedProjectKeys}
+                    onToggleProjectCollapsed={toggleProjectCollapsed}
+                    shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
+                    groupMode={groupMode}
+                    workspaceGroups={workspaceGroups}
+                    projectIconTargets={projectIconTargets}
+                    pinnedGroups={pinnedGroups}
+                    projects={projects}
+                    hasProjectsBeforeFilter={hasProjectsBeforeFilter}
+                    hasActiveProjectFilter={hasActiveProjectFilter}
+                    workspaceEntriesByKey={workspaceEntriesByKey}
+                    isRefreshing={isManualRefresh && isRevalidating}
+                    onRefresh={handleRefresh}
+                    onWorkspacePress={handleWorkspacePress}
+                    onAddProject={handleOpenProject}
+                    onImportSession={handleImportSession}
+                    parentGestureRef={closeGestureRef}
+                    dragGestureHostActive={active}
+                    listLeadingComponent={botsAndChatsSections}
+                    listHeaderComponent={workspacesSectionHeaderElement}
+                  />
+                )}
+              </SidebarToastRegion>
+            </SidebarViewSlot>
 
             {HOME_V2_ENABLED ? (
               <MobileChatPanelTabs />
@@ -451,75 +443,93 @@ function DesktopSidebar({
   handleOpenHostSettings,
   insetsTop,
   active,
+  overlay,
 }: DesktopSidebarProps) {
   const ownsTopLeft = useOwnsWindowChromeCorner("top-left");
+  const closeSidebar = usePanelStore((state) => state.showMobileAgent);
+  const { gesture: closeGesture, gestureRef: closeGestureRef } = useCloseAgentListGesture(overlay);
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
   const sidebarHeaderGroupStyle = useMemo(
     () => [styles.sidebarHeaderGroup, ownsTopLeft && styles.sidebarHeaderGroupBelowChrome],
     [ownsTopLeft],
   );
   return (
-    <DesktopSidebarFrame active={active} insetsTop={insetsTop}>
-      <View style={styles.sidebarDragArea}>
-        {ownsTopLeft || DEV_BUILD_LABEL ? (
-          <View style={styles.desktopChromeRow}>
+    <MobilePanelOverlay
+      panel="agent-list"
+      presentation={overlay ? "overlay" : "dock"}
+      dockVisible={active}
+      closeGesture={closeGesture}
+    >
+      <DesktopSidebarFrame active={active} insetsTop={insetsTop}>
+        <View style={styles.sidebarDragArea}>
+          {ownsTopLeft || DEV_BUILD_LABEL ? (
+            <View style={styles.desktopChromeRow}>
+              <TitlebarDragRegion />
+              {DEV_BUILD_LABEL ? (
+                <View
+                  pointerEvents="none"
+                  style={styles.devBuildBadge}
+                  testID="dev-build-label"
+                  accessibilityLabel={`Development build: ${DEV_BUILD_LABEL}`}
+                >
+                  <GitBranch size={12} color={theme.colors.accentForeground} />
+                  <Text numberOfLines={1} ellipsizeMode="tail" style={styles.devBuildBadgeText}>
+                    {DEV_BUILD_LABEL}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : (
             <TitlebarDragRegion />
-            {DEV_BUILD_LABEL ? (
-              <View
-                pointerEvents="none"
-                style={styles.devBuildBadge}
-                testID="dev-build-label"
-                accessibilityLabel={`Development build: ${DEV_BUILD_LABEL}`}
-              >
-                <GitBranch size={12} color={theme.colors.accentForeground} />
-                <Text numberOfLines={1} ellipsizeMode="tail" style={styles.devBuildBadgeText}>
-                  {DEV_BUILD_LABEL}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        ) : (
-          <TitlebarDragRegion />
-        )}
-        <SidebarNavGroup style={sidebarHeaderGroupStyle} />
-      </View>
+          )}
+          <SidebarNavGroup style={sidebarHeaderGroupStyle} />
+        </View>
 
-      <SidebarMetadataNotice />
-      {isInitialLoad && !hasActiveHostFilter ? (
-        <SidebarAgentListSkeleton />
-      ) : (
-        <SidebarWorkspaceList
-          collapsedProjectKeys={collapsedProjectKeys}
-          onToggleProjectCollapsed={toggleProjectCollapsed}
-          shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
-          groupMode={groupMode}
-          workspaceGroups={workspaceGroups}
-          projectIconTargets={projectIconTargets}
-          pinnedGroups={pinnedGroups}
-          projects={projects}
-          hasProjectsBeforeFilter={hasProjectsBeforeFilter}
-          hasActiveProjectFilter={hasActiveProjectFilter}
-          workspaceEntriesByKey={workspaceEntriesByKey}
-          isRefreshing={isManualRefresh && isRevalidating}
-          onRefresh={handleRefresh}
-          onAddProject={handleOpenProject}
-          onImportSession={handleImportSession}
-          listLeadingComponent={botsAndChatsSectionsElement}
-          listHeaderComponent={workspacesSectionHeaderElement}
+        <SidebarMetadataNotice />
+        <SidebarViewSlot dismiss={closeSidebar}>
+          <SidebarToastRegion active={active}>
+            {isInitialLoad && !hasActiveHostFilter ? (
+              <SidebarAgentListSkeleton />
+            ) : (
+              <SidebarWorkspaceList
+                collapsedProjectKeys={collapsedProjectKeys}
+                onToggleProjectCollapsed={toggleProjectCollapsed}
+                shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
+                groupMode={groupMode}
+                workspaceGroups={workspaceGroups}
+                projectIconTargets={projectIconTargets}
+                pinnedGroups={pinnedGroups}
+                projects={projects}
+                hasProjectsBeforeFilter={hasProjectsBeforeFilter}
+                hasActiveProjectFilter={hasActiveProjectFilter}
+                workspaceEntriesByKey={workspaceEntriesByKey}
+                isRefreshing={isManualRefresh && isRevalidating}
+                onRefresh={handleRefresh}
+                onAddProject={handleOpenProject}
+                onImportSession={handleImportSession}
+                onWorkspacePress={closeSidebar}
+                parentGestureRef={closeGestureRef}
+                dragGestureHostActive={active}
+                listLeadingComponent={botsAndChatsSectionsElement}
+                listHeaderComponent={workspacesSectionHeaderElement}
+              />
+            )}
+          </SidebarToastRegion>
+        </SidebarViewSlot>
+
+        <SidebarCalloutSlot />
+
+        <SidebarFooter
+          handleOpenProject={handleOpenProject}
+          handleImportSession={handleImportSession}
+          handleSettings={handleSettings}
+          labels={labels}
+          handleAddHost={handleAddHost}
+          handleOpenHostSettings={handleOpenHostSettings}
+          onBeforeNavigate={closeSidebar}
         />
-      )}
-
-      <SidebarCalloutSlot />
-
-      <SidebarFooter
-        handleOpenProject={handleOpenProject}
-        handleImportSession={handleImportSession}
-        handleSettings={handleSettings}
-        labels={labels}
-        handleAddHost={handleAddHost}
-        handleOpenHostSettings={handleOpenHostSettings}
-      />
-    </DesktopSidebarFrame>
+      </DesktopSidebarFrame>
+    </MobilePanelOverlay>
   );
 }
 
@@ -635,9 +645,9 @@ const styles = StyleSheet.create((theme) => ({
     zIndex: 2,
     alignItems: "flex-end",
   },
-  mobileCloseButton: {
-    marginRight: theme.spacing[2],
-  },
+  mobileCloseButton: (rightInset: number) => ({
+    marginRight: theme.spacing[2] + rightInset,
+  }),
   sidebarDragArea: {
     position: "relative",
   },

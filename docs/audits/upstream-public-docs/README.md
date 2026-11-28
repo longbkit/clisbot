@@ -77,3 +77,50 @@ Clisbot has durable bounded channel ingress retries/dead letters and a channel-i
 When a complete translation is reviewed against the current Clisbot contract, restore its public source and remove that exact archival rule and required-English fallback together. Until then, unknown new pages still fail translation coverage. Do not extend the list automatically when upstream introduces a page or locale.
 
 The earlier scoped hosted-claim corrections to `cli.zh-CN.md`, `hub/index.zh-CN.md`, `hub/daemons.zh-CN.md` and `hub/configuration/index.zh-CN.md` are superseded by this whole-page English fallback; their original repair evidence remains in the integration receipts. The `hub/api.zh-CN.md` correction remains live. `hub/hosted.zh-CN.md` is separately archived because Clisbot deliberately retired that service page; it has no public fallback route.
+
+## v0.17.4 Hub capability reconciliation
+
+The source is raw Paseo v0.17.4, revision `2b3559b107243306986176b80beb0e779f9fe53e` in [getpaseo/paseo](https://github.com/getpaseo/paseo/tree/2b3559b107243306986176b80beb0e779f9fe53e/public-docs/hub). Archives follow the v0.13.0 format: raw UTF-8 source plus one provenance blockquote after the frontmatter, written by `scripts/rebrand-templates/publication.mjs`; the SHA256 hashes the raw source.
+
+Upstream's Hub guides describe getpaseo/hub. The bundled Clisbot Hub (`packages/hub`, synced separately) was checked at its parsers and dispatch:
+
+- `packages/hub/src/triggers/configuration/schema.ts` makes `on.<event>` a strict object of `connection` and `filters` (no `recurrence`) and `run` a strict object without `continuation`, `tools` or `background`; `reuse: binding` is the only continuation field.
+- Trigger providers register only `slack.mention`, `discord.mention`, `linear.issue`/`linear.comment`, GitHub, `manual.run` and `channel.message` sources (`src/triggers/*/provider.ts`); `src/workflows/engine.ts` drops any other source.
+- The public API manifest (`src/public-api/operation-manifest.ts`) has no webhook-secret operation, and Hub has no `/webhooks/wh_...` route.
+
+Linear triggers are implemented (`src/triggers/linear/`, `src/providers/linear/`); their guide stays published, aligned to the Clisbot contract (Connections, no continuation, `hub.reply`).
+
+### Unsupported upstream pages (English and Chinese)
+
+Removed from publication; `/docs/hub/tools`, `/docs/hub/triggers/webhooks` and `/docs/hub/triggers/schedules` redirect to `/docs/hub/triggers`, whose "Not available in Clisbot Hub" section names the alternatives.
+
+- `public-docs/hub/tools{,.zh-CN}.md` → `hub/tools{,.zh-CN}.md`
+- `public-docs/hub/triggers/webhooks{,.zh-CN}.md` → `hub/triggers/webhooks{,.zh-CN}.md`
+- `public-docs/hub/triggers/schedules{,.zh-CN}.md` → `hub/triggers/schedules{,.zh-CN}.md`
+
+### Divergent Chinese guides
+
+These upstream translations teach the fields above or a standalone Hub dashboard on its own port. The Chinese routes serve the current Clisbot English original, added to the reviewed fallback list in `packages/website/src/content-translations.test.ts`:
+
+- `public-docs/hub/triggers/index.zh-CN.md` → `hub/triggers/index.zh-CN.md`
+- `public-docs/hub/configuration/reference.zh-CN.md` → `hub/configuration/reference.zh-CN.md`
+- `public-docs/hub/self-hosting/index.zh-CN.md` → `hub/self-hosting/index.zh-CN.md`
+
+`public-docs/hub/api.zh-CN.md` was replaced by upstream's translation of a different API (webhook secrets, no legacy configuration endpoints). Its upstream text is archived; the reviewed Clisbot translation from `55398093e` is restored and updated to the current English. The upstream Chinese pages for Slack, Discord, Linear, GitHub access and the Slack, Discord and Linear app setup stay published, with the sentences that taught continuation, Integration tools or `.clisbot/triggers` deployment translated from the Clisbot English.
+
+The `/docs/hub/workflows` and `/docs/hub/configuration/hub-yml` English pages no longer exist; both redirect to `/docs/hub/configuration/reference`, which documents Workflow documents and legacy repository bundles. The v0.13.0 `hub/configuration/hub-yml.zh-CN.md` archive remains as evidence.
+
+| Public source removed                              | Raw SHA256                                                         |
+| -------------------------------------------------- | ------------------------------------------------------------------ |
+| `public-docs/hub/tools.md`                         | `98eea9700f55a8238e7ad3d546e0806e239c3922344b0d1275453537cd604941` |
+| `public-docs/hub/tools.zh-CN.md`                   | `85255a02e8c788816b9ad26ac9d0206962b8d715dd1c43e82d61e7365a8efcc4` |
+| `public-docs/hub/triggers/webhooks.md`             | `4d7cab967c2a7752f3b1c3afa3543a9693032caaabf618dadf44d18d3106a95b` |
+| `public-docs/hub/triggers/webhooks.zh-CN.md`       | `e6a311b4d00bc33e19957fbbcffc72ac0216265f96e467a3eeb681e1f4f5b4c1` |
+| `public-docs/hub/triggers/schedules.md`            | `001813aa454b010d838fd70296eeae28d365965acf8d0057c3f7b7b09dadeac3` |
+| `public-docs/hub/triggers/schedules.zh-CN.md`      | `d0da7dd190dee9204b2838ee89e27b7ae4d8a22c645dbe8a06b6549ecaeddf01` |
+| `public-docs/hub/api.zh-CN.md`                     | `e7924edc0a74cd8a8dd84b9d49f56f09583a0a035fe83783b7952dc8d43bcaff` |
+| `public-docs/hub/triggers/index.zh-CN.md`          | `6ff4abf0b3d1c415fb9c3a4d1f52beaef8d6bded89fedf2ee5ace5b03c832e34` |
+| `public-docs/hub/configuration/reference.zh-CN.md` | `cace485453504f17abbbb673494fa3c2c6672957858ae85420b4d3c7020d2392` |
+| `public-docs/hub/self-hosting/index.zh-CN.md`      | `981ca81fc72e8e0565e56578255dca4c3f8914d2715a4d328fecac81242065bc` |
+
+`scripts/rebrand-templates/publication.mjs` archives these paths on every future rebrand: the three feature guides in every locale (`unsupportedHubDoc`) and the four Chinese guides by exact path (`divergentChineseDocs`). `scripts/rebrand-clisbot.test.mjs` covers both rules, raw recovery and idempotency. When the bundled Hub implements a feature, or a translation is reviewed against the Clisbot contract, remove its rule, fallback entry and redirect together.

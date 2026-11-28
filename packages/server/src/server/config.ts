@@ -30,7 +30,7 @@ import { DEFAULT_RELAY_ENDPOINT } from "@clisbot/protocol/daemon-endpoints";
 import { DEFAULT_APP_BASE_URL } from "@clisbot/protocol/connection-offer";
 import { hashDaemonPassword } from "./auth.js";
 import { resolveSpeechConfig } from "./speech/speech-config-resolver.js";
-import type { RequestedSpeechProviders } from "./speech/speech-types.js";
+import { readSpeechSettings } from "./speech/speech-settings.js";
 import { mergeHostnames, parseHostnamesEnv, type HostnamesConfig } from "./hostnames.js";
 import { resolveGitProcessPolicy } from "../utils/git-process-scheduler.js";
 
@@ -531,6 +531,10 @@ function resolveAppendSystemPrompt(persisted: ReturnType<typeof loadPersistedCon
   return persisted.daemon?.appendSystemPrompt ?? "";
 }
 
+function resolveUsageEnabled(persisted: ReturnType<typeof loadPersistedConfig>): boolean {
+  return persisted.daemon?.usage?.enabled !== false;
+}
+
 function resolveBrowserToolsEnabled(persisted: ReturnType<typeof loadPersistedConfig>): boolean {
   return persisted.daemon?.browserTools?.enabled ?? false;
 }
@@ -556,6 +560,7 @@ function resolveStaticLoadConfigSettings(
     mcpEnabled: cli?.mcpEnabled ?? persisted.daemon?.mcp?.enabled ?? true,
     mcpInjectIntoAgents:
       cli?.mcpInjectIntoAgents ?? persisted.daemon?.mcp?.injectIntoAgents ?? false,
+    usageEnabled: resolveUsageEnabled(persisted),
     browserToolsEnabled: resolveBrowserToolsEnabled(persisted),
     autoArchiveAfterMerge: persisted.daemon?.autoArchiveAfterMerge ?? false,
     appendSystemPrompt: resolveAppendSystemPrompt(persisted),
@@ -576,32 +581,48 @@ interface ResolveConfigFromPersistedOptions {
   relayEnabledFallback?: boolean;
 }
 
+// Startup values, including authentication, never enter runtime settings resolution.
+export type ResolvedDaemonSettings = Pick<
+  ClisbotDaemonConfig,
+  | "corsAllowedOrigins"
+  | "hostnames"
+  | "trustedProxies"
+  | "mcpEnabled"
+  | "mcpInjectIntoAgents"
+  | "usageEnabled"
+  | "browserToolsEnabled"
+  | "git"
+  | "autoArchiveAfterMerge"
+  | "enableTerminalAgentHooks"
+  | "appendSystemPrompt"
+  | "terminalProfiles"
+  | "agentProfiles"
+  | "skillSelection"
+  | "pluginsEnabled"
+  | "plugins"
+  | "relayEnabled"
+  | "relayRequireProtectedSecurity"
+  | "appBaseUrl"
+  | "idleRuntimeCleanup"
+  | "resumeOnStartup"
+  | "resumePrompt"
+  | "providerCatalogRefreshTimeoutMs"
+  | "metadataGeneration"
+  | "providerOverrides"
+  | "managedAccessMode"
+>;
+
 // eslint-disable-next-line complexity -- upstream resolver: one flat mapping of env and config.json to daemon config.
 export function resolveConfigFromPersisted(
   clisbotHome: string,
   persisted: PersistedConfig,
   options?: ResolveConfigFromPersistedOptions,
 ): ClisbotDaemonConfig {
-  const resolvedOptions = options ?? {};
-  const env = configurationEnvironment(resolvedOptions.env ?? process.env);
-  const cli = resolvedOptions.cli;
+  const env = configurationEnvironment(options?.env ?? process.env);
+  const cli = options?.cli;
   const relayEnabledFallback =
-    resolvedOptions.relayEnabledFallback ?? persisted.daemon?.relay?.enabled === undefined;
-
-  const listen = resolveListenAddress(env, cli, persisted);
-  const {
-    mcpEnabled,
-    mcpInjectIntoAgents,
-    browserToolsEnabled,
-    autoArchiveAfterMerge,
-    appendSystemPrompt,
-    terminalProfiles,
-    agentProfiles,
-    hostnames,
-    trustedProxies,
-    appBaseUrl,
-  } = resolveStaticLoadConfigSettings(env, cli, persisted);
-
+    options?.relayEnabledFallback ?? persisted.daemon?.relay?.enabled === undefined;
+  const { overrideControlledPaths, ...settings } = resolveReloadableConfig(persisted, options);
   const relay = resolveRelayConfig({
     env,
     persisted,
@@ -609,48 +630,20 @@ export function resolveConfigFromPersisted(
     cliRelayUseTls: cli?.relayUseTls,
     enabledFallback: relayEnabledFallback,
   });
-  const serviceProxy = resolveServiceProxyConfig(env, persisted);
   const directEndpoint =
     env.CLISBOT_DIRECT_ENDPOINT?.trim() || persisted.daemon?.direct?.endpoint?.trim() || undefined;
   const directUseTls =
     parseBooleanEnv(env.CLISBOT_DIRECT_USE_TLS) ?? persisted.daemon?.direct?.useTls ?? true;
-  const webUi = resolveWebUiConfig(clisbotHome, env, cli, persisted);
-
-  const { openai, speech } = resolveSpeechConfig({
-    clisbotHome,
-    env,
-    persisted,
-  });
-
+  const { openai, speech } = resolveSpeechConfig({ clisbotHome, env, persisted });
   const voiceLlm = resolveVoiceLlmConfig(env, persisted);
-  const providerOverrides = extractProviderOverrides(
-    persisted.agents?.providers as Record<string, unknown> | undefined,
-  );
-
-  const overrideControlledPaths = resolveOverrideControlledPaths(env, cli, speech.providers);
-
   return {
-    listen,
+    ...settings,
+    listen: resolveListenAddress(env, cli, persisted),
     clisbotHome,
     desktopManaged: env.CLISBOT_DESKTOP_MANAGED === "1",
     worktreesRoot: resolveWorktreesRoot(clisbotHome, persisted),
-    corsAllowedOrigins: resolveCorsAllowedOrigins(env, persisted),
-    hostnames,
-    trustedProxies,
-    mcpEnabled,
-    mcpInjectIntoAgents,
-    // Restart-only and never part of a config patch, so a remote client cannot enable it.
+    // Restart-only and never part of a config patch or reload, so a remote client cannot enable it.
     mcpAllowAnonymous: persisted.daemon?.mcp?.allowAnonymous ?? false,
-    browserToolsEnabled,
-    git: resolveGitProcessConfig(env, persisted),
-    autoArchiveAfterMerge,
-    enableTerminalAgentHooks: persisted.daemon?.enableTerminalAgentHooks ?? false,
-    appendSystemPrompt,
-    terminalProfiles,
-    agentProfiles,
-    skillSelection: persisted.agents?.skills?.selection,
-    pluginsEnabled: persisted.pluginsEnabled ?? false,
-    plugins: persisted.plugins,
     pluginRegistries: persisted.pluginRegistries,
     pluginRegistryUrl: env.CLISBOT_PLUGIN_REGISTRY,
     mcpDebug: env.MCP_DEBUG === "1",
@@ -670,9 +663,7 @@ export function resolveConfigFromPersisted(
     }),
     staticDir: "public",
     agentClients: {},
-    relayEnabled: relay.enabled,
     relayEnabledMutable: relay.enabledMutable,
-    relayRequireProtectedSecurity: relay.requireProtectedSecurity,
     relayEndpoint: relay.endpoint,
     relayPublicEndpoint: relay.publicEndpoint,
     relayUseTls: relay.useTls,
@@ -681,17 +672,12 @@ export function resolveConfigFromPersisted(
     directUseTls,
     hubSocketPingIntervalMs: parsePositiveIntegerEnv(env.CLISBOT_HUB_SOCKET_PING_INTERVAL_MS),
     hubSocketStaleTimeoutMs: parsePositiveIntegerEnv(env.CLISBOT_HUB_SOCKET_STALE_TIMEOUT_MS),
-    serviceProxy,
-    webUi,
+    serviceProxy: resolveServiceProxyConfig(env, persisted),
+    webUi: resolveWebUiConfig(clisbotHome, env, cli, persisted),
     hubHttpProxyUrl: env.CLISBOT_HUB_PROXY_URL?.trim() || persisted.features?.webUi?.hubProxyUrl,
     devicePairingEnabled:
       parseBooleanEnv(env.CLISBOT_DEVICE_PAIRING) ?? persisted.features?.devicePairing ?? false,
-    appBaseUrl,
     auth: resolveAuthConfig(env, persisted),
-    // COMPAT(clisbot-managed-access-default): upstream Clisbot runs `off`. The Clisbot fusion
-    // runs `external` unless config says otherwise; it requires tickets only once the daemon
-    // belongs to a Hub (managed-access/hub-membership.ts).
-    managedAccessMode: persisted.daemon?.managedAccess?.mode ?? "external",
     bots: resolveBotsConfig({ env, persisted: persisted.daemon?.bots, clisbotHome }),
     connectors: resolveConnectorsConfig({ env, persisted: persisted.daemon?.connectors }),
     openai,
@@ -699,12 +685,9 @@ export function resolveConfigFromPersisted(
     voiceLlmProvider: voiceLlm.provider,
     voiceLlmProviderExplicit: voiceLlm.providerExplicit,
     voiceLlmModel: voiceLlm.model,
-    agentProviderSettings: extractAgentProviderSettings(providerOverrides),
-    providerCatalogRefreshTimeoutMs: persisted.agents?.catalogRefreshTimeoutMs,
+    agentProviderSettings: extractAgentProviderSettings(settings.providerOverrides),
     closeIdleSessionsAfterMs:
       persisted.agents?.closeIdleSessionsAfterMs ?? DEFAULT_CLOSE_IDLE_SESSIONS_AFTER_MS,
-    metadataGeneration: persisted.agents?.metadataGeneration,
-    providerOverrides,
     log: resolveLogConfigFromEnv(env, persisted),
     configReload: {
       env: { ...env },
@@ -736,6 +719,52 @@ function resolveAgentSessionStorageFeature(
   return features?.agentSessionStorage !== false;
 }
 
+// COMPAT(clisbot-managed-access-default): upstream Clisbot runs `off`. The Clisbot fusion
+// runs `external` unless config says otherwise; it requires tickets only once the daemon
+// belongs to a Hub (managed-access/hub-membership.ts). It is part of the reloadable settings
+// so a config reload can never fall back to the `off` default.
+function resolveManagedAccessMode(
+  persisted: PersistedConfig,
+): ResolvedDaemonSettings["managedAccessMode"] {
+  return persisted.daemon?.managedAccess?.mode ?? "external";
+}
+
+export function resolveReloadableConfig(
+  persisted: PersistedConfig,
+  options?: ResolveConfigFromPersistedOptions,
+): ResolvedDaemonSettings & { overrideControlledPaths: string[] } {
+  const env = configurationEnvironment(options?.env ?? process.env);
+  const cli = options?.cli;
+  const relay = resolveRelayConfig({
+    env,
+    persisted,
+    cliRelayEnabled: cli?.relayEnabled,
+    cliRelayUseTls: cli?.relayUseTls,
+    enabledFallback:
+      options?.relayEnabledFallback ?? persisted.daemon?.relay?.enabled === undefined,
+  });
+  return {
+    ...resolveStaticLoadConfigSettings(env, cli, persisted),
+    corsAllowedOrigins: resolveCorsAllowedOrigins(env, persisted),
+    git: resolveGitProcessConfig(env, persisted),
+    enableTerminalAgentHooks: persisted.daemon?.enableTerminalAgentHooks ?? false,
+    skillSelection: persisted.agents?.skills?.selection,
+    pluginsEnabled: persisted.pluginsEnabled ?? false,
+    plugins: persisted.plugins,
+    relayEnabled: relay.enabled,
+    relayRequireProtectedSecurity: relay.requireProtectedSecurity,
+    managedAccessMode: resolveManagedAccessMode(persisted),
+    idleRuntimeCleanup: persisted.agents?.idleRuntimeCleanup ?? true,
+    ...resolveRestartRecoveryConfig(persisted.agents),
+    providerCatalogRefreshTimeoutMs: persisted.agents?.catalogRefreshTimeoutMs,
+    metadataGeneration: persisted.agents?.metadataGeneration,
+    providerOverrides: extractProviderOverrides(
+      persisted.agents?.providers as Record<string, unknown> | undefined,
+    ),
+    overrideControlledPaths: resolveOverrideControlledPaths(env, cli, persisted),
+  };
+}
+
 export function loadConfig(
   clisbotHome: string,
   options?: Omit<ResolveConfigFromPersistedOptions, "relayEnabledFallback">,
@@ -753,13 +782,13 @@ function parsePositiveGitOverride(value: string | undefined): boolean {
 function resolveOverrideControlledPaths(
   env: NodeJS.ProcessEnv,
   cli: CliConfigOverrides | undefined,
-  speechProviders: RequestedSpeechProviders,
+  persisted: PersistedConfig,
 ): string[] {
   return Array.from(
     new Set([
       ...resolveDaemonOverrideControlledPaths(env, cli),
       ...resolveLogOverrideControlledPaths(env),
-      ...resolveSpeechOverrideControlledPaths(env, speechProviders),
+      ...resolveSpeechOverrideControlledPaths(env, persisted),
     ]),
   ).sort();
 }
@@ -877,67 +906,19 @@ function resolveLogOverrideControlledPaths(env: NodeJS.ProcessEnv): string[] {
   return paths;
 }
 
-function isEnabledSpeechProvider(
-  provider: RequestedSpeechProviders[keyof RequestedSpeechProviders],
-  expected: "local" | "openai",
-): boolean {
-  return provider.enabled !== false && provider.provider === expected;
-}
-
 function resolveSpeechOverrideControlledPaths(
   env: NodeJS.ProcessEnv,
-  providers: RequestedSpeechProviders,
+  persisted: PersistedConfig,
 ): string[] {
-  const paths: string[] = [];
-  const add = (envName: string, ...configPaths: string[]) => {
-    if (env[envName] !== undefined) paths.push(...configPaths);
-  };
-
-  add("CLISBOT_DICTATION_ENABLED", "features.dictation.enabled");
-  add("CLISBOT_DICTATION_STT_PROVIDER", "features.dictation.stt.provider");
-  if (
-    env.CLISBOT_DICTATION_LOCAL_STT_MODEL !== undefined &&
-    isEnabledSpeechProvider(providers.dictationStt, "local")
-  ) {
-    paths.push("features.dictation.stt.model");
-  }
-  add("CLISBOT_DICTATION_LANGUAGE", "features.dictation.stt.language");
-  add("CLISBOT_VOICE_MODE_ENABLED", "features.voiceMode.enabled");
-  add("CLISBOT_VOICE_LLM_PROVIDER", "features.voiceMode.llm.provider");
-  add("CLISBOT_VOICE_STT_PROVIDER", "features.voiceMode.stt.provider");
-  if (
-    env.CLISBOT_VOICE_LOCAL_STT_MODEL !== undefined &&
-    isEnabledSpeechProvider(providers.voiceStt, "local")
-  ) {
-    paths.push("features.voiceMode.stt.model");
-  }
-  add("CLISBOT_VOICE_LANGUAGE", "features.voiceMode.stt.language");
-  add("CLISBOT_VOICE_TURN_DETECTION_PROVIDER", "features.voiceMode.turnDetection.provider");
-  add("CLISBOT_VOICE_TTS_PROVIDER", "features.voiceMode.tts.provider");
-  if (
-    env.CLISBOT_VOICE_LOCAL_TTS_MODEL !== undefined &&
-    isEnabledSpeechProvider(providers.voiceTts, "local")
-  ) {
-    paths.push("features.voiceMode.tts.model");
-  }
-  add("CLISBOT_VOICE_LOCAL_TTS_SPEAKER_ID", "features.voiceMode.tts.speakerId");
-  add("CLISBOT_VOICE_LOCAL_TTS_SPEED", "features.voiceMode.tts.speed");
-  add("CLISBOT_LOCAL_MODELS_DIR", "providers.local.modelsDir");
-  const openAiDictationStt = isEnabledSpeechProvider(providers.dictationStt, "openai");
-  const openAiVoiceStt = isEnabledSpeechProvider(providers.voiceStt, "openai");
-  if (env.STT_CONFIDENCE_THRESHOLD !== undefined && (openAiDictationStt || openAiVoiceStt)) {
-    paths.push("features.dictation.stt.confidenceThreshold");
-  }
-  if (env.STT_MODEL !== undefined) {
-    if (openAiDictationStt) paths.push("features.dictation.stt.model");
-    if (openAiVoiceStt) paths.push("features.voiceMode.stt.model");
-  }
-  if (isEnabledSpeechProvider(providers.voiceTts, "openai")) {
-    add("TTS_MODEL", "features.voiceMode.tts.model");
-    add("TTS_VOICE", "features.voiceMode.tts.voice");
-  }
-  if (env.CLISBOT_DICTATION_LANGUAGE !== undefined && env.CLISBOT_VOICE_LANGUAGE === undefined) {
-    paths.push("features.voiceMode.stt.language");
-  }
+  const paths = Object.keys(readSpeechSettings(persisted, env).envOverrides);
+  if (env.CLISBOT_VOICE_LLM_PROVIDER !== undefined) paths.push("features.voiceMode.llm.provider");
+  if (env.CLISBOT_LOCAL_MODELS_DIR !== undefined) paths.push("providers.local.modelsDir");
   return paths;
+}
+
+function resolveRestartRecoveryConfig(agents: PersistedConfig["agents"]) {
+  return {
+    resumeOnStartup: agents?.resumeOnStartup ?? false,
+    resumePrompt: agents?.resumePrompt ?? "Resume working.",
+  };
 }

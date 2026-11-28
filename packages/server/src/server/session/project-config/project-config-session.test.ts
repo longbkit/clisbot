@@ -237,7 +237,7 @@ describe("ProjectConfigSession", () => {
       requestId: "write-uncommitted-setup",
       repoRoot,
       config: { worktree: { setup: "npm install" } },
-      expectedRevision: statClisbotConfigPath(repoRoot),
+      expectedRevision: await statClisbotConfigPath(repoRoot),
     });
 
     expect(emitted).toEqual([

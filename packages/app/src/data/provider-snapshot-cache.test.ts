@@ -696,7 +696,7 @@ it("stores and expands identical content once across directory associations", as
 });
 
 it("coalesces missing bodies and keeps a newer pushed association when an older pull completes", async () => {
-  const { QueryClient } = await import("@tanstack/react-query");
+  const { QueryClient, QueryObserver } = await import("@tanstack/react-query");
   const { applyProvidersSnapshotUpdate } = await import("./push-router");
   const { fetchProvidersSnapshot, providersSnapshotQueryKey } =
     await import("./providers-snapshot");
@@ -711,6 +711,16 @@ it("coalesces missing bodies and keeps a newer pushed association when an older 
     generatedAt: fetchedAt,
     fetchedAt: { pi: fetchedAt },
     requestId: hash,
+  });
+  // Announcements only download for directories a screen is showing.
+  const unsubscribers = ["/a", "/b", "/c"].map((cwd) => {
+    const queryKey = providersSnapshotQueryKey(serverId, cwd);
+    queryClient.setQueryData(queryKey, snapshot("seed"));
+    return new QueryObserver(queryClient, {
+      queryKey,
+      queryFn: async () => snapshot("seed"),
+      staleTime: Infinity,
+    }).subscribe(() => {});
   });
   let transfers = 0;
   const client = {
@@ -835,6 +845,7 @@ it("coalesces missing bodies and keeps a newer pushed association when an older 
       entries: [{ models: [{ id: "shared" }] }],
     });
   } finally {
+    for (const unsubscribe of unsubscribers) unsubscribe();
     queryClient.clear();
   }
 });

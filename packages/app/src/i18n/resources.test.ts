@@ -323,15 +323,15 @@ describe("translation resources", () => {
     expect(en.shell.menu.toggleSidebar).toBe("Toggle sidebar");
     expect(en.shell.menu.open).toBe("Open menu");
     expect(en.shell.menu.close).toBe("Close menu");
-    expect(en.shell.commandCenter.placeholder).toBe(
-      "Search commands, files, workspaces, and agents...",
-    );
+    expect(en.shell.commandCenter.placeholder).toBe("Search workspaces, files, and actions...");
+    expect(en.shell.commandCenter.placeholderWithoutFiles).toBe("Search workspaces and actions...");
     expect(en.shell.commandCenter.filePlaceholder).toBe("Search files...");
     expect(en.shell.commandCenter.files).toBe("Files");
     expect(en.shell.commandCenter.noMatches).toBe("No matches");
     expect(en.shell.commandCenter.actions).toBe("Actions");
     expect(en.shell.commandCenter.workspaces).toBe("Workspaces");
-    expect(en.shell.commandCenter.agents).toBe("Agents");
+    expect(en.shell.commandCenter.recentWorkspaces).toBe("Recent workspaces");
+    expect(en.shell.commandCenter.tabs.all).toBe("All");
     expect(en.shell.commandCenter.newAgent).toBe("New agent");
     expect(en.shell.commandCenter.addProject).toBe("Add project");
     expect(en.shell.commandCenter.home).toBe("Home");
@@ -455,7 +455,7 @@ describe("translation resources", () => {
       "Update the host to remove projects.",
     );
     expect(en.newWorkspace.title).toBe("New workspace");
-    expect(en.newWorkspace.refPicker.searchPlaceholder).toBe("Search branches and PRs");
+    expect(en.newWorkspace.refPicker.searchBranches).toBe("Search branches");
     expect(en.openProject.tiles.addProject.title).toBe("Add a project");
   });
 
@@ -825,7 +825,7 @@ describe("translation resources", () => {
     expect(en.branchSwitcher.stashRestored).toBe("Stashed changes restored");
     expect(en.agentAutocomplete.searchingWorkspace).toBe("Searching workspace...");
     expect(en.agentAutocomplete.noCommands).toBe("No commands found");
-    expect(en.agentAutocomplete.failedToLoad).toBe("Failed to load");
+    expect(en.agentAutocomplete.commandsFailed).toBe("Couldn't load commands");
     expect(en.loadOlderHistory.failed).toBe("Couldn't load older history");
     expect(en.agentControls.thinking.extraHigh).toBe("Extra high");
     expect(en.agentControls.model.unknown).toBe("Unknown model");
@@ -837,7 +837,6 @@ describe("translation resources", () => {
     expect(en.common.placeholders.search).toBe("Search...");
     expect(en.common.empty.noResults).toBe("No results found");
     expect(en.common.empty.noOptionsMatchSearch).toBe("No options match your search.");
-    expect(en.toolCallDetails.subAgentActivity).toBe("Sub-agent activity");
     expect(en.panels.file.failedToLoadPreview).toBe("Failed to load file preview");
   });
 
@@ -850,19 +849,20 @@ describe("translation resources", () => {
 });
 
 it("keeps the existing tool display labels and adds the exact latest-call labels", () => {
-  expect(en.settings.general.toolCallDetail.options).toEqual({
+  // Upstream folded the tool display levels into Chat display, beside its own options.
+  expect(en.settings.general.chatDisplay.options).toMatchObject({
     overview: "Summary",
     detailed: "Full detail",
     "summary-with-latest-call": "Summary with latest call",
   });
-  expect(vi.settings.general.toolCallDetail.options).toEqual({
+  expect(vi.settings.general.chatDisplay.options).toMatchObject({
     overview: "Tóm tắt",
     detailed: "Đầy đủ chi tiết",
     "summary-with-latest-call": "Tóm tắt kèm lệnh cuối",
   });
   for (const resource of [ar, es, fr, ja, ko, ptBR, ru, zhCN]) {
     expect(
-      resource.settings.general.toolCallDetail.options["summary-with-latest-call"].length,
+      resource.settings.general.chatDisplay.options["summary-with-latest-call"].length,
     ).toBeGreaterThan(0);
   }
 });

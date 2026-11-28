@@ -50,7 +50,7 @@ projects, or organization members.
 
 CLI credentials grant all five scopes listed above (`projects:read`, `configuration:validate`, `configuration:install`, `runs:dispatch`, `daemons:enroll`) and have no automatic expiry. They remain revocable independently of daemon relationships. `clisbot hub logout` deletes the active local CLI credential; it does not revoke the credential on the server or disconnect the daemon identity. Revoke CLI credentials in Hub → Configuration → API keys. For automation, prefer a key containing only the needed scopes.
 
-API failures use RFC 9457 problem details. Missing, invalid, or revoked credentials return `401` with `application/problem+json`:
+API failures use RFC 9457 problem details (`application/problem+json`) with an `X-Request-ID` header. Missing, invalid, or revoked credentials return `401` with `WWW-Authenticate: Bearer`:
 
 ```json
 {
@@ -247,8 +247,7 @@ curl --fail-with-body -sS -X POST "$CLISBOT_HUB_URL/api/v1/manual-runs" \
   }'
 ```
 
-See [Hub workflows](/docs/hub/workflows) for input types, defaults, choices,
-rejected input, and manual invocation examples.
+See the [Trigger YAML reference](/docs/hub/configuration/reference#top-level-fields) for input types, defaults and choices.
 
 ## Daemon enrollment
 

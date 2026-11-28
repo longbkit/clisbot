@@ -154,7 +154,7 @@ function QuickLanguage({ locale, active, explicit, onChange }: QuickLanguageProp
   return (
     <Button
       variant="ghost"
-      size="xs"
+      size="sm"
       onPress={handlePress}
       style={active ? styles.itemActive : styles.item}
       textStyle={active ? styles.itemTextActive : undefined}

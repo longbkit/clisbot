@@ -28,7 +28,7 @@ export async function recoverStoredSessionAuthorship(
     if (record) manager.applySessionAuthorship(agentId, record);
   });
   const deferred: string[] = [];
-  for (const record of await storage.list()) {
+  for (const record of await storage.listAll()) {
     if (record.internal) continue;
     if (cold?.isCold(record)) deferred.push(record.id);
     else await probeSessionAuthorship(storage, timeline, record, "await");

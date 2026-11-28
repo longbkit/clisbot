@@ -17,7 +17,8 @@ import { openHostOverview } from "@/navigation/settings-navigation";
 import { pluginIconComponent } from "@/plugins/icons";
 import { PluginSidebarItem } from "@/plugins/sidebar-items";
 import { UsageSidebarRoot, useOpenSidebarUsage } from "@/usage";
-import { buildSettingsAddHostRoute, buildSettingsRoute } from "@/utils/host-routes";
+import { buildSettingsRoute } from "@/utils/host-routes";
+import { useAddHost } from "@/hosts/add-host";
 import { settingsStyles } from "@/styles/settings";
 import { RenderProfile } from "@/utils/render-profiler";
 import { ICON_SIZE, ICON_STROKE_WIDTH, type Theme } from "@/styles/theme";
@@ -126,9 +127,8 @@ function MoreUsage({ section, last }: { section: BuiltinSection; last: boolean }
 
 function MoreHosts({ section, last }: { section: BuiltinSection; last: boolean }) {
   const { t } = useTranslation();
-  const router = useRouter();
   const status = useHostsStatus();
-  const addHost = useCallback(() => router.push(buildSettingsAddHostRoute(Date.now())), [router]);
+  const addHost = useAddHost();
   const label = t(section.labelKey);
   const filter = useHostFilter();
   const filterLabel = filter.active ? hostFilterLabel(filter, t) : null;

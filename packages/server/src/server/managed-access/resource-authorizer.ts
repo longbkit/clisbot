@@ -56,7 +56,7 @@ import type { NewAgentScheduleConfig } from "./schedule-access.js";
 
 interface AgentStorageReader {
   get(agentId: string): Promise<StoredAgentRecord | null>;
-  list(): Promise<StoredAgentRecord[]>;
+  listAll(): Promise<StoredAgentRecord[]>;
   listByProviderSession(provider: string, providerHandleId: string): Promise<StoredAgentRecord[]>;
 }
 
@@ -641,7 +641,8 @@ export class ManagedResourceAuthorizer {
     if (!this.authorization.allowsProject(projectId, requiredPrivilege)) return false;
     const grant = this.authorization.project(projectId);
     if (!grant) return false;
-    if (usesFasterTier(config.featureValues) && !grant.privileges.has("agent.fast.use")) {
+    // Since v0.17 requested speed tiers travel as provider options (featureValues fold into them).
+    if (usesFasterTier(config.providerOptions) && !grant.privileges.has("agent.fast.use")) {
       return false;
     }
     if (config.toolPolicy?.preapproved.length && !hasEveryApprovalPrivilege(grant.privileges)) {
@@ -681,6 +682,8 @@ export class ManagedResourceAuthorizer {
       modeId?: string;
       thinkingOptionId?: string | null;
       featureValues?: Record<string, unknown>;
+      /** A patch of provider options; `null` removes a key. */
+      providerOptions?: Record<string, unknown>;
     },
   ): Promise<boolean> {
     const live = this.agentManager.getAgent(agentId);
@@ -705,8 +708,15 @@ export class ManagedResourceAuthorizer {
       ...(update.thinkingOptionId !== undefined
         ? { thinkingOptionId: update.thinkingOptionId ?? undefined }
         : {}),
-      ...(update.featureValues
-        ? { featureValues: { ...base.featureValues, ...update.featureValues } }
+      // A requested feature or option change is judged as the provider options it becomes.
+      ...(update.featureValues || update.providerOptions
+        ? {
+            providerOptions: patchProviderOptions(
+              base.providerOptions,
+              update.featureValues,
+              update.providerOptions,
+            ),
+          }
         : {}),
     };
     if (!(await this.configurationMatchesProject(workspace.projectId, next, "agent.interact"))) {
@@ -910,12 +920,14 @@ export class ManagedResourceAuthorizer {
         return this.allowsAgentConfigurationForProject(
           message.projectId,
           message.workspaceId,
-          message.config,
+          requestedAgentConfig(message.config),
         );
       }
       const workspaceId =
         message.workspaceId ?? this.longestWorkspaceRoot(message.config.cwd)?.workspaceId;
-      return workspaceId ? this.allowsAgentConfiguration(workspaceId, message.config) : false;
+      return workspaceId
+        ? this.allowsAgentConfiguration(workspaceId, requestedAgentConfig(message.config))
+        : false;
     }
     if (message.type === "import_agent_request") {
       // Import carries no effective Model, Mode, Thinking, or tool policy, so
@@ -991,7 +1003,14 @@ export class ManagedResourceAuthorizer {
           ? { thinkingOptionId: message.config.thinkingOptionId }
           : {}),
         ...(message.config.modeId !== undefined ? { modeId: message.config.modeId } : {}),
-        ...(message.config.featureValues ? { featureValues: message.config.featureValues } : {}),
+        ...(message.config.featureValues || message.config.options
+          ? {
+              providerOptions: {
+                ...message.config.featureValues,
+                ...message.config.options,
+              } as Record<string, unknown>,
+            }
+          : {}),
       });
     }
     return undefined;
@@ -1200,8 +1219,8 @@ export class ManagedResourceAuthorizer {
   private async load(): Promise<void> {
     const [projects, workspaces, agents] = await Promise.all([
       this.projectRegistry.list(),
-      this.workspaceRegistry.list(),
-      this.agentStorage.list(),
+      this.workspaceRegistry.listAll(),
+      this.agentStorage.listAll(),
     ]);
     for (const project of projects) this.projects.set(project.projectId, project);
     for (const workspace of workspaces) this.workspaces.set(workspace.workspaceId, workspace);
@@ -1452,14 +1471,14 @@ export async function assertProjectCwdPlacement(
   cwd: string,
   projectId: string,
   projectRegistry: Pick<ProjectRegistry, "get" | "list">,
-  workspaceRegistry: Pick<WorkspaceRegistry, "list">,
+  workspaceRegistry: Pick<WorkspaceRegistry, "listAll">,
 ): Promise<void> {
   const project = await projectRegistry.get(projectId);
   if (!project || project.archivedAt !== null) {
     throw new Error(`Unknown project: ${projectId}`);
   }
   const [workspaces, projects] = await Promise.all([
-    workspaceRegistry.list(),
+    workspaceRegistry.listAll(),
     projectRegistry.list(),
   ]);
   if ((await resolveProjectIdForExistingCwd(cwd, workspaces, projects)) !== projectId) {
@@ -1555,6 +1574,39 @@ function isWorkspaceFileOutbound(type: SessionOutboundMessage["type"]): boolean 
   );
 }
 
+type ProviderOptionValues = NonNullable<AgentSessionConfig["providerOptions"]>;
+
+/**
+ * A request may name provider options as legacy `featureValues` (COMPAT, folded into options by
+ * the daemon) and as `providerOptions`/`options`; the provider receives their union. Judge that
+ * union, so neither spelling can carry a faster tier or a no-prompt option past Managed Access.
+ * A `null` option value removes the key.
+ */
+function patchProviderOptions(
+  base: AgentSessionConfig["providerOptions"],
+  ...patches: Array<Record<string, unknown> | null | undefined>
+): ProviderOptionValues | undefined {
+  const next: Record<string, unknown> = { ...base };
+  let touched = base !== undefined;
+  for (const patch of patches) {
+    if (!patch) continue;
+    touched = true;
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) delete next[key];
+      else next[key] = value;
+    }
+  }
+  return touched ? (next as ProviderOptionValues) : undefined;
+}
+
+function requestedAgentConfig(
+  config: AgentSessionConfig & { featureValues?: Record<string, unknown> },
+): AgentSessionConfig {
+  const { featureValues, ...rest } = config;
+  const providerOptions = patchProviderOptions(undefined, featureValues, config.providerOptions);
+  return { ...rest, ...(providerOptions ? { providerOptions } : {}) };
+}
+
 function storedAgentConfig(record: StoredAgentRecord): AgentSessionConfig {
   const config = record.config;
   return {
@@ -1563,7 +1615,6 @@ function storedAgentConfig(record: StoredAgentRecord): AgentSessionConfig {
     ...(config?.modeId ? { modeId: config.modeId } : {}),
     ...(config?.model ? { model: config.model } : {}),
     ...(config?.thinkingOptionId ? { thinkingOptionId: config.thinkingOptionId } : {}),
-    ...(config?.featureValues ? { featureValues: config.featureValues } : {}),
     ...(config?.providerOptions ? { providerOptions: config.providerOptions } : {}),
     ...(config?.toolPolicy ? { toolPolicy: config.toolPolicy } : {}),
     ...(config?.fullAutoAccept ? { fullAutoAccept: true } : {}),

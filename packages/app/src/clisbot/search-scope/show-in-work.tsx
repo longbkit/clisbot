@@ -18,13 +18,14 @@ function runPendingUndo(): void {
   undo?.();
 }
 
-function UndoToast({ label }: { label: string }) {
+/** Exported for the compact-layout check (`compact-sm-buttons.browser.test.tsx`). */
+export function UndoToast({ label }: { label: string }) {
   return (
     <View style={styles.row}>
       <Text style={styles.text} numberOfLines={2}>
         {searchScopeT("workFilterChanged", { label })}
       </Text>
-      <Button size="xs" variant="ghost" onPress={runPendingUndo} testID="search-scope-undo">
+      <Button size="sm" variant="ghost" onPress={runPendingUndo} testID="search-scope-undo">
         {searchScopeT("undo")}
       </Button>
     </View>

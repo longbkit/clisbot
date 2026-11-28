@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import registry from "./registry.fixture.json" with { type: "json" };
+import hubPlans from "../src/hub-plans.fixture.json" with { type: "json" };
 
 import securityPlugin from "./overview.fixture.json" with { type: "json" };
 
@@ -29,6 +30,10 @@ createServer((request, response) => {
         },
       ]),
     );
+    return;
+  }
+  if (request.url === "/hub-plans") {
+    response.end(JSON.stringify(hubPlans));
     return;
   }
   if (request.url === "/index.json") {

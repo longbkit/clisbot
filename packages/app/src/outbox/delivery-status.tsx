@@ -56,10 +56,10 @@ function FailedActions({ entry }: { entry: OutboxEntry }) {
       <Text style={styles.error} numberOfLines={1} accessibilityRole="alert">
         {label}
       </Text>
-      <Button variant="ghost" size="xs" onPress={retry} testID="message-delivery-retry">
+      <Button variant="ghost" size="sm" onPress={retry} testID="message-delivery-retry">
         {t("messageDelivery.retry")}
       </Button>
-      <Button variant="ghost" size="xs" onPress={remove} testID="message-delivery-delete">
+      <Button variant="ghost" size="sm" onPress={remove} testID="message-delivery-delete">
         {t("messageDelivery.delete")}
       </Button>
     </View>

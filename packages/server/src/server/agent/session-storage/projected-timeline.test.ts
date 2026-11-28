@@ -3,7 +3,13 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { AgentTimelineRow } from "../agent-timeline-store-types.js";
-import { projectTimelineRows, selectProjectedTimelinePage } from "../timeline-projection.js";
+import { projectTimelineRows } from "../timeline-projection.js";
+// The frozen pre-index selector is an independent oracle for plain pages; whole-turn pages are
+// compared with the in-memory store's retained projection, which defines their semantics.
+import {
+  selectProjectedTimelinePage as selectInMemoryTimelinePage,
+  selectReferenceProjectedTimelinePage as selectProjectedTimelinePage,
+} from "../test-utils/timeline-page-reference.js";
 import { FileAgentTimelineStore } from "./file-agent-timeline-store.js";
 import { SessionEventLog } from "./session-event-log.js";
 
@@ -559,4 +565,144 @@ describe("durable projected timeline", () => {
       ceiling ? 300_000 : 120_000,
     );
   }
+});
+
+describe("durable whole-turn pages", () => {
+  /** `turns` turns, each a prompt then `rowsPerTurn - 1` distinct replies. */
+  function turnRows(turns: number, rowsPerTurn: (turn: number) => number): AgentTimelineRow[] {
+    const rows: AgentTimelineRow[] = [];
+    for (let turn = 0; turn < turns; turn++) {
+      const turnId = `turn-${turn}`;
+      rows.push({
+        seq: rows.length + 1,
+        timestamp: "2026-09-11T00:00:00Z",
+        turnId,
+        item: { type: "user_message", text: `prompt ${turn}`, messageId: `u-${turn}` },
+      });
+      for (let index = 1; index < rowsPerTurn(turn); index++) {
+        rows.push({
+          seq: rows.length + 1,
+          timestamp: "2026-09-11T00:00:00Z",
+          turnId,
+          item: {
+            type: "tool_call",
+            callId: `t-${turn}-${index}`,
+            name: "shell",
+            status: "completed",
+            detail: { type: "unknown", input: {}, output: null },
+            error: null,
+          },
+        });
+      }
+    }
+    return rows;
+  }
+
+  async function expectWholeTurnsMatchReference(
+    store: FileAgentTimelineStore,
+    rows: AgentTimelineRow[],
+    cursors: number[],
+    limits: number[],
+  ) {
+    const epoch = await store.getEpoch("a");
+    const bounds = { minSeq: 1, maxSeq: rows.length };
+    for (const limit of limits) {
+      const tail = await store.fetchProjectedCommitted("a", {
+        direction: "tail",
+        limit,
+        wholeTurns: true,
+      });
+      const expectedTail = selectInMemoryTimelinePage({
+        rows,
+        bounds,
+        direction: "tail",
+        limit,
+        wholeTurns: true,
+      });
+      expect(
+        {
+          entries: tail.entries,
+          startSeq: tail.startSeq,
+          endSeq: tail.endSeq,
+          hasOlder: tail.hasOlder,
+          hasNewer: tail.hasNewer,
+        },
+        `tail/${limit}`,
+      ).toEqual(expectedTail);
+      for (const cursorSeq of cursors) {
+        const before = await store.fetchProjectedCommitted("a", {
+          direction: "before",
+          limit,
+          wholeTurns: true,
+          cursor: { epoch, seq: cursorSeq },
+        });
+        const expected = selectInMemoryTimelinePage({
+          rows,
+          bounds,
+          direction: "before",
+          cursorSeq,
+          limit,
+          wholeTurns: true,
+        });
+        expect(
+          {
+            entries: before.entries,
+            startSeq: before.startSeq,
+            endSeq: before.endSeq,
+            hasOlder: before.hasOlder,
+            hasNewer: before.hasNewer,
+          },
+          `before/${cursorSeq}/${limit}`,
+        ).toEqual(expected);
+      }
+    }
+  }
+
+  it("matches the in-memory projection's whole-turn pages, including after a cold reopen", async () => {
+    const { directory, store } = await fixture();
+    const rows = turnRows(12, (turn) => 2 + (turn % 5) * 3);
+    await store.bulkInsert("a", rows);
+    const cursors = [2, 5, 17, 40, rows.length - 3, rows.length, rows.length + 1];
+    await expectWholeTurnsMatchReference(store, rows, cursors, [1, 2, 5, 40]);
+    await expectWholeTurnsMatchReference(
+      new FileAgentTimelineStore(async () => directory),
+      rows,
+      cursors,
+      [1, 2, 5],
+    );
+  });
+
+  it("returns a whole turn that straddles several storage pages", async () => {
+    const { directory, store } = await fixture();
+    // The middle turn spans more rows than one journal page (256) and more than the first window.
+    const rows = turnRows(3, (turn) => (turn === 1 ? 700 : 4));
+    await store.bulkInsert("a", rows);
+    const epoch = await store.getEpoch("a");
+    for (const reader of [store, new FileAgentTimelineStore(async () => directory)]) {
+      // The page before the last turn is exactly the 700-row turn.
+      const before = await reader.fetchProjectedCommitted("a", {
+        direction: "before",
+        limit: 1,
+        wholeTurns: true,
+        cursor: { epoch, seq: rows.length - 3 },
+      });
+      expect(before.entries.map((entry) => entry.seqStart)[0]).toBe(5);
+      expect(before.entries).toHaveLength(700);
+      expect(before.endSeq).toBe(704);
+      expect(before.hasOlder).toBe(true);
+      expect(before.hasNewer).toBe(true);
+      // A cursor in the middle of that turn still gets the turn's start and its end.
+      const middle = await reader.fetchProjectedCommitted("a", {
+        direction: "before",
+        limit: 2,
+        wholeTurns: true,
+        cursor: { epoch, seq: 400 },
+      });
+      expect(middle.startSeq).toBe(5);
+      expect(middle.endSeq).toBe(704);
+      // Without wholeTurns paging is unchanged.
+      const plain = await reader.fetchProjectedCommitted("a", { direction: "tail", limit: 2 });
+      expect(plain.entries).toHaveLength(2);
+    }
+  });
 });

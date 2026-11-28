@@ -25,6 +25,8 @@ vi.mock("expo-router", () => ({
   useRouter: () => ({ setParams: fixture.setParams }),
   useLocalSearchParams: () => ({ channelConnectionId: fixture.connectionId }),
 }));
+// Upstream v0.17: owner setup opens the add-host flow's scan step instead of /pair-scan.
+vi.mock("@/hosts/add-host", () => ({ useAddHost: () => vi.fn() }));
 vi.mock("../account-provider", () => ({
   useHubAccount: () => {
     const state = {
@@ -74,7 +76,11 @@ vi.mock("./channel-identities-section", () => ({
     </button>
   ),
 }));
-vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => false }));
+// Upstream v0.17 desktop window chrome reads layout constants through this module.
+vi.mock("@/constants/layout", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/constants/layout")>()),
+  useIsCompactFormFactor: () => false,
+}));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
   // v0.8.0 moved SettingsSection under components/, which pulls in withUnistyles.

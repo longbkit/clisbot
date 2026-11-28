@@ -41,6 +41,10 @@ vi.mock("@/data/query", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({}) } }));
 vi.mock("react-native", () => ({
+  Platform: {
+    OS: "web",
+    select: (values: Record<string, unknown>) => values.web ?? values.default,
+  },
   View: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   Text: ({ children }: { children: ReactNode }) => <span>{children}</span>,
 }));

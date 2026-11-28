@@ -2,6 +2,7 @@
   "name": "@clisbot/cli",
   "version": "2.2.5",
   "description": "Clisbot CLI - control your AI coding agents from the command line",
+  "license": "Apache-2.0",
   "bin": {
     "clisbot": "bin/clisbot"
   },

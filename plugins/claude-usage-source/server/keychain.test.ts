@@ -143,7 +143,11 @@ describe("Claude credential routes", () => {
           key: "fixture-account.fixture-org",
           providerId: "claude",
           harness: "Claude",
-          input: { route: { store: "claude", path: join(dir, ".credentials.json") } },
+          provider: "claude",
+          input: {
+            route: { store: "claude", path: join(dir, ".credentials.json") },
+            accountKey: "fixture-account.fixture-org",
+          },
         },
       ]);
       expect(
