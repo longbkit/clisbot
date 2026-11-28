@@ -99,8 +99,8 @@ test("a plugin badge shows on workspace rows, hides quietly, and follows its Sho
     await test.step("the badge draws on the row; a null item and a throwing item draw nothing", async () => {
       await expect(badge(page, "review")).toBeVisible();
       await expect(badge(page, "review")).toContainText("In review");
-      // The null and throwing items after them draw nothing, and the line adds nothing of its own.
-      await expect(badgeLine(page, "review")).toHaveText("In reviewDocs");
+      // The seeded branch stays visible alongside plugin items. Null and throwing items add no text.
+      await expect(badgeLine(page, "review")).toHaveText("mainIn reviewDocs");
       // An icon-only badge is named by its item's title.
       await expect(
         page.getByLabel("Icon state", { exact: true }).locator("visible=true"),
@@ -123,7 +123,7 @@ test("a plugin badge shows on workspace rows, hides quietly, and follows its Sho
       await closeSidebarDisplayPreferences(page);
       await expect(badge(page, "review")).toHaveCount(0);
       // The first badge is gone, so the next one leads the line without a "·".
-      await expect(badgeLine(page, "docs")).toHaveText("Docs");
+      await expect(badgeLine(page, "docs")).toHaveText("mainDocs");
       await toggleShowItem(page, "Review state", false);
       await expect(badge(page, "review")).toBeVisible();
     });

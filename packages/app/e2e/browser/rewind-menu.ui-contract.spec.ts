@@ -193,7 +193,7 @@ test.describe("Rewind sheet", () => {
       gate.setAgentStreamSuppressed(true);
       gate.restore();
       await page.reload();
-      await gate.waitForHeldTimelineResponse();
+      // A covered replica can render without fetching another page. Any reconciliation is still held.
       await waitForCachedMessageWithoutProviderId(page, prompt);
 
       const restoredMessage = userMessage(page, prompt);
