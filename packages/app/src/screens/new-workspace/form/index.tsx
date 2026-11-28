@@ -649,6 +649,7 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
         {hostField}
         {isolationField}
         {baseField}
+        {pluginItems}
         {launchField}
         {pickers}
       </View>

@@ -211,7 +211,9 @@ function StartLayoutContent({
           <ComposerPickerPlacementProvider value="bottom-start">
             {composer}
           </ComposerPickerPlacementProvider>
-          <StartStatus serverId={serverId} onImportSession={onImportSession} />
+          <View style={styles.afterComposer}>
+            <StartStatus serverId={serverId} onImportSession={onImportSession} />
+          </View>
           {quickStarts}
           {showActivity ? <HomeActivity /> : null}
         </View>
@@ -234,6 +236,7 @@ const styles = StyleSheet.create((t) => ({
     paddingHorizontal: t.spacing[4],
     paddingVertical: t.spacing[4],
   },
+  afterComposer: { marginTop: t.spacing[3] },
   desktopContext: { flexDirection: "row", alignItems: "center" },
   // The form row below carries its own bottom margin and left inset; the switcher matches it.
   desktopChoices: { paddingLeft: t.spacing[4], marginBottom: t.spacing[4] },
