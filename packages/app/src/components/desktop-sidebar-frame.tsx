@@ -132,6 +132,7 @@ export function DesktopSidebarFrame({
 // tries to patch the native node that Reanimated also manages.
 const staticStyles = RNStyleSheet.create({
   desktopSidebar: {
+    height: "100%",
     position: "relative" as const,
   },
   desktopSidebarHidden: {
