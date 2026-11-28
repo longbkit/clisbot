@@ -216,6 +216,7 @@ export function useUsageHostReports({
     queryFn: serverId ? () => listReports(queryClient, serverId) : skipToken,
     dataShape: "value",
     staleTimeMs: REPORTS_STALE_TIME_MS,
+    refetchOnMount: true, // A newly mounted footer can reuse a still-fresh Host summary.
     refetchInterval: shouldPoll ? REPORTS_REFETCH_INTERVAL_MS : false,
   });
   return setting.enabled ? (query.data ?? NO_REPORTS) : NO_REPORTS;
