@@ -42,6 +42,7 @@ import {
   expectMobileExplorerHidden,
   expectMobileExplorerVisible,
   openMobileAgentSidebarWithKeyboard,
+  swipeFromLeftEdge,
   swipeOpenMobileExplorer,
 } from "../support/helpers/sidebar";
 
@@ -587,7 +588,7 @@ test("a real compact overlay over a fullscreen editor leaves the exit action alo
     if (usesChatNavigation) {
       // Home V2 deliberately removes the left drawer, including while fullscreen.
       // Prove that swipe leaves the editor intact, then cover it with the real Explorer.
-      await openMobileAgentSidebarWithKeyboard(page);
+      await swipeFromLeftEdge(page);
       await expectMobileAgentSidebarHidden(page);
       await expectComposerFullscreenControls(page);
       await expect(composerLocator(page)).toHaveValue(draft);
