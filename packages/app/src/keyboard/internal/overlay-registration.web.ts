@@ -150,15 +150,18 @@ function addWebOverlay(entry: WebOverlayEntry): (options?: RemoveWebOverlayOptio
 
   return (options) => {
     window.cancelAnimationFrame(focusFrame);
+    const wasTop = getTopWebOverlay() === entry;
     remove();
     detachWebOverlayListeners();
-    if (
-      entry.manageFocus &&
-      options?.restoreFocus !== false &&
-      entry.restoreFocus &&
-      document.contains(entry.restoreFocus)
-    ) {
-      entry.restoreFocus.focus();
+    if (!entry.manageFocus || options?.restoreFocus === false || !wasTop) return;
+    const parent = getTopWebOverlay();
+    const parentScope = parent?.manageFocus ? parent.getScope() : null;
+    const opener = entry.restoreFocus;
+    if (opener?.isConnected && (!parentScope || parentScope.contains(opener))) {
+      opener.focus();
+    } else if (parentScope && !parentScope.contains(document.activeElement)) {
+      // A submenu action can disappear while its sheet is open. Keep keyboard focus in the parent.
+      focusFirstElement(parentScope);
     }
   };
 }
