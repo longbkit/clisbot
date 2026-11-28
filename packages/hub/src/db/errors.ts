@@ -85,3 +85,27 @@ function isUnavailablePgError(error: unknown): boolean {
     (typeof code === "string" && code.startsWith("08"))
   );
 }
+
+/** Messages `pg` gives its own client-side deadlines (`query_timeout`, pool connect). */
+const PG_CLIENT_TIMEOUTS = new Set([
+  "Query read timeout",
+  "timeout exceeded when trying to connect",
+]);
+
+/**
+ * The Hub's own database was slow or away: a query hit its deadline, the server
+ * canceled it, or the connection dropped. Drizzle wraps the driver's error as
+ * `Failed query: …` with the real one as `cause`, so the whole cause chain is
+ * read. Nothing about the request it served was wrong; running it later can
+ * succeed.
+ */
+export function isTransientDatabaseFault(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  for (let current = error; current instanceof Error && !seen.has(current); ) {
+    seen.add(current);
+    if (current instanceof DatabaseUnavailableError || isUnavailablePgError(current)) return true;
+    if (PG_CLIENT_TIMEOUTS.has(current.message)) return true;
+    current = current.cause;
+  }
+  return false;
+}

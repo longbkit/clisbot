@@ -123,7 +123,7 @@ it("keeps the durable ingress queue operations behind Channel management authori
   );
   const pruned = await owner.handle(request("/channel-ingress/prune", "POST", {}));
   assert.equal(pruned.status, 200);
-  assert.deepEqual(await pruned.json(), { deleted: 0 });
+  assert.deepEqual(await pruned.json(), { deleted: 0, caughtUp: true });
   assert.equal((await owner.handle(request("/channel-ingress/unknown", "GET"))).status, 404);
   const otherOrganization = new Request(
     "https://hub.example.test/api/management/v1/organizations/other/channel-ingress",

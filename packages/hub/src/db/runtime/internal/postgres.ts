@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { reportFailure } from "../../../failures/index.js";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { Pool } from "pg";
+import { Client, Pool } from "pg";
 import type { PoolClient, PoolConfig, QueryResultRow } from "pg";
 import * as schema from "../../schema.js";
 import { DatabaseUnavailableError, toDatabaseError } from "../../errors.js";
@@ -10,6 +10,7 @@ import { TransactionRollback } from "../index.js";
 import type {
   DatabaseRuntime,
   DatabaseRuntimeBundle,
+  OnlineIndex,
   QueryHandle,
   DrizzleHandle,
   QueryResult,
@@ -49,7 +50,7 @@ export async function createPostgresRuntime(
 ): Promise<DatabaseRuntimeBundle> {
   await ensureDatabaseExists(connectionString);
   const pool = createPool(connectionString, poolSize);
-  const runtime = new PostgresRuntime(pool);
+  const runtime = new PostgresRuntime(pool, connectionString);
   return {
     runtime,
     locks: postgresLocks((operation) => runtime.withConnection(operation)),
@@ -60,7 +61,10 @@ class PostgresRuntime implements DatabaseRuntime {
   private readonly database;
   readonly connectionLimit: number;
 
-  constructor(private readonly pool: Pool) {
+  constructor(
+    private readonly pool: Pool,
+    private readonly connectionString: string,
+  ) {
     this.database = drizzle(pool, { schema });
     this.connectionLimit = pool.options.max;
   }
@@ -87,6 +91,43 @@ class PostgresRuntime implements DatabaseRuntime {
 
   async migrate(): Promise<void> {
     await migrate(this.database, { migrationsFolder: MIGRATIONS_FOLDER });
+  }
+
+  /**
+   * `CREATE INDEX CONCURRENTLY` on a connection of its own, outside the pool's
+   * deadlines: the build reads the whole table and may take minutes, while
+   * reads and writes go on. A build that failed leaves an invalid index, which
+   * is dropped and built again. `lock_timeout` keeps it from queueing ahead of
+   * the Hub's writes behind a long transaction.
+   */
+  async buildIndexOnline(index: OnlineIndex): Promise<"present" | "built"> {
+    const client = new Client({ connectionString: this.connectionString });
+    await client.connect();
+    try {
+      await client.query("set lock_timeout = '5s'");
+      // An index another Hub process is still building reads as invalid: only
+      // the holder of this lock may drop and rebuild it. Released with the session.
+      const lock = await client.query<{ held: boolean }>(
+        "select pg_try_advisory_lock(hashtext($1)) as held",
+        [`online-index:${index.name}`],
+      );
+      if (lock.rows[0]?.held !== true) return "present";
+      const name = quoteIdentifier(index.name);
+      const existing = await client.query<{ valid: boolean }>(
+        "select indisvalid as valid from pg_index where indexrelid = to_regclass($1)",
+        [index.name],
+      );
+      if (existing.rows[0]?.valid === true) return "present";
+      if (existing.rows[0] !== undefined) await client.query(`drop index concurrently ${name}`);
+      await client.query(
+        `create index concurrently ${name} on ${quoteIdentifier(index.table)} ${index.definition}`,
+      );
+      return "built";
+    } catch (error) {
+      throw toDatabaseError(error);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
   }
 
   async close(): Promise<void> {

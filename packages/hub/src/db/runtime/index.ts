@@ -42,7 +42,21 @@ export interface DatabaseRuntime extends QueryHandle {
   transaction<T>(operation: (transaction: TransactionHandle) => Promise<T>): Promise<T>;
   drizzle(): DrizzleHandle;
   migrate(): Promise<void>;
+  /** Build an index without blocking writes (`online-indexes.ts`). */
+  buildIndexOnline(index: OnlineIndex): Promise<"present" | "built">;
   close(): Promise<void>;
+}
+
+/**
+ * An index too costly to build inside a migration: the migrator runs every
+ * pending migration in one transaction on the pool's 3 s deadline, so it can
+ * neither wait out a build on a large table nor use `CONCURRENTLY`.
+ * `definition` follows `ON <table>`: the column list and an optional `WHERE`.
+ */
+export interface OnlineIndex {
+  name: string;
+  table: string;
+  definition: string;
 }
 
 export interface DatabaseRuntimeBundle {

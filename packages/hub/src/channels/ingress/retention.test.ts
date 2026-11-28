@@ -14,6 +14,7 @@ import type { ChannelIngressQueueStatus } from "../../db/schema.js";
 import {
   CHANNEL_INGRESS_RETENTION_DEFAULTS,
   createChannelIngressRetentionSweep,
+  pruneExpiredIngress,
 } from "./retention.js";
 
 const CHANNEL = "telegram";
@@ -28,7 +29,7 @@ beforeAll(async () => {
   dataDirectory = await mkdtemp(join(tmpdir(), "hub-ingress-retention-"));
   bundle = await embeddedDatabaseRuntime(dataDirectory);
   await bundle.runtime.migrate();
-  for (const id of ["retention-a", "retention-b", "retention-c", "retention-d"]) {
+  for (const id of ["retention-a", "retention-b", "retention-c", "retention-d", "retention-e"]) {
     await bundle.runtime.query(`insert into organization (id, name, slug) values ($1, $1, $1)`, [
       id,
     ]);
@@ -126,7 +127,7 @@ describe("channel ingress retention sweep", () => {
     const pending = await seed(organizationId, "pending", "pending");
 
     const sweep = createChannelIngressRetentionSweep({ store });
-    assert.equal(await sweep.sweepOnce(), 2);
+    assert.equal((await sweep.sweepOnce()).deleted, 2);
 
     assert.equal(await statusOf(organizationId, oldCompleted), undefined);
     assert.equal(await statusOf(organizationId, oldDead), undefined);
@@ -143,7 +144,7 @@ describe("channel ingress retention sweep", () => {
     const second = await seed("retention-c", "c-old", "completed", 40);
     const keep = await seed("retention-c", "c-new", "completed", 2);
 
-    assert.equal(await createChannelIngressRetentionSweep({ store }).sweepOnce(), 2);
+    assert.equal((await createChannelIngressRetentionSweep({ store }).sweepOnce()).deleted, 2);
 
     assert.equal(await statusOf("retention-b", first), undefined);
     assert.equal(await statusOf("retention-c", second), undefined);
@@ -163,7 +164,7 @@ describe("channel ingress retention sweep", () => {
     const fresh = await seed(organizationId, "d-fresh", "pending");
     for (const id of [claimed, retrying, pending]) await admittedDaysAgo(id, 31);
 
-    assert.equal(await createChannelIngressRetentionSweep({ store }).sweepOnce(), 2);
+    assert.equal((await createChannelIngressRetentionSweep({ store }).sweepOnce()).deleted, 2);
     assert.equal(await statusOf(organizationId, pending), undefined);
     assert.equal(await statusOf(organizationId, retrying), undefined);
     assert.equal(await statusOf(organizationId, fresh), "pending");
@@ -196,5 +197,82 @@ describe("channel ingress retention sweep", () => {
     // A tick after stop must not restart the loop or leave a sweep in flight.
     tick?.();
     assert.equal(scheduled.length, 1);
+  }, 60_000);
+
+  it("deletes a backlog far past its TTL in batches, one bounded statement each", async () => {
+    // Production: one DELETE per status over 849k expired rows hit the 3 s query
+    // deadline, so the sweep failed every hour and the table kept growing.
+    const organizationId = "retention-e";
+    const old = [];
+    for (let n = 0; n < 5; n += 1)
+      old.push(await seed(organizationId, `e-old-${n}`, "completed", 31));
+    const fresh = await seed(organizationId, "e-fresh", "completed", 1);
+    const limits: number[] = [];
+    const counting = {
+      pruneChannelIngress: (input: Parameters<typeof store.pruneChannelIngress>[0]) => {
+        limits.push(input.limit);
+        return store.pruneChannelIngress(input);
+      },
+    };
+
+    const result = await pruneExpiredIngress({
+      store: counting,
+      organizationId,
+      now: Date.now(),
+      deadline: Number.POSITIVE_INFINITY,
+      retention: { batchRows: 2 },
+    });
+
+    assert.deepEqual(result, { deleted: 5, caughtUp: true });
+    assert.deepEqual(limits, [2, 2, 2], "three batches of at most two rows");
+    for (const id of old) assert.equal(await statusOf(organizationId, id), undefined);
+    assert.equal(await statusOf(organizationId, fresh), "completed");
+  }, 60_000);
+
+  it("stops at its budget and comes back soon, not an hour later, while expired rows are left", async () => {
+    let left = 5;
+    let clock = 0;
+    const backlog = {
+      listChannelIngressOrganizations: async () => ["busy"],
+      pruneChannelIngress: async (input: { limit: number }) => {
+        // Each batch takes the whole budget.
+        clock += 10;
+        const removed = Math.min(left, input.limit);
+        left -= removed;
+        return removed;
+      },
+    };
+    const delays: number[] = [];
+    let tick: (() => void) | undefined;
+    const swept: { deleted: number; caughtUp: boolean }[] = [];
+    const sweep = createChannelIngressRetentionSweep({
+      store: backlog,
+      now: () => clock,
+      retention: { batchRows: 2, sweepBudgetMs: 10 },
+      schedule: (callback, delayMs) => {
+        delays.push(delayMs);
+        tick = callback;
+        return () => undefined;
+      },
+      log: { swept: ({ deleted, caughtUp }) => swept.push({ deleted, caughtUp }) },
+    });
+    const ran = async () => {
+      tick?.();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+
+    sweep.start();
+    await ran();
+    await ran();
+    await ran();
+    await sweep.stop();
+
+    assert.deepEqual(swept, [
+      { deleted: 2, caughtUp: false },
+      { deleted: 2, caughtUp: false },
+      { deleted: 1, caughtUp: true },
+    ]);
+    const { pruneIntervalMs, catchUpDelayMs } = CHANNEL_INGRESS_RETENTION_DEFAULTS;
+    assert.deepEqual(delays, [pruneIntervalMs, catchUpDelayMs, catchUpDelayMs, pruneIntervalMs]);
   }, 60_000);
 });
