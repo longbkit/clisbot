@@ -1,3 +1,4 @@
+import { openSettings } from "./support/navigation.mjs";
 import { expect } from "@playwright/test";
 
 export async function runSettingsScrollRegression(page, resizeWindow) {
@@ -11,7 +12,7 @@ export async function runSettingsScrollRegression(page, resizeWindow) {
     await expect
       .poll(() => page.evaluate(() => ({ width: innerWidth, height: innerHeight })))
       .toEqual({ width: 1000, height: 500 });
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await openSettings(page);
     await sidebar().hover();
     await page.mouse.wheel(0, 2000);
     await expect.poll(offset).toBeGreaterThan(0);
@@ -54,7 +55,7 @@ export async function runSettingsScrollRegression(page, resizeWindow) {
       observations.push({ title, offset: await offset() });
     }
     await page.locator('[data-testid="settings-back-to-workspace"]:visible').click();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await openSettings(page);
     await expect.poll(offset).toBe(0);
     observations.push({ reentryOffset: await offset() });
     await page.locator('[data-testid="settings-back-to-workspace"]:visible').click();
