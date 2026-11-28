@@ -464,7 +464,9 @@ test.describe("CodeMirror workspace file editing", () => {
       await selectFileView(page, "Preview");
       await expect(page.getByTestId("file-source-editor")).not.toBeVisible();
       await expect(
-        page.getByTestId("workspace-file-pane").getByText("Heading at line 7"),
+        page
+          .getByTestId("workspace-file-pane")
+          .getByRole("heading", { name: "Heading at line 7", level: 2 }),
       ).toBeVisible();
 
       await page

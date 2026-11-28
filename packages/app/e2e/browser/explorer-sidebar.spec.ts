@@ -525,17 +525,16 @@ test("keeps the comment shortcut in the editor beside an Explorer agent", async 
     title: "Chat beside the editor",
     model: "ten-second-stream",
   });
+  const modelControl = {
+    name: /^(?:Model and options: Ten second stream(?:, .+)?|Select model \(Ten second stream\))$/i,
+  };
   try {
     await writeFile(`${workspace.cwd}/comment.cs`, "public class Example {}");
     await openAgentRoute(page, workspace);
-    await expect(
-      page.getByRole("button", { name: "Select model (Ten second stream)" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", modelControl)).toBeVisible();
     await ensureExplorerSidebar(page);
     await dragTabIntoExplorer(page, `agent_${workspace.agentId}`);
-    await expect(
-      explorerSidebar(page).getByRole("button", { name: "Select model (Ten second stream)" }),
-    ).toBeVisible();
+    await expect(explorerSidebar(page).getByRole("button", modelControl)).toBeVisible();
     await openFilesPanel(page);
     await openFileFromExplorer(page, "comment.cs");
     await explorerSidebar(page).getByTestId(`workspace-tab-agent_${workspace.agentId}`).click();
